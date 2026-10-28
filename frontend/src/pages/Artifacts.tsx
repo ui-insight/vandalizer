@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
+import { ArrowLeft, ArrowUpRight, Check, ChevronRight, Code2, Copy, Download, FileText, Globe2, Link2, LockKeyhole, MessageSquare, Share2, Trash2, Workflow } from 'lucide-react'
 import * as api from '../api/artifacts'
 import { PagesBrowser } from '../components/artifacts/PagesBrowser'
+import { PageBadge, PageDialog, PagePreview, pagesUrl } from '../components/artifacts/PagePrimitives'
 import { listTeams } from '../api/teams'
 
-const buttonStyle = 'rounded border border-gray-300 bg-white px-3 py-2 text-sm hover:bg-gray-100 disabled:opacity-50'
-const errorMessage = (error: unknown) => error instanceof Error ? error.message : 'Could not complete this action. Please try again.'
+const errorMessage = (error: unknown) => error instanceof Error ? error.message.replace(/\bArtifact\b/g, 'Page').replace(/\bartifact\b/g, 'page') : 'Could not complete this action. Please try again.'
 
 export function ArtifactsHome() {
-  return <main className="mx-auto max-w-5xl p-4 text-gray-900"><a href="/?mode=files" className="underline">Back to Files</a><PagesBrowser /></main>
+  return <main className="page-workspace"><div className="page-workspace-inner"><nav className="page-breadcrumb" aria-label="Breadcrumb"><a href={pagesUrl()}><ArrowLeft size={15} />Back to Files → Pages</a></nav><PagesBrowser /></div></main>
 }
 
 export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; publicToken?: string }) {
@@ -19,24 +20,33 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
   const [busy, setBusy] = useState(false)
   const pending = useRef(false)
   const [loading, setLoading] = useState(true)
+  const [attempt, setAttempt] = useState(0)
   const [editor, setEditor] = useState<{ title: string; html: string; base: string } | null>(null)
   const [teams, setTeams] = useState<{ uuid: string; name: string }[]>([])
+  const [teamError, setTeamError] = useState(false)
   const [team, setTeam] = useState('')
+  const [sharing, setSharing] = useState(() => window.location.hash === '#share')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [requestChanges, setRequestChanges] = useState(false)
+  const [changes, setChanges] = useState('')
   useEffect(() => {
     let live = true
-    setLoading(true); setError(''); setArtifact(null); setPublicInfo(null); setEditor(null)
+    setLoading(true); setError(''); setArtifact(null); setPublicInfo(null); setEditor(null); setTeamError(false)
     const load = async () => {
       try {
         if (publicToken) { const info = await api.getPublicArtifact(publicToken); if (live) setPublicInfo(info) }
-        else if (uuid) { const item = await api.getArtifact(uuid); if (live) { setArtifact(item); setSelected(item.latest_revision); setTeam(item.team_id || '') }
-          if (item.can_manage) { const all = await listTeams(); if (live) setTeams(all) }
+        else if (uuid) {
+          const item = await api.getArtifact(uuid)
+          if (live) { setArtifact(item); setSelected(item.latest_revision); setTeam(item.team_id || '') }
+          if (item.can_manage) {
+            try { const all = await listTeams(); if (live) setTeams(all) } catch { if (live) setTeamError(true) }
+          }
         }
       } catch (e) { if (live) setError(errorMessage(e)) }
       finally { if (live) setLoading(false) }
     }
     void load(); return () => { live = false }
-  }, [uuid, publicToken])
+  }, [uuid, publicToken, attempt])
   const action = async (fn: () => Promise<void>) => {
     if (pending.current) return
     pending.current = true; setBusy(true); setError(''); setNotice('')
@@ -44,44 +54,72 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
   }
   const reload = async () => { if (uuid) { const item = await api.getArtifact(uuid); setArtifact(item); setTeam(item.team_id || ''); return item } }
   const revision = artifact?.revisions.find(r => r.uuid === selected)
+  const version = artifact ? artifact.revisions.findIndex(r => r.uuid === selected) + 1 : 1
+  const publishedVersion = artifact?.published_revision ? artifact.revisions.findIndex(r => r.uuid === artifact.published_revision) + 1 : 0
+  const selectedIsPublished = !!artifact?.published_revision && selected === artifact.published_revision
+  const hasDraft = !!artifact?.published_revision && artifact.latest_revision !== artifact.published_revision
   const contentUrl = publicToken ? api.publicArtifactContentUrl(publicToken) : uuid && selected ? api.artifactContentUrl(uuid, selected) : ''
-  const title = publicInfo?.title || revision?.title || artifact?.title || 'Artifact'
-  return <main className="mx-auto max-w-7xl p-4 text-gray-900 sm:p-6">
-    {!publicToken && <a href="/artifacts" className="underline">All artifacts</a>}
-    <h1 className="my-4 text-2xl font-semibold">{title}</h1>
-    {loading && <p role="status">Loading artifact…</p>}
-    {error && <p role="alert" className="my-3 rounded border border-red-200 bg-red-50 p-3">{error}</p>}
-    {notice && <p role="status" className="my-3 rounded bg-green-50 p-3">{notice}</p>}
+  const title = publicInfo?.title || revision?.title || artifact?.title || 'Page'
+  const backUrl = pagesUrl(artifact?.source?.project_uuid)
+  const publicLink = artifact?.public_token ? `${window.location.origin}/a/${artifact.public_token}` : ''
+  const copy = (value: string, success: string) => void action(async () => { await navigator.clipboard.writeText(value); setNotice(success) })
+  const chatUrl = uuid ? `/?editPage=${encodeURIComponent(uuid)}${artifact?.source?.conversation_uuid ? `&conversation=${encodeURIComponent(artifact.source.conversation_uuid)}` : ''}${artifact?.source?.project_uuid ? `&project=${encodeURIComponent(artifact.source.project_uuid)}` : ''}` : ''
+  const closeSharing = () => { setSharing(false); if (window.location.hash === '#share') window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search) }
+  const feedback = <>{error && <p role="alert" className="page-alert">{error}</p>}{notice && <p role="status" className="page-notice">{notice}</p>}</>
+  return <main className="page-workspace"><div className="page-workspace-inner">
+    {!publicToken && <nav className="page-breadcrumb" aria-label="Breadcrumb"><a href={backUrl}><ArrowLeft size={15} />Files</a><ChevronRight size={13} /><a href={backUrl}>Pages</a><ChevronRight size={13} /><span>{loading ? 'Loading…' : 'Page details'}</span></nav>}
+    <header className="page-heading"><div className="page-heading-copy"><p className="page-eyebrow">{publicToken ? 'SHARED PAGE' : 'SAVED PAGE'}</p><h1>{title}</h1>
+      {(artifact || publicInfo) && <div className="page-meta">
+        {publicToken ? <PageBadge published>Published · anyone with the link</PageBadge> : <>
+          {artifact?.published_revision ? <PageBadge published>Published · version {publishedVersion}</PageBadge> : <PageBadge>{artifact?.team_id ? 'Team access' : 'Private · only you'}</PageBadge>}
+          {hasDraft && <PageBadge>Unpublished changes</PageBadge>}
+          {artifact?.published_revision && <span>Workspace access: {artifact.team_id ? 'you and your team' : 'only you'}</span>}
+          {!artifact?.published_revision && <span>Share only when you’re ready</span>}
+        </>}
+      </div>}
+    </div>
+    {!loading && (artifact || publicInfo) && <div className="page-actions">
+      <a className="page-button" href={`${contentUrl}?download=true`}><Download size={16} />Download HTML</a>
+      {artifact?.can_manage && <><button className="page-button" disabled={busy || !!editor} onClick={() => { setNotice(''); setError(''); setRequestChanges(true) }}><MessageSquare size={16} />Request changes</button><button className="page-button page-button-primary" disabled={busy} onClick={() => setSharing(true)}><Share2 size={16} />Share</button></>}
+      {publicToken && <a className="page-button page-button-primary" href={contentUrl} target="_blank" rel="noreferrer"><ArrowUpRight size={16} />Open full page</a>}
+    </div>}</header>
+    {!sharing && !requestChanges && !confirmDelete && !editor && feedback}
+    {loading && <p role="status" className="pages-loading">Loading your page…</p>}
+    {!loading && !artifact && !publicInfo && <div className="pages-empty"><FileText size={32} /><h2>Page unavailable</h2><p>{publicToken ? 'This link may have been removed. Ask the owner for a current link.' : 'The page may have been removed, or your access may have changed.'}</p><button className="page-button" onClick={() => setAttempt(n => n + 1)}>Try again</button></div>}
     {!loading && (artifact || publicInfo) && <>
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        {artifact && <label>Revision <select aria-label="Artifact revision" className="rounded border p-2" disabled={busy || !!editor} value={selected} onChange={e => setSelected(e.target.value)}>{artifact.revisions.map((r, index) => <option key={r.uuid} value={r.uuid}>{index + 1}{r.uuid === artifact.published_revision ? ' · published' : ''}{r.uuid === artifact.latest_revision ? ' · latest' : ''}</option>)}</select></label>}
-        <a className={buttonStyle} href={`${contentUrl}?download=true`}>Download HTML</a>
-        <a className={buttonStyle} href={contentUrl} target="_blank" rel="noreferrer">Open full page</a>
-        {!publicToken && <button className={buttonStyle} onClick={() => void action(async () => { await navigator.clipboard.writeText(`${window.location.origin}/artifacts/${uuid}`); setNotice('Private link copied. Only you and the team you grant access can open it.') })}>Copy private link</button>}
-        <span className="text-sm text-gray-600">{publicToken ? 'Published page · anyone with the link' : artifact?.team_id ? 'Private · team access enabled' : 'Private · only you'}</span>
-      </div>
-      {revision?.warnings.map(w => <p key={w} className="mb-3 text-sm text-amber-800">{w}</p>)}
-      {artifact?.source && <nav aria-label="Page source" className="mb-3 flex flex-wrap gap-3 text-sm">
-        {artifact.source.conversation_uuid && <a className="underline" href={`/?conversation=${encodeURIComponent(artifact.source.conversation_uuid)}${artifact.source.project_uuid ? `&project=${encodeURIComponent(artifact.source.project_uuid)}` : ''}`}>Open originating chat</a>}
-        {artifact.source.workflow_id && <a className="underline" href={`/?mode=files&workflow=${encodeURIComponent(artifact.source.workflow_id)}${artifact.source.session_id ? `&run=${encodeURIComponent(artifact.source.session_id)}` : ''}${artifact.source.project_uuid ? `&project=${encodeURIComponent(artifact.source.project_uuid)}` : ''}`}>Open originating workflow run</a>}
+      {artifact && <div className="page-revision-bar"><label>Version<select aria-label="Page version" disabled={busy || !!editor} value={selected} onChange={e => setSelected(e.target.value)}>{artifact.revisions.map((r, index) => <option key={r.uuid} value={r.uuid}>Version {index + 1}{r.uuid === artifact.published_revision ? ' · published' : ''}{r.uuid === artifact.latest_revision ? ' · latest' : ''}</option>)}</select></label><a className="page-text-button" href={contentUrl} target="_blank" rel="noreferrer"><ArrowUpRight size={14} />Open full page</a></div>}
+      {hasDraft && !selectedIsPublished && <p className="page-revision-note">You’re previewing version {version}. The public link still shows version {publishedVersion}. Share → Publish updates when you’re ready.</p>}
+      {!!revision?.warnings.length && <div className="page-revision-note"><strong>Some content was removed to keep this page safe.</strong>{revision.warnings.map(w => <p key={w}>{w}</p>)}</div>}
+      <PagePreview key={contentUrl} src={contentUrl} title={title} />
+      {artifact?.source && <nav aria-label="Page source" className="page-source">
+        {artifact.source.conversation_uuid && <a href={`/?conversation=${encodeURIComponent(artifact.source.conversation_uuid)}${artifact.source.project_uuid ? `&project=${encodeURIComponent(artifact.source.project_uuid)}` : ''}`}><MessageSquare size={14} />Open originating chat</a>}
+        {artifact.source.workflow_id && <a href={`/?mode=files&workflow=${encodeURIComponent(artifact.source.workflow_id)}${artifact.source.session_id ? `&run=${encodeURIComponent(artifact.source.session_id)}` : ''}${artifact.source.project_uuid ? `&project=${encodeURIComponent(artifact.source.project_uuid)}` : ''}`}><Workflow size={14} />Open originating workflow run</a>}
+        <span>Saved in Files → Pages</span>
       </nav>}
-      <iframe key={contentUrl} src={contentUrl} title="Artifact preview" sandbox="" referrerPolicy="no-referrer" className="h-[65vh] min-h-80 w-full rounded-xl border bg-white" />
-      {artifact?.can_manage && uuid && <section className="mt-6 space-y-4 rounded-xl border p-4">
-        <p className="text-sm text-gray-600">Static HTML/CSS only. Scripts, forms, and remote assets are blocked. Review the preview before sharing. Public links show only the revision you publish; later edits require publishing again.</p>
-        {!editor && <button className={buttonStyle} disabled={busy} onClick={() => void action(async () => { const source = await api.artifactSource(uuid, selected); setEditor({ ...source, base: artifact.latest_revision }) })}>Edit HTML</button>}
-        {editor && <div className="space-y-3">
-          <label className="block">Title<input className="mt-1 block w-full rounded border p-2" maxLength={200} value={editor.title} onChange={e => setEditor({ ...editor, title: e.target.value })} /></label>
-          <label className="block">HTML<textarea className="mt-1 block h-80 w-full rounded border p-2 font-mono text-sm" value={editor.html} onChange={e => setEditor({ ...editor, html: e.target.value })} /></label>
-          <div className="flex gap-2"><button className={buttonStyle} disabled={busy} onClick={() => void action(async () => { const saved = await api.reviseArtifact(uuid, editor.title, editor.html, editor.base); await reload(); setSelected(saved.latest_revision); setEditor(null); setNotice('New revision saved. Review it before publishing.') })}>Save new revision</button><button className={buttonStyle} disabled={busy} onClick={() => setEditor(null)}>Cancel edit</button></div>
-        </div>}
-        <div className="flex flex-wrap items-center gap-3"><label>Private access <select aria-label="Private artifact access" className="rounded border p-2" value={team} onChange={e => setTeam(e.target.value)}><option value="">Only me</option>{teams.map(t => <option key={t.uuid} value={t.uuid}>{t.name}</option>)}</select></label><button className={buttonStyle} disabled={busy} onClick={() => void action(async () => { await api.shareArtifactTeam(uuid, team || null); await reload(); setNotice('Private access updated.') })}>Save access</button></div>
-        <div className="space-y-3 border-t pt-4"><h2 className="font-semibold">Public link</h2><p className="text-sm">Publishing exposes this selected page to anyone with the link, including any source quotations you included. It does not grant access to the source workspace.</p>
-          <button className={buttonStyle} disabled={busy || !!editor || !artifact.public_sharing_enabled} onClick={() => void action(async () => { await api.publishArtifact(uuid, selected); await reload(); setNotice('Selected revision published.') })}>Publish selected revision</button>
-          {artifact.public_sharing_enabled === false && <p className="text-sm">Public sharing is disabled on this deployment.</p>}
-          {artifact.public_token && <div className="flex flex-wrap gap-3"><a className="break-all underline" href={`/a/${artifact.public_token}`} target="_blank" rel="noreferrer">Open published page</a><button className={buttonStyle} disabled={busy} onClick={() => void action(async () => { await navigator.clipboard.writeText(`${window.location.origin}/a/${artifact.public_token}`); setNotice('Public link copied.') })}>Copy public link</button><button className={buttonStyle} disabled={busy} onClick={() => void action(async () => { await api.unpublishArtifact(uuid); await reload(); setNotice('Public link revoked. Previously downloaded copies cannot be recalled.') })}>Unpublish and revoke link</button></div>}
-        </div>
-        <div className="border-t pt-4">{confirmDelete ? <><p className="mb-2">Delete every revision and revoke all links? This cannot be undone.</p><button className={buttonStyle} disabled={busy} onClick={() => void action(async () => { await api.deleteArtifact(uuid); window.location.assign('/artifacts') })}>Delete permanently</button><button className={buttonStyle} disabled={busy} onClick={() => setConfirmDelete(false)}>Keep artifact</button></> : <button className={buttonStyle} disabled={busy} onClick={() => setConfirmDelete(true)}>Delete artifact</button>}</div>
-      </section>}
+      {artifact?.can_manage && uuid && <>
+        {editor && <section className="page-editor" aria-label="HTML editor"><h2>Edit page HTML</h2>{!sharing && !confirmDelete && feedback}<p>Saving creates a new version. Your published page stays unchanged until you publish the update.</p><label>Title<input autoFocus maxLength={200} disabled={busy} value={editor.title} onChange={e => setEditor({ ...editor, title: e.target.value })} /></label><label>HTML<textarea spellCheck={false} disabled={busy} value={editor.html} onChange={e => setEditor({ ...editor, html: e.target.value })} /></label><div className="page-actions"><button className="page-button page-button-primary" disabled={busy} onClick={() => void action(async () => { const saved = await api.reviseArtifact(uuid, editor.title, editor.html, editor.base); await reload(); setSelected(saved.latest_revision); setEditor(null); setNotice('New version saved. Your public link has not changed.') })}>{busy ? 'Saving…' : 'Save new version'}</button><button className="page-button" disabled={busy} onClick={() => setEditor(null)}>Cancel edit</button></div></section>}
+        <details className="page-advanced"><summary>Advanced page options</summary><p>Pages support static HTML and CSS. Scripts, forms and remote assets are blocked.</p><div className="page-actions">{!editor && <button className="page-button" disabled={busy} onClick={() => void action(async () => { const source = await api.artifactSource(uuid, selected); setEditor({ ...source, base: artifact.latest_revision }) })}><Code2 size={16} />Edit HTML</button>}<button className="page-button page-button-danger" disabled={busy} onClick={() => setConfirmDelete(true)}><Trash2 size={16} />Delete page</button></div></details>
+      </>}
     </>}
-  </main>
+    {sharing && artifact?.can_manage && uuid && <PageDialog title="Share page" onClose={closeSharing} busy={busy}>
+      <p>Choose who can open <strong>{title}</strong>.</p>{feedback}
+      <section className="page-share-section"><h3><LockKeyhole size={17} />Workspace access</h3><p>This link opens the saved page for you{artifact.team_id ? ' and your team' : ''}. It does not make the page public.</p>
+        <label>Who can access<select aria-label="Workspace page access" value={team} disabled={busy || teamError} onChange={e => setTeam(e.target.value)}><option value="">Only me</option>{teams.map(t => <option key={t.uuid} value={t.uuid}>{t.name}</option>)}</select></label>
+        {teamError && <p role="alert">Team options could not be loaded. <button className="underline" onClick={() => void action(async () => { setTeams(await listTeams()); setTeamError(false) })}>Retry teams</button></p>}
+        <div className="page-actions"><button className="page-button" disabled={busy || teamError || team === (artifact.team_id || '')} onClick={() => void action(async () => { await api.shareArtifactTeam(uuid, team || null); await reload(); setNotice('Workspace access updated.') })}>Save access</button><button className="page-button" disabled={busy} onClick={() => copy(`${window.location.origin}/artifacts/${uuid}`, 'Workspace link copied. The recipient still needs access.')}><Copy size={15} />Copy private link</button></div>
+      </section>
+      <section className="page-share-section"><h3><Globe2 size={17} />Public link {publishedVersion > 0 && <PageBadge published>Version {publishedVersion} is live</PageBadge>}</h3>
+        <p>{publishedVersion ? `Anyone with this link can view version ${publishedVersion}. Later edits stay private until you publish them.` : `Publish version ${version} so anyone with its link can view it. Check the page for private information before publishing.`}</p>
+        {publicLink && <div className="page-share-link"><label>Published page link<input aria-label="Published page link" readOnly value={publicLink} onFocus={e => e.target.select()} /></label><button className="page-icon-button" aria-label="Copy public link" disabled={busy} onClick={() => copy(publicLink, 'Public link copied.')}><Copy size={17} /></button></div>}
+        <div className="page-actions"><button className="page-button page-button-primary" disabled={busy || !!editor || !artifact.public_sharing_enabled || selectedIsPublished} onClick={() => void action(async () => { await api.publishArtifact(uuid, selected); await reload(); setNotice(`Version ${version} published. Anyone with the link can view it.`) })}>{selectedIsPublished ? <><Check size={16} />Published</> : publishedVersion ? `Publish updates · version ${version}` : `Publish version ${version}`}</button>{publicLink && <a className="page-button" href={`/a/${artifact.public_token}`} target="_blank" rel="noreferrer"><ArrowUpRight size={16} />Open published page</a>}</div>
+        {artifact.public_sharing_enabled === false && <p>Public sharing is disabled on this deployment.</p>}
+        {editor && <p>Save or cancel your HTML edits before publishing.</p>}
+        {publicLink && <button className="page-text-button mt-3" disabled={busy} onClick={() => void action(async () => { await api.unpublishArtifact(uuid); await reload(); setNotice('Public link removed. Downloaded copies cannot be recalled.') })}><Link2 size={14} />Remove public link</button>}
+      </section>
+    </PageDialog>}
+    {requestChanges && uuid && artifact?.can_manage && <PageDialog title="Request changes" onClose={() => setRequestChanges(false)}>
+      <p>Describe what you’d like to change in <strong>{title}</strong>. You’ll review the message in chat before sending it.</p>{feedback}<label className="block text-sm font-medium">What would you like to change?<textarea className="mt-2 min-h-36 w-full rounded-lg border border-slate-300 p-3 text-sm" value={changes} maxLength={8000} onChange={e => setChanges(e.target.value)} placeholder="Make the funding summary easier to scan, add a next-steps section…" autoFocus /></label><div className="page-actions"><button className="page-button page-button-primary" disabled={!changes.trim()} onClick={() => { try { sessionStorage.setItem(`pages:edit-request:${uuid}`, changes.trim()); window.location.assign(chatUrl) } catch { setError('Could not open chat. Copy your request and return to the originating chat.') } }}><MessageSquare size={16} />Continue in chat</button><button className="page-button" onClick={() => setRequestChanges(false)}>Cancel</button></div>
+    </PageDialog>}
+    {confirmDelete && uuid && artifact?.can_manage && <PageDialog title="Delete this page?" busy={busy} onClose={() => setConfirmDelete(false)}><p>This deletes every saved version of <strong>{title}</strong> and removes its public link. This cannot be undone.</p>{feedback}<div className="page-actions"><button className="page-button" disabled={busy} autoFocus onClick={() => setConfirmDelete(false)}>Keep page</button><button className="page-button page-button-danger" disabled={busy} onClick={() => void action(async () => { await api.deleteArtifact(uuid); window.location.assign(backUrl) })}>Delete permanently</button></div></PageDialog>}
+  </div></main>
 }

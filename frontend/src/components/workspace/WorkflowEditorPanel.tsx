@@ -6652,8 +6652,8 @@ function OutputConfigCard({
       <label className="mb-4 flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={!!(oc?.artifact as { enabled?: boolean } | undefined)?.enabled} onChange={async e => {
         if (!openWorkflowId) return
         try { await updateWorkflow(openWorkflowId, { output_config: { ...(oc || {}), artifact: { enabled: e.target.checked } } }); onRefresh() }
-        catch (error) { toast(describeConfigSaveError(error, 'artifact output'), 'error') }
-      }} />Create a private HTML Artifact after each completed run</label>
+        catch (error) { toast(describeConfigSaveError(error, 'page output'), 'error') }
+      }} />Create a private page after each completed run</label>
       <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', cursor: 'pointer', marginBottom: enabled ? 12 : 0 }}>
         <input
           type="checkbox"

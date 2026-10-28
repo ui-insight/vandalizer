@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./styles/workspace-polish.css";
+@import "./styles/pages.css";
 
 html {
   scroll-behavior: smooth;

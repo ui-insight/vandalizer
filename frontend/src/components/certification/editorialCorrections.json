@@ -553,10 +553,10 @@
       "title": "Chat exports and hosted pages",
       "issued_at": "2026-10-27",
       "paragraphs": [
-        "Beside Copy, the Export menu is available for an individual chat message and for the full conversation. HTML page, Word (.docx) and Excel (.xlsx) produce downloaded files. Word means a DOCX download, not a Google Docs integration. The old thumbs-up/down bubble actions have been removed.",
+        "Beside Copy, the Export menu is available for an individual chat message and for the full conversation. HTML transcript, Word (.docx) and Excel (.xlsx) produce downloaded files. Word means a DOCX download, not a Google Docs integration. The old thumbs-up/down bubble actions have been removed.",
         "Choose the scope before exporting. A full conversation can include both your messages and assistant replies; a message export includes only that message. Inspect the downloaded content, citations, tool results and any incomplete-evidence warnings. Export preserves the selected content; it does not perform a new analysis or validate its claims.",
         "An Excel download contains a transcript and separate sheets for detected Markdown tables. Prose does not automatically become an analysis table, and text that looks like a formula is exported as text rather than executed. Check identifiers, units, row boundaries and completeness in the actual workbook.",
-        "Downloading an HTML page does not create a hosted link. Choose Save as Artifact to save the selected chat content as a private hosted HTML page, then open and review that page before deciding who can access it."
+        "Downloading an HTML transcript does not create a hosted link. Choose Save transcript as page to save the selected chat content as a private hosted HTML page, then open and review that page before deciding who can access it."
       ],
       "assessment_changed": false,
       "unversioned_content_sha256": [
@@ -576,9 +576,9 @@
       "title": "HTML Artifact revisions and audience",
       "issued_at": "2026-10-27",
       "paragraphs": [
-        "A hosted HTML Artifact is a saved, versioned page. New pages are private to their owner. Copy private link does not grant access: the reader must sign in as the owner or belong to the team granted access. The owner can select a team under Private access and choose Save access.",
-        "Publishing is a separate owner action: select the inspected revision and choose Publish selected revision. Anyone with the public link can read that published page without signing in, including any source quotations embedded in it. This does not grant access to the source workspace. Public sharing may be disabled on a deployment.",
-        "Later edits create a new private revision; the public link continues to show the published revision until the owner publishes another selected revision. Unpublish revokes access through the public link. It does not recall files or copies readers already saved. Changing team access is separate from unpublishing.",
+        "A hosted HTML Artifact is a saved, versioned page. New pages are private to their owner. Copy private link does not grant access: the reader must sign in as the owner or belong to the team granted access. The owner can select a team under Share → Workspace access and choose Save access.",
+        "Publishing is a separate owner action: select the inspected revision and choose Publish version. Anyone with the public link can read that published page without signing in, including any source quotations embedded in it. This does not grant access to the source workspace. Public sharing may be disabled on a deployment.",
+        "Later edits create a new private revision; the public link continues to show the published revision until the owner publishes another selected revision. Remove public link revokes access through the public link. It does not recall files or copies readers already saved. Changing team access is separate from unpublishing.",
         "These Artifacts support static HTML and CSS. Scripts, forms, frames and remote assets are blocked. Review the rendered page and sanitization warnings; a page that depends on JavaScript or a remote chart is not a supported interactive app. Private creation or revision through chat still follows the tool confirmation gate; the Skill cannot confirm it for you."
       ],
       "assessment_changed": false,
@@ -598,7 +598,7 @@
       "title": "Private HTML output from a completed workflow",
       "issued_at": "2026-10-27",
       "paragraphs": [
-        "A completed workflow can also be saved as an HTML Artifact using Save as Artifact in its results. To create one after each completed run, enable Create a private HTML Artifact after each completed run in the workflow output settings and save the workflow. This is an output setting, not a new graph node.",
+        "A completed workflow can also be saved as an HTML Artifact using Save as page in its results. To create one after each completed run, enable Create a private page after each completed run in the workflow output settings and save the workflow. This is an output setting, not a new graph node.",
         "Inspect the created Artifact link and the actual completed output. A file-download payload is not itself HTML content; a workflow that produces only binary deliverables needs a suitable text or structured result for the hosted page. Artifact delivery can fail even when execution completed; inspect the delivery status before claiming the page exists. Creation never automatically publishes the page.",
         "These interface updates do not change this historical course version’s assigned formats, assessment requirements or earned credit. Follow the exercise attached to your enrollment."
       ],

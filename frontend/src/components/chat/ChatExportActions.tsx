@@ -8,6 +8,7 @@ import { exportChat } from '../../api/chat'
 import { saveChatArtifact } from '../../api/artifacts'
 import { conversationToCsv, conversationToText, copyMessages, exportMessages } from './conversationExport'
 import { openPrintPage } from '../../lib/printPage'
+import { announceWorkspaceWrite } from '../../lib/chatWrites'
 
 function download(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)
@@ -18,7 +19,7 @@ function download(blob: Blob, filename: string) {
   setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }
 
-const formats = [ ['html', 'HTML page'], ['docx', 'Word (.docx)'], ['xlsx', 'Excel (.xlsx)'], ['artifact', 'Save as Artifact'], ['pdf', 'PDF'], ['csv', 'CSV'], ['text', 'Text'] ] as const
+const formats = [ ['html', 'HTML transcript'], ['docx', 'Word (.docx)'], ['xlsx', 'Excel (.xlsx)'], ['pdf', 'PDF'], ['csv', 'CSV'], ['text', 'Text'], ['artifact', 'Save transcript as page'] ] as const
 
 export function ChatExportActions({ messages, scope = 'message', names = {}, disabled = false, artifactSource }: {
   messages: ChatMessage[]
@@ -42,8 +43,9 @@ export function ChatExportActions({ messages, scope = 'message', names = {}, dis
     if (!open || !button.current || !menu.current) return
     const rect = button.current.getBoundingClientRect()
     const height = menu.current.offsetHeight
+    const width = menu.current.offsetWidth
     setPosition({
-      left: Math.max(8, Math.min(window.innerWidth - 192, rect.right - 184)),
+      left: Math.max(8, Math.min(window.innerWidth - width - 8, rect.right - width)),
       top: rect.top >= height + 8 ? rect.top - height - 8 : Math.max(8, Math.min(rect.bottom + 8, window.innerHeight - height - 8)),
     })
     menu.current.querySelector('button')?.focus()
@@ -71,6 +73,7 @@ export function ChatExportActions({ messages, scope = 'message', names = {}, dis
         if (artifactRequest.current?.content !== content) artifactRequest.current = { content, id: crypto.randomUUID() }
         const artifact = await saveChatArtifact(normalized, artifactRequest.current.id, artifactSource)
         setSavedArtifact(artifact.uuid)
+        announceWorkspaceWrite('pages')
       } else if (format === 'html' || format === 'docx' || format === 'xlsx') {
         download(await exportChat(format, exportMessages(messages, names)), `${scope}.${format}`)
       } else if (format === 'pdf') {
@@ -95,7 +98,7 @@ export function ChatExportActions({ messages, scope = 'message', names = {}, dis
     }}>{copied ? <Check size={16} /> : <Copy size={16} />}</button>
     <button ref={button} type="button" className="rounded p-1.5 hover:bg-black/10 disabled:opacity-50" aria-label={`Export ${scope}`} title={`Export ${scope}`} aria-haspopup="menu" aria-expanded={open} disabled={disabled || busy} onClick={() => setOpen(!open)}><Download size={16} /></button>
     {busy && <span role="status" className="text-xs">Preparing export…</span>}
-    {open && createPortal(<div ref={menu} role="menu" style={position} className="fixed z-[1000] w-[184px] max-h-[90vh] overflow-auto rounded-lg border bg-white p-1.5 text-gray-800 shadow-lg" aria-label={`Export ${scope} format`} onBlur={e => {
+    {open && createPortal(<div ref={menu} role="menu" style={position} className="fixed z-[1000] w-[236px] max-h-[90vh] overflow-auto rounded-lg border bg-white p-1.5 text-gray-800 shadow-lg" aria-label={`Export ${scope} format`} onBlur={e => {
       if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOpen(false)
     }} onKeyDown={e => {
       if (e.key === 'Escape') { e.stopPropagation(); close() }
@@ -106,9 +109,10 @@ export function ChatExportActions({ messages, scope = 'message', names = {}, dis
         items[e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : (index + (e.key === 'ArrowUp' ? -1 : 1) + items.length) % items.length]?.focus()
       }
     }}>
-      {formats.map(([format, label]) => <button key={format} type="button" role="menuitem" disabled={disabled} className="block w-full rounded px-3 py-2 text-left text-sm hover:bg-gray-100 focus:bg-gray-100 disabled:opacity-50" onClick={() => void run(format)}>{label}</button>)}
+      <div className="chat-export-heading"><strong>{scope === 'conversation' ? 'Export conversation' : 'Export message'}</strong><span>Text and source references</span></div>
+      {formats.map(([format, label]) => <button key={format} type="button" role="menuitem" disabled={disabled} className={`block min-h-10 w-full rounded px-3 py-2 text-left text-sm hover:bg-gray-100 focus:bg-gray-100 disabled:opacity-50 ${format === 'artifact' ? 'mt-1 border-t border-slate-200 pt-3' : ''}`} onClick={() => void run(format)}>{label}</button>)}
     </div>, document.body)}
     {error && <p role="alert" className="w-full text-xs">{error}</p>}
-    {savedArtifact && <a className="text-xs underline" href={`/artifacts/${savedArtifact}`} target="_blank" rel="noreferrer">Open private artifact</a>}
+    {savedArtifact && <a className="text-xs underline" href={`/artifacts/${savedArtifact}`} target="_blank" rel="noreferrer">Open saved page</a>}
   </div>
 }

@@ -1,20 +1,22 @@
 import { useRef, useState } from 'react'
-import { saveWorkflowArtifact } from '../../api/artifacts'
+import { Check, FileText } from 'lucide-react'
+import { saveWorkflowArtifact, type Artifact } from '../../api/artifacts'
+import { PageActions } from '../artifacts/PagePrimitives'
+import { announceWorkspaceWrite } from '../../lib/chatWrites'
 
 export function WorkflowArtifactAction({ sessionId }: { sessionId: string }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [uuid, setUuid] = useState('')
+  const [page, setPage] = useState<Artifact | null>(null)
   const pending = useRef(false)
-  return <div className="flex flex-wrap items-center gap-2">
-    <button type="button" disabled={busy} className="rounded border bg-white px-3 py-2 text-sm disabled:opacity-50" onClick={async () => {
+  return <div className="mt-3 rounded-xl border border-slate-200 bg-white p-4">
+    {page ? <><p className="mb-3 flex items-center gap-2 text-sm font-medium"><Check size={16} className="text-emerald-700" />{page.title} · saved to Pages</p><PageActions uuid={page.uuid} revision={page.latest_revision} title={page.title} /></> : <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-semibold">Keep this result as a page</p><p className="mt-1 text-xs text-slate-500">A private, shareable copy you can find in Files → Pages.</p></div><button type="button" disabled={busy} className="page-button" onClick={async () => {
       if (pending.current) return
       pending.current = true; setBusy(true); setError('')
-      try { setUuid((await saveWorkflowArtifact(sessionId)).uuid) }
-      catch (e) { setError(e instanceof Error ? e.message : 'Could not save artifact.') }
+      try { setPage(await saveWorkflowArtifact(sessionId)); announceWorkspaceWrite('pages') }
+      catch (e) { setError(e instanceof Error ? e.message : 'Could not save page.') }
       finally { pending.current = false; setBusy(false) }
-    }}>{busy ? 'Saving artifact…' : 'Save as Artifact'}</button>
-    {uuid && <a className="text-sm underline" href={`/artifacts/${uuid}`} target="_blank" rel="noreferrer">Open private artifact</a>}
-    {error && <p role="alert" className="w-full text-sm text-red-700">{error}</p>}
+    }}><FileText size={16} />{busy ? 'Saving page…' : 'Save as page'}</button></div>}
+    {error && <p role="alert" className="page-alert mt-3">{error}</p>}
   </div>
 }

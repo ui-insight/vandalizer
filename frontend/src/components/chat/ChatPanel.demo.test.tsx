@@ -53,7 +53,7 @@ vi.mock('./HomeExperience', () => ({
   </>,
 }))
 
-function renderPanel(pendingMessage?: { message: string; skillUuid?: string }) {
+function renderPanel(pendingMessage?: { message: string; skillUuid?: string; draftOnly?: boolean }) {
   return render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><ChatPanel pendingMessage={pendingMessage} /></QueryClientProvider>)
 }
 
@@ -86,6 +86,13 @@ function expectDocumentRequest() {
 }
 
 describe('Show me what you can do', () => {
+  it('prepares a page edit draft without sending a chat message', async () => {
+    renderPanel({ message: 'Update this page: /artifacts/page-id. Make the title shorter.', draftOnly: true })
+    await waitFor(() => expect(mocks.workspace.focusChat).toHaveBeenCalledOnce())
+    expect(mocks.send).not.toHaveBeenCalled()
+    expect(mocks.selectSkill).not.toHaveBeenCalled()
+  })
+
   it('consumes a Library Skill handoff without submitting an empty message', async () => {
     renderPanel({ message: '', skillUuid: 'award-skill' })
     await waitFor(() => expect(mocks.selectSkill).toHaveBeenCalledWith('award-skill'))

@@ -191,6 +191,8 @@ const indexRoute = createRoute({
     mode: (['chat', 'files', 'automations', 'knowledge', 'projects'].includes(search.mode as string)
       ? (search.mode as 'chat' | 'files' | 'automations' | 'knowledge' | 'projects')
       : undefined),
+    ...(search.files === 'pages' ? { files: 'pages' as const } : {}),
+    ...(typeof search.editPage === 'string' && /^[a-f0-9]{32}$/.test(search.editPage) ? { editPage: search.editPage } : {}),
     // Active right panel tab (assistant is the default, omitted when active)
     tab: (['assistant', 'library'].includes(search.tab as string)
       ? (search.tab as 'assistant' | 'library')

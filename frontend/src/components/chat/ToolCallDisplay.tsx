@@ -1,3 +1,4 @@
+import { ChatPageCard } from '../artifacts/ChatPageCard'
 import type { ApprovalRecord } from './approvalHistory'
 import { certificationPayloadIssue } from '../../lib/certificationPayload'
 import { useEffect, useRef, useState } from 'react'
@@ -78,9 +79,9 @@ const TOOL_META: Record<string, { label: string; category: ToolCategory }> = {
   apply_optimization:    { label: 'Applying optimized config',  category: 'write' },
   regenerate_validation_plan: { label: 'Regenerating validation plan', category: 'write' },
   save_to_folder:        { label: 'Saving to folder',         category: 'write' },
-  create_html_artifact:  { label: 'Creating artifact',        category: 'write' },
-  revise_html_artifact:  { label: 'Revising artifact',        category: 'write' },
-  get_html_artifact:     { label: 'Reading artifact',         category: 'read' },
+  create_html_artifact:  { label: 'Creating page',        category: 'write' },
+  revise_html_artifact:  { label: 'Updating page',        category: 'write' },
+  get_html_artifact:     { label: 'Reading page',         category: 'read' },
   create_project:        { label: 'Creating project',         category: 'write' },
   list_project_documents:{ label: 'Listing project files',    category: 'read' },
   run_pin_on_project:    { label: 'Running pinned item',      category: 'workflow' },
@@ -1385,6 +1386,17 @@ export function ToolStatusLine({
     )
   }
 
+  if (['create_html_artifact', 'revise_html_artifact'].includes(name)) {
+    const uuid = typeof obj?.artifact_uuid === 'string' && /^[a-f0-9]{32}$/.test(obj.artifact_uuid) ? obj.artifact_uuid : undefined
+    const revision = typeof obj?.revision === 'string' ? obj.revision : undefined
+    return <ChatPageCard title={String(obj?.title || args.title || 'Untitled page')}
+      html={typeof obj?.artifact_preview_html === 'string' ? obj.artifact_preview_html : undefined}
+      uuid={uuid} revision={revision} running={isActive} error={isError ? summaryText || 'The page could not be saved. Ask the assistant to check the result before retrying.' : undefined}
+      unconfirmed={unconfirmed || (!isActive && !needsConfirmation && !isError && !canceled && (!uuid || !revision))}
+      canceled={canceled} needsApproval={needsConfirmation} history={approvalHistory} decision={decision} decisionError={decisionError}
+      onDecide={onConfirm ? decide : undefined} revising={name === 'revise_html_artifact'} />
+  }
+
   return (
     <div className="agent-tool-result" data-tool-state={executionLabel}>
       <p className="agent-tool-state" role="status" aria-atomic="true">{meta.label} · {executionLabel}</p>
@@ -1473,11 +1485,6 @@ export function ToolStatusLine({
       </div>
 
       {/* Auto-shown rich content (copy/export buttons are inside each block) */}
-      {result && !isError && ['create_html_artifact', 'revise_html_artifact'].includes(name) && <div className="my-3 rounded-lg border bg-white p-3">
-        {needsConfirmation && typeof obj?.artifact_preview_html === 'string' && <iframe title="Proposed artifact preview" srcDoc={obj.artifact_preview_html} sandbox="" referrerPolicy="no-referrer" className="h-64 w-full border" />}
-        {!needsConfirmation && typeof obj?.artifact_uuid === 'string' && /^[a-f0-9]{32}$/.test(obj.artifact_uuid) && <a className="font-medium underline" href={`/artifacts/${obj.artifact_uuid}`} target="_blank" rel="noreferrer">Open artifact · review and share</a>}
-        <p className="mt-2 text-xs text-gray-600">Saved revisions do not change a public link until you publish them in the artifact viewer.</p>
-      </div>}
       {result && name === 'run_extraction' && obj?.entities != null && (
         <ExtractionContent content={obj} actions={kbActions} />
       )}

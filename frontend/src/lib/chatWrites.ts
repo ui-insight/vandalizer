@@ -3,9 +3,14 @@ import { useQueryClient } from '@tanstack/react-query'
 import type { ToolResultInfo } from '../types/chat'
 
 /** Workspace lists a chat tool can change behind a panel's back. */
-export type ChatWriteTarget = 'knowledgeBases' | 'library' | 'automations' | 'projects' | 'documents'
+export type ChatWriteTarget = 'knowledgeBases' | 'library' | 'automations' | 'projects' | 'documents' | 'pages'
 
 const EVENT = 'vandalizer:chat-write'
+
+/** Keep local-state panels current after saves outside the chat tool stream. */
+export function announceWorkspaceWrite(...targets: ChatWriteTarget[]) {
+  window.dispatchEvent(new CustomEvent<ChatWriteTarget[]>(EVENT, { detail: targets }))
+}
 
 /** React Query roots each target owns. Panels on local state listen for EVENT instead. */
 const QUERY_ROOTS: Record<ChatWriteTarget, string[]> = {
@@ -14,6 +19,7 @@ const QUERY_ROOTS: Record<ChatWriteTarget, string[]> = {
   automations: [],
   projects: ['projects', 'project'],
   documents: ['documents'],
+  pages: [],
 }
 
 /**
@@ -27,6 +33,8 @@ export function chatWriteTargets(result: ToolResultInfo): ChatWriteTarget[] {
   if (value.error || value.needs_confirmation) return []
   const has = (key: string) => typeof value[key] === 'string' && value[key] !== ''
   switch (result.tool_name) {
+    case 'create_html_artifact':
+    case 'revise_html_artifact': return has('artifact_uuid') ? ['pages'] : []
     case 'create_knowledge_base': return has('uuid') ? ['knowledgeBases'] : []
     case 'add_documents_to_kb':
     case 'add_url_to_kb': return has('kb_uuid') ? ['knowledgeBases'] : []
@@ -52,7 +60,7 @@ export function useChatWriteAnnouncer() {
     for (const target of targets) {
       for (const root of QUERY_ROOTS[target]) void qc.invalidateQueries({ queryKey: [root] })
     }
-    window.dispatchEvent(new CustomEvent<ChatWriteTarget[]>(EVENT, { detail: targets }))
+    announceWorkspaceWrite(...targets)
   }, [qc])
 }
 

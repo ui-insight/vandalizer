@@ -442,7 +442,10 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       pendingHandled.current = pendingMessage
       const docs = pendingMessage.documentUuids ?? selectedDocUuids
       const folders = pendingMessage.folderUuids ?? selectedFolderUuids
-      if (pendingMessage.skillUuid) {
+      if (pendingMessage.draftOnly) {
+        setDraftInsertion(previous => ({ id: (previous?.id ?? 0) + 1, text: pendingMessage.message }))
+        focusChat()
+      } else if (pendingMessage.skillUuid) {
         void selectSkill(pendingMessage.skillUuid).then(selected => { if (selected) focusChat() })
       } else {
         send(pendingMessage.message, docs, undefined, undefined, undefined, folders)

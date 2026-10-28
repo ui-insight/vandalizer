@@ -85,6 +85,7 @@ const NavigationContext = createContext<NavigationContextValue | null>(null)
 
 export interface PendingChatMessage {
   message: string
+  draftOnly?: boolean
   skillUuid?: string
   documentUuids?: string[]
   folderUuids?: string[]
@@ -108,7 +109,7 @@ interface ChatStateContextValue {
   pendingChatMessage: PendingChatMessage | null
   sendChatMessage: (
     message: string,
-    options?: { documentUuids?: string[]; folderUuids?: string[]; skillUuid?: string },
+    options?: { documentUuids?: string[]; folderUuids?: string[]; skillUuid?: string; draftOnly?: boolean },
   ) => void
   clearPendingChatMessage: () => void
   // Knowledge bases attached to the chat. Several can be attached at once;
@@ -561,12 +562,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const sendChatMessage = useCallback((
     message: string,
-    options?: { documentUuids?: string[]; folderUuids?: string[]; skillUuid?: string },
+    options?: { documentUuids?: string[]; folderUuids?: string[]; skillUuid?: string; draftOnly?: boolean },
   ) => {
     updateSearch((prev) => ({ ...prev, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined }))
     setPendingChatMessage({
       message,
       skillUuid: options?.skillUuid,
+      draftOnly: options?.draftOnly,
       documentUuids: options?.documentUuids,
       folderUuids: options?.folderUuids,
     })
@@ -891,13 +893,18 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const handledResourceLink = useRef('')
   useEffect(() => {
     if (search.project && activeProjectUuid !== search.project) return
-    const identity = `${search.project ?? ''}:${search.conversation ?? ''}:${search.skill ?? ''}`
-    if ((!search.conversation && !search.skill) || handledResourceLink.current === identity) return
+    const identity = `${search.project ?? ''}:${search.conversation ?? ''}:${search.skill ?? ''}:${search.editPage ?? ''}`
+    if ((!search.conversation && !search.skill && !search.editPage) || handledResourceLink.current === identity) return
     handledResourceLink.current = identity
     if (search.conversation) setLoadConversationId(search.conversation)
     if (search.skill) sendChatMessage('', { skillUuid: search.skill })
-    updateSearch(prev => ({ ...prev, mode: 'chat', tab: undefined, conversation: undefined, skill: undefined }))
-  }, [search.project, search.conversation, search.skill, activeProjectUuid, sendChatMessage, updateSearch])
+    if (search.editPage) {
+      let request = ''
+      try { request = sessionStorage.getItem(`pages:edit-request:${search.editPage}`) || ''; sessionStorage.removeItem(`pages:edit-request:${search.editPage}`) } catch { /* A draft can still be prepared without stored details. */ }
+      sendChatMessage(`Update this page: ${window.location.origin}/artifacts/${search.editPage}\n\n${request.slice(0, 8000)}\n\nShow me the proposed update before saving.`, { draftOnly: true })
+    }
+    updateSearch(prev => ({ ...prev, mode: 'chat', tab: undefined, conversation: undefined, skill: undefined, editPage: undefined }))
+  }, [search.project, search.conversation, search.skill, search.editPage, activeProjectUuid, sendChatMessage, updateSearch])
 
   // ── Memoized context values ─────────────────────────────────────────────
 
