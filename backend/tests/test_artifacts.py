@@ -177,6 +177,14 @@ def test_size_revision_limit_and_html_workflow_inputs(db):
         artifacts.workflow_html({"type": "file_download", "data": "base64"}, "Report")
 
 
+@pytest.mark.parametrize("html", ["é" * 140000, "x" * (artifacts.MAX_HTML_BYTES - 1)])
+def test_page_size_limit_explains_how_to_recover_without_saving(db, html):
+    with pytest.raises(HTTPException) as error:
+        artifacts.create(db, "owner", "All tabs", html, "large-page")
+    assert artifacts.PAGE_TOO_LARGE_MESSAGE in error.value.detail
+    assert db.html_artifacts.docs == []
+
+
 def test_workflow_delivery_retry_has_one_private_artifact_and_provenance(db):
     db.workflow.docs.append({"_id": "wf1", "name": "Award review", "user_id": "testuser"})
     result = {"_id": "run1", "workflow": "wf1", "session_id": "session1", "status": "completed", "final_output": {"output": "<main><h1>Workflow</h1></main>"}}
