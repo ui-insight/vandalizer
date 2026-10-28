@@ -37,7 +37,7 @@ export function PagePreview({ src, html, title, compact = false, thumbnail = fal
 }
 
 export function PageActions({ uuid, revision, title, share = true }: { uuid: string; revision: string; title: string; share?: boolean }) {
-  const href = `/artifacts/${encodeURIComponent(uuid)}`
+  const href = `/pages/${encodeURIComponent(uuid)}`
   return <div className="page-actions">
     <a className="page-button page-button-primary" aria-label={`Open page: ${title}`} href={href} target="_blank" rel="noreferrer"><ArrowUpRight size={16} aria-hidden="true" />Open page</a>
     <a className="page-button" aria-label={`Download HTML: ${title}`} href={`${artifactContentUrl(uuid, revision)}?download=true`}><Download size={16} aria-hidden="true" />Download HTML</a>

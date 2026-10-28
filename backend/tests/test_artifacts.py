@@ -146,18 +146,18 @@ async def test_private_access_team_membership_and_owner_only_mutations(client, d
     doc = make(db)
     uid, rev = doc["uuid"], doc["latest_revision"]
     cookies, headers = _auth()
-    assert (await client.get(f"/api/artifacts/{uid}")).status_code == 200
+    assert (await client.get(f"/api/pages/{uid}")).status_code == 200
     route_env.user.user_id = "other-user"
     for suffix in ["", f"/revisions/{rev}/content", f"/revisions/{rev}/source"]:
-        assert (await client.get(f"/api/artifacts/{uid}{suffix}")).status_code == 404
+        assert (await client.get(f"/api/pages/{uid}{suffix}")).status_code == 404
     db.html_artifacts.update_one({"uuid": uid}, {"$set": {"team_id": "team-a"}})
     route_env.access.return_value = TeamAccessContext(team_uuids={"team-a"})
-    assert (await client.get(f"/api/artifacts/{uid}")).status_code == 200
-    assert (await client.get(f"/api/artifacts/{uid}/revisions/{rev}/content")).status_code == 200
-    assert (await client.get(f"/api/artifacts/{uid}/revisions/{rev}/source")).status_code == 404
-    assert (await client.put(f"/api/artifacts/{uid}/publication", json={"revision": rev}, cookies=cookies, headers=headers)).status_code == 404
+    assert (await client.get(f"/api/pages/{uid}")).status_code == 200
+    assert (await client.get(f"/api/pages/{uid}/revisions/{rev}/content")).status_code == 200
+    assert (await client.get(f"/api/pages/{uid}/revisions/{rev}/source")).status_code == 404
+    assert (await client.put(f"/api/pages/{uid}/publication", json={"revision": rev}, cookies=cookies, headers=headers)).status_code == 404
     route_env.access.return_value = TeamAccessContext()
-    assert (await client.get(f"/api/artifacts/{uid}")).status_code == 404
+    assert (await client.get(f"/api/pages/{uid}")).status_code == 404
 
 
 @pytest.mark.asyncio
@@ -165,28 +165,28 @@ async def test_public_revision_no_private_metadata_revocation_rotation_and_opera
     doc = make(db)
     uid, rev = doc["uuid"], doc["latest_revision"]
     cookies, headers = _auth()
-    response = await client.put(f"/api/artifacts/{uid}/publication", json={"revision": rev}, cookies=cookies, headers=headers)
+    response = await client.put(f"/api/pages/{uid}/publication", json={"revision": rev}, cookies=cookies, headers=headers)
     token = response.json()["public_token"]
     artifacts.revise(db, artifacts.get(db, uid), "Secret draft", "<p>Not published</p>", rev)
-    response = await client.get(f"/api/artifacts/public/{token}")
+    response = await client.get(f"/api/pages/public/{token}")
     assert response.json() == {"title": "Review", "revision": rev}
-    content = await client.get(f"/api/artifacts/public/{token}/content")
+    content = await client.get(f"/api/pages/public/{token}/content")
     assert "Original" in content.text and "Not published" not in content.text
     assert "private-chat" not in content.text
     assert content.headers["cache-control"] == "no-store"
     assert content.headers["x-frame-options"] == "SAMEORIGIN"
     assert content.headers["content-security-policy"] == artifacts.CONTENT_CSP
     route_env.settings.artifact_public_sharing_enabled = False
-    assert (await client.get(f"/api/artifacts/public/{token}/content")).status_code == 404
-    assert (await client.put(f"/api/artifacts/{uid}/publication", json={"revision": rev}, cookies=cookies, headers=headers)).status_code == 403
+    assert (await client.get(f"/api/pages/public/{token}/content")).status_code == 404
+    assert (await client.put(f"/api/pages/{uid}/publication", json={"revision": rev}, cookies=cookies, headers=headers)).status_code == 403
     route_env.settings.artifact_public_sharing_enabled = True
-    assert (await client.delete(f"/api/artifacts/{uid}/publication", cookies=cookies, headers=headers)).status_code == 200
-    assert (await client.get(f"/api/artifacts/public/{token}/content")).status_code == 404
-    response = await client.put(f"/api/artifacts/{uid}/publication", json={"revision": rev}, cookies=cookies, headers=headers)
+    assert (await client.delete(f"/api/pages/{uid}/publication", cookies=cookies, headers=headers)).status_code == 200
+    assert (await client.get(f"/api/pages/public/{token}/content")).status_code == 404
+    response = await client.put(f"/api/pages/{uid}/publication", json={"revision": rev}, cookies=cookies, headers=headers)
     assert response.json()["public_token"] != token
-    assert (await client.delete(f"/api/artifacts/{uid}", cookies=cookies, headers=headers)).status_code == 200
-    assert (await client.get(f"/api/artifacts/{uid}")).status_code == 404
-    assert (await client.get(f'/api/artifacts/public/{response.json()["public_token"]}/content')).status_code == 404
+    assert (await client.delete(f"/api/pages/{uid}", cookies=cookies, headers=headers)).status_code == 200
+    assert (await client.get(f"/api/pages/{uid}")).status_code == 404
+    assert (await client.get(f'/api/pages/public/{response.json()["public_token"]}/content')).status_code == 404
     with pytest.raises(HTTPException) as exc:
         make(db)
     assert exc.value.status_code == 410
@@ -197,8 +197,8 @@ async def test_unauthenticated_private_denied_public_allowed(client, db):
     doc = make(db)
     public = artifacts.publish(db, doc, doc["latest_revision"])
     with patch("app.routers.artifacts.get_sync_db", return_value=db):
-        assert (await client.get(f'/api/artifacts/{doc["uuid"]}')).status_code == 401
-        response = await client.get(f'/api/artifacts/public/{public["public_token"]}/content')
+        assert (await client.get(f'/api/pages/{doc["uuid"]}')).status_code == 401
+        response = await client.get(f'/api/pages/public/{public["public_token"]}/content')
         assert response.status_code == 200
 
 
@@ -275,11 +275,11 @@ async def test_workflow_save_route_authorizes_before_reading_run_output(client, 
     cookies, headers = _auth()
     run = {"workflow": "wf1", "session_id": "run1", "status": "completed", "final_output": {"output": "<main>Run output</main>"}}
     with patch("app.services.workflow_service._get_authorized_workflow_result", AsyncMock(return_value=None)) as authorize:
-        response = await client.post("/api/artifacts/from-workflow/run1", cookies=cookies, headers=headers)
+        response = await client.post("/api/pages/from-workflow/run1", cookies=cookies, headers=headers)
         assert response.status_code == 404 and not db.html_artifacts.docs
         authorize.return_value = SimpleNamespace(model_dump=lambda: run)
-        first = await client.post("/api/artifacts/from-workflow/run1", cookies=cookies, headers=headers)
-        again = await client.post("/api/artifacts/from-workflow/run1", cookies=cookies, headers=headers)
+        first = await client.post("/api/pages/from-workflow/run1", cookies=cookies, headers=headers)
+        again = await client.post("/api/pages/from-workflow/run1", cookies=cookies, headers=headers)
     assert first.status_code == again.status_code == 200
     assert first.json()["uuid"] == again.json()["uuid"]
     assert first.json()["source"]["session_id"] == "run1"

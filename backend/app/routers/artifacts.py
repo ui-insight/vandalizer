@@ -73,14 +73,14 @@ async def authorized(uuid, user, manage=False):
         return doc
     if not manage and access_control.can_view_team(doc.get("team_id"), await access_control.get_team_access_context(user)):
         return doc
-    raise HTTPException(404, "Artifact not found")
+    raise HTTPException(404, "Page not found")
 
 
 def content_response(rev, download=False):
     return HTMLResponse(rev["html"], headers={
         "Content-Security-Policy": artifacts.CONTENT_CSP, "X-Frame-Options": "SAMEORIGIN",
         "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Robots-Tag": "noindex, nofollow",
-        **({"Content-Disposition": 'attachment; filename="artifact.html"'} if download else {}),
+        **({"Content-Disposition": 'attachment; filename="page.html"'} if download else {}),
     })
 
 
@@ -133,10 +133,10 @@ async def workflow_artifact(request: Request, session_id: str, step: str | None 
 
 async def public_doc(token, settings):
     if not settings.artifact_public_sharing_enabled:
-        raise HTTPException(404, "Artifact not found")
+        raise HTTPException(404, "Page not found")
     doc = await run(lambda db: db.html_artifacts.find_one({"public_token": token, "deleted_at": None}))
     if not doc or not doc.get("published_revision"):
-        raise HTTPException(404, "Artifact not found")
+        raise HTTPException(404, "Page not found")
     return doc, artifacts.revision(doc, doc["published_revision"])
 
 
@@ -188,11 +188,11 @@ async def share_team(uuid: str, body: ShareArtifactRequest, user: User = Depends
 @router.put("/{uuid}/publication")
 async def publish(uuid: str, body: PublishArtifactRequest, user: User = Depends(get_current_user), settings: Settings = Depends(get_settings)):
     if not settings.artifact_public_sharing_enabled:
-        raise HTTPException(403, "Public artifact sharing is disabled on this deployment.")
+        raise HTTPException(403, "Public page sharing is disabled on this deployment.")
     doc = await authorized(uuid, user, manage=True)
     saved = await run(artifacts.publish, doc, body.revision)
     if not saved:
-        raise HTTPException(404, "Artifact not found")
+        raise HTTPException(404, "Page not found")
     return artifacts.metadata(saved, True)
 
 

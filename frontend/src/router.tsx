@@ -498,8 +498,8 @@ const demoResendRoute = createRoute({
   component: DemoResend,
 })
 
-const artifactsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/artifacts', component: () => <ProtectedRoute><ArtifactsHome /></ProtectedRoute> })
-const artifactRoute = createRoute({ getParentRoute: () => rootRoute, path: '/artifacts/$uuid', component: () => {
+const artifactsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/pages', component: () => <ProtectedRoute><ArtifactsHome /></ProtectedRoute> })
+const artifactRoute = createRoute({ getParentRoute: () => rootRoute, path: '/pages/$uuid', component: () => {
   const { uuid } = artifactRoute.useParams()
   return <ProtectedRoute><ArtifactPage key={uuid} uuid={uuid} /></ProtectedRoute>
 } })

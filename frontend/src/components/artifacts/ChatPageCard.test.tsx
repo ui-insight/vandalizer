@@ -22,9 +22,9 @@ it('lets a user inspect an isolated preview and approve exactly once', () => {
 it('downloads the saved page revision separately from transcript exports', () => {
   const uuid = 'a'.repeat(32)
   render(<ToolStatusLine call={call} result={{ ...result, content: { artifact_uuid: uuid, title: 'Award report', revision: 'saved-version' } }} />)
-  expect(screen.getByRole('link', { name: 'Download HTML: Award report' })).toHaveAttribute('href', `/api/artifacts/${uuid}/revisions/saved-version/content?download=true`)
-  expect(screen.getByRole('link', { name: 'Share: Award report' })).toHaveAttribute('href', `/artifacts/${uuid}#share`)
-  expect(screen.getByTitle('Page preview')).toHaveAttribute('src', `/api/artifacts/${uuid}/revisions/saved-version/content`)
+  expect(screen.getByRole('link', { name: 'Download HTML: Award report' })).toHaveAttribute('href', `/api/pages/${uuid}/revisions/saved-version/content?download=true`)
+  expect(screen.getByRole('link', { name: 'Share: Award report' })).toHaveAttribute('href', `/pages/${uuid}#share`)
+  expect(screen.getByTitle('Page preview')).toHaveAttribute('src', `/api/pages/${uuid}/revisions/saved-version/content`)
 })
 it('never offers another approval for a historical decision', () => {
   render(<ToolStatusLine call={call} result={result} onConfirm={vi.fn()} approvalHistory={{ label: 'Result recorded', detail: 'Saved below.' }} />)

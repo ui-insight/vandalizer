@@ -56,22 +56,22 @@ async def test_pages_pagination_search_and_team_revocation(client, db, route_env
     for i in range(121):
         artifacts.create(db, 'testuser', f'Page {i:03}', '<p>Private</p>', str(i))
     other = artifacts.create(db, 'other', 'Hidden', '<p>Hidden</p>', 'other', {'conversation_uuid': 'secret'})
-    result = (await client.get('/api/artifacts/browse?page=6&sort=title')).json()
+    result = (await client.get('/api/pages/browse?page=6&sort=title')).json()
     assert result['total'] == 121 and len(result['items']) == 20
     assert result['items'][0]['title'] == 'Page 100'
     assert 'Private' not in str(result)
     literal = artifacts.create(db, 'testuser', 'Report (C++)', '<p>x</p>', 'literal')
     # An earlier saved page has no top-level title; search still finds it.
     next(d for d in db.html_artifacts.docs if d['uuid'] == literal['uuid']).pop('title')
-    result = (await client.get('/api/artifacts/browse', params={'search': '(C++)'})).json()
+    result = (await client.get('/api/pages/browse', params={'search': '(C++)'})).json()
     assert [d['uuid'] for d in result['items']] == [literal['uuid']]
     db.html_artifacts.update_one({'uuid': other['uuid']}, {'$set': {'team_id': 'team-a'}})
     route_env.access.return_value = TeamAccessContext(team_uuids={'team-a'})
-    visible = (await client.get('/api/artifacts/browse?search=Hidden')).json()['items']
+    visible = (await client.get('/api/pages/browse?search=Hidden')).json()['items']
     assert len(visible) == 1 and 'source' not in visible[0]
     route_env.access.return_value = TeamAccessContext()
-    assert (await client.get('/api/artifacts/browse?search=Hidden')).json()['items'] == []
-    assert (await client.get('/api/artifacts/browse?page=0')).status_code == 422
+    assert (await client.get('/api/pages/browse?search=Hidden')).json()['items'] == []
+    assert (await client.get('/api/pages/browse?page=0')).status_code == 422
 
 
 @pytest.mark.asyncio
@@ -82,12 +82,12 @@ async def test_project_pages_include_generated_and_pinned_without_granting_acces
     private = artifacts.create(db, 'other', 'Private', '<p>secret</p>', 'three', {'project_uuid': 'p1'})
     artifacts.create(db, 'testuser', 'Unrelated', '<p>c</p>', 'four')
     with patch.object(project_service, 'get_authorized_project', AsyncMock(return_value=SimpleNamespace(uuid='p1'))) as authorize, patch('app.models.project.ProjectPin.find', return_value=SimpleNamespace(to_list=AsyncMock(return_value=[SimpleNamespace(target_id=pinned['uuid']), SimpleNamespace(target_id=private['uuid'])]))):
-        result = (await client.get('/api/artifacts/browse?project_uuid=p1')).json()
+        result = (await client.get('/api/pages/browse?project_uuid=p1')).json()
         assert {d['uuid'] for d in result['items']} == {generated['uuid'], pinned['uuid']}
         authorize.return_value = None
-        assert (await client.get('/api/artifacts/browse?project_uuid=p1')).status_code == 404
+        assert (await client.get('/api/pages/browse?project_uuid=p1')).status_code == 404
         cookies, headers = _auth()
-        response = await client.post('/api/artifacts', json={'title': 'Page', 'html': '<p>x</p>', 'request_id': 'denied', 'project_uuid': 'p1'}, cookies=cookies, headers=headers)
+        response = await client.post('/api/pages', json={'title': 'Page', 'html': '<p>x</p>', 'request_id': 'denied', 'project_uuid': 'p1'}, cookies=cookies, headers=headers)
         assert response.status_code == 404
         assert len(db.html_artifacts.docs) == 4
 
@@ -144,11 +144,11 @@ async def test_transcript_origin_requires_owned_chat_and_project_access(client, 
     payload = {'request_id': 'transcript', 'messages': [{'role': 'assistant', 'content': 'Reviewed'}],
                'project_uuid': 'p1', 'conversation_uuid': 'c1'}
     with patch.object(project_service, 'get_authorized_project', AsyncMock(return_value=SimpleNamespace(uuid='p1'))), patch('app.models.chat.ChatConversation.find_one', AsyncMock(return_value=None)) as conversation:
-        response = await client.post('/api/artifacts/from-chat', json=payload, cookies=cookies, headers=headers)
+        response = await client.post('/api/pages/from-chat', json=payload, cookies=cookies, headers=headers)
         assert response.status_code == 404 and db.html_artifacts.docs == []
         conversation.assert_awaited_with({'uuid': 'c1', 'user_id': 'testuser'})
         conversation.return_value = SimpleNamespace(uuid='c1')
-        response = await client.post('/api/artifacts/from-chat', json=payload, cookies=cookies, headers=headers)
+        response = await client.post('/api/pages/from-chat', json=payload, cookies=cookies, headers=headers)
         assert response.status_code == 200
         assert response.json()['source'] == {'kind': 'chat_export', 'conversation_uuid': 'c1', 'project_uuid': 'p1'}
         assert db.html_artifacts.docs[0]['project_uuid'] == 'p1'

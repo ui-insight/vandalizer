@@ -5,7 +5,7 @@ import { PagesBrowser } from '../components/artifacts/PagesBrowser'
 import { PageBadge, PageDialog, PagePreview, pagesUrl } from '../components/artifacts/PagePrimitives'
 import { listTeams } from '../api/teams'
 
-const errorMessage = (error: unknown) => error instanceof Error ? error.message.replace(/\bArtifact\b/g, 'Page').replace(/\bartifact\b/g, 'page') : 'Could not complete this action. Please try again.'
+const errorMessage = (error: unknown) => error instanceof Error ? error.message : 'Could not complete this action. Please try again.'
 
 export function ArtifactsHome() {
   return <main className="page-workspace"><div className="page-workspace-inner"><nav className="page-breadcrumb" aria-label="Breadcrumb"><a href={pagesUrl()}><ArrowLeft size={15} />Back to Files → Pages</a></nav><PagesBrowser /></div></main>
@@ -106,7 +106,7 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
       <section className="page-share-section"><h3><LockKeyhole size={17} />Workspace access</h3><p>This link opens the saved page for you{artifact.team_id ? ' and your team' : ''}. It does not make the page public.</p>
         <label>Who can access<select aria-label="Workspace page access" value={team} disabled={busy || teamError} onChange={e => setTeam(e.target.value)}><option value="">Only me</option>{teams.map(t => <option key={t.uuid} value={t.uuid}>{t.name}</option>)}</select></label>
         {teamError && <p role="alert">Team options could not be loaded. <button className="underline" onClick={() => void action(async () => { setTeams(await listTeams()); setTeamError(false) })}>Retry teams</button></p>}
-        <div className="page-actions"><button className="page-button" disabled={busy || teamError || team === (artifact.team_id || '')} onClick={() => void action(async () => { await api.shareArtifactTeam(uuid, team || null); await reload(); setNotice('Workspace access updated.') })}>Save access</button><button className="page-button" disabled={busy} onClick={() => copy(`${window.location.origin}/artifacts/${uuid}`, 'Workspace link copied. The recipient still needs access.')}><Copy size={15} />Copy private link</button></div>
+        <div className="page-actions"><button className="page-button" disabled={busy || teamError || team === (artifact.team_id || '')} onClick={() => void action(async () => { await api.shareArtifactTeam(uuid, team || null); await reload(); setNotice('Workspace access updated.') })}>Save access</button><button className="page-button" disabled={busy} onClick={() => copy(`${window.location.origin}/pages/${uuid}`, 'Workspace link copied. The recipient still needs access.')}><Copy size={15} />Copy private link</button></div>
       </section>
       <section className="page-share-section"><h3><Globe2 size={17} />Public link {publishedVersion > 0 && <PageBadge published>Version {publishedVersion} is live</PageBadge>}</h3>
         <p>{publishedVersion ? `Anyone with this link can view version ${publishedVersion}. Later edits stay private until you publish them.` : `Publish version ${version} so anyone with its link can view it. Check the page for private information before publishing.`}</p>

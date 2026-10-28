@@ -53,7 +53,7 @@ export function PagesBrowser({ projectUuid, canManage = false }: { projectUuid?:
   }
   const newPage = () => void act(async () => {
     const saved = await createArtifact('Untitled page', '<style>body{font:17px/1.7 system-ui;color:#263245;max-width:760px;margin:64px auto;padding:0 28px}h1{font-size:36px;line-height:1.2}</style><main><h1>Your next idea starts here.</h1><p>Use “Request changes” to describe the page you want, or open the HTML editor to make it your own.</p></main>', request.current, projectUuid)
-    window.location.assign(`/artifacts/${saved.uuid}`)
+    window.location.assign(`/pages/${saved.uuid}`)
   })
   return <section aria-label={projectUuid ? 'Project pages' : 'Saved pages'} className="pages-library">
     <header className="pages-library-heading"><div><p className="page-eyebrow">{projectUuid ? 'PROJECT LIBRARY' : 'YOUR LIBRARY'}</p><h2>{adding ? 'Add an existing page' : projectUuid ? 'Project pages' : 'Pages'}</h2></div><button className="page-button page-button-primary" disabled={busy} onClick={newPage}><Plus size={16} />{busy ? 'Working…' : 'New page'}</button></header>
@@ -64,7 +64,7 @@ export function PagesBrowser({ projectUuid, canManage = false }: { projectUuid?:
     {loading ? <p role="status" className="pages-loading"><Loader2 size={18} className="animate-spin" />Loading your pages…</p> : result && <>
       {!result.items.length && <div className="pages-empty">{query ? <Search size={30} /> : <FileText size={30} />}<h3>{query ? 'No pages match your search.' : 'A home for your finished work'}</h3><p>{query ? 'Try a different title, or clear the search to see all your pages.' : 'Ask the assistant to create a page, save a workflow result, or start with a blank page.'}</p>{query ? <button className="page-button" onClick={() => setSearch('')}>Clear search</button> : <button className="page-button page-button-primary" disabled={busy} onClick={newPage}><Plus size={16} />Create your first page</button>}</div>}
       <ul className="pages-results">{result.items.map(item => {
-        const href = `/artifacts/${encodeURIComponent(item.uuid)}`
+        const href = `/pages/${encodeURIComponent(item.uuid)}`
         const date = item.updated_at ? new Date(item.updated_at) : null
         const validDate = date && !Number.isNaN(date.getTime())
         const Origin = item.source?.kind === 'workflow' ? Workflow : MessageSquare

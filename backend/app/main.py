@@ -164,7 +164,7 @@ class SecurityHeadersMiddleware:
                 headers["X-Content-Type-Options"] = "nosniff"
                 headers["X-Frame-Options"] = headers.get("X-Frame-Options", "DENY")
                 headers["Referrer-Policy"] = headers.get("Referrer-Policy", "strict-origin-when-cross-origin")
-                if scope.get("path", "").startswith("/api/artifacts"):
+                if scope.get("path", "").startswith("/api/pages"):
                     headers["Cache-Control"] = "no-store"
                     headers["X-Robots-Tag"] = "noindex, nofollow"
                 headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
@@ -230,7 +230,7 @@ app.include_router(extractions.router, prefix="/api/extractions", tags=["extract
 app.include_router(workflows.router, prefix="/api/workflows", tags=["workflows"])
 app.include_router(config.router, prefix="/api/config", tags=["config"])
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
-app.include_router(artifacts.router, prefix="/api/artifacts", tags=["artifacts"])
+app.include_router(artifacts.router, prefix="/api/pages", tags=["pages"])
 app.include_router(activity.router, prefix="/api/activity", tags=["activity"])
 app.include_router(library.router, prefix="/api/library", tags=["library"])
 app.include_router(feedback.router, prefix="/api/feedback", tags=["feedback"])

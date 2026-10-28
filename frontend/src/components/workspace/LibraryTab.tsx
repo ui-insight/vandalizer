@@ -753,7 +753,7 @@ export function LibraryTab() {
             </div>
       }>
         {/* Saved ownership views and shared discovery. */}
-        <a href="/artifacts" className="mb-2 inline-block text-sm underline">Open saved Artifacts</a>
+        <a href="/pages" className="mb-2 inline-block text-sm underline">Open saved pages</a>
         <div role="group" aria-label="Library views" className="library-scope-tabs" style={{ display: 'flex', gap: 0, margin: 0 }}>
           {([
             { key: 'mine' as const, label: 'Mine' },

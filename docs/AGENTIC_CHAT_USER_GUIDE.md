@@ -42,13 +42,13 @@ Exports include readable tool summaries, recorded sources, and warnings about un
 
 The rating buttons have been removed. Use the existing **Support** control for help; historical ratings remain in Support Center.
 
-## Hosted Artifacts
+## Pages
 
-Choose **Export → Save as Artifact**, or ask the Assistant to create an HTML report. The Assistant previews the page and asks for approval before saving it privately. Ask for changes to create a new revision. Open the saved card to inspect, edit, download, or share it; find saved pages through **Files → Pages** or **Library → Open saved Artifacts**. Search, sort, and paginate to return to older pages. Project details include their own Pages section, and owners see links back to a recorded originating chat or workflow run. Adding a page to a project preserves its existing access restrictions.
+Choose **Export → Save transcript as page**, or ask the Assistant to create an HTML report. The Assistant previews the page and asks for approval before saving it privately. Ask for changes to create a new revision. Open the saved card to inspect, edit, download, or share it; find saved pages through **Files → Pages** or **Library → Open saved pages**. Search, sort, and paginate to return to older pages. Project details include their own Pages section, and owners see links back to a recorded originating chat or workflow run. Adding a page to a project preserves its existing access restrictions.
 
-Private links require sign-in and your permission. You can grant one team read access, or explicitly publish the selected revision for anyone with its public link. New edits do not change the published revision until you publish again. **Unpublish and revoke link** disables the public URL. Downloads and already loaded copies cannot be recalled.
+Private links require sign-in and your permission. You can grant one team read access, or explicitly publish the selected revision for anyone with its public link. New edits do not change the published revision until you publish again. **Remove public link** disables the public URL. Downloads and already loaded copies cannot be recalled.
 
-Workflows also offer **Save as Artifact** on completed results and an output setting that creates a private artifact after each run. Pages support static HTML/CSS and embedded raster images; scripts, forms, and remote assets are blocked. See [Hosted HTML Artifacts](./HTML_ARTIFACTS.md) for limits and sharing details.
+Workflows also offer **Save as page** on completed results and an output setting that creates a private page after each run. Pages support static HTML/CSS and embedded raster images; scripts, forms, and remote assets are blocked. See [Pages](./HTML_ARTIFACTS.md) for limits and sharing details.
 
 ## What you can ask the chat to do
 

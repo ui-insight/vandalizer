@@ -113,6 +113,6 @@ export function ChatExportActions({ messages, scope = 'message', names = {}, dis
       {formats.map(([format, label]) => <button key={format} type="button" role="menuitem" disabled={disabled} className={`block min-h-10 w-full rounded px-3 py-2 text-left text-sm hover:bg-gray-100 focus:bg-gray-100 disabled:opacity-50 ${format === 'artifact' ? 'mt-1 border-t border-slate-200 pt-3' : ''}`} onClick={() => void run(format)}>{label}</button>)}
     </div>, document.body)}
     {error && <p role="alert" className="w-full text-xs">{error}</p>}
-    {savedArtifact && <a className="text-xs underline" href={`/artifacts/${savedArtifact}`} target="_blank" rel="noreferrer">Open saved page</a>}
+    {savedArtifact && <a className="text-xs underline" href={`/pages/${savedArtifact}`} target="_blank" rel="noreferrer">Open saved page</a>}
   </div>
 }

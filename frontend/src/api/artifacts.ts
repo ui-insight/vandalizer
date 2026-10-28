@@ -15,18 +15,18 @@ export interface Artifact {
   public_sharing_enabled?: boolean
   revisions: { uuid: string; title: string; created_at: string; warnings: string[] }[]
 }
-const path = (id: string) => `/api/artifacts/${encodeURIComponent(id)}`
+const path = (id: string) => `/api/pages/${encodeURIComponent(id)}`
 export interface ArtifactPageResult { items: Artifact[]; total: number; page: number; page_size: number }
 export const browseArtifacts = (params: { search?: string; sort?: string; page?: number; project_uuid?: string }) => {
   const query = new URLSearchParams()
   for (const [key, value] of Object.entries(params)) if (value !== undefined) query.set(key, String(value))
-  return apiFetch<ArtifactPageResult>(`/api/artifacts/browse?${query}`)
+  return apiFetch<ArtifactPageResult>(`/api/pages/browse?${query}`)
 }
-export const listArtifacts = () => apiFetch<Artifact[]>('/api/artifacts')
+export const listArtifacts = () => apiFetch<Artifact[]>('/api/pages')
 export const getArtifact = (id: string) => apiFetch<Artifact>(path(id))
 export const getPublicArtifact = (token: string) => apiFetch<{ title: string; revision: string }>(`${path('public')}/${encodeURIComponent(token)}`)
-export const createArtifact = (title: string, html: string, requestId: string, projectUuid?: string) => apiFetch<Artifact>('/api/artifacts', { method: 'POST', body: JSON.stringify({ title, html, request_id: requestId, project_uuid: projectUuid }) })
-export const saveChatArtifact = (messages: ExportMessage[], requestId: string, source?: { project_uuid?: string; conversation_uuid?: string }) => apiFetch<Artifact>('/api/artifacts/from-chat', { method: 'POST', body: JSON.stringify({ messages, request_id: requestId, ...source }) })
+export const createArtifact = (title: string, html: string, requestId: string, projectUuid?: string) => apiFetch<Artifact>('/api/pages', { method: 'POST', body: JSON.stringify({ title, html, request_id: requestId, project_uuid: projectUuid }) })
+export const saveChatArtifact = (messages: ExportMessage[], requestId: string, source?: { project_uuid?: string; conversation_uuid?: string }) => apiFetch<Artifact>('/api/pages/from-chat', { method: 'POST', body: JSON.stringify({ messages, request_id: requestId, ...source }) })
 export const saveWorkflowArtifact = (sessionId: string) => apiFetch<Artifact>(`${path('from-workflow')}/${encodeURIComponent(sessionId)}`, { method: 'POST' })
 export const artifactContentUrl = (id: string, revision: string) => `${path(id)}/revisions/${encodeURIComponent(revision)}/content`
 export const publicArtifactContentUrl = (token: string) => `${path('public')}/${encodeURIComponent(token)}/content`

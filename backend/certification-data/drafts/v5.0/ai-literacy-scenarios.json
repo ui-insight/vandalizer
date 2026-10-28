@@ -281,7 +281,7 @@
         {
           "id": "published",
           "text": "The exported answer is now hosted at a public link.",
-          "feedback": "An XLSX download does not publish a hosted Artifact."
+          "feedback": "An XLSX download does not publish a hosted page."
         }
       ],
       "correct_choice_id": "inspect"

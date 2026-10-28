@@ -415,9 +415,9 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
 
     case 'create_html_artifact':
     case 'revise_html_artifact':
-      return { text: `Saved private artifact: ${String(obj.title || 'HTML page')}`, qualityHint }
+      return { text: `Saved private page: ${String(obj.title || 'HTML page')}`, qualityHint }
     case 'get_html_artifact':
-      return { text: `Read artifact: ${String(obj.title || 'HTML page')}`, qualityHint }
+      return { text: `Read page: ${String(obj.title || 'HTML page')}`, qualityHint }
     case 'save_to_folder': {
       const t = obj.title ? `"${String(obj.title).slice(0, 40)}"` : 'document'
       return { text: `Saved ${t}`, qualityHint }

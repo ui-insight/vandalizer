@@ -87,7 +87,7 @@ function expectDocumentRequest() {
 
 describe('Show me what you can do', () => {
   it('prepares a page edit draft without sending a chat message', async () => {
-    renderPanel({ message: 'Update this page: /artifacts/page-id. Make the title shorter.', draftOnly: true })
+    renderPanel({ message: 'Update this page: /pages/page-id. Make the title shorter.', draftOnly: true })
     await waitFor(() => expect(mocks.workspace.focusChat).toHaveBeenCalledOnce())
     expect(mocks.send).not.toHaveBeenCalled()
     expect(mocks.selectSkill).not.toHaveBeenCalled()

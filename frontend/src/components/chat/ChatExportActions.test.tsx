@@ -28,7 +28,7 @@ describe('shared chat export actions', () => {
     await screen.findByRole('alert')
     fireEvent.click(screen.getByRole('button', { name: 'Export message' }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Save transcript as page' }))
-    expect(await screen.findByRole('link', { name: 'Open saved page' })).toHaveAttribute('href', '/artifacts/artifact1')
+    expect(await screen.findByRole('link', { name: 'Open saved page' })).toHaveAttribute('href', '/pages/artifact1')
     const calls = vi.mocked(saveChatArtifact).mock.calls
     expect(calls[0][0]).toHaveLength(1)
     expect(calls[0][0][0].content).toBe('The award is $10.')

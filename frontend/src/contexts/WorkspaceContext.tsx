@@ -901,7 +901,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     if (search.editPage) {
       let request = ''
       try { request = sessionStorage.getItem(`pages:edit-request:${search.editPage}`) || ''; sessionStorage.removeItem(`pages:edit-request:${search.editPage}`) } catch { /* A draft can still be prepared without stored details. */ }
-      sendChatMessage(`Update this page: ${window.location.origin}/artifacts/${search.editPage}\n\n${request.slice(0, 8000)}\n\nShow me the proposed update before saving.`, { draftOnly: true })
+      sendChatMessage(`Update this page: ${window.location.origin}/pages/${search.editPage}\n\n${request.slice(0, 8000)}\n\nShow me the proposed update before saving.`, { draftOnly: true })
     }
     updateSearch(prev => ({ ...prev, mode: 'chat', tab: undefined, conversation: undefined, skill: undefined, editPage: undefined }))
   }, [search.project, search.conversation, search.skill, search.editPage, activeProjectUuid, sendChatMessage, updateSearch])

@@ -103,7 +103,7 @@
     {
       "id": "governance.published_revision",
       "outcome_id": "governance.review_and_revision",
-      "prompt": "You published HTML Artifact revision 1 and later saved a corrected revision 2. Which account of the public page is accurate?",
+      "prompt": "You published page revision 1 and later saved a corrected revision 2. Which account of the public page is accurate?",
       "choices": [
         {
           "id": "review_publish",
@@ -126,7 +126,7 @@
     {
       "id": "governance.revoke_page",
       "outcome_id": "governance.review_and_revision",
-      "prompt": "You unpublish a hosted HTML Artifact after a reader downloaded it. What can you accurately report?",
+      "prompt": "You unpublish a hosted page after a reader downloaded it. What can you accurately report?",
       "choices": [
         {
           "id": "link_revoked",

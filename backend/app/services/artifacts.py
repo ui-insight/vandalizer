@@ -33,9 +33,9 @@ def clean_html(html: str, title: str) -> tuple[str, list[str]]:
         size = len(html.encode("utf-8"))
         title.encode("utf-8")
     except UnicodeError as exc:
-        raise HTTPException(422, "Artifact text must be valid Unicode.") from exc
+        raise HTTPException(422, "Page text must be valid Unicode.") from exc
     if size > MAX_HTML_BYTES:
-        raise HTTPException(422, "Artifacts support at most 256 KiB of self-contained HTML.")
+        raise HTTPException(422, "Pages support at most 256 KiB of self-contained HTML.")
     soup = BeautifulSoup(html, "html.parser")
     removed = False
     for comment in soup.find_all(string=lambda text: isinstance(text, Comment)):
@@ -74,7 +74,7 @@ def clean_html(html: str, title: str) -> tuple[str, list[str]]:
     body = soup.body.decode_contents() if soup.body else str(soup)
     result = f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="{CONTENT_CSP}"><title>{escape(title)}</title>{styles}</head><body>{body}</body></html>'
     if len(result.encode("utf-8")) > MAX_HTML_BYTES:
-        raise HTTPException(422, "Rendered artifact exceeds 256 KiB. Reduce content or inline images.")
+        raise HTTPException(422, "Rendered page exceeds 256 KiB. Reduce content or inline images.")
     return result, ["Unsupported HTML, scripts, or remote assets were removed. Review the saved preview."] if removed else []
 
 
@@ -97,7 +97,7 @@ def create(db, user_id, title, html, request_id, source=None):
         "created_at": now, "updated_at": now, "deleted_at": None,
     }}, upsert=True, return_document=ReturnDocument.AFTER)
     if doc.get("deleted_at"):
-        raise HTTPException(410, "This artifact was deleted. Start a new artifact.")
+        raise HTTPException(410, "This page was deleted. Start a new page.")
     if doc["revisions"][0]["sha256"] != revision["sha256"]:
         raise HTTPException(409, "This save request was already used for different content.")
     return doc
@@ -106,14 +106,14 @@ def create(db, user_id, title, html, request_id, source=None):
 def get(db, uuid):
     doc = db.html_artifacts.find_one({"uuid": uuid, "deleted_at": None})
     if not doc:
-        raise HTTPException(404, "Artifact not found")
+        raise HTTPException(404, "Page not found")
     return doc
 
 
 def revision(doc, uuid=None):
     selected = next((r for r in doc["revisions"] if r["uuid"] == (uuid or doc["latest_revision"])), None)
     if not selected:
-        raise HTTPException(404, "Artifact revision not found")
+        raise HTTPException(404, "Page revision not found")
     return selected
 
 
@@ -122,13 +122,13 @@ def revise(db, doc, title, html, base_revision, source=None):
     if any(r["uuid"] == new["uuid"] for r in doc["revisions"]):
         return doc  # a retried save must not append again
     if len(doc["revisions"]) >= MAX_REVISIONS:
-        raise HTTPException(422, "This artifact has 25 revisions. Create a new artifact to continue.")
+        raise HTTPException(422, "This page has 25 revisions. Create a new page to continue.")
     saved = db.html_artifacts.find_one_and_update({
         "uuid": doc["uuid"], "user_id": doc["user_id"], "deleted_at": None,
         "latest_revision": base_revision,
     }, {"$push": {"revisions": new}, "$set": {"title": title, "latest_revision": new["uuid"], "updated_at": new["created_at"]}}, return_document=ReturnDocument.AFTER)
     if not saved:
-        raise HTTPException(409, "This artifact changed. Reload before saving another revision.")
+        raise HTTPException(409, "This page changed. Reload before saving another revision.")
     return saved
 
 
@@ -159,7 +159,7 @@ def workflow_html(output, title):
             return value.get("type") == "file_download" or any(has_file(v) for v in value.values())
         return isinstance(value, list) and any(has_file(v) for v in value)
     if has_file(output):
-        raise HTTPException(422, "Use the text or HTML step output to create an artifact, not a binary file.")
+        raise HTTPException(422, "Use the text or HTML step output to create a page, not a binary file.")
     if isinstance(output, str):
         text = output.strip()
         if text.startswith('```html') and text.endswith('```'):
@@ -175,7 +175,7 @@ def workflow_html(output, title):
 
 def from_workflow(db, result, user_id, step=None):
     if result.get("status") != "completed":
-        raise HTTPException(409, "Finish the workflow before creating its artifact.")
+        raise HTTPException(409, "Finish the workflow before creating its page.")
     workflow = db.workflow.find_one({"_id": result.get("workflow")}) or {}
     title = (workflow.get("name") or "Workflow output")[:200]
     output = (result.get("final_output") or {}).get("output")
@@ -195,7 +195,7 @@ def from_workflow(db, result, user_id, step=None):
 
 def deliver_workflow_artifact(db, result, user_id):
     """Idempotent output delivery, with a visible failure and a manual retry path."""
-    failure = "The HTML artifact could not be created. Use Save as Artifact on the completed run to retry."
+    failure = "The HTML page could not be created. Use Save as page on the completed run to retry."
     try:
         doc = from_workflow(db, result, user_id)
         db.workflow_result.update_one({"_id": result["_id"]}, {
@@ -204,7 +204,7 @@ def deliver_workflow_artifact(db, result, user_id):
         return {"status": "completed", "artifact_uuid": doc["uuid"]}
     except Exception:
         import logging
-        logging.getLogger(__name__).exception("Artifact delivery failed for workflow run %s", result.get("session_id"))
+        logging.getLogger(__name__).exception("Page delivery failed for workflow run %s", result.get("session_id"))
         db.workflow_result.update_one({"_id": result["_id"]}, {"$addToSet": {"delivery_failures": failure}})
         return {"status": "failed", "error": failure}
 

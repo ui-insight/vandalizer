@@ -25,11 +25,11 @@ def _source(context):
 
 
 async def get_html_artifact(context: RunContext[AgenticChatDeps], artifact_uuid: str) -> dict:
-    """Read your own artifact's latest saved HTML and revision before revising it."""
+    """Read your own page's latest saved HTML and revision before revising it."""
     try:
         doc = await _call(artifacts.get, artifact_uuid)
         if doc["user_id"] != context.deps.user_id:
-            return {"error": "Artifact not found or you do not own it."}
+            return {"error": "Page not found or you do not own it."}
         rev = artifacts.revision(doc)
         return {"artifact_uuid": doc["uuid"], "title": rev["title"], "revision": rev["uuid"], "html": rev["html"]}
     except HTTPException as exc:
@@ -46,7 +46,7 @@ async def create_html_artifact(context: RunContext[AgenticChatDeps], title: str,
 
 
 async def revise_html_artifact(context: RunContext[AgenticChatDeps], artifact_uuid: str, base_revision: str, title: str, html: str, confirmed: bool = False) -> dict:
-    """Preview then save a new revision of your own artifact. Read it with get_html_artifact first.
+    """Preview then save a new revision of your own page. Read it with get_html_artifact first.
 
     Send full replacement HTML and the exact base_revision read. The prior published
     revision remains unchanged. Publication is an explicit owner action in the viewer.
@@ -65,14 +65,14 @@ async def _save(context, title, html, confirmed, artifact_uuid=None, base_revisi
         if artifact_uuid:
             doc = await _call(artifacts.get, artifact_uuid)
             if doc["user_id"] != context.deps.user_id:
-                return {"error": "Artifact not found or you do not own it."}
+                return {"error": "Page not found or you do not own it."}
             if doc["latest_revision"] != base_revision:
-                return {"error": "Artifact changed. Read the latest revision before proposing an edit."}
+                return {"error": "Page changed. Read the latest revision before proposing an edit."}
         name = "revise_html_artifact" if artifact_uuid else "create_html_artifact"
         gate = await _confirm_gate(context, tool_name=name,
             key={"artifact": artifact_uuid, "base": base_revision, "sha256": digest}, confirmed=confirmed,
             preview={"needs_confirmation": True, "action": name,
-                     "preview": f'Save a private HTML artifact: {title}. This does not publish it.',
+                     "preview": f'Save a private HTML page: {title}. This does not publish it.',
                      "artifact_preview_html": prepared, "warnings": warnings})
         if gate is not None:
             return gate
@@ -82,6 +82,6 @@ async def _save(context, title, html, confirmed, artifact_uuid=None, base_revisi
             key = f"chat:{context.deps.conversation.uuid}:{digest}"
             saved = await _call(artifacts.create, context.deps.user_id, title, html, key, _source(context))
         return {"artifact_uuid": saved["uuid"], "title": title, "revision": saved["latest_revision"],
-                "url": f'/artifacts/{saved["uuid"]}', "visibility": "private", "warnings": warnings}
+                "url": f'/pages/{saved["uuid"]}', "visibility": "private", "warnings": warnings}
     except HTTPException as exc:
         return {"error": exc.detail}

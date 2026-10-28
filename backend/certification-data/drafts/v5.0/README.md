@@ -34,7 +34,7 @@ The internal `TransitionPreview.inspect` uses a packaged outcome contract to sho
 
 `ai-literacy-teaching.json` contains all nine lesson replacements with explicit revisions and revised module metadata for a future course; `ai-literacy-scenarios.json` now contains twelve recognition scenarios (bank revision 2). The deterministic scenario kernel has regression coverage for every wrong choice and exact bank identity. These files are outside the course registry. Authenticated, enrollment-pinned scenario receipts and a learner answer/retry interface are implemented behind the disabled course rollout. Public definitions exclude answer keys, replay preserves the original choices, and scenario results award no XP or completion. The recognition mechanism is marked `implemented`; earned-credit integration and outcome release verification remain open. See checkpoints 20–24, 46, 60 and 62 in the implementation progress log for evidence and limits.
 
-## Skills, chat exports and hosted HTML Artifacts — October 27, 2026
+## Skills, chat exports and hosted pages — October 27, 2026
 
 Nine revised lessons across AI Literacy, Output and Delivery, and Governance teach Library Skill selection and pinned instructions, message/conversation HTML/DOCX/XLSX downloads, and private hosted HTML pages from chat and completed workflows. They explain static HTML/CSS limits, team access, explicit publication of a selected revision, and revocation that cannot recall downloaded copies. Workflow Prompt steps retain their existing meaning. Hosted workflow output is a saved output setting rather than a graph node.
 

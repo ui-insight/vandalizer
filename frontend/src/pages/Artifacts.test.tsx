@@ -23,7 +23,7 @@ it('shows the pinned public page without loading private metadata or management 
   const frame = screen.getByTitle('Page preview')
   expect(frame).toHaveAttribute('sandbox', '')
   expect(frame).toHaveAttribute('referrerpolicy', 'no-referrer')
-  expect(frame).toHaveAttribute('src', '/api/artifacts/public/public-link/content')
+  expect(frame).toHaveAttribute('src', '/api/pages/public/public-link/content')
 })
 
 it('publishes exactly the selected saved revision and revokes an existing link', async () => {
@@ -38,7 +38,7 @@ it('publishes exactly the selected saved revision and revokes an existing link',
 
 it('retains an unsaved edit when the server rejects a stale base revision', async () => {
   vi.mocked(api.artifactSource).mockResolvedValue({ title: 'Private draft', html: '<main>Original</main>' })
-  vi.mocked(api.reviseArtifact).mockRejectedValue(new Error('This artifact changed. Reload before saving another revision.'))
+  vi.mocked(api.reviseArtifact).mockRejectedValue(new Error('This page changed. Reload before saving another revision.'))
   render(<ArtifactPage uuid="a1" />)
   fireEvent.click(await screen.findByRole('button', { name: 'Edit HTML' }))
   fireEvent.change(await screen.findByLabelText('HTML'), { target: { value: '<main>Unsaved edit</main>' } })
@@ -62,7 +62,7 @@ it('requires explicit access saving and respects the deployment publish switch',
 })
 
 it('shows a revoked public link error without rendering an iframe', async () => {
-  vi.mocked(api.getPublicArtifact).mockRejectedValue(new Error('Artifact not found'))
+  vi.mocked(api.getPublicArtifact).mockRejectedValue(new Error('Page not found'))
   render(<ArtifactPage publicToken="revoked" />)
   expect(await screen.findByRole('alert')).toHaveTextContent('Page not found')
   expect(screen.queryByTitle('Page preview')).not.toBeInTheDocument()
