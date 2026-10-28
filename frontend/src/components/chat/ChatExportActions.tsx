@@ -100,7 +100,9 @@ export function ChatExportActions({ messages, scope = 'message', names = {}, dis
     {canExport && <button ref={button} type="button" className="rounded p-1.5 hover:bg-black/10 disabled:opacity-50" aria-label={`Export ${scope}`} title={`Export ${scope}`} aria-haspopup="menu" aria-expanded={open} disabled={disabled || busy} onClick={() => setOpen(!open)}><Download size={16} /></button>}
     {busy && <span role="status" className="text-xs">Preparing export…</span>}
     {canExport && open && createPortal(<div ref={menu} role="menu" style={position} className="fixed z-[1000] w-[236px] max-h-[90vh] overflow-auto rounded-lg border bg-white p-1.5 text-gray-800 shadow-lg" aria-label={`Export ${scope} format`} onBlur={e => {
-      if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOpen(false)
+      // A pointer click in Safari can blur without focusing the selected
+      // button. Keep it mounted until click; outside pointers dismiss above.
+      if (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget as Node)) setOpen(false)
     }} onKeyDown={e => {
       if (e.key === 'Escape') { e.stopPropagation(); close() }
       if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) {

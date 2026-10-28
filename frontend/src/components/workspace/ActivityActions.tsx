@@ -37,7 +37,10 @@ export function ActivityActions({ title, disabled, onRename, onDelete }: {
   }, [open])
 
   return <div ref={root} className="activity-actions" onBlur={e => {
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) setOpen(false)
+    // Safari pointer clicks can blur to the document before dispatching click.
+    // Only a known outside focus target means the user has left the menu;
+    // outside pointer presses are handled separately above.
+    if (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget as Node)) setOpen(false)
   }}>
     <button ref={trigger} type="button" className="activity-actions__trigger"
       aria-label={`Actions for ${title}`} title="More actions" aria-haspopup="menu" aria-expanded={open}

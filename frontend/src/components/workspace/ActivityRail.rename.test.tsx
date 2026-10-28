@@ -5,6 +5,9 @@ import type { ActivityEvent } from '../../types/chat'
 const refresh = vi.fn()
 const toast = vi.fn()
 const renameActivity = vi.fn()
+const deleteActivity = vi.fn()
+const confirm = vi.fn()
+const triggerNewChat = vi.fn()
 
 const chat = (overrides: Partial<ActivityEvent> = {}): ActivityEvent => ({
   id: 'chat-1', type: 'conversation', status: 'completed',
@@ -23,13 +26,13 @@ vi.mock('../../hooks/useActivities', () => ({
 }))
 vi.mock('../../hooks/useMyReviewCount', () => ({ useMyReviewCount: () => ({ count: 0 }) }))
 vi.mock('../../api/activity', () => ({
-  deleteActivity: vi.fn(),
+  deleteActivity: (...args: unknown[]) => deleteActivity(...args),
   renameActivity: (...args: unknown[]) => renameActivity(...args),
 }))
 vi.mock('../../contexts/WorkspaceContext', () => ({
   useWorkspace: () => ({
-    railDocked: false, toggleRailDocked: vi.fn(), triggerNewChat: vi.fn(), focusChat: vi.fn(),
-    activitySignal: 0, currentConversationUuid: null, openWorkflowId: null, openExtractionId: null,
+    railDocked: false, toggleRailDocked: vi.fn(), triggerNewChat, focusChat: vi.fn(),
+    activitySignal: 0, currentConversationUuid: 'conv-1', openWorkflowId: null, openExtractionId: null,
   }),
 }))
 vi.mock('../../hooks/useOpenActivity', () => ({
@@ -37,7 +40,7 @@ vi.mock('../../hooks/useOpenActivity', () => ({
   useOpenActivity: () => ({ openActivity: vi.fn() }),
 }))
 vi.mock('../../contexts/ToastContext', () => ({ useToast: () => ({ toast }) }))
-vi.mock('../shared/useConfirm', () => ({ useConfirm: () => vi.fn() }))
+vi.mock('../shared/useConfirm', () => ({ useConfirm: () => confirm }))
 vi.mock('../../contexts/CertificationPanelContext', () => ({
   useCertificationPanel: () => ({ openPanel: vi.fn(), ...certification }),
 }))
@@ -52,6 +55,8 @@ beforeEach(() => {
 
 function startRename() {
   fireEvent.click(screen.getByRole('button', { name: /^Actions for/ }))
+  fireEvent.pointerDown(screen.getByRole('menuitem', { name: /^Rename chat:/ }))
+  fireEvent.blur(document.activeElement!, { relatedTarget: null })
   fireEvent.click(screen.getByRole('menuitem', { name: /^Rename chat:/ }))
   return screen.getByLabelText('Chat name') as HTMLInputElement
 }
@@ -103,6 +108,30 @@ describe('renaming a chat in the activity list (ticket)', () => {
     render(<ActivityRail />)
     fireEvent.click(screen.getByRole('button', { name: /^Actions for/ }))
     expect(screen.queryByRole('menuitem', { name: /^Rename chat:/ })).not.toBeInTheDocument()
+  })
+})
+
+describe('deleting from the activity rail', () => {
+  it.each([true, false])('honors confirmation (%s) after pointer blur and refreshes after deletion', async (approved) => {
+    confirm.mockResolvedValue(approved)
+    deleteActivity.mockResolvedValue({ status: 'success' })
+    render(<ActivityRail />)
+    fireEvent.click(screen.getByRole('button', { name: /^Actions for/ }))
+    fireEvent.pointerDown(screen.getByRole('menuitem', { name: /^Delete activity:/ }))
+    fireEvent.blur(document.activeElement!, { relatedTarget: null })
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Delete activity:/ }))
+    await waitFor(() => expect(confirm).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Delete from activity?', destructive: true,
+    })))
+    if (approved) {
+      await waitFor(() => expect(refresh).toHaveBeenCalledOnce())
+      expect(deleteActivity).toHaveBeenCalledWith('chat-1')
+      expect(triggerNewChat).toHaveBeenCalledOnce()
+    } else {
+      expect(deleteActivity).not.toHaveBeenCalled()
+      expect(triggerNewChat).not.toHaveBeenCalled()
+      expect(refresh).not.toHaveBeenCalled()
+    }
   })
 })
 

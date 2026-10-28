@@ -13,6 +13,7 @@ const messages: ChatMessage[] = [
 ]
 
 beforeEach(() => {
+  vi.mocked(saveChatArtifact).mockReset()
   vi.mocked(exportChat).mockReset().mockResolvedValue(new Blob(['file']))
   vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:test'), revokeObjectURL: vi.fn() })
   vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
@@ -20,6 +21,31 @@ beforeEach(() => {
 })
 
 describe('shared chat export actions', () => {
+  it('saves the conversation when pointer activation blurs the menu without a new focus target', async () => {
+    vi.mocked(saveChatArtifact).mockResolvedValue({ uuid: 'saved-conversation' } as Awaited<ReturnType<typeof saveChatArtifact>>)
+    const source = { conversation_uuid: 'conversation-1', project_uuid: 'project-1' }
+    render(<ChatExportActions messages={messages} scope="conversation" artifactSource={source} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Export conversation' }))
+    const item = screen.getByRole('menuitem', { name: 'Save transcript as page' })
+    fireEvent.pointerDown(item)
+    fireEvent.mouseDown(item)
+    fireEvent.blur(document.activeElement!, { relatedTarget: null })
+    fireEvent.mouseUp(item)
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Save transcript as page' }))
+    expect(await screen.findByRole('link', { name: 'Open saved page' })).toHaveAttribute('href', '/pages/saved-conversation')
+    expect(saveChatArtifact).toHaveBeenCalledWith([
+      expect.objectContaining({ role: 'user', content: 'Review the award' }),
+      expect.objectContaining({ role: 'assistant', content: 'The award is $10.' }),
+    ], expect.any(String), source)
+  })
+
+  it('dismisses when keyboard focus moves outside the export menu', () => {
+    render(<ChatExportActions messages={messages} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Export message' }))
+    fireEvent.blur(document.activeElement!, { relatedTarget: screen.getByRole('button', { name: 'Copy message' }) })
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+
   it('saves only the selected bubble as a private artifact and reuses the retry identity', async () => {
     vi.mocked(saveChatArtifact).mockRejectedValueOnce(new Error('Connection lost')).mockResolvedValueOnce({ uuid: 'artifact1' } as Awaited<ReturnType<typeof saveChatArtifact>>)
     render(<ChatExportActions messages={[messages[1]]} />)
