@@ -1,11 +1,11 @@
 import './chat-message-actions.css'
 import { activityLabel } from './ChatActivityIndicator'
+import { ThinkingTrace } from './ThinkingTrace'
 import type { ApprovalRecord } from './approvalHistory'
 import { usePanelEffect } from '../shared/usePanelEffect'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronRight, Eye, FileText, AlertTriangle } from 'lucide-react'
 import { ChatExportActions } from './ChatExportActions'
-import { useBranding } from '../../contexts/BrandingContext'
 import { useCertificationPanel } from '../../contexts/CertificationPanelContext'
 import { certificationChatEntry } from '../../lib/certificationChat'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
@@ -17,41 +17,6 @@ import type { ReactNode } from 'react'
 import { formatPageLocator } from '../../utils/pageLocator'
 import { citationAnchor } from '../../utils/textMatch'
 import { isUsedCitation } from '../../utils/snippetRefs'
-
-const THINKING_WORDS = [
-  'Thinking', 'Vandalizing', 'Pondering', 'Analyzing',
-  'Processing', 'Reading', 'Reviewing',
-]
-
-function ThinkingLabel() {
-  const { isCustomized } = useBranding()
-  // 'Vandalizing' is a Joe Vandal in-joke — keep it off white-labeled deployments.
-  const words = isCustomized ? THINKING_WORDS.filter(w => w !== 'Vandalizing') : THINKING_WORDS
-  const [index, setIndex] = useState(0)
-  const [fade, setFade] = useState(true)
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setFade(false)
-      setTimeout(() => {
-        setIndex(i => (i + 1) % words.length)
-        setFade(true)
-      }, 200)
-    }, 2000)
-    return () => clearInterval(interval)
-  }, [words.length])
-
-  return (
-    <span style={{
-      opacity: fade ? 1 : 0,
-      transition: 'opacity 0.2s ease',
-      display: 'inline-block',
-      minWidth: 80,
-    }}>
-      {words[index % words.length]}&hellip;
-    </span>
-  )
-}
 
 function CitationMenuItem({ icon, label, onClick }: {
   icon: ReactNode
@@ -137,7 +102,6 @@ export function ChatMessage({
   toolResults, streamSegments, onSendMessage, approvalHistory,
 }: Props) {
   const isUser = message.role === 'user'
-  const [thinkingExpanded, setThinkingExpanded] = useState(false)
   const [openCitation, setOpenCitation] = useState<number | null>(null)
   const [showUnusedSources, setShowUnusedSources] = useState(false)
   // Citation whose Preview/Open chooser is showing (null = none).
@@ -340,62 +304,13 @@ export function ChatMessage({
         <>
           {/* Collapsible thinking trace */}
           {hasThinking && (
-            <div style={{ marginBottom: 'var(--workspace-space-12)' }}>
-              <button
-                type="button"
-                onClick={() => setThinkingExpanded(!thinkingExpanded)}
-                aria-expanded={thinkingExpanded}
-                aria-label={thinkingExpanded ? 'Collapse thinking' : 'Expand thinking'}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--workspace-space-4)',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: "var(--workspace-space-2) 0",
-                  fontSize: 'var(--workspace-font-meta)',
-                  color: '#6b7280',
-                  fontFamily: 'inherit',
-                  transition: 'color 0.15s',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.color = '#4b5563' }}
-                onMouseLeave={e => { e.currentTarget.style.color = '#6b7280' }}
-              >
-                <ChevronRight
-                  size={14}
-                  style={{
-                    transition: 'transform 0.2s ease',
-                    transform: thinkingExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
-                  }}
-                />
-                {isStreamingProp && activity && activity.phase !== 'writing' && !activeToolCalls?.length
-                  ? activityLabel(activity, [], exportNames || {}, compactionStatus)
-                  : duration != null
-                  ? `Thought for ${duration < 1 ? 'less than a second' : `${Math.round(duration)} second${Math.round(duration) !== 1 ? 's' : ''}`}`
-                  : isStreamingProp && !activeToolCalls?.length
-                    ? <span className="thinking-shimmer">{activity ? activityLabel(activity, [], exportNames || {}, compactionStatus) : <ThinkingLabel />}</span>
-                    : 'Reasoning'}
-              </button>
-              <div className={`thinking-collapse${thinkingExpanded ? ' open' : ''}`}>
-                <div>
-                  <div
-                    style={{
-                      marginTop: 'var(--workspace-space-6)', padding: "var(--workspace-space-12) var(--workspace-space-12)",
-                      backgroundColor: '#f9fafb',
-                      borderLeft: '3px solid var(--highlight-color, #eab308)',
-                      borderRadius: 'var(--workspace-radius-small)', fontSize: 'var(--workspace-font-control)', lineHeight: 1.6,
-                      color: '#6b7280', fontStyle: 'italic',
-                      maxHeight: 400, overflowY: 'auto',
-                      whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                    }}
-                    className="hide-scrollbar"
-                  >
-                    {thinkingText}
-                  </div>
-                </div>
-              </div>
-            </div>
+            <ThinkingTrace
+              text={thinkingText}
+              duration={duration}
+              status={isStreamingProp && !activeToolCalls?.length && activity?.phase !== 'writing' && (activity || duration == null)
+                ? activityLabel(activity, [], exportNames || {}, compactionStatus)
+                : undefined}
+            />
           )}
 
           {/* Interleaved segment rendering (streaming + persisted) */}

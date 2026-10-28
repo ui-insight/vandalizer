@@ -170,3 +170,32 @@ it('uses the existing thinking disclosure to name preparation without adding ano
   expect(screen.getByRole('button', { name: 'Expand thinking' })).toHaveTextContent('Preparing tool · Searching knowledge base')
   expect(screen.queryByRole('status', { name: 'Assistant progress' })).not.toBeInTheDocument()
 })
+
+it('keeps the trace open and readable when progress hands off to a tool', () => {
+  const message: ChatMessageType = { role: 'assistant', content: '' }
+  const trace = 'Check the project requirements.\n\nCompare the dates with the source document.'
+  const { rerender } = render(<ChatMessage message={message} streamingThinking={trace} isStreaming />)
+  const toggle = screen.getByRole('button', { name: 'Expand thinking' })
+  expect(toggle).toHaveTextContent('Thinking')
+  expect(screen.queryByText(/Compare the dates/)).not.toBeInTheDocument()
+  fireEvent.click(toggle)
+  const bodyId = toggle.getAttribute('aria-controls')!
+  expect(document.getElementById(bodyId)).toHaveTextContent('Compare the dates')
+
+  rerender(<ChatMessage message={message} streamingThinking={trace} thinkingDuration={2} isStreaming
+    activity={{ phase: 'tool_running', tool_name: 'search_knowledge_base' }}
+    activeToolCalls={[{ tool_call_id: 'search', tool_name: 'search_knowledge_base', args: { query: 'proposal eligibility' } }]} />)
+  expect(screen.getByRole('button', { name: 'Collapse thinking' })).toHaveTextContent('Reasoning')
+  expect(document.getElementById(bodyId)).toHaveTextContent('Compare the dates')
+  expect(screen.queryByRole('status', { name: 'Assistant progress' })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Collapse thinking' }))
+  expect(document.getElementById(bodyId)).not.toBeVisible()
+})
+
+it('shows saved reasoning without suggesting that completed or interrupted work is still running', () => {
+  render(<ChatMessage message={{ role: 'assistant', content: 'Partial answer', thinking: 'Review the sources.', thinking_duration: 0.4, interruption: 'stopped' }} />)
+  expect(screen.getByRole('button', { name: 'Expand thinking' })).toHaveTextContent('Reasoning<1s')
+  expect(screen.getByText(/Response stopped/)).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Expand thinking' }))
+  expect(screen.getByText('Review the sources.')).toBeVisible()
+})
