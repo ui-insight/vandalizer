@@ -15,7 +15,7 @@ export function catalogSignals(item: SignalItem): string[] {
     out.push(`on ${item.test_case_count} case${item.test_case_count === 1 ? '' : 's'}`)
   }
   if (!item.quality_asserted && item.consistency != null) {
-    out.push(`same answer ${Math.round(item.consistency * 100)}% of the time`)
+    out.push('Consistency measured · view evaluation')
   }
   if (item.adoption_count && item.adoption_count > 0) {
     out.push(item.adoption_count === 1 ? '1 person uses it' : `${item.adoption_count} people use it`)
@@ -56,6 +56,8 @@ export function CatalogEvidence({ item }: { item: VerifiedCatalogItem }) {
       <h3 className="mb-3 font-semibold text-gray-900">Validation evidence</h3>
       <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div><dt className="font-medium">Rating origin</dt><dd>{item.quality_asserted ? 'Author-provided rating; not measured here' : measured ? 'Recorded validation score' : 'No measured score available'}</dd></div>
+        <div><dt className="font-medium">Recorded score</dt><dd>{measured ? `${Math.round(item.quality_score!)}/100` : 'Not evaluated'}</dd></div>
+        <div><dt className="font-medium">Consistency</dt><dd>{measured && item.consistency != null ? `${Math.round(item.consistency * 100)}%` : 'Not recorded'}</dd></div>
         <div><dt className="font-medium">Last validation</dt><dd>{date || 'Not recorded'}</dd></div>
         <div><dt className="font-medium">Sample size</dt><dd>{measured && item.test_case_count != null ? `${item.test_case_count} test cases` : 'Not recorded for a measured score'}</dd></div>
         <div><dt className="font-medium">Recorded runs</dt><dd>{item.validation_run_count ?? 'Not recorded'}</dd></div>

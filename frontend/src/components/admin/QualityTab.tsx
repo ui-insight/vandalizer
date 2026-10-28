@@ -1,3 +1,4 @@
+import { qualityPresentation } from '../../lib/qualityLabels'
 import { useAdminViewState } from './shared/AdminViewState'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -622,18 +623,8 @@ export function QualityTab() {
               <tbody>
                 {sortedQualityItems.map(item => {
                   const isExpanded = expandedItem?.kind === item.item_kind && expandedItem?.id === item.item_id
-                  const scoreColor = item.quality_score == null ? '#59616b'
-                    : item.quality_score >= 90 ? '#15803d'
-                    : item.quality_score >= 70 ? '#2563eb'
-                    : item.quality_score >= 50 ? '#92400e'
-                    : '#dc2626'
-                  const tierColors: Record<string, { bg: string; text: string }> = {
-                    excellent: { bg: '#dcfce7', text: '#166534' },
-                    good: { bg: '#dbeafe', text: '#1e40af' },
-                    fair: { bg: '#fef3c7', text: '#92400e' },
-                    poor: { bg: '#fee2e2', text: '#991b1b' },
-                  }
-                  const tc = tierColors[item.quality_tier || ''] || { bg: '#f3f4f6', text: '#374151' }
+                  const scoreColor = '#59616b'
+                  const tc = qualityPresentation({ tier: item.quality_tier, score: item.quality_score }).colors
                   return (
                     <React.Fragment key={`${item.item_kind}-${item.item_id}`}>
                       <tr
@@ -660,7 +651,7 @@ export function QualityTab() {
                               fontSize: 11, fontWeight: 600, backgroundColor: tc.bg, color: tc.text,
                               textTransform: 'capitalize',
                             }}>
-                              {item.quality_tier}
+                              {qualityPresentation({ tier: item.quality_tier, score: item.quality_score }).label}
                             </span>
                           ) : '-'}
                         </td>

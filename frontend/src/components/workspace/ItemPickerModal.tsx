@@ -1,3 +1,4 @@
+import { qualityPresentation } from '../../lib/qualityLabels'
 import { createPortal } from '../shared/panelPortal'
 import { usePanelEffect } from '../shared/usePanelEffect'
 import { useEffect, useRef, useState } from 'react'
@@ -15,6 +16,10 @@ interface PickerItem {
   description?: string | null
   owner?: 'mine' | 'team' | 'explore'
   qualityTier?: string | null
+  qualityScore?: number | null
+  qualityAsserted?: boolean
+  regressionPending?: boolean
+  testCaseCount?: number
   pinned?: boolean
   favorited?: boolean
 }
@@ -116,7 +121,11 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
             name: item.display_name || item.name,
             description: item.description,
             owner: 'explore' as const,
+            qualityAsserted: item.quality_asserted,
+            testCaseCount: item.test_case_count,
             qualityTier: item.quality_tier,
+            qualityScore: item.quality_score,
+            regressionPending: item.regression_pending_review,
           }))
         } else {
           // Use library items so mine/team tabs match the Library page
@@ -145,6 +154,8 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
               description: item.description,
               owner: scope as 'mine' | 'team',
               qualityTier: item.quality_tier,
+            qualityScore: item.quality_score,
+            regressionPending: item.regression_pending_review,
               pinned: item.pinned,
               favorited: item.favorited,
             }))
@@ -188,11 +199,7 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
       : [{ value: 'explore' as const, label: 'Explore', icon: Compass }]),
   ]
 
-  const tierColors: Record<string, { bg: string; text: string }> = {
-    gold: { bg: '#fef3c7', text: '#92400e' },
-    silver: { bg: '#f3f4f6', text: '#4b5563' },
-    bronze: { bg: '#fed7aa', text: '#9a3412' },
-  }
+
 
   const dialog = (
     <div
@@ -408,16 +415,10 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
                         </div>
                       )}
                     </div>
-                    {item.qualityTier && tierColors[item.qualityTier] && (
-                      <span style={{
-                        fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: "var(--workspace-space-2) var(--workspace-space-8)",
-                        borderRadius: 'var(--workspace-radius-large)', textTransform: 'uppercase', flexShrink: 0,
-                        backgroundColor: tierColors[item.qualityTier].bg,
-                        color: tierColors[item.qualityTier].text,
-                      }}>
-                        {item.qualityTier}
-                      </span>
-                    )}
+                    {(kind === 'workflow' || kind === 'extraction') && <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#59616b', maxWidth: 190 }}>
+                      {qualityPresentation({ tier: item.qualityTier, score: item.qualityScore, asserted: item.qualityAsserted, needsReview: item.regressionPending, testCaseCount: item.testCaseCount }).label}
+                      <span style={{ display: 'block' }}>{qualityPresentation({ tier: item.qualityTier, score: item.qualityScore, asserted: item.qualityAsserted, testCaseCount: item.testCaseCount }).evidence}</span>
+                    </span>}
                     {isSelected && (
                       <span style={{
                         fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: "var(--workspace-space-2) var(--workspace-space-8)",

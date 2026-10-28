@@ -6,7 +6,7 @@ import type { QualityMeta } from '../../types/chat'
 it('opens readable evidence details and returns focus on Escape without implying live settings', () => {
   const quality = { tier: 'good', score: 80, num_test_cases: 2, last_validated_at: null, optimization: { pending_recommendation: true, optimized_score: 0.85, baseline_score: 0.7 } } as QualityMeta
   render(<QualityBadge quality={quality} />)
-  const button = screen.getByRole('button', { name: /Quality Good, score 80/ })
+  const button = screen.getByRole('button', { name: /Strong on tested examples. Limited evidence/ })
   fireEvent.click(button)
   const details = screen.getByRole('region', { name: 'Tool quality details' })
   expect(details).toHaveFocus()
@@ -21,8 +21,8 @@ it('opens readable evidence details and returns focus on Escape without implying
 it('labels an extraction with no validation run Unscored (v5 retest ticket)', () => {
   const quality = { score: null, tier: 'unscored', grade: null, last_validated_at: null, num_test_cases: 0, active_alerts: [] } as QualityMeta
   render(<QualityBadge quality={quality} />)
-  const button = screen.getByRole('button', { name: 'Quality Unscored. Show details.' })
-  expect(button).toHaveTextContent('Unscored')
+  const button = screen.getByRole('button', { name: 'Not evaluated. No measured evaluation available. Show details.' })
+  expect(button).toHaveTextContent('Not evaluated')
   fireEvent.click(button)
-  expect(screen.getByRole('region', { name: 'Tool quality details' })).toHaveTextContent('No Score')
+  expect(screen.getByRole('region', { name: 'Tool quality details' })).toHaveTextContent('Not evaluated')
 })

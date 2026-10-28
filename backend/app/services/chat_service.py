@@ -22,6 +22,8 @@ from pydantic_ai.messages import (
     TextPartDelta,
     ThinkingPart,
     ThinkingPartDelta,
+    ToolCallPart,
+    ToolCallPartDelta,
     ToolReturnPart,
     UserPromptPart,
 )
@@ -648,6 +650,37 @@ def _classify_stream_error(exc: BaseException) -> tuple[str, str]:
         "Something went wrong while generating that response. Please try again — "
         "if it keeps happening, let your administrator know."
     )
+
+
+def _activity_chunk(phase: str, content: str = "", **fields) -> str:
+    """Transient progress only: never store this as assistant text or reasoning."""
+    return json.dumps({"kind": "activity", "content": "", "activity": {"phase": phase, "content": content, **fields}}) + "\n"
+
+
+class _ToolPreparationProgress:
+    """Surface tool selection while arguments (especially full HTML) are streaming.
+
+    Only tool names/ids leave this helper. Partial arguments are neither parsed
+    nor exposed, and argument deltas don't flood the client with duplicate events.
+    One instance belongs to one model response, where part indices are unique.
+    """
+
+    def __init__(self):
+        self.names: dict[int, str] = {}
+
+    def feed(self, event) -> str | None:
+        if isinstance(event, PartStartEvent) and isinstance(event.part, ToolCallPart):
+            name = event.part.tool_name
+            call_id = event.part.tool_call_id
+        elif isinstance(event, PartDeltaEvent) and isinstance(event.delta, ToolCallPartDelta) and event.delta.tool_name_delta:
+            name = self.names.get(event.index, "") + event.delta.tool_name_delta
+            call_id = event.delta.tool_call_id
+        else:
+            return None
+        if not name or self.names.get(event.index) == name:
+            return None
+        self.names[event.index] = name
+        return _activity_chunk("tool_preparing", tool_name=name, tool_call_id=call_id)
 
 
 def _extract_event_content(event) -> tuple[str | None, bool]:
@@ -1504,6 +1537,8 @@ async def chat_stream(
 ) -> AsyncGenerator[str, None]:
     """Async generator yielding newline-delimited JSON chunks for streaming chat."""
 
+    yield _activity_chunk("context", "Loading your conversation and available sources.")
+
     # Resolve model — prefer per-request override, fall back to user config
     if model_override:
         from app.services.config_service import resolve_model_name
@@ -1564,6 +1599,8 @@ async def chat_stream(
         await _finalize(conversation, fallback, [], None, activity_id, user_id)
         return
 
+    if document_uuids:
+        yield _activity_chunk("context", f"Loading {len(document_uuids)} attached document(s).")
     # Load documents
     documents: list[SmartDocument] = []
     for doc_uuid in document_uuids:
@@ -2032,6 +2069,7 @@ async def chat_stream(
     # project is active or which target_ids to run. Existing tools are
     # unaffected; the block explicitly tells the agent not to narrow them.
     if project_uuid and user:
+        yield _activity_chunk("context", "Loading the project brief and available project tools.")
         try:
             project_block = await _build_project_context(project_uuid, user)
         except Exception as e:  # never let project context break a turn
@@ -2505,8 +2543,13 @@ async def chat_stream(
                                 "kind": "queue_consumed",
                                 "content": queued_text,
                             }) + "\n"
+                    yield _activity_chunk("model")
+                    tool_preparation = _ToolPreparationProgress()
                     async with node.stream(agent_run.ctx) as stream:
                         async for event in stream:
+                            preparation = tool_preparation.feed(event)
+                            if preparation:
+                                yield preparation
                             content, is_api_thinking = _extract_event_content(event)
                             if content is None:
                                 continue

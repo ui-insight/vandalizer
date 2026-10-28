@@ -15,7 +15,7 @@ export type KindFilter = '' | 'workflow' | 'search_set' | 'knowledge_base'
 export type SortOption = '' | 'quality' | 'name' | 'adoption' | 'validations'
 // Keyed on the tiers compute_quality_tier emits — the only vocabulary a
 // measured item can carry.
-export type QualityFilter = '' | 'excellent' | 'good' | 'fair'
+export type QualityFilter = '' | 'strong' | 'mixed' | 'improvement' | 'unevaluated' | 'review'
 
 export const CATALOG_PAGE_SIZE = 30
 
@@ -29,12 +29,14 @@ export const SORT_OPTIONS: [SortOption, string][] = [
 
 export const QUALITY_FILTER_OPTIONS: [QualityFilter, string][] = [
   ['', 'Any quality'],
-  ['excellent', 'Excellent'],
-  ['good', 'Good'],
-  ['fair', 'Fair'],
+  ['strong', 'Strong on tested examples'],
+  ['mixed', 'Mixed results'],
+  ['improvement', 'Needs improvement'],
+  ['unevaluated', 'Not evaluated'],
+  ['review', 'Needs review'],
 ]
 
-/** How many excellent-tier items the "Top Rated" spotlight shows. */
+/** Maximum number of measured strong results in the spotlight. */
 export const SPOTLIGHT_SIZE = 6
 
 /** The landing view's two sections: the spotlight, and everything else.
@@ -45,15 +47,13 @@ export const SPOTLIGHT_SIZE = 6
 export function splitSpotlight(items: VerifiedCatalogItem[]): {
   spotlight: VerifiedCatalogItem[]; rest: VerifiedCatalogItem[]; topRatedCount: number
 } {
-  const top = items.filter(i => i.quality_tier === 'excellent').sort(spotlightOrder)
+  const top = items.filter(i => !i.quality_asserted && i.quality_score != null && !i.regression_pending_review && ['excellent', 'good'].includes(i.quality_tier || '')).sort(spotlightOrder)
   const spotlight = top.slice(0, SPOTLIGHT_SIZE)
   const shown = new Set(spotlight.map(i => i.id))
   return { spotlight, rest: items.filter(i => !shown.has(i.id)), topRatedCount: top.length }
 }
 
-/** Measured top-tier items lead the spotlight; hand-asserted ones follow. Both
- *  stay eligible so a fresh install still has a landing page, but the earned
- *  rating always outranks the typed one. */
+/** Keep measured items ahead of author assertions when ordering catalog items. */
 export function spotlightOrder(a: VerifiedCatalogItem, b: VerifiedCatalogItem): number {
   return Number(!!a.quality_asserted) - Number(!!b.quality_asserted)
 }

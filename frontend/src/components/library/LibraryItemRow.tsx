@@ -173,7 +173,7 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
           {item.created_by && item.created_by.user_id !== user?.user_id && (
             <AuthorChip author={item.created_by} />
           )}
-          {(qualityTier != null || qualityScore != null) && item.set_type !== 'prompt' && item.set_type !== 'formatter' && (
+          {item.set_type !== 'prompt' && item.set_type !== 'formatter' && (
             <QualityBadge
               tier={qualityTier ?? null}
               score={qualityScore ?? null}

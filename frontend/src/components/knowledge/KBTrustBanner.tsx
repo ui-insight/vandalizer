@@ -30,7 +30,7 @@ function formatRelativeTime(iso: string | null | undefined): string | null {
  * Headline banner for the KB detail view that answers, in plain language:
  * "does the AI actually answer my questions better when it has this KB?"
  *
- * KBs are a trust mechanism — this banner is the proof. When unvalidated,
+ * Keep the scope of measured evidence explicit. When unvalidated,
  * the banner prompts the owner to run validation so they (and their team)
  * can see whether the KB is pulling its weight.
  */
@@ -90,7 +90,7 @@ export function KBTrustBanner({ score, baseline, lift, validatedAt, metric, conf
         {!hasRun ? (
           <>
             <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 'var(--workspace-space-4)' }}>
-              Answer quality not yet measured
+              Not evaluated
             </div>
             <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
               Test representative questions with and without this knowledge base. Scores describe this test set; they do not guarantee future answers.
@@ -99,39 +99,39 @@ export function KBTrustBanner({ score, baseline, lift, validatedAt, metric, conf
         ) : composite ? (
           <>
             <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 'var(--workspace-space-4)' }}>
-              Composite quality: {scorePct}/100 · {configState === 'applied' ? 'Settings applied in this run' : configState === 'reverted' ? 'Application reverted' : configState === 'default' ? 'Default settings tested' : configState === 'no_improvement' ? 'No improvement found' : 'Proposed settings'}
+              Evaluation recorded · {configState === 'applied' ? 'Settings applied in this run' : configState === 'reverted' ? 'Application reverted' : configState === 'default' ? 'Default settings tested' : configState === 'no_improvement' ? 'No improvement found' : 'Proposed settings'}
             </div>
             <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
               This combines retrieval and answer quality on the tested questions. It is not answer accuracy or a comparison with the AI alone.
               {configState === 'proposed' && ' Review and apply the settings before using them in chat.'}
               {configState === 'no_improvement' && ' No tested settings measurably beat the current ones, so the current settings were kept and there is nothing to apply.'}
-              {configState === 'reverted' && ' This score describes the tested settings, not the restored settings.'}
+              {configState === 'reverted' && ' This evaluation describes the tested settings, not the restored settings.'}
               {relTime && <span> · Last tested {relTime}</span>}
+              <details><summary style={{ cursor: 'pointer' }}>View evaluation</summary>Composite quality: {scorePct}/100</details>
             </div>
           </>
         ) : (
           <>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--workspace-space-12)', flexWrap: 'wrap', marginBottom: 'var(--workspace-space-4)' }}>
-              {liftPts != null && (
-                <span style={{ fontSize: 22, fontWeight: 700, color: accent }}>
-                  {liftPts > 0 ? '+' : ''}{liftPts} pts
-                </span>
-              )}
-              <span style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)' }}>
-                {liftPts == null ? 'Answer accuracy measured; no AI-only comparison yet' : positive
-                  ? 'more accurate than asking the AI alone'
-                  : 'no measured improvement over the AI alone'}
+              <span style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: 'var(--workspace-text)' }}>
+                {liftPts == null ? 'Evaluation recorded · no AI-only comparison yet' : positive
+                  ? 'Improved on tested questions'
+                  : 'No measured improvement over the AI alone'}
               </span>
             </div>
             <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
-              {scorePct != null && baselinePct != null ? (
-                <>
-                  Average answer accuracy: {scorePct}% with this KB,
-                  versus {baselinePct}% without it.
-                </>
-              ) : scorePct != null ? (
-                <>Average answer accuracy: {scorePct}% with this KB.</>
-              ) : null}
+              <details>
+                <summary style={{ cursor: 'pointer' }}>View evaluation</summary>
+                {liftPts != null && <div>Difference: {liftPts > 0 ? '+' : ''}{liftPts} pts on tested questions</div>}
+                {scorePct != null && baselinePct != null ? (
+                  <>
+                    Average answer accuracy: {scorePct}% with this KB,
+                    versus {baselinePct}% without it.
+                  </>
+                ) : scorePct != null ? (
+                  <>Average answer accuracy: {scorePct}% with this KB.</>
+                ) : null}
+              </details>
               <span> These results describe the tested questions, not a guarantee of future answers.</span>
               {relTime && (
                 <span style={{ color: 'var(--workspace-muted)' }}> · Last validated {relTime}</span>

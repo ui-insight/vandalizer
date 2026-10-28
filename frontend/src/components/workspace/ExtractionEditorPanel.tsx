@@ -770,16 +770,16 @@ export function ExtractionEditorPanel() {
               >
                 <Pencil style={{ width: 14, height: 14 }} aria-hidden="true" />
               </button>
-              {searchSet.quality_tier && (
-                <>
-                  <QualityBadge
-                    tier={searchSet.quality_tier}
-                    score={searchSet.quality_score ?? null}
-                    regressionPending={searchSet.regression_pending_review}
-                  />
-                  {sparklineScores.length >= 2 && <QualitySparkline scores={sparklineScores} />}
-                </>
-              )}
+              <QualityBadge
+                tier={qualityStatus ? qualityStatus.tier : searchSet.quality_tier}
+                score={qualityStatus ? qualityStatus.score : searchSet.quality_score ?? null}
+                asserted={!!qualityStatus?.tier_asserted}
+                regressionPending={qualityStatus?.regression_pending_review ?? searchSet.regression_pending_review}
+                lastValidatedAt={qualityStatus?.last_validated_at ?? searchSet.last_validated_at}
+                testCaseCount={qualityStatus?.num_test_cases}
+                outdated={qualityStatus?.stale || qualityStatus?.config_changed || qualityStatus?.model_changed || qualityStatus?.test_cases_changed}
+              />
+              {sparklineScores.length >= 2 && <QualitySparkline scores={sparklineScores} />}
               {searchSet.last_validated_at && (
                 <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', whiteSpace: 'nowrap' }}>
                   Validated {relativeTime(searchSet.last_validated_at)}
@@ -2125,7 +2125,7 @@ function QualityPulse({ searchSetUuid, itemCount = 0 }: { searchSetUuid?: string
     }}>
       <Shield style={{
         width: 20, height: 20, flexShrink: 0,
-        color: status.config_changed ? '#92400e' : status.tier === 'excellent' ? '#16a34a' : status.tier === 'good' ? '#2563eb' : '#92400e',
+        color: '#59616b',
       }} />
       <div style={{ flex: 1 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)' }}>
@@ -2133,6 +2133,9 @@ function QualityPulse({ searchSetUuid, itemCount = 0 }: { searchSetUuid?: string
             tier={status.tier}
             score={status.score}
             regressionPending={status.regression_pending_review}
+            outdated={status.stale || status.config_changed || !!status.model_changed || !!status.test_cases_changed}
+            lastValidatedAt={status.last_validated_at}
+            testCaseCount={status.num_test_cases}
           />
           {status.last_validated_at && (
             <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>

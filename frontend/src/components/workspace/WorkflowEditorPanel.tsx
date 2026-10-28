@@ -1,3 +1,4 @@
+import { qualityPresentation } from '../../lib/qualityLabels'
 import { ProjectContextRunOption } from '../projects/ProjectContextRunOption'
 import { ValidationNav, type ValidationStage } from '../shared/ValidationNav'
 import { workflowTaskLabel, workflowTaskTitle } from './workflowTaskLabels'
@@ -822,12 +823,15 @@ export function WorkflowEditorPanel() {
                   <ShieldCheck style={{ width: 14, height: 14, color: '#b45309' }} />
                 </span>
               )}
-              {qualityStatus?.tier && (
+              {qualityStatus && (
                 <>
                   <QualityBadge
                     tier={qualityStatus.tier}
                     score={qualityStatus.score ?? null}
                     regressionPending={qualityStatus.regression_pending_review}
+                    outdated={qualityStatus.stale || qualityStatus.config_changed || !!qualityStatus.model_changed || !!qualityStatus.test_cases_changed}
+                    lastValidatedAt={qualityStatus.last_validated_at}
+                    testCaseCount={qualityStatus.num_test_cases}
                   />
                   {sparklineScores.length >= 2 && <QualitySparkline scores={sparklineScores} />}
                 </>
@@ -1078,7 +1082,7 @@ export function WorkflowEditorPanel() {
                   }}>
                     <ShieldCheck style={{
                       width: 20, height: 20, flexShrink: 0,
-                      color: qualityStatus.config_changed ? '#d97706' : qualityStatus.tier === 'excellent' ? '#15803d' : qualityStatus.tier === 'good' ? '#1d4ed8' : '#d97706',
+                      color: '#59616b',
                     }} />
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)' }}>
@@ -1086,6 +1090,9 @@ export function WorkflowEditorPanel() {
                           tier={qualityStatus.tier}
                           score={qualityStatus.score}
                           regressionPending={qualityStatus.regression_pending_review}
+                          outdated={qualityStatus.stale || qualityStatus.config_changed || !!qualityStatus.model_changed || !!qualityStatus.test_cases_changed}
+                          lastValidatedAt={qualityStatus.last_validated_at}
+                          testCaseCount={qualityStatus.num_test_cases}
                         />
                         {qualityStatus.last_validated_at && (
                           <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>
@@ -7456,7 +7463,7 @@ function ValidateTab({
     accuracy: { bg: '#fef3c7', text: '#854d0e' },
   }
 
-  const gradeStyle = gradeInfo ? GRADE_COLORS[gradeInfo.grade] || GRADE_COLORS.F : null
+  const resultQuality = qualityPresentation({ grade: gradeInfo?.grade, outdated: resultPlanStale, needsReview: checks.some(check => check.status === 'FAIL') || staticDiagnostics.some(d => d.level === 'error'), limitedEvidence: checks.some(check => check.status === 'SKIP') })
   const hasInputs = inputs.length > 0
   const hasChecks = planChecks.length > 0
   const isBusy = runPhase !== 'idle' || validating
@@ -8136,7 +8143,7 @@ function ValidateTab({
         {gradeInfo && (
           <>
             <section aria-label="Workflow validation review summary" className="validation-review-summary">
-              <strong>{gradeInfo.grade} · {checks.filter(check => check.status === 'FAIL').length} failed · {checks.filter(check => check.status === 'WARN').length} need review · {checks.filter(check => check.status === 'SKIP').length} skipped</strong>
+              <strong>{resultQuality.label} · {checks.filter(check => check.status === 'FAIL').length} failed · {checks.filter(check => check.status === 'WARN').length} need review · {checks.filter(check => check.status === 'SKIP').length} skipped</strong>
               <p>Compare failed checks with the expected output and source. Skipped checks provide no correctness evidence.</p>
             </section>
             {/* Check results */}
@@ -8177,25 +8184,16 @@ function ValidateTab({
                 )
               })}
             </div>
-            {/* Grade badge */}
+            {/* Evaluation summary */}
             <div style={{
               display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-16)', padding: 'var(--workspace-space-16)',
               border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)', backgroundColor: '#fff',
             }}>
-              <div style={{
-                width: 56, height: 56, borderRadius: 'var(--workspace-radius-large)',
-                backgroundColor: gradeStyle?.bg,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-              }}>
-                <span style={{ fontSize: 28, fontWeight: 800, color: gradeStyle?.text }}>
-                  {gradeInfo.grade}
-                </span>
-              </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124' }}>Validation Grade</div>
+                <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124' }}>{resultQuality.label}</div>
                 <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-2)' }}>{gradeInfo.summary}</div>
                 <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-4)', lineHeight: 1.4 }}>
-                  A <TermDef term="judge" theme="light">judge</TermDef> compared each step's output to your expected answers. Lower grade = more checks failed or scored low.
+                  A <TermDef term="judge" theme="light">judge</TermDef> compared each step's output to your expected answers. Review the failed and skipped checks before using this workflow.
                 </div>
                 {resultPlanStale && (
                   <div
@@ -8206,11 +8204,14 @@ function ValidateTab({
                     }}
                   >
                     <AlertTriangle style={{ width: 12, height: 12, color: '#d97706', flexShrink: 0 }} />
-                    Graded against a stale plan. Regenerate the plan above before trusting this grade.
+                    Evaluated against an outdated plan. Regenerate the plan above and evaluate again.
                   </div>
                 )}
               </div>
-              {gradeInfo.variancePts != null && (
+              <details className="validation-details">
+                <summary>Scoring details</summary>
+                <p>Recorded rubric grade: {gradeInfo.grade}</p>
+                {gradeInfo.variancePts != null && (
                 <div style={{
                   fontSize: 'var(--workspace-font-meta)', color: '#526071', whiteSpace: 'nowrap',
                   padding: "var(--workspace-space-4) var(--workspace-space-8)", backgroundColor: '#f3f4f6',
@@ -8219,7 +8220,7 @@ function ValidateTab({
                 title="95% confidence interval: how much the grade could swing on a re-evaluation, based on how often check verdicts flipped when re-judged.">
                   ± {gradeInfo.variancePts.toFixed(1)} pts
                 </div>
-              )}
+              )}</details>
               <div style={{ display: 'flex', gap: 'var(--workspace-space-6)', flexShrink: 0 }}>
                 <button
                   onClick={() => handleDownloadReport('md')}
@@ -8269,7 +8270,7 @@ function ValidateTab({
             )}
 
             {/* Improvement Suggestions */}
-            {gradeInfo.grade !== 'A' && (
+            {(checks.some(check => check.status === 'FAIL' || check.status === 'WARN') || !['A', 'B'].includes(gradeInfo.grade)) && (
               <div style={{
                 border: '1px solid #fde68a', borderRadius: 'var(--workspace-radius-medium)', padding: 'var(--workspace-space-16)', backgroundColor: '#fffbeb',
               }}>
@@ -8341,7 +8342,7 @@ function ValidateTab({
                           }}
                           labelFormatter={(label, payload) => {
                             const item = payload?.[0]?.payload
-                            if (item) return `${label} · Grade ${item.grade} (${item.passed}/${item.passed + item.failed} passed)`
+                            if (item) return `${label} · ${qualityPresentation({ grade: item.grade }).label} (${item.passed}/${item.passed + item.failed} passed)`
                             return label
                           }}
                         />

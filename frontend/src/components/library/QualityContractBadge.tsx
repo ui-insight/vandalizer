@@ -1,66 +1,17 @@
-import { relativeTime } from '../../utils/time'
+import { QualityBadge } from './QualityBadge'
 
-interface QualityContractBadgeProps {
+export function QualityContractBadge({ status, tier, score, lastValidatedAt, isStale, asserted, testCaseCount, regressionPending }: {
   status: string
   tier: string | null
   score: number | null
   lastValidatedAt: string | null
   isStale: boolean
   monitored: boolean
-  /** The tier was hand-typed in the catalog seed and no measured validation
-   *  backs it — render it as an assertion, never as a measurement. */
   asserted?: boolean
-}
-
-const statusColors: Record<string, { bg: string; text: string; border: string }> = {
-  monitored: { bg: '#f0fdf4', text: '#15803d', border: '#bbf7d0' },
-  stale: { bg: '#fffbeb', text: '#a16207', border: '#fde68a' },
-  degraded: { bg: '#fef2f2', text: '#dc2626', border: '#fecaca' },
-  unmonitored: { bg: '#f9fafb', text: '#6b7280', border: "var(--workspace-border)" },
-}
-
-export function QualityContractBadge({ status, tier, lastValidatedAt, isStale, monitored, asserted }: QualityContractBadgeProps) {
-  // An asserted tier is a claim, not a measurement \u2014 present it in the
-  // neutral style regardless of how confident the tier word sounds.
-  const effectiveStatus = asserted ? 'unmonitored' : isStale ? 'stale' : status
-  const colors = statusColors[effectiveStatus] || statusColors.unmonitored
-
-  const tierLabel = tier ? tier.charAt(0).toUpperCase() + tier.slice(1) : 'Unknown'
-  const monitorLabel = monitored ? 'Monitored' : 'Unmonitored'
-  const staleLabel = isStale && lastValidatedAt ? `Last checked ${relativeTime(lastValidatedAt)}` : ''
-
-  let label = `Checked`
-  if (tier) label += ` \u00b7 ${tierLabel}`
-  if (asserted) {
-    // Same plain words as QualityBadge: an author's rating, not a check.
-    label = tier ? `Rated ${tierLabel} by its author \u00b7 not yet checked here` : 'Not yet checked here'
-  } else if (isStale) {
-    label += ` \u00b7 Stale`
-    if (staleLabel) label += ` \u00b7 ${staleLabel}`
-  } else {
-    label += ` \u00b7 ${monitorLabel}`
-  }
-
-  return (
-    <span
-      title={asserted
-        ? 'This tier was assigned by the catalog author; no measured validation backs it yet. Validate the item to measure it.'
-        : undefined}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        fontSize: 'var(--workspace-font-meta)',
-        lineHeight: '16px',
-        padding: "1px var(--workspace-space-6)",
-        borderRadius: '4px',
-        border: `1px solid ${colors.border}`,
-        backgroundColor: colors.bg,
-        color: colors.text,
-        fontWeight: 500,
-        whiteSpace: 'nowrap',
-      }}
-    >
-      {label}
-    </span>
-  )
+  testCaseCount?: number | null
+  regressionPending?: boolean
+}) {
+  return <QualityBadge tier={tier} score={score} lastValidatedAt={lastValidatedAt}
+    outdated={isStale} asserted={asserted} testCaseCount={testCaseCount}
+    regressionPending={regressionPending || status === 'degraded'} />
 }

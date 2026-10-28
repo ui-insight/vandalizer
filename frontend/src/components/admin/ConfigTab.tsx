@@ -1277,7 +1277,8 @@ ${playgroundResult.request.user_prompt}`}
             </div>
 
             <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 12 }}>Quality Tiers</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 12 }}>Scoring thresholds</div>
+              <p style={{ fontSize: 12, color: '#59616b', marginBottom: 12 }}>These stored tiers drive evaluation calculations. Good and Excellent display as “Strong on tested examples”; Fair displays as “Mixed results.” Measured results below Fair display as “Needs improvement.”</p>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 16 }}>
                 <div>
                   <label style={labelStyle}>Excellent threshold</label>

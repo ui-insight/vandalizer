@@ -1,3 +1,4 @@
+import { QualityBadge } from '../library/QualityBadge'
 /**
  * "Tune this extraction" panel — drives the extraction tuning loop end-to-end
  * inside the Validate tab.
@@ -1000,23 +1001,10 @@ function PostApplyDelta({
         fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-info)', textTransform: 'uppercase', letterSpacing: 0.5,
         fontWeight: 600, marginBottom: 'var(--workspace-space-6)',
       }}>
-        Certified score · measured after apply
+        Evaluation after applying settings
       </div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--workspace-space-12)', flexWrap: 'wrap' }}>
-        {certifiedPct != null && (
-          <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
-            Quality score:{' '}
-            <b style={{ color: 'var(--workspace-text)', fontSize: 'var(--workspace-font-card-title)' }}>{certifiedPct}%</b>
-            {after.quality_tier && (
-              <span style={{
-                marginLeft: 'var(--workspace-space-6)', fontSize: 'var(--workspace-font-meta)', textTransform: 'capitalize',
-                color: 'var(--workspace-muted)', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)', padding: "1px var(--workspace-space-6)",
-              }}>
-                {after.quality_tier}
-              </span>
-            )}
-          </span>
-        )}
+        <QualityBadge tier={after.quality_tier} score={certifiedPct} limitedEvidence={penalized} />
         {beforePct != null && (
           <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
             Optimizer estimate: <b style={{ color: 'var(--workspace-text)' }}>{beforePct}%</b>

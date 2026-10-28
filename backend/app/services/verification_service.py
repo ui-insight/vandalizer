@@ -539,6 +539,23 @@ _TIER_ORDER = {"excellent": 0, "good": 1, "fair": 2}
 LEGACY_TIERS = {"gold": "excellent", "silver": "good", "bronze": "fair"}
 
 
+def matches_quality_filter(tier, score, regression_pending, requested):
+    """Presentation groups use stored configured tiers, never new score thresholds."""
+    if not requested:
+        return True
+    if requested == "review":
+        return bool(regression_pending)
+    if requested == "unevaluated":
+        return score is None and not regression_pending
+    if requested in {"strong", "mixed", "improvement"}:
+        if score is None or regression_pending:
+            return False
+        return {"strong": tier in {"excellent", "good"},
+                "mixed": tier == "fair",
+                "improvement": tier in {None, "poor"}}[requested]
+    return tier == requested
+
+
 def normalize_tier(tier: str | None) -> str | None:
     return LEGACY_TIERS.get(tier, tier) if tier else tier
 
@@ -800,7 +817,8 @@ async def list_verified_items(
 
         # Quality tier filter
         item_tier = normalize_tier(meta.quality_tier) if meta else None
-        if quality_tier and item_tier != quality_tier:
+        if not matches_quality_filter(item_tier, meta.quality_score if meta else None,
+                                      bool(meta and meta.regression_pending_review), quality_tier):
             continue
 
         # Don't advertise a row the access check will refuse.

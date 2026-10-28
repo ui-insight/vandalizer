@@ -724,6 +724,8 @@ export function getWorkflowImprovementSuggestions(workflowId: string) {
 // Quality status
 
 export interface WorkflowQualityStatus {
+  num_test_cases?: number | null
+  num_runs?: number | null
   status: 'validated' | 'unvalidated'
   score: number | null
   tier: string | null

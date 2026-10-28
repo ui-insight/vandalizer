@@ -1,20 +1,9 @@
+import { qualityPresentation } from '../../lib/qualityLabels'
 import { useState, useRef, useId } from 'react'
 import { usePanelEffect } from '../shared/usePanelEffect'
 import { createPortal } from '../shared/panelPortal'
 import { Shield, ShieldAlert, ShieldCheck, AlertTriangle, Sparkles } from 'lucide-react'
 import type { QualityMeta } from '../../types/chat'
-
-// Labels and colors match QUALITY_SIGNALS_EXPLAINED.md. "Verified" is
-// deliberately NOT a tier label here — it means examiner verification, a
-// separate from a validation score.
-const TIER_CONFIG: Record<string, { bg: string; border: string; text: string; icon: typeof Shield; label: string }> = {
-  excellent: { bg: 'rgba(34,197,94,0.10)', border: '#22c55e', text: '#15803d', icon: ShieldCheck, label: 'Excellent' },
-  good:      { bg: 'rgba(59,130,246,0.10)', border: '#3b82f6', text: '#1d4ed8', icon: ShieldCheck, label: 'Good' },
-  fair:      { bg: 'rgba(234,179,8,0.10)', border: '#eab308', text: '#a16207', icon: Shield, label: 'Fair' },
-  poor:      { bg: 'rgba(239,68,68,0.08)', border: '#ef4444', text: '#dc2626', icon: ShieldAlert, label: 'Poor' },
-}
-
-const DEFAULT_CONFIG = { bg: 'rgba(148,163,184,0.06)', border: '#cbd5e1', text: '#64748b', icon: Shield, label: 'Unscored' }
 
 function formatDate(iso: string | null): string {
   if (!iso) return 'Never'
@@ -35,11 +24,11 @@ export function QualityBadge({ quality }: { quality: QualityMeta }) {
   const detailsId = useId()
   const [position, setPosition] = useState({ left: 12, top: 12 })
 
-  const tier = quality.tier?.toLowerCase() ?? ''
-  const config = TIER_CONFIG[tier] || DEFAULT_CONFIG
-  const IconComponent = config.icon
   const hasAlerts = (quality.active_alerts?.length ?? 0) > 0
   const hasCriticalAlert = (quality.active_alerts ?? []).some(a => a.severity === 'critical')
+  const presentation = qualityPresentation({ ...quality, testCaseCount: quality.num_test_cases, outdated: !!quality.plan_stale || quality.active_alerts?.some(a => /stale/.test(a.type)), needsReview: hasCriticalAlert })
+  const config = { ...presentation.colors, label: presentation.label }
+  const IconComponent = hasCriticalAlert ? ShieldAlert : presentation.tone === 'strong' ? ShieldCheck : Shield
 
   // Close tooltip on outside click
   usePanelEffect(() => {
@@ -68,7 +57,6 @@ export function QualityBadge({ quality }: { quality: QualityMeta }) {
 
   }, [showTooltip])
 
-  if (quality.score == null && !quality.tier) return null
 
   return (
     <span style={{ position: 'relative', display: 'inline-flex' }}>
@@ -76,11 +64,7 @@ export function QualityBadge({ quality }: { quality: QualityMeta }) {
         ref={badgeRef}
         aria-expanded={showTooltip}
         aria-controls={showTooltip ? detailsId : undefined}
-        aria-label={
-          quality.score != null
-            ? `Quality ${config.label}, score ${Math.round(quality.score)} of 100. Show details.`
-            : `Quality ${config.label}. Show details.`
-        }
+        aria-label={`${config.label}. ${presentation.evidence}. Show details.`}
         onClick={(e) => { e.stopPropagation(); setShowTooltip(!showTooltip) }}
         style={{
           display: 'inline-flex',
@@ -100,10 +84,7 @@ export function QualityBadge({ quality }: { quality: QualityMeta }) {
         }}
       >
         <IconComponent size={12} />
-        {quality.score != null && (
-          <span style={{ fontWeight: 600 }}>{Math.round(quality.score)}</span>
-        )}
-        <span>{config.label}</span>
+        <span>{config.label}<span style={{ display: 'block', fontWeight: 400 }}>{presentation.evidence}</span></span>
         {hasAlerts && (
           // Red = critical (accuracy floor breached / run errored); amber =
           // warning (consistency drift, stale validation).
@@ -140,14 +121,14 @@ export function QualityBadge({ quality }: { quality: QualityMeta }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', marginBottom: 'var(--workspace-space-8)', paddingBottom: 'var(--workspace-space-8)', borderBottom: '1px solid #f3f4f6' }}>
             <IconComponent size={16} style={{ color: config.text }} />
             <span style={{ fontWeight: 600, fontSize: 'var(--workspace-font-control)' }}>
-              {quality.score != null ? `Quality Score: ${Math.round(quality.score)}/100` : 'No Score'}
+              {quality.score != null ? `Quality Score: ${Math.round(quality.score)}/100` : 'Not evaluated'}
             </span>
           </div>
 
           <p style={{ margin: '0 0 8px', color: '#59616b' }}>Recorded validation describes the cases tested. Completion and permission to share do not establish correctness on new documents.</p>
           <button type="button" onClick={() => { setShowTooltip(false); badgeRef.current?.focus() }} aria-label="Close quality details" className="mb-2 underline">Close</button>
           {/* Metrics */}
-          {(quality.accuracy != null || quality.consistency != null) && (
+          {(quality.accuracy != null || quality.consistency != null || quality.num_test_cases != null || quality.num_runs != null || quality.grade != null) && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: "var(--workspace-space-4) var(--workspace-space-12)", marginBottom: 'var(--workspace-space-8)' }}>
               {quality.accuracy != null && (
                 <>

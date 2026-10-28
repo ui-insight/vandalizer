@@ -1,7 +1,7 @@
 import { getProjectDefaultSkill } from '../api/projects'
 import { useState, useCallback, useRef } from 'react'
 import { streamChat, getHistory, previewSkill, selectConversationSkill, queueChatMessage, stopChatTurn, type ChatHistory } from '../api/chat'
-import type { SkillSnapshot } from '../types/chat'
+import type { ChatActivity, SkillSnapshot } from '../types/chat'
 import { expandSnippetRefs, markUsed } from '../utils/snippetRefs'
 import type { ChatMessage, Citation, ContextBudgetPlan, ContextMeterInfo, OversizeDocument, PlanTask, StreamChunk, StreamSegment, SuggestedModel, ToolCallInfo, ToolResultInfo } from '../types/chat'
 
@@ -71,6 +71,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
   const [thinkingContent, setThinkingContent] = useState('')
   const [thinkingDuration, setThinkingDuration] = useState<number | null>(null)
   const [isStreaming, setIsStreaming] = useState(false)
+  const [activity, setActivityProgress] = useState<ChatActivity | null>(null)
   const [conversationUuid, setConversationUuid] = useState<string | null>(null)
   const [activityId, setActivityId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -172,6 +173,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
   const clearLiveTurn = useCallback(() => {
     abortRef.current = null
     setIsStreaming(false)
+    setActivityProgress(null)
     setStreamingContent('')
     setThinkingContent('')
     setThinkingDuration(null)
@@ -193,6 +195,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
       setPlanTasks(null) // The previous turn's plan must not label this new action.
       setErrorDetails(null)
       setIsStreaming(true)
+      setActivityProgress({ phase: 'starting' })
       setStreamingContent('')
       setThinkingContent('')
       setThinkingDuration(null)
@@ -282,7 +285,10 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
           activityId,
           (chunk: StreamChunk) => {
             if (!ownsView()) return
-            if (chunk.kind === 'text') {
+            if (chunk.kind === 'activity') {
+              if (chunk.activity) setActivityProgress(chunk.activity)
+            } else if (chunk.kind === 'text') {
+              setActivityProgress(previous => previous?.phase === 'writing' ? previous : { phase: 'writing' })
               streamingRef.current += chunk.content
               // Strip any residual think tags the backend parser missed
               const display = streamingRef.current
@@ -300,12 +306,14 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
               }
               setSegments([...segs])
             } else if (chunk.kind === 'thinking') {
+              setActivityProgress(previous => previous?.phase === 'model' ? previous : { phase: 'model' })
               thinkingRef.current += chunk.content
               setThinkingContent(thinkingRef.current)
             } else if (chunk.kind === 'thinking_done') {
               thinkingDurationRef.current = chunk.duration ?? null
               setThinkingDuration(chunk.duration ?? null)
             } else if (chunk.kind === 'tool_call') {
+              setActivityProgress({ phase: 'tool_running', tool_name: chunk.tool_name, tool_call_id: chunk.tool_call_id })
               // update_plan renders as the pinned checklist (plan_update
               // chunk), not as a tool status line.
               if (chunk.tool_name === 'update_plan') return
@@ -319,6 +327,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
               segmentsRef.current.push({ kind: 'tool_call', call })
               setSegments([...segmentsRef.current])
             } else if (chunk.kind === 'tool_result') {
+              setActivityProgress({ phase: 'reviewing' })
               if (chunk.tool_name === 'update_plan') return
               const res: ToolResultInfo = {
                 tool_name: chunk.tool_name!,
@@ -617,6 +626,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
     thinkingContent,
     thinkingDuration,
     isStreaming,
+    activity,
     conversationUuid,
     activityId,
     error,

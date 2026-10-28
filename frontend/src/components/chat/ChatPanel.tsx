@@ -1,7 +1,8 @@
+import { ChatActivityCard } from './ChatActivityCard'
 import { conversationNearMemoryLimit } from '../../lib/contextNudge'
 import { approvalHistoryFor } from './approvalHistory'
 import { useEffect, useLayoutEffect, useRef, useState, useCallback, type DragEvent } from 'react'
-import { Loader2, BookOpen, X, ArrowDown, ChevronRight, Upload, Zap, Sparkles, FolderKanban } from 'lucide-react'
+import { Loader2, BookOpen, X, ArrowDown, Upload, Zap, Sparkles, FolderKanban } from 'lucide-react'
 import { useQueryClient, useQueries } from '@tanstack/react-query'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
@@ -46,50 +47,6 @@ import { stageCopy, isDocReady } from '../../utils/processingStatus'
 import { partitionNewFiles } from './attachmentDedup'
 import { shouldAutoContinueAfterAttach } from './autoContinue'
 
-const LOADING_WORDS = [
-  'Thinking', 'Vandalizing', 'Pondering', 'Analyzing',
-  'Processing', 'Reading', 'Reviewing',
-]
-
-function StreamingLabel() {
-  const { isCustomized } = useBranding()
-  // 'Vandalizing' is a Joe Vandal in-joke — keep it off white-labeled deployments.
-  const words = isCustomized ? LOADING_WORDS.filter(w => w !== 'Vandalizing') : LOADING_WORDS
-  const [index, setIndex] = useState(0)
-  const [fade, setFade] = useState(true)
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setFade(false)
-      setTimeout(() => {
-        setIndex(i => (i + 1) % words.length)
-        setFade(true)
-      }, 200)
-    }, 2000)
-    return () => clearInterval(interval)
-  }, [words.length])
-
-  return (
-    // role=status announces "working" to assistive tech ONCE when streaming
-    // begins; the rotating word itself is decorative (aria-hidden) so screen
-    // readers aren't spammed with "Thinking… Pondering… Analyzing…" every 2s.
-    <span role="status" aria-live="polite">
-      <span
-        aria-hidden="true"
-        style={{
-          opacity: fade ? 1 : 0,
-          transition: 'opacity 0.2s ease',
-          fontSize: 'var(--workspace-font-control)',
-          color: '#6b7280',
-        }}
-      >
-        {words[index % words.length]}&hellip;
-      </span>
-      <span className="sr-only">The assistant is working…</span>
-    </span>
-  )
-}
-
 interface ChatPanelProps {
   workspaceLabel?: string
   initialDraft?: string
@@ -107,6 +64,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const {
     messages,
     streamingContent,
+    activity,
     thinkingContent,
     thinkingDuration,
     isStreaming,
@@ -918,6 +876,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         {modelPreference.error && <div role="alert" className="px-4 py-2 text-sm text-red-800">{modelPreference.error} <button type="button" onClick={modelPreference.retry} className="underline">Retry model preference</button></div>}
         {modelPreference.saving && <p role="status" className="px-4 py-1 text-xs text-gray-600">Saving default model…</p>}
         {!showHome && <CertificationRefreshNotice />}
+        {isStreaming && <ChatActivityCard activity={activity} calls={activeToolCalls} results={toolResults} segments={segments} names={scopeNamesRef.current} compactionStatus={compactionStatus} onViewActivity={scrollToBottom} />}
         <ChatInput
           initialDraft={initialDraft}
           draftInsertion={draftInsertion}
@@ -1313,16 +1272,6 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           />
         )}
 
-        {/* Loading indicator */}
-        {isStreaming && !streamingContent && !thinkingContent && activeToolCalls.length === 0 && toolResults.length === 0 && segments.length === 0 && (
-          <div role="status" aria-live="polite" style={{ padding: 15, marginBottom: 15, backgroundColor: '#00000008', borderRadius: 'var(--ui-radius, 12px)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)', fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
-              <ChevronRight size={14} />
-              <span className="thinking-shimmer"><StreamingLabel /></span>
-            </div>
-          </div>
-        )}
-
         {/* Held message: queued while attached docs finish processing. Renders
             as the user's bubble with a waiting note; auto-sends when ready. */}
         {heldMessage && !isStreaming && (() => {
@@ -1456,12 +1405,13 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
             when the backend consumes them into the run. */}
         {queuedMessages.length > 0 && (
           <div className="mt-2 space-y-1">
+            {!isStreaming && <p className="text-xs text-gray-600">{error ? 'The connection ended before delivery was confirmed. Check the conversation before sending these messages again.' : 'These messages are waiting for the next turn. Send a follow-up to continue.'}</p>}
             {queuedMessages.map((m, i) => (
               <div key={`${i}-${m.slice(0, 24)}`} className="flex justify-end">
                 <div className="max-w-[80%] rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-1.5 text-sm text-gray-600">
                   {m}
                   <span className="ml-2 text-xs font-medium uppercase tracking-wide text-gray-600">
-                    Queued
+                    {isStreaming ? 'Queued' : error ? 'Delivery unconfirmed' : 'Waiting for next turn'}
                   </span>
                 </div>
               </div>

@@ -148,7 +148,7 @@ function KBCatalogCard({
 }) {
   // An asserted tier gets neither ring nor colour: the badge renders
   // assertions in neutral and the card must not out-claim it.
-  const measuredTier = item.quality_tier && !item.quality_asserted
+  const measuredTier = item.quality_tier && !item.quality_asserted && !item.regression_pending_review
     ? (item.quality_tier as keyof typeof TIER_RING)
     : null
   const tierBorder = (measuredTier && TIER_RING[measuredTier]) || `1px solid ${C.border}`
@@ -189,6 +189,8 @@ function KBCatalogCard({
         <QualityBadge
           tier={item.quality_tier}
           score={item.quality_score}
+          testCaseCount={item.test_case_count}
+          lastValidatedAt={item.last_validated_at}
           title={KB_QUALITY_SCORE_HOVER}
           asserted={item.quality_asserted}
           regressionPending={item.regression_pending_review}
@@ -657,10 +659,10 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                         background: 'var(--workspace-canvas)',
                       }} />
                       <h3 style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 700, color: C.text, margin: 0 }}>
-                        Top Rated
+                        Strong on tested examples
                       </h3>
                       <span style={{ fontSize: 'var(--workspace-font-meta)', color: C.textFaint }}>
-                        {topRatedCount} excellent-tier item{topRatedCount !== 1 ? 's' : ''}
+                        {topRatedCount} items with strong measured results
                       </span>
                     </div>
                     <div style={{ display: 'grid', gap: 'var(--workspace-space-12)', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))' }}>

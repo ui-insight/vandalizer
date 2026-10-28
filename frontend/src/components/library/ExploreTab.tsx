@@ -159,7 +159,7 @@ export function ItemDetailModal({
       setAdoptError(error instanceof Error ? error.message : 'Could not add this knowledge base. Try again.')
     } finally { adoptingRef.current = false; setAdopting(null) }
   }
-  const tierStyle = TIER_STYLES[(item.quality_tier || '') as keyof typeof TIER_STYLES]
+  const tierStyle = item.quality_asserted || item.regression_pending_review ? undefined : TIER_STYLES[(item.quality_tier || '') as keyof typeof TIER_STYLES]
   const kindConf = KIND_CONFIG[(item.kind === 'search_set' && (item.set_type === 'prompt' || item.set_type === 'formatter') ? item.set_type : item.kind) as keyof typeof KIND_CONFIG]
   const shareLink = useShareLink()
   const shareKind: 'workflow' | 'extraction' | 'kb' | null =
@@ -207,6 +207,8 @@ export function ItemDetailModal({
             <QualityBadge
               tier={item.quality_tier}
               score={item.quality_score}
+              testCaseCount={item.test_case_count}
+              lastValidatedAt={item.last_validated_at}
               asserted={item.quality_asserted}
               regressionPending={item.regression_pending_review}
               variant="catalog"
@@ -395,7 +397,7 @@ function CatalogCard({
 }) {
   // An asserted tier gets no ring: the ring is the card-level version of the
   // badge colour, and the badge renders assertions in neutral.
-  const tierStyle = item.quality_asserted ? undefined : TIER_STYLES[(item.quality_tier || '') as keyof typeof TIER_STYLES]
+  const tierStyle = item.quality_asserted || item.regression_pending_review ? undefined : TIER_STYLES[(item.quality_tier || '') as keyof typeof TIER_STYLES]
 
   return (
     <article
@@ -408,7 +410,6 @@ function CatalogCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-1.5 mb-1">
             <ShieldCheck className={`h-3.5 w-3.5 shrink-0 mt-0.5 ${tierStyle ? tierStyle.accent : 'text-gray-400'}`} />
-            <span className="sr-only">Quality tier: {item.quality_tier || 'unrated'}</span>
             <button type="button" onClick={onClick} className="min-h-9 text-base font-semibold text-gray-900 flex-1 min-w-0 text-left group-hover:text-blue-700 transition-colors">
               {item.display_name || item.name}
             </button>
@@ -425,6 +426,8 @@ function CatalogCard({
         <QualityBadge
               tier={item.quality_tier}
               score={item.quality_score}
+              testCaseCount={item.test_case_count}
+              lastValidatedAt={item.last_validated_at}
               asserted={item.quality_asserted}
               regressionPending={item.regression_pending_review}
               variant="catalog"
@@ -865,8 +868,8 @@ export function ExploreTab() {
                   <div className="mb-8">
                     <div className="flex items-center gap-2 mb-3">
                       <div className="h-4 w-4 rounded-full bg-gradient-to-br from-green-400 to-green-600" />
-                      <h3 className="text-sm font-bold text-gray-900">Top Rated</h3>
-                      <span className="text-xs text-gray-500">{topRatedCount} excellent-tier item{topRatedCount !== 1 ? 's' : ''}</span>
+                      <h3 className="text-sm font-bold text-gray-900">Strong on tested examples</h3>
+                      <span className="text-xs text-gray-500">{topRatedCount} items with strong measured results</span>
                     </div>
                     <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))' }}>
                       {topItems.map(item => (

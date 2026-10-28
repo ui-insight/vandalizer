@@ -14,6 +14,7 @@ from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 
+from app.services.chat_stream_transport import with_heartbeats
 from app.config import Settings
 from app.dependencies import get_current_user, get_settings
 from app.rate_limit import limiter
@@ -360,12 +361,12 @@ async def chat(
                             activity.id,
                         )
 
-    headers = {"X-Conversation-UUID": conversation.uuid}
+    headers = {"X-Conversation-UUID": conversation.uuid, "Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"}
     if activity:
         headers["X-Activity-ID"] = str(activity.id)
 
     return StreamingResponse(
-        generate(),
+        with_heartbeats(generate()),
         media_type="text/event-stream",
         headers=headers,
     )

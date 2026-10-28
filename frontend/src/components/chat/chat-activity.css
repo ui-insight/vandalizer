@@ -1,0 +1,32 @@
+.chat-activity { margin: 8px 15px; border: 1px solid #dce3ed; border-radius: 14px; background: linear-gradient(115deg, #fffdf7, #f8fafc 65%); color: #18283f; box-shadow: 0 3px 12px #24365006; overflow: hidden; flex-shrink: 0; }
+.chat-activity-main { display: flex; align-items: flex-start; gap: 12px; padding: 15px 16px 11px; }
+.chat-activity-mark { position: relative; display: grid; place-items: center; width: 38px; height: 38px; flex-shrink: 0; border: 1px solid #e6dfc9; border-radius: 12px; background: #fff9e8; color: #73551b; margin-top: 3px; }
+.chat-activity-mark span { position: absolute; inset: -3px; border: 1px solid #d7c58a; border-radius: 14px; animation: chat-activity-breathe 2.4s ease-in-out infinite; }
+.chat-activity-copy { min-width: 0; flex: 1; }
+.chat-activity-eyebrow { display: flex; align-items: center; gap: 6px; color: #687587; font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 4px; }
+.chat-activity-dot { width: 5px; height: 5px; background: #9c791b; border-radius: 50%; }
+.chat-activity-title { font-size: 14px; font-weight: 650; line-height: 1.4; }
+.chat-activity-detail { margin-top: 3px; font-size: 12px; color: #526176; line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.chat-activity-time { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; font-size: 11px; font-variant-numeric: tabular-nums; color: #64748b; padding-top: 4px; }
+.chat-activity-footer { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 0 15px 6px; }
+.chat-activity-footer button { display: inline-flex; align-items: center; gap: 5px; min-height: 32px; border: 0; background: transparent; font: inherit; font-size: 11px; color: #475569; cursor: pointer; padding: 4px 0; }
+.chat-activity-footer button:hover { color: #17263c; text-decoration: underline; }
+.chat-activity-footer button:focus-visible { outline: 2px solid #9b7513; outline-offset: 3px; border-radius: 4px; }
+.chat-activity-jump { flex-shrink: 0; }
+.chat-activity-note { font-size: 11px; line-height: 1.4; color: #687587; }
+.chat-activity-toggle .is-expanded { transform: rotate(180deg); }
+.chat-activity-steps { list-style: none; padding: 4px 15px 10px; margin: 0; border-top: 1px solid #e4e9ef; max-height: 150px; overflow-y: auto; overscroll-behavior: contain; }
+.chat-activity-steps li { display: flex; gap: 8px; align-items: flex-start; padding: 9px 0; border-bottom: 1px solid #edf0f4; font-size: 12px; }
+.chat-activity-steps li:last-child { border-bottom: 0; }
+.chat-activity-steps li > svg { margin-top: 2px; flex-shrink: 0; color: #61758b; }
+.chat-activity-steps li[data-state="active"] > svg { color: #9b7513; }
+.chat-activity-steps li[data-state="error"] > svg { color: #b45309; }
+.chat-activity-steps li > div { min-width: 0; flex: 1; }
+.chat-activity-steps strong { display: block; font-weight: 550; }
+.chat-activity-steps span { display: block; font-size: 11px; color: #687587; overflow-wrap: anywhere; }
+.chat-activity-steps small { color: #687587; font-size: 10px; text-align: right; flex: 0 0 80px; }
+.chat-activity-spin { animation: chat-activity-spin 1.3s linear infinite; }
+@keyframes chat-activity-spin { to { transform: rotate(360deg); } }
+@keyframes chat-activity-breathe { 50% { opacity: .25; transform: scale(1.06); } }
+@media (prefers-reduced-motion: reduce) { .chat-activity-mark span, .chat-activity-spin { animation: none; } }
+@media (max-width: 600px) { .chat-activity { margin: 6px 8px; border-radius: 12px; } .chat-activity-main { padding: 12px 12px 8px; gap: 9px; } .chat-activity-mark { width: 30px; height: 30px; border-radius: 9px; } .chat-activity-mark span { border-radius: 11px; } .chat-activity-eyebrow { font-size: 9px; letter-spacing: .035em; } .chat-activity-title { font-size: 13px; } .chat-activity-time { font-size: 10px; gap: 3px; } .chat-activity-footer { padding: 0 12px 5px; } .chat-activity-footer button { min-height: 36px; } .chat-activity-steps { max-height: 120px; } }

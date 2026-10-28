@@ -227,8 +227,18 @@ export interface PlanTask {
   status: 'pending' | 'in_progress' | 'completed'
 }
 
+/** Transient UI status, never model reasoning or persisted transcript content. */
+export interface ChatActivity {
+  phase: 'starting' | 'context' | 'model' | 'tool_preparing' | 'tool_running' | 'reviewing' | 'writing'
+  content?: string
+  tool_name?: string
+  tool_call_id?: string
+}
+
 export interface StreamChunk {
   kind:
+    | 'activity'
+    | 'heartbeat'
     | 'text'
     | 'thinking'
     | 'thinking_done'
@@ -246,6 +256,7 @@ export interface StreamChunk {
     | 'sources_used'
     | 'grounding_warning'
   content: string
+  activity?: ChatActivity
   duration?: number
   tool_name?: string
   tool_call_id?: string

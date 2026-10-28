@@ -19,7 +19,7 @@
       "issued_at": "2026-10-09",
       "title": "Correction to historical quality guidance",
       "paragraphs": [
-        "The preserved lesson below includes outdated quality claims. Scores can be missing or Unscored; neither establishes a pass or failure. A score describes the tested cases and configuration, not the correctness of the current answer.",
+        "Quality badges lead with Strong on tested examples, Mixed results, or Needs improvement. Limited evidence and Evaluation outdated describe the evidence separately. Open the evaluation details for exact scores, sample sizes and failed checks. The preserved lesson below includes outdated quality claims. Scores can be missing or Not evaluated; neither establishes a pass or failure. A score describes the tested cases and configuration, not the correctness of the current answer.",
         "Additional test cases can expose failures and lower a score. Saving a test case does not itself repair an artifact. Check source values and inspect measured reruns before claiming improvement.",
         "Chat can receive score metadata. Inspect the stored evaluation details rather than relying on an assurance. Successful execution and reviewer acceptance are separate from measured correctness."
       ],
@@ -508,7 +508,7 @@
       "title": "Current guidance for this preserved practice",
       "issued_at": "2026-10-09",
       "paragraphs": [
-        "Checked identifies examiner acceptance of a shared entry. A quality score may be missing or Unscored; that does not establish either a pass or a failure. Review status does not prove a current output is accurate or suitable for every use.",
+        "Checked identifies examiner acceptance of a shared entry. A quality score may be missing or Not evaluated; that does not establish either a pass or a failure. Review status does not prove a current output is accurate or suitable for every use.",
         "A passed validation describes its measured cases and conditions; it does not automatically approve a library review. Recheck changed behavior. Configured monitoring and historical scores do not establish that every later output was evaluated."
       ],
       "assessment_changed": false,

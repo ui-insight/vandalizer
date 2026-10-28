@@ -220,7 +220,7 @@ describe('ExploreTab KB adopt', () => {
 })
 
 describe('ExploreTab quality tiers', () => {
-  it('spotlights measured excellent items ahead of asserted ones and labels assertions', async () => {
+  it('spotlights measured strong items and leaves author assertions unevaluated', async () => {
     // #908/#909: the spotlight is keyed on the tier the measurement pipeline
     // emits, a validated item leads it, and a seeded tier is shown as a claim.
     const measured = makeItem({ id: 'c-1', item_id: 'wf-1', name: 'Measured WF', source_uuid: 'wf-1', quality_tier: 'excellent', quality_score: 94 })
@@ -229,15 +229,16 @@ describe('ExploreTab quality tiers', () => {
     vi.mocked(listVerifiedItems).mockResolvedValue({ items: [asserted, good, measured], total: 3 })
     render(<ExploreTab />)
 
-    const heading = await screen.findByText('Top Rated')
-    expect(heading.parentElement?.textContent).toContain('2 excellent-tier items')
+    const heading = await screen.findByRole('heading', { name: 'Strong on tested examples' })
+    expect(heading.parentElement?.textContent).toContain('2 items with strong measured results')
     const spotlight = heading.parentElement!.parentElement!
     const names = Array.from(spotlight.querySelectorAll('button')).map(b => b.textContent || '')
-    expect(names.findIndex(n => n.includes('Measured WF'))).toBeLessThan(names.findIndex(n => n.includes('Seeded WF')))
-    expect(names.some(n => n.includes('Good WF'))).toBe(false)
+    expect(names.some(n => n.includes('Measured WF'))).toBe(true)
+    expect(names.some(n => n.includes('Seeded WF'))).toBe(false)
+    expect(names.some(n => n.includes('Good WF'))).toBe(true)
 
-    expect(screen.getByText('Rated Excellent by its author · not yet checked here')).toBeTruthy()
-    expect(screen.getByText('Checked · Excellent (94%)')).toBeTruthy()
+    expect(screen.getByText('Author rating · no measured evaluation')).toBeTruthy()
+    expect(screen.getAllByLabelText('Strong on tested examples. View evaluation')).toHaveLength(2)
   })
 })
 
@@ -253,7 +254,7 @@ describe('ExploreTab adoption and stability signals', () => {
     await screen.findByText('Measured WF')
     // Each chip appears once per card; the modal is closed.
     expect(screen.getAllByText('on 12 cases')).toHaveLength(1)
-    expect(screen.getAllByText('same answer 91% of the time')).toHaveLength(1)
+    expect(screen.getAllByText('Consistency measured · view evaluation')).toHaveLength(1)
     expect(screen.getAllByText('4 people use it')).toHaveLength(1)
     expect(screen.getAllByText('1 person uses it')).toHaveLength(1)
     expect(screen.getAllByText('Starter example')).toHaveLength(1)

@@ -1,3 +1,4 @@
+import { QUALITY_FILTER_OPTIONS, type QualityFilter } from './useCatalogBrowser'
 import { useAdminQuery } from '../admin/shared/useAdminQuery'
 import { usePanelEffect } from '../shared/usePanelEffect'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -14,15 +15,6 @@ import { listOrganizationsFlat } from '../../api/organizations'
 import { useConfirm } from '../shared/useConfirm'
 
 type KindFilter = '' | 'workflow' | 'search_set' | 'knowledge_base'
-type QualityFilter = '' | 'excellent' | 'good' | 'fair'
-
-function meetsQualityFilter(tier: string | null, filter: QualityFilter): boolean {
-  if (!filter) return true
-  if (!tier) return false
-  const order = ['fair', 'good', 'excellent']
-  return order.indexOf(tier) >= order.indexOf(filter)
-}
-
 function KindBadge({ kind }: { kind: string }) {
   if (kind === 'workflow') {
     return (
@@ -312,10 +304,10 @@ export function VerifiedCatalog() {
       .catch(() => {})
   }, [])
 
-  const request = useCallback(() => listVerifiedItems({ kind: kindFilter || undefined, search: searchQuery || undefined, skip: pageIndex * 200, limit: 200 }), [kindFilter, searchQuery, pageIndex])
+  const request = useCallback(() => listVerifiedItems({ kind: kindFilter || undefined, search: searchQuery || undefined, quality_tier: qualityFilter || undefined, skip: pageIndex * 200, limit: 200 }), [kindFilter, searchQuery, qualityFilter, pageIndex])
   const { data, loading, error, load: refresh } = useAdminQuery(request)
   const items = data?.items ?? []
-  const shown = items.filter(item => meetsQualityFilter(item.quality_tier, qualityFilter))
+  const shown = items
 
   const handleUnverify = async (item: VerifiedCatalogItem) => {
     if (removePending.current) return
@@ -370,14 +362,11 @@ export function VerifiedCatalog() {
         </div>
         <select
           value={qualityFilter}
-          onChange={(e) => setQualityFilter(e.target.value as QualityFilter)}
+          onChange={(e) => { setQualityFilter(e.target.value as QualityFilter); setPageIndex(0) }}
           aria-label="Filter by quality"
           className="px-3 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400"
         >
-          <option value="">All Quality</option>
-          <option value="excellent">Excellent</option>
-          <option value="good">Good or better</option>
-          <option value="fair">Fair or better</option>
+          {QUALITY_FILTER_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
         <div className="flex items-center gap-1 ml-auto">
           <button
@@ -417,7 +406,7 @@ export function VerifiedCatalog() {
       </div>
 
       {collectionError && <p role="alert" className="mb-3 text-sm text-red-800">Collection choices unavailable. <button onClick={refreshCollections} className="underline">Retry collection choices</button></p>}
-      {data && data.total > 200 && <div className="mb-3 flex flex-wrap gap-3 text-sm"><span>Page {pageIndex + 1} of {Math.ceil(data.total / 200)}. Quality filtering applies to this page.</span><button disabled={pageIndex === 0} onClick={() => setPageIndex(value => value - 1)}>Previous page</button><button disabled={(pageIndex + 1) * 200 >= data.total} onClick={() => setPageIndex(value => value + 1)}>Next page</button></div>}
+      {data && data.total > 200 && <div className="mb-3 flex flex-wrap gap-3 text-sm"><span>Page {pageIndex + 1} of {Math.ceil(data.total / 200)}.</span><button disabled={pageIndex === 0} onClick={() => setPageIndex(value => value - 1)}>Previous page</button><button disabled={(pageIndex + 1) * 200 >= data.total} onClick={() => setPageIndex(value => value + 1)}>Next page</button></div>}
       {error ? <p role="alert" className="p-3 text-sm text-red-800">{error} <button onClick={refresh} className="underline">Retry catalog</button></p> : loading ? (
         <div role="status" aria-live="polite" className="text-sm text-gray-500 py-8 text-center">Loading...</div>
       ) : shown.length === 0 ? (
@@ -449,6 +438,8 @@ export function VerifiedCatalog() {
                       isStale={item.last_validated_at ? (Date.now() - new Date(item.last_validated_at).getTime()) > 14 * 86400000 : false}
                       monitored={true}
                       asserted={item.quality_asserted}
+                      testCaseCount={item.test_case_count}
+                      regressionPending={item.regression_pending_review}
                     />
                     {item.created_at && (
                       <span className="text-xs text-gray-500">

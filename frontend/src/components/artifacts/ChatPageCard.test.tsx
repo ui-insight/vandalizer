@@ -31,3 +31,10 @@ it('never offers another approval for a historical decision', () => {
   expect(screen.queryByRole('button', { name: 'Save page' })).not.toBeInTheDocument()
   expect(screen.getByRole('region', { name: 'Earlier action decision' })).toHaveTextContent('Saved below.')
 })
+it('distinguishes preparing a preview from saving an approved page while the tool runs', () => {
+  const { rerender } = render(<ToolStatusLine call={call} isActive />)
+  expect(screen.getByRole('status')).toHaveTextContent('Preparing your page preview')
+  rerender(<ToolStatusLine call={{ ...call, args: { ...call.args, confirmed: true } }} isActive />)
+  expect(screen.getByRole('status')).toHaveTextContent('Saving your page')
+  expect(screen.queryByText('Preparing a preview for you to review before saving.')).not.toBeInTheDocument()
+})

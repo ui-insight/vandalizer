@@ -490,6 +490,8 @@ export function getQualitySparkline(uuid: string, limit = 10) {
 }
 
 export interface QualityStatus {
+  num_test_cases?: number | null
+  num_runs?: number | null
   status: 'validated' | 'unvalidated'
   score: number | null
   tier: string | null

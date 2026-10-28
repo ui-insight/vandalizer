@@ -12,7 +12,7 @@ describe('catalog evidence', () => {
     expect(screen.getByText('Sep 1, 2026')).toBeTruthy()
     rerender(<CatalogEvidence item={{ ...item, quality_score: null, last_validated_at: null }} />)
     expect(screen.getByText('No measured score available')).toBeTruthy()
-    expect(screen.getByText('Not recorded')).toBeTruthy()
+    expect(screen.getByText('Last validation').nextElementSibling).toHaveTextContent('Not recorded')
   })
   it('identifies asserted ratings and regression limitations', () => {
     render(<CatalogEvidence item={{ ...item, quality_asserted: true, regression_pending_review: true }} />)

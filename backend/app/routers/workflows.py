@@ -1513,8 +1513,17 @@ async def get_workflow_quality_status(
             "regression_pending_review": bool(meta.regression_pending_review),
         }
 
-    score = meta.quality_score if meta else latest.get("score") if latest else None
-    tier = meta.quality_tier if meta else None
+    measured_meta = meta is not None and meta.quality_score is not None
+    score = meta.quality_score if measured_meta else latest.get("score") if latest else None
+    if measured_meta:
+        tier = meta.quality_tier
+    else:
+        # A saved run can precede catalog metadata. Interpret it with the same
+        # configured thresholds rather than presenting a missing tier as poor.
+        from app.models.system_config import SystemConfig
+        from app.services.quality_service import compute_quality_tier
+        config = await SystemConfig.get_config()
+        tier = compute_quality_tier(score, config.get_quality_config())
     last_at = (meta.last_validated_at.isoformat() if meta and meta.last_validated_at else
                latest.get("created_at") if latest else None)
 
@@ -1556,6 +1565,8 @@ async def get_workflow_quality_status(
         "score": score,
         "tier": tier,
         "last_validated_at": last_at,
+        "num_test_cases": latest.get("num_test_cases") if latest else None,
+        "num_runs": latest.get("num_runs") if latest else None,
         "config_changed": config_changed,
         "stale": stale,
         **drift,

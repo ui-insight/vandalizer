@@ -1,3 +1,5 @@
+import { getToolMeta as getMeta, TOOL_META } from './toolActivity'
+import { qualityPresentation } from '../../lib/qualityLabels'
 import { ChatPageCard } from '../artifacts/ChatPageCard'
 import type { ApprovalRecord } from './approvalHistory'
 import { certificationPayloadIssue } from '../../lib/certificationPayload'
@@ -46,72 +48,11 @@ function CertificationResponseRecovery() {
   </div>
 }
 
-const TOOL_META: Record<string, { label: string; category: ToolCategory }> = {
-  search_documents:      { label: 'Searching documents',      category: 'read' },
-  list_documents:        { label: 'Listing documents',        category: 'read' },
-  list_folders:          { label: 'Listing folders',          category: 'read' },
-  search_knowledge_base: { label: 'Querying knowledge base',  category: 'read' },
-  list_knowledge_bases:  { label: 'Listing knowledge bases',  category: 'read' },
-  list_extraction_sets:  { label: 'Listing extraction templates',  category: 'read' },
-  list_workflows:        { label: 'Listing workflows',        category: 'read' },
-  get_quality_info:      { label: 'Checking quality',         category: 'read' },
-  search_library:        { label: 'Searching library',        category: 'read' },
-  get_document_text:     { label: 'Reading document',         category: 'read' },
-  get_app_help:          { label: 'Looking up help',          category: 'read' },
-  fetch_url:             { label: 'Reading web page',         category: 'read' },
-  web_search:            { label: 'Searching the web',        category: 'read' },
-  run_extraction:        { label: 'Running extraction',       category: 'extract' },
-  check_compliance:      { label: 'Checking compliance rules', category: 'workflow' },
-  create_knowledge_base: { label: 'Creating knowledge base',  category: 'write' },
-  add_documents_to_kb:   { label: 'Adding documents to KB',   category: 'write' },
-  add_url_to_kb:         { label: 'Adding URL to KB',         category: 'write' },
-  run_workflow:          { label: 'Running workflow',          category: 'workflow' },
-  get_workflow_status:   { label: 'Checking workflow status',  category: 'workflow' },
-  approve_workflow_step: { label: 'Approving workflow review', category: 'workflow' },
-  reject_workflow_step:  { label: 'Rejecting workflow review', category: 'workflow' },
-  list_test_cases:       { label: 'Listing test cases',         category: 'read' },
-  propose_test_case:     { label: 'Preparing guided verification', category: 'extract' },
-  run_validation:        { label: 'Running validation',         category: 'workflow' },
-  create_extraction_from_document: { label: 'Building extraction from document', category: 'write' },
-  list_optimization_recommendations: { label: 'Checking optimization suggestions', category: 'workflow' },
-  get_optimization_run:  { label: 'Checking autovalidate run',  category: 'workflow' },
-  start_optimization:    { label: 'Starting autovalidate',      category: 'write' },
-  apply_optimization:    { label: 'Applying optimized config',  category: 'write' },
-  regenerate_validation_plan: { label: 'Regenerating validation plan', category: 'write' },
-  save_to_folder:        { label: 'Saving to folder',         category: 'write' },
-  create_html_artifact:  { label: 'Creating page',        category: 'write' },
-  revise_html_artifact:  { label: 'Updating page',        category: 'write' },
-  get_html_artifact:     { label: 'Reading page',         category: 'read' },
-  create_project:        { label: 'Creating project',         category: 'write' },
-  list_project_documents:{ label: 'Listing project files',    category: 'read' },
-  run_pin_on_project:    { label: 'Running pinned item',      category: 'workflow' },
-  pin_to_project:        { label: 'Pinning to project',       category: 'write' },
-  unpin_from_project:    { label: 'Removing project pin',     category: 'write' },
-  set_project_status:    { label: 'Updating project status',  category: 'write' },
-  propose_obligations: { label: 'Updating the RA inbox', category: 'write' },
-  create_automation:     { label: 'Creating automation',      category: 'write' },
-  create_workflow:       { label: 'Building workflow',         category: 'write' },
-  get_workflow_definition: { label: 'Reading workflow steps',  category: 'read' },
-  update_workflow:       { label: 'Updating workflow',         category: 'write' },
-  get_certification_progress:      { label: 'Checking certification progress', category: 'read' },
-  get_certification_module:        { label: 'Loading certification module',    category: 'read' },
-  get_certification_lesson:        { label: 'Loading lesson',                  category: 'read' },
-  provision_certification_lab:     { label: 'Setting up certification lab',    category: 'write' },
-  check_certification_module:      { label: 'Grading certification module',    category: 'read' },
-  complete_certification_module:   { label: 'Completing certification module', category: 'write' },
-  submit_certification_assessment: { label: 'Saving self-assessment',          category: 'write' },
-  save_certification_position:     { label: 'Saving lesson position',          category: 'write' },
-}
-
 const CATEGORY_ACCENT: Record<ToolCategory, string> = {
   read: '#3b82f6',
   extract: '#f59e0b',
   write: '#22c55e',
   workflow: '#8b5cf6',
-}
-
-function getMeta(name: string) {
-  return TOOL_META[name] || { label: name.replace(/_/g, ' '), category: 'read' as ToolCategory }
 }
 
 // ---------------------------------------------------------------------------
@@ -320,7 +261,7 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
       if (obj.score != null) {
         const tc = obj.num_test_cases || 0
         return {
-          text: `Score: ${Math.round(obj.score as number)}/100 · ${tc} test case${tc !== 1 ? 's' : ''}`,
+          text: `${qualityPresentation({ score: obj.score as number, tier: typeof obj.tier === 'string' ? obj.tier : undefined, grade: typeof obj.grade === 'string' ? obj.grade : undefined }).label} · ${tc} test case${tc !== 1 ? 's' : ''}`,
           qualityHint,
         }
       }
@@ -343,7 +284,7 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
     }
 
     case 'get_quality_info':
-      if (obj.score != null) return { text: `Score: ${Math.round(obj.score as number)}/100`, qualityHint }
+      if (obj.score != null) return { text: qualityPresentation({ score: obj.score as number, tier: typeof obj.tier === 'string' ? obj.tier : undefined }).label, qualityHint }
       return { text: obj.note ? String(obj.note) : 'No validation data', qualityHint: '' }
 
     case 'create_knowledge_base':
@@ -550,18 +491,8 @@ export function toolResultExportText(toolName: string, content: unknown): string
 
 function formatQualityHint(quality: QualityMeta | null): string {
   if (!quality) return ''
-  const parts: string[] = []
-  if (quality.accuracy != null) {
-    parts.push(`${Math.round(quality.accuracy * 100)}% accuracy`)
-  } else if (quality.score != null) {
-    parts.push(`${Math.round(quality.score)}/100 quality`)
-  }
-  if (quality.num_runs != null && quality.num_runs > 0) {
-    parts.push(`${quality.num_runs} validation${quality.num_runs !== 1 ? 's' : ''}`)
-  } else if (quality.num_test_cases != null && quality.num_test_cases > 0) {
-    parts.push(`${quality.num_test_cases} test case${quality.num_test_cases !== 1 ? 's' : ''}`)
-  }
-  return parts.join(' · ')
+  const status = qualityPresentation({ ...quality, testCaseCount: quality.num_test_cases, outdated: !!quality.plan_stale, needsReview: quality.active_alerts?.some(a => a.severity === 'critical') })
+  return `${status.label} · ${status.evidence}`
 }
 
 // ---------------------------------------------------------------------------
@@ -1389,7 +1320,7 @@ export function ToolStatusLine({
   if (['create_html_artifact', 'revise_html_artifact'].includes(name)) {
     const uuid = typeof obj?.artifact_uuid === 'string' && /^[a-f0-9]{32}$/.test(obj.artifact_uuid) ? obj.artifact_uuid : undefined
     const revision = typeof obj?.revision === 'string' ? obj.revision : undefined
-    return <ChatPageCard title={String(obj?.title || args.title || 'Untitled page')}
+    return <ChatPageCard saving={args.confirmed === true} title={String(obj?.title || args.title || 'Untitled page')}
       html={typeof obj?.artifact_preview_html === 'string' ? obj.artifact_preview_html : undefined}
       uuid={uuid} revision={revision} running={isActive} error={isError ? summaryText || 'The page could not be saved. Ask the assistant to check the result before retrying.' : undefined}
       unconfirmed={unconfirmed || (!isActive && !needsConfirmation && !isError && !canceled && (!uuid || !revision))}

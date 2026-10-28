@@ -1,3 +1,4 @@
+import { QualityBadge } from '../library/QualityBadge'
 import { ValidationNav } from '../shared/ValidationNav'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ShieldCheck, Loader2, ChevronDown, ChevronRight } from 'lucide-react'
@@ -64,6 +65,8 @@ const isSmokeTest = (h: KBHistoryItem) => h.source === 'smoke_test'
  * "85" they see is fresh, on a comparable judge, and on a comparable set —
  * which addresses the audit's "no labeling, no reconciliation" gap. */
 type LatestQualitySummary = {
+  tier?: string | null
+  limitedEvidence: boolean
   score: number
   // Overall-score composition + the judge's answer accuracy, so the chip's
   // hover can say the score is a composite instead of reading as "judged N".
@@ -140,6 +143,8 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
     const snap = last?.result_snapshot ?? null
     setLatestQuality(last?.score != null ? {
       score: Number(last.score),
+      tier: snap?.quality_tier,
+      limitedEvidence: !!snap?.score_breakdown?.sample_size_penalty,
       breakdown: snap ? describeKBScoreWithValues(explainKBScore(snap).components) : null,
       answerAccuracy: snap?.retrieval_precision?.avg_judge_score ?? null,
       judgeModel: last.judge_model ?? null,
@@ -204,13 +209,6 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
   }, [tab, refreshQueries])
 
   const latestScore = latestQuality?.score ?? null
-  const scoreColor =
-    latestScore == null ? 'var(--workspace-muted)'
-    : latestScore >= 90 ? 'var(--workspace-success)'
-    : latestScore >= 70 ? '#1d4ed8'
-    : latestScore >= 50 ? 'var(--workspace-warning)'
-    : 'var(--workspace-danger)'
-
   // Build the "source of this score" tooltip — answers the audit's #11 directly.
   // Leads with what the number IS (a composite) before who judged it, because
   // "Score: 91 · judged by X" read as the judge's score, which it is not.
@@ -258,44 +256,28 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
         borderRadius: 'var(--workspace-radius-medium)',
       }}
     >
-      {/* Header — doubles as the collapse toggle when the parent controls it */}
-      <button
-        type="button"
-        onClick={onToggleCollapsed}
-        aria-expanded={onToggleCollapsed ? !collapsed : undefined}
-        disabled={!onToggleCollapsed}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)', width: '100%',
-          marginBottom: collapsed ? 0 : 10, padding: 0,
-          background: 'transparent', border: 'none', fontFamily: 'inherit',
-          cursor: onToggleCollapsed ? 'pointer' : 'default', textAlign: 'left',
-        }}
-      >
-        {onToggleCollapsed && (
-          collapsed
-            ? <ChevronRight size={14} style={{ color: 'var(--workspace-muted)', flexShrink: 0 }} />
-            : <ChevronDown size={14} style={{ color: 'var(--workspace-muted)', flexShrink: 0 }} />
-        )}
-        <ShieldCheck size={16} style={{ color: 'var(--workspace-muted)' }} aria-hidden="true" />
-        <span style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: 'var(--workspace-text)' }}>Validation</span>
-        {latestScore != null && (
-          <span
-            role="status"
-            aria-live="polite"
-            title={tooltip}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
-              fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: "var(--workspace-space-2) var(--workspace-space-8)", borderRadius: 'var(--workspace-radius-medium)',
-              color: scoreColor, backgroundColor: 'var(--workspace-canvas)',
-              border: `1px solid color-mix(in srgb, ${scoreColor} 20.0%, transparent)`,
-            }}
-          >
-            <span style={{
-              width: 6, height: 6, borderRadius: '50%', backgroundColor: scoreColor,
-            }} />
-            {latestScore.toFixed(0)}
-          </span>
-        )}
+      {/* Keep the collapse control separate from the evaluation disclosure. */}
+      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--workspace-space-12)', marginBottom: collapsed ? 0 : 10 }}>
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          aria-expanded={onToggleCollapsed ? !collapsed : undefined}
+          disabled={!onToggleCollapsed}
+          style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)', padding: 0,
+            background: 'transparent', border: 'none', fontFamily: 'inherit',
+            cursor: onToggleCollapsed ? 'pointer' : 'default', textAlign: 'left' }}
+        >
+          {onToggleCollapsed && (
+            collapsed
+              ? <ChevronRight size={14} style={{ color: 'var(--workspace-muted)', flexShrink: 0 }} />
+              : <ChevronDown size={14} style={{ color: 'var(--workspace-muted)', flexShrink: 0 }} />
+          )}
+          <ShieldCheck size={16} style={{ color: 'var(--workspace-muted)' }} aria-hidden="true" />
+          <span style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: 'var(--workspace-text)' }}>Validation</span>
+        </button>
+        <QualityBadge tier={latestQuality?.tier} score={latestScore}
+          testCaseCount={latestQuality?.numQueries} lastValidatedAt={latestQuality?.createdAt}
+          limitedEvidence={latestQuality?.limitedEvidence} title={tooltip} />
         {provenance && (
           <span
             title={tooltip}
@@ -324,7 +306,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
         <span style={{ marginLeft: 'auto', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)' }}>
           {queries.length} {queries.length === 1 ? 'query' : 'queries'}
         </span>
-      </button>
+      </div>
 
       {!collapsed && (<>
       <ValidationNav active={tab === 'queries' ? 'examples' : tab === 'autovalidate' ? 'improve' : 'check'}

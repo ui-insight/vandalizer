@@ -66,5 +66,18 @@ async def test_a_measured_score_is_still_validated(status_of):
 @pytest.mark.parametrize("status_of", [_workflow_status, _extraction_status])
 async def test_a_validation_run_is_still_validated(status_of):
     latest = {"score": 72.0, "created_at": "2026-10-01T00:00:00+00:00", "extraction_config": {}}
-    result = await status_of(_meta(), latest)
+    config = SimpleNamespace(get_quality_config=lambda: {"quality_tiers": {"good": {"min_score": 70}, "fair": {"min_score": 50}}})
+    with patch("app.models.system_config.SystemConfig.get_config", AsyncMock(return_value=config)):
+        result = await status_of(_meta(), latest)
     assert result["status"] == "validated"
+    assert result["score"] == 72.0
+    assert result["tier"] == "good"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status_of", [_workflow_status, _extraction_status])
+async def test_quality_status_preserves_sample_size_and_run_count(status_of):
+    latest = {"score": 91.0, "num_test_cases": 2, "num_runs": 3, "extraction_config": {}}
+    result = await status_of(_meta(score=91.0), latest)
+    assert result["num_test_cases"] == 2
+    assert result["num_runs"] == 3

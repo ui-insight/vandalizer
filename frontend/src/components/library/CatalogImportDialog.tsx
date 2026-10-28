@@ -1,3 +1,4 @@
+import { qualityPresentation } from '../../lib/qualityLabels'
 import { usePanelEffect } from '../shared/usePanelEffect'
 import { useState } from 'react'
 import { X, Search, Loader2 } from 'lucide-react'
@@ -169,7 +170,7 @@ export function CatalogImportDialog({
                   <KindBadge kind={item.item_kind} />
                   {item.quality_tier && (
                     <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', textTransform: 'capitalize' }}>
-                      {item.quality_tier}
+                      {qualityPresentation({ tier: item.quality_tier, score: undefined }).label}
                     </span>
                   )}
                 </div>

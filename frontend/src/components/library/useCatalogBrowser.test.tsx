@@ -14,11 +14,12 @@ describe('catalog query isolation', () => {
     const old = deferred<ReturnType<typeof page>>()
     vi.mocked(listVerifiedItems).mockReturnValueOnce(old.promise).mockResolvedValue(page('filtered'))
     const { result } = renderHook(() => useCatalogBrowser(options))
-    act(() => result.current.setQualityFilter('excellent'))
+    act(() => result.current.setQualityFilter('strong'))
     await waitFor(() => expect(result.current.items[0]?.id).toBe('filtered'))
     await act(async () => old.resolve(page('old')))
     expect(result.current.items[0].id).toBe('filtered')
     expect(result.current.total).toBe(1)
+    expect(listVerifiedItems).toHaveBeenLastCalledWith(expect.objectContaining({ quality_tier: 'strong' }))
   })
   it('blocks duplicate pagination and ignores a next page after changing kind', async () => {
     const next = deferred<ReturnType<typeof page>>()

@@ -1,3 +1,4 @@
+import { QualityBadge } from '../library/QualityBadge'
 import { useMemo, useState } from 'react'
 import { Play, Loader2, ChevronDown, ChevronRight, Download } from 'lucide-react'
 import {
@@ -313,6 +314,7 @@ export function KBValidationRunTab({
           )}
 
           <section aria-label="Validation review summary" className="validation-review-summary">
+            <QualityBadge tier={latestRun.quality_tier} score={latestRun.score ?? null} testCaseCount={latestRun.num_test_queries} limitedEvidence={!!latestRun.score_breakdown?.sample_size_penalty} />
             <strong>{latestRun.retrieval_precision.details.filter(detail => detail.judge?.verdict === 'FAIL').length} failed, {latestRun.retrieval_precision.details.filter(detail => detail.judge?.verdict === 'WARN').length} need review, {latestRun.retrieval_precision.details.filter(detail => !detail.judge || detail.judge.verdict === 'SKIPPED').length} ungraded</strong>
             <p>{latestRun.num_test_queries} questions · {latestRun.num_sources} sources. Open a question to compare the answer with its reference and evidence.</p>
             {latestRun.retrieval_precision.details.some(detail => !detail.expected_answer?.trim()) && <p>Missing expected answers leave some questions ungraded.</p>}
@@ -415,14 +417,6 @@ function ExportButton({ format, onExport }: {
 
 function CertifiedQualityCard({ run }: { run: KBValidationResult }) {
   if (run.score == null) return null
-  const tierColors: Record<string, { border: string; text: string }> = {
-    excellent: { border: '#22c55e55', text: 'var(--workspace-success)' },
-    good: { border: '#3b82f655', text: 'var(--workspace-info)' },
-    fair: { border: '#f59e0b55', text: 'var(--workspace-warning)' },
-  }
-  const tier = run.quality_tier || null
-  const c = (tier && tierColors[tier]) || { border: '#2e3a52', text: 'var(--workspace-muted)' }
-  const tierLabel = tier ? tier.charAt(0).toUpperCase() + tier.slice(1) : 'Unrated'
   const bd = run.score_breakdown
   const penalized = !!bd && bd.sample_size_penalty > 0
   const needed = bd?.test_cases_needed ?? 0
@@ -430,12 +424,12 @@ function CertifiedQualityCard({ run }: { run: KBValidationResult }) {
   return (
     <div style={{
       padding: 'var(--workspace-space-12)', marginBottom: 'var(--workspace-space-12)', backgroundColor: 'var(--workspace-info-surface)',
-      border: `1px solid ${c.border}`, borderRadius: 'var(--workspace-radius-small)',
+      border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)',
     }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--workspace-space-8)' }}>
         <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Overall quality</span>
-        <span style={{ fontSize: 22, fontWeight: 700, color: c.text }}>
-          {tierLabel} - {Math.round(run.score)}%
+        <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 500 }}>
+          Recorded score: {Math.round(run.score)}/100
         </span>
       </div>
       {/* The formula is printed, not tucked in a tooltip: this number is a
