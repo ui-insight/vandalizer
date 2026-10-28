@@ -8,6 +8,54 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(stopChatTurn).mockResolvedValue({ success: true })
 })
+
+it.each([false, true])('keeps one user message through three failed page attempts (partial output: %s)', async (partial) => {
+  vi.mocked(streamChat).mockImplementation(async (_m, _d, _a, onChunk, _model, _kb, _o, _f, _first, _demo, _signal, _project, onStarted) => {
+    onStarted?.({ conversationUuid: 'pages', activityId: 'page-activity' })
+    if (partial) onChunk?.({ kind: 'text', content: 'Preparing the table.' })
+    onChunk?.({ kind: 'error', content: 'This page is too large; try fewer rows or tabs, or split it into pages.' })
+    return { conversationUuid: 'pages', activityId: 'page-activity' }
+  })
+  const { result } = renderHook(() => useChat())
+  await act(async () => { await result.current.send('Summarize every row', ['workbook'], 'kimi-k3') })
+  for (let attempt = 0; attempt < 2; attempt++) {
+    act(() => result.current.retry())
+    await waitFor(() => expect(result.current.isStreaming).toBe(false))
+  }
+  expect(result.current.messages.filter(message => message.role === 'user')).toEqual([
+    expect.objectContaining({ content: 'Summarize every row' }),
+  ])
+  expect(result.current.error).toContain('fewer rows or tabs')
+  expect(streamChat).toHaveBeenCalledTimes(3)
+  for (const call of vi.mocked(streamChat).mock.calls.slice(1)) {
+    expect(call[0]).toBe('Summarize every row')
+    expect(call[1]).toEqual(['workbook'])
+    expect(call[2]).toBe('page-activity')
+    expect(call[4]).toBe('kimi-k3')
+    expect(call[15]).toBe(true)
+  }
+})
+
+it('allows an intentionally repeated new message', async () => {
+  vi.mocked(streamChat).mockResolvedValue({ conversationUuid: 'pages', activityId: 'page-activity' })
+  const { result } = renderHook(() => useChat())
+  await act(async () => { await result.current.send('Hello') })
+  await act(async () => { await result.current.send('Hello') })
+  expect(result.current.messages.filter(message => message.role === 'user')).toHaveLength(2)
+  expect(vi.mocked(streamChat).mock.lastCall?.[15]).toBe(false)
+})
+
+it('resends a request rejected before acceptance without asking the server to reuse a missing message', async () => {
+  vi.mocked(streamChat).mockResolvedValue({ conversationUuid: 'pages', activityId: 'page-activity' })
+  const { result } = renderHook(() => useChat())
+  await act(async () => { await result.current.send('First message') })
+  vi.mocked(streamChat).mockRejectedValueOnce(new Error('Service unavailable'))
+  await act(async () => { await result.current.send('Make a page') })
+  act(() => result.current.retry())
+  await waitFor(() => expect(result.current.isStreaming).toBe(false))
+  expect(vi.mocked(streamChat).mock.lastCall?.[15]).toBe(false)
+  expect(result.current.messages.filter(message => message.content === 'Make a page')).toHaveLength(1)
+})
 describe('interrupted agent responses', () => {
   it('retains a tool call even when stopped before text or a result arrives', async () => {
     vi.mocked(streamChat).mockImplementation(async (_m, _d, _a, onChunk, _model, _kb, _o, _f, _first, _demo, signal) => {
@@ -39,7 +87,8 @@ describe('interrupted agent responses', () => {
     })
     act(() => result.current.retry())
     await waitFor(() => expect(result.current.isStreaming).toBe(false))
-    expect(result.current.messages).toHaveLength(4)
+    expect(result.current.messages).toHaveLength(3)
+    expect(result.current.messages.filter(message => message.role === 'user')).toHaveLength(1)
     expect(result.current.messages[1].tool_results?.[0].content).toEqual({ workflow_id: 'wf-1' })
     expect(result.current.messages.at(-1)?.content).toBe('Checking the existing workflow.')
   })

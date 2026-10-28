@@ -29,7 +29,7 @@ it.each([skill, null])('syncs a confirmed tool selection (%j) into the transcrip
   expect(result.current.messages[0].active_skill).toEqual(old)
   expect(result.current.messages[1].active_skill ?? null).toEqual(selected)
   await act(async () => { await result.current.send('Continue') })
-  expect(vi.mocked(streamChat).mock.calls[1].slice(13)).toEqual([selected?.uuid ?? null, selected?.version])
+  expect(vi.mocked(streamChat).mock.calls[1].slice(13, 15)).toEqual([selected?.uuid ?? null, selected?.version])
 })
 
 it.each([
@@ -64,7 +64,7 @@ it('selects without sending a prompt and passes the reviewed version on send', a
   expect(result.current.messages).toEqual([])
   expect(streamChat).not.toHaveBeenCalled()
   await act(async () => { await result.current.send('Review the award') })
-  expect(vi.mocked(streamChat).mock.calls[0].slice(13)).toEqual(['skill-1', 'v1'])
+  expect(vi.mocked(streamChat).mock.calls[0].slice(13, 15)).toEqual(['skill-1', 'v1'])
   expect(result.current.messages[0].active_skill).toEqual(skill)
 })
 
@@ -171,7 +171,7 @@ it.each([false, true])('runs a Skill with its resolved snapshot (existing chat: 
   const args = vi.mocked(streamChat).mock.calls[0]
   expect(args[0]).toBe('Run the Budget review skill.')
   expect(args[1]).toEqual(['doc'])
-  expect(args.slice(13)).toEqual(['replacement', 'v2'])
+  expect(args.slice(13, 15)).toEqual(['replacement', 'v2'])
   expect(result.current.messages[0].active_skill).toEqual(replacement)
 })
 

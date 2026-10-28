@@ -9,6 +9,41 @@ from unittest.mock import MagicMock
 import pytest
 
 
+@pytest.mark.parametrize("tool_name", ["create_html_artifact", "revise_html_artifact"])
+@pytest.mark.parametrize("args", ['{"html":"<table>', {"title": "Matrix", "html": "<table>"}])
+def test_truncated_page_arguments_are_rejected_even_when_json_is_valid(tool_name, args):
+    from pydantic_ai.messages import ModelResponse, ToolCallPart
+    from app.services.chat_service import _check_response_size, _classify_stream_error, _OutputLimitExceeded
+    from app.services.artifacts import PAGE_TOO_LARGE_MESSAGE
+
+    response = ModelResponse(parts=[ToolCallPart(tool_name, args)], finish_reason="length")
+    with pytest.raises(_OutputLimitExceeded) as error:
+        _check_response_size(response)
+    assert _classify_stream_error(error.value) == ("warning", PAGE_TOO_LARGE_MESSAGE)
+
+
+def test_small_page_response_is_not_rejected():
+    from pydantic_ai.messages import ModelResponse, ToolCallPart
+    from app.services.chat_service import _check_response_size
+
+    _check_response_size(ModelResponse(parts=[ToolCallPart(
+        "create_html_artifact", {"title": "First ten rows", "html": "<table></table>"},
+    )], finish_reason="tool_call"))
+
+
+def test_sdk_output_exhaustion_is_actionable_without_mislabeling_other_errors():
+    from pydantic_ai.exceptions import IncompleteToolCall
+    from app.services.chat_service import _classify_stream_error
+    from app.services.artifacts import PAGE_TOO_LARGE_MESSAGE
+
+    assert _classify_stream_error(IncompleteToolCall("private provider details"), preparing_page=True) == (
+        "warning", PAGE_TOO_LARGE_MESSAGE,
+    )
+    severity, message = _classify_stream_error(IncompleteToolCall("private provider details"))
+    assert severity == "warning" and "split" in message and "page" not in message
+    assert _classify_stream_error(ValueError("unrelated bug"), preparing_page=True)[0] == "error"
+
+
 # ---------------------------------------------------------------------------
 # _ThinkTagParser
 # ---------------------------------------------------------------------------

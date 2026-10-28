@@ -76,6 +76,73 @@ def test_sanitized_self_contained_html_has_no_active_or_remote_elements():
     assert soup.h1.text == "Report" and warnings
 
 
+def test_static_budget_dashboard_preserves_rows_values_and_css_bars():
+    html = '''<main><h1>Budget overview (static)</h1><p>Total: $150,000</p>
+        <figure><figcaption>Budget by Category and Year</figcaption>
+        <div style="width:66.7%;background:navy">Personnel: $100,000</div>
+        <div style="width:33.3%;background:teal">Equipment: $50,000</div></figure>
+        <table><thead><tr><th>Category</th><th>Year 1</th></tr></thead>
+        <tbody><tr><td>Personnel</td><td>$100,000</td></tr>
+        <tr><td>Equipment</td><td>$50,000</td></tr></tbody></table></main>'''
+    cleaned, warnings = artifacts.clean_html(html, "Budget")
+    soup = BeautifulSoup(cleaned, "html.parser")
+    assert warnings == []
+    assert [row.get_text('|') for row in soup.select('tbody tr')] == [
+        'Personnel|$100,000', 'Equipment|$50,000',
+    ]
+    assert [bar.text for bar in soup.select('figure div')] == ['Personnel: $100,000', 'Equipment: $50,000']
+    assert soup.select_one('figure div')['style'] == 'width:66.7%;background:navy'
+
+
+@pytest.mark.asyncio
+async def test_script_dashboard_warnings_reach_preview_save_read_and_revision(db):
+    from app.services.chat_artifact_tools import create_html_artifact, get_html_artifact, revise_html_artifact
+    from app.services.chat_deps import AgenticChatDeps
+
+    conversation = SimpleNamespace(uuid="dashboard-chat", pending_confirmations=[], save=AsyncMock())
+    deps = AgenticChatDeps(user=_make_user(), user_id="testuser", team_id=None,
+        team_access=TeamAccessContext(), organization_id=None, system_config_doc={},
+        model_name="test", conversation=conversation, turn_marker=1)
+    context = SimpleNamespace(deps=deps)
+    html = '''<main><h1>Budget</h1><p>Total: $150,000</p>
+        <h2>Budget by Category and Year</h2><canvas id="chart"></canvas>
+        <h2>Budget Distribution</h2><canvas id="pie"></canvas>
+        <div>Filter by Category: <button onclick="filter()">Personnel</button></div>
+        <table><thead><tr><th onclick="sort()">Category</th></tr></thead><tbody></tbody></table>
+        <script>document.querySelector('tbody').innerHTML = '<tr><td>Personnel</td></tr>';</script></main>'''
+    with patch("app.services.chat_artifact_tools.get_sync_db", return_value=db):
+        preview = await create_html_artifact(context, "Budget", html)
+        assert preview["needs_confirmation"] and not db.html_artifacts.docs
+        soup = BeautifulSoup(preview["artifact_preview_html"], "html.parser")
+        assert not soup.select('script, canvas, button, [onclick]')
+        assert '$150,000' in soup.text
+        assert "Data rendered only by scripts will be missing" in preview["warnings"][0]
+        assert "table sorting are not supported" in preview["rendering_note"]
+
+        deps.turn_marker = 2
+        saved = await create_html_artifact(context, "Budget", html, confirmed=True)
+        read = await get_html_artifact(context, saved["artifact_uuid"])
+        assert read["html"] == preview["artifact_preview_html"]
+        assert saved["warnings"] == read["warnings"] == preview["warnings"]
+        assert saved["rendering_note"] == read["rendering_note"] == preview["rendering_note"]
+
+        # A retry using the sanitized HTML must still report the stored warnings.
+        retry_preview = await create_html_artifact(context, "Budget", read["html"])
+        assert retry_preview["needs_confirmation"]
+        deps.turn_marker = 3
+        retry = await create_html_artifact(context, "Budget", read["html"], confirmed=True)
+        assert retry["artifact_uuid"] == saved["artifact_uuid"]
+        assert retry["warnings"] == saved["warnings"]
+
+        revised_html = html.replace('$150,000', '$160,000')
+        revision_preview = await revise_html_artifact(context, saved["artifact_uuid"], saved["revision"], "Budget", revised_html)
+        assert revision_preview["warnings"] == preview["warnings"]
+        deps.turn_marker = 4
+        revised = await revise_html_artifact(context, saved["artifact_uuid"], saved["revision"], "Budget", revised_html, confirmed=True)
+        assert revised["warnings"] == revision_preview["warnings"]
+        assert revised["revision"] != saved["revision"]
+
+
 def test_create_retry_and_revision_cas_and_public_pin(db):
     doc = make(db)
     assert make(db)["uuid"] == doc["uuid"] and len(db.html_artifacts.docs) == 1

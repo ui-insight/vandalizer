@@ -204,6 +204,11 @@ async def chat(
             ChatConversation.uuid == activity.conversation_id,
             ChatConversation.user_id == user_id,
         )
+    if body.retry:
+        history = await conversation.get_messages() if conversation else []
+        last_user = next((m for m in reversed(history) if m["role"] == "user"), None)
+        if not last_user or last_user["content"] != message:
+            raise HTTPException(409, "This message can no longer be retried. Reopen the conversation and send a new message.")
     current_skill = getattr(conversation, "active_skill", None)
     requested_skill = body.skill_uuid
     explicit_skill = "skill_uuid" in body.model_fields_set
@@ -309,9 +314,14 @@ async def chat(
         conversation.last_context_tokens = 0
         conversation.last_context_message_count = -1
     conversation.active_skill = active_skill
-    await conversation.add_message(
-        ChatRole.USER, message, source_documents=source_documents or None,
-    )
+    if body.retry:
+        # Keep partial answers and completed tool results, but reuse the user
+        # message. This also keeps the transcript correct after reopening it.
+        await conversation.save()
+    else:
+        await conversation.add_message(
+            ChatRole.USER, message, source_documents=source_documents or None,
+        )
 
     async def generate():
         try:
@@ -332,6 +342,7 @@ async def chat(
                 team_access=team_access,
                 onboarding_context=onboarding_ctx,
                 active_skill=active_skill,
+                retry=body.retry,
             ):
                 yield chunk
         finally:

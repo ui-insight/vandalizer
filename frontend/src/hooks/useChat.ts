@@ -166,6 +166,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
   const abortRef = useRef<AbortController | null>(null)
   const citationsRef = useRef<Citation[]>([])
   const lastSendArgsRef = useRef<SendArgs | null>(null)
+  const lastSendAcceptedRef = useRef(false)
   const unsupportedFiguresRef = useRef<string[]>([])
   const silenceInferencesRef = useRef<string[]>([])
   const unsupportedCitationsRef = useRef<string[]>([])
@@ -184,7 +185,8 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
   }, [])
 
   const send = useCallback(
-    async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuids?: string[], includeOnboardingContext?: boolean, folderUuids?: string[], isFirstSession?: boolean, runDemo?: boolean, projectUuid?: string, skillUuid?: string) => {
+    async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuids?: string[], includeOnboardingContext?: boolean, folderUuids?: string[], isFirstSession?: boolean, runDemo?: boolean, projectUuid?: string, skillUuid?: string, retry = false) => {
+      if (abortRef.current) return
       if (isLoadingHistory || isSelectingSkill || (projectSkillBlocked && !skillUuid)) return
       if (conversationUuid && !activityId) {
         setError('This conversation could not be resumed. Reopen it from Activity before sending.')
@@ -216,6 +218,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
       }
       const deliveredResults = new Set<string>()
       lastSendArgsRef.current = [message, documentUuids, model, knowledgeBaseUuids, includeOnboardingContext, folderUuids, isFirstSession, runDemo, projectUuid, skillUuid]
+      if (!retry) lastSendAcceptedRef.current = false
       setError(null)
       setPlanTasks(null) // The previous turn's plan must not label this new action.
       setErrorDetails(null)
@@ -244,7 +247,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
       // Capture the invocation before tool results can change turnSkill.
       const invokedSkill = turnSkill
       // Add user message immediately
-      setMessages((prev) => [...prev, { role: 'user', content: message, ...(invokedSkill ? { active_skill: invokedSkill } : {}), request_scope: { documents: [...documentUuids], folders: [...(folderUuids ?? [])], knowledgeBases: [...(knowledgeBaseUuids ?? [])], ...(projectUuid ? { project: projectUuid } : {}) } }])
+      if (!retry) setMessages((prev) => [...prev, { role: 'user', content: message, ...(invokedSkill ? { active_skill: invokedSkill } : {}), request_scope: { documents: [...documentUuids], folders: [...(folderUuids ?? [])], knowledgeBases: [...(knowledgeBaseUuids ?? [])], ...(projectUuid ? { project: projectUuid } : {}) } }])
 
       // Build and append an assistant message from whatever has accumulated so
       // far. Shared by the normal-completion, user-stop, and network-failure
@@ -471,14 +474,17 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
           projectUuid,
           identity => {
             if (controller.signal.aborted || !ownsView()) return
+            lastSendAcceptedRef.current = true
             setConversationUuid(identity.conversationUuid)
             setActivityId(identity.activityId)
           },
           turnSkill?.uuid ?? null,
           turnSkill?.version,
+          retry && lastSendAcceptedRef.current && !!activityId,
         )
         if (!ownsView()) return
 
+        lastSendAcceptedRef.current = true
         setConversationUuid(result.conversationUuid)
         setActivityId(result.activityId)
 
@@ -603,15 +609,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
   const retry = useCallback(() => {
     const args = lastSendArgsRef.current
     if (!args) return
-    setMessages((prev) => {
-      const next = [...prev]
-      // With no assistant output, replace the unanswered user message. If
-      // partial output exists, retain that exchange as the record of work
-      // already attempted; send() appends the explicitly requested retry.
-      if (next.length && next[next.length - 1].role === 'user') next.pop()
-      return next
-    })
-    send(...args)
+    void send(...args, true)
   }, [send])
 
   /** Queue a message typed while a turn is streaming (Phase 10). Optimistic:

@@ -75,7 +75,11 @@ def clean_html(html: str, title: str) -> tuple[str, list[str]]:
     result = f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="{CONTENT_CSP}"><title>{escape(title)}</title>{styles}</head><body>{body}</body></html>'
     if len(result.encode("utf-8")) > MAX_HTML_BYTES:
         raise HTTPException(422, "Rendered page exceeds 256 KiB. Reduce content or inline images.")
-    return result, ["Unsupported HTML, scripts, or remote assets were removed. Review the saved preview."] if removed else []
+    return result, [
+        "Unsupported HTML, scripts, or remote assets were removed. Review this preview before saving or sharing. "
+        "Data rendered only by scripts will be missing. Use full HTML tables and static CSS charts; "
+        "JavaScript charts, filters and table sorting are not supported."
+    ] if removed else []
 
 
 def _revision(title, html, base="", source=None):

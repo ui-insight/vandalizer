@@ -1328,6 +1328,7 @@ export function ToolStatusLine({
     const revision = typeof obj?.revision === 'string' ? obj.revision : undefined
     return <ChatPageCard saving={args.confirmed === true} title={String(obj?.title || args.title || 'Untitled page')}
       html={typeof obj?.artifact_preview_html === 'string' ? obj.artifact_preview_html : undefined}
+      warnings={Array.isArray(obj?.warnings) ? obj.warnings.filter((warning): warning is string => typeof warning === 'string') : []}
       uuid={uuid} revision={revision} running={isActive} error={isError ? summaryText || 'The page could not be saved. Ask the assistant to check the result before retrying.' : undefined}
       unconfirmed={unconfirmed || (!isActive && !needsConfirmation && !isError && !canceled && (!uuid || !revision))}
       canceled={canceled} needsApproval={needsConfirmation} history={approvalHistory} decision={decision} decisionError={decisionError}

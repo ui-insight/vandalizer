@@ -57,6 +57,55 @@ class TestChatAuth:
         assert resp.status_code == 401
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("partial", [False, True])
+async def test_retry_reuses_persisted_user_message(client, partial):
+    user = _make_user()
+    cookies, headers = _auth()
+    history = [{"role": "user", "content": "Make a page of every row"}]
+    if partial:
+        history.append({"role": "assistant", "content": "Prepared first tab", "tool_results": [{"page": "saved"}]})
+    conversation = MagicMock(uuid="pages")
+    conversation.get_messages = AsyncMock(return_value=history)
+    conversation.save = AsyncMock()
+    conversation.add_message = AsyncMock()
+    activity = MagicMock(id="0123456789abcdef01234567", conversation_id="pages")
+    activity.save = AsyncMock()
+    attempts = []
+
+    async def fake_stream(**kwargs):
+        attempts.append(kwargs)
+        history.append({"role": "assistant", "content": "This page is too large"})
+        yield '{"kind":"error","content":"This page is too large"}\n'
+
+    with (
+        patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+        patch("app.dependencies.User") as users,
+        patch("app.routers.chat.access_control.get_team_access_context", new_callable=AsyncMock),
+        patch("app.routers.chat.activity_service.get_activity", new=AsyncMock(return_value=activity)),
+        patch("app.routers.chat.ChatConversation") as conversations,
+        patch("app.routers.chat.chat_stream", new=fake_stream),
+    ):
+        users.find_one = AsyncMock(return_value=user)
+        conversations.find_one = AsyncMock(return_value=conversation)
+        for _ in range(2):
+            response = await client.post("/api/chat", json={
+                "message": "Make a page of every row", "activity_id": str(activity.id), "retry": True,
+            }, cookies=cookies, headers=headers)
+            assert response.status_code == 200
+        stale = await client.post("/api/chat", json={
+            "message": "A different message", "activity_id": str(activity.id), "retry": True,
+        }, cookies=cookies, headers=headers)
+        assert stale.status_code == 409
+
+    conversation.add_message.assert_not_awaited()
+    assert all(attempt["retry"] for attempt in attempts)
+    assert len(attempts) == 2
+    assert len([m for m in await conversation.get_messages() if m["role"] == "user"]) == 1
+    if partial:
+        assert history[1]["tool_results"] == [{"page": "saved"}]
+
+
 class TestListConversations:
     @pytest.mark.asyncio
     async def test_returns_conversation_list(self, client):

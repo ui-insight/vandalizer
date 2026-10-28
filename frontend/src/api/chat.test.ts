@@ -2,6 +2,13 @@ import { expect, it, vi } from 'vitest'
 import { streamChat, exportChat } from './chat'
 import { rawFetch } from './client'
 vi.mock('./client', () => ({ rawFetch: vi.fn(), apiFetch: vi.fn() }))
+it('marks a retry for the server so reopening does not restore duplicate user messages', async () => {
+  vi.mocked(rawFetch).mockResolvedValueOnce(new Response(''))
+  await streamChat('Make a page', ['workbook'], 'activity', undefined, 'kimi-k3', undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, null, undefined, true)
+  expect(JSON.parse(vi.mocked(rawFetch).mock.lastCall![1]!.body as string)).toMatchObject({
+    message: 'Make a page', activity_id: 'activity', document_uuids: ['workbook'], retry: true,
+  })
+})
 it('downloads a real export through the authenticated fetch wrapper', async () => {
   vi.mocked(rawFetch).mockResolvedValueOnce(new Response('office bytes', { headers: { 'Content-Type': 'application/octet-stream' } }))
   const messages = [{ role: 'assistant' as const, content: 'Answer', tools: [], evidence: 'Source.pdf' }]

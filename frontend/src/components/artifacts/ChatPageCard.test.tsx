@@ -38,3 +38,34 @@ it('distinguishes preparing a preview from saving an approved page while the too
   expect(screen.getByRole('status')).toHaveTextContent('Saving your page')
   expect(screen.queryByText('Preparing a preview for you to review before saving.')).not.toBeInTheDocument()
 })
+
+it.each(['create_html_artifact', 'revise_html_artifact'])('shows removal warnings before saving a %s preview', toolName => {
+  const warning = 'Scripts were removed. Data rendered only by scripts will be missing.'
+  render(<ToolStatusLine call={{ ...call, tool_name: toolName }} result={{ ...result, tool_name: toolName, content: { ...result.content, warnings: [warning] } }} onConfirm={vi.fn()} />)
+  const alert = screen.getByRole('alert')
+  expect(alert).toHaveTextContent('Some content was removed to keep this page safe.')
+  expect(alert).toHaveTextContent(warning)
+  expect(alert.compareDocumentPosition(screen.getByTitle('Page preview')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(screen.getByText(/JavaScript charts, filters and table sorting are not supported/)).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: toolName === 'create_html_artifact' ? 'Save page' : 'Save new version' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Expand preview' }))
+  expect(screen.getByRole('alert')).toHaveTextContent(warning)
+  expect(screen.getByTitle('Award report expanded preview')).toHaveAttribute('sandbox', '')
+})
+
+it('keeps warnings visible in saved and historical chat cards', () => {
+  const warning = 'Unsupported scripts were removed.'
+  const { rerender } = render(<ToolStatusLine call={call} result={{ ...result, content: { artifact_uuid: 'a'.repeat(32), revision: 'saved-version', warnings: [warning] } }} />)
+  expect(screen.getByRole('alert')).toHaveTextContent(warning)
+  rerender(<ToolStatusLine call={call} result={{ ...result, content: { ...result.content, warnings: [warning] } }} approvalHistory={{ label: 'Result recorded', detail: 'Saved below.' }} />)
+  expect(screen.getByRole('alert')).toHaveTextContent(warning)
+  expect(screen.queryByRole('button', { name: 'Save page' })).not.toBeInTheDocument()
+})
+
+it('handles legacy results and malformed warnings without inventing removals', () => {
+  const { rerender } = render(<ToolStatusLine call={call} result={result} />)
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  expect(screen.getByText(/Pages support static HTML and CSS/)).toBeInTheDocument()
+  rerender(<ToolStatusLine call={call} result={{ ...result, content: { ...result.content, warnings: [null, { message: 'invalid' }, 42] } }} />)
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+})

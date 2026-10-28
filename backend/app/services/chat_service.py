@@ -16,6 +16,8 @@ from pydantic_ai.messages import (
     FunctionToolCallEvent,
     FunctionToolResultEvent,
     ModelMessage,
+    ModelRequest,
+    ModelResponse,
     PartDeltaEvent,
     PartStartEvent,
     TextPart,
@@ -583,7 +585,27 @@ def _stream_error_event(exc: BaseException, user_message: str) -> dict:
     return event
 
 
-def _classify_stream_error(exc: BaseException) -> tuple[str, str]:
+class _OutputLimitExceeded(Exception):
+    """A response ended at the output cap, before tools may execute it."""
+
+
+def _check_response_size(response: ModelResponse) -> None:
+    if response.finish_reason != "length":
+        return
+    from app.services.artifacts import PAGE_TOO_LARGE_MESSAGE
+
+    page = any(
+        isinstance(part, ToolCallPart)
+        and part.tool_name in {"create_html_artifact", "revise_html_artifact"}
+        for part in response.parts
+    )
+    raise _OutputLimitExceeded(
+        PAGE_TOO_LARGE_MESSAGE if page else
+        "The response is too large for the model to finish. Ask for less content or split the request into parts."
+    )
+
+
+def _classify_stream_error(exc: BaseException, *, preparing_page: bool = False) -> tuple[str, str]:
     """Classify a chat stream error into (severity, user_message).
 
     severity is "warning" for transient/external/user-input issues that aren't
@@ -592,6 +614,17 @@ def _classify_stream_error(exc: BaseException) -> tuple[str, str]:
     """
     text = str(exc)
     lower = text.lower()
+
+    from pydantic_ai.exceptions import IncompleteToolCall
+    from app.services.artifacts import PAGE_TOO_LARGE_MESSAGE
+
+    if isinstance(exc, _OutputLimitExceeded):
+        return "warning", str(exc)
+    if isinstance(exc, IncompleteToolCall):
+        return "warning", (
+            PAGE_TOO_LARGE_MESSAGE if preparing_page else
+            "The response is too large for the model to finish. Ask for less content or split the request into parts."
+        )
 
     # Trial lifecycle events (out of tokens, unconfirmed address, fleet pause)
     # — expected states with actionable messages, not bugs.
@@ -1534,6 +1567,7 @@ async def chat_stream(
     team_access: Optional[TeamAccessContext] = None,
     onboarding_context=None,
     active_skill=None,
+    retry: bool = False,
 ) -> AsyncGenerator[str, None]:
     """Async generator yielding newline-delimited JSON chunks for streaming chat."""
 
@@ -1735,11 +1769,15 @@ async def chat_stream(
     # Load message history, excluding the user message we just saved (chat.py
     # saves the bare message before calling chat_stream).  We re-send it as
     # the enriched prompt below so the model only sees the version that
-    # includes document / KB / attachment context.
+    # includes document / KB / attachment context. A retry appended no user
+    # message: retain its partial assistant answer and completed tool results.
     previous_messages: list[ModelMessage] = await conversation.to_model_messages(
         compactable_tools=compactable_tools,
     )
-    if previous_messages:
+    if previous_messages and (not retry or (
+        isinstance(previous_messages[-1], ModelRequest)
+        and all(isinstance(part, UserPromptPart) for part in previous_messages[-1].parts)
+    )):
         previous_messages = previous_messages[:-1]
 
     # Document segments — one entry per SmartDocument so each can be trimmed
@@ -2467,6 +2505,7 @@ async def chat_stream(
     # Citations accumulated this turn: pre-agent KB context (classic path)
     # plus any search_knowledge_base tool calls (agentic path).
     streamed_citations: list[dict] = list(kb_sources)
+    preparing_page = False
 
     def _completed_work() -> dict:
         """What a turn that ends early finished, for _save_failed_assistant_turn."""
@@ -2550,9 +2589,14 @@ async def chat_stream(
                             }) + "\n"
                     yield _activity_chunk("model")
                     tool_preparation = _ToolPreparationProgress()
+                    preparing_page = False
                     async with node.stream(agent_run.ctx) as stream:
                         async for event in stream:
                             preparation = tool_preparation.feed(event)
+                            preparing_page = any(
+                                name in {"create_html_artifact", "revise_html_artifact"}
+                                for name in tool_preparation.names.values()
+                            )
                             if preparation:
                                 yield preparation
                             content, is_api_thinking = _extract_event_content(event)
@@ -2591,6 +2635,10 @@ async def chat_stream(
                                         else:
                                             streamed_segments.append({"kind": "text", "content": text})
                                         yield json.dumps({"kind": "text", "content": text}) + "\n"
+
+                    # Check before advancing to the tool node: even parseable
+                    # JSON can contain incomplete HTML at the output cap.
+                    _check_response_size(stream.response)
 
                     # Flush any remaining buffered content from the parser
                     for kind, text in think_parser.flush():
@@ -2928,7 +2976,7 @@ async def chat_stream(
         raise
 
     except Exception as e:
-        severity, user_message = _classify_stream_error(e)
+        severity, user_message = _classify_stream_error(e, preparing_page=preparing_page)
         if severity == "warning":
             logger.warning("Chat stream error: %s", e)
         else:
