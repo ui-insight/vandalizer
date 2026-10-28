@@ -33,7 +33,8 @@ async def test_team_can_only_read_the_selected_version_even_by_direct_url(client
     assert member['latest_revision'] == member['team_revision'] == shared
     assert member['title'] == 'Reviewed dashboard'
     assert [r['version'] for r in member['revisions']] == [2]
-    assert not member['can_manage'] and 'source' not in member and 'public_token' not in member
+    assert not member['can_manage'] and 'public_token' not in member
+    assert member['source'] == {'kind': 'chat'}
     assert old not in str(member) and draft not in str(member)
     for revision in (old, draft):
         for suffix in ('content', 'content?download=true', 'source'):
@@ -136,3 +137,32 @@ async def test_draft_edits_do_not_change_team_library_sort_order_or_dates(client
     items = (await client.get('/api/pages/browse?sort=updated')).json()['items']
     assert [item['uuid'] for item in items] == [second['uuid'], first['uuid']]
     assert items[1]['updated_at'] == items[1]['revisions'][0]['created_at']
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('kind', ['chat', 'workflow', 'editor'])
+@pytest.mark.parametrize('legacy', [False, True])
+async def test_source_type_matches_for_owner_and_team_without_private_provenance(client, db, route_env, kind, legacy):
+    db.html_artifacts = BrowseCollection()
+    source = {'kind': kind, 'conversation_uuid': 'private-chat', 'workflow_id': 'private-workflow',
+              'session_id': 'private-session', 'project_uuid': 'private-project',
+              'skill': {'uuid': 'private-skill', 'version': 'v1'}}
+    first = artifacts.create(db, 'testuser', 'Original', '<p>Original</p>', 'origin', source)
+    second = artifacts.revise(db, first, 'Shared edit', '<p>Shared edit</p>', first['latest_revision'])
+    artifacts.share_team(db, second, 'team-a')
+    if legacy:
+        db.html_artifacts.update_one({'uuid': first['uuid']}, {'$set': {'source': None}})
+    route_env.access.return_value = TeamAccessContext(team_uuids={'team-a'})
+    for viewer in ('testuser', 'QA1'):
+        route_env.user.user_id = viewer
+        for url in (f'/api/pages/{first["uuid"]}', '/api/pages', '/api/pages/browse'):
+            response = await client.get(url)
+            assert response.status_code == 200
+            payload = response.json()
+            item = payload['items'][0] if url.endswith('/browse') else payload[0] if url == '/api/pages' else payload
+            assert item['source']['kind'] == kind
+            if viewer == 'testuser':
+                assert item['source'] == source
+            else:
+                assert item['source'] == {'kind': kind}
+                assert 'private-' not in response.text

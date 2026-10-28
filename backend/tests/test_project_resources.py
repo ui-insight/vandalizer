@@ -97,7 +97,8 @@ async def test_pages_pagination_search_and_team_revocation(client, db, route_env
     db.html_artifacts.update_one({'uuid': other['uuid']}, {'$set': {'team_id': 'team-a'}})
     route_env.access.return_value = TeamAccessContext(team_uuids={'team-a'})
     visible = (await client.get('/api/pages/browse?search=Hidden')).json()['items']
-    assert len(visible) == 1 and 'source' not in visible[0]
+    assert len(visible) == 1 and visible[0]['source'] == {'kind': 'editor'}
+    assert 'secret' not in str(visible)
     route_env.access.return_value = TeamAccessContext()
     assert (await client.get('/api/pages/browse?search=Hidden')).json()['items'] == []
     assert (await client.get('/api/pages/browse?page=0')).status_code == 422
@@ -163,7 +164,7 @@ def test_page_edits_keep_origin_and_workflow_pages_keep_project(db):
     with pytest.raises(HTTPException):
         artifacts.metadata(changed, False)
     shared = artifacts.share_team(db, changed, 'team-a')
-    assert 'source' not in artifacts.metadata(shared, False)
+    assert artifacts.metadata(shared, False)['source'] == {'kind': 'chat'}
     db.activity_event.docs.append({'workflow_session_id': 'run1', 'user_id': 'testuser', 'project_uuid': 'p1'})
     saved = artifacts.from_workflow(db, {'workflow': 'wf1', 'session_id': 'run1', 'status': 'completed', 'final_output': {'output': '<p>Result</p>'}}, 'testuser')
     assert saved['project_uuid'] == 'p1'

@@ -65,3 +65,22 @@ it('refreshes a visible library after a workflow or transcript save', async () =
   expect(await screen.findByRole('link', { name: 'New workflow page' })).toBeInTheDocument()
   expect(screen.queryByRole('link', { name: 'Award report' })).not.toBeInTheDocument()
 })
+
+it.each([
+  ['chat', 'From chat'],
+  ['workflow', 'From a workflow'],
+  ['editor', 'Created in Pages'],
+])('shows the same %s origin for owners and team members', async (kind, label) => {
+  const data = result()
+  data.items[0].source = { kind, conversation_uuid: 'private-chat' }
+  vi.mocked(browseArtifacts).mockResolvedValue(data)
+  const owner = render(<PagesBrowser />)
+  expect(await screen.findByText(label)).toBeInTheDocument()
+  owner.unmount()
+  vi.mocked(browseArtifacts).mockResolvedValue({ ...data, items: [{ ...data.items[0],
+    can_manage: false, team_id: 'team-a', source: { kind },
+  }] })
+  render(<PagesBrowser />)
+  expect(await screen.findByText(label)).toBeInTheDocument()
+  if (kind !== 'editor') expect(screen.queryByText('Created in Pages')).not.toBeInTheDocument()
+})

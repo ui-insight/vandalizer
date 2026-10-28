@@ -157,6 +157,8 @@ def team_view(doc):
     visible = revision(doc, selected)
     number = visible.get("version") or next(i for i, r in enumerate(doc["revisions"], 1) if r["uuid"] == selected)
     return {**doc, "title": visible["title"], "latest_revision": selected,
+            # Preserve the page's origin before narrowing revision history.
+            "source": doc.get("source") or doc["revisions"][0].get("source", {}),
             "team_revision": selected, "revisions": [{**visible, "version": number}],
             "published_revision": selected if selected == doc.get("published_revision") else None,
             "updated_at": visible["created_at"]}
@@ -209,9 +211,11 @@ def metadata(doc, owner=False):
                              "version": r.get("version", i)} for i, r in enumerate(doc["revisions"], 1)]}
     result["created_at"] = doc.get("created_at")
     result["updated_at"] = doc.get("updated_at")
+    source = doc.get("source") or doc["revisions"][0].get("source", {})
+    # The origin label is shared; source identifiers and provenance are private.
+    result["source"] = source if owner else {"kind": source.get("kind", "editor")}
     if owner:
         result["public_token"] = doc.get("public_token")
-        result["source"] = doc.get("source") or doc["revisions"][0].get("source", {})
     return result
 
 
