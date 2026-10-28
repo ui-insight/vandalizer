@@ -82,10 +82,10 @@ export function ProjectPinsSection({ projectUuid, onChange, onOpen }: { projectU
   }
 
   return (
-    <div className="mt-8">
+    <div className="project-detail-card">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Pinned tools</h2>
-        <button type="button" onClick={() => setAdding(a => !a)} className="flex items-center gap-1 text-sm text-gray-700 hover:underline">
+        <h2 className="project-section-title">Pinned tools</h2>
+        <button type="button" onClick={() => setAdding(a => !a)} className="project-button">
           <Plus size={14} /> Pin a tool
         </button>
       </div>
@@ -120,7 +120,7 @@ export function ProjectPinsSection({ projectUuid, onChange, onOpen }: { projectU
           No pinned tools. Pin the workflows, extractions, automations, and knowledge bases you use for this project.
         </div>
       ) : (
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid gap-2">
           {pins.map(p => {
             const meta = TYPE_META[p.pin_type] ?? TYPE_META.workflow
             const Icon = meta.icon
@@ -128,7 +128,7 @@ export function ProjectPinsSection({ projectUuid, onChange, onOpen }: { projectU
               <div key={key(p)} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white p-3">
                 <Icon size={16} className="shrink-0 text-gray-500" />
                 <button type="button" onClick={() => open(p)} className="min-w-0 flex-1 text-left">
-                  <div className="truncate text-sm font-medium text-gray-900">{p.name}</div>
+                  <div className="break-words text-sm font-medium text-gray-900">{p.name}</div>
                   <div className="text-xs text-gray-500">{meta.label}</div>
                 </button>
                 <button type="button" onClick={() => unpin(p)} title="Unpin" aria-label={`Unpin ${p.name}`} disabled={pending} className="p-1 text-gray-500 hover:text-red-500">

@@ -155,7 +155,7 @@ export function WorkspaceLayout() {
 
   // Layout: [UtilityBar 48px] [Content per mode] [ActivityRail(right)]
   return (
-    <div className="workspace-shell flex h-screen min-w-0 flex-col">
+    <div className="workspace-shell flex h-screen min-w-0 flex-col" data-project-surface={isProjects || !!activeProjectUuid ? "true" : undefined}>
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-[1000] focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:shadow-lg focus:ring-2 focus:ring-highlight"

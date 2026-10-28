@@ -4,7 +4,7 @@ import { listSearchSets } from '../../api/extractions'
 import { setProjectDefaultSkill } from '../../api/projects'
 import { useProjectPins } from '../../hooks/useProjectPins'
 
-const button = 'rounded border border-gray-300 bg-white px-3 py-2 text-sm disabled:opacity-50'
+const button = 'project-button disabled:opacity-50'
 
 export function ProjectSkillsSection({ projectUuid, defaultSkillUuid, canManage, onChange }: {
   projectUuid: string; defaultSkillUuid?: string | null; canManage: boolean; onChange: () => void
@@ -28,9 +28,9 @@ export function ProjectSkillsSection({ projectUuid, defaultSkillUuid, canManage,
     try { await work(); onChange() } catch (e) { setError(e instanceof Error ? e.message : 'Could not update project Skills.') }
     finally { pending.current = false; setBusy(false) }
   }
-  return <section aria-label="Project Skills" className="mt-6 space-y-3 rounded-lg border p-4">
-    <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Skills</h2>{canManage && <button className={button} onClick={() => setAdding(!adding)}>{adding ? 'Close Skill picker' : 'Pin a Skill'}</button>}</div>
-    <p className="text-sm text-gray-600">Reuse Skills in this project. Pinning keeps their existing access permissions. The default applies to new chats; existing conversations keep their selected version.</p>
+  return <section aria-label="Project Skills" className="project-detail-card space-y-3">
+    <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="project-section-title">Skills</h2>{canManage && <button className={button} onClick={() => setAdding(!adding)}>{adding ? 'Close Skill picker' : 'Pin a Skill'}</button>}</div>
+    <p className="text-sm text-gray-600">Reuse Skills in this project. The default applies to new chats. Existing conversations keep their selected version and access permissions stay the same.</p>
     {(error || pinError) && <p role="alert" className="text-sm text-red-800">{error || pinError} {pinError && <button className="underline" onClick={() => void refresh()}>Retry Skills</button>}</p>}
     {loading ? <p role="status">Loading Skills…</p> : !skills.length ? <p className="text-sm">No accessible Skills pinned yet.</p> : <ul className="space-y-2">{skills.map(skill => <li key={skill.target_id} className="flex flex-wrap items-center gap-2 rounded border p-3">
       <span className="min-w-0 flex-1 break-words font-medium">{skill.name}{skill.target_id === defaultSkillUuid && <span className="ml-2 text-xs font-normal">Default</span>}</span>
@@ -38,7 +38,7 @@ export function ProjectSkillsSection({ projectUuid, defaultSkillUuid, canManage,
       {canManage && <button className={button} disabled={busy} onClick={() => void act(async () => { await unpin('skill', skill.target_id); if (choice === skill.target_id) setChoice('') })} aria-label={`Unpin ${skill.name}`}>Unpin</button>}
     </li>)}</ul>}
     {canManage && <div className="flex flex-wrap items-end gap-2">
-      <label className="min-w-0 text-sm">Default Skill<select className="mt-1 block max-w-full rounded border p-2" value={choice} disabled={busy || loading} onChange={e => setChoice(e.target.value)}><option value="">No default Skill</option>{choice && !skills.some(s => s.target_id === choice) && <option value={choice}>Default Skill unavailable</option>}{skills.map(s => <option value={s.target_id} key={s.target_id}>{s.name}</option>)}</select></label>
+      <label className="min-w-0 text-sm">Default Skill<select className="mt-1 block max-w-full rounded-lg border border-slate-300 p-2" value={choice} disabled={busy || loading} onChange={e => setChoice(e.target.value)}><option value="">No default Skill</option>{choice && !skills.some(s => s.target_id === choice) && <option value={choice}>Default Skill unavailable</option>}{skills.map(s => <option value={s.target_id} key={s.target_id}>{s.name}</option>)}</select></label>
       <button className={button} disabled={busy || loading || choice === (defaultSkillUuid ?? '')} onClick={() => void act(async () => { await setProjectDefaultSkill(projectUuid, choice || null) })}>Save default Skill</button>
     </div>}
     {adding && canManage && <div className="space-y-2 border-t pt-3"><label className="block text-sm">Search Skills<input type="search" className="mt-1 block w-full rounded border p-2" value={search} onChange={e => setSearch(e.target.value)} /></label>

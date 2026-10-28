@@ -24,6 +24,18 @@ beforeEach(() => {
   mocks.project = { uuid: 'a', title: 'Grant A', description: 'A description', role: 'owner', owner_user_id: 'user-a', state: 'draft', team_id: null, capabilities: { files: { count: 0, folders: 0 }, knowledge: { ready: false, documents: 0 }, workflows: { count: 0 }, extractions: { count: 0 }, automations: { count: 0 }, external_kbs: { count: 0 }, members: { count: 1 } } } as ProjectOverview
 })
 describe('Project detail recovery', () => {
+  it('preserves an unsaved description when switching details sections', () => {
+    setup()
+    fireEvent.click(screen.getByRole('button', { name: 'Edit description' }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Project description' }), { target: { value: 'Draft to keep' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Tools' }))
+    expect(screen.getByText('Pinned tools')).toBeVisible()
+    expect(screen.queryByRole('textbox', { name: 'Project description' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Overview' }))
+    expect(screen.getByRole('textbox', { name: 'Project description' })).toHaveValue('Draft to keep')
+    expect(screen.getByText('Pinned tools')).not.toBeVisible()
+    expect(mocks.update).not.toHaveBeenCalled()
+  })
   it('keeps a failed title draft and does not submit twice while saving', async () => {
     mocks.update.mockRejectedValueOnce(new Error('Save unavailable'))
     setup(); fireEvent.click(screen.getByRole('button', { name: 'Rename project' }))
@@ -67,6 +79,7 @@ describe('Project detail recovery', () => {
   it('offers retry for project and member loading failures', async () => {
     mocks.members.mockRejectedValueOnce(new Error('offline'))
     const rendered = setup()
+    fireEvent.click(screen.getByRole('button', { name: 'Sharing' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Retry members' }))
     await waitFor(() => expect(mocks.members).toHaveBeenCalledTimes(2))
     rendered.unmount(); mocks.project = undefined; setup()

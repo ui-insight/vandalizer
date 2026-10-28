@@ -42,6 +42,8 @@ export function ProjectManageModal({ open, onClose }: { open: boolean; onClose: 
   const navigate = useNavigate()
   const qc = useQueryClient()
 
+  const [section, setSection] = useState('overview')
+  const sectionBody = useRef<HTMLDivElement>(null)
   const [members, setMembers] = useState<ProjectMember[]>([])
   const [inviteUrl, setInviteUrl] = useState<string | null>(null)
   const [creatingLink, setCreatingLink] = useState(false)
@@ -95,7 +97,7 @@ export function ProjectManageModal({ open, onClose }: { open: boolean; onClose: 
   if (!project) return (
     <div className="fixed inset-0 z-[1000] flex justify-end bg-black/40">
       <FocusTrap focusTrapOptions={{ escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
-        <div role="dialog" aria-modal="true" aria-label="Manage project" className="h-full w-full max-w-md bg-white p-5">
+        <div role="dialog" aria-modal="true" aria-label="Manage project" className="project-details h-full bg-white p-5">
           <button onClick={onClose} className="mb-6 rounded border px-3 py-2">Close</button>
           {loading ? <p role="status">Loading project…</p> : <div role="alert">
             <p>This project could not be loaded. It may be unavailable or no longer shared with you.</p>
@@ -266,16 +268,16 @@ export function ProjectManageModal({ open, onClose }: { open: boolean; onClose: 
     >
       <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
       <div
-        className="flex h-full w-full max-w-md flex-col overflow-y-auto bg-white shadow-xl"
+        className="project-details flex h-full w-full flex-col bg-white shadow-xl"
         role="dialog"
         aria-modal="true"
         aria-label="Manage project"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-start justify-between gap-3 border-b border-gray-100 p-5">
+        <div className="project-details-header">
           <div className="min-w-0 flex-1">
-            <div className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-600">Manage project</div>
+            <div className="project-eyebrow">Project details</div>
             <div className="flex flex-wrap items-center gap-2">
               {editingTitle ? (
                 <div className="w-full">
@@ -306,48 +308,21 @@ export function ProjectManageModal({ open, onClose }: { open: boolean; onClose: 
               <ProjectStateBadge state={project.state} />
             </div>
           </div>
-          <button onClick={onClose} disabled={saving} className="p-1 text-gray-400 hover:text-gray-700" aria-label="Close">
+          <button onClick={onClose} disabled={saving} className="project-icon-button" aria-label="Close">
             <X size={18} />
           </button>
         </div>
 
-        <div className="flex flex-col gap-6 p-5">
+        <nav className="project-details-nav" aria-label="Project details sections">
+          {(['overview', 'pages', 'tools', 'sharing'] as const).map(item => <button key={item} type="button" aria-pressed={section === item} aria-controls={`project-section-${item}`} onClick={() => { setSection(item); if (sectionBody.current) sectionBody.current.scrollTop = 0 }}>{item.charAt(0).toUpperCase() + item.slice(1)}</button>)}
+        </nav>
+        <div ref={sectionBody} className="project-details-body">
           {loadError && <div role="alert" className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">Project details could not refresh. <button onClick={() => refresh()} className="underline">Retry project</button></div>}
-          {saveError && !editingContext && <p role="alert" className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">{saveError}</p>}
-          <section aria-label="Project contents" className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-            <h3 className="font-semibold text-gray-900">What belongs here</h3>
-            <p className="mt-1 text-sm text-gray-600">Keep this project's source files, knowledge and reusable tools together.</p>
-            <ProjectSummaryStats capabilities={project.capabilities} className="mt-3" />
-            <p className="mt-3 text-sm text-gray-600">{canManage
-              ? project.capabilities.files.count === 0 ? 'Start by adding the files your project needs.' : 'Review the source files or ask a question about this project.'
-              : 'You have read-only access. Ask questions about shared project content; an owner or editor manages files and tools.'}</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {canManage && <button onClick={() => { setWorkspaceMode('files'); onClose() }} className="rounded border border-gray-300 bg-white px-3 py-2 text-sm">{project.capabilities.files.count ? 'Open project files' : 'Add project files'}</button>}
-              <button onClick={() => { setWorkspaceMode('chat'); onClose() }} className="rounded border border-gray-300 bg-white px-3 py-2 text-sm">Open project chat</button>
-            </div>
-          </section>
-          <section aria-label="Project access" className="rounded-lg border border-gray-200 p-3 text-sm text-gray-600">
-            <h3 className="font-semibold text-gray-900">Your access: {project.role}</h3>
-            <p className="mt-1">{canManage ? 'You can update this project’s files and tools. Viewers can ask questions about shared content without changing it.' : 'You can view this project and ask questions about its shared content. An owner or editor changes its files and tools.'}</p>
-            {project.team_id ? <p className="mt-2">Members of the shared team have editor access to this project.</p> : isOwner && currentTeam ? <p className="mt-2">Share with team gives members of {currentTeam.name} editor access. A PI invite link gives read-only access instead.</p> : null}
-          </section>
-          <section aria-labelledby="project-context-title" className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <div className="flex items-center justify-between gap-3"><h3 id="project-context-title" className="font-semibold text-slate-900">Project context</h3><span className="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600">{project.context ? 'Active in chat' : 'Optional'}</span></div>
-            <p className="mt-2 text-sm leading-relaxed text-slate-600">Brief the assistant on your goals, audience, terminology and constraints. This guides project chats; your current request takes precedence.</p>
-            <p className="mt-2 text-xs leading-relaxed text-slate-500">Visible to everyone with project access. Workflows use it only when selected for a run.</p>
-            {editingContext ? <div className="mt-4">
-              {saveError && <p role="alert" className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{saveError}</p>}
-              <label className="text-sm font-medium text-slate-700" htmlFor="project-context-input">Project brief</label>
-              <textarea id="project-context-input" autoFocus disabled={saving} value={contextDraft} maxLength={12000} onChange={e => setContextDraft(e.target.value)} rows={8} placeholder="Goal: Prepare our grant application.&#10;Audience: Federal grant reviewers.&#10;Priorities: Measurable outcomes and plain language.&#10;Constraints: Flag unsupported claims; distinguish confirmed funding from estimates." className="mt-2 w-full rounded-lg border border-slate-300 bg-white p-3 text-base leading-relaxed outline-none focus:border-highlight" aria-describedby="project-context-help" />
-              <div id="project-context-help" className="mt-2 flex justify-between gap-3 text-xs text-slate-500"><span>Leave blank to remove context.</span><span>{contextDraft.length.toLocaleString()} / 12,000</span></div>
-              <div className="mt-3 flex gap-2"><button type="button" disabled={saving} className="page-button page-button-primary" onClick={() => void saveChange({ context: contextDraft.trim() || null }, () => setEditingContext(false))}>{saving ? 'Saving…' : 'Save context'}</button><button type="button" disabled={saving} className="page-button" onClick={() => { setEditingContext(false); setSaveError(null) }}>Cancel context edit</button></div>
-            </div> : <>
-              {project.context && <p className="mt-4 max-h-52 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-slate-200 bg-white p-3 text-sm leading-relaxed text-slate-700">{project.context}</p>}
-              {canManage && <button type="button" disabled={saving} className="page-button mt-3" onClick={() => { setContextDraft(project.context || ''); setEditingContext(true); setSaveError(null) }}><Pencil size={14} />{project.context ? 'Edit project context' : 'Add project context'}</button>}
-            </>}
-          </section>
+          {saveError && <p role="alert" className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">{saveError}</p>}
+          <div id="project-section-overview" hidden={section !== 'overview'} className="project-details-section">
           {/* Description */}
-          <div>
+          <section aria-label="Project description" className="project-details-description">
+            <h3 className="project-section-title">About this project</h3>
             {editingDesc ? (
               <>
                 <textarea
@@ -378,13 +353,13 @@ export function ProjectManageModal({ open, onClose }: { open: boolean; onClose: 
               <button onClick={() => { setDescDraft(''); setEditingDesc(true) }} className="text-sm text-gray-500 hover:text-gray-600">
                 + Add description
               </button>
-            ) : null}
-          </div>
+            ) : <p className="text-sm text-gray-500">No description yet.</p>}
+          </section>
 
           {/* Status + sharing */}
           {canManage && (
             <div className="flex flex-wrap items-center gap-2">
-              <select
+              <label className="project-status-label">Project status<select
                 value={stateDraft ?? project.state}
                 disabled={saving}
                 onChange={e => setState(e.target.value as ProjectState)}
@@ -392,9 +367,59 @@ export function ProjectManageModal({ open, onClose }: { open: boolean; onClose: 
                 title="Project status"
                 aria-label="Project status"
               >
-                {PROJECT_STATES.map(s => <option key={s} value={s} className="capitalize">{s}</option>)}
-              </select>
+                {PROJECT_STATES.map(s => <option key={s} value={s} className="capitalize">{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+              </select></label>
               {stateDraft && saveError && <button onClick={() => setState(stateDraft)} disabled={saving} className="rounded border px-3 py-1.5 text-sm">Retry status</button>}
+
+            </div>
+          )}
+
+          <section aria-label="Project contents" className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+            <h3 className="font-semibold text-gray-900">Project resources</h3>
+            <p className="mt-1 text-sm text-gray-600">Your source files and reusable tools, together.</p>
+            <ProjectSummaryStats capabilities={project.capabilities} className="mt-3" />
+            {!canManage && <p className="mt-3 text-sm text-gray-600">You have read-only access. Ask questions about shared project content; an owner or editor manages files and tools.</p>}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {canManage && <button onClick={() => { setWorkspaceMode('files'); onClose() }} className="rounded border border-gray-300 bg-white px-3 py-2 text-sm">{project.capabilities.files.count ? 'Open project files' : 'Add project files'}</button>}
+              <button onClick={() => { setWorkspaceMode('chat'); onClose() }} className="rounded border border-gray-300 bg-white px-3 py-2 text-sm">Open project chat</button>
+            </div>
+          </section>
+          <section aria-labelledby="project-context-title" className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex items-center justify-between gap-3"><h3 id="project-context-title" className="font-semibold text-slate-900">Project context</h3><span className="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600">{project.context ? 'Active in chat' : 'Optional'}</span></div>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">Set goals, audience and constraints for project chats. Your current request takes precedence.</p>
+            <p className="mt-2 text-xs leading-relaxed text-slate-500">Visible to everyone with project access. Workflows use it only when selected for a run.</p>
+            {editingContext ? <div className="mt-4">
+              <label className="text-sm font-medium text-slate-700" htmlFor="project-context-input">Project brief</label>
+              <textarea id="project-context-input" autoFocus disabled={saving} value={contextDraft} maxLength={12000} onChange={e => setContextDraft(e.target.value)} rows={8} placeholder="Goal: Prepare our grant application.&#10;Audience: Federal grant reviewers.&#10;Priorities: Measurable outcomes and plain language.&#10;Constraints: Flag unsupported claims; distinguish confirmed funding from estimates." className="mt-2 w-full rounded-lg border border-slate-300 bg-white p-3 text-base leading-relaxed outline-none focus:border-highlight" aria-describedby="project-context-help" />
+              <div id="project-context-help" className="mt-2 flex justify-between gap-3 text-xs text-slate-500"><span>Leave blank to remove context.</span><span>{contextDraft.length.toLocaleString()} / 12,000</span></div>
+              <div className="mt-3 flex gap-2"><button type="button" disabled={saving} className="page-button page-button-primary" onClick={() => void saveChange({ context: contextDraft.trim() || null }, () => setEditingContext(false))}>{saving ? 'Saving…' : 'Save context'}</button><button type="button" disabled={saving} className="page-button" onClick={() => { setEditingContext(false); setSaveError(null) }}>Cancel context edit</button></div>
+            </div> : <>
+              {project.context && <p className="mt-4 max-h-52 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-slate-200 bg-white p-3 text-sm leading-relaxed text-slate-700">{project.context}</p>}
+              {canManage && <button type="button" disabled={saving} className="page-button mt-3" onClick={() => { setContextDraft(project.context || ''); setEditingContext(true); setSaveError(null) }}><Pencil size={14} />{project.context ? 'Edit project context' : 'Add project context'}</button>}
+            </>}
+          </section>
+
+          </div>
+          <div id="project-section-pages" hidden={section !== 'pages'} className="project-details-section">
+          <PagesBrowser key={`pages:${uuid}`} projectUuid={uuid} canManage={canManage} />
+          </div>
+          <div id="project-section-tools" hidden={section !== 'tools'} className="project-details-section">
+          {/* Pinned tools */}
+          <ProjectSkillsSection key={`skills:${uuid}`} projectUuid={uuid} defaultSkillUuid={project.default_skill_uuid} canManage={canManage} onChange={() => { void qc.invalidateQueries({ queryKey: ['project', uuid] }) }} />
+
+          {canManage && (
+            <ProjectPinsSection projectUuid={uuid} onChange={() => qc.invalidateQueries({ queryKey: ['project', uuid] })} onOpen={onClose} />
+          )}
+
+
+          </div>
+          <div id="project-section-sharing" hidden={section !== 'sharing'} className="project-details-section">
+          <section aria-label="Project access" className="rounded-lg border border-gray-200 p-3 text-sm text-gray-600">
+            <h3 className="font-semibold text-gray-900">Your access: {project.role}</h3>
+            <p className="mt-1">{canManage ? 'You can update this project’s files and tools. Viewers can ask questions about shared content without changing it.' : 'You can view this project and ask questions about its shared content. An owner or editor changes its files and tools.'}</p>
+            {project.team_id ? <p className="mt-2">Members of the shared team have editor access to this project.</p> : isOwner && currentTeam ? <p className="mt-2">Share with team gives members of {currentTeam.name} editor access. A PI invite link gives read-only access instead.</p> : null}
+          </section>
+          <div className="flex flex-wrap gap-2">
               {project.team_id ? (
                 isOwner && (
                   <button onClick={handleMakePersonal} disabled={busy} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50">
@@ -408,20 +433,11 @@ export function ProjectManageModal({ open, onClose }: { open: boolean; onClose: 
               ) : project.team_id && (
                 <span className="inline-flex items-center gap-1 text-xs text-gray-500"><Users size={13} /> Shared with team</span>
               )}
-            </div>
-          )}
-
-          {/* Pinned tools */}
-          <ProjectSkillsSection key={`skills:${uuid}`} projectUuid={uuid} defaultSkillUuid={project.default_skill_uuid} canManage={canManage} onChange={() => { void qc.invalidateQueries({ queryKey: ['project', uuid] }) }} />
-          <PagesBrowser key={`pages:${uuid}`} projectUuid={uuid} canManage={canManage} />
-          {canManage && (
-            <ProjectPinsSection projectUuid={uuid} onChange={() => qc.invalidateQueries({ queryKey: ['project', uuid] })} onOpen={onClose} />
-          )}
-
+          </div>
           {/* Share — invite links + members */}
           {canManage && (
             <div>
-              <div className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-600">Share</div>
+              <div className="mb-2 project-section-title">People with access</div>
               <div className="rounded-lg border border-gray-200 p-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="text-sm text-gray-600">Invite a PI to view & chat (read-only).</div>
@@ -469,6 +485,8 @@ export function ProjectManageModal({ open, onClose }: { open: boolean; onClose: 
               </button>
             )}
           </div>
+          </div>
+
         </div>
       </div>
       </FocusTrap>

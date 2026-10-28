@@ -20,9 +20,11 @@ import type { ProjectCapabilities } from '../../types/project'
  */
 export function ProjectSummaryStats({
   capabilities,
+  compact = false,
   className = '',
 }: {
   capabilities: ProjectCapabilities | undefined
+  compact?: boolean
   className?: string
 }) {
   if (!capabilities) return null
@@ -37,7 +39,8 @@ export function ProjectSummaryStats({
     { icon: Users, value: c.members.count, label: 'members' },
   ]
 
-  const shown = stats.filter(s => s.always || s.value > 0)
+  const compactStats = [stats[0], { icon: Workflow, value: c.workflows.count + c.extractions.count + c.automations.count, label: 'tools' }, stats[5]]
+  const shown = (compact ? compactStats : stats).filter(s => s.always || s.value > 0)
 
   return (
     <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600 ${className}`}>

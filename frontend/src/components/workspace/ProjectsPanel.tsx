@@ -3,7 +3,7 @@ import { WorkspaceSectionHeader } from '../shared/WorkspaceSectionHeader'
 import { usePanelVisible } from '../shared/PanelVisibility'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { Plus, HelpCircle, MoreHorizontal, Copy, Pin, PinOff } from 'lucide-react'
+import { Plus, HelpCircle, MoreHorizontal, Copy, Pin, PinOff, FolderKanban, ArrowUpRight } from 'lucide-react'
 import { useProjects } from '../../hooks/useProjects'
 import { MAX_HOME_PINS, useHomePinnedProjects } from '../../hooks/useHomePinnedProjects'
 import { useToast } from '../../contexts/ToastContext'
@@ -29,6 +29,8 @@ export function ProjectsPanel() {
   const { projects, loading, error, refresh, create, duplicate } = useProjects()
   const { isPinned, togglePin } = useHomePinnedProjects()
   const { toast } = useToast()
+  const [showCreate, setShowCreate] = useState(false)
+  const createToggle = useRef<HTMLButtonElement>(null)
   const [newName, setNewName] = useState('')
   const [createError, setCreateError] = useState<string | null>(null)
   const mounted = useRef(true)
@@ -112,8 +114,8 @@ export function ProjectsPanel() {
   }
 
   return (
-    <div role="region" aria-label="Projects list" className="relative h-full overflow-auto bg-white">
-      <WorkspaceSectionHeader title="Projects" help={<button
+    <div role="region" aria-label="Projects list" className="projects-browser relative h-full overflow-auto">
+      <WorkspaceSectionHeader title="Projects" actions={<button ref={createToggle} type="button" disabled={creating} className="project-button project-button-primary" aria-expanded={showCreate} aria-controls="project-create-form" onClick={() => setShowCreate(v => !v)}><Plus size={16} />New project</button>} help={<button
           aria-label="What are Projects?" title="What are Projects?"
           onClick={() => setShowExplainer(true)}
           className="inline-flex items-center gap-1 rounded-full border border-gray-300 px-2.5 py-1 text-xs font-semibold text-gray-500 hover:bg-gray-50 hover:text-gray-700"
@@ -122,18 +124,19 @@ export function ProjectsPanel() {
           About
         </button>} description={loading ? 'Loading…' : error ? 'Unavailable' : filtered ? `${visibleProjects.length} of ${projects.length} projects` : `${projects.length} projects`}>
 
-        <div>
+        {showCreate && <div id="project-create-form" className="project-create-form">
         <FieldLabel htmlFor="new-project-name" required>New project name</FieldLabel>
         <div className="flex gap-2">
           <input
             id="new-project-name"
+            autoFocus
             aria-required="true"
             aria-describedby={createError ? 'project-create-error' : undefined}
             type="text"
             value={newName}
             disabled={creating}
             onChange={e => setNewName(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && !e.nativeEvent.isComposing && handleCreate()}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) void handleCreate(); if (e.key === 'Escape' && !creating) { setShowCreate(false); createToggle.current?.focus() } }}
             placeholder="New project name..."
             aria-label="New project name"
             className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-highlight"
@@ -146,10 +149,11 @@ export function ProjectsPanel() {
           >
             <Plus size={16} /> <span>{creating ? 'Creating…' : 'Create'}</span>
           </button>
+          <button type="button" className="project-button" disabled={creating} onClick={() => { setShowCreate(false); createToggle.current?.focus() }}>Cancel</button>
         </div>
 
         {createError && <FieldMessage id="project-create-error" error>{createError}</FieldMessage>}
-        </div>
+        </div>}
         {projects.length > 0 && <div className="project-list-tools">
           <input type="search" aria-label="Search projects" placeholder="Search projects…" value={search} onChange={e => { setSearch(e.target.value); setVisibleLimit(40) }} />
           <select aria-label="Sort projects" value={sort} onChange={e => { setSort(e.target.value as ProjectSort); setVisibleLimit(40) }}>
@@ -186,37 +190,38 @@ export function ProjectsPanel() {
         )}
       </WorkspaceSectionHeader>
       {showExplainer && <ProjectsExplainer onClose={() => setShowExplainer(false)} />}
-      <div className="p-5 pb-24">
-        <div className="mt-4 space-y-2">
+      <div className="project-card-list">
+        <div className="space-y-3">
           {loading ? (
             <div role="status" className="text-sm text-gray-600">Loading projects…</div>
           ) : error ? (<div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">Projects could not be loaded. <button onClick={() => refresh()} className="ml-2 rounded border border-red-300 px-2 py-1 underline">Retry projects</button></div>) : projects.length === 0 ? (
-            <div className="project-empty"><h3>Bring your work together</h3><p>A project keeps related files, knowledge and reusable tools in one place. Name your first project above to get started.</p></div>
+            <div className="project-empty"><h3>Bring your work together</h3><p>A project keeps related files, knowledge and reusable tools in one place. Create your first project to get started.</p><button className="project-button project-button-primary" onClick={() => setShowCreate(true)}><Plus size={16} />Create a project</button></div>
           ) : (
             visibleProjects.length === 0 ? <p role="status" className="py-6 text-sm text-gray-600">No projects match{search.trim() ? ` “${search.trim()}”` : ''}{stage !== 'all' ? ` in ${stage}` : ''}. <button type="button" onClick={clearFilters}>Clear filters</button></p> : visibleProjects.slice(0, visibleLimit).map(p => (
               <div
                 key={p.uuid}
-                className="group relative rounded-lg border border-gray-200 bg-white transition-colors hover:border-highlight"
+                className="project-card group relative"
               >
                 <button
                   onClick={() => openProject(p.uuid)}
-                  className="flex w-full flex-col items-start p-3 text-left"
+                  className="project-card-open"
                 >
-                  <div className="flex w-full flex-col items-start gap-2 pr-7">
+                  <div className="project-card-heading"><span className="project-card-icon"><FolderKanban size={20} /></span><div className="min-w-0 flex-1">
                     <span className="w-full min-w-0 break-words font-medium text-gray-900">{p.title}{isPinned(p.uuid) && <span className="ml-2 text-xs font-normal text-gray-600">Pinned to Home</span>}</span>
-                    <ProjectStateBadge state={p.state} />
+                    </div><ProjectStateBadge state={p.state} />
                   </div>
                   {p.description && (
-                    <span className="mt-1 break-words text-sm text-gray-600">{p.description}</span>
+                    <span className="project-card-description">{p.description}</span>
                   )}
-                  <ProjectSummaryStats capabilities={p.capabilities} className="mt-2" />
+                  <ProjectSummaryStats capabilities={p.capabilities} compact className="mt-4" />
                   <span className="mt-2 text-xs text-gray-600">{p.role ? `${p.role === 'viewer' ? 'Read-only' : p.role === 'owner' ? 'Owner' : 'Editor'} · ` : ''}Updated {Number.isNaN(new Date(p.updated_at).getTime()) ? 'date unavailable' : new Date(p.updated_at).toLocaleDateString()}</span>
+                  <ArrowUpRight size={16} className="project-card-arrow" aria-hidden="true" />
                   {duplicatingId === p.uuid && <span role="status" className="mt-2 text-sm text-gray-600">Requesting a copy…</span>}
                 </button>
 
                 {/* Per-project actions. Kept outside the card <button> above —
                     a button can't be nested inside another button. */}
-                <div className="absolute right-1.5 top-1.5">
+                <div className="absolute right-3 top-3">
                   <button
                     onClick={() => setMenuOpenId(menuOpenId === p.uuid ? null : p.uuid)}
                     disabled={!!duplicatingId}

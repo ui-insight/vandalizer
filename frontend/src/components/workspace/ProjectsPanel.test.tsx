@@ -10,9 +10,23 @@ vi.mock('../../hooks/useProjects', () => ({ useProjects: () => ({ ...mocks, load
 
 beforeEach(() => { vi.clearAllMocks(); mocks.error = null; mocks.projects = [] })
 describe('Projects recovery', () => {
+  it('preserves the creation draft and restores focus when Escape closes the form', () => {
+    render(<ProjectsPanel />)
+    const toggle = screen.getByRole('button', { name: 'New project' })
+    fireEvent.click(toggle)
+    const input = screen.getByRole('textbox', { name: 'New project name' })
+    fireEvent.change(input, { target: { value: 'Research plan' } })
+    fireEvent.keyDown(input, { key: 'Escape' })
+    expect(screen.queryByRole('textbox', { name: 'New project name' })).not.toBeInTheDocument()
+    expect(toggle).toHaveFocus()
+    fireEvent.click(toggle)
+    expect(screen.getByRole('textbox', { name: 'New project name' })).toHaveValue('Research plan')
+    expect(mocks.create).not.toHaveBeenCalled()
+  })
   it('preserves failed creation and prevents duplicate submissions while pending', async () => {
     mocks.create.mockRejectedValueOnce(new Error('Create unavailable'))
     render(<ProjectsPanel />)
+    fireEvent.click(screen.getByRole('button', { name: 'New project' }))
     const input = screen.getByRole('textbox', { name: 'New project name' })
     fireEvent.change(input, { target: { value: 'Grant review' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create project' }))
@@ -31,6 +45,7 @@ describe('Projects recovery', () => {
     let finish!: (value: { uuid: string }) => void
     mocks.create.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
     const view = render(<ProjectsPanel />)
+    fireEvent.click(screen.getByRole('button', { name: 'New project' }))
     fireEvent.change(screen.getByRole('textbox', { name: 'New project name' }), { target: { value: 'Later project' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create project' }))
     view.unmount()
