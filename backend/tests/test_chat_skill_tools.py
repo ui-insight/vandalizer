@@ -41,6 +41,34 @@ async def test_discovery_filters_types_deduplicates_and_rechecks_access():
 
 
 @pytest.mark.asyncio
+async def test_empty_discovery_does_not_fall_back_to_selected_skill():
+    ctx = _make_context(conversation=conversation())
+    with patch("app.services.library_service.search_libraries", AsyncMock(return_value=[])) as search, \
+         patch.object(skill_service, "snapshot_skill", AsyncMock()) as read:
+        assert await tools.list_skills(ctx) == []
+    search.assert_awaited_once_with(ctx.deps.user, "", team_id=ctx.deps.team_id, kind="search_set")
+    read.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_discovery_description_uses_saved_instructions_not_title_or_library_metadata():
+    instructions = "Compare the award end date with the source notice. " * 12
+    source = SimpleNamespace(
+        uuid="s1", title="Award Review", set_type="prompt",
+        extraction_config={"content": "Outdated creation instructions"},
+        get_items=AsyncMock(return_value=[SimpleNamespace(searchphrase=instructions)]),
+    )
+    items = [{"set_type": "prompt", "item_uuid": "s1", "name": "Old title",
+              "description": "a structured award review method for consistency, completeness, and compliance"}]
+    with patch("app.services.library_service.search_libraries", AsyncMock(return_value=items)), \
+         patch.object(skill_service.access_control, "get_authorized_search_set", AsyncMock(return_value=source)):
+        result = await tools.list_skills(_make_context())
+    assert len(result) == 1
+    assert result[0]["title"] == "Award Review"
+    assert result[0]["description"] == instructions.strip()[:400]
+
+
+@pytest.mark.asyncio
 async def test_inspection_does_not_select_and_reports_inaccessible_skills():
     conv = conversation()
     with patch.object(skill_service, "snapshot_skill", AsyncMock(return_value=snapshot())):
@@ -136,10 +164,11 @@ async def test_skill_cannot_be_executed_as_an_extraction():
 
 
 @pytest.mark.asyncio
-async def test_inventory_reports_skills_separately_without_extraction_scores():
+@pytest.mark.parametrize("has_extraction", [False, True])
+async def test_inventory_cannot_advertise_prompt_records_outside_library(has_extraction):
     from app.services import chat_service
     chat_service._inventory_cache.clear()
-    skill = SimpleNamespace(uuid="s1", title="Review style", set_type="prompt")
+    skill = SimpleNamespace(uuid="s1", title="NSF_Grant_Proposal_Summary", set_type="prompt")
     extraction = SimpleNamespace(uuid="e1", title="Budget fields", set_type="extraction", verified=False)
 
     def query(rows):
@@ -160,13 +189,19 @@ async def test_inventory_reports_skills_separately_without_extraction_scores():
          patch("app.services.user_memory_service.build_patterns_block", AsyncMock(return_value="")):
         for model in [docs, events, workflows, knowledge, validation, alerts]:
             model.find.return_value = query([])
-        sets.find.side_effect = lambda filters: query([skill] if filters["set_type"] == "prompt" else [extraction])
+        sets.find.side_effect = lambda filters: query(
+            [skill] if filters["set_type"] == "prompt" else ([extraction] if has_extraction else [])
+        )
         block = await chat_service._build_workspace_inventory("user1", None)
     chat_service._inventory_cache.clear()
-    assert '1 Skill (newest: "Review style" (uuid: s1))' in block
-    assert '1 extraction set (newest: "Budget fields")' in block
-    assert "Listed Skills are not automatically active" in block
-    assert validation.find.call_args.args[0]["item_id"]["$in"] == ["e1"]
+    assert skill.title not in block
+    assert all(call.args[0]["set_type"] == {"$in": ["extraction", None]} for call in sets.find.call_args_list)
+    if has_extraction:
+        assert '1 extraction set (newest: "Budget fields")' in block
+        assert validation.find.call_args.args[0]["item_id"]["$in"] == ["e1"]
+    else:
+        assert block == ""
+        validation.find.assert_not_called()
 
 
 def test_guidance_help_and_registry_distinguish_the_three_capabilities():
@@ -174,6 +209,10 @@ def test_guidance_help_and_registry_distinguish_the_three_capabilities():
     from app.services.llm_service import AGENTIC_CHAT_SYSTEM_PROMPT
     assert "Repeated instructions alone call for a Skill" in AGENTIC_CHAT_SYSTEM_PROMPT
     assert "repeatable processing stages call for a workflow" in AGENTIC_CHAT_SYSTEM_PROMPT
+    assert "List only the Skills returned by that call" in AGENTIC_CHAT_SYSTEM_PROMPT
+    assert "Descriptions must come from the Skill itself" in AGENTIC_CHAT_SYSTEM_PROMPT
+    assert "no accessible Library Skills were found" in AGENTIC_CHAT_SYSTEM_PROMPT
+    assert "Skill availability is an exception" in AGENTIC_CHAT_SYSTEM_PROMPT
     assert find_topics("skills", limit=1)[0]["id"] == "skills"
     names = {fn.__name__ for fn in chat_tools.TOOLS}
     assert {"list_skills", "get_skill", "select_skill"} <= names

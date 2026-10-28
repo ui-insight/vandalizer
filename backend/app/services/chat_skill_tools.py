@@ -17,7 +17,13 @@ def conversation_instructions(base: str):
 
 
 async def list_skills(context: RunContext[AgenticChatDeps], search: str = "") -> list[dict]:
-    """Find accessible Library Skills by name or tags; empty search lists Skills.
+    """Find up to 20 accessible Library Skills by name or tags.
+
+    For "What skills do I have?", use an empty search and list only the returned
+    Skills, with their exact titles and descriptions. Descriptions are verbatim
+    excerpts of saved instructions, not inferred summaries. An empty list means
+    no matching accessible Library Skills were found. Never supplement results
+    from memory, workspace summaries, or earlier conversation claims.
 
     Skills guide flexible chat work (review methods, writing standards, checklists).
     They are not typed extraction schemas or executable workflow pipelines.

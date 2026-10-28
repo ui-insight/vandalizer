@@ -4619,7 +4619,9 @@ async def _build_workspace_inventory(
         wf_filter = {"user_id": user_id}
         kb_filter = {"user_id": user_id}
 
-    skill_filter = {**ss_filter, "set_type": "prompt"}
+    # Skills are discovered only through list_skills, which checks Library
+    # membership and current access. Raw prompt records can survive removal
+    # from a Library and must not become a second, conflicting Skill catalog.
     ss_filter = {**ss_filter, "set_type": {"$in": ["extraction", None]}}
 
     # Parallel queries — lightweight counts + limited name lists
@@ -4632,8 +4634,6 @@ async def _build_workspace_inventory(
         recent_activity,
         ss_count,
         wf_count,
-        skills,
-        skill_count,
     ) = await asyncio.gather(
         SmartDocument.find(doc_filter).count(),
         SmartDocument.find(doc_filter)
@@ -4651,13 +4651,11 @@ async def _build_workspace_inventory(
         .to_list(),
         SearchSet.find(ss_filter).count(),
         Workflow.find(wf_filter).count(),
-        SearchSet.find(skill_filter).sort("-created_at").limit(5).to_list(),
-        SearchSet.find(skill_filter).count(),
     )
 
     # Quick check: if the user has nothing, return empty
     total_items = (
-        doc_count + len(search_sets) + len(workflows) + len(knowledge_bases) + len(skills)
+        doc_count + len(search_sets) + len(workflows) + len(knowledge_bases)
     )
     if total_items == 0:
         _inventory_cache[cache_key] = (now, "")
@@ -4666,7 +4664,7 @@ async def _build_workspace_inventory(
     # Detect post-demo state: only onboarding sample docs, no real content
     all_onboarding = doc_count > 0 and all(
         getattr(d, "is_onboarding_sample", False) for d in recent_docs
-    ) and not search_sets and not workflows and not skills
+    ) and not search_sets and not workflows
 
     # Fetch validation scores for extraction sets (if any)
     quality_map: dict[str, float] = {}  # ss_uuid → score
@@ -4712,11 +4710,6 @@ async def _build_workspace_inventory(
             f"{'s' if ss_count != 1 else ''} (newest: "
             + ", ".join(ss_parts) + ")"
         )
-
-    if skills:
-        names = ", ".join(f'"{skill.title}" (uuid: {skill.uuid})' for skill in skills[:3])
-        lines.append(f"- {skill_count} Skill{'s' if skill_count != 1 else ''} (newest: {names}). "
-                     "Reusable chat guidance; inspect with get_skill. Listed Skills are not automatically active.")
 
     # Workflows
     if workflows:
