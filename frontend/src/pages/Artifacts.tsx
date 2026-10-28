@@ -53,7 +53,21 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
     pending.current = true; setBusy(true); setError(''); setNotice('')
     try { await fn() } catch (e) { setError(errorMessage(e)) } finally { pending.current = false; setBusy(false) }
   }
-  const reload = async () => { if (uuid) { const item = await api.getArtifact(uuid); setArtifact(item); setTeam(item.team_id || ''); setTeamRevision(item.team_revision || item.published_revision || item.latest_revision); return item } }
+  const savedTeam = artifact?.team_id || ''
+  const savedTeamRevision = artifact?.team_revision || artifact?.published_revision || artifact?.latest_revision || ''
+  const accessDirty = team !== savedTeam || (!!team && teamRevision !== savedTeamRevision)
+  const discardAccessChanges = () => { setTeam(savedTeam); setTeamRevision(savedTeamRevision) }
+  const reload = async (resetAccess = false) => {
+    if (uuid) {
+      const item = await api.getArtifact(uuid)
+      setArtifact(item)
+      if (resetAccess || !accessDirty) {
+        setTeam(item.team_id || '')
+        setTeamRevision(item.team_revision || item.published_revision || item.latest_revision)
+      }
+      return item
+    }
+  }
   const revision = artifact?.revisions.find(r => r.uuid === selected)
   const versionNumber = (id: string) => artifact?.revisions.find(r => r.uuid === id)?.version ?? (artifact ? artifact.revisions.findIndex(r => r.uuid === id) + 1 : 1)
   const version = versionNumber(selected)
@@ -112,13 +126,14 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
         <label>Who can access<select aria-label="Workspace page access" value={team} disabled={busy || teamError} onChange={e => setTeam(e.target.value)}><option value="">Only me</option>{teams.map(t => <option key={t.uuid} value={t.uuid}>{t.name}</option>)}</select></label>
         {team && <><label>Version shared with team<select aria-label="Version shared with team" value={teamRevision} disabled={busy} onChange={e => setTeamRevision(e.target.value)}>{artifact.revisions.map((r, index) => <option key={r.uuid} value={r.uuid}>Version {r.version ?? index + 1}{r.uuid === artifact.published_revision ? ' · published' : ''}{r.uuid === artifact.latest_revision ? ' · latest saved' : ''}</option>)}</select></label><p>Team members can view and download only the selected version. Other versions and future drafts stay owner-only until you select a different version and save access.</p>{artifact.team_revision && <p>Currently shared: version {versionNumber(artifact.team_revision)}.</p>}</>}
         {teamError && <p role="alert">Team options could not be loaded. <button className="underline" onClick={() => void action(async () => { setTeams(await listTeams()); setTeamError(false) })}>Retry teams</button></p>}
-        <div className="page-actions"><button className="page-button" disabled={busy || teamError || (team === (artifact.team_id || '') && (!team || teamRevision === (artifact.team_revision || artifact.published_revision || artifact.latest_revision)))} onClick={() => void action(async () => { await api.shareArtifactTeam(uuid, team || null, team ? teamRevision : undefined); await reload(); setNotice('Workspace access updated.') })}>Save access</button><button className="page-button" disabled={busy} onClick={() => copy(`${window.location.origin}/pages/${uuid}`, 'Workspace link copied. The recipient still needs access.')}><Copy size={15} />Copy private link</button></div>
+        {accessDirty && <p id="page-unsaved-access" role="status">You have unsaved workspace access changes. Save access or discard these changes before publishing.</p>}
+        <div className="page-actions"><button className="page-button" disabled={busy || teamError || !accessDirty} onClick={() => void action(async () => { await api.shareArtifactTeam(uuid, team || null, team ? teamRevision : undefined); await reload(true); setNotice('Workspace access updated.') })}>Save access</button>{accessDirty && <button className="page-button" disabled={busy} onClick={discardAccessChanges}>Discard access changes</button>}<button className="page-button" disabled={busy} onClick={() => copy(`${window.location.origin}/pages/${uuid}`, 'Workspace link copied. The recipient still needs access.')}><Copy size={15} />Copy private link</button></div>
       </section>
       <section className="page-share-section"><h3><Globe2 size={17} />Public link {publishedVersion > 0 && <PageBadge published>Version {publishedVersion} is live</PageBadge>}</h3>
         <p>Before publishing, compare figures and source notes with the original documents. Saving a page does not verify its accuracy.</p>
         <p>{publishedVersion ? `Anyone with this link can view version ${publishedVersion}. Later edits stay private until you publish them.` : `Publish version ${version} so anyone with its link can view it. Check the page for private information before publishing.`}</p>
         {publicLink && <div className="page-share-link"><label>Published page link<input aria-label="Published page link" readOnly value={publicLink} onFocus={e => e.target.select()} /></label><button className="page-icon-button" aria-label="Copy public link" disabled={busy} onClick={() => copy(publicLink, 'Public link copied.')}><Copy size={17} /></button></div>}
-        <div className="page-actions"><button className="page-button page-button-primary" disabled={busy || !!editor || !artifact.public_sharing_enabled || selectedIsPublished} onClick={() => void action(async () => { await api.publishArtifact(uuid, selected); await reload(); setNotice(`Version ${version} published. Anyone with the link can view it.`) })}>{selectedIsPublished ? <><Check size={16} />Published</> : publishedVersion ? `Publish updates · version ${version}` : `Publish version ${version}`}</button>{publicLink && <a className="page-button" href={`/a/${artifact.public_token}`} target="_blank" rel="noreferrer"><ArrowUpRight size={16} />Open published page</a>}</div>
+        <div className="page-actions"><button className="page-button page-button-primary" disabled={busy || !!editor || !artifact.public_sharing_enabled || selectedIsPublished || accessDirty} aria-describedby={accessDirty ? 'page-unsaved-access' : undefined} onClick={() => void action(async () => { await api.publishArtifact(uuid, selected); await reload(); setNotice(`Version ${version} published. Anyone with the link can view it.`) })}>{selectedIsPublished ? <><Check size={16} />Published</> : publishedVersion ? `Publish updates · version ${version}` : `Publish version ${version}`}</button>{publicLink && <a className="page-button" href={`/a/${artifact.public_token}`} target="_blank" rel="noreferrer"><ArrowUpRight size={16} />Open published page</a>}</div>
         {artifact.public_sharing_enabled === false && <p>Public sharing is disabled on this deployment.</p>}
         {editor && <p>Save or cancel your HTML edits before publishing.</p>}
         {publicLink && <button className="page-text-button mt-3" disabled={busy} onClick={() => void action(async () => { await api.unpublishArtifact(uuid); await reload(); setNotice('Public link removed. Downloaded copies cannot be recalled.') })}><Link2 size={14} />Remove public link</button>}
