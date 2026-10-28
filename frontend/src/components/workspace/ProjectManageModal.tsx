@@ -49,6 +49,8 @@ export function ProjectManageModal({ open, onClose }: { open: boolean; onClose: 
   const [titleDraft, setTitleDraft] = useState('')
   const [editingDesc, setEditingDesc] = useState(false)
   const [descDraft, setDescDraft] = useState('')
+  const [editingContext, setEditingContext] = useState(false)
+  const [contextDraft, setContextDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const [saving, setSaving] = useState(false)
   const [stateDraft, setStateDraft] = useState<ProjectState | null>(null)
@@ -82,11 +84,12 @@ export function ProjectManageModal({ open, onClose }: { open: boolean; onClose: 
       if (e.key !== 'Escape' || e.defaultPrevented || savePending.current) return
       if (editingTitle) setEditingTitle(false)
       else if (editingDesc) setEditingDesc(false)
+      else if (editingContext) setEditingContext(false)
       else onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [open, onClose, editingTitle, editingDesc])
+  }, [open, onClose, editingTitle, editingDesc, editingContext])
 
   if (!open) return null
   if (!project) return (
@@ -310,7 +313,7 @@ export function ProjectManageModal({ open, onClose }: { open: boolean; onClose: 
 
         <div className="flex flex-col gap-6 p-5">
           {loadError && <div role="alert" className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">Project details could not refresh. <button onClick={() => refresh()} className="underline">Retry project</button></div>}
-          {saveError && <p role="alert" className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">{saveError}</p>}
+          {saveError && !editingContext && <p role="alert" className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">{saveError}</p>}
           <section aria-label="Project contents" className="rounded-lg border border-gray-200 bg-gray-50 p-3">
             <h3 className="font-semibold text-gray-900">What belongs here</h3>
             <p className="mt-1 text-sm text-gray-600">Keep this project's source files, knowledge and reusable tools together.</p>
@@ -327,6 +330,21 @@ export function ProjectManageModal({ open, onClose }: { open: boolean; onClose: 
             <h3 className="font-semibold text-gray-900">Your access: {project.role}</h3>
             <p className="mt-1">{canManage ? 'You can update this project’s files and tools. Viewers can ask questions about shared content without changing it.' : 'You can view this project and ask questions about its shared content. An owner or editor changes its files and tools.'}</p>
             {project.team_id ? <p className="mt-2">Members of the shared team have editor access to this project.</p> : isOwner && currentTeam ? <p className="mt-2">Share with team gives members of {currentTeam.name} editor access. A PI invite link gives read-only access instead.</p> : null}
+          </section>
+          <section aria-labelledby="project-context-title" className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex items-center justify-between gap-3"><h3 id="project-context-title" className="font-semibold text-slate-900">Project context</h3><span className="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600">{project.context ? 'Active in chat' : 'Optional'}</span></div>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">Brief the assistant on your goals, audience, terminology and constraints. This guides project chats; your current request takes precedence.</p>
+            <p className="mt-2 text-xs leading-relaxed text-slate-500">Visible to everyone with project access. Workflows use it only when selected for a run.</p>
+            {editingContext ? <div className="mt-4">
+              {saveError && <p role="alert" className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{saveError}</p>}
+              <label className="text-sm font-medium text-slate-700" htmlFor="project-context-input">Project brief</label>
+              <textarea id="project-context-input" autoFocus disabled={saving} value={contextDraft} maxLength={12000} onChange={e => setContextDraft(e.target.value)} rows={8} placeholder="Goal: Prepare our grant application.&#10;Audience: Federal grant reviewers.&#10;Priorities: Measurable outcomes and plain language.&#10;Constraints: Flag unsupported claims; distinguish confirmed funding from estimates." className="mt-2 w-full rounded-lg border border-slate-300 bg-white p-3 text-base leading-relaxed outline-none focus:border-highlight" aria-describedby="project-context-help" />
+              <div id="project-context-help" className="mt-2 flex justify-between gap-3 text-xs text-slate-500"><span>Leave blank to remove context.</span><span>{contextDraft.length.toLocaleString()} / 12,000</span></div>
+              <div className="mt-3 flex gap-2"><button type="button" disabled={saving} className="page-button page-button-primary" onClick={() => void saveChange({ context: contextDraft.trim() || null }, () => setEditingContext(false))}>{saving ? 'Saving…' : 'Save context'}</button><button type="button" disabled={saving} className="page-button" onClick={() => { setEditingContext(false); setSaveError(null) }}>Cancel context edit</button></div>
+            </div> : <>
+              {project.context && <p className="mt-4 max-h-52 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-slate-200 bg-white p-3 text-sm leading-relaxed text-slate-700">{project.context}</p>}
+              {canManage && <button type="button" disabled={saving} className="page-button mt-3" onClick={() => { setContextDraft(project.context || ''); setEditingContext(true); setSaveError(null) }}><Pencil size={14} />{project.context ? 'Edit project context' : 'Add project context'}</button>}
+            </>}
           </section>
           {/* Description */}
           <div>

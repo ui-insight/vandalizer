@@ -257,6 +257,12 @@ def build_steps_data(db, workflow_doc, workflow_id, trigger_step_data):
 
             # Resolve extraction keys from search set
             task_data = dict(task_doc.get("data", {}))
+            # Only an explicitly selected run snapshot can supply this brief.
+            # Never re-read a project's live context when resuming a run.
+            task_data.pop("project_context", None)
+            project_context = (trigger_step_data or {}).get("project_context")
+            if task_doc.get("name") in ("Prompt", "Formatter", "Format") and project_context:
+                task_data["project_context"] = project_context
 
             # Input is configured on the step and shared by every task in it.
             # Applied here, before the document preloads below, so

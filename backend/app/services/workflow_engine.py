@@ -966,6 +966,10 @@ class PromptNode(Node):
                 "step_name": self.name,
             }
 
+        from app.services.project_context import render_context
+        brief = render_context((self.data.get("project_context") or {}).get("text", ""), workflow=True)
+        if brief:
+            prompt = f"{brief}\n\n## Workflow step instructions\n{prompt}"
         self.report_progress(f"Prompt: {prompt}")
 
         sources = _resolve_input_sources(self.data, prev_step_name)
@@ -988,6 +992,10 @@ class FormatNode(Node):
 
     def process(self, inputs):
         formatting_prompt = self.data.get("format_template") or self.data.get("prompt", "")
+        from app.services.project_context import render_context
+        brief = render_context((self.data.get("project_context") or {}).get("text", ""), workflow=True)
+        if brief:
+            formatting_prompt = f"{brief}\n\n## Workflow step instructions\n{formatting_prompt}"
         prev_step_name = inputs.get("step_name")
         self.report_progress(f"Formatter: {formatting_prompt}")
 

@@ -1122,6 +1122,11 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
             status_code=400,
             detail="This workflow has no steps yet — add at least one step before running it.",
         )
+    project_context = None
+    if req.project_context_uuid:
+        from app.services.project_context import snapshot_project_context
+        project_context = await snapshot_project_context(req.project_context_uuid, user)
+    context_options = {"project_context": project_context} if project_context else {}
     document_uuids = await _authorize_documents(req.document_uuids, user)
     if req.folder_uuids:
         from app.services import folder_service
@@ -1158,6 +1163,7 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
                 activity_id=str(activity.id),
                 user=user,
                 share_token=req.share_token,
+                **context_options,
             )
             return {"batch_id": batch_id, "activity_id": str(activity.id)}
         else:
@@ -1166,6 +1172,7 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
                 activity_id=str(activity.id),
                 user=user,
                 share_token=req.share_token,
+                **context_options,
             )
             activity.workflow_session_id = session_id
             await activity.save()

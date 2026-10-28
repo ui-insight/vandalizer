@@ -56,6 +56,7 @@ async def create_project(
     title: str,
     description: str | None,
     user: User,
+    context: str | None = None,
 ) -> Project:
     """Create a project, allocating its root folder and implicit-KB name.
 
@@ -93,6 +94,7 @@ async def create_project(
         uuid=project_uuid,
         title=title,
         description=description,
+        context=(context or "").strip() or None,
         owner_user_id=user.user_id,
         team_id=None,
         state="active",
@@ -140,6 +142,7 @@ async def duplicate_project(source: Project, user: User) -> Project:
         uuid=new_uuid,
         title=title,
         description=source.description,
+        context=getattr(source, "context", None),
         owner_user_id=user.user_id,
         team_id=None,
         state="active",
@@ -314,6 +317,7 @@ async def update_project(
     title: str | None = None,
     description: str | None = None,
     state: str | None = None,
+    context: str | None = None,
 ) -> Project:
     if title is not None:
         project.title = title
@@ -321,6 +325,8 @@ async def update_project(
         project.description = description
     if state is not None:
         project.state = state
+    if context is not None:
+        project.context = context.strip() or None
     project.updated_at = datetime.datetime.now()
     await project.save()
     return project
@@ -811,6 +817,7 @@ def serialize_project(project: Project) -> dict:
         "uuid": project.uuid,
         "title": project.title,
         "description": project.description,
+        "context": getattr(project, "context", None),
         "owner_user_id": project.owner_user_id,
         "team_id": project.team_id,
         "state": project.state,

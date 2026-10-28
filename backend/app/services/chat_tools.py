@@ -15,6 +15,7 @@ import logging
 import re
 from typing import Optional
 
+from fastapi import HTTPException
 from pydantic import BaseModel
 from pydantic_ai.tools import RunContext
 
@@ -2662,6 +2663,7 @@ async def run_workflow(
     text_input: str = "",
     model: Optional[str] = None,
     confirmed: bool = False,
+    use_project_context: bool = False,
 ) -> dict:
     """Start a workflow execution. Returns a session ID for status polling.
 
@@ -2698,6 +2700,8 @@ async def run_workflow(
             sets none. The preview says which. To compare models, call once
             per model and compare the two runs' outputs.
         confirmed: Must be true to actually run. If false, returns a preview.
+        use_project_context: Only true when the user explicitly asks to apply the
+            active project brief to Prompt and Formatter steps. Defaults false.
     """
     requested_model, model_error = await _resolve_requested_model(model)
     if model_error:
@@ -2750,16 +2754,27 @@ async def run_workflow(
         "workflow": f", on {run_model} (the workflow's model)",
         "chat": f", on {run_model} (this chat's model)",
     }[model_source] if run_model else ""
+    project_context = None
+    if use_project_context:
+        from app.services.project_context import snapshot_project_context
+        project_uuid = getattr(context.deps, "active_project_uuid", None)
+        if not project_uuid:
+            return {"error": "Open a project to use its saved context."}
+        try:
+            project_context = await snapshot_project_context(project_uuid, context.deps.user)
+        except HTTPException as exc:
+            return {"error": str(exc.detail)}
     gate = await _confirm_gate(
         context,
         tool_name="run_workflow",
         key={
             "workflow_id": workflow_id, "docs": sorted(document_uuids),
             "text": text[:200], "model": run_model,
+            **({"project_context": project_context} if project_context else {}),
         },
         preview={
             "action": "run_workflow",
-            "preview": f"Run workflow \"{wf.name}\" on {run_label}{model_note}",
+            "preview": f"Run workflow \"{wf.name}\" on {run_label}{model_note}" + (" with saved project context for writing steps" if project_context else ""),
             "needs_confirmation": True,
         },
         confirmed=confirmed,
@@ -2782,7 +2797,7 @@ async def run_workflow(
             logger.error("Failed to create temp document for workflow %s: %s", workflow_id, e)
             return {"error": "Couldn't prepare the text input for this run — try again."}
 
-    return await _execute_workflow(context, wf, run_docs, model=requested_model)
+    return await _execute_workflow(context, wf, run_docs, model=requested_model, **({"project_context": project_context} if project_context else {}))
 
 
 def _source_conversation_id(context: RunContext[AgenticChatDeps]) -> Optional[str]:
@@ -2799,6 +2814,7 @@ async def _execute_workflow(
     wf,
     document_uuids: list[str],
     model: Optional[str] = None,
+    project_context: dict | None = None,
 ) -> dict:
     """Dispatch an already-authorized workflow against documents.
 
@@ -2851,6 +2867,7 @@ async def _execute_workflow(
             user=context.deps.user,
             activity_id=activity_id,
             force_model=bool(model),
+            **({"project_context": project_context} if project_context else {}),
         )
     except ValueError as e:
         return {"error": str(e)}
@@ -4851,6 +4868,7 @@ async def run_pin_on_project(
     pin_type: str,
     target_id: str,
     confirmed: bool = False,
+    use_project_context: bool = False,
 ) -> dict:
     """Run a project-pinned workflow or extraction on ALL the project's documents.
 
@@ -4867,6 +4885,8 @@ async def run_pin_on_project(
         pin_type: "workflow" or "extraction".
         target_id: The pinned item's target_id (from the Active project section).
         confirmed: Must be true to actually run; false returns a preview.
+        use_project_context: Only true when explicitly requested for a workflow.
+            Applies to Prompt and Formatter steps; never to extraction evidence.
     """
     project = await _resolve_active_project(context)
     if not project:
@@ -4901,15 +4921,25 @@ async def run_pin_on_project(
     if not doc_uuids:
         return {"error": "This project has no documents to run on yet."}
 
+    project_context = None
+    if use_project_context:
+        if pin_type != "workflow":
+            return {"error": "Project context applies to workflow writing steps, not extraction source evidence."}
+        from app.services.project_context import snapshot_project_context
+        try:
+            project_context = await snapshot_project_context(project.uuid, context.deps.user)
+        except HTTPException as exc:
+            return {"error": str(exc.detail)}
     gate = await _confirm_gate(
         context,
         tool_name="run_pin_on_project",
-        key={"project": project.uuid, "pin_type": pin_type, "target_id": target_id},
+        key={"project": project.uuid, "pin_type": pin_type, "target_id": target_id, **({"project_context": project_context} if project_context else {})},
         preview={
             "action": "run_pin_on_project",
             "preview": (
                 f'Run {pin_type} "{match["name"]}" on {len(doc_uuids)} '
                 f'document(s) in project "{project.title}"'
+                + (" with saved project context for writing steps" if project_context else "")
             ),
             "needs_confirmation": True,
             "document_count": len(doc_uuids),
@@ -4928,7 +4958,7 @@ async def run_pin_on_project(
         wf = await Workflow.get(target_id)
         if not wf:
             return {"error": "The pinned workflow no longer exists."}
-        result = await _execute_workflow(context, wf, doc_uuids)
+        result = await _execute_workflow(context, wf, doc_uuids, **({"project_context": project_context} if project_context else {}))
         if len(doc_uuids) > 10 and "error" not in result:
             result["note"] = (
                 "Ran on the first 10 of "

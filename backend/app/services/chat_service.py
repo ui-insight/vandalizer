@@ -4418,6 +4418,10 @@ async def _build_project_context(project_uuid: str, user: User) -> str:
     ]
     if project.description:
         lines.append(f"Description: {project.description}")
+    from app.services.project_context import context_text, render_context
+    brief = render_context(context_text(project))
+    if brief:
+        lines.append(brief)
     kb_state = "ready" if caps["knowledge"]["ready"] else "not set up"
     lines.append(
         f"- {caps['files']['count']} file(s); project knowledge base {kb_state} "

@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import * as api from '../api/projects'
 import type { Project, ProjectOverview, ProjectPin, ProjectState } from '../types/project'
 
-type ProjectUpdate = { title?: string; description?: string; state?: ProjectState }
+type ProjectUpdate = { title?: string; description?: string; context?: string | null; state?: ProjectState }
 
 /** The pins (workflows/extractions/etc.) attached to a project. */
 export function useProjectPins(uuid: string | null | undefined) {
@@ -72,7 +72,7 @@ export function useProject(uuid: string) {
   })
 
   const updateMutation = useMutation({
-    mutationFn: (data: { title?: string; description?: string; state?: ProjectState }) =>
+    mutationFn: (data: { title?: string; description?: string; context?: string | null; state?: ProjectState }) =>
       api.updateProject(uuid, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey })
@@ -80,7 +80,7 @@ export function useProject(uuid: string) {
     },
   })
 
-  const update = (data: { title?: string; description?: string; state?: ProjectState }) =>
+  const update = (data: { title?: string; description?: string; context?: string | null; state?: ProjectState }) =>
     updateMutation.mutateAsync(data)
 
   return { project, loading, error, refresh: refetch, update }

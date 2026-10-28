@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import { PageDialog } from '../artifacts/PagePrimitives'
 import { BookOpen, X } from 'lucide-react'
 import { useProject } from '../../hooks/useProjects'
 
@@ -20,6 +22,7 @@ export function ProjectChatBadge({
   onExit: () => void
 }) {
   const { project } = useProject(projectUuid)
+  const [viewingContext, setViewingContext] = useState(false)
   const title = project?.title ?? fallbackTitle ?? 'Project'
   const kbReady = project?.capabilities?.knowledge.ready
 
@@ -43,7 +46,9 @@ export function ProjectChatBadge({
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: "var(--workspace-space-2) var(--workspace-space-8)", minWidth: 0 }}>
         <span title={`Sources for ${title}`}>Project sources</span>
         <span style={{ fontWeight: 400 }}>{project ? kbReady ? 'Knowledge available' : 'Knowledge not ready' : 'Checking availability…'}</span>
+        {project?.context && <button type="button" className="min-h-9 rounded border border-slate-300 bg-white px-2 text-xs font-medium text-slate-700" onClick={() => setViewingContext(true)} aria-label="View project context">Project context on</button>}
       </div>
+      {viewingContext && project?.context && <PageDialog title="Project context" onClose={() => setViewingContext(false)}><p>Saved guidance for <strong>{title}</strong>. Your current request takes precedence. Edit this brief in Manage project.</p><p className="whitespace-pre-wrap break-words rounded-lg border border-slate-200 bg-slate-50 p-4">{project.context}</p></PageDialog>}
       <button
         onClick={onExit}
         title="Exit project scope"

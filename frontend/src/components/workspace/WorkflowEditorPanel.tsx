@@ -1,3 +1,4 @@
+import { ProjectContextRunOption } from '../projects/ProjectContextRunOption'
 import { ValidationNav, type ValidationStage } from '../shared/ValidationNav'
 import { workflowTaskLabel, workflowTaskTitle } from './workflowTaskLabels'
 import './workflow-builder.css'
@@ -258,6 +259,8 @@ export function WorkflowEditorPanel() {
   const [editingTask, setEditingTask] = useState<WorkflowTask | null>(null)
   const runner = useWorkflowRunner()
   const [batchMode, setBatchMode] = useState(false)
+  const [useProjectContext, setUseProjectContext] = useState(false)
+  useEffect(() => { setUseProjectContext(false) }, [activeProjectUuid, openWorkflowId])
   const [runElapsed, setRunElapsed] = useState(0)
   const [textInput, setTextInput] = useState('')
   const [qualityStatus, setQualityStatus] = useState<WorkflowQualityStatus | null>(null)
@@ -650,12 +653,15 @@ export function WorkflowEditorPanel() {
     // system default. The engine applies it to steps without their own model.
     const runModel = (workflow?.input_config?.default_model as string) || undefined
 
+    const startRun = (uuids: string[], batch: boolean) => useProjectContext && activeProjectUuid
+      ? runner.start(openWorkflowId, uuids, runModel, batch, activeProjectUuid)
+      : runner.start(openWorkflowId, uuids, runModel, batch)
     try {
       if (isNoInput) {
         // Run with no documents and no text — the steps generate/fetch their
         // own content (e.g. API calls, KB queries, static prompts).
         setActiveTab('design')
-        await runner.start(openWorkflowId, [], runModel, false)
+        await startRun([], false)
       } else if (isTextInput) {
         if (!textInput.trim()) return
         // Convert text to temp document, then combine with any selected docs
@@ -664,7 +670,7 @@ export function WorkflowEditorPanel() {
         ])
         const allUuids = [...textUuids, ...selectedDocUuids]
         setActiveTab('design')
-        await runner.start(openWorkflowId, allUuids, runModel, false)
+        await startRun(allUuids, false)
       } else {
         // Default to the whole project when nothing is explicitly selected;
         // failing that, the fixed documents alone (the run loader merges them
@@ -682,7 +688,7 @@ export function WorkflowEditorPanel() {
           }
         }
         setActiveTab('design')
-        await runner.start(openWorkflowId, uuids, runModel, batchMode)
+        await startRun(uuids, batchMode)
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to run workflow'
@@ -1237,6 +1243,7 @@ export function WorkflowEditorPanel() {
             </label>
           )
         )}
+        {activeProjectUuid && <ProjectContextRunOption projectUuid={activeProjectUuid} checked={useProjectContext} onChange={setUseProjectContext} disabled={runner.running} />}
         {!hasSteps && (
           <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginBottom: 'var(--workspace-space-12)', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)' }}>
             <Info style={{ width: 12, height: 12 }} />

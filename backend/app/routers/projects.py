@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.dependencies import get_current_user
-from app.models.project import PROJECT_STATES
+from app.models.project import PROJECT_STATES, PROJECT_CONTEXT_MAX_LENGTH
 from app.models.user import User
 from app.services import project_service
 
@@ -12,12 +12,14 @@ router = APIRouter()
 class CreateProjectRequest(BaseModel):
     title: str
     description: str | None = None
+    context: str | None = Field(default=None, max_length=PROJECT_CONTEXT_MAX_LENGTH)
 
 
 class UpdateProjectRequest(BaseModel):
     title: str | None = None
     description: str | None = None
     state: str | None = None
+    context: str | None = Field(default=None, max_length=PROJECT_CONTEXT_MAX_LENGTH)
 
 
 @router.post("")
@@ -28,7 +30,7 @@ async def create_project(
     title = body.title.strip()
     if not title:
         raise HTTPException(status_code=400, detail="Project title is required")
-    project = await project_service.create_project(title, body.description, user)
+    project = await project_service.create_project(title, body.description, user, context=body.context)
     return project_service.serialize_project(project)
 
 
@@ -181,6 +183,7 @@ async def update_project(
         title=body.title.strip() if body.title is not None else None,
         description=body.description,
         state=body.state,
+        **({"context": body.context or ""} if "context" in body.model_fields_set else {}),
     )
     return project_service.serialize_project(project)
 

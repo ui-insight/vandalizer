@@ -137,7 +137,7 @@ export function improvePrompt(data: {
 // grants the holder run access to a workflow they don't own / aren't on the team for.
 export function runWorkflow(
   workflowId: string,
-  data: { document_uuids?: string[]; folder_uuids?: string[]; model?: string; batch_mode?: boolean },
+  data: { document_uuids?: string[]; folder_uuids?: string[]; model?: string; batch_mode?: boolean; project_context_uuid?: string },
   shareToken?: string,
 ) {
   return apiFetch<{ session_id?: string; batch_id?: string; activity_id?: string }>(`/api/workflows/${workflowId}/run`, {

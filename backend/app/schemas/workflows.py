@@ -99,6 +99,8 @@ class RunWorkflowRequest(BaseModel):
     folder_uuids: list[str] = []
     model: Optional[str] = None
     batch_mode: bool = False
+    # Explicit opt-in for this run; never inferred from the active workspace.
+    project_context_uuid: Optional[str] = None
     # Present when the workflow was opened via a share link. Grants the holder
     # run + poll access to a workflow they don't own / aren't on the team for.
     share_token: Optional[str] = None

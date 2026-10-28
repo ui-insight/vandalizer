@@ -565,6 +565,7 @@ async def run_workflow(
     user: User | None = None,
     share_token: str | None = None,
     force_model: bool = False,
+    project_context: dict | None = None,
 ) -> str:
     """Start workflow execution. Returns session_id for polling.
 
@@ -610,19 +611,19 @@ async def run_workflow(
     # It is the handle the cancel endpoint uses to revoke/terminate the run.
     celery_task_id = str(uuid_mod.uuid4())
 
+    trigger_step_data = {"doc_uuids": document_uuids, **({"project_context": project_context} if project_context else {})}
     result = WorkflowResult(
         workflow=wf.id,
         session_id=session_id,
         status="queued",
         num_steps_total=len(wf.steps),
-        input_context={"doc_uuids": document_uuids},
+        input_context=trigger_step_data,
         model=model,
         model_forced=bool(force_model and model),
         celery_task_id=celery_task_id,
     )
     await result.insert()
 
-    trigger_step_data = {"doc_uuids": document_uuids}
 
     celery_app.send_task(
         "tasks.workflow_next.execution",
@@ -807,6 +808,7 @@ async def run_workflow_batch(
     activity_id: str | None = None,
     user: User | None = None,
     share_token: str | None = None,
+    project_context: dict | None = None,
 ) -> str:
     """Start a batched workflow execution — one run per document.
 
@@ -860,6 +862,7 @@ async def run_workflow_batch(
         # run past that point would finish its LLM call regardless of STOP.
         celery_task_id = str(uuid_mod.uuid4())
 
+        trigger_step_data = {"doc_uuids": [doc_uuid], **({"project_context": project_context} if project_context else {})}
         result = WorkflowResult(
             workflow=wf.id,
             session_id=session_id,
@@ -867,12 +870,12 @@ async def run_workflow_batch(
             num_steps_total=len(wf.steps),
             batch_id=batch_id,
             document_title=doc_title,
+            input_context=trigger_step_data,
             model=model,
             celery_task_id=celery_task_id,
         )
         await result.insert()
 
-        trigger_step_data = {"doc_uuids": [doc_uuid]}
 
         celery_app.send_task(
             "tasks.workflow_next.execution",

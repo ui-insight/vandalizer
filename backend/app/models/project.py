@@ -17,6 +17,7 @@ PIN_TYPES = ("workflow", "extraction", "automation", "knowledge_base", "skill", 
 # Project-local collaborator roles. Deliberately lighter than Team roles: a
 # Project ACL is for sharing one unit of work (read-mostly), not running an org.
 PROJECT_ROLES = ("viewer", "editor")
+PROJECT_CONTEXT_MAX_LENGTH = 12000
 
 
 class Project(Document):
@@ -31,6 +32,7 @@ class Project(Document):
     uuid: str
     title: str
     description: Optional[str] = None
+    context: Optional[str] = Field(default=None, max_length=PROJECT_CONTEXT_MAX_LENGTH)
     owner_user_id: str
     # Team UUID (matches SmartFolder/SmartDocument.team_id). None = personal
     # project. Both Team and Project scopes are optional by design.

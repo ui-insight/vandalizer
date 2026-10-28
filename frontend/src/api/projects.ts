@@ -13,7 +13,7 @@ export function listProjects() {
   return apiFetch<Project[]>('/api/projects')
 }
 
-export function createProject(data: { title: string; description?: string }) {
+export function createProject(data: { title: string; description?: string; context?: string }) {
   return apiFetch<Project>('/api/projects', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -36,7 +36,7 @@ export function getProjectDocuments(uuid: string) {
 
 export function updateProject(
   uuid: string,
-  data: { title?: string; description?: string; state?: ProjectState },
+  data: { title?: string; description?: string; context?: string | null; state?: ProjectState },
 ) {
   return apiFetch<Project>(`/api/projects/${uuid}`, {
     method: 'PATCH',

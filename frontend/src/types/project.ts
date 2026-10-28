@@ -19,6 +19,7 @@ export interface Project {
   uuid: string
   title: string
   description: string | null
+  context?: string | null
   owner_user_id: string
   team_id: string | null
   state: ProjectState

@@ -85,3 +85,29 @@ describe('Project detail recovery', () => {
     expect(mocks.members).not.toHaveBeenCalled()
   })
 })
+
+it('preserves a failed project brief, retries saving, and supports explicit clearing', async () => {
+  mocks.project = { ...mocks.project!, context: 'Current audience' }
+  mocks.update.mockRejectedValueOnce(new Error('Offline')).mockResolvedValue({})
+  setup()
+  fireEvent.click(screen.getByRole('button', { name: 'Edit project context' }))
+  const brief = screen.getByRole('textbox', { name: 'Project brief' })
+  fireEvent.change(brief, { target: { value: 'New audience and goals' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Save context' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Your edit is preserved')
+  expect(brief).toHaveValue('New audience and goals')
+  fireEvent.click(screen.getByRole('button', { name: 'Save context' }))
+  await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Project brief' })).not.toBeInTheDocument())
+  expect(mocks.update).toHaveBeenLastCalledWith({ context: 'New audience and goals' })
+  fireEvent.click(screen.getByRole('button', { name: 'Edit project context' }))
+  fireEvent.change(screen.getByRole('textbox', { name: 'Project brief' }), { target: { value: '' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Save context' }))
+  await waitFor(() => expect(mocks.update).toHaveBeenLastCalledWith({ context: null }))
+})
+
+it('lets viewers read the brief without offering editing', () => {
+  mocks.project = { ...mocks.project!, role: 'viewer', context: 'Shared project goals' }
+  setup()
+  expect(screen.getByText('Shared project goals')).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Edit project context' })).not.toBeInTheDocument()
+})
