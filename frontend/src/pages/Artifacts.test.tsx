@@ -12,7 +12,7 @@ const item: api.Artifact = { uuid: 'a1', title: 'Private draft', latest_revision
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(api.getArtifact).mockResolvedValue(item)
-  vi.mocked(api.getPublicArtifact).mockResolvedValue({ title: 'Published report', revision: 'r1' })
+  vi.mocked(api.getPublicArtifact).mockResolvedValue({ title: 'Published report', revision: 'r2', version: 2, updated_at: '2026-03-10T15:30:00Z' })
 })
 
 it('shows the pinned public page without loading private metadata or management controls', async () => {
@@ -20,10 +20,26 @@ it('shows the pinned public page without loading private metadata or management 
   await screen.findByRole('heading', { name: 'Published report' })
   expect(api.getArtifact).not.toHaveBeenCalled()
   expect(screen.queryByRole('button', { name: 'Edit HTML' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Share' })).not.toBeInTheDocument()
+  expect(screen.queryByText('Unpublished changes')).not.toBeInTheDocument()
+  expect(screen.getByText('Published · version 2')).toBeInTheDocument()
+  const updated = screen.getByText(/Last updated/).querySelector('time')
+  expect(updated).toHaveAttribute('datetime', '2026-03-10T15:30:00Z')
+  expect(updated).toHaveTextContent('2026')
+  expect(updated).toHaveTextContent('UTC')
   const frame = screen.getByTitle('Page preview')
   expect(frame).toHaveAttribute('sandbox', '')
   expect(frame).toHaveAttribute('referrerpolicy', 'no-referrer')
-  expect(frame).toHaveAttribute('src', '/api/pages/public/public-link/content')
+  expect(frame).toHaveAttribute('src', '/api/pages/public/public-link/content?revision=r2')
+  expect(screen.getByRole('link', { name: 'Download HTML' })).toHaveAttribute('href', '/api/pages/public/public-link/content?revision=r2&download=true')
+  expect(screen.getByRole('link', { name: 'Open full page' })).toHaveAttribute('href', '/api/pages/public/public-link/content?revision=r2')
+})
+
+it('does not invent an update date when public metadata has an invalid timestamp', async () => {
+  vi.mocked(api.getPublicArtifact).mockResolvedValue({ title: 'Published report', revision: 'r2', version: 2, updated_at: 'invalid' })
+  render(<ArtifactPage publicToken="public-link" />)
+  expect(await screen.findByText('Last updated date unavailable')).toBeInTheDocument()
+  expect(screen.queryByText(/Invalid Date/)).not.toBeInTheDocument()
 })
 
 it('publishes exactly the selected saved revision and revokes an existing link', async () => {

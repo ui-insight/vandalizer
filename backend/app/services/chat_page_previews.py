@@ -46,7 +46,9 @@ def save(db, user_id, conversation_uuid, preview_id):
         saved = artifacts.create(db, user_id, title, html, f"chat-preview:{preview_id}", preview["source"])
     expected = artifacts._revision(title, html, base or "", preview["source"])
     revision = artifacts.revision(saved, expected["uuid"])
+    version = next(i for i, entry in enumerate(saved["revisions"], 1) if entry["uuid"] == revision["uuid"])
     return {"preview_id": preview_id, "artifact_uuid": saved["uuid"],
             "title": revision["title"], "revision": revision["uuid"],
+            "version": version, "message": f'Saved "{revision["title"]}" as Page version {version}.',
             "url": f'/pages/{saved["uuid"]}', "visibility": "private",
             "warnings": revision["warnings"]}

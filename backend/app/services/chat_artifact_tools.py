@@ -8,7 +8,7 @@ from pydantic_ai.tools import RunContext
 
 from app.services.chat_deps import AgenticChatDeps
 from app.services import artifacts, chat_page_previews
-from app.services.page_authoring import PAGE_SOURCE_FIDELITY_RULES
+from app.services.page_authoring import PAGE_LANGUAGE_RULES, PAGE_SOURCE_FIDELITY_RULES
 from app.tasks import get_sync_db
 
 
@@ -45,8 +45,9 @@ async def get_html_artifact(context: RunContext[AgenticChatDeps], artifact_uuid:
             return {"error": "Page not found or you do not own it."}
         rev = artifacts.revision(doc)
         return {"artifact_uuid": doc["uuid"], "title": rev["title"], "revision": rev["uuid"], "html": rev["html"],
+                "version": next(i for i, entry in enumerate(doc["revisions"], 1) if entry["uuid"] == rev["uuid"]),
                 "warnings": rev["warnings"], "rendering_note": RENDERING_NOTE,
-                "source_fidelity_note": PAGE_SOURCE_FIDELITY_RULES}
+                "source_fidelity_note": PAGE_SOURCE_FIDELITY_RULES, "language_note": PAGE_LANGUAGE_RULES}
     except HTTPException as exc:
         return {"error": exc.detail}
 
@@ -63,6 +64,7 @@ async def create_html_artifact(context: RunContext[AgenticChatDeps], title: str,
     table cell, including repeated values. Label calculated summaries separately;
     never invent source notes or call exact source values ranges. Compare all
     displayed values and source claims with the original before previewing.
+    Call it a Page in replies; name the Save page button, never the tool or flags.
     """
     return await _save(context, title, html, confirmed)
 
@@ -77,6 +79,7 @@ async def revise_html_artifact(context: RunContext[AgenticChatDeps], artifact_uu
     Re-read the original source, not just the old page: preserve every category/year
     value in separate cells, including repeated values. Label calculated summaries
     separately and verify source notes instead of carrying forward earlier inventions.
+    Call it a Page in replies; name the Save new version button, never revision IDs or flags.
     """
     return await _save(context, title, html, confirmed, artifact_uuid, base_revision)
 
@@ -100,15 +103,15 @@ async def _save(context, title, html, confirmed, artifact_uuid=None, base_revisi
         gate = await _confirm_gate(context, tool_name=name,
             key={"artifact": artifact_uuid, "base": base_revision, "sha256": digest}, confirmed=confirmed,
             preview={"needs_confirmation": True, "action": name,
-                     "preview": f'Save a private HTML page: {title}. This does not publish it.',
+                     "preview": f'Save a private Page: {title}. This does not publish it.',
                      "preview_id": snapshot["_id"], "title": snapshot["title"],
                      "artifact_preview_html": snapshot["prepared_html"], "warnings": snapshot["warnings"], "rendering_note": RENDERING_NOTE,
-                     "source_fidelity_note": PAGE_SOURCE_FIDELITY_RULES})
+                     "source_fidelity_note": PAGE_SOURCE_FIDELITY_RULES, "language_note": PAGE_LANGUAGE_RULES})
         if gate is not None:
             return gate
         saved = await _call(chat_page_previews.save, context.deps.user_id,
             context.deps.conversation.uuid, snapshot["_id"])
         return {**saved, "rendering_note": RENDERING_NOTE,
-                "source_fidelity_note": PAGE_SOURCE_FIDELITY_RULES}
+                "source_fidelity_note": PAGE_SOURCE_FIDELITY_RULES, "language_note": PAGE_LANGUAGE_RULES}
     except HTTPException as exc:
         return {"error": exc.detail}

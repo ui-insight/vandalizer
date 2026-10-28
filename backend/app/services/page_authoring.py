@@ -1,5 +1,17 @@
 """Source-fidelity guidance shared by Page generation and tool feedback."""
 
+PAGE_LANGUAGE_RULES = (
+    "In replies, call this feature a Page (plural Pages), never an artifact or HTML artifact. "
+    "Describe actions and outcomes, not tool calls: 'I prepared the Page preview' or 'Saved the Page'. "
+    "Do not narrate function names, confirmation flags, raw field names, internal IDs or character counts, "
+    "including tool names rewritten with spaces. Use the Page title and a returned version number "
+    "such as 'Version 2'; if no number was returned, say 'the previous version' or 'the saved version'. "
+    "Never infer a version number from a revision ID. The actual buttons are 'Save page' and 'Save new version', "
+    "not 'Approve create html artifact' or 'Approve revise html artifact'. Before approval, say the preview "
+    "is ready, not saved. For sharing, say 'Open the Page and choose Share'. IDs may appear only inside "
+    "link destinations, never in visible link labels or prose."
+)
+
 PAGE_SOURCE_FIDELITY_RULES = (
     "For a Page built from documents or spreadsheets, read the original source before authoring or revising; "
     "an earlier generated page or chat summary is not source evidence. Read all relevant rows and columns, "

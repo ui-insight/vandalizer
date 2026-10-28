@@ -312,6 +312,8 @@ def _doc_text_unavailable_err(doc: "SmartDocument") -> dict:
 # frontend/src/components/chat/ToolCallDisplay.tsx so the assistant can name
 # the button the user actually sees.
 _APPROVE_BUTTON_LABELS = {
+    "create_html_artifact": "Save page",
+    "revise_html_artifact": "Save new version",
     "select_skill": "Apply Skill selection",
     "create_workflow": "Create workflow",
     "update_workflow": "Update workflow",
@@ -432,8 +434,9 @@ async def _confirm_gate(
     # leaving the user thinking the write happened when it did not.
     out["status"] = "awaiting_user_confirmation"
     label = approve_button_label(tool_name)
+    staged_action = "The Page" if tool_name in {"create_html_artifact", "revise_html_artifact"} else f"'{tool_name}'"
     out["assistant_instruction"] = (
-        f"This action has NOT been performed. '{tool_name}' is only staged and "
+        f"This action has NOT been performed. {staged_action} is only staged and "
         f'is waiting for the user to approve it with the "{label}" button on '
         "the approval card (or by replying yes). Do NOT tell the user it is "
         "done, added, saved, created, indexed, or running. The approval card "

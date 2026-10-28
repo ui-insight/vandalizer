@@ -47,7 +47,7 @@ async def _save_and_record(conversation, preview, activity_id, user_id, call):
             logger.exception("Could not save page preview %s", preview["_id"])
             saved = {"preview_id": preview["_id"], "error": "The page save could not be confirmed. Retry saving this preview."}
         result = {"tool_name": name, "tool_call_id": call["tool_call_id"], "content": saved}
-        message = saved.get("error") or f'Saved "{saved["title"]}" as a private page version.'
+        message = saved.get("error") or saved["message"]
         segments = [{"kind": "tool_call", "call": call}, {"kind": "tool_result", "result": result}]
         try:
             if saved.get("error"):

@@ -101,7 +101,7 @@ export function toolOutcome(result: ToolResultInfo): 'returned' | 'approval' | '
 
 export function activeToolLabel(call: ToolCallInfo): string {
   if (call.tool_name === 'create_html_artifact' || call.tool_name === 'revise_html_artifact') {
-    return call.args.confirmed === true ? (call.tool_name === 'revise_html_artifact' ? 'Saving your page revision' : 'Saving your page') : 'Preparing your page preview'
+    return call.args.confirmed === true ? (call.tool_name === 'revise_html_artifact' ? 'Saving your new page version' : 'Saving your page') : 'Preparing your page preview'
   }
   return getToolMeta(call.tool_name).label
 }

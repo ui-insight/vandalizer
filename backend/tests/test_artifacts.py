@@ -113,6 +113,8 @@ async def test_script_dashboard_warnings_reach_preview_save_read_and_revision(db
     with patch("app.services.chat_artifact_tools.get_sync_db", return_value=db):
         preview = await create_html_artifact(context, "Budget", html)
         assert preview["needs_confirmation"] and not db.html_artifacts.docs
+        assert '"Save page" button' in preview['assistant_instruction']
+        assert 'artifact' not in preview['assistant_instruction']
         soup = BeautifulSoup(preview["artifact_preview_html"], "html.parser")
         assert not soup.select('script, canvas, button, [onclick]')
         assert '$150,000' in soup.text
@@ -125,6 +127,9 @@ async def test_script_dashboard_warnings_reach_preview_save_read_and_revision(db
         assert read["html"] == preview["artifact_preview_html"]
         assert saved["warnings"] == read["warnings"] == preview["warnings"]
         assert saved["rendering_note"] == read["rendering_note"] == preview["rendering_note"]
+        assert saved['version'] == read['version'] == 1
+        from app.services.page_authoring import PAGE_LANGUAGE_RULES
+        assert saved['language_note'] == read['language_note'] == preview['language_note'] == PAGE_LANGUAGE_RULES
         from app.services.page_authoring import PAGE_SOURCE_FIDELITY_RULES
         assert saved["source_fidelity_note"] == read["source_fidelity_note"] == preview["source_fidelity_note"] == PAGE_SOURCE_FIDELITY_RULES
 
@@ -138,12 +143,15 @@ async def test_script_dashboard_warnings_reach_preview_save_read_and_revision(db
 
         revised_html = html.replace('$150,000', '$160,000')
         revision_preview = await revise_html_artifact(context, saved["artifact_uuid"], saved["revision"], "Budget", revised_html)
+        assert '"Save new version" button' in revision_preview['assistant_instruction']
+        assert 'artifact' not in revision_preview['assistant_instruction']
         assert revision_preview["warnings"] == preview["warnings"]
         deps.turn_marker = 4
         revised = await revise_html_artifact(context, saved["artifact_uuid"], saved["revision"], "Budget", revised_html, confirmed=True)
         assert revised["warnings"] == revision_preview["warnings"]
         assert revised["source_fidelity_note"] == revision_preview["source_fidelity_note"] == PAGE_SOURCE_FIDELITY_RULES
         assert revised["revision"] != saved["revision"]
+        assert revised['version'] == 2
 
 
 def test_create_retry_and_revision_cas_and_public_pin(db):
@@ -291,7 +299,9 @@ async def test_public_revision_no_private_metadata_revocation_rotation_and_opera
     token = response.json()["public_token"]
     artifacts.revise(db, artifacts.get(db, uid), "Secret draft", "<p>Not published</p>", rev)
     response = await client.get(f"/api/pages/public/{token}")
-    assert response.json() == {"title": "Review", "revision": rev}
+    from fastapi.encoders import jsonable_encoder
+    assert response.json() == jsonable_encoder({"title": "Review", "revision": rev,
+        "version": 1, "updated_at": doc["revisions"][0]["created_at"]})
     content = await client.get(f"/api/pages/public/{token}/content")
     assert "Original" in content.text and "Not published" not in content.text
     assert "private-chat" not in content.text

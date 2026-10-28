@@ -134,6 +134,18 @@ class TestBehavioralTransplants:
         assert "true minimum and maximum" in PAGE_SOURCE_FIDELITY_RULES
         assert "exact source cells are not 'ranges in the source'" in PAGE_SOURCE_FIDELITY_RULES
 
+    def test_page_language_rules_reach_generation_and_use_real_controls(self):
+        from app.services.page_authoring import PAGE_LANGUAGE_RULES
+        from app.services.chat_tools import approve_button_label
+
+        for prompt in (AGENTIC_CHAT_SYSTEM_PROMPT, FIRST_SESSION_SYSTEM_PROMPT):
+            assert PAGE_LANGUAGE_RULES in prompt
+            assert 'artifact viewer' not in prompt
+        assert approve_button_label('create_html_artifact') == 'Save page'
+        assert approve_button_label('revise_html_artifact') == 'Save new version'
+        assert 'tool names rewritten with spaces' in PAGE_LANGUAGE_RULES
+        assert 'never in visible link labels or prose' in PAGE_LANGUAGE_RULES
+
     def test_routing_tools_carry_paired_examples(self):
         from app.services.chat_tools import (
             check_compliance,

@@ -8,6 +8,14 @@ vi.mock('../../contexts/CertificationPanelContext', () => ({ useCertificationPan
 
 // v5 chat retest ticket: small display issues.
 describe('approval button label', () => {
+  it.each([['create_html_artifact', 'Save page'], ['revise_html_artifact', 'Save new version']])('names the Page action for %s', (name, label) => {
+    expect(approveLabel(name)).toBe(label)
+    const call = { tool_name: name, tool_call_id: 'page-action', args: { title: 'NIH dashboard', base_revision: '0625f9ce', confirmed: false } }
+    const { container } = render(<ToolStatusLine call={call} result={{ ...call, content: { needs_confirmation: true, artifact_preview_html: '<h1>Budget</h1>' }, quality: null }} onConfirm={vi.fn()} />)
+    expect(screen.getByRole('button', { name: label })).toBeInTheDocument()
+    expect(container).not.toHaveTextContent(/artifact|0625f9ce|confirmed/)
+  })
+
   it('reads "Approve step" for a workflow approval', () => {
     const call = { tool_name: 'approve_workflow_step', tool_call_id: 'a1', args: {} }
     render(<ToolStatusLine

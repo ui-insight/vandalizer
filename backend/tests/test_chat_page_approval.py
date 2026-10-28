@@ -34,6 +34,8 @@ def test_large_revision_saves_exact_preview_on_first_approval(db):
     assert len(page['revisions']) == 2
     assert artifacts.revision(page)['html'] == preview['prepared_html']
     assert saved['revision'] == page['latest_revision']
+    assert saved['version'] == 2
+    assert saved['message'] == 'Saved "NIH dashboard" as Page version 2.'
 
 
 @pytest.mark.parametrize('revision', [False, True])
@@ -41,6 +43,7 @@ def test_lost_acknowledgement_retry_never_creates_another_page_or_version(db, re
     doc = artifacts.create(db, 'owner', 'Old', '<p>Old</p>', 'original') if revision else None
     preview = proposal(db, '<p>Reviewed</p><script>removed()</script>', doc)
     first = previews.save(db, 'owner', 'chat', preview['_id'])
+    assert first['version'] == (2 if revision else 1)
     for _ in range(3):
         assert previews.save(db, 'owner', 'chat', preview['_id']) == first
     assert len(db.html_artifacts.docs) == 1
@@ -100,7 +103,10 @@ async def test_save_stream_persists_result_before_reporting_success_and_has_no_n
         assert result['kind'] == 'tool_result'
         assert result['content']['preview_id'] == preview['_id']
         assert 'needs_confirmation' not in result['content']
-        assert json.loads(await anext(stream))['kind'] == 'text'
+        receipt = json.loads(await anext(stream))
+        assert receipt == {'kind': 'text', 'content': 'Saved "NIH dashboard" as Page version 1.'}
+        assert result['content']['revision'] not in receipt['content']
+        assert result['content']['artifact_uuid'] not in receipt['content']
         await stream.aclose()
     assert finalized.await_args.kwargs['tool_results'][0]['content'] == result['content']
 

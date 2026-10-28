@@ -138,6 +138,8 @@ function kbPassages(content: unknown): Array<Record<string, unknown>> {
 /** The approve button for a tool with no label of its own: "Approve run
  * report", never "Approve approve …" for a tool whose name starts with the verb. */
 export function approveLabel(toolName: string): string {
+  if (toolName === 'create_html_artifact') return 'Save page'
+  if (toolName === 'revise_html_artifact') return 'Save new version'
   const words = toolName.replaceAll('_', ' ').trim()
   return /^approve\b/i.test(words) ? `A${words.slice(1)}` : `Approve ${words}`
 }
@@ -224,9 +226,9 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
       const title = obj.title ? `"${String(obj.title).slice(0, 40)}"` : ''
       // Say which pages a read covered, so a partial read of a long
       // document never looks like the whole thing (#1007).
-      const extent = typeof obj.pages_returned === 'string' && typeof obj.page_count === 'number'
+      const extent = obj.total_chars === 0 ? 'No readable text' : typeof obj.pages_returned === 'string' && typeof obj.page_count === 'number'
         ? (obj.complete ? `all ${obj.page_count} pages` : `read pp. ${obj.pages_returned} of ${obj.page_count}`)
-        : obj.total_chars ? `${((obj.total_chars as number) / 1000).toFixed(0)}K chars${obj.complete === false ? ', partly read' : ''}` : ''
+        : obj.complete === false || obj.truncated === true ? 'Partly read' : obj.complete === true ? 'Read complete' : ''
       return { text: [title, extent].filter(Boolean).join(' - '), qualityHint }
     }
 
@@ -309,8 +311,7 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
 
     case 'fetch_url': {
       const title = obj.title ? `"${String(obj.title).slice(0, 50)}"` : 'page'
-      const chars = obj.total_chars ? `${Math.round((obj.total_chars as number) / 1000)}K chars` : ''
-      return { text: [`Read ${title}`, chars].filter(Boolean).join(' - '), qualityHint: '' }
+      return { text: [`Read ${title}`, obj.truncated === true ? 'Partly read' : ''].filter(Boolean).join(' - '), qualityHint: '' }
     }
 
     case 'web_search': {
@@ -352,9 +353,9 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
 
     case 'create_html_artifact':
     case 'revise_html_artifact':
-      return { text: `Saved private page: ${String(obj.title || 'HTML page')}`, qualityHint }
+      return { text: `Saved private Page: ${String(obj.title || 'Untitled Page')}`, qualityHint }
     case 'get_html_artifact':
-      return { text: `Read page: ${String(obj.title || 'HTML page')}`, qualityHint }
+      return { text: `Read Page: ${String(obj.title || 'Untitled Page')}`, qualityHint }
     case 'list_skills':
       return { text: Array.isArray(content) ? `Found ${content.length} Skill${content.length === 1 ? '' : 's'}` : 'Skills', qualityHint: '' }
     case 'get_skill':

@@ -13,7 +13,7 @@ export function ArtifactsHome() {
 
 export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; publicToken?: string }) {
   const [artifact, setArtifact] = useState<api.Artifact | null>(null)
-  const [publicInfo, setPublicInfo] = useState<{ title: string; revision: string } | null>(null)
+  const [publicInfo, setPublicInfo] = useState<api.PublicArtifact | null>(null)
   const [selected, setSelected] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -60,7 +60,10 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
   const publishedVersion = artifact?.published_revision ? versionNumber(artifact.published_revision) : 0
   const selectedIsPublished = !!artifact?.published_revision && selected === artifact.published_revision
   const hasDraft = !!artifact?.can_manage && !!artifact.published_revision && artifact.latest_revision !== artifact.published_revision
-  const contentUrl = publicToken ? api.publicArtifactContentUrl(publicToken) : uuid && selected ? api.artifactContentUrl(uuid, selected) : ''
+  const contentUrl = publicToken ? api.publicArtifactContentUrl(publicToken, publicInfo?.revision) : uuid && selected ? api.artifactContentUrl(uuid, selected) : ''
+  const publicUpdated = publicInfo?.updated_at ? new Date(publicInfo.updated_at) : null
+  const publicUpdatedLabel = publicUpdated && !Number.isNaN(publicUpdated.getTime())
+    ? publicUpdated.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC', timeZoneName: 'short' }) : null
   const title = publicInfo?.title || revision?.title || artifact?.title || 'Page'
   const backUrl = pagesUrl(artifact?.source?.project_uuid)
   const publicLink = artifact?.public_token ? `${window.location.origin}/a/${artifact.public_token}` : ''
@@ -72,7 +75,7 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
     {!publicToken && <nav className="page-breadcrumb" aria-label="Breadcrumb"><a href={backUrl}><ArrowLeft size={15} />Files</a><ChevronRight size={13} /><a href={backUrl}>Pages</a><ChevronRight size={13} /><span>{loading ? 'Loading…' : 'Page details'}</span></nav>}
     <header className="page-heading"><div className="page-heading-copy"><p className="page-eyebrow">{publicToken ? 'SHARED PAGE' : 'SAVED PAGE'}</p><h1>{title}</h1>
       {(artifact || publicInfo) && <div className="page-meta">
-        {publicToken ? <PageBadge published>Published · anyone with the link</PageBadge> : artifact && !artifact.can_manage ? <PageBadge>Team access · version {version}</PageBadge> : <>
+        {publicToken ? <><PageBadge published>Published · version {publicInfo?.version}</PageBadge><span>Anyone with the link</span>{publicUpdatedLabel ? <span>Last updated <time dateTime={publicInfo!.updated_at}>{publicUpdatedLabel}</time></span> : <span>Last updated date unavailable</span>}</> : artifact && !artifact.can_manage ? <PageBadge>Team access · version {version}</PageBadge> : <>
           {artifact?.published_revision ? <PageBadge published>Published · version {publishedVersion}</PageBadge> : <PageBadge>{artifact?.team_id ? 'Team access' : 'Private · only you'}</PageBadge>}
           {hasDraft && <PageBadge>Unpublished changes</PageBadge>}
           {artifact?.published_revision && <span>Workspace access: {artifact.team_id ? 'you and your team' : 'only you'}</span>}
@@ -81,7 +84,7 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
       </div>}
     </div>
     {!loading && (artifact || publicInfo) && <div className="page-actions">
-      <a className="page-button" href={`${contentUrl}?download=true`}><Download size={16} />Download HTML</a>
+      <a className="page-button" href={`${contentUrl}${contentUrl.includes('?') ? '&' : '?'}download=true`}><Download size={16} />Download HTML</a>
       {artifact?.can_manage && <><button className="page-button" disabled={busy || !!editor} onClick={() => { setNotice(''); setError(''); setRequestChanges(true) }}><MessageSquare size={16} />Request changes</button><button className="page-button page-button-primary" disabled={busy} onClick={() => setSharing(true)}><Share2 size={16} />Share</button></>}
       {publicToken && <a className="page-button page-button-primary" href={contentUrl} target="_blank" rel="noreferrer"><ArrowUpRight size={16} />Open full page</a>}
     </div>}</header>

@@ -1,10 +1,11 @@
 """Authenticated artifact drafts and explicitly published revision links."""
 import functools
 import re
+from datetime import timezone
 from typing import Literal
 
 import anyio
-from fastapi import APIRouter, Depends, HTTPException, Request, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, Query, Response
 from fastapi.responses import HTMLResponse
 
 from app.config import Settings
@@ -135,14 +136,26 @@ async def public_doc(token, settings):
 
 
 @router.get("/public/{token}")
-async def get_public(token: str, settings: Settings = Depends(get_settings)):
-    _, rev = await public_doc(token, settings)
-    return {"title": rev["title"], "revision": rev["uuid"]}
+async def get_public(token: str, response: Response, settings: Settings = Depends(get_settings)):
+    doc, rev = await public_doc(token, settings)
+    # Mongo may return naive UTC datetimes. Never use the page's updated_at:
+    # it advances when an owner saves a private draft.
+    updated_at = rev["created_at"]
+    if updated_at.tzinfo is None:
+        updated_at = updated_at.replace(tzinfo=timezone.utc)
+    response.headers["Cache-Control"] = "no-store"
+    return {"title": rev["title"], "revision": rev["uuid"],
+            "version": next(i for i, item in enumerate(doc["revisions"], 1) if item["uuid"] == rev["uuid"]),
+            "updated_at": updated_at}
 
 
 @router.get("/public/{token}/content")
-async def public_content(token: str, download: bool = False, settings: Settings = Depends(get_settings)):
+async def public_content(token: str, download: bool = False, revision: str | None = None, settings: Settings = Depends(get_settings)):
     _, rev = await public_doc(token, settings)
+    # Keep a viewer's version/date label matched to the HTML even if the owner
+    # publishes again between the metadata request and the iframe request.
+    if revision is not None and revision != rev["uuid"]:
+        raise HTTPException(409, "The published page changed. Reload the page to view the current version.")
     return content_response(rev, download)
 
 
