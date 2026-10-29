@@ -18,6 +18,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
+from app.utils.timestamps import utc_iso
 from app.dependencies import get_api_key_user, get_current_user, get_current_user_or_api_key
 from app.exceptions import TrialSpendBlockedError
 from app.models.user import User
@@ -1285,8 +1286,8 @@ async def get_workflow_history(
             {
                 "id": str(ev.id),
                 "status": ev.status,
-                "started_at": ev.started_at.isoformat() if ev.started_at else None,
-                "finished_at": ev.finished_at.isoformat() if ev.finished_at else None,
+                "started_at": utc_iso(ev.started_at),
+                "finished_at": utc_iso(ev.finished_at),
                 "duration_ms": ev.duration_ms,
                 "error": ev.error or "",
                 "tokens_input": ev.tokens_input,

@@ -1,4 +1,5 @@
 import type { ScheduleTriggerConfig } from '../types/automation'
+import { parseServerTimestamp, formatLocalTimestamp } from './time'
 
 /** Monday-first, matching the backend's 0 = Monday. */
 export const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -85,8 +86,8 @@ export function formatRunTime(iso: string, timeZone: string): string {
     return new Intl.DateTimeFormat(undefined, {
       weekday: 'short', month: 'short', day: 'numeric',
       hour: 'numeric', minute: '2-digit', timeZone, timeZoneName: 'short',
-    }).format(new Date(iso))
+    }).format(parseServerTimestamp(iso))
   } catch {
-    return new Date(iso).toLocaleString()
+    return formatLocalTimestamp(iso)
   }
 }

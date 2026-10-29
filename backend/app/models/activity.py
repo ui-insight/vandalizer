@@ -7,6 +7,8 @@ from typing import Optional
 from beanie import Document, PydanticObjectId
 from pydantic import Field
 
+from app.utils.timestamps import utc_iso
+
 
 class ActivityType(str, Enum):
     CONVERSATION = "conversation"
@@ -107,9 +109,9 @@ class ActivityEvent(Document):
             "search_set_uuid": self.search_set_uuid,
             "workflow_id": str(self.workflow) if self.workflow else None,
             "workflow_session_id": self.workflow_session_id,
-            "started_at": self.started_at.isoformat() if self.started_at else None,
-            "finished_at": self.finished_at.isoformat() if self.finished_at else None,
-            "last_updated_at": self.last_updated_at.isoformat() if self.last_updated_at else None,
+            "started_at": utc_iso(self.started_at),
+            "finished_at": utc_iso(self.finished_at),
+            "last_updated_at": utc_iso(self.last_updated_at),
             "error": self.error or "",
             "tokens_input": self.tokens_input,
             "tokens_output": self.tokens_output,

@@ -1,4 +1,5 @@
 import type { Automation } from '../../types/automation'
+import { parseServerTimestamp } from '../../utils/time'
 
 export type AutomationStatus = 'running' | 'active' | 'paused'
 
@@ -27,7 +28,7 @@ export const AUTOMATION_SORT_OPTIONS: [AutomationSort, string][] = [
 const STATUS_ORDER: Record<AutomationStatus, number> = { running: 0, active: 1, paused: 2 }
 
 const time = (iso: string | null | undefined) => {
-  const t = iso ? Date.parse(iso) : NaN
+  const t = iso ? parseServerTimestamp(iso).getTime() : NaN
   return Number.isNaN(t) ? 0 : t
 }
 

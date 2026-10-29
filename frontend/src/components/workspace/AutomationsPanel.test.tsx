@@ -22,6 +22,13 @@ beforeEach(() => {
   mock.items = [item('folder', 'Proposal review', 'folder_watch'), item('api', 'Incoming awards', 'api', 'Proposal intake'), item('schedule', 'Weekly proposal', 'schedule'), item('m365', 'Mailbox intake', 'm365_intake')]
 })
 describe('automation list filtering and recovery', () => {
+  it('shows the last run in local time even when the schedule uses another zone', () => {
+    mock.items = [{ ...item('schedule', 'Weekly proposal', 'schedule'), trigger_config: { timezone: 'UTC' }, last_event_status: 'completed', last_event_at: '2026-10-29T21:38:00' }]
+    render(<AutomationsPanel />)
+    const local = new Date('2026-10-29T21:38:00Z').toLocaleString(undefined, { timeZoneName: 'short' })
+    expect(screen.getByText(`Last run: Succeeded · ${local}`)).toBeVisible()
+  })
+
   it('combines trimmed case-insensitive search with type and clears both filters', () => {
     render(<AutomationsPanel />)
     fireEvent.change(screen.getByRole('textbox', { name: 'Filter automations' }), { target: { value: ' PROPOSAL ' } })

@@ -15,6 +15,7 @@ import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { getFeatureFlags } from '../../api/config'
 import type { Automation, TriggerType } from '../../types/automation'
 import { formatRunTime } from '../../utils/schedule'
+import { formatLocalTimestamp } from '../../utils/time'
 import {
   AUTOMATION_SORT_OPTIONS, AUTOMATION_STATUS, automationStatus, loadAutomationSort,
   saveAutomationSort, sortAutomations, type AutomationSort,
@@ -378,7 +379,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
                   </div>
                   <AutomationSummary automation={auto} names={folderNames} actionName={getActionName(auto)} compact />
                   <div style={{ marginTop: 'var(--workspace-space-8)', fontSize: 'var(--workspace-font-meta)', color: auto.last_event_status === 'failed' ? '#b91c1c' : 'var(--workspace-muted)' }}>
-                    {auto.last_event_status ? `Last run: ${{ completed: 'Succeeded', failed: 'Failed', pending: 'Pending', queued: 'Queued', running: 'Running', skipped: 'Skipped' }[auto.last_event_status] || auto.last_event_status}${auto.last_event_at ? ` · ${formatRunTime(auto.last_event_at, String(auto.trigger_config?.timezone || 'UTC'))}` : ''}` : auto.last_event_status === null ? 'No runs yet' : 'Run history not reported'}
+                    {auto.last_event_status ? `Last run: ${{ completed: 'Succeeded', failed: 'Failed', pending: 'Pending', queued: 'Queued', running: 'Running', skipped: 'Skipped' }[auto.last_event_status] || auto.last_event_status}${auto.last_event_at ? ` · ${formatLocalTimestamp(auto.last_event_at)}` : ''}` : auto.last_event_status === null ? 'No runs yet' : 'Run history not reported'}
                   </div>
                   {/* Paused is on the status pill for every trigger type now. */}
                   {auto.trigger_type === 'schedule' && auto.next_run_at && auto.enabled && !isRunning && (

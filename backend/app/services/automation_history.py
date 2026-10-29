@@ -4,10 +4,7 @@ import datetime
 from bson import ObjectId
 
 from app.models.passive import ExtractionTriggerEvent, WorkflowTriggerEvent
-
-
-def _utc(value: datetime.datetime) -> datetime.datetime:
-    return value.replace(tzinfo=datetime.timezone.utc) if value.tzinfo is None else value.astimezone(datetime.timezone.utc)
+from app.utils.timestamps import utc_iso
 
 
 async def list_runs(automation_id: str, limit: int, before: datetime.datetime | None = None, before_id: str | None = None) -> dict:
@@ -35,9 +32,9 @@ async def list_runs(automation_id: str, limit: int, before: datetime.datetime | 
                 "trigger_event_id": str(event["_id"]),
                 "action_type": action_type,
                 "status": event["status"],
-                "created_at": _utc(event["created_at"]).isoformat(),
-                "started_at": _utc(event["started_at"]).isoformat() if event.get("started_at") else None,
-                "completed_at": _utc(event["completed_at"]).isoformat() if event.get("completed_at") else None,
+                "created_at": utc_iso(event["created_at"]),
+                "started_at": utc_iso(event.get("started_at")),
+                "completed_at": utc_iso(event.get("completed_at")),
                 "error": event.get("error"),
             })
     rows.sort(key=lambda row: (row["created_at"], row["trigger_event_id"]), reverse=True)

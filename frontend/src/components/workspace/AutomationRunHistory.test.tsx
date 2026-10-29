@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { AutomationRunHistory } from './AutomationRunHistory'
+import { AutomationRunHistory, runDuration } from './AutomationRunHistory'
 import { getAutomationHistory, getAutomationRun } from '../../api/automations'
 import type { AutomationRunStatus } from '../../types/automation'
 vi.mock('../../api/automations', () => ({ getAutomationHistory: vi.fn(), getAutomationRun: vi.fn() }))
@@ -10,6 +10,17 @@ function deferred<T>() { let resolve!: (value: T) => void; const promise = new P
 beforeEach(() => { vi.mocked(getAutomationHistory).mockReset(); vi.mocked(getAutomationRun).mockReset() })
 const props = { automationId: 'a', open: true, canRun: true, onPrepareRun: vi.fn() }
 describe('automation run history', () => {
+  it('shows the same local instant in a zoned list row and older unzoned run details', async () => {
+    const local = new Date('2026-10-29T21:38:00Z').toLocaleString(undefined, { timeZoneName: 'short' })
+    vi.mocked(getAutomationHistory).mockResolvedValue({ items: [{ ...run('local'), created_at: '2026-10-29T21:38:00+00:00' }], next_cursor: null })
+    vi.mocked(getAutomationRun).mockResolvedValue({ ...run('local'), started_at: '2026-10-29T21:38:00', completed_at: '2026-10-29T21:38:45' })
+    render(<AutomationRunHistory {...props} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Open run local' }))
+    expect(screen.getByText(local)).toBeVisible()
+    expect(await screen.findByText(`Started: ${local}`)).toBeVisible()
+    expect(runDuration('2026-10-29T21:38:00Z', '2026-10-29T21:38:45')).toBe('45s')
+  })
+
   it('retries a failed page at the same cursor while preserving previous runs', async () => {
     vi.mocked(getAutomationHistory).mockResolvedValueOnce({ items: [run('first')], next_cursor: cursor }).mockRejectedValueOnce(new Error('History unavailable')).mockResolvedValueOnce({ items: [run('older')], next_cursor: null })
     render(<AutomationRunHistory {...props} />)

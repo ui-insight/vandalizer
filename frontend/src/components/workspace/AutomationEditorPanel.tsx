@@ -19,7 +19,8 @@ import { AutomationRunHistory } from './AutomationRunHistory'
 import { AutomationRunNowPanel } from './AutomationRunNowPanel'
 import { ScheduleConfigFields } from './ScheduleConfigFields'
 import { CollapsibleSection } from '../shared/CollapsibleSection'
-import { defaultScheduleConfig, describeSchedule, formatRunTime, isScheduleComplete, scheduleConfigPayload, toScheduleConfig } from '../../utils/schedule'
+import { defaultScheduleConfig, describeSchedule, isScheduleComplete, scheduleConfigPayload, toScheduleConfig } from '../../utils/schedule'
+import { formatLocalTimestamp } from '../../utils/time'
 import type { Automation, TriggerType, ActionType } from '../../types/automation'
 import { SUPPORTED_EXTENSIONS } from '../../utils/fileTypes'
 
@@ -627,7 +628,7 @@ function ScheduleConfig({ automation, onSave }: { automation: Automation; onSave
         )}
         {!automation.enabled && <span>Paused: it will not run until the automation is enabled.</span>}
         <span>
-          {automation.last_run_at ? `Last ran ${formatRunTime(automation.last_run_at, config.timezone)}` : 'Has not run yet'}
+          {automation.last_run_at ? `Last ran ${formatLocalTimestamp(automation.last_run_at)}` : 'Has not run yet'}
         </span>
       </div>
     </div>

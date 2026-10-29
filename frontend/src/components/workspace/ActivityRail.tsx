@@ -1,3 +1,4 @@
+import { parseServerTimestamp } from '../../utils/time'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import {
@@ -106,7 +107,7 @@ export function isStale(activity: ActivityEvent, thresholdMinutes: number): bool
   if (pendingReviewUuid(activity)) return false
   const ts = activity.last_updated_at || activity.started_at
   if (!ts) return false
-  const age = Date.now() - new Date(ts).getTime()
+  const age = Date.now() - parseServerTimestamp(ts).getTime()
   return age > thresholdMinutes * 60 * 1000
 }
 
@@ -270,7 +271,7 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
     // shimmering placeholder instead of the raw working title. Capped to ~2
     // min after completion so a silently failed Celery task can't leave the
     // row stuck on the placeholder. Runs keep their template's name.
-    const finishedAt = activity.finished_at ? new Date(activity.finished_at).getTime() : 0
+    const finishedAt = activity.finished_at ? parseServerTimestamp(activity.finished_at).getTime() : 0
     const ageMs = finishedAt ? Date.now() - finishedAt : 0
     const awaitingTitle =
       isChat && activity.status === 'completed' && !aiTitleReady && ageMs < 120000

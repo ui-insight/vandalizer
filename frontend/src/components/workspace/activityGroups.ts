@@ -1,4 +1,5 @@
 import type { ActivityEvent } from '../../types/chat'
+import { parseServerTimestamp } from '../../utils/time'
 
 /** A chat and the extraction and workflow runs it started, newest first. */
 export interface ChatGroup {
@@ -7,7 +8,7 @@ export interface ChatGroup {
 }
 
 function time(iso: string | null | undefined): number {
-  const t = iso ? new Date(iso).getTime() : 0
+  const t = iso ? parseServerTimestamp(iso).getTime() : 0
   return Number.isNaN(t) ? 0 : t
 }
 
@@ -77,7 +78,7 @@ export function runDocumentLabel(activity: ActivityEvent): string {
 /** "10:42" for a run today, "Oct 3" otherwise. */
 export function runTimeLabel(iso: string | null | undefined, now: Date = new Date()): string {
   if (!iso) return ''
-  const d = new Date(iso)
+  const d = parseServerTimestamp(iso)
   if (Number.isNaN(d.getTime())) return ''
   const sameDay = d.toDateString() === now.toDateString()
   return sameDay

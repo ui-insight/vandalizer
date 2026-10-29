@@ -12,6 +12,7 @@ from bson import ObjectId
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from starlette.responses import JSONResponse
 
+from app.utils.timestamps import utc_iso
 from app.dependencies import get_api_key_user, get_current_user
 from app.models.automation import Automation
 from app.models.document import SmartDocument
@@ -126,8 +127,8 @@ def _schedule_times(auto) -> tuple[str | None, str | None]:
         base = automation_schedule.last_run_base(auto, now)
         next_run = automation_schedule.next_runs(auto.trigger_config, base)[0]
     except Exception:
-        return None, last.isoformat() if last else None
-    return next_run.isoformat(), last.isoformat() if last else None
+        return None, utc_iso(last)
+    return utc_iso(next_run), utc_iso(last)
 
 
 async def _resolve_action_name(action_type: str | None, action_id: str | None) -> str | None:
@@ -257,13 +258,13 @@ async def _to_response(
         team_id=auto.team_id,
         shared_with_team=auto.shared_with_team,
         output_config=auto.output_config,
-        created_at=auto.created_at.isoformat(),
-        updated_at=auto.updated_at.isoformat(),
+        created_at=utc_iso(auto.created_at),
+        updated_at=utc_iso(auto.updated_at),
         can_manage=can_manage,
         next_run_at=next_run_at,
         last_run_at=last_run_at,
         last_event_status=last_event["status"] if last_event else None,
-        last_event_at=last_event["created_at"].isoformat() if last_event else None,
+        last_event_at=utc_iso(last_event["created_at"]) if last_event else None,
     )
 
 
@@ -473,9 +474,9 @@ async def _trigger_event_status(trigger_event_id: str, *, may_view):
             trigger_event_id=trigger_event_id,
             status=wf_event.status,
             action_type="workflow",
-            created_at=wf_event.created_at.isoformat() if wf_event.created_at else None,
-            started_at=wf_event.started_at.isoformat() if wf_event.started_at else None,
-            completed_at=wf_event.completed_at.isoformat() if wf_event.completed_at else None,
+            created_at=utc_iso(wf_event.created_at),
+            started_at=utc_iso(wf_event.started_at),
+            completed_at=utc_iso(wf_event.completed_at),
             output=output,
             error=wf_event.error,
         )
@@ -494,9 +495,9 @@ async def _trigger_event_status(trigger_event_id: str, *, may_view):
             trigger_event_id=trigger_event_id,
             status=ext_event.status,
             action_type="extraction",
-            created_at=ext_event.created_at.isoformat() if ext_event.created_at else None,
-            started_at=ext_event.started_at.isoformat() if ext_event.started_at else None,
-            completed_at=ext_event.completed_at.isoformat() if ext_event.completed_at else None,
+            created_at=utc_iso(ext_event.created_at),
+            started_at=utc_iso(ext_event.started_at),
+            completed_at=utc_iso(ext_event.completed_at),
             output=ext_event.result,
             error=ext_event.error,
         )

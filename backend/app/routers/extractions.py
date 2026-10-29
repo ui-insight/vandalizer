@@ -17,6 +17,7 @@ from beanie import PydanticObjectId
 from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile
 from fastapi.responses import StreamingResponse
 
+from app.utils.timestamps import utc_iso
 from app.dependencies import get_api_key_user, get_current_user
 from app.rate_limit import limiter
 from app.models.activity import ActivityStatus, ActivityType
@@ -1503,8 +1504,8 @@ async def get_extraction_status(
     return {
         "status": activity.status,
         "title": activity.title,
-        "started_at": activity.started_at.isoformat() if activity.started_at else None,
-        "finished_at": activity.finished_at.isoformat() if activity.finished_at else None,
+        "started_at": utc_iso(activity.started_at),
+        "finished_at": utc_iso(activity.finished_at),
         "error": activity.error,
         "documents_touched": activity.documents_touched,
         "result_snapshot": activity.result_snapshot,
@@ -1766,8 +1767,8 @@ async def get_extraction_history(
             {
                 "id": str(ev.id),
                 "status": ev.status,
-                "started_at": ev.started_at.isoformat() if ev.started_at else None,
-                "finished_at": ev.finished_at.isoformat() if ev.finished_at else None,
+                "started_at": utc_iso(ev.started_at),
+                "finished_at": utc_iso(ev.finished_at),
                 "duration_ms": ev.duration_ms,
                 "error": ev.error or "",
                 "tokens_input": ev.tokens_input,

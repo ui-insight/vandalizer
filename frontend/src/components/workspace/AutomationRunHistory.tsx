@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getAutomationHistory, getAutomationRun, type AutomationHistoryCursor } from '../../api/automations'
 import type { AutomationRunStatus } from '../../types/automation'
+import { formatLocalTimestamp as timestamp, parseServerTimestamp } from '../../utils/time'
 
 const ACTIVE = new Set(['pending', 'queued', 'running'])
 const buttonStyle = { border: '1px solid #9ca3af', borderRadius: 'var(--workspace-radius-small)', padding: "var(--workspace-space-6) var(--workspace-space-12)", font: 'inherit', fontSize: 'var(--workspace-font-control)', background: '#fff', color: '#374151', cursor: 'pointer' }
-const timestamp = (value: string | null) => value ? new Date(value).toLocaleString() : 'Time unavailable'
 
 interface Props { automationId: string; open: boolean; canRun: boolean; onPrepareRun: () => void }
 export function AutomationRunHistory(props: Props) {
@@ -122,7 +122,7 @@ function RunDetails({ automationId, event, open, canRun, onPrepareRun, onClose }
 /** Show recorded elapsed time only; never invent timing for pending or incomplete runs. */
 export function runDuration(start?: string | null, end?: string | null): string | null {
   if (!start || !end) return null
-  const ms = Date.parse(end) - Date.parse(start)
+  const ms = parseServerTimestamp(end).getTime() - parseServerTimestamp(start).getTime()
   if (!Number.isFinite(ms) || ms < 0) return null
   const seconds = Math.round(ms / 1000)
   if (seconds < 60) return `${seconds}s`

@@ -54,6 +54,14 @@ describe('groupActivities (ticket: which chat produced each run)', () => {
 })
 
 describe('run labels', () => {
+  it('shows legacy UTC event times in the same local time as offset-aware events', () => {
+    const now = new Date('2026-10-29T22:38:00Z')
+    const expected = new Date('2026-10-29T22:28:00Z').toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    expect(runTimeLabel('2026-10-29T22:28:00', now)).toBe(expected)
+    expect(runTimeLabel('2026-10-29T22:28:00+00:00', now)).toBe(expected)
+    expect(runTimeLabel('invalid', now)).toBe('')
+  })
+
   it('drops the old "Workflow:" prefix from chat-started workflow titles', () => {
     expect(runName(ev({ type: 'workflow_run', title: 'Workflow: Subaward Review Summary v2' })))
       .toBe('Subaward Review Summary v2')
@@ -68,7 +76,7 @@ describe('run labels', () => {
 
   it('shows a time for today and a date otherwise', () => {
     const now = new Date('2026-10-15T15:00:00')
-    expect(runTimeLabel('2026-10-15T10:42:00', now)).toMatch(/10:42/)
+    expect(runTimeLabel(new Date(2026, 9, 15, 10, 42).toISOString(), now)).toMatch(/10:42/)
     expect(runTimeLabel('2026-10-03T10:42:00', now)).toMatch(/Oct/)
     expect(runTimeLabel(null, now)).toBe('')
   })
