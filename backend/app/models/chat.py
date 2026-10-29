@@ -86,6 +86,12 @@ class ChatMessage(Document):
     # reason, quote?}], summary}``. The UI marks a chip whose claim the
     # passage does not state.
     claim_checks: Optional[dict] = None
+    # A KB answer checked against every passage the model saw, and repaired
+    # where both checkers found a sentence contradicted (see
+    # chat_answer_repair): ``{version, outcome, sentences, checks, repair?,
+    # original_answer?}``. ``message`` is the repaired answer when outcome is
+    # "repaired".
+    answer_check: Optional[dict] = None
     # The documents in scope when this turn was asked: ``{uuid, title}`` each,
     # plus ``{"truncated": n}`` as a final entry if the selection was larger
     # than we record.
@@ -125,6 +131,8 @@ class ChatMessage(Document):
             d["unsupported_citations"] = self.unsupported_citations
         if self.claim_checks:
             d["claim_checks"] = self.claim_checks
+        if self.answer_check:
+            d["answer_check"] = self.answer_check
         if self.source_documents:
             d["source_documents"] = self.source_documents
         return d
@@ -374,6 +382,7 @@ class ChatConversation(Document):
         interruption: Optional[str] = None,
         unsupported_citations: Optional[list[str]] = None,
         claim_checks: Optional[dict] = None,
+        answer_check: Optional[dict] = None,
     ) -> ChatMessage:
         msg = ChatMessage(
             role=role,
@@ -389,6 +398,7 @@ class ChatConversation(Document):
             interruption=interruption or None,
             unsupported_citations=unsupported_citations or None,
             claim_checks=claim_checks or None,
+            answer_check=answer_check or None,
             source_documents=_cap_source_documents(source_documents),
         )
         await msg.insert()

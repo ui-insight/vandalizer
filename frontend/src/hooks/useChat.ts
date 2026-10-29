@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { streamChat, getHistory, queueChatMessage, stopChatTurn, type ChatHistory } from '../api/chat'
 import { expandSnippetRefs, markUsed } from '../utils/snippetRefs'
-import type { ChatMessage, Citation, ClaimChecks, ContextBudgetPlan, ContextMeterInfo, OversizeDocument, PlanTask, StreamChunk, StreamSegment, SuggestedModel, ToolCallInfo, ToolResultInfo } from '../types/chat'
+import type { AnswerCheck, ChatMessage, Citation, ClaimChecks, ContextBudgetPlan, ContextMeterInfo, OversizeDocument, PlanTask, StreamChunk, StreamSegment, SuggestedModel, ToolCallInfo, ToolResultInfo } from '../types/chat'
 
 export interface ContextNotice {
   action: string
@@ -116,6 +116,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
   const silenceInferencesRef = useRef<string[]>([])
   const unsupportedCitationsRef = useRef<string[]>([])
   const claimChecksRef = useRef<ClaimChecks | null>(null)
+  const answerCheckRef = useRef<AnswerCheck | null>(null)
 
   /** Drop the streaming turn's live display and release Stop's handle. */
   const clearLiveTurn = useCallback(() => {
@@ -162,6 +163,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
       silenceInferencesRef.current = []
       unsupportedCitationsRef.current = []
       claimChecksRef.current = null
+      answerCheckRef.current = null
 
       // Add user message immediately
       setMessages((prev) => [...prev, { role: 'user', content: message, request_scope: { documents: [...documentUuids], folders: [...(folderUuids ?? [])], knowledgeBases: [...(knowledgeBaseUuids ?? [])], ...(projectUuid ? { project: projectUuid } : {}) } }])
@@ -217,6 +219,9 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
         }
         if (claimChecksRef.current) {
           assistantMsg.claim_checks = claimChecksRef.current
+        }
+        if (answerCheckRef.current) {
+          assistantMsg.answer_check = answerCheckRef.current
         }
         setMessages((prev) => [...prev, assistantMsg])
       }
@@ -350,6 +355,17 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
               unsupportedCitationsRef.current = chunk.unsupported_citations ?? []
             } else if (chunk.kind === 'claim_checks') {
               claimChecksRef.current = chunk.claim_checks ?? null
+            } else if (chunk.kind === 'answer_revised') {
+              // The finished answer, checked and rewritten: it replaces every
+              // streamed text segment, as the server stores it.
+              streamingRef.current = chunk.content
+              setStreamingContent(expandSnippetRefs(chunk.content, citationsRef.current))
+              segmentsRef.current = [
+                ...segmentsRef.current.filter((seg) => seg.kind !== 'text'),
+                { kind: 'text', content: chunk.content },
+              ]
+              setSegments([...segmentsRef.current])
+              answerCheckRef.current = chunk.answer_check ?? null
             } else if (chunk.kind === 'context_notice') {
               setContextNotices((prev) => [
                 ...prev,

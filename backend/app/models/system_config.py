@@ -218,6 +218,12 @@ class SystemConfig(Document):
     #       serialize regardless (Phase 7). Read at agent construction.
     #   "subagents_enabled": bool (default True) — allow analyze_documents
     #       to fan out per-document sub-analyses (Phase 9).
+    #   "answer_repair_enabled": bool (default False) — check a finished KB
+    #       answer against every passage the model saw and rewrite the
+    #       sentences two checkers both find contradicted
+    #       (chat_answer_repair). With it: "answer_repair_checker_model",
+    #       "answer_repair_second_checker_model" (empty for none),
+    #       "answer_repair_model", "answer_repair_second_check_seconds".
     # Missing keys mean "use the default" so deployments never need a
     # migration to pick up new phases.
     chat_config: dict = {}

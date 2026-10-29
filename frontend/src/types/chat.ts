@@ -21,6 +21,9 @@ export interface ChatMessage {
   unsupported_citations?: string[]
   /** KB answers: each cited claim checked against the passage it cites. */
   claim_checks?: ClaimChecks
+  /** KB answers: the answer checked against every passage, and repaired when
+   *  outcome is "repaired". */
+  answer_check?: AnswerCheck
   /** Documents in scope when this turn was asked — `{uuid, title}` each, with
    *  a final `{truncated: n}` when the selection was larger than is recorded.
    *  Present on user turns; assistant turns carry `citations` instead. */
@@ -236,6 +239,17 @@ export interface ClaimChecks {
   summary?: { verified: number; unverified: number; unchecked: number }
 }
 
+/** A KB answer checked against every passage the model saw (chat_answer_repair).
+ *  outcome "repaired": both checkers found a sentence contradicted and the
+ *  answer was rewritten; original_answer is what streamed first. */
+export interface AnswerCheck {
+  version: number
+  outcome: string
+  sentences?: string[]
+  original_answer?: string
+  repair?: { model: string; flagged: number[]; changed?: number[]; kept?: number[] }
+}
+
 // Live task checklist from the update_plan tool (chat_tools Phase 8).
 export interface PlanTask {
   content: string
@@ -262,6 +276,7 @@ export interface StreamChunk {
     | 'sources_used'
     | 'grounding_warning'
     | 'claim_checks'
+    | 'answer_revised'
   content: string
   duration?: number
   tool_name?: string
@@ -300,6 +315,9 @@ export interface StreamChunk {
   unsupported_citations?: string[]
   // claim_checks only: each cited claim checked against its passage.
   claim_checks?: ClaimChecks
+  // answer_revised only: the check that rewrote the answer; content is the
+  // whole corrected answer, which replaces the streamed text.
+  answer_check?: AnswerCheck
 }
 
 export interface SuggestedModel {

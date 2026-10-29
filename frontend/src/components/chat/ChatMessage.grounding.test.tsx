@@ -23,6 +23,23 @@ function answer(extra: Partial<ChatMessageType> = {}): ChatMessageType {
   return { role: 'assistant', content: 'The single audit threshold is $750,000.', ...extra }
 }
 
+// A KB answer rewritten after two checkers found a sentence that misstated a
+// passage says so under the answer (chat_answer_repair).
+describe('ChatMessage corrected answer', () => {
+  it('says the answer was corrected after checking', () => {
+    render(<ChatMessage message={answer({ answer_check: { version: 1, outcome: 'repaired' } })} />)
+
+    expect(screen.getByRole('note', { name: 'Answer corrected after checking' }))
+      .toHaveTextContent(/misstated them, and it was rewritten/)
+  })
+
+  it.each(['no_flags', 'unchanged', 'second_check_late'])('shows nothing when the check ended %s', (outcome) => {
+    render(<ChatMessage message={answer({ answer_check: { version: 1, outcome } })} />)
+
+    expect(screen.queryByRole('note')).not.toBeInTheDocument()
+  })
+})
+
 describe('ChatMessage unsupported figures', () => {
   it('names the figures no retrieved source states', () => {
     render(<ChatMessage message={answer({ unsupported_figures: ['$750,000'] })} />)

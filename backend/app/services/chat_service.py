@@ -2664,6 +2664,33 @@ async def chat_stream(
                         "used_refs": used_refs,
                     }) + "\n"
 
+                # Every sentence checked against all the passages the model
+                # was given, and the answer rewritten where two checkers find
+                # one contradicted (off unless chat_config turns it on). The
+                # answer has streamed already: a repaired one replaces it,
+                # before the checks below read it.
+                assistant_message, answer_check = await _repair_answer(
+                    assistant_message, message, kb_sources, streamed_tool_results,
+                    bool(documents or attachment_segments), previous_messages,
+                    model_name, sys_config_doc,
+                )
+                if answer_check and answer_check.get("outcome") == "repaired":
+                    streamed_segments[:] = [
+                        s for s in streamed_segments if s.get("kind") != "text"
+                    ] + [{"kind": "text", "content": assistant_message}]
+                    yield json.dumps({
+                        "kind": "answer_revised",
+                        "content": assistant_message,
+                        "answer_check": answer_check,
+                    }) + "\n"
+                    used_refs = _mark_used_citations(assistant_message, streamed_citations)
+                    if used_refs is not None:
+                        yield json.dumps({
+                            "kind": "sources_used",
+                            "content": "",
+                            "used_refs": used_refs,
+                        }) + "\n"
+
                 # Clean think tags from text segments before persisting
                 cleaned_segments: list[dict] = []
                 for seg in streamed_segments:
@@ -2773,6 +2800,7 @@ async def chat_stream(
                     silence_inferences=silent or None,
                     unsupported_citations=miscited or None,
                     claim_checks=claim_checks,
+                    answer_check=answer_check,
                 )
                 if unsupported or silent or miscited:
                     yield json.dumps({
@@ -4428,6 +4456,43 @@ async def _check_cited_claims(
         return None
 
 
+async def _repair_answer(
+    answer: str,
+    question: str,
+    kb_sources: list[dict],
+    tool_results: list[dict],
+    attached_documents: bool,
+    history: list[ModelMessage],
+    model_name: str,
+    system_config_doc: Optional[dict],
+) -> tuple[str, Optional[dict]]:
+    """``answer`` checked against every passage the model was given, and
+    repaired where both checkers find a sentence contradicted
+    (``chat_answer_repair``): the answer to keep, and the record of the
+    check. The record is None when ``chat_config`` leaves the step off or the
+    turn is not a KB answer it was measured on. Never raises: a failure
+    keeps the answer."""
+    from app.services import chat_answer_repair
+
+    config = chat_answer_repair.repair_config(system_config_doc)
+    if config is None or not answer.strip():
+        return answer, None
+    if not chat_answer_repair.in_scope(tool_results, attached_documents=attached_documents):
+        return answer, None
+    passages = chat_answer_repair.seen_passages(kb_sources, tool_results)
+    if not passages:
+        return answer, None
+    try:
+        return await chat_answer_repair.check_and_repair(
+            answer, question, passages, config,
+            chat_answer_repair.model_ask(model_name, system_config_doc),
+            prev_question=_previous_question(_recent_turns(history)),
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning("Chat answer check failed: %s", e)
+        return answer, None
+
+
 def _miscited_sources(
     answer: str,
     question: str,
@@ -5071,6 +5136,7 @@ async def _finalize(
     silence_inferences: Optional[list[str]] = None,
     unsupported_citations: Optional[list[str]] = None,
     claim_checks: Optional[dict] = None,
+    answer_check: Optional[dict] = None,
 ) -> None:
     """Save assistant message and update activity metrics."""
     await conversation.add_message(
@@ -5086,6 +5152,7 @@ async def _finalize(
         silence_inferences=silence_inferences,
         unsupported_citations=unsupported_citations,
         claim_checks=claim_checks,
+        answer_check=answer_check,
     )
 
     # Stamp the usage anchor for next turn's cheap context estimate (uplift

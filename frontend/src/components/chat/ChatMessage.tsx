@@ -588,6 +588,23 @@ export function ChatMessage({
             </>
           )}
 
+          {message.answer_check?.outcome === 'repaired' && (
+            <div
+              role="note"
+              aria-label="Answer corrected after checking"
+              style={{
+                marginTop: 8, padding: '8px 10px', display: 'flex', gap: 8, alignItems: 'flex-start',
+                backgroundColor: '#eff6ff', borderRadius: 6, fontSize: 12, lineHeight: 1.5, color: '#1e40af',
+              }}
+            >
+              <Check aria-hidden style={{ width: 14, height: 14, flexShrink: 0, marginTop: 2, color: '#1d4ed8' }} />
+              <span>
+                Corrected after checking: a second reading of the retrieved passages found a sentence
+                that misstated them, and it was rewritten to say what the passages say.
+              </span>
+            </div>
+          )}
+
           {message.unsupported_figures && message.unsupported_figures.length > 0 && (
             <div
               role="note"
