@@ -1,3 +1,4 @@
+import { isPagePreparation } from '../lib/chatProgress'
 import { getProjectDefaultSkill } from '../api/projects'
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { streamChat, getHistory, previewSkill, selectConversationSkill, stopChatTurn, type ChatHistory } from '../api/chat'
@@ -341,7 +342,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
             if (chunk.kind === 'activity') {
               if (chunk.activity) setActivityProgress(chunk.activity)
             } else if (chunk.kind === 'text') {
-              setActivityProgress(previous => previous?.phase === 'writing' ? previous : { phase: 'writing' })
+              setActivityProgress(previous => isPagePreparation(previous) || previous?.phase === 'writing' ? previous : { phase: 'writing' })
               streamingRef.current += chunk.content
               // Strip any residual think tags the backend parser missed
               const display = streamingRef.current
@@ -359,7 +360,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
               }
               setSegments([...segs])
             } else if (chunk.kind === 'thinking') {
-              setActivityProgress(previous => previous?.phase === 'model' ? previous : { phase: 'model' })
+              setActivityProgress(previous => isPagePreparation(previous) || previous?.phase === 'model' ? previous : { phase: 'model' })
               thinkingRef.current += chunk.content
               setThinkingContent(thinkingRef.current)
             } else if (chunk.kind === 'thinking_done') {

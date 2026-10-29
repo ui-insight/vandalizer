@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ChatPanel } from './ChatPanel'
-import type { ChatMessage, StreamSegment, SkillSnapshot } from '../../types/chat'
+import type { ChatActivity, ChatMessage, StreamSegment, SkillSnapshot, ToolResultInfo } from '../../types/chat'
 import { pollStatus } from '../../api/documents'
 
 const mocks = vi.hoisted(() => ({
@@ -21,6 +21,9 @@ const mocks = vi.hoisted(() => ({
   isStreaming: false,
   segments: [] as StreamSegment[],
   thinkingContent: '',
+  streamingContent: '',
+  activity: null as ChatActivity | null,
+  toolResults: [] as ToolResultInfo[],
   activeToolCalls: [] as { tool_name: string; tool_call_id: string; args: Record<string, unknown> }[],
   loadHistory: vi.fn(),
   blocked: false,
@@ -50,6 +53,7 @@ vi.mock('../../api/extractions', () => ({ listSearchSets: mocks.listSearchSets }
 vi.mock('../../hooks/useProjects', () => ({ useProject: () => ({ project: null }) }))
 vi.mock('../../hooks/useOnboarding', () => ({ useOnboarding: () => ({ pills: [], isFirstSession: true, loading: false, status: null }) }))
 vi.mock('../../hooks/useChat', () => ({ useChat: () => ({
+  activity: mocks.activity, streamingContent: mocks.streamingContent, toolResults: mocks.toolResults,
   messages: mocks.messages, activityId: mocks.activityId, segments: mocks.segments, thinkingContent: mocks.thinkingContent, activeToolCalls: mocks.activeToolCalls, queuedMessages: mocks.queuedMessages, error: mocks.error, planTasks: [], contextNotices: [],
   activeSkill: mocks.activeSkill, isSelectingSkill: mocks.isSelectingSkill,
   projectSkillBlocked: mocks.blocked, conversationUuid: mocks.conversationUuid, isStreaming: mocks.isStreaming, loadHistory: mocks.loadHistory, contextTokens: 0, initializeProjectSkill: vi.fn(), send: mocks.send, selectSkill: mocks.selectSkill, resumeQueuedMessages: mocks.resumeQueuedMessages,
@@ -89,6 +93,9 @@ beforeEach(() => {
   mocks.messages = []
   mocks.isStreaming = false
   mocks.thinkingContent = ''
+  mocks.streamingContent = ''
+  mocks.activity = null
+  mocks.toolResults = []
   mocks.segments = []
   mocks.activeToolCalls = []
   mocks.loadHistory.mockResolvedValue(null)
@@ -338,4 +345,65 @@ it('does not add a second progress indicator alongside an existing thinking or a
   rerender(<QueryClientProvider client={client}><ChatPanel /></QueryClientProvider>)
   expect(screen.getByRole('status')).toHaveTextContent('Searching knowledge base · Running')
   expect(screen.queryByRole('status', { name: 'Assistant progress' })).not.toBeInTheDocument()
+})
+
+
+describe('Page preparation progress in the conversation', () => {
+  it.each(['create_html_artifact', 'revise_html_artifact'])('keeps %s progress visible through the preamble, reasoning, execution and preview', toolName => {
+    mocks.isStreaming = true
+    mocks.thinkingContent = 'Earlier reasoning'
+    mocks.streamingContent = "I'm preparing the page."
+    mocks.segments = [{ kind: 'text', content: mocks.streamingContent }]
+    mocks.activity = { phase: 'writing' }
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const view = render(<QueryClientProvider client={client}><ChatPanel /></QueryClientProvider>)
+    const rerender = () => view.rerender(<QueryClientProvider client={client}><ChatPanel /></QueryClientProvider>)
+    expect(screen.getByRole('status', { name: 'Assistant progress' })).toHaveTextContent('Writing your response')
+
+    mocks.thinkingContent = 'Earlier reasoning'
+    mocks.activity = { phase: 'tool_preparing', tool_name: toolName, tool_call_id: 'page' }
+    rerender()
+    const progress = screen.getByRole('status', { name: 'Assistant progress' })
+    expect(progress).toHaveTextContent(toolName === 'create_html_artifact' ? 'Designing your page' : 'Revising your page')
+    expect(progress).toHaveTextContent('0:00 elapsed')
+    expect(screen.getByRole('region', { name: 'Conversation' })).toContainElement(progress)
+    expect(screen.getByRole('button', { name: 'Expand thinking' })).toHaveTextContent('Reasoning')
+    expect(screen.queryByTitle('Page preview')).not.toBeInTheDocument()
+    rerender()
+    expect(screen.getByRole('status', { name: 'Assistant progress' })).toBe(progress)
+
+    const call = { tool_name: toolName, tool_call_id: 'page', args: { title: 'Award page' } }
+    mocks.activeToolCalls = [call]
+    mocks.segments.push({ kind: 'tool_call', call })
+    mocks.activity = { phase: 'tool_running', tool_name: toolName, tool_call_id: 'page' }
+    rerender()
+    expect(screen.getByText('Preparing your page preview')).toBeVisible()
+    expect(screen.queryByRole('status', { name: 'Assistant progress' })).not.toBeInTheDocument()
+
+    const result = { tool_name: toolName, tool_call_id: 'page', quality: null,
+      content: { needs_confirmation: true, title: 'Award page', artifact_preview_html: '<h1>Ready</h1>' } }
+    mocks.activeToolCalls = []
+    mocks.toolResults = [result]
+    mocks.segments.push({ kind: 'tool_result', result })
+    mocks.activity = { phase: 'reviewing', tool_name: toolName }
+    rerender()
+    expect(screen.getByTitle('Page preview')).toBeInTheDocument()
+    expect(screen.getByText('Ready for your review')).toBeVisible()
+    expect(screen.queryByText(/elapsed/)).not.toBeInTheDocument()
+    expect(screen.queryByText('Preparing your page preview')).not.toBeInTheDocument()
+  })
+
+  it.each(['stopped', 'failed'])('removes Page preparation progress when the stream is %s', outcome => {
+    mocks.isStreaming = true
+    mocks.activity = { phase: 'tool_preparing', tool_name: 'create_html_artifact', tool_call_id: 'page' }
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const view = render(<QueryClientProvider client={client}><ChatPanel /></QueryClientProvider>)
+    expect(screen.getByRole('status', { name: 'Assistant progress' })).toHaveTextContent('Designing your page')
+    mocks.isStreaming = false
+    mocks.activity = null
+    if (outcome === 'failed') mocks.error = 'The response was interrupted.'
+    view.rerender(<QueryClientProvider client={client}><ChatPanel /></QueryClientProvider>)
+    expect(screen.queryByRole('status', { name: 'Assistant progress' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/elapsed/)).not.toBeInTheDocument()
+  })
 })

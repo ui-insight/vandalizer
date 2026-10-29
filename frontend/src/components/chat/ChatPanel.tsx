@@ -1,3 +1,4 @@
+import { isPagePreparation } from '../../lib/chatProgress'
 import { ChatActivityIndicator } from './ChatActivityIndicator'
 import { conversationNearMemoryLimit } from '../../lib/contextNudge'
 import { approvalHistoryFor } from './approvalHistory'
@@ -1284,7 +1285,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           />
         )}
 
-        {isStreaming && !thinkingContent && !activeToolCalls?.length && activity?.phase !== 'writing' && <ChatActivityIndicator activity={activity} names={scopeNamesRef.current} compactionStatus={compactionStatus} />}
+        {isStreaming && !activeToolCalls?.length && (!thinkingContent || activity?.phase === 'writing' || isPagePreparation(activity)) && <ChatActivityIndicator activity={activity} names={scopeNamesRef.current} compactionStatus={compactionStatus} />}
 
         {/* Held message: queued while attached docs finish processing. Renders
             as the user's bubble with a waiting note; auto-sends when ready. */}

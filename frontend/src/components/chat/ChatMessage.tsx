@@ -1,3 +1,4 @@
+import { isPagePreparation } from '../../lib/chatProgress'
 import './chat-message-actions.css'
 import { activityLabel } from './ChatActivityIndicator'
 import { ThinkingTrace } from './ThinkingTrace'
@@ -307,7 +308,7 @@ export function ChatMessage({
             <ThinkingTrace
               text={thinkingText}
               duration={duration}
-              status={isStreamingProp && !activeToolCalls?.length && activity?.phase !== 'writing' && (activity || duration == null)
+              status={isStreamingProp && !isPagePreparation(activity) && !activeToolCalls?.length && activity?.phase !== 'writing' && (activity || duration == null)
                 ? activityLabel(activity, [], exportNames || {}, compactionStatus)
                 : undefined}
             />

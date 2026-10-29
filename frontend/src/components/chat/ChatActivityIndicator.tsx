@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react'
 import type { ChatActivity, ToolCallInfo } from '../../types/chat'
+import { isPagePreparation } from '../../lib/chatProgress'
 import { activeToolLabel, getToolMeta, toolTarget } from './toolActivity'
 import './chat-activity.css'
 
@@ -17,7 +19,18 @@ export function activityLabel(activity: ChatActivity | null | undefined, calls: 
   return 'Thinking'
 }
 
-/** Only fills gaps before the transcript has a thinking or running-tool entry. */
+function PagePreparationTimer() {
+  const [seconds, setSeconds] = useState(0)
+  useEffect(() => {
+    const started = Date.now()
+    const timer = setInterval(() => setSeconds(Math.floor((Date.now() - started) / 1000)), 1000)
+    return () => clearInterval(timer)
+  }, [])
+  // Keep live announcements on the status label, not on every timer tick.
+  return <span className="chat-activity-elapsed" aria-hidden="true">{Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')} elapsed</span>
+}
+
+/** Visible between stream updates, including while a Page's HTML is generated. */
 export function ChatActivityIndicator({ activity, names = {}, compactionStatus }: {
   activity?: ChatActivity | null
   names?: Record<string, string>
@@ -26,5 +39,6 @@ export function ChatActivityIndicator({ activity, names = {}, compactionStatus }
   return <div className="chat-activity-line" role="status" aria-label="Assistant progress">
     <span className="chat-activity-dot" aria-hidden="true" />
     <span className="chat-activity-label">{activityLabel(activity, [], names, compactionStatus)}</span>
+    {isPagePreparation(activity) && <PagePreparationTimer key={activity?.tool_call_id || activity?.tool_name} />}
   </div>
 }
