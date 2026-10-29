@@ -3,6 +3,14 @@
 Scenario recognition is separate from practical evidence and earned credit.
 There is no automatic completion, XP award or agent self-assessment fallback.
 """
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from motor.motor_asyncio import AsyncIOMotorCollection
+    from app.services.certification_versions.runtime import CourseOperation
+    from app.services.certification_versions.catalog import CoursePackage
+
 import datetime
 import hashlib
 import json
@@ -20,7 +28,7 @@ from .scenario_assessment import ScenarioBank
 from .writes import require_lease, save_progress
 
 
-def module_bank(package, module_id):
+def module_bank(package: CoursePackage, module_id: str):
     if module_id not in {module.id for module in package.manifest.modules}:
         raise EnrollmentConflict('This module is not part of the selected course')
     path = f'assessments/{module_id}.json'
@@ -48,15 +56,17 @@ def answers_digest(record):
 
 class ScenarioSubmissionRepository:
     @property
-    def records(self):
+    def records(self) -> AsyncIOMotorCollection:
         return CertificationScenarioAttempt.get_motor_collection()
 
     @staticmethod
-    def decode(raw):
+    def decode(raw: dict) -> dict:
         try:
             if hashlib.sha256(raw['record_json'].encode()).hexdigest() != raw['record_sha256']:
                 raise ValueError('Digest mismatch')
             record = json.loads(raw['record_json'])
+            if not isinstance(record, dict):
+                raise ValueError('The saved record must be an object')
             if any(record[key] != raw[key] for key in (
                 'uuid', 'user_id', 'enrollment_id', 'module_id', 'course_version', 'manifest_sha256', 'request_sha256',
             )):
@@ -67,11 +77,11 @@ class ScenarioSubmissionRepository:
         except (ValueError, TypeError, KeyError) as exc:
             raise CourseCatalogError('The saved scenario submission failed its integrity check') from exc
 
-    async def get(self, user_id, attempt_id):
+    async def get(self, user_id: str, attempt_id: str) -> dict | None:
         raw = await self.records.find_one({'uuid': attempt_id, 'user_id': user_id})
         return self.decode(raw) if raw else None
 
-    async def status(self, user_id, attempt_id):
+    async def status(self, user_id: str, attempt_id: str) -> None | dict:
         """Read a receipt and its current link without grading or repairing it."""
         record = await self.get(user_id, attempt_id)
         if record is None:
@@ -108,7 +118,7 @@ class ScenarioSubmissionRepository:
                 return record
         return None
 
-    async def submit(self, operation, module_id, request_id, bank_sha256, answers, *, actor_user_id):
+    async def submit(self, operation: CourseOperation, module_id: str, request_id: str, bank_sha256, answers, *, actor_user_id: str) -> dict:
         progress, package = operation.progress, operation.package
         if not operation.writable or actor_user_id != operation.user_id or not re.fullmatch(r'[a-f0-9]{32}', request_id):
             raise EnrollmentConflict('Scenario submission requires the authenticated learner and a writable course operation')

@@ -1,4 +1,10 @@
 """Pinned teaching proposal and explicit source selection for Foundations."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.catalog import CoursePackage
+
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -16,7 +22,7 @@ class ScopeProposalCase(BaseModel):
     task: str = Field(min_length=20, max_length=3000)
     original_source_filename: str = Field(pattern=r'^[a-z0-9][a-z0-9-]*\.pdf$')
 
-    def verify_exercise(self, exercise):
+    def verify_exercise(self, exercise) -> None:
         """Bind the new draft instructions without changing legacy exercises."""
         if (not isinstance(exercise, dict)
                 or exercise.get('assessment_method') != 'owned_scoped_extraction'
@@ -40,7 +46,7 @@ class ProposalSelection(BaseModel):
     source_id: str = Field(min_length=1, max_length=200)
 
 
-def load_proposal_case(package, module_id):
+def load_proposal_case(package: CoursePackage, module_id: str):
     from .learner_decisions import execution_requirement
     path = f'proposals/{module_id}.json'
     if path not in package.manifest.artifacts:
@@ -62,7 +68,7 @@ def load_proposal_case(package, module_id):
         raise CourseCatalogError('The scope proposal case is invalid') from exc
 
 
-def capture_proposal(package, snapshot):
+def capture_proposal(package: CoursePackage, snapshot) -> None | dict:
     case = load_proposal_case(package, snapshot['module_id'])
     if case is None:
         return None

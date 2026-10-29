@@ -32,7 +32,7 @@ def versioning_enabled() -> bool:
     return Settings().certification_versioning_enabled
 
 
-def course_operation(*, write=False, http=False, tool=False):
+def course_operation(*, write: bool=False, http: bool=False, tool: bool=False):
     """Bind at the outer boundary; nested calls cannot change user or course.
 
     Disabled by default until rollout verification. The enrollment_id argument

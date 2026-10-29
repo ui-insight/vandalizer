@@ -43,7 +43,7 @@ PROPERTIES = set(('color background background-color border-color border-top-col
                   'flex-wrap align-items justify-content list-style-type opacity outline outline-offset scroll-margin-top').split())
 
 
-def _css_value(value):
+def _css_value(value) -> bool:
     # No strings, URLs, escapes, custom properties, data attributes, or generated content.
     if not re.fullmatch(r'[\w\s#.,()%+/-]+', value, re.ASCII):
         return False

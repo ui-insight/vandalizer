@@ -40,7 +40,7 @@ _rag_agent_cache: dict[str, Agent] = {}
 _prompt_agent_cache: dict[str, Agent] = {}
 
 
-def clear_agent_caches():
+def clear_agent_caches() -> None:
     """Clear all cached agents so config changes (API keys, endpoints) take effect."""
     _chat_agent_cache.clear()
     _agentic_chat_agent_cache.clear()
@@ -142,7 +142,7 @@ class RateLimitRetryTransport(httpx.AsyncBaseTransport):
         max_attempts: int = RATE_LIMIT_MAX_ATTEMPTS,
         base_wait: float = RATE_LIMIT_BASE_WAIT_SECONDS,
         max_wait: float = RATE_LIMIT_MAX_WAIT_SECONDS,
-    ):
+    ) -> None:
         self.wrapped = wrapped
         self.max_attempts = max(1, max_attempts)
         self.base_wait = base_wait
@@ -245,7 +245,7 @@ class InsightAIProvider(OpenRouterProvider):
     """Custom OpenRouter provider for UIdaho Insight AI server."""
 
     def __init__(self, api_key: str, endpoint: Optional[str] = None,
-                 http_client: Optional[httpx.AsyncClient] = None):
+                 http_client: Optional[httpx.AsyncClient] = None) -> None:
         self._endpoint = endpoint
         # Passing a dedicated http_client makes pydantic-ai build a per-instance
         # AsyncOpenAI rather than fall back to the process-wide
@@ -282,7 +282,7 @@ class OllamaProvider(OpenRouterProvider):
     """Provider for Ollama API-compatible servers."""
 
     def __init__(self, api_key: str, endpoint: str,
-                 http_client: Optional[httpx.AsyncClient] = None):
+                 http_client: Optional[httpx.AsyncClient] = None) -> None:
         self._endpoint = endpoint
         if http_client is not None:
             super().__init__(api_key=api_key, http_client=http_client)
@@ -312,7 +312,7 @@ class VLLMProvider(OpenRouterProvider):
     """Provider for VLLM API-compatible servers."""
 
     def __init__(self, api_key: str, endpoint: str,
-                 http_client: Optional[httpx.AsyncClient] = None):
+                 http_client: Optional[httpx.AsyncClient] = None) -> None:
         self._endpoint = endpoint
         if http_client is not None:
             super().__init__(api_key=api_key, http_client=http_client)
@@ -934,7 +934,7 @@ class MeteredModel(WrapperModel):
             # Truncation reporting must never break an LLM call.
             pass
 
-    def _record(self, messages, usage, parts, model_settings=None, model_request_parameters=None):
+    def _record(self, messages, usage, parts, model_settings=None, model_request_parameters=None) -> None:
         from app.services.metering import (
             estimate_messages_tokens,
             estimate_parts_tokens,

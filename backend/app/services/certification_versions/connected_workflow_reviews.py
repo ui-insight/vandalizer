@@ -1,4 +1,11 @@
 """Save authenticated comparisons of two exact owned executions, without grading."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
+from typing import Self
 import datetime
 from types import SimpleNamespace
 from typing import Annotated, Literal
@@ -13,7 +20,7 @@ from .connected_workflow_preparation import ConnectedWorkflowPreparation
 from .enrollments import EnrollmentConflict
 from .lab_execution import LabExecutionRepository
 from .lab_inputs import LabInputRepository
-from .learner_decisions import LearnerDecisionRepository
+from .learner_decisions import LearnerDecisionRepository, LearnerDecisionJournal
 from .multi_step_case import load_multi_step_case
 from .outcomes import ContractModel
 
@@ -34,7 +41,7 @@ class ConnectedReviewRequest(ContractModel):
     consent: Literal['save_connected_workflow_result_review']
 
     @model_validator(mode='after')
-    def complete_answers(self):
+    def complete_answers(self) -> Self:
         if (set(self.answers) != {'connection_repair', 'source_review'} or any(not value.strip() for value in self.answers.values())
                 or self.original_run_id == self.corrected_run_id):
             raise ValueError('Select distinct original/corrected runs and answer both result-review questions')
@@ -55,9 +62,9 @@ def embedded_execution(run):
     return raw
 
 
-class ConnectedReviewRepository(LearnerDecisionRepository):
+class ConnectedReviewRepository(LearnerDecisionJournal):
     @staticmethod
-    def decode(raw):
+    def decode(raw: dict) -> dict:
         record = LearnerDecisionRepository.decode(raw)
         try:
             body = ConnectedReviewRequest.model_validate(record['submission'])
@@ -84,11 +91,11 @@ class ConnectedReviewRepository(LearnerDecisionRepository):
         except (KeyError, TypeError, ValueError) as exc:
             raise CourseCatalogError('The saved connected-workflow result review failed integrity verification') from exc
 
-    async def get(self, user_id, submission_id):
+    async def get(self, user_id: str, submission_id) -> dict | None:
         raw = await self.records.find_one({'uuid': submission_id, 'user_id': user_id, 'module_id': 'multi_step', 'prompt_id': PROMPT_ID})
         return self.decode(raw) if raw else None
 
-    async def submit(self, operation, body, *, actor_user_id):
+    async def submit(self, operation: CourseOperation, body, *, actor_user_id: str):
         body = ConnectedReviewRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Only the authenticated learner can record this result comparison')
@@ -120,6 +127,7 @@ class ConnectedReviewRepository(LearnerDecisionRepository):
             if previous['case'] != case.public_definition():
                 raise EnrollmentConflict('A revised review cannot silently replace the original assignment')
         runs = []
+        run: dict | None
         for kind in ('original', 'corrected'):
             run_id = getattr(body, kind + '_run_id')
             if previous is not None and previous['submission'][kind + '_run_id'] == run_id:

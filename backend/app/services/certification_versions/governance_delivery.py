@@ -29,18 +29,18 @@ class GovernanceUnavailable(ValueError):
 
 
 class GovernanceDelivery:
-    def __init__(self, repository=None):
+    def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         self.repository = repository or EnrollmentRepository()
         self.inputs, self.runs, self.scopes = GovernanceInputRepository(), GovernanceExecution(), GovernanceApprovalRepository()
         self.corrections, self.findings = GovernanceScopeCorrection(), GovernanceFindingRepository()
         self.memos, self.releases, self.handoffs = GovernanceMemoRepository(), GovernanceReleaseRepository(), GovernanceHandoffRepository()
         self.reviews = GovernanceReviewRepository()
 
-    def repositories(self):
+    def repositories(self) -> dict:
         return {'capture': self.inputs, 'run': self.runs, 'scope': self.scopes, 'correction': self.corrections,
             'finding': self.findings, 'memo': self.memos, 'release': self.releases, 'handoff': self.handoffs, 'review': self.reviews}
 
-    async def course(self, user_id, enrollment_id):
+    async def course(self, user_id: str, enrollment_id: str):
         enrollment = await self.repository._enrollment(user_id, enrollment_id)
         package = self.repository.catalog.load(enrollment.course_version)
         if 'governance-cases/governance.json' not in package.manifest.artifacts:
@@ -48,13 +48,13 @@ class GovernanceDelivery:
         return enrollment, package, load_governance_case(package)
 
     @staticmethod
-    def verify(record, enrollment, case):
+    def verify(record, enrollment, case) -> None:
         if (any(record[k] != v for k, v in {'user_id': enrollment.user_id, 'enrollment_id': enrollment.uuid,
                 'course_version': enrollment.course_version, 'manifest_sha256': enrollment.manifest_sha256, 'module_id': 'governance'}.items())
                 or (record['case_sha256'] != case.digest if 'case_sha256' in record else record['case'] != case.public_definition())):
             raise CourseCatalogError('The saved capstone record differs from its original course')
 
-    async def writable(self, enrollment, enabled):
+    async def writable(self, enrollment, enabled) -> bool:
         selection = await self.repository.selections.find_one({'user_id': enrollment.user_id})
         return bool(enabled and enrollment.state in ('active', 'completed') and selection and selection.get('active_enrollment_id') == enrollment.uuid)
 
@@ -65,7 +65,7 @@ class GovernanceDelivery:
             'documents': [{k: v for k, v in s.items() if k != 'source_pdf_base64'} for s in saved['documents']],
             'input_snapshot_sha256': encode(saved)[1], 'execution_authorized': False, 'credit_awarded': False}
 
-    async def run_view(self, run, *, writable=False):
+    async def run_view(self, run, *, writable: bool=False) -> dict:
         plan = run['plan']
         scope = run['authorization']['decision'] if run['authorization'] else None
         if scope is None and run['scope_decision_id']:
@@ -111,7 +111,7 @@ class GovernanceDelivery:
             result['handoff'] = await self.record_view('handoff', saved['handoff'])
         return result
 
-    async def get(self, user_id, enrollment_id, reference, *, kind='review', delivery_enabled=False):
+    async def get(self, user_id: str, enrollment_id: str, reference: str, *, kind: str='review', delivery_enabled: bool=False):
         enrollment, _, case = await self.course(user_id, enrollment_id)
         saved = await self.repositories()[kind].get(user_id, reference)
         if saved is None:
@@ -123,7 +123,7 @@ class GovernanceDelivery:
             return await self.run_view(saved, writable=await self.writable(enrollment, delivery_enabled))
         return await self.record_view(kind, saved)
 
-    async def list(self, user_id, enrollment_id, *, delivery_enabled=False):
+    async def list(self, user_id: str, enrollment_id: str, *, delivery_enabled: bool=False) -> dict:
         enrollment, _, case = await self.course(user_id, enrollment_id)
         query = {'user_id': user_id, 'enrollment_id': enrollment_id, 'module_id': 'governance'}
         result = {'enrollment_id': enrollment_id, 'module_id': 'governance', 'course_version': enrollment.course_version,
@@ -159,7 +159,7 @@ class GovernanceDelivery:
             'assigned_sources': sources, 'older_extractions_available': len(owned) > 50, 'can_submit': writable,
             'read_only_reason': None if writable else 'This is preserved course history. Select an available current course before saving new work.'}
 
-    async def download(self, user_id, enrollment_id, reference, *, origin, source_id=None):
+    async def download(self, user_id: str, enrollment_id: str, reference: str, *, origin, source_id: str | None=None):
         enrollment, _, case = await self.course(user_id, enrollment_id)
         saved = await self.repositories()[origin].get(user_id, reference)
         if saved is None:
@@ -189,7 +189,7 @@ class GovernanceDelivery:
             raise GovernanceUnavailable('This record has no confirmed saved memo copy')
         return base64.b64decode(file['content_base64'], validate=True), file['filename'], file['content_type']
 
-    async def save(self, user_id, enrollment_id, payload, *, action):
+    async def save(self, user_id: str, enrollment_id: str, payload, *, action):
         current = await self.repository.current(user_id)
         if current is None or current.uuid != enrollment_id:
             raise EnrollmentConflict('Select your existing course before saving or executing capstone work')
@@ -224,5 +224,5 @@ class GovernanceAssessment(ProcessAssessment):
     delivery_class = GovernanceDelivery
     prepare_method = 'prepare_from_governance_review'
 
-    def __init__(self, repository=None):
+    def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         super().__init__(repository or EnrollmentRepository())

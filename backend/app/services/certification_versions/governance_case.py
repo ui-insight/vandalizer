@@ -1,4 +1,11 @@
 """Authored supervision capstone; no assumed learner decisions or delivery."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.catalog import CoursePackage
+
+from typing import Self
 import hashlib
 from typing import Literal
 
@@ -76,7 +83,7 @@ class GovernanceCase(ContractModel):
     assessment_policy: Literal['automatic_source_veto_and_learner_decision_review_no_staff_queue_or_sharing_credit']
 
     @model_validator(mode='after')
-    def coherent(self):
+    def coherent(self) -> Self:
         if tuple(f.title for f in self.fields) != FIELDS or tuple(e.field for e in self.expectations) != FIELDS:
             raise ValueError('The capstone must preserve all six distinct source-grounded fields')
         if ({s.id: s.filename for s in self.sources} != SOURCES or len({s.sha256 for s in self.sources}) != 2
@@ -96,10 +103,10 @@ class GovernanceCase(ContractModel):
     def digest(self):
         return encode(self.model_dump(mode='json'))[1]
 
-    def public_definition(self):
+    def public_definition(self) -> dict:
         return {**self.model_dump(mode='json', exclude={'expectations', 'review_guidance'}), 'case_sha256': self.digest}
 
-    def verify_contract(self, contract):
+    def verify_contract(self, contract) -> None:
         module = next((m for m in contract.modules if m.module_id == 'governance'), None)
         practical = [o for o in module.outcomes if o.method == 'structured_review'] if module else []
         if {o.id for o in practical} != set(EVIDENCE):
@@ -111,7 +118,7 @@ class GovernanceCase(ContractModel):
                     or guidance[outcome.id].critical_failures != outcome.critical_failures):
                 raise ValueError('Authored guidance cannot weaken or replace the original rubric')
 
-    def verify_source(self, source_id, source_bytes, pages):
+    def verify_source(self, source_id: str, source_bytes, pages) -> None:
         source = next((s for s in self.sources if s.id == source_id), None)
         if source is None or hashlib.sha256(source_bytes).hexdigest() != source.sha256:
             raise ValueError('The assigned complete capstone source changed')
@@ -121,7 +128,7 @@ class GovernanceCase(ContractModel):
                         or ' '.join(anchor.quote.split()) not in ' '.join(pages[anchor.page - 1].split())):
                     raise ValueError('A source-grounded field lost its original page anchor')
 
-    def verify_exercise(self, exercise):
+    def verify_exercise(self, exercise) -> None:
         if (exercise.get('documents') != [s.filename for s in self.sources] or exercise.get('expected_fields') != list(FIELDS)
                 or exercise.get('expected_values') != {} or exercise.get('star_criteria') != {}
                 or exercise.get('assessment_case_id') != self.id or exercise.get('governance_case_sha256') != self.digest
@@ -129,7 +136,7 @@ class GovernanceCase(ContractModel):
             raise ValueError('Bind this exact assignment without broad-sharing, staff-availability or presence credit')
 
 
-def load_governance_case(package):
+def load_governance_case(package: CoursePackage):
     from .catalog import CourseCatalogError
     from .outcomes import package_outcomes
     path = 'governance-cases/governance.json'

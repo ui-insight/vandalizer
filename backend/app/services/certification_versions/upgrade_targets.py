@@ -4,6 +4,12 @@ Preparing an explicitly chosen course creates no assessed credit and cannot
 activate it. A later selection commit must reacquire/revalidate the original
 choice and reconcile saved operations. Existing target work is never reset.
 """
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.catalog import CoursePackage
+
 from uuid import NAMESPACE_URL, uuid5
 
 from bson import ObjectId
@@ -17,12 +23,12 @@ from .upgrade_decisions import UpgradeDecisionRepository
 from .writes import require_lease
 
 
-def target_identity(request_id):
+def target_identity(request_id: str):
     enrollment_id = uuid5(NAMESPACE_URL, 'vandalizer:certification:upgrade-target:' + request_id).hex
     return enrollment_id, enrollment_id[:24]
 
 
-def initial_level(package):
+def initial_level(package: CoursePackage):
     levels = package.json('course-structure.json').get('levels')
     if (not isinstance(levels, list) or not levels
             or any(not isinstance(level, dict) or not isinstance(level.get('name'), str) or not level['name'].strip()
@@ -36,15 +42,15 @@ def initial_level(package):
 
 
 class UpgradeTargetRepository:
-    def __init__(self, repository=None):
+    def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         self.repository = repository or EnrollmentRepository()
         self.decisions = UpgradeDecisionRepository(self.repository)
 
-    async def prepare(self, user_id, request_id):
+    async def prepare(self, user_id: str, request_id: str):
         async with self.decisions.hold_reviewed_choice(user_id, request_id) as (decision, source_progress, package):
             return await self.stage(decision, source_progress, package)
 
-    async def stage(self, decision, source_progress, package):
+    async def stage(self, decision, source_progress, package: CoursePackage) -> dict:
         """Internal helper for a future commit holding the same reviewed guard."""
         user_id, source_id = decision.user_id, decision.request.source_enrollment_id
         lease = require_lease(user_id, source_id)

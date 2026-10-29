@@ -9,8 +9,9 @@ class ControlledTrainingStop(Exception):
     """The approved practice deliberately stopped before the reasoning call."""
 
 
-def is_failure_practice(plan):
-    return plan.get('request', {}).get('consent') == PRACTICE_CONSENT
+def is_failure_practice(plan: dict) -> bool:
+    consent = plan.get('request', {}).get('consent')
+    return isinstance(consent, str) and consent == PRACTICE_CONSENT
 
 
 def approval_question(public_case, consent):
@@ -23,7 +24,7 @@ def approval_question(public_case, consent):
     return {**question, 'prompt': question['prompt'] + '\n\n' + practice['notice']}
 
 
-def stopped_stage_result():
+def stopped_stage_result() -> dict:
     # This is an actual executor rejection before dispatch, not invented model
     # output. Its marker must be carried into every display and recovery choice.
     return {'step_name': 'Prompt', 'output': None, 'training_stop': STOP_MARKER,

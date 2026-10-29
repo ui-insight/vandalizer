@@ -1,4 +1,11 @@
 """Persist exact bounded batch plans for separate learner approval."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
+from typing import Self
 from copy import deepcopy
 import datetime
 from typing import Annotated, Literal
@@ -12,7 +19,7 @@ from .batch_inputs import BatchInputRepository
 from .batch_plan import batch_plan, bind_inputs, embedded_input, item_plans
 from .catalog import CourseCatalogError
 from .enrollments import EnrollmentConflict
-from .lab_execution import LabExecutionRepository
+from .lab_execution import LabExecutionRepository, LabExecutionJournal
 from .lab_inputs import LabInputRepository
 from .outcomes import ContractModel
 
@@ -35,7 +42,7 @@ class BatchPlanRequest(ContractModel):
     consent: Literal['prepare_bounded_batch_action']
 
     @model_validator(mode='after')
-    def complete_references(self):
+    def complete_references(self) -> Self:
         if (self.parent_run_id is None) != (self.parent_run_sha256 is None) or (self.previous_retry_id is None) != (self.previous_retry_sha256 is None):
             raise ValueError('A saved parent requires both its identity and exact digest')
         if (self.phase == 'pilot' and (self.parent_run_id or self.failed_source_id or self.previous_retry_id)
@@ -47,16 +54,16 @@ class BatchPlanRequest(ContractModel):
         return self
 
 
-def scope_question(case, phase):
+def scope_question(case, phase) -> dict:
     key = {'pilot': 'pilot_choice', 'batch': 'scale_choice', 'retry': 'recovery_choice'}[phase]
     question = next(q for q in case.questions if q.id == key)
     return {'id': 'batch_scope_approval', 'phase': 'before_execution', 'batch_phase': phase,
         'case_question_id': key, 'prompt': question.prompt + ' Model usage may be incurred. This choice authorizes only the displayed internal action; it does not award credit or authorize external effects.'}
 
 
-class BatchPreparation(LabExecutionRepository):
+class BatchPreparation(LabExecutionJournal):
     @staticmethod
-    def decode(raw, _depth=0):
+    def decode(raw: dict, _depth: int=0) -> dict:
         if _depth > 8:
             raise CourseCatalogError('This saved recovery ancestry exceeds its bounded depth')
         saved = LabExecutionRepository.decode(raw)
@@ -130,7 +137,7 @@ class BatchPreparation(LabExecutionRepository):
         except (KeyError, TypeError, ValueError, AttributeError) as exc:
             raise CourseCatalogError('The saved bounded batch plan failed integrity verification') from exc
 
-    async def prepare(self, operation, body, system_config_doc, *, actor_user_id):
+    async def prepare(self, operation: CourseOperation, body, system_config_doc, *, actor_user_id: str):
         body = BatchPlanRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Only the authenticated learner can prepare this bounded action')
@@ -192,5 +199,5 @@ class BatchPreparation(LabExecutionRepository):
         await LabInputRepository._check_lease(lease)
         return await self.get(actor_user_id, body.request_id)
 
-    async def execute(self, *args, **kwargs):
+    async def execute(self, *args, **kwargs) -> dict:
         raise EnrollmentConflict('Batch dispatch requires the separately approved durable item executor')

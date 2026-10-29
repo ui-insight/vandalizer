@@ -5,6 +5,7 @@ from app.services.storage import get_storage
 
 from . import practical_preparation
 from .attempts import encode
+from .repository_protocols import RecordReader
 from .catalog import CourseCatalogError
 from .output_workflow_approval import OutputScopeRepository
 from .output_workflow_execution import OutputWorkflowExecution
@@ -25,7 +26,7 @@ class OutputWorkflowUnavailable(ValueError):
 
 
 class OutputWorkflowDelivery:
-    def __init__(self, repository=None):
+    def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         self.repository = repository or EnrollmentRepository()
         self.inputs = OutputWorkflowInputRepository()
         self.runs = OutputWorkflowExecution()
@@ -34,7 +35,7 @@ class OutputWorkflowDelivery:
         self.handoffs = OutputPrivateHandoffRepository()
         self.scopes = OutputScopeRepository()
 
-    async def course(self, user_id, enrollment_id):
+    async def course(self, user_id: str, enrollment_id: str):
         enrollment = await self.repository._enrollment(user_id, enrollment_id)
         package = self.repository.catalog.load(enrollment.course_version)
         if 'output-cases/output_delivery.json' not in package.manifest.artifacts:
@@ -50,7 +51,7 @@ class OutputWorkflowDelivery:
             raise CourseCatalogError('This saved output work does not match its original course')
         return record
 
-    async def writable(self, enrollment, delivery_enabled):
+    async def writable(self, enrollment, delivery_enabled) -> bool:
         selection = await self.repository.selections.find_one({'user_id': enrollment.user_id})
         return bool(delivery_enabled and enrollment.state in ('active', 'completed')
                     and selection and selection.get('active_enrollment_id') == enrollment.uuid)
@@ -63,7 +64,7 @@ class OutputWorkflowDelivery:
             'input_snapshot_sha256': encode(snapshot)[1], 'execution_authorized': False, 'credit_awarded': False}
 
     @staticmethod
-    def artifacts_view(artifacts):
+    def artifacts_view(artifacts) -> dict:
         return {**artifacts, 'files': [{key: value for key, value in file.items() if key != 'data_base64'} for file in artifacts['files']],
             'download': {key: value for key, value in artifacts['download'].items() if key != 'data_base64'},
             'artifacts_sha256': encode(artifacts)[1]}
@@ -90,7 +91,7 @@ class OutputWorkflowDelivery:
             'case', 'submission', 'submitted_at', 'previous_release_decision_id', 'credit_awarded', 'module_completion_eligible')} | {
             'review_sha256': encode(saved)[1], 'run': await self.run_view(OutputWorkflowPreparation.decode(saved['execution']))}
 
-    async def run_view(self, run, *, writable=False):
+    async def run_view(self, run, *, writable: bool=False) -> dict:
         plan = run['plan']
         scope = run['authorization']['decision'] if run['authorization'] else None
         if scope is None and run['scope_decision_id']:
@@ -101,7 +102,7 @@ class OutputWorkflowDelivery:
             raise CourseCatalogError('The displayed scope choice differs from this saved run')
         raw = await self.runs.records.find_one({'uuid': run['run_id'], 'user_id': plan['user_id']})
         release = await self.file_reviews.get(plan['user_id'], raw.get('release_decision_id')) if raw else None
-        if release and (release['run_id'] != run['run_id'] or encode(release)[1] != raw.get('release_decision_sha256')
+        if release and (raw is None or release['run_id'] != run['run_id'] or encode(release)[1] != raw.get('release_decision_sha256')
                 or release['submission']['result_sha256'] != encode(run['result'])[1]):
             raise CourseCatalogError('The linked release choice does not match the generated files')
         result = run['result']
@@ -128,9 +129,10 @@ class OutputWorkflowDelivery:
                 'can_inspect': bool(writable and run['state'] == 'completed' and raw and not raw.get('output_handoff_claimed')),
                 'credit_awarded': False, 'module_completion_eligible': False}
 
-    async def get(self, user_id, enrollment_id, reference, *, kind='review', delivery_enabled=False):
+    async def get(self, user_id: str, enrollment_id: str, reference: str, *, kind: str='review', delivery_enabled: bool=False):
         enrollment, _, case = await self.course(user_id, enrollment_id)
-        repository = {'capture': self.inputs, 'run': self.runs, 'review': self.reviews, 'scope': self.scopes, 'inspection': self.file_reviews, 'handoff': self.handoffs}[kind]
+        repositories: dict[str, RecordReader] = {'capture': self.inputs, 'run': self.runs, 'review': self.reviews, 'scope': self.scopes, 'inspection': self.file_reviews, 'handoff': self.handoffs}
+        repository = repositories[kind]
         saved = await repository.get(user_id, reference)
         if saved is None:
             raise OutputWorkflowUnavailable('This saved output workflow record is unavailable')
@@ -155,7 +157,7 @@ class OutputWorkflowDelivery:
             'file_review': await self.file_review_view(review),
             'handoff': self.handoff_view(restore_handoff(saved['handoff'], run['result']['generated_artifacts']))}
 
-    async def list(self, user_id, enrollment_id, *, delivery_enabled=False):
+    async def list(self, user_id: str, enrollment_id: str, *, delivery_enabled: bool=False) -> dict:
         enrollment, _, case = await self.course(user_id, enrollment_id)
         query = {'user_id': user_id, 'enrollment_id': enrollment_id, 'module_id': 'output_delivery'}
         result = {'enrollment_id': enrollment_id, 'module_id': 'output_delivery', 'course_version': enrollment.course_version,
@@ -198,11 +200,12 @@ class OutputWorkflowDelivery:
                 'older_workflows_available': len(owned) > 50, 'can_submit': writable,
                 'read_only_reason': None if writable else 'This is preserved course history. Select an available current course before saving new work.'}
 
-    async def download(self, user_id, enrollment_id, reference, *, origin, kind, file_index=0):
+    async def download(self, user_id: str, enrollment_id: str, reference: str, *, origin, kind, file_index: int=0):
         import base64
         from .output_artifacts import MEDIA_TYPES
         enrollment, _, case = await self.course(user_id, enrollment_id)
-        repository = {'run': self.runs, 'inspection': self.file_reviews, 'review': self.reviews, 'handoff': self.handoffs}[origin]
+        repositories: dict[str, RecordReader] = {'run': self.runs, 'inspection': self.file_reviews, 'review': self.reviews, 'handoff': self.handoffs}
+        repository = repositories[origin]
         saved = await repository.get(user_id, reference)
         if saved is None:
             raise OutputWorkflowUnavailable('This saved file is unavailable')
@@ -237,7 +240,7 @@ class OutputWorkflowDelivery:
         return (base64.b64decode(item['data_base64'], validate=True),
                 item.get('media_type') or MEDIA_TYPES.get(item['file_type'], 'application/octet-stream'), item['filename'])
 
-    async def save(self, user_id, enrollment_id, payload, *, action):
+    async def save(self, user_id: str, enrollment_id: str, payload, *, action):
         current = await self.repository.current(user_id)
         if current is None or current.uuid != enrollment_id:
             raise EnrollmentConflict('Select your existing course before saving or executing output work')
@@ -285,5 +288,5 @@ class OutputWorkflowAssessment(ProcessAssessment):
     delivery_class = OutputWorkflowDelivery
     prepare_method = 'prepare_from_output_review'
 
-    def __init__(self, repository=None):
+    def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         super().__init__(repository or EnrollmentRepository())

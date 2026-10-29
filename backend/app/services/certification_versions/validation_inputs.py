@@ -1,4 +1,10 @@
 """Freeze owned extraction instructions and both complete assigned test sources."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
 import base64
 import datetime
 import hashlib
@@ -26,7 +32,7 @@ class ValidationCaptureRequest(ContractModel):
     consent: Literal['capture_validation_extraction_and_complete_sources']
 
 
-def verify_artifact(artifact, artifact_id, user_id):
+def verify_artifact(artifact, artifact_id: str, user_id: str) -> None:
     fields = artifact['fields']
     if (artifact['uuid'] != artifact_id or artifact['user_id'] != user_id or artifact['set_type'] != 'extraction'
             or len(fields) != 3 or tuple(f['title'] for f in fields) != FIELDS
@@ -48,7 +54,7 @@ def pdf_pages(data):
 
 class ValidationInputRepository(LabInputRepository):
     @staticmethod
-    def decode(raw):
+    def decode(raw: dict) -> dict:
         saved = LabInputRepository.decode(raw)
         try:
             body = ValidationCaptureRequest.model_validate(saved['request'])
@@ -77,7 +83,7 @@ class ValidationInputRepository(LabInputRepository):
             raise CourseCatalogError('Saved representative validation inputs failed integrity verification') from exc
 
     @staticmethod
-    async def _read_artifact(user_id, artifact_id):
+    async def _read_artifact(user_id: str, artifact_id: str):
         artifact = await SearchSet.find_one({'uuid': artifact_id, 'user_id': user_id})
         if artifact is None:
             raise EnrollmentConflict('Select an extraction owned by this learner')
@@ -93,7 +99,7 @@ class ValidationInputRepository(LabInputRepository):
         verify_artifact(result, artifact_id, user_id)
         return result
 
-    async def capture(self, operation, body, *, actor_user_id, storage):
+    async def capture(self, operation: CourseOperation, body, *, actor_user_id: str, storage):
         body = ValidationCaptureRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Validation capture requires the authenticated learner')

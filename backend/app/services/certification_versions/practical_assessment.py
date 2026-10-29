@@ -39,17 +39,17 @@ def assessment_model(config):
 
 
 class PracticalAssessment:
-    def __init__(self, repository=None):
+    def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         self.repository = repository or EnrollmentRepository()
         self.reviews = ReviewAttemptRepository()
 
-    async def selected(self, user_id, enrollment_id):
+    async def selected(self, user_id: str, enrollment_id: str):
         source = await self.repository.current(user_id)
         if source is None or source.uuid != enrollment_id:
             raise EnrollmentConflict('Select your existing course before requesting automatic assessment')
         return source
 
-    async def existing(self, user_id, enrollment_id, run_id, request_id, parent_id=None):
+    async def existing(self, user_id: str, enrollment_id: str, run_id: str, request_id: str, parent_id=None):
         raw = await self.reviews.records.find_one({'uuid': request_id})
         if raw is None:
             return None
@@ -62,7 +62,7 @@ class PracticalAssessment:
             raise EnrollmentConflict('This assessment reference belongs to different saved work')
         return saved
 
-    async def finish(self, user_id, enrollment_id, saved, config=None):
+    async def finish(self, user_id: str, enrollment_id: str, saved, config=None):
         # A replay/recovery of in-flight or terminal work requires no settings.
         # evaluate_saved never resets an evaluating intent or dispatches twice.
         if saved['state'] == 'prepared' and config is None:
@@ -70,7 +70,7 @@ class PracticalAssessment:
         await self.reviews.evaluate_saved(self.repository, user_id, enrollment_id, saved['attempt_id'], config or {})
         return await ReviewDelivery(self.repository).get(user_id, enrollment_id, saved['attempt_id'])
 
-    async def request(self, user_id, enrollment_id, run_id, submission):
+    async def request(self, user_id: str, enrollment_id: str, run_id: str, submission):
         source = await self.selected(user_id, enrollment_id)
         saved = await self.existing(user_id, enrollment_id, run_id, submission.request_id)
         if saved is not None:
@@ -83,7 +83,7 @@ class PracticalAssessment:
                 submission.request_id, actor_user_id=user_id, model_name=model, system_config=config)
         return await self.finish(user_id, enrollment_id, saved, config)
 
-    async def retry(self, user_id, enrollment_id, parent_id, submission):
+    async def retry(self, user_id: str, enrollment_id: str, parent_id, submission):
         await self.selected(user_id, enrollment_id)
         # Validate the parent's owned pinned public contract before allowing a
         # child; an internal/untrusted producer cannot become a learner retry.
@@ -95,6 +95,8 @@ class PracticalAssessment:
             return await self.finish(user_id, enrollment_id, saved)
         config = await preparation.configured_runtime()
         async with self.repository.write_boundary(user_id, enrollment_id, operation='prepare_automatic_review_retry') as progress:
+            if progress.course_version is None:
+                raise EnrollmentConflict('This operation requires a bound course version')
             package = self.repository.catalog.load(progress.course_version)
             saved = await self.reviews.prepare_retry(CourseOperation(user_id, package, progress, True), parent_id,
                 submission.request_id, actor_user_id=user_id, system_config=config)

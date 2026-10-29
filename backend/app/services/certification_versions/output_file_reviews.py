@@ -3,6 +3,13 @@
 Opening acknowledgements and explanations are evidence to assess, never proof
 of source correctness or an automatic passing grade.
 """
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
+from typing import Self
 import datetime
 from typing import Annotated, Literal
 
@@ -14,7 +21,7 @@ from .catalog import CourseCatalogError
 from .enrollments import EnrollmentConflict
 from .lab_execution import LabExecutionRepository
 from .lab_inputs import LabInputRepository
-from .learner_decisions import LearnerDecisionRepository
+from .learner_decisions import LearnerDecisionRepository, LearnerDecisionJournal
 from .outcomes import ContractModel
 from .output_case import load_output_case
 from .output_workflow_preparation import OutputWorkflowPreparation
@@ -49,7 +56,7 @@ class OutputFileReviewRequest(ContractModel):
     consent: Literal['save_exact_output_inspection_and_release_choice']
 
     @model_validator(mode='after')
-    def complete_inspection(self):
+    def complete_inspection(self) -> Self:
         if (set(self.answers) != {'artifact_review', 'release_decision'}
                 or any(len(value.strip()) < 10 for value in self.answers.values())
                 or any(len(item.observations.strip()) < 10 for item in self.file_inspections)
@@ -74,7 +81,7 @@ def embedded_execution(run):
     return raw
 
 
-def validate_inspection(body, run):
+def validate_inspection(body, run) -> None:
     artifacts = run['result']['generated_artifacts']
     case = run['plan']['input_snapshot']['case']
     if (run['state'] != 'completed' or body.result_sha256 != encode(run['result'])[1]
@@ -88,9 +95,9 @@ def validate_inspection(body, run):
         raise EnrollmentConflict('Repair the invalid or incomplete generated files before approving release')
 
 
-class OutputFileReviewRepository(LearnerDecisionRepository):
+class OutputFileReviewRepository(LearnerDecisionJournal):
     @staticmethod
-    def decode(raw):
+    def decode(raw: dict) -> dict:
         saved = LearnerDecisionRepository.decode(raw)
         try:
             body = OutputFileReviewRequest.model_validate(saved['submission'])
@@ -111,11 +118,11 @@ class OutputFileReviewRepository(LearnerDecisionRepository):
         except (KeyError, TypeError, ValueError, EnrollmentConflict) as exc:
             raise CourseCatalogError('The saved output inspection failed integrity verification') from exc
 
-    async def get(self, user_id, submission_id):
+    async def get(self, user_id: str, submission_id) -> dict | None:
         raw = await self.records.find_one({'uuid': submission_id, 'user_id': user_id, 'module_id': 'output_delivery', 'prompt_id': PROMPT_ID})
         return self.decode(raw) if raw else None
 
-    async def submit(self, operation, body, *, actor_user_id):
+    async def submit(self, operation: CourseOperation, body, *, actor_user_id: str):
         body = OutputFileReviewRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Output inspection requires the authenticated learner')
@@ -148,6 +155,8 @@ class OutputFileReviewRepository(LearnerDecisionRepository):
             raise EnrollmentConflict('The generated files belong to another assignment')
         validate_inspection(body, run)
         raw_run = await LabExecutionRepository().records.find_one({'uuid': body.run_id, 'user_id': actor_user_id})
+        if raw_run is None:
+            raise EnrollmentConflict('The original generation is no longer available')
         if raw_run.get('output_handoff_claimed') is True:
             raise EnrollmentConflict('This release has already been claimed; preserve its original inspection and receipt')
         saved = {**identity, 'record_kind': PROMPT_ID, 'request_sha256': request_hash,
@@ -170,7 +179,7 @@ class OutputFileReviewRepository(LearnerDecisionRepository):
         await self._link(operation, saved, replay=False)
         return saved
 
-    async def _link(self, operation, saved, *, replay):
+    async def _link(self, operation, saved, *, replay) -> None:
         lease = LabExecutionRepository.check_operation(operation, saved)
         records = LabExecutionRepository().records
         current = await records.find_one({'uuid': saved['run_id'], 'user_id': operation.user_id})

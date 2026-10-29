@@ -12,7 +12,7 @@ from .lab_inputs import LabInputRepository
 MAX_CHECKPOINT_BYTES = 2 * 1024 * 1024
 
 
-def validate_event(event, previous, run):
+def validate_event(event, previous, run) -> None:
     sequence = len(previous)
     if sequence >= 4:
         raise ValueError('The suite already contains every required checkpoint')

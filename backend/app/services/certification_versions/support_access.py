@@ -1,4 +1,6 @@
 """Access-only administrator changes, recorded atomically with their effect."""
+from __future__ import annotations
+
 import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -17,7 +19,7 @@ class AccessChangeRequest(BaseModel):
     reason: str = Field(min_length=5, max_length=1000)
 
 
-async def apply_access_change(repository, progress, request, actor_user_id, access_filter):
+async def apply_access_change(repository, progress: CertificationProgress, request, actor_user_id: str, access_filter):
     """The audit event and flag share one Mongo write; earned fields are untouched.
 
     This private journal is outside the learner progress model. Ordinary model
@@ -64,7 +66,7 @@ async def apply_access_change(repository, progress, request, actor_user_id, acce
     return CertificationProgress.model_validate(saved)
 
 
-async def access_history(repository, progress):
+async def access_history(repository, progress) -> dict:
     raw = await repository.progress.find_one(
         {'_id': progress.id, 'user_id': progress.user_id}, {'user_id': 1, JOURNAL: {'$slice': -11}})
     events = raw.get(JOURNAL, []) if raw else []

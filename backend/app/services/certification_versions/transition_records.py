@@ -4,6 +4,12 @@ This neither recovers workers nor rejudges evidence. Every supported record is
 retained in its original enrollment. The returned digest describes this read,
 not permission to activate later or proof of outcome equivalence.
 """
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.catalog import CoursePackage
+
 from importlib import import_module
 
 from app.models import certification as models
@@ -80,7 +86,7 @@ def decode_with(mapping, key, raw):
     return getattr(import_module('.' + module, __package__), name).decode(raw)
 
 
-def check_identity(raw, enrollment, package, *, recovery=False):
+def check_identity(raw, enrollment, package: CoursePackage, *, recovery: bool=False) -> None:
     expected = {'user_id': enrollment.user_id, 'enrollment_id': enrollment.uuid}
     if not recovery:
         expected.update(course_version=enrollment.course_version, manifest_sha256=enrollment.manifest_sha256)
@@ -89,7 +95,7 @@ def check_identity(raw, enrollment, package, *, recovery=False):
         raise CourseCatalogError('Saved work differs from its original learner or pinned course')
 
 
-def check_completion(raw, enrollment, package):
+def check_completion(raw, enrollment, package: CoursePackage) -> None:
     if raw['state'] not in ('applied', 'rejected', 'failed'):
         raise EnrollmentConflict('Resolve the original completion before changing courses')
     if raw.get('rubric_id') != package.manifest.rubric_id or raw.get('artifact_sha256') != package.manifest.artifacts:
@@ -106,7 +112,7 @@ def check_completion(raw, enrollment, package):
         raise CourseCatalogError('The original completion result identifies another request')
 
 
-def check_recovery(raw, enrollment):
+def check_recovery(raw, enrollment) -> None:
     if raw['state'] != 'completed':
         raise EnrollmentConflict('Confirm the original recovery before changing courses')
     request = AttemptRepository.payload(raw, 'request')
@@ -145,20 +151,20 @@ def check_decision(raw, package):
 
 
 class TransitionRecordReconciliation:
-    def __init__(self, repository=None):
+    def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         self.repository = repository or EnrollmentRepository()
 
-    async def inventory(self, user_id, enrollment_id):
+    async def inventory(self, user_id: str, enrollment_id: str) -> dict:
         query = {'user_id': user_id, 'enrollment_id': enrollment_id}
         return {kind: await model.get_motor_collection().find(query).sort('uuid', 1).to_list(None)
                 for kind, model in COLLECTIONS.items()}
 
-    async def check_boundary(self, lease):
+    async def check_boundary(self, lease) -> None:
         if (await self.repository.selections.find_one(lease.selection_filter()) is None
                 or await self.repository.progress.find_one(lease.progress_filter()) is None):
             raise EnrollmentConflict('Preservation verification lost its original course boundary')
 
-    async def inspect(self, user_id, enrollment_id):
+    async def inspect(self, user_id: str, enrollment_id: str) -> dict:
         lease = require_lease(user_id, enrollment_id)
         await self.check_boundary(lease)
         enrollment = await self.repository._enrollment(user_id, enrollment_id)
@@ -180,7 +186,7 @@ class TransitionRecordReconciliation:
         return {**result, 'reconciliation_sha256': encode(result)[1]}
 
     @classmethod
-    def verify_inventory(cls, original, enrollment, package):
+    def verify_inventory(cls, original, enrollment, package) -> None:
         """Pure integrity check shared by held commits and read-only previews."""
         try:
             for kind, records in original.items():
@@ -196,7 +202,7 @@ class TransitionRecordReconciliation:
             raise CourseCatalogError('Original saved work needs integrity reconciliation before changing courses') from exc
 
     @staticmethod
-    def check(kind, raw, enrollment, package):
+    def check(kind, raw, enrollment, package) -> None:
         if kind == 'inputs':
             saved = LabInputRepository.decode(raw)
             if raw['module_id'] == 'advanced_nodes' and saved.get('record_kind') == 'advanced_calculation_input':
@@ -235,7 +241,7 @@ class TransitionRecordReconciliation:
             check_recovery(raw, enrollment)
 
     @staticmethod
-    def check_run_inputs(inventory):
+    def check_run_inputs(inventory) -> None:
         inputs = {row['uuid']: row for row in inventory['inputs']}
         for raw in inventory['runs']:
             from .lab_execution import LabExecutionRepository

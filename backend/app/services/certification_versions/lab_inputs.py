@@ -4,6 +4,13 @@ Internal foundation only: no execution, grade, transfer or credit is produced.
 The current legacy grader is unchanged. A future runner must consume this saved
 payload, bind its execution receipt, and record learner decisions separately.
 """
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from motor.motor_asyncio import AsyncIOMotorCollection
+    from app.services.certification_versions.runtime import CourseOperation
+
 import datetime
 import hashlib
 import json
@@ -27,15 +34,17 @@ EXTRACTION_ID = r'^([a-f0-9]{32}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}
 
 class LabInputRepository:
     @property
-    def records(self):
+    def records(self) -> AsyncIOMotorCollection:
         return CertificationLabInput.get_motor_collection()
 
     @staticmethod
-    def decode(record):
+    def decode(record: dict) -> dict:
         try:
             if hashlib.sha256(record['record_json'].encode()).hexdigest() != record['record_sha256']:
                 raise ValueError('Digest mismatch')
             payload = json.loads(record['record_json'])
+            if not isinstance(payload, dict):
+                raise ValueError('The saved record must be an object')
             if any(payload[key] != record[key] for key in (
                 'uuid', 'user_id', 'enrollment_id', 'module_id', 'course_version', 'manifest_sha256', 'artifact_id',
             )):
@@ -44,11 +53,11 @@ class LabInputRepository:
         except (KeyError, TypeError, ValueError) as exc:
             raise CourseCatalogError('Saved lab inputs failed integrity verification') from exc
 
-    async def get(self, user_id, snapshot_id):
+    async def get(self, user_id: str, snapshot_id: str) -> dict | None:
         raw = await self.records.find_one({'uuid': snapshot_id, 'user_id': user_id})
         return self.decode(raw) if raw else None
 
-    async def capture_extraction(self, operation, module_id, artifact_id, request_id, storage):
+    async def capture_extraction(self, operation: CourseOperation, module_id: str, artifact_id: str, request_id: str, storage):
         """Only owned artifacts and currently readable owned sources qualify.
 
         The caller holds the enrollment write boundary. Retrying an identical
@@ -144,6 +153,6 @@ class LabInputRepository:
         return payload
 
     @staticmethod
-    async def _check_lease(lease):
+    async def _check_lease(lease) -> None:
         if await CertificationProgress.get_motor_collection().find_one(lease.progress_filter(), {'_id': 1}) is None:
             raise EnrollmentConflict('Lab preparation no longer owns the enrollment write boundary')

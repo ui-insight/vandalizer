@@ -15,7 +15,7 @@ from .enrollments import EnrollmentConflict
 MAX_STAGE_BYTES = 4 * 1024 * 1024
 
 
-def execute_approved_generation(run, case, system_config, *, checkpoint, should_stop):
+def execute_approved_generation(run, case, system_config, *, checkpoint, should_stop) -> dict:
     from app.services import workflow_engine
 
     try:
@@ -53,10 +53,12 @@ def execute_approved_generation(run, case, system_config, *, checkpoint, should_
     engine = workflow_engine.build_workflow_engine(deepcopy(plan['engine_steps']), plan['default_model'],
         user_id=plan['user_id'], system_config_doc=deepcopy(system_config), allow_code_execution=False)
     nodes, output_keys = engine.get_topological_order(), engine.step_output_keys()
-    index, upstream, started = 0, None, None
-    completed = []
+    index = 0
+    upstream: dict | None = None
+    started: tuple[dict, str] | None = None
+    completed: list[dict] = []
 
-    def emit(event):
+    def emit(event: dict) -> tuple[dict, str]:
         payload = {**event, 'run_id': run['run_id'], 'plan_sha256': run['plan_sha256'],
                    'authorization_sha256': encode(authorization)[1], 'credit_awarded': False}
         serialized, digest = encode(payload)
@@ -67,7 +69,7 @@ def execute_approved_generation(run, case, system_config, *, checkpoint, should_
         checkpoint(deepcopy(payload), digest)
         return payload, digest
 
-    def update(event):
+    def update(event: dict) -> None:
         nonlocal index, upstream, started
         if index >= len(nodes):
             raise EnrollmentConflict('The engine emitted an unexpected extra stage')
@@ -76,6 +78,8 @@ def execute_approved_generation(run, case, system_config, *, checkpoint, should_
                 and event['current_step_name'] == node.name and event['current_step_detail'] == 'Starting ' + node.name):
             if index == 0:
                 return
+            if upstream is None:
+                raise EnrollmentConflict('The previous stage has no preserved output')
             stage = plan['stage_plans'][index - 1]
             data = node.tasks[0].data
             sources = workflow_engine._resolve_input_sources(data, upstream.get('step_name'))

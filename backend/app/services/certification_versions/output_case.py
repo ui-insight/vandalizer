@@ -1,4 +1,11 @@
 """Authored file inspection/private handoff assignment, never a delivery receipt."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.catalog import CoursePackage
+
+from typing import Self
 import hashlib
 from typing import Literal
 
@@ -82,7 +89,7 @@ class OutputDeliveryCase(ContractModel):
     review_guidance: tuple[ProcessReviewGuidance, ...] = Field(min_length=3, max_length=3)
 
     @model_validator(mode='after')
-    def coherent_case(self):
+    def coherent_case(self) -> Self:
         if ({q.id for q in self.questions} != set(QUESTIONS)
                 or any((q.outcome_id, q.phase) != QUESTIONS[q.id] for q in self.questions)
                 or {g.outcome_id for g in self.review_guidance} != set(EVIDENCE)):
@@ -101,10 +108,10 @@ class OutputDeliveryCase(ContractModel):
     def digest(self):
         return encode(self.model_dump(mode='json'))[1]
 
-    def public_definition(self):
+    def public_definition(self) -> dict:
         return {**self.model_dump(mode='json', exclude={'source_checks', 'review_guidance'}), 'case_sha256': self.digest}
 
-    def verify_contract(self, contract):
+    def verify_contract(self, contract) -> None:
         module = next((m for m in contract.modules if m.module_id == self.module_id), None)
         if module is None or {o.id for o in module.outcomes} != set(EVIDENCE):
             raise ValueError('The case must bind all three exact Output and Delivery outcomes')
@@ -115,7 +122,7 @@ class OutputDeliveryCase(ContractModel):
                     or guidance[outcome.id].critical_failures != outcome.critical_failures):
                 raise ValueError('Authored guidance cannot replace evidence or weaken the outcome rubric')
 
-    def verify_source(self, source_bytes, page_texts):
+    def verify_source(self, source_bytes, page_texts) -> None:
         if hashlib.sha256(source_bytes).hexdigest() != self.source_sha256:
             raise ValueError('The assigned progress report changed')
         for check in self.source_checks:
@@ -123,7 +130,7 @@ class OutputDeliveryCase(ContractModel):
                 if anchor.page > len(page_texts) or ' '.join(anchor.quote.split()) not in ' '.join(page_texts[anchor.page - 1].split()):
                     raise ValueError('An authored file-review expectation lacks its original source anchor')
 
-    def verify_exercise(self, exercise):
+    def verify_exercise(self, exercise) -> None:
         if (exercise.get('documents') != [self.source_filename] or exercise.get('expected_fields') != []
                 or exercise.get('expected_values') != {} or exercise.get('star_criteria') != {}
                 or exercise.get('assessment_case_id') != self.id or exercise.get('output_case_sha256') != self.digest
@@ -131,7 +138,7 @@ class OutputDeliveryCase(ContractModel):
             raise ValueError('The exercise must bind this exact case without file-count or reflection-presence credit')
 
 
-def load_output_case(package):
+def load_output_case(package: CoursePackage):
     from .catalog import CourseCatalogError
     from .outcomes import package_outcomes
     path = 'output-cases/output_delivery.json'

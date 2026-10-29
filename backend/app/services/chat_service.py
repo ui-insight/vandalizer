@@ -701,7 +701,7 @@ class _ToolPreparationProgress:
     One instance belongs to one model response, where part indices are unique.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.names: dict[int, str] = {}
 
     def feed(self, event) -> str | None:

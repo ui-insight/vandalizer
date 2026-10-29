@@ -318,7 +318,7 @@ async def _render_with_browser(url: str, timeout_seconds: int) -> Optional[str]:
                 # navigation and abort blocked ones. Subresources are left
                 # alone — their bodies never reach us, and per-request blocking
                 # DNS lookups would stall rendering.
-                async def _guard(route):
+                async def _guard(route) -> None:
                     req = route.request
                     if req.resource_type == "document":
                         try:

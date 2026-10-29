@@ -51,7 +51,7 @@ def _build_candidate_configs(available_models: list[dict], num_fields: int) -> l
     if not models:
         return []
 
-    def _add(label: str, model_name: str, config_override: dict):
+    def _add(label: str, model_name: str, config_override: dict) -> None:
         if label not in seen_labels:
             seen_labels.add(label)
             candidates.append({

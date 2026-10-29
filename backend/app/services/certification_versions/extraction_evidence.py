@@ -1,4 +1,10 @@
 """Collect an owned NIH repair, retaining authored and executed provenance."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
 import hashlib
 from pathlib import Path
 
@@ -19,7 +25,7 @@ from .repair_case import capture_repair_case, load_repair_case, repair_reference
 MODULE = 'extraction_engine'
 
 
-def verify_decision(operation, run, record, prompt_id, state):
+def verify_decision(operation: CourseOperation, run, record, prompt_id: str, state) -> None:
     LabExecutionRepository.check_operation(operation, record)
     prompt = load_prompt(operation.package, MODULE, prompt_id)
     try:
@@ -40,7 +46,7 @@ def verify_decision(operation, run, record, prompt_id, state):
         raise CourseCatalogError('The saved repair decision does not bind this evidence') from exc
 
 
-async def assemble_extraction(operation, run_id, *, actor_user_id):
+async def assemble_extraction(operation: CourseOperation, run_id: str, *, actor_user_id: str) -> dict:
     if actor_user_id != operation.user_id:
         raise EnrollmentConflict('Repair assessment requires the authenticated learner')
     run = await LabExecutionRepository().get(actor_user_id, run_id)
@@ -86,7 +92,7 @@ async def assemble_extraction(operation, run_id, *, actor_user_id):
             raise CourseCatalogError('The saved repair source checks are incomplete or unbound')
     evidence = []
 
-    def add(kind, identity, payload):
+    def add(kind, identity, payload) -> None:
         try:
             evidence.append(ReviewEvidence(id=identity, kind=kind, text=encode(payload)[0]).model_dump(mode='json'))
         except ValidationError as exc:

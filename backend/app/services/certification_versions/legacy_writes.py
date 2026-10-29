@@ -55,7 +55,7 @@ async def read_progress(user_id: str) -> CertificationProgress:
     return operation.progress
 
 
-async def save_progress(progress: CertificationProgress):
+async def save_progress(progress: CertificationProgress) -> CertificationProgress:
     from .enrollments import EnrollmentConflict
     operation = legacy_operation.get()
     if operation is None or not operation.active or not operation.writable or operation.progress is not progress or operation.snapshot is None:

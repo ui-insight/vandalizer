@@ -34,7 +34,7 @@ def canonical(value, comparison):
     raise CourseCatalogError('Unsupported validation comparison')
 
 
-def check_case(case: ValidationCase, snapshot, suite_case, result):
+def check_case(case: ValidationCase, snapshot, suite_case, result) -> dict:
     """Check all three fields, including explicit absence in an optional field.
 
     `result` is a durable engine receipt supplied by the authenticated collector,
@@ -85,7 +85,7 @@ def check_case(case: ValidationCase, snapshot, suite_case, result):
         'optional_absence_checked': True, 'consistency_proves_accuracy': False, 'credit_awarded': False}
 
 
-def check_suite(case, snapshot, cases, results):
+def check_suite(case, snapshot, cases, results) -> dict:
     required = [s.id for s in case.sources]
     if ([s['source_id'] for s in cases] != required or [r.get('source_id') for r in results] != required):
         raise CourseCatalogError('Validation requires every distinct assigned case in its original order')
@@ -117,7 +117,7 @@ def verify_repair_inputs(original_snapshot, corrected_snapshot, original_cases, 
     return changed
 
 
-def check_repair(case, original_snapshot, corrected_snapshot, original_cases, corrected_cases, original_results, corrected_results):
+def check_repair(case, original_snapshot, corrected_snapshot, original_cases, corrected_cases, original_results, corrected_results) -> dict:
     """Require a real failure and the entire same suite on a changed revision."""
     changed = verify_repair_inputs(original_snapshot, corrected_snapshot, original_cases, corrected_cases)
     before = check_suite(case, original_snapshot, original_cases, original_results)

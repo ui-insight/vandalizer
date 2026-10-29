@@ -1,4 +1,11 @@
 """Internal immutable saved-design capture. No run, grade or credit is created."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
+from typing import Self
 import datetime
 from typing import Literal
 
@@ -27,15 +34,15 @@ class DesignCaptureRequest(ContractModel):
     consent: Literal['capture_saved_workflow_design']
 
     @model_validator(mode='after')
-    def validate_choice(self):
+    def validate_choice(self) -> Self:
         if (self.handoff == 'owned_saved_process_submission') != (self.process_submission_id is not None):
             raise ValueError('Only an owned-map choice requires a saved submission reference')
         return self
 
 
-class WorkflowDesignInputRepository(LabInputRepository):
+class WorkflowDesignInputJournal(LabInputRepository):
     @staticmethod
-    def decode(record):
+    def decode(record: dict) -> dict:
         saved = LabInputRepository.decode(record)
         try:
             body = DesignCaptureRequest.model_validate(saved['request'])
@@ -64,7 +71,7 @@ class WorkflowDesignInputRepository(LabInputRepository):
         except (KeyError, TypeError, ValueError) as exc:
             raise CourseCatalogError('Saved workflow design failed integrity verification') from exc
 
-    async def _read_artifact(self, user_id, workflow_id):
+    async def _read_artifact(self, user_id: str, workflow_id: str) -> dict:
         workflow = await Workflow.find_one({'_id': ObjectId(workflow_id), 'user_id': user_id})
         if workflow is None:
             raise EnrollmentConflict('Select a workflow owned by this learner')
@@ -98,7 +105,7 @@ class WorkflowDesignInputRepository(LabInputRepository):
                 'referenced_extraction_sets': extraction_sets}
 
     @staticmethod
-    async def _read_extraction(user_id, reference):
+    async def _read_extraction(user_id: str, reference: str):
         matches = await SearchSet.find({'uuid': reference, 'user_id': user_id, 'set_type': 'extraction'}).limit(2).to_list()
         if len(matches) != 1:
             raise EnrollmentConflict('Every referenced extraction template must be owned by this learner')
@@ -118,7 +125,9 @@ class WorkflowDesignInputRepository(LabInputRepository):
         }) for item in fields]
         return state
 
-    async def capture(self, operation, body, *, actor_user_id):
+
+class WorkflowDesignInputRepository(WorkflowDesignInputJournal):
+    async def capture(self, operation: CourseOperation, body, *, actor_user_id: str):
         body = DesignCaptureRequest.model_validate(body)
         progress, package = operation.progress, operation.package
         if (not operation.writable or actor_user_id != operation.user_id or progress.user_id != operation.user_id

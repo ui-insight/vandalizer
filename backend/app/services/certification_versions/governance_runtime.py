@@ -8,7 +8,7 @@ from .governance_checks import check_result
 from .governance_plan import governance_plan
 
 
-def complete_result(plan, extraction):
+def complete_result(plan, extraction) -> dict:
     checks = check_result(GovernanceCase.model_validate(plan['input_snapshot']['authored_case']),
         plan['input_snapshot'], extraction, run_id=plan['uuid'], phase=plan['phase'])
     repair_checks = None

@@ -4,6 +4,14 @@ Rules are immutable target-package assets, not request parameters. A compatible
 rubric alone is insufficient: original, enrollment-bound assessed credit must
 also validate. Legacy participation remains earned in its original course.
 """
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.outcome_credit import CreditProgress
+    from app.services.certification_versions.catalog import CoursePackage
+
+from typing import Self
 import datetime
 from typing import Literal
 
@@ -31,7 +39,7 @@ class EquivalencePolicy(ContractModel):
     rules: tuple[EquivalenceRule, ...] = Field(min_length=1)
 
     @model_validator(mode='after')
-    def unique_rules(self):
+    def unique_rules(self) -> Self:
         if (len({rule.rule_id for rule in self.rules}) != len(self.rules)
                 or len({rule.outcome_id for rule in self.rules}) != len(self.rules)):
             raise ValueError('Equivalence rules and target outcomes must be unique')
@@ -63,7 +71,7 @@ class EquivalenceReview(ContractModel):
     determinations: tuple[OutcomeDetermination, ...] = Field(min_length=1)
 
     @model_validator(mode='after')
-    def unique_outcomes(self):
+    def unique_outcomes(self) -> Self:
         if len({item.outcome_id for item in self.determinations}) != len(self.determinations):
             raise ValueError('Each target outcome needs exactly one determination')
         return self
@@ -82,7 +90,7 @@ def equivalence_review(source, target, contract):
     return review
 
 
-def assessment_basis(package):
+def assessment_basis(package: CoursePackage):
     """Conservative compatibility boundary; only presentation may differ.
 
 Unknown assets are included by default. New exercises, judge configuration,
@@ -110,7 +118,7 @@ The mapping itself is excluded to avoid a circular package digest.
         'assets': {name: digest for name, digest in manifest.artifacts.items() if name not in presentation}})[1]
 
 
-def equivalence_plan(source, target, progress, *, _verified_snapshots=None):
+def equivalence_plan(source, target, progress: CreditProgress, *, _verified_snapshots=None):
     """Inspect trusted repository progress without changing either enrollment."""
     if progress.course_version != source.manifest.release_id or not progress.enrollment_id:
         raise CourseCatalogError('Equivalence requires the original pinned enrollment')
@@ -153,7 +161,7 @@ def equivalence_plan(source, target, progress, *, _verified_snapshots=None):
             row = {'outcome_id': outcome.id, 'module_id': module.module_id,
                    'statement': outcome.statement,
                    'status': 'eligible_for_transfer' if eligible else 'requires_assessment',
-                   'reason': rule.reason if eligible else (
+                   'reason': rule.reason if rule is not None and eligible else (
                        'Original assessed evidence is required; prior XP or completion alone is insufficient.' if rule
                        else determination.reason if determination
                        else 'No authored equivalence rule applies to this source course and outcome.'),
@@ -168,7 +176,7 @@ def equivalence_plan(source, target, progress, *, _verified_snapshots=None):
         'source_enrollment_id': progress.enrollment_id,
         'source_version': source.manifest.release_id, 'source_manifest_sha256': source.manifest_sha256,
         'target_version': target.manifest.release_id, 'target_manifest_sha256': target.manifest_sha256,
-        'policy_id': policy.policy_id if rules else None, 'review_id': review.review_id if review else None,
+        'policy_id': policy.policy_id if policy is not None and rules else None, 'review_id': review.review_id if review else None,
         'outcomes': outcomes,
         'eligible_outcome_count': sum(item['status'] == 'eligible_for_transfer' for item in outcomes),
         'required_outcome_count': len(outcomes), 'read_only': True, 'can_apply': False,

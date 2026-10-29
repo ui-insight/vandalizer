@@ -196,7 +196,7 @@ async def set_support_unlock(user_id: str, unlocked: bool, enrollment_id: str | 
     # Legacy reads have no enrolled write lease. Never replace their complete
     # document: an assessment or lesson save may have committed since this read.
     # Compare only the reviewed access/binding, then return the fresh saved row.
-    access_filter = {'unlocked': True} if progress.unlocked else {
+    access_filter: dict = {'unlocked': True} if progress.unlocked else {
         '$or': [{'unlocked': False}, {'unlocked': {'$exists': False}}],
     }
     return await apply_access_change(repository, progress, request, actor_user_id,

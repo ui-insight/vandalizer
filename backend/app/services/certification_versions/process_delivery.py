@@ -1,5 +1,7 @@
 """Owned design saving/history and explicit assessment; no automatic execution."""
-from .catalog import CourseCatalogError
+from typing import Protocol
+from app.models.certification import CertificationEnrollment
+from .catalog import CourseCatalogError, CoursePackage
 from .enrollments import EnrollmentConflict, EnrollmentRepository
 from .practical_assessment import PracticalAssessment, assessment_model
 from . import practical_preparation
@@ -14,11 +16,11 @@ class ProcessDesignUnavailable(ValueError):
 
 
 class ProcessDelivery:
-    def __init__(self, repository=None):
+    def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         self.repository = repository or EnrollmentRepository()
         self.records = ProcessSubmissionRepository()
 
-    async def course(self, user_id, enrollment_id):
+    async def course(self, user_id: str, enrollment_id: str):
         enrollment = await self.repository._enrollment(user_id, enrollment_id)
         package = self.repository.catalog.load(enrollment.course_version)
         if 'process-cases/process_mapping.json' not in package.manifest.artifacts:
@@ -33,14 +35,14 @@ class ProcessDelivery:
             raise CourseCatalogError('The saved design does not match its original course requirements')
         return record
 
-    async def get(self, user_id, enrollment_id, submission_id):
+    async def get(self, user_id: str, enrollment_id: str, submission_id):
         enrollment, _, case = await self.course(user_id, enrollment_id)
         saved = await self.records.get(user_id, submission_id)
         if saved is None:
             raise ProcessDesignUnavailable('This saved process design is unavailable')
         return self.verify(saved, enrollment, case)
 
-    async def list(self, user_id, enrollment_id, *, delivery_enabled=False):
+    async def list(self, user_id: str, enrollment_id: str, *, delivery_enabled: bool=False) -> dict:
         enrollment, _, case = await self.course(user_id, enrollment_id)
         rows = await self.records.records.find({'user_id': user_id, 'enrollment_id': enrollment_id,
             'module_id': 'process_mapping'}).sort('_id', -1).limit(51).to_list(51)
@@ -57,7 +59,7 @@ class ProcessDelivery:
                 'case': case.public_definition(), 'submissions': submissions, 'older_submissions_available': len(rows) > 50,
                 'can_submit': writable, 'read_only_reason': None if writable else 'This is preserved course history. Select an available current course before saving new work.'}
 
-    async def save(self, user_id, enrollment_id, payload):
+    async def save(self, user_id: str, enrollment_id: str, payload):
         current = await self.repository.current(user_id)
         if current is None or current.uuid != enrollment_id:
             raise EnrollmentConflict('Select your existing course before saving a process design')
@@ -66,18 +68,26 @@ class ProcessDelivery:
             return await self.records.submit(CourseOperation(user_id, package, progress, True), payload, actor_user_id=user_id)
 
 
+class AssessmentDelivery(Protocol):
+    def __init__(self, repository: EnrollmentRepository) -> None: ...
+
+    async def get(self, user_id: str, enrollment_id: str, submission_id: str, /) -> dict: ...
+
+    async def course(self, user_id: str, enrollment_id: str, /) -> tuple[CertificationEnrollment, CoursePackage, object]: ...
+
+
 class ProcessAssessment(PracticalAssessment):
     module_id = 'process_mapping'
     channel = 'trusted_saved_process_records'
     reference_key = 'process_submission_id'
     assessment_kind = 'process_design_review_draft'
-    delivery_class = ProcessDelivery
+    delivery_class: type[AssessmentDelivery] = ProcessDelivery
     prepare_method = 'prepare_from_process'
 
-    def __init__(self, repository=None):
+    def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         super().__init__(repository or EnrollmentRepository())
 
-    async def existing(self, user_id, enrollment_id, submission_id, request_id, parent_id=None):
+    async def existing(self, user_id: str, enrollment_id: str, submission_id, request_id: str, parent_id=None):
         raw = await self.reviews.records.find_one({'uuid': request_id})
         if raw is None:
             return None
@@ -91,7 +101,7 @@ class ProcessAssessment(PracticalAssessment):
             raise EnrollmentConflict('This assessment reference belongs to different saved work')
         return saved
 
-    async def request(self, user_id, enrollment_id, submission_id, payload):
+    async def request(self, user_id: str, enrollment_id: str, submission_id, payload):
         await self.selected(user_id, enrollment_id)
         saved = await self.existing(user_id, enrollment_id, submission_id, payload.request_id)
         if saved is not None:
@@ -106,7 +116,7 @@ class ProcessAssessment(PracticalAssessment):
                 submission_id, payload.request_id, actor_user_id=user_id, model_name=model, system_config=config)
         return await self.finish(user_id, enrollment_id, saved, config)
 
-    async def retry(self, user_id, enrollment_id, parent_id, payload):
+    async def retry(self, user_id: str, enrollment_id: str, parent_id, payload):
         await self.selected(user_id, enrollment_id)
         parent = await ReviewDelivery(self.repository).get(user_id, enrollment_id, parent_id)
         if parent['module_id'] != self.module_id or parent['assessment_kind'] != self.assessment_kind:
@@ -116,6 +126,8 @@ class ProcessAssessment(PracticalAssessment):
             return await self.finish(user_id, enrollment_id, saved)
         config = await practical_preparation.configured_runtime()
         async with self.repository.write_boundary(user_id, enrollment_id, operation='retry_process_review') as progress:
+            if progress.course_version is None:
+                raise EnrollmentConflict('This operation requires a bound course version')
             package = self.repository.catalog.load(progress.course_version)
             saved = await self.reviews.prepare_retry(CourseOperation(user_id, package, progress, True), parent_id,
                 payload.request_id, actor_user_id=user_id, system_config=config)

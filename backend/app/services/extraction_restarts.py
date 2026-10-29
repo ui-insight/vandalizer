@@ -4,7 +4,7 @@ from app.services.extraction_staleness import extraction_is_stale
 
 
 class ExtractionRestartConflict(RuntimeError):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('Document changed or another retry started. Refresh its status before retrying.')
 
 

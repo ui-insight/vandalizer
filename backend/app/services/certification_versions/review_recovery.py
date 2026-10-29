@@ -11,18 +11,18 @@ from bson import ObjectId
 
 from app.models.certification import CertificationEnrollmentSelection
 from .attempts import encode
-from .enrollments import EnrollmentConflict
+from .enrollments import EnrollmentConflict, EnrollmentRepository
 from .writes import WriteLease, closed_fence
 
 REVIEW_RECOVERY_SECONDS = 300
 REVIEW_OPERATION = 'evaluate_automatic_review'
 
 
-def utc_now():
+def utc_now() -> datetime.datetime:
     return datetime.datetime.now(datetime.timezone.utc)
 
 
-def expired(value, now):
+def expired(value: object, now: datetime.datetime) -> bool:
     if not isinstance(value, datetime.datetime):
         return False
     return value.replace(tzinfo=datetime.timezone.utc) <= now
@@ -50,10 +50,10 @@ async def bind_review_worker(saved, lease):
 
 
 class ReviewRecovery:
-    def __init__(self, repository):
+    def __init__(self, repository: EnrollmentRepository) -> None:
         self.repository = repository
 
-    async def reconcile(self, user_id, enrollment_id, attempt_id):
+    async def reconcile(self, user_id: str, enrollment_id: str, attempt_id: str):
         from .review_attempts import ReviewAttemptRepository
         repo, reviews = self.repository, ReviewAttemptRepository()
         enrollment = await repo._enrollment(user_id, enrollment_id)
@@ -121,7 +121,7 @@ class ReviewRecovery:
         return await reviews.get(user_id, attempt_id)
 
     @staticmethod
-    async def _finish_interrupted(reviews, raw, now, original_worker):
+    async def _finish_interrupted(reviews, raw, now, original_worker) -> None:
         saved = reviews.decode(raw)
         if saved['state'] not in ('prepared', 'evaluating'):
             return  # A terminal result racing recovery always wins.

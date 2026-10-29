@@ -9,7 +9,7 @@ from .governance_case import FIELDS
 from .governance_inputs import GovernanceInputRepository
 
 
-def embedded_input(snapshot):
+def embedded_input(snapshot) -> dict:
     payload, digest = encode(snapshot)
     return {**{key: snapshot[key] for key in ('uuid', 'user_id', 'enrollment_id', 'module_id', 'course_version', 'manifest_sha256', 'artifact_id')},
             'record_json': payload, 'record_sha256': digest}
@@ -26,7 +26,7 @@ def canonical(value, comparison):
         return ('unrecognized', None)
 
 
-def check_result(case, snapshot, result, *, run_id, phase):
+def check_result(case, snapshot, result, *, run_id: str, phase) -> dict:
     snapshot = GovernanceInputRepository.decode(embedded_input(snapshot))
     if (snapshot['case'] != case.public_definition() or phase not in ('original', 'repair')
             or result.get('run_id') != run_id or result.get('phase') != phase
@@ -61,7 +61,7 @@ def check_result(case, snapshot, result, *, run_id, phase):
         'credit_awarded': False, 'module_completion_eligible': False}
 
 
-def compare_repair(case, original, repaired):
+def compare_repair(case, original, repaired) -> dict:
     """Caller first decodes owned durable runs; this grants no dispatch authority."""
     before, after = original['plan']['input_snapshot'], repaired['plan']['input_snapshot']
     if (original['state'] != 'completed' or repaired['state'] != 'completed' or original['run_id'] == repaired['run_id']

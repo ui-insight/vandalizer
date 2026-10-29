@@ -4,6 +4,12 @@ Email providers can lose acknowledgements. Each issuance gets at most one
 automatic send attempt; an uncertain attempt is retained, never blindly
 resent. The durable in-app notice and credential remain available regardless.
 """
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from motor.motor_asyncio import AsyncIOMotorCollection
+
 import datetime
 import hashlib
 import json
@@ -22,7 +28,7 @@ from .credentials import CredentialRepository
 from .enrollments import EnrollmentConflict
 
 
-def notice_record(credential):
+def notice_record(credential) -> dict:
     if (credential.provenance != 'versioned_course_completion' or not credential.certified_at
             or not credential.course_version or not credential.module_ids):
         raise EnrollmentConflict('Historical credential preservation is not a new completion announcement')
@@ -64,15 +70,17 @@ def render_email(record, frontend_url):
 
 class CompletionNoticeRepository:
     @property
-    def records(self):
+    def records(self) -> AsyncIOMotorCollection:
         return CertificationCompletionNotice.get_motor_collection()
 
     @staticmethod
-    def decode(raw):
+    def decode(raw: dict) -> dict:
         try:
             if hashlib.sha256(raw['record_json'].encode()).hexdigest() != raw['record_sha256']:
                 raise ValueError('Changed completion notice')
             record = json.loads(raw['record_json'])
+            if not isinstance(record, dict):
+                raise ValueError('The saved record must be an object')
             if (record['schema_version'] != 1 or record['credential_id'] != raw['uuid']
                     or record['user_id'] != raw['user_id'] or record['enrollment_id'] != raw['enrollment_id']
                     or raw['email_state'] not in ('pending', 'sending', 'sent', 'uncertain', 'skipped')):
@@ -81,7 +89,7 @@ class CompletionNoticeRepository:
         except (KeyError, TypeError, ValueError) as exc:
             raise CourseCatalogError('The preserved completion notice failed integrity verification') from exc
 
-    async def prepare(self, user_id, enrollment_id):
+    async def prepare(self, user_id: str, enrollment_id: str):
         credential = await CredentialRepository().for_enrollment(user_id, enrollment_id)
         if credential is None:
             raise EnrollmentConflict('Preserve the earned credential before announcing completion')

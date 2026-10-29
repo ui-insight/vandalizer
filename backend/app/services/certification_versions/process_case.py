@@ -4,6 +4,13 @@ Keep the flawed proposal, learner-facing questions and private review guidance
 versioned together. Authenticated submission, saved-map handoff and assessment
 are separate delivery work; validating this case awards nothing.
 """
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.catalog import CoursePackage
+
+from typing import Self
 from typing import Literal
 
 from pydantic import Field, model_validator
@@ -72,7 +79,7 @@ class ProcessMappingCase(ContractModel):
     review_guidance: tuple[ProcessReviewGuidance, ...] = Field(min_length=3, max_length=3)
 
     @model_validator(mode='after')
-    def complete_and_unambiguous(self):
+    def complete_and_unambiguous(self) -> Self:
         for items in (self.assigned_inputs, self.method_comparisons, self.questions):
             if len({item.id for item in items}) != len(items):
                 raise ValueError('Case inputs, comparisons and questions need unique identities')
@@ -95,10 +102,10 @@ class ProcessMappingCase(ContractModel):
     def digest(self):
         return encode(self.model_dump(mode='json'))[1]
 
-    def public_definition(self):
+    def public_definition(self) -> dict:
         return {**self.model_dump(mode='json', exclude={'review_guidance'}), 'case_sha256': self.digest}
 
-    def verify_contract(self, contract):
+    def verify_contract(self, contract) -> None:
         module = next((module for module in contract.modules if module.module_id == self.module_id), None)
         if module is None or {outcome.id for outcome in module.outcomes} != OUTCOMES:
             raise ValueError('Process case must cover the exact declared module outcomes')
@@ -109,7 +116,7 @@ class ProcessMappingCase(ContractModel):
                     or review.critical_failures != outcome.critical_failures):
                 raise ValueError('Case review guidance cannot silently change the outcome rubric')
 
-    def verify_exercise(self, exercise):
+    def verify_exercise(self, exercise) -> None:
         if (exercise.get('documents') != [] or exercise.get('expected_fields') != []
                 or exercise.get('expected_values') != {} or exercise.get('star_criteria') != {}
                 or exercise.get('assessment_case_id') != self.id or exercise.get('process_case_sha256') != self.digest
@@ -117,7 +124,7 @@ class ProcessMappingCase(ContractModel):
             raise ValueError('The process exercise must bind the case without document, field-count or legacy reflection credit')
 
 
-def load_process_case(package, module_id='process_mapping'):
+def load_process_case(package: CoursePackage, module_id: str='process_mapping'):
     from .catalog import CourseCatalogError
     from .outcomes import package_outcomes
     path = f'process-cases/{module_id}.json'

@@ -1,4 +1,11 @@
 """Authored bounded batch assignment; never execution or recovery evidence."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.catalog import CoursePackage
+
+from typing import Self
 import hashlib
 from typing import Literal
 
@@ -91,7 +98,7 @@ class BatchCase(ContractModel):
     assessment_policy: Literal['deterministic_coverage_and_source_checks_plus_automatic_review_no_staff_queue_or_count_credit']
 
     @model_validator(mode='after')
-    def coherent(self):
+    def coherent(self) -> Self:
         if (tuple(f.title for f in self.fields) != FIELDS
                 or tuple(f.comparison for f in self.fields) != ('person_name', 'exact_text', 'usd_amount', 'exact_text', 'exact_text')):
             raise ValueError('Preserve the five distinct field meanings and comparisons')
@@ -121,7 +128,7 @@ class BatchCase(ContractModel):
     def digest(self):
         return encode(self.model_dump(mode='json'))[1]
 
-    def public_definition(self):
+    def public_definition(self) -> dict:
         # The proposal's reason would name the wrong file; learners see only the proposed batch.
         return {**self.model_dump(mode='json', exclude={'expectations', 'review_guidance', 'scope_proposal'}), 'case_sha256': self.digest}
 
@@ -129,7 +136,7 @@ class BatchCase(ContractModel):
         """The proposed batch, all preselected: the assigned inputs with the wrong file second."""
         return [assigned_ids[0], COURSE_ASSET + self.scope_proposal.wrong_filename, *assigned_ids[1:]]
 
-    def verify_contract(self, contract):
+    def verify_contract(self, contract) -> None:
         module = next((m for m in contract.modules if m.module_id == self.module_id), None)
         if module is None or {o.id for o in module.outcomes} != set(EVIDENCE):
             raise ValueError('All three original batch outcomes are required')
@@ -141,7 +148,7 @@ class BatchCase(ContractModel):
                     or guidance[outcome.id].critical_failures != outcome.critical_failures):
                 raise ValueError('Batch evidence, deterministic coverage and review criteria cannot be weakened')
 
-    def verify_source(self, source_id, source_bytes, page_texts):
+    def verify_source(self, source_id: str, source_bytes, page_texts) -> None:
         source = next((s for s in self.sources if s.id == source_id), None)
         if source is None or hashlib.sha256(source_bytes).hexdigest() != source.sha256:
             raise ValueError('The original assigned batch source changed')
@@ -152,7 +159,7 @@ class BatchCase(ContractModel):
             if not any(token in a.quote for a in expectation.anchors):
                 raise ValueError('The expected value is not supported by its original source anchor')
 
-    def verify_exercise(self, exercise):
+    def verify_exercise(self, exercise) -> None:
         if (exercise.get('documents') != [s.filename for s in self.sources]
                 or exercise.get('assessment_case_id') != self.id or exercise.get('batch_case_sha256') != self.digest
                 or exercise.get('assessment_method') != 'authenticated_pilot_batch_inventory_and_targeted_recovery'
@@ -161,7 +168,7 @@ class BatchCase(ContractModel):
             raise ValueError('The exercise must bind the assigned case without count-based stars or private answers')
 
 
-def load_batch_case(package):
+def load_batch_case(package: CoursePackage):
     from .catalog import CourseCatalogError
     from .outcomes import package_outcomes
     path = 'batch-cases/batch_processing.json'

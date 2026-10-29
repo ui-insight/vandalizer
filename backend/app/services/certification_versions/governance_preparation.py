@@ -1,4 +1,10 @@
 """Persist exact diagnostic plans; preparation does not execute the capstone."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
 import datetime
 from typing import Literal
 
@@ -12,7 +18,7 @@ from .governance_checks import embedded_input
 from .governance_inputs import GovernanceInputRepository
 from .governance_plan import extraction_input, governance_plan, validate_scope_binding, validate_repair_binding
 from .governance_scope import Digest, Identity, GovernanceScopeCorrection
-from .lab_execution import LabExecutionRepository
+from .lab_execution import LabExecutionRepository, LabExecutionJournal
 from .lab_inputs import LabInputRepository
 from .outcomes import ContractModel
 
@@ -31,14 +37,14 @@ class GovernancePlanRequest(ContractModel):
     consent: Literal['prepare_original_bounded_capstone_extraction', 'prepare_repaired_bounded_capstone_extraction']
 
 
-def scope_question(phase='original'):
+def scope_question(phase: str='original') -> dict:
     detail = ('original diagnostic extraction. Its disclosed funding instruction may produce an unsupported value for you to inspect.'
         if phase == 'original' else 'changed-revision repair extraction, preserving your original source finding and rerunning both complete records with unchanged models and settings.')
     return {'id': 'governance_execution_approval', 'phase': 'before_execution', 'extraction_phase': phase,
         'prompt': 'Inspect the saved learner scope correction, both complete fictional sources, exact six-field revision and resolved model. Approve or hold only this bounded ' + detail + ' Model usage may be incurred; this does not authorize any handoff, external effect, recurring action or earned credit.'}
 
 
-def validate_authorization(saved):
+def validate_authorization(saved) -> None:
     from .governance_approval import GovernanceApprovalRepository
     plan, authorization = saved['plan'], saved['authorization']
     if authorization is None:
@@ -58,9 +64,9 @@ def validate_authorization(saved):
         raise ValueError('The saved capstone claim changed its exact authenticated approval')
 
 
-class GovernancePreparation(LabExecutionRepository):
+class GovernancePreparation(LabExecutionJournal):
     @staticmethod
-    def decode(raw):
+    def decode(raw: dict) -> dict:
         saved = LabExecutionRepository.decode(raw)
         try:
             plan = saved['plan']
@@ -127,7 +133,7 @@ class GovernancePreparation(LabExecutionRepository):
         except (KeyError, TypeError, ValueError, AttributeError) as exc:
             raise CourseCatalogError('The saved Governance plan failed integrity verification') from exc
 
-    async def prepare(self, operation, body, system_config_doc, *, actor_user_id):
+    async def prepare(self, operation: CourseOperation, body, system_config_doc, *, actor_user_id: str):
         body = GovernancePlanRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Only the authenticated learner can prepare the bounded capstone')
@@ -189,5 +195,5 @@ class GovernancePreparation(LabExecutionRepository):
         await LabInputRepository._check_lease(lease)
         return await self.get(actor_user_id, body.request_id)
 
-    async def execute(self, *args, **kwargs):
+    async def execute(self, *args, **kwargs) -> dict:
         raise EnrollmentConflict('Capstone execution requires the separately approved durable executor')

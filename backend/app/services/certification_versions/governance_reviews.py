@@ -1,4 +1,5 @@
 """Save the learner's final supervision explanation with the exact complete handoff chain."""
+from typing import Self
 from typing import Literal
 
 from pydantic import Field, model_validator
@@ -23,13 +24,13 @@ class GovernanceReviewRequest(ContractModel):
     consent: Literal['save_my_capstone_supervision_interpretation']
 
     @model_validator(mode='after')
-    def own_explanation(self):
+    def own_explanation(self) -> Self:
         if len(self.final_supervision.strip()) < 40 or self.previous_submission_id == self.request_id:
             raise ValueError('Explain your own supervision chain; revised answers need a new request identity')
         return self
 
 
-def validate_handoff(body, handoff):
+def validate_handoff(body, handoff) -> None:
     if (handoff['uuid'] != body.handoff_id or encode(handoff)[1] != body.handoff_sha256
             or handoff['run_id'] != body.run_id or handoff['case']['case_sha256'] != body.case_sha256
             or handoff['status'] != 'delivered' or handoff['destination_written'] is not True):
@@ -42,14 +43,14 @@ class GovernanceReviewRepository(GovernanceJournal):
     channel = 'authenticated_learner_governance_supervision_review'
 
     @classmethod
-    def validate(cls, saved, body):
+    def validate(cls, saved, body) -> None:
         handoff = GovernanceHandoffRepository.decode(embedded_record(saved['handoff']))
         validate_handoff(body, handoff)
         if (any(saved[k] != handoff[k] for k in IDENTITY_KEYS) or saved['case'] != handoff['case']
                 or saved['prompt'] != next(q for q in handoff['case']['questions'] if q['id'] == 'final_supervision')):
             raise ValueError('The saved supervision changed its complete original handoff chain or question')
 
-    async def build(self, operation, body):
+    async def build(self, operation, body) -> dict:
         previous = await self.get(operation.user_id, body.previous_submission_id) if body.previous_submission_id else None
         if body.previous_submission_id and previous is None:
             raise EnrollmentConflict('A revision must retain an owned original supervision review')

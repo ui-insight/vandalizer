@@ -104,7 +104,7 @@ class AutoQueryIdAllocator:
     cannot see; ``reserve_and_write`` turns that into "take the next number".
     """
 
-    def __init__(self, prefix: str, existing_ids: Iterable[Optional[str]]):
+    def __init__(self, prefix: str, existing_ids: Iterable[Optional[str]]) -> None:
         self.prefix = prefix
         self._next = next_auto_query_number(existing_ids)
 

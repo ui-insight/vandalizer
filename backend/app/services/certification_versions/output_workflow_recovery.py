@@ -27,7 +27,7 @@ class OutputFinalizationRequest(ContractModel):
 
 
 class OutputWorkflowRecovery(OutputWorkflowPreparation):
-    async def finalize(self, operation, body, *, actor_user_id):
+    async def finalize(self, operation, body, *, actor_user_id: str):
         from .output_artifacts import capture_generated_artifacts
         body = OutputFinalizationRequest.model_validate(body)
         if actor_user_id != operation.user_id:

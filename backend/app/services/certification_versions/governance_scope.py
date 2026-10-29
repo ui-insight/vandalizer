@@ -1,4 +1,11 @@
 """Authenticated correction of the flawed capstone proposal before execution."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
+from typing import Self
 import datetime
 from typing import Annotated, Literal
 
@@ -13,7 +20,7 @@ from .governance_checks import embedded_input
 from .governance_inputs import GovernanceInputRepository
 from .lab_execution import LabExecutionRepository
 from .lab_inputs import LabInputRepository
-from .learner_decisions import LearnerDecisionRepository
+from .learner_decisions import LearnerDecisionRepository, LearnerDecisionJournal
 from .outcomes import ContractModel
 
 Identity = Annotated[str, Field(pattern=r'^[a-f0-9]{32}$')]
@@ -35,15 +42,15 @@ class GovernanceScopeCorrectionRequest(ContractModel):
     consent: Literal['save_my_corrected_capstone_scope_without_execution']
 
     @model_validator(mode='after')
-    def distinct_sources(self):
+    def distinct_sources(self) -> Self:
         if len(set(self.source_document_ids)) != 2 or len(self.reason.strip()) < 40:
             raise ValueError('Record two distinct original source identities and your own scope reasoning')
         return self
 
 
-class GovernanceScopeCorrection(LearnerDecisionRepository):
+class GovernanceScopeCorrection(LearnerDecisionJournal):
     @staticmethod
-    def decode(raw):
+    def decode(raw: dict) -> dict:
         saved = LearnerDecisionRepository.decode(raw)
         try:
             body = GovernanceScopeCorrectionRequest.model_validate(saved['submission'])
@@ -65,11 +72,11 @@ class GovernanceScopeCorrection(LearnerDecisionRepository):
         except (KeyError, TypeError, ValueError, StopIteration) as exc:
             raise CourseCatalogError('The saved Governance scope correction failed integrity verification') from exc
 
-    async def get(self, user_id, reference):
+    async def get(self, user_id: str, reference: str) -> dict | None:
         raw = await self.records.find_one({'uuid': reference, 'user_id': user_id, 'module_id': 'governance', 'prompt_id': PROMPT_ID})
         return self.decode(raw) if raw else None
 
-    async def submit(self, operation, body, *, actor_user_id):
+    async def submit(self, operation: CourseOperation, body, *, actor_user_id: str):
         body = GovernanceScopeCorrectionRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Only the authenticated learner can record the capstone scope correction')

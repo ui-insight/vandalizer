@@ -39,7 +39,7 @@ class ShareError(Exception):
     actionable HTTP responses instead of a single conflated 404.
     """
 
-    def __init__(self, code: str, status: int, message: str | None = None):
+    def __init__(self, code: str, status: int, message: str | None = None) -> None:
         self.code = code
         self.status = status
         # Set when the underlying failure already carries a user-facing reason
@@ -65,7 +65,7 @@ class UnderlyingDeleteError(Exception):
     deleted when this raises.
     """
 
-    def __init__(self, code: str):
+    def __init__(self, code: str) -> None:
         self.code = code
         super().__init__(code)
 

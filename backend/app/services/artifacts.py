@@ -197,7 +197,7 @@ def team_view(doc):
             "updated_at": visible["created_at"]}
 
 
-def _pin_legacy_team_revision(db, doc):
+def _pin_legacy_team_revision(db, doc) -> None:
     # Freeze old shares before changing latest/publication. Otherwise removing a
     # public link or saving a draft would silently expose a different revision.
     if doc.get("team_id") and not doc.get("team_revision"):
@@ -268,7 +268,7 @@ def publish_separate(db, doc, selected):
     return saved if saved is not None else get(db, doc["uuid"])
 
 
-def unpublish_separate(db, doc, selected):
+def unpublish_separate(db, doc, selected) -> None:
     revision(doc, selected)
     db.html_artifacts.update_one({"uuid": doc["uuid"], "user_id": doc["user_id"], "deleted_at": None},
         {"$pull": {"publications": {"revision": selected}}})
@@ -282,7 +282,7 @@ def publish(db, doc, selected):
     }, return_document=ReturnDocument.AFTER)
 
 
-def unpublish(db, doc):
+def unpublish(db, doc) -> None:
     _pin_legacy_team_revision(db, doc)
     db.html_artifacts.update_one({"uuid": doc["uuid"], "user_id": doc["user_id"], "deleted_at": None},
         {"$set": {"public_token": None, "published_revision": None}})

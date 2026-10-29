@@ -34,7 +34,7 @@ def implementation_digest():
     return encode({str(path.relative_to(folder.parents[1])): hashlib.sha256(path.read_bytes()).hexdigest() for path in paths})[1]
 
 
-def output_workflow_plan(snapshot, case, system_config, *, default_model):
+def output_workflow_plan(snapshot, case, system_config, *, default_model) -> dict:
     from app.services.workflow_engine import apply_step_input_config, _resolve_input_sources, build_step_output_keys
     try:
         serialized, digest = encode(snapshot)
@@ -70,7 +70,7 @@ def output_workflow_plan(snapshot, case, system_config, *, default_model):
             raise EnrollmentConflict('Select an available model before preparing generation')
         source = snapshot['documents'][0]
         metadata = {'uuid': source['document_id'], 'title': source['title'], 'text_markers': source['text_markers']}
-        engine_steps = [{'name': 'Document', 'data': {'doc_uuids': [source['document_id']]}, 'tasks': []}]
+        engine_steps: list[dict] = [{'name': 'Document', 'data': {'doc_uuids': [source['document_id']]}, 'tasks': []}]
         stages, used_models, filenames = [], set(), set()
         for index, item in enumerate(captured):
             step, task = item['step'], item['tasks'][0]
@@ -78,7 +78,7 @@ def output_workflow_plan(snapshot, case, system_config, *, default_model):
             if not step['name'].strip() or step['name'] == 'Document' or set(step['data']) - INPUT_KEYS:
                 raise EnrollmentConflict('A saved step has unsupported generation settings')
             allowed = OUTPUT_KEYS.get(kind, TASK_KEYS.get(kind))
-            if set(data) - allowed:
+            if allowed is None or set(data) - allowed:
                 raise EnrollmentConflict('A task contains unresolved instructions or unsupported settings')
             checked_sources(step['data'])
             checked_sources({key: value for key, value in data.items() if key in TASK_INPUT_KEYS})

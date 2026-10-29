@@ -1,10 +1,11 @@
 """Confirm one committed selection without repeating or replacing it."""
 from .attempts import AttemptRepository, encode
 from .catalog import CourseCatalogError
-from .enrollments import EnrollmentConflict
+from .enrollments import EnrollmentConflict, EnrollmentRepository
 
 
 class SelectionJournal:
+    repository: EnrollmentRepository
     receipt_id_field = 'activation_id'
 
     async def resume_receipt(self, raw):
@@ -45,7 +46,7 @@ class SelectionJournal:
         await self.clear_pending(saved, result)
         return result
 
-    async def clear_pending(self, raw, result):
+    async def clear_pending(self, raw, result) -> None:
         # A later selection or active worker is never cleared by old replay.
         query = {'user_id': raw['user_id'],
             'active_enrollment_id': result['target_enrollment_id'], 'revision': result['revision'],

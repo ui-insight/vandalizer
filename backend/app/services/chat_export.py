@@ -30,7 +30,7 @@ def _message_html(message):
     return f'<section><h2>{message.role.title()}</h2>{body}{tools}{evidence}</section>'
 
 
-def _inline(paragraph, node, bold=False, italic=False):
+def _inline(paragraph, node, bold=False, italic=False) -> None:
     if isinstance(node, NavigableString):
         run = paragraph.add_run(str(node))
         run.bold, run.italic = bold, italic
@@ -53,7 +53,7 @@ def _docx(soup):
     doc.styles["Normal"].font.size = Pt(11)
     doc.add_heading("Chat export", 0)
 
-    def blocks(parent):
+    def blocks(parent) -> None:
         for node in parent.children:
             if not isinstance(node, Tag):
                 continue
@@ -69,7 +69,7 @@ def _docx(soup):
             elif node.name in ("section", "ul", "ol", "blockquote"):
                 blocks(node)
             elif node.name == "li":
-                p = doc.add_paragraph(style="List Number" if node.parent.name == "ol" else "List Bullet")
+                p = doc.add_paragraph(style="List Number" if node.parent is not None and node.parent.name == "ol" else "List Bullet")
                 for child in node.children:
                     if isinstance(child, Tag) and child.name in ("ul", "ol"):
                         blocks(child)
@@ -93,7 +93,7 @@ def _docx(soup):
     return out.getvalue()
 
 
-def _cell(sheet, row, column, value, numeric=False):
+def _cell(sheet, row, column, value, numeric=False) -> None:
     # Force strings to literal cells: formulas and Excel error tokens remain text.
     cell = sheet.cell(row, column)
     cell.value = value

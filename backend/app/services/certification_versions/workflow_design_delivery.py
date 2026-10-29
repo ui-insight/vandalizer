@@ -15,12 +15,12 @@ class WorkflowDesignUnavailable(ValueError):
 
 
 class WorkflowDesignDelivery:
-    def __init__(self, repository=None):
+    def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         self.repository = repository or EnrollmentRepository()
         self.inputs = WorkflowDesignInputRepository()
         self.records = WorkflowDesignSubmissionRepository()
 
-    async def course(self, user_id, enrollment_id):
+    async def course(self, user_id: str, enrollment_id: str):
         enrollment = await self.repository._enrollment(user_id, enrollment_id)
         package = self.repository.catalog.load(enrollment.course_version)
         if 'design-cases/workflow_design.json' not in package.manifest.artifacts:
@@ -28,7 +28,7 @@ class WorkflowDesignDelivery:
         return enrollment, package, load_workflow_design_case(package)
 
     @staticmethod
-    def verify(saved, enrollment, case, *, capture=False):
+    def verify(saved, enrollment, case, *, capture: bool=False):
         snapshot = saved if capture else saved['input_snapshot']
         if (any(saved[key] != value for key, value in {'user_id': enrollment.user_id,
                 'enrollment_id': enrollment.uuid, 'course_version': enrollment.course_version,
@@ -37,7 +37,7 @@ class WorkflowDesignDelivery:
             raise CourseCatalogError('The saved workflow design does not match its original course')
         return saved
 
-    async def get(self, user_id, enrollment_id, submission_id, *, capture=False):
+    async def get(self, user_id: str, enrollment_id: str, submission_id, *, capture: bool=False):
         enrollment, _, case = await self.course(user_id, enrollment_id)
         saved = await (self.inputs if capture else self.records).get(user_id, submission_id)
         if saved is None:
@@ -45,7 +45,7 @@ class WorkflowDesignDelivery:
         saved = self.verify(saved, enrollment, case, capture=capture)
         return {**saved, 'input_snapshot_sha256': encode(saved)[1]} if capture else saved
 
-    async def list(self, user_id, enrollment_id, *, delivery_enabled=False):
+    async def list(self, user_id: str, enrollment_id: str, *, delivery_enabled: bool=False) -> dict:
         enrollment, _, case = await self.course(user_id, enrollment_id)
         query = {'user_id': user_id, 'enrollment_id': enrollment_id, 'module_id': 'workflow_design'}
         rows = await self.records.records.find(query).sort('_id', -1).limit(51).to_list(51)
@@ -72,7 +72,7 @@ class WorkflowDesignDelivery:
                 'process_choices': process_choices, 'older_process_choices_available': older_processes,
                 'can_submit': writable, 'read_only_reason': None if writable else 'This is preserved course history. Select an available current course before saving new work.'}
 
-    async def save(self, user_id, enrollment_id, payload, *, capture=False):
+    async def save(self, user_id: str, enrollment_id: str, payload, *, capture: bool=False):
         current = await self.repository.current(user_id)
         if current is None or current.uuid != enrollment_id:
             raise EnrollmentConflict('Select your existing course before saving Workflow Design work')
@@ -93,5 +93,5 @@ class WorkflowDesignAssessment(ProcessAssessment):
     delivery_class = WorkflowDesignDelivery
     prepare_method = 'prepare_from_workflow_design'
 
-    def __init__(self, repository=None):
+    def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         super().__init__(repository or EnrollmentRepository())

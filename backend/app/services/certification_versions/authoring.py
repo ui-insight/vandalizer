@@ -24,7 +24,7 @@ def authoring_lock(root: Path):
             fcntl.flock(handle, fcntl.LOCK_UN)
 
 
-def write_registry(root: Path, registry: dict):
+def write_registry(root: Path, registry: dict) -> None:
     """Validate the whole proposed registry before an atomic replacement."""
     with tempfile.TemporaryDirectory(prefix='.registry-', dir=root) as staging:
         candidate = Path(staging) / 'registry.json'
@@ -94,7 +94,7 @@ def publish(catalog: CourseCatalog, release_id: str, *, expected_digest: str,
         return record
 
 
-def retire(catalog: CourseCatalog, release_id: str):
+def retire(catalog: CourseCatalog, release_id: str) -> None:
     """Close new enrollment while retaining supported requirements and assets."""
     with authoring_lock(catalog.root):
         package = catalog.load(release_id)
@@ -107,7 +107,7 @@ def retire(catalog: CourseCatalog, release_id: str):
         write_registry(catalog.root, registry)
 
 
-def choose_default(catalog: CourseCatalog, release_id: str, *, legacy_continuation: bool = False, reviews_root=None):
+def choose_default(catalog: CourseCatalog, release_id: str, *, legacy_continuation: bool = False, reviews_root=None) -> None:
     """Set initialization policy only; existing selections are never updated."""
     with authoring_lock(catalog.root):
         package = catalog.load(release_id, new_enrollment=not legacy_continuation)

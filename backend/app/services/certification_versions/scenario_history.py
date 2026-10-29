@@ -5,11 +5,11 @@ from .scenario_submissions import ScenarioSubmissionRepository, module_bank
 
 
 class ScenarioHistory:
-    def __init__(self, repository=None):
+    def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         self.repository = repository or EnrollmentRepository()
         self.submissions = ScenarioSubmissionRepository()
 
-    async def resolve(self, user_id, enrollment_id, module_id):
+    async def resolve(self, user_id: str, enrollment_id: str, module_id: str):
         enrollment = await self.repository._enrollment(user_id, enrollment_id)
         package = self.repository.catalog.load(enrollment.course_version)
         return enrollment, module_bank(package, module_id)
@@ -43,7 +43,7 @@ class ScenarioHistory:
         return record
 
     @staticmethod
-    def validate_feedback(record, bank):
+    def validate_feedback(record, bank) -> None:
         """Validate the receipt's own summaries without running the grader.
 
         Historical verdicts are retained. This does not re-decide whether a
@@ -78,7 +78,7 @@ class ScenarioHistory:
         if result['passed'] is not all(check['passed'] for check in checks):
             raise ValueError('Scenario result summary contradicts its saved checks')
 
-    async def attempts(self, user_id, enrollment_id, module_id):
+    async def attempts(self, user_id: str, enrollment_id: str, module_id: str) -> dict:
         enrollment, bank = await self.resolve(user_id, enrollment_id, module_id)
         rows = await self.submissions.records.find({'user_id': user_id, 'enrollment_id': enrollment_id,
             'module_id': module_id}).sort('_id', -1).limit(51).to_list(51)
@@ -88,7 +88,7 @@ class ScenarioHistory:
                 'attempts': [{'attempt_id': record['uuid'], 'submitted_at': record['submitted_at'],
                               'passed': record['result']['passed']} for record in records]}
 
-    async def attempt(self, user_id, enrollment_id, module_id, attempt_id):
+    async def attempt(self, user_id: str, enrollment_id: str, module_id: str, attempt_id: str) -> None | dict:
         enrollment, bank = await self.resolve(user_id, enrollment_id, module_id)
         raw = await self.submissions.records.find_one({'uuid': attempt_id, 'user_id': user_id,
             'enrollment_id': enrollment_id, 'module_id': module_id})

@@ -12,7 +12,7 @@ from .lab_inputs import LabInputRepository
 MAX_CHECKPOINT_BYTES = 2 * 1024 * 1024
 
 
-def validate_event(event, previous, run):
+def validate_event(event, previous, run) -> None:
     sequence = len(previous)
     if sequence >= len(run['plan']['item_plans']) * 2:
         raise ValueError('The batch action already contains every required checkpoint')

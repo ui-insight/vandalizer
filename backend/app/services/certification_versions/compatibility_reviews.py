@@ -6,6 +6,13 @@ against an exact product commit. CI rejects the review once a later commit
 changes a watched product path, so a material product change forces a new
 recorded review before the course can keep being offered as current.
 """
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.catalog import CoursePackage
+
+from typing import Self
 import datetime
 from pathlib import Path
 from typing import Literal
@@ -43,7 +50,7 @@ class CompatibilityReview(BaseModel):
     reviewed_at: str
 
     @model_validator(mode='after')
-    def consistent(self):
+    def consistent(self) -> Self:
         if set(self.checks) != set(CHECKS):
             raise ValueError('A compatibility review must record every maintenance check: ' + ', '.join(CHECKS))
         if self.result == 'compatible' and any(check.result == 'failed' for check in self.checks.values()):
@@ -67,12 +74,12 @@ def load_review(release_id: str, root: Path = REVIEWS_ROOT) -> CompatibilityRevi
     return review
 
 
-def needs_review(package) -> bool:
+def needs_review(package: CoursePackage) -> bool:
     """Only a production-authorized authored course is advertised as current."""
     return package.manifest.historical_provenance != 'continuation-baseline' and not package.entry.qa_staging
 
 
-def require_compatible(package, root: Path = REVIEWS_ROOT) -> CompatibilityReview | None:
+def require_compatible(package: CoursePackage, root: Path = REVIEWS_ROOT) -> CompatibilityReview | None:
     if not needs_review(package):
         return None
     release_id = package.manifest.release_id

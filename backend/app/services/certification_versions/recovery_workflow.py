@@ -1,4 +1,10 @@
 """Reviewed completion recovery with durable operator intent and receipts."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from motor.motor_asyncio import AsyncIOMotorCollection
+
 import json
 import re
 
@@ -12,15 +18,15 @@ from .recovery import COMPLETION_OPERATIONS, CompletionRecovery
 
 
 class RecoveryWorkflow:
-    def __init__(self, repository=None):
+    def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         self.repository = repository or EnrollmentRepository()
         self.recovery = CompletionRecovery(self.repository)
 
     @property
-    def records(self):
+    def records(self) -> AsyncIOMotorCollection:
         return CertificationRecoveryRecord.get_motor_collection()
 
-    async def inspect(self, user_id, enrollment_id):
+    async def inspect(self, user_id: str, enrollment_id: str):
         repo = self.repository
         enrollment = await repo._enrollment(user_id, enrollment_id)
         selection = await repo.selections.find_one({'user_id': user_id})
@@ -30,8 +36,8 @@ class RecoveryWorkflow:
         pending = await self.recovery.journal.records.find({
             'user_id': user_id, 'enrollment_id': enrollment_id, 'state': {'$in': ['evaluating', 'graded']},
         }).limit(2).to_list(2)
-        marker = (selection.get('active_write') or {}) if is_active else {}
-        active = bool(is_active and selection.get('in_flight_writes'))
+        marker = (selection.get('active_write') or {}) if is_active and selection is not None else {}
+        active = bool(is_active and selection is not None and selection.get('in_flight_writes'))
         kind, write_id, attempt_id, allowed = 'none', None, None, False
         explanation = 'No interrupted completion needs recovery.'
         if active:
@@ -78,7 +84,7 @@ class RecoveryWorkflow:
         review['review_sha256'] = encode(review)[1]
         return review
 
-    async def history(self, user_id, enrollment_id):
+    async def history(self, user_id: str, enrollment_id: str):
         rows = await self.records.find({'user_id': user_id, 'enrollment_id': enrollment_id}).sort('created_at', -1).limit(10).to_list(10)
         results = []
         for row in rows:
@@ -91,7 +97,7 @@ class RecoveryWorkflow:
                 'result': AttemptRepository.payload(row, 'result') if row['state'] == 'completed' else None})
         return results
 
-    async def submit(self, actor_user_id, user_id, enrollment_id, *, request_id, review_sha256, reason):
+    async def submit(self, actor_user_id: str, user_id: str, enrollment_id: str, *, request_id: str, review_sha256, reason):
         if not re.fullmatch(r'[a-f0-9]{32}', request_id) or not re.fullmatch(r'[a-f0-9]{64}', review_sha256):
             raise EnrollmentConflict('A valid recovery request and reviewed snapshot are required')
         if not isinstance(reason, str) or not 5 <= len(reason.strip()) <= 1000:
@@ -156,4 +162,6 @@ class RecoveryWorkflow:
         await self.records.update_one({'uuid': request_id, 'state': 'started'},
             {'$set': {'state': 'completed', 'result_json': result_json, 'result_sha256': result_sha256}})
         saved = await self.records.find_one({'uuid': request_id})
+        if saved is None:
+            raise EnrollmentConflict('The saved recovery receipt is no longer available')
         return AttemptRepository.payload(saved, 'result')

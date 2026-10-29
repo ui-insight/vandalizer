@@ -1,4 +1,5 @@
 """Separate learner inspection and current approve/hold choice for exact memo bytes."""
+from typing import Self
 from typing import Literal
 
 from pydantic import Field, model_validator
@@ -28,13 +29,13 @@ class GovernanceReleaseRequest(ContractModel):
     consent: Literal['save_my_exact_capstone_memo_release_choice']
 
     @model_validator(mode='after')
-    def own_inspection(self):
+    def own_inspection(self) -> Self:
         if len(self.reason.strip()) < 40 or (self.choice == 'approve' and not self.opened):
             raise ValueError('Inspect the actual memo before approval and explain your release or hold decision')
         return self
 
 
-def validate_memo(body, memo):
+def validate_memo(body, memo) -> None:
     if (memo['uuid'] != body.memo_id or encode(memo)[1] != body.memo_sha256 or memo['run_id'] != body.run_id
             or memo['case']['case_sha256'] != body.case_sha256 or memo['file']['sha256'] != body.file_sha256):
         raise EnrollmentConflict('Inspect this exact saved memo, owned repair and original downloadable bytes')
@@ -46,7 +47,7 @@ class GovernanceReleaseRepository(GovernanceJournal):
     channel = 'authenticated_learner_governance_memo_inspection'
 
     @classmethod
-    def validate(cls, saved, body):
+    def validate(cls, saved, body) -> None:
         memo = GovernanceMemoRepository.decode(embedded_record(saved['memo']))
         validate_memo(body, memo)
         if (any(saved[k] != memo[k] for k in IDENTITY_KEYS) or saved['case'] != memo['case']
@@ -54,7 +55,7 @@ class GovernanceReleaseRepository(GovernanceJournal):
                 or saved['delivery_confirmed'] is not False):
             raise ValueError('The release decision changed its exact owned memo, question or authority')
 
-    async def build(self, operation, body):
+    async def build(self, operation, body) -> dict:
         memo = await GovernanceMemoRepository().get(operation.user_id, body.memo_id)
         if memo is None:
             raise EnrollmentConflict('Read your complete saved memo before making its release choice')
@@ -66,7 +67,7 @@ class GovernanceReleaseRepository(GovernanceJournal):
         return {'memo': memo, 'prompt': next(q for q in memo['case']['questions'] if q['id'] == 'release_review'),
             'previous_release_decision_id': raw.get('release_decision_id'), 'delivery_confirmed': False}
 
-    async def after_save(self, operation, saved, *, replay):
+    async def after_save(self, operation, saved, *, replay) -> None:
         lease = LabExecutionRepository.check_operation(operation, saved)
         current = await self.records.find_one({'uuid': saved['memo']['uuid'], 'user_id': operation.user_id})
         if current is None:

@@ -1,4 +1,11 @@
 """Preserve learner repair explanations with original failure and full retest."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
+from typing import Self
 import datetime
 from typing import Annotated, Literal
 
@@ -12,7 +19,7 @@ from .catalog import CourseCatalogError
 from .enrollments import EnrollmentConflict
 from .lab_execution import LabExecutionRepository
 from .lab_inputs import LabInputRepository
-from .learner_decisions import LearnerDecisionRepository
+from .learner_decisions import LearnerDecisionRepository, LearnerDecisionJournal
 from .outcomes import ContractModel
 
 MAX_REVIEW_BYTES = 15 * 1024 * 1024
@@ -30,7 +37,7 @@ class ValidationReviewRequest(ContractModel):
     consent: Literal['save_validation_repair_interpretation']
 
     @model_validator(mode='after')
-    def complete_answers(self):
+    def complete_answers(self) -> Self:
         if (set(self.answers) != {'repair_review'}
                 or any(not value.strip() for value in self.answers.values()) or self.previous_submission_id == self.request_id):
             raise ValueError('Explain the actual repair and complete regression result; revised answers require a new request identity')
@@ -50,9 +57,9 @@ def embedded_execution(run):
     return raw
 
 
-class ValidationReviewRepository(LearnerDecisionRepository):
+class ValidationReviewRepository(LearnerDecisionJournal):
     @staticmethod
-    def decode(raw):
+    def decode(raw: dict) -> dict:
         saved = LearnerDecisionRepository.decode(raw)
         try:
             body = ValidationReviewRequest.model_validate(saved['submission'])
@@ -72,11 +79,11 @@ class ValidationReviewRepository(LearnerDecisionRepository):
         except (KeyError, TypeError, ValueError) as exc:
             raise CourseCatalogError('The saved validation result review failed integrity verification') from exc
 
-    async def get(self, user_id, submission_id):
+    async def get(self, user_id: str, submission_id) -> dict | None:
         raw = await self.records.find_one({'uuid': submission_id, 'user_id': user_id, 'module_id': 'validation_qa', 'prompt_id': PROMPT_ID})
         return self.decode(raw) if raw else None
 
-    async def submit(self, operation, body, *, actor_user_id):
+    async def submit(self, operation: CourseOperation, body, *, actor_user_id: str):
         body = ValidationReviewRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Validation result review requires the authenticated learner')

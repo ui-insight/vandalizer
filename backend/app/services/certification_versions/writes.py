@@ -19,11 +19,11 @@ class WriteLease:
     progress_id: str
     write_id: str
 
-    def selection_filter(self):
+    def selection_filter(self) -> dict[str, str | int]:
         return {'user_id': self.user_id, 'active_enrollment_id': self.enrollment_id,
                 'in_flight_writes': 1, 'active_write.id': self.write_id}
 
-    def progress_filter(self):
+    def progress_filter(self) -> dict[str, str | ObjectId]:
         return {'_id': ObjectId(self.progress_id), 'user_id': self.user_id,
                 '_certification_write_fence': self.write_id}
 
@@ -31,11 +31,11 @@ class WriteLease:
 lease_context: ContextVar[WriteLease | None] = ContextVar('certification_write_lease', default=None)
 
 
-def closed_fence(write_id):
+def closed_fence(write_id: str) -> str:
     return uuid5(NAMESPACE_URL, 'vandalizer:certification:closed:' + write_id).hex
 
 
-def require_lease(user_id, enrollment_id):
+def require_lease(user_id: str, enrollment_id: str | None) -> WriteLease:
     from .enrollments import EnrollmentConflict
     lease = lease_context.get()
     if lease is None or (lease.user_id, lease.enrollment_id) != (user_id, enrollment_id):
@@ -43,7 +43,7 @@ def require_lease(user_id, enrollment_id):
     return lease
 
 
-def progress_filter(progress):
+def progress_filter(progress: CertificationProgress) -> dict[str, str | ObjectId]:
     from .enrollments import EnrollmentConflict
     lease = require_lease(progress.user_id, progress.enrollment_id)
     if str(progress.id) != lease.progress_id:
@@ -51,7 +51,7 @@ def progress_filter(progress):
     return lease.progress_filter()
 
 
-async def save_progress(progress):
+async def save_progress(progress: CertificationProgress) -> CertificationProgress:
     """All staged progress saves compare ownership in the same Mongo write."""
     from .enrollments import EnrollmentConflict
     if lease_context.get() is None and not getattr(progress, 'enrollment_id', None):

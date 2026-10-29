@@ -1,4 +1,10 @@
 """Prepare owned, frozen practical inputs without dispatching or awarding credit."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.catalog import CoursePackage
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.system_config import SystemConfig
@@ -38,13 +44,13 @@ async def configured_runtime():
 
 
 class PracticalPreparation:
-    def __init__(self, repository=None):
+    def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         self.repository = repository or EnrollmentRepository()
         self.inputs = LabInputRepository()
         self.runs = LabExecutionRepository()
 
     @staticmethod
-    def eligible(package, module_id):
+    def eligible(package: CoursePackage, module_id: str) -> None:
         contract = package_outcomes(package)
         if (module_id not in ('foundations', 'extraction_engine') or contract is None
                 or not any(module.module_id == module_id for module in contract.modules)
@@ -58,7 +64,7 @@ class PracticalPreparation:
                 raise PreparationUnavailable('This course does not offer preparation for this practical module')
 
     @staticmethod
-    def public(snapshot, run):
+    def public(snapshot, run) -> dict:
         if run and (run['plan']['input_snapshot_id'] != snapshot['uuid']
                 or run['plan']['input_snapshot_sha256'] != encode(snapshot)[1]
                 or any(run['plan'][key] != snapshot[key] for key in
@@ -84,7 +90,7 @@ class PracticalPreparation:
             'can_execute': False, 'credit_awarded': False, 'module_completion_eligible': False,
         }
 
-    async def get(self, user_id, enrollment_id, request_id):
+    async def get(self, user_id: str, enrollment_id: str, request_id: str):
         snapshot = await self.inputs.get(user_id, request_id)
         if snapshot is None or snapshot.get('record_kind') is not None:
             raise PreparationUnavailable('This saved preparation is unavailable')
@@ -94,7 +100,7 @@ class PracticalPreparation:
             raise EnrollmentConflict('This preparation belongs to a different course')
         return self.public(snapshot, await self.runs.get(user_id, request_id))
 
-    async def prepare(self, user_id, enrollment_id, module_id, submission):
+    async def prepare(self, user_id: str, enrollment_id: str, module_id: str, submission):
         repo = self.repository
         source = await repo.current(user_id)
         if source is None or source.uuid != enrollment_id:

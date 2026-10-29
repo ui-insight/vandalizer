@@ -219,7 +219,7 @@ class ExtractionError(RuntimeError):
 class ExtractionEngine:
     """Synchronous extraction engine. Thread-safe for use in Celery workers."""
 
-    def __init__(self, system_config_doc: dict | None = None, domain: str | None = None):
+    def __init__(self, system_config_doc: dict | None = None, domain: str | None = None) -> None:
         """
         Args:
             system_config_doc: Pre-fetched SystemConfig as a plain dict for sync access.

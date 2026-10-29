@@ -10,11 +10,11 @@ class SavedReviewUnavailable(ValueError):
 
 
 class ReviewDelivery:
-    def __init__(self, repository=None):
+    def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         self.repository = repository or EnrollmentRepository()
         self.reviews = ReviewAttemptRepository()
 
-    async def course(self, user_id, enrollment_id, module_id=None):
+    async def course(self, user_id: str, enrollment_id: str, module_id: str | None=None):
         enrollment = await self.repository._enrollment(user_id, enrollment_id)
         package = self.repository.catalog.load(enrollment.course_version)
         contract = package_outcomes(package)
@@ -32,7 +32,7 @@ class ReviewDelivery:
             raise CourseCatalogError('The saved assessment could not be displayed safely') from exc
 
     @staticmethod
-    def _public(saved, enrollment, contract):
+    def _public(saved, enrollment, contract) -> dict:
         record = saved['record']
         if (record['user_id'] != enrollment.user_id or record['enrollment_id'] != enrollment.uuid
                 or record['course_version'] != enrollment.course_version or record['manifest_sha256'] != enrollment.manifest_sha256
@@ -100,7 +100,7 @@ class ReviewDelivery:
                 'module_completion_eligible': False, 'staff_review_required': False,
                 'can_request_review': False, 'can_retry_review': False}
 
-    async def get(self, user_id, enrollment_id, attempt_id):
+    async def get(self, user_id: str, enrollment_id: str, attempt_id: str):
         saved = await self.reviews.get(user_id, attempt_id)
         if saved is None:
             raise SavedReviewUnavailable('This saved assessment is unavailable')
@@ -109,7 +109,7 @@ class ReviewDelivery:
         enrollment, contract = await self.course(user_id, enrollment_id)
         return self.public(saved, enrollment, contract)
 
-    async def list(self, user_id, enrollment_id, module_id):
+    async def list(self, user_id: str, enrollment_id: str, module_id: str) -> dict:
         enrollment, contract = await self.course(user_id, enrollment_id, module_id)
         rows = await self.reviews.records.find({'user_id': user_id, 'enrollment_id': enrollment_id,
                                                 'module_id': module_id}).sort('_id', -1).limit(51).to_list(51)

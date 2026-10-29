@@ -1,4 +1,7 @@
 """Pinned draft progression rules, separate from release verification."""
+from .catalog import CoursePackage
+
+from typing import Self
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -29,7 +32,7 @@ class ProgressionPolicy(BaseModel):
     legacy_credit: Literal['preserve_original_no_automatic_transfer']
 
     @model_validator(mode='after')
-    def coverage(self):
+    def coverage(self) -> Self:
         if (not self.module_order or len(set(self.module_order)) != len(self.module_order)
                 or set(self.module_order) != set(self.module_xp)
                 or any(type(value) is not int or value <= 0 for value in self.module_xp.values())):
@@ -37,7 +40,7 @@ class ProgressionPolicy(BaseModel):
         return self
 
 
-def package_progression_policy(package):
+def package_progression_policy(package: CoursePackage) -> ProgressionPolicy | None:
     """Old immutable packages retain their original requirements without backfill."""
     if 'progression-policy.json' not in package.manifest.artifacts:
         return None
@@ -66,12 +69,14 @@ def package_progression_policy(package):
     return policy
 
 
-def public_progression_policy(package):
+def public_progression_policy(package: CoursePackage) -> dict | None:
     policy = package_progression_policy(package)
     if policy is None:
         return None
     from .outcomes import package_outcomes
     contract = package_outcomes(package)
+    if contract is None:
+        raise ValueError('Progression policy requires its pinned outcome contract')
     return {'policy_id': policy.policy_id, 'state': policy.state,
         'required_modules': len(policy.module_order), 'required_outcomes': len(contract.required_outcomes()),
         'base_xp_total': sum(policy.module_xp.values()),

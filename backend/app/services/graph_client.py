@@ -25,7 +25,7 @@ class GraphAuthError(Exception):
 class GraphAPIError(Exception):
     """Raised when a Graph API call returns an error response."""
 
-    def __init__(self, status_code: int, error: dict | str, url: str = ""):
+    def __init__(self, status_code: int, error: dict | str, url: str = "") -> None:
         self.status_code = status_code
         self.error = error
         self.url = url
@@ -66,7 +66,7 @@ def _get_valid_token(user_id: str) -> str | None:
 class GraphClient:
     """Per-user Microsoft Graph API wrapper."""
 
-    def __init__(self, user_id: str, timeout: float = 30.0):
+    def __init__(self, user_id: str, timeout: float = 30.0) -> None:
         self.user_id = user_id
         self.timeout = timeout
 

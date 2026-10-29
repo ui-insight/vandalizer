@@ -1,4 +1,10 @@
 """Read-only support metadata without reflection text, source data or grading."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.models.certification import CertificationProgress
+
 import datetime
 import hashlib
 import re
@@ -29,9 +35,9 @@ def recorded_time(value):
     return None
 
 
-def progress_modules(progress, module_ids):
+def progress_modules(progress: CertificationProgress, module_ids):
     """The admin detail needs earned-state fields, never arbitrary module blobs."""
-    result = {}
+    result: dict = {}
     for module_id in module_ids:
         module = progress.modules.get(module_id)
         if not isinstance(module, dict):
@@ -73,8 +79,8 @@ def completion_validation(journal, row):
     return validation
 
 
-async def support_snapshot(progress, metadata, *, repository=None):
-    result = {
+async def support_snapshot(progress: CertificationProgress, metadata, *, repository=None):
+    result: dict = {
         'observed_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
         'read_only': True, 'last_saved_lesson': None,
         'position_status': 'not_recorded', 'pending_credential': progress.pending_credential is not None,
@@ -106,7 +112,7 @@ async def support_snapshot(progress, metadata, *, repository=None):
         module = modules.get(position.get('module_id')) if isinstance(position.get('module_id'), str) else None
         lesson = next((item for item in lessons[module.id]['lessons']
                        if item['id'] == position.get('lesson_id')), None) if module else None
-        if (lesson and type(position.get('revision')) is int and lesson['revision'] == position.get('revision')
+        if (module is not None and lesson and type(position.get('revision')) is int and lesson['revision'] == position.get('revision')
                 and hashlib.sha256(lesson['content'].encode()).hexdigest() == position.get('content_sha256')):
             result.update(position_status='saved', last_saved_lesson={
                 'module_id': module.id, 'module_title': module.title,

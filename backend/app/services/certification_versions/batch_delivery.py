@@ -24,14 +24,14 @@ class BatchUnavailable(ValueError):
 
 
 class BatchDelivery:
-    def __init__(self, repository=None):
+    def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         self.repository = repository or EnrollmentRepository()
         self.inputs = BatchInputRepository()
         self.runs = BatchExecution()
         self.scopes = BatchScopeRepository()
         self.reviews = BatchReviewRepository()
 
-    async def course(self, user_id, enrollment_id):
+    async def course(self, user_id: str, enrollment_id: str):
         enrollment = await self.repository._enrollment(user_id, enrollment_id)
         package = self.repository.catalog.load(enrollment.course_version)
         if 'batch-cases/batch_processing.json' not in package.manifest.artifacts:
@@ -39,14 +39,14 @@ class BatchDelivery:
         return enrollment, package, load_batch_case(package)
 
     @staticmethod
-    def verify(record, enrollment, case):
+    def verify(record, enrollment, case) -> None:
         if (any(record[key] != value for key, value in {'user_id': enrollment.user_id,
                 'enrollment_id': enrollment.uuid, 'course_version': enrollment.course_version,
                 'manifest_sha256': enrollment.manifest_sha256, 'module_id': 'batch_processing'}.items())
                 or record.get('case', record.get('input_snapshot', {}).get('case')) != case.public_definition()):
             raise CourseCatalogError('This saved batch work differs from its original course')
 
-    async def writable(self, enrollment, enabled):
+    async def writable(self, enrollment, enabled) -> bool:
         selection = await self.repository.selections.find_one({'user_id': enrollment.user_id})
         return bool(enabled and enrollment.state in ('active', 'completed') and selection
                     and selection.get('active_enrollment_id') == enrollment.uuid)
@@ -58,7 +58,7 @@ class BatchDelivery:
             'documents': [{key: value for key, value in source.items() if key != 'source_pdf_base64'} for source in saved['documents']],
             'input_snapshot_sha256': encode(saved)[1], 'execution_authorized': False, 'credit_awarded': False}
 
-    async def run_view(self, run, *, writable=False):
+    async def run_view(self, run, *, writable: bool=False) -> dict:
         plan = run['plan']
         scope = run['authorization']['decision'] if run['authorization'] else None
         if scope is None and run['scope_decision_id']:
@@ -85,10 +85,10 @@ class BatchDelivery:
                 'can_finalize': bool(writable and run['state'] == 'executing' and len(run['item_events']) == 2 * len(plan['item_plans'])),
                 'credit_awarded': False, 'module_completion_eligible': False}
 
-    def repositories(self):
+    def repositories(self) -> dict:
         return {'capture': self.inputs, 'run': self.runs, 'scope': self.scopes, 'review': self.reviews}
 
-    async def get(self, user_id, enrollment_id, reference, *, kind='review', delivery_enabled=False):
+    async def get(self, user_id: str, enrollment_id: str, reference: str, *, kind: str='review', delivery_enabled: bool=False):
         enrollment, _, case = await self.course(user_id, enrollment_id)
         saved = await self.repositories()[kind].get(user_id, reference)
         if saved is None:
@@ -108,7 +108,7 @@ class BatchDelivery:
             'run': await self.run_view(BatchPreparation.decode(saved['execution'])),
             'retries': [await self.run_view(BatchPreparation.decode(raw)) for raw in saved['retry_executions']]}
 
-    async def list(self, user_id, enrollment_id, *, delivery_enabled=False):
+    async def list(self, user_id: str, enrollment_id: str, *, delivery_enabled: bool=False) -> dict:
         enrollment, package, case = await self.course(user_id, enrollment_id)
         query = {'user_id': user_id, 'enrollment_id': enrollment_id, 'module_id': 'batch_processing'}
         result = {'enrollment_id': enrollment_id, 'module_id': 'batch_processing', 'course_version': enrollment.course_version,
@@ -157,7 +157,7 @@ class BatchDelivery:
                 'assigned_sources': sources, 'proposed_scope': proposed, 'older_extractions_available': len(owned) > 50, 'can_submit': writable,
                 'read_only_reason': None if writable else 'This is preserved course history. Select an available current course before saving new work.'}
 
-    async def download(self, user_id, enrollment_id, reference, *, origin, source_id):
+    async def download(self, user_id: str, enrollment_id: str, reference: str, *, origin, source_id: str):
         enrollment, _, case = await self.course(user_id, enrollment_id)
         saved = await self.repositories()[origin].get(user_id, reference)
         if saved is None:
@@ -175,7 +175,7 @@ class BatchDelivery:
             raise BatchUnavailable('This source is not a member of the original assigned inventory')
         return base64.b64decode(source['source_pdf_base64'], validate=True), source['assigned_filename']
 
-    async def save(self, user_id, enrollment_id, payload, *, action):
+    async def save(self, user_id: str, enrollment_id: str, payload, *, action):
         current = await self.repository.current(user_id)
         if current is None or current.uuid != enrollment_id:
             raise EnrollmentConflict('Select your existing course before saving or executing batch work')
@@ -213,5 +213,5 @@ class BatchAssessment(ProcessAssessment):
     delivery_class = BatchDelivery
     prepare_method = 'prepare_from_batch_review'
 
-    def __init__(self, repository=None):
+    def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         super().__init__(repository or EnrollmentRepository())

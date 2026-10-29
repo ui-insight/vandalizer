@@ -66,7 +66,7 @@ def validate_suite_binding(snapshot, suite, case, *, original_run=None):
     return phase, changed, digest
 
 
-def validation_plan(snapshot, suite, case, system_config, *, original_run=None):
+def validation_plan(snapshot, suite, case, system_config, *, original_run=None) -> dict:
     phase, changed, digest = validate_suite_binding(snapshot, suite, case, original_run=original_run)
     # Reuse production extraction configuration resolution only. The validation
     # record remains a distinct kind and cannot enter the generic lab executor.

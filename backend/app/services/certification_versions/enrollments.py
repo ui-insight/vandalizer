@@ -4,9 +4,17 @@ Initialization is restartable without transactions: deterministic initial IDs,
 insert-only progress/enrollment writes, then a single atomic active selection.
 No historical grade or credential field is rewritten by initialization.
 """
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from motor.motor_asyncio import AsyncIOMotorCollection
+
 from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator
 from uuid import NAMESPACE_URL, uuid4, uuid5
 import datetime
+from typing import cast
 
 from beanie import PydanticObjectId
 from bson import ObjectId
@@ -27,38 +35,38 @@ def initial_enrollment_id(user_id: str) -> str:
 
 
 class EnrollmentRepository:
-    def __init__(self, catalog: CourseCatalog | None = None):
+    def __init__(self, catalog: CourseCatalog | None = None) -> None:
         self.catalog = catalog or CourseCatalog()
 
     @property
-    def enrollments(self):
+    def enrollments(self) -> AsyncIOMotorCollection:
         return CertificationEnrollment.get_motor_collection()
 
     @property
-    def selections(self):
+    def selections(self) -> AsyncIOMotorCollection:
         return CertificationEnrollmentSelection.get_motor_collection()
 
     @property
-    def progress(self):
+    def progress(self) -> AsyncIOMotorCollection:
         return CertificationProgress.get_motor_collection()
 
-    async def _enrollment(self, user_id, enrollment_id):
+    async def _enrollment(self, user_id: str, enrollment_id: str) -> CertificationEnrollment:
         raw = await self.enrollments.find_one({'uuid': enrollment_id, 'user_id': user_id})
         if raw is None:
             raise EnrollmentConflict('The selected enrollment is unavailable; recover the existing selection before continuing')
-        enrollment = CertificationEnrollment.model_validate(raw)
+        enrollment = cast(CertificationEnrollment, CertificationEnrollment.model_validate(raw))
         package = self.catalog.load(enrollment.course_version)
         if package.manifest_sha256 != enrollment.manifest_sha256:
             raise CourseCatalogError('The enrollment definition no longer matches the published course')
         return enrollment
 
-    async def current(self, user_id: str):
+    async def current(self, user_id: str) -> CertificationEnrollment | None:
         selection = await self.selections.find_one({'user_id': user_id})
         if selection is None:
             return None
         return await self._enrollment(user_id, selection['active_enrollment_id'])
 
-    async def ensure_initial(self, user_id: str):
+    async def ensure_initial(self, user_id: str) -> CertificationEnrollment:
         current = await self.current(user_id)
         if current is not None:
             return current
@@ -113,9 +121,12 @@ class EnrollmentRepository:
             }}, upsert=True)
         except DuplicateKeyError:
             pass
-        return await self.current(user_id)
+        selected = await self.current(user_id)
+        if selected is None:
+            raise EnrollmentConflict("The course selection disappeared during initialization; reload before continuing")
+        return selected
 
-    async def read_progress(self, user_id: str, enrollment_id: str):
+    async def read_progress(self, user_id: str, enrollment_id: str) -> CertificationProgress:
         enrollment = await self._enrollment(user_id, enrollment_id)
         raw = await self.progress.find_one({'_id': PydanticObjectId(enrollment.progress_id), 'user_id': user_id})
         if raw is None:
@@ -126,7 +137,7 @@ class EnrollmentRepository:
             raw.get('enrollment_id') != enrollment.uuid or raw.get('course_version') != enrollment.course_version
         ):
             raise EnrollmentConflict('Versioned progress is missing its enrollment identity')
-        progress = CertificationProgress.model_validate(raw)
+        progress = cast(CertificationProgress, CertificationProgress.model_validate(raw))
         # These bindings are returned to the operation, not written to legacy data.
         progress.enrollment_id = enrollment.uuid
         progress.course_version = enrollment.course_version
@@ -134,7 +145,7 @@ class EnrollmentRepository:
 
     @asynccontextmanager
     async def write_boundary(self, user_id: str, enrollment_id: str, *, operation: str = 'certification_write', recovery_request_id: str | None = None,
-                             review_attempt_id: str | None = None, selection_request: dict | None = None):
+                             review_attempt_id: str | None = None, selection_request: dict | None = None) -> AsyncIterator[CertificationProgress]:
         """Pin and serialize writes; an interrupted worker fails closed.
 
         The durable marker is intentionally not cleared by a timeout: a slow
@@ -192,7 +203,7 @@ class EnrollmentRepository:
                 {'$set': {'in_flight_writes': 0}, '$unset': {'active_write': ''}},
             )
 
-    async def activate(self, user_id: str, target_id: str, *, expected_source: str, expected_revision: int, decision: dict):
+    async def activate(self, user_id: str, target_id: str, *, expected_source: str, expected_revision: int, decision: dict) -> CertificationEnrollment:
         """Internal activation boundary; callers must supply a reviewed transfer.
 
         No HTTP activation endpoint is exposed until credit previews, attempt

@@ -1,4 +1,10 @@
 """Read-only release comparison; never infer credit equivalence or rollout consent."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.catalog import CoursePackage
+
 import hashlib
 import json
 from datetime import datetime, timezone
@@ -15,7 +21,7 @@ def digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
 
 
-def differences(before, after):
+def differences(before, after) -> dict:
     return {
         'added': sorted(after.keys() - before.keys()),
         'removed': sorted(before.keys() - after.keys()),
@@ -24,7 +30,7 @@ def differences(before, after):
     }
 
 
-def lesson_index(package):
+def lesson_index(package: CoursePackage) -> dict:
     return {lesson['id']: {'module_id': module_id, **lesson}
             for module_id, module in package.json('lessons.json').items()
             for lesson in module['lessons']}
@@ -35,12 +41,12 @@ def outcome_index(contract):
             for module in contract.modules for outcome in module.outcomes} if contract else {}
 
 
-def cohort_summary(report):
+def cohort_summary(report) -> dict:
     """Accept only the aggregate inventory format; omit arbitrary extra payloads."""
     if (not isinstance(report, dict) or type(report.get('schema_version')) is not int
             or report.get('schema_version') != 1):
         raise CourseCatalogError('Provide a schema-1 certification cohort inventory')
-    def counts(value):
+    def counts(value) -> dict:
         if not isinstance(value, dict) or any(not isinstance(k, str) or type(v) is not int or v < 0
                                               for k, v in value.items()):
             raise CourseCatalogError('Cohort inventory counts must be nonnegative integers')
@@ -73,7 +79,7 @@ def cohort_summary(report):
             'interpretation': 'Observed aggregates only; not current membership, integrity verification or permission to migrate.'}
 
 
-def publication_impact(source, target, *, inventory=None):
+def publication_impact(source, target, *, inventory=None) -> dict:
     """Compare already verified packages without database access or mutations.
 
     This is preparation evidence. Compatibility of live models/tools and actual
@@ -90,7 +96,7 @@ def publication_impact(source, target, *, inventory=None):
     outcomes = differences(outcome_index(source_contract), outcome_index(target_contract))
     artifacts = differences(source.manifest.artifacts, target.manifest.artifacts)
     findings = []
-    def block(code, action):
+    def block(code, action) -> None:
         findings.append({'code': code, 'action': action})
     if source.manifest.release_id == target.manifest.release_id:
         block('same_release_identity', 'Use a separate release identity for a material course change.')
@@ -207,7 +213,7 @@ def publication_impact(source, target, *, inventory=None):
     }
 
 
-def inspect_catalogs(source_catalog, source_id, target_catalog, target_id, *, inventory=None):
+def inspect_catalogs(source_catalog, source_id: str, target_catalog, target_id: str, *, inventory=None):
     source_bytes = (source_catalog.root / 'registry.json').read_bytes()
     target_bytes = (target_catalog.root / 'registry.json').read_bytes()
     source_registry, target_registry = source_catalog.registry(), target_catalog.registry()
@@ -261,7 +267,7 @@ def require_publication_impact(catalog, release_id, *, report, source_catalog=No
     return current
 
 
-def change_summary(report):
+def change_summary(report) -> dict:
     """Reviewer-facing names of exactly what a publication changes."""
     return {
         'source': report['source']['course_version'], 'target': report['target']['course_version'],

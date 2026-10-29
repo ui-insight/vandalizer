@@ -1,4 +1,10 @@
 """Claim one approved internal run and retain its bounded stage evidence."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
 import asyncio
 from copy import deepcopy
 import datetime
@@ -32,7 +38,7 @@ class ConnectedExecutionRequest(ContractModel):
 
 
 class ConnectedWorkflowExecution(ConnectedWorkflowPreparation):
-    async def execute(self, operation, body, system_config_doc, *, actor_user_id):
+    async def execute(self, operation: CourseOperation, body, system_config_doc, *, actor_user_id: str):
         body = ConnectedExecutionRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Only the authenticated learner can dispatch this approved run')
@@ -64,6 +70,8 @@ class ConnectedWorkflowExecution(ConnectedWorkflowPreparation):
                 raise EnrollmentConflict('The saved scope choice changed before this run was claimed')
             return latest
         run = await self.get(operation.user_id, body.run_id)
+        if run is None:
+            raise EnrollmentConflict('The original execution receipt is no longer available')
         started_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
         stop = threading.Event()
         loop = asyncio.get_running_loop()
@@ -86,6 +94,8 @@ class ConnectedWorkflowExecution(ConnectedWorkflowPreparation):
             output = await asyncio.wait_for(asyncio.to_thread(execute_approved_chain, run, case, config,
                 checkpoint=checkpoint, should_stop=stop.is_set), timeout=RUN_TIMEOUT_SECONDS)
             saved = await self.get(operation.user_id, body.run_id)
+            if saved is None:
+                raise EnrollmentConflict('The original execution receipt is no longer available')
             completed = [item for item in saved['stage_events'] if item['receipt']['kind'] == 'stage_completed']
             if len(saved['stage_events']) != 6 or completed != output['stage_receipts']:
                 raise EnrollmentConflict('The final output does not match every durable completed stage')
@@ -112,7 +122,7 @@ class ConnectedWorkflowExecution(ConnectedWorkflowPreparation):
         await self._finish_connected(run, lease, result, started_at)
         return await self.get(operation.user_id, body.run_id)
 
-    async def _finish_connected(self, run, lease, result, started_at):
+    async def _finish_connected(self, run, lease, result, started_at) -> None:
         raw = await self.records.find_one({'uuid': run['run_id'], 'user_id': run['plan']['user_id']})
         if raw is None or raw.get('authorization_sha256') != encode(run['authorization'])[1]:
             raise EnrollmentConflict('The connected run disappeared before its terminal receipt was saved')

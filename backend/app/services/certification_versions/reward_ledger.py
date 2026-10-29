@@ -13,9 +13,16 @@ Reward rule (C8-MIGRATE-09):
 Lifetime earned XP sums earned XP only; carried XP is shown, never added twice.
 Recorded totals that the rule cannot explain are reported, not rewritten.
 """
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.models.certification import CertificationProgress
+    from app.services.certification_versions.catalog import CoursePackage
 
 
-def _module(item, saved, star_bonus, legacy):
+
+def _module(item, saved, star_bonus, legacy) -> dict:
     if not isinstance(saved, dict):
         saved = {}
     completed = saved.get('completed') is True
@@ -32,7 +39,7 @@ def _module(item, saved, star_bonus, legacy):
             'explained': star_xp == expected_star_xp and (completed or earned == 0)}
 
 
-def enrollment_rewards(package, progress, *, provenance=None, credential_id=None):
+def enrollment_rewards(package: CoursePackage, progress: CertificationProgress, *, provenance=None, credential_id=None) -> dict:
     legacy = provenance == 'legacy_version_unknown'
     modules = [_module(item, progress.modules.get(item.id), package.manifest.star_bonus_xp, legacy)
                for item in package.manifest.modules]
@@ -50,7 +57,7 @@ def enrollment_rewards(package, progress, *, provenance=None, credential_id=None
             'credential_id': credential_id}
 
 
-def user_rewards(rows):
+def user_rewards(rows) -> dict:
     """Combine per-enrollment ledgers; carried XP never enters the lifetime total."""
     credentials = [row['credential_id'] for row in rows if row['credential_id']]
     return {'enrollments': rows, 'lifetime_earned_xp': sum(row['earned_xp'] for row in rows),
@@ -65,7 +72,7 @@ def user_rewards(rows):
             ]}
 
 
-async def load_user_rewards(repository, user_id):
+async def load_user_rewards(repository, user_id: str):
     from .credentials import CredentialRepository
     credentials = CredentialRepository()
     rows = []

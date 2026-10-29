@@ -1,4 +1,10 @@
 """Collect owned process-design evidence; never manufacture executed work."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
 import hashlib
 from pathlib import Path
 
@@ -16,7 +22,7 @@ from .process_case import load_process_case
 from .process_submissions import ProcessSubmissionRepository
 
 
-async def assemble_process(operation, submission_id, *, actor_user_id):
+async def assemble_process(operation: CourseOperation, submission_id, *, actor_user_id: str) -> dict:
     if actor_user_id != operation.user_id:
         raise EnrollmentConflict('Process assessment requires the authenticated learner')
     saved = await ProcessSubmissionRepository().get(actor_user_id, submission_id)
@@ -30,7 +36,7 @@ async def assemble_process(operation, submission_id, *, actor_user_id):
         raise CourseCatalogError('The saved process design does not match its original assigned case')
     evidence = []
 
-    def add(kind, identity, value):
+    def add(kind, identity, value) -> None:
         try:
             evidence.append(ReviewEvidence(id=identity, kind=kind, text=encode(value)[0]).model_dump(mode='json'))
         except ValidationError as exc:

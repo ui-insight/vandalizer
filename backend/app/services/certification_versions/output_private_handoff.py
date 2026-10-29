@@ -5,6 +5,13 @@ bytes. Explicit retry copies only the reviewed files into this private record.
 The copy and success receipt are one MongoDB insert, so a lost reply is resolved
 by reading the original request, never repeating generation or an external send.
 """
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
+from typing import Self
 from copy import deepcopy
 import datetime
 from typing import Annotated, Literal
@@ -17,7 +24,7 @@ from .catalog import CourseCatalogError
 from .enrollments import EnrollmentConflict
 from .lab_execution import LabExecutionRepository
 from .lab_inputs import LabInputRepository
-from .learner_decisions import LearnerDecisionRepository
+from .learner_decisions import LearnerDecisionRepository, LearnerDecisionJournal
 from .outcomes import ContractModel
 from .output_artifacts import verify_generated_artifacts
 from .output_file_reviews import OutputFileReviewRepository, OutputFileReviewRequest
@@ -43,7 +50,7 @@ class OutputHandoffRequest(ContractModel):
     consent: Literal['attempt_approved_private_training_handoff', 'retry_only_failed_private_training_handoff']
 
     @model_validator(mode='after')
-    def explicit_action(self):
+    def explicit_action(self) -> Self:
         if self.action == 'attempt':
             if (self.previous_failed_id is not None or self.previous_failed_sha256 is not None
                     or self.consent != 'attempt_approved_private_training_handoff'):
@@ -55,14 +62,14 @@ class OutputHandoffRequest(ContractModel):
         return self
 
 
-def release_authorization(review):
+def release_authorization(review) -> dict:
     return {key: deepcopy(review[key]) for key in ('uuid', 'user_id', 'enrollment_id', 'module_id', 'course_version',
         'manifest_sha256', 'run_id', 'submission', 'submitted_at', 'submission_channel')}
 
 
-class OutputPrivateHandoffRepository(LearnerDecisionRepository):
+class OutputPrivateHandoffRepository(LearnerDecisionJournal):
     @staticmethod
-    def decode(raw):
+    def decode(raw: dict) -> dict:
         saved = LearnerDecisionRepository.decode(raw)
         try:
             body = OutputHandoffRequest.model_validate(saved['submission'])
@@ -109,11 +116,11 @@ class OutputPrivateHandoffRepository(LearnerDecisionRepository):
         except (KeyError, TypeError, ValueError, EnrollmentConflict) as exc:
             raise CourseCatalogError('The private training handoff failed integrity verification') from exc
 
-    async def get(self, user_id, request_id):
+    async def get(self, user_id: str, request_id: str) -> dict | None:
         raw = await self.records.find_one({'uuid': request_id, 'user_id': user_id, 'prompt_id': PROMPT_ID, 'module_id': 'output_delivery'})
         return self.decode(raw) if raw else None
 
-    async def submit(self, operation, body, *, actor_user_id):
+    async def submit(self, operation: CourseOperation, body, *, actor_user_id: str):
         body = OutputHandoffRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Only the authenticated learner can send to this private training inbox')
@@ -208,7 +215,7 @@ class OutputPrivateHandoffRepository(LearnerDecisionRepository):
         await self._finish_claim(operation, saved)
         return saved
 
-    async def _finish_claim(self, operation, saved):
+    async def _finish_claim(self, operation, saved) -> None:
         lease = LabExecutionRepository.check_operation(operation, saved)
         await LabInputRepository._check_lease(lease)
         # First failure releases the decision lock, permitting a subsequent hold.

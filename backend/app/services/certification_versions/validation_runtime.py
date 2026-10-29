@@ -8,7 +8,7 @@ from .validation_checks import check_repair, check_suite
 from .validation_plan import validation_plan
 
 
-def complete_result(plan, results):
+def complete_result(plan, results) -> dict:
     from .validation_preparation import ValidationPreparation
     case = ValidationCase.model_validate(plan['input_snapshot']['authored_case'])
     checks = check_suite(case, plan['input_snapshot'], plan['suite']['test_cases'], results)

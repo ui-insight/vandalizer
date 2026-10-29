@@ -1,5 +1,12 @@
 """Common authenticated, immutable journal protocol for capstone learner records."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
 import datetime
+from typing import Protocol, Self, Literal
 
 from pymongo.errors import DuplicateKeyError
 
@@ -9,24 +16,40 @@ from .enrollments import EnrollmentConflict
 from .governance_case import load_governance_case
 from .lab_execution import LabExecutionRepository
 from .lab_inputs import LabInputRepository
-from .learner_decisions import LearnerDecisionRepository
+from .learner_decisions import LearnerDecisionRepository, LearnerDecisionJournal
 
 MAX_RECORD_BYTES = 14 * 1024 * 1024
 IDENTITY_KEYS = ('user_id', 'enrollment_id', 'module_id', 'course_version', 'manifest_sha256', 'run_id')
 
 
-def embedded_record(saved):
+def embedded_record(saved) -> dict:
     serialized, digest = encode(saved)
     return {**saved, 'record_json': serialized, 'record_sha256': digest}
 
 
-class GovernanceJournal(LearnerDecisionRepository):
-    request_model = None
-    prompt_id = None
-    channel = None
+class GovernanceRequest(Protocol):
+    @property
+    def request_id(self) -> str: ...
+
+    @property
+    def run_id(self) -> str: ...
+
+    @property
+    def case_sha256(self) -> str: ...
 
     @classmethod
-    def decode(cls, raw):
+    def model_validate(cls, value: object) -> Self: ...
+
+    def model_dump(self, *, mode: Literal['json', 'python']) -> dict: ...
+
+
+class GovernanceJournal(LearnerDecisionJournal):
+    request_model: type[GovernanceRequest]
+    prompt_id: str
+    channel: str
+
+    @classmethod
+    def decode(cls, raw: dict) -> dict:
         saved = LearnerDecisionRepository.decode(raw)
         try:
             body = cls.request_model.model_validate(saved['submission'])
@@ -43,20 +66,20 @@ class GovernanceJournal(LearnerDecisionRepository):
             raise CourseCatalogError('The saved Governance learner record failed integrity verification') from exc
 
     @classmethod
-    def validate(cls, saved, body):
+    def validate(cls, saved, body) -> None:
         raise NotImplementedError
 
-    async def get(self, user_id, reference):
+    async def get(self, user_id: str, reference: str) -> dict | None:
         raw = await self.records.find_one({'uuid': reference, 'user_id': user_id, 'module_id': 'governance', 'prompt_id': self.prompt_id})
         return self.decode(raw) if raw else None
 
-    async def after_save(self, operation, saved, *, replay):
+    async def after_save(self, operation, saved, *, replay) -> None:
         return None
 
-    async def build(self, operation, body):
+    async def build(self, operation, body) -> dict:
         raise NotImplementedError
 
-    async def submit(self, operation, body, *, actor_user_id):
+    async def submit(self, operation: CourseOperation, body, *, actor_user_id: str):
         body = self.request_model.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('This capstone decision requires the authenticated learner')

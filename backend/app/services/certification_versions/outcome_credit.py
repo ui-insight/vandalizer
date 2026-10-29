@@ -1,13 +1,34 @@
 """Freeze validated original outcomes for a module's earned-credit record."""
+from __future__ import annotations
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.catalog import CoursePackage
+
 import re
 
 from .attempts import AttemptRepository, encode, normalize_assessment_selection
 from .catalog import CourseCatalogError
 from .enrollments import EnrollmentConflict
-from .outcomes import package_outcomes
+from .outcomes import require_package_outcomes
 
 
-def verified_credit_snapshot(package, progress, module_id, credit, *, expected_attempt_id, _transfer_depth=0):
+class CreditProgress(Protocol):
+    """Read-only credit identity, shared by live progress and preserved snapshots."""
+    @property
+    def user_id(self) -> str: ...
+
+    @property
+    def enrollment_id(self) -> str | None: ...
+
+    @property
+    def course_version(self) -> str | None: ...
+
+    @property
+    def modules(self) -> dict: ...
+
+
+def verified_credit_snapshot(package: CoursePackage, progress: CreditProgress, module_id: str, credit, *, expected_attempt_id, _transfer_depth: int=0):
     """Validate an internal journal snapshot, never a client-supplied verdict."""
     try:
         if (not isinstance(credit, dict) or credit['attempt_id'] != expected_attempt_id
@@ -17,7 +38,7 @@ def verified_credit_snapshot(package, progress, module_id, credit, *, expected_a
         if validation.get('assessment_kind') == 'transferred_outcome_validation':
             from .credit_transfer import verify_transfer_credit
             return verify_transfer_credit(package, progress, module_id, credit, depth=_transfer_depth)
-        contract = package_outcomes(package)
+        contract = require_package_outcomes(package)
         required = next(module for module in contract.modules if module.module_id == module_id)
         authored = {item.id: item for item in required.outcomes}
         snapshot = validation['assessment_snapshot']
@@ -71,7 +92,7 @@ def verified_credit_snapshot(package, progress, module_id, credit, *, expected_a
         raise CourseCatalogError('Competency credit requires complete original outcome evidence') from exc
 
 
-def freeze_credit(package, progress, module_id, attempt):
+def freeze_credit(package, progress, module_id: str, attempt):
     credit = {'attempt_id': attempt['uuid'], 'validation_json': attempt['validation_json'],
               'validation_sha256': attempt['validation_sha256'],
               'assessment_selection_json': attempt.get('assessment_selection_json'),
@@ -82,7 +103,7 @@ def freeze_credit(package, progress, module_id, attempt):
     return credit
 
 
-def repeats_earned_outcomes(package, progress, module_id, credit):
+def repeats_earned_outcomes(package, progress: CreditProgress, module_id: str, credit) -> bool:
     """A new request receipt need not replace credit for the same saved work."""
     module = progress.modules.get(module_id, {})
     previous = module.get('outcome_credit')

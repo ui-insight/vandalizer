@@ -1,4 +1,10 @@
 """Collect exact source, pilot, inventory and recovery evidence for automatic review."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
 import hashlib
 from pathlib import Path
 
@@ -13,14 +19,14 @@ from .catalog import CourseCatalogError
 from .enrollments import EnrollmentConflict
 from .lab_execution import LabExecutionRepository
 from .lab_inputs import LabInputRepository
-from .outcomes import package_outcomes
+from .outcomes import require_package_outcomes
 from .practical_evidence import EvidenceAssemblyUnavailable
 
 REQUIREMENT_KEYS = ('id', 'statement', 'method', 'evidence', 'passing_conditions', 'critical_failures')
 REQUIREMENTS_SHA256 = '98998a3d3cee237eea5be427ef0383e80fed74ed5bca6a33a8e152cceecb0c59'
 
 
-async def assemble_batch_review(operation, submission_id, *, actor_user_id):
+async def assemble_batch_review(operation: CourseOperation, submission_id, *, actor_user_id: str) -> dict:
     if actor_user_id != operation.user_id:
         raise EnrollmentConflict('Batch assessment requires the authenticated learner')
     saved = await BatchReviewRepository().get(actor_user_id, submission_id)
@@ -28,7 +34,7 @@ async def assemble_batch_review(operation, submission_id, *, actor_user_id):
         raise EvidenceAssemblyUnavailable('Save the actual batch interpretation before requesting assessment')
     lease = LabExecutionRepository.check_operation(operation, saved)
     package = operation.package
-    case, contract = load_batch_case(package), package_outcomes(package)
+    case, contract = load_batch_case(package), require_package_outcomes(package)
     original = BatchPreparation.decode(saved['execution'])
     pilot = BatchPreparation.decode(original['plan']['parent_run_record'])
     retries = [BatchPreparation.decode(raw) for raw in saved['retry_executions']]
@@ -39,7 +45,7 @@ async def assemble_batch_review(operation, submission_id, *, actor_user_id):
     # Include all failed earlier retries, not just the selected final attempt.
     ancestors = {}
     for run in retries:
-        cursor = run
+        cursor: dict | None = run
         while cursor:
             ancestors[cursor['run_id']] = cursor
             raw = cursor['plan']['previous_retry_record']
@@ -50,13 +56,13 @@ async def assemble_batch_review(operation, submission_id, *, actor_user_id):
             raise EvidenceAssemblyUnavailable('Missing or uncomparable output values are unavailable evidence; inspect the saved item before assessment')
     evidence = []
 
-    def add(kind, identity, payload):
+    def add(kind, identity, payload) -> None:
         try:
             evidence.append(ReviewEvidence(id=identity, kind=kind, text=encode(payload)[0]).model_dump(mode='json'))
         except ValidationError as exc:
             raise EvidenceAssemblyUnavailable('Batch evidence exceeds review limits; no content was truncated') from exc
 
-    def chunks(kind, identity, text, metadata):
+    def chunks(kind, identity, text, metadata) -> None:
         for offset in range(0, max(1, len(text)), 6000):
             add(kind, f'{identity}:{offset}', {**metadata, 'text_offset': offset, 'text_length': len(text), 'text': text[offset:offset + 6000]})
 

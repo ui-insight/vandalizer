@@ -30,7 +30,7 @@ def implementation_digest():
                    'files': {str(path.relative_to(services.parent)): hashlib.sha256(path.read_bytes()).hexdigest() for path in paths}})[1]
 
 
-def checked_sources(data):
+def checked_sources(data) -> None:
     if set(data) - (TASK_INPUT_KEYS | TASK_KEYS['Extraction'] | TASK_KEYS['Prompt'] | TASK_KEYS['Formatter']):
         raise EnrollmentConflict('This workflow has settings the bounded executor does not support yet')
     if 'input_sources' in data and (not isinstance(data['input_sources'], list)
@@ -43,7 +43,7 @@ def checked_sources(data):
         raise EnrollmentConflict('Task input override must be an explicit boolean')
 
 
-def connected_workflow_plan(snapshot, case, system_config, *, default_model):
+def connected_workflow_plan(snapshot, case, system_config, *, default_model) -> dict:
     """Support the assigned three-role chain, using product input precedence.
 
     No live artifact/source lookup occurs. Unsupported integrations, linked
@@ -88,7 +88,7 @@ def connected_workflow_plan(snapshot, case, system_config, *, default_model):
             raise EnrollmentConflict('Select an explicit configured default model before preparing the workflow')
         source = documents[0]
         meta = {'uuid': source['document_id'], 'title': source['title'], 'text_markers': deepcopy(source['text_markers'])}
-        engine_steps = [{'name': 'Document', 'data': {'doc_uuids': [source['document_id']]}, 'tasks': []}]
+        engine_steps: list[dict] = [{'name': 'Document', 'data': {'doc_uuids': [source['document_id']]}, 'tasks': []}]
         stage_plans, model_names, references = [], set(), set()
         for index, item in enumerate(captured_steps):
             step, task = item['step'], item['tasks'][0]

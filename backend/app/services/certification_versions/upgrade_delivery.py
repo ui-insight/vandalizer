@@ -19,22 +19,22 @@ from .upgrade_comparison import UpgradeComparison, UpgradeUnavailable
 from .upgrade_decisions import UpgradeDecisionRepository, UpgradeDecisionRequest
 
 
-def stable_request(user_id, kind, digest):
+def stable_request(user_id: str, kind, digest):
     return uuid5(NAMESPACE_URL, f'vandalizer:certification:{kind}:{user_id}:{digest}').hex
 
 
 class UpgradeDelivery:
-    def __init__(self, repository=None):
+    def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         self.repository = repository or EnrollmentRepository()
         self.decisions = UpgradeDecisionRepository(self.repository)
         self.activations = UpgradeActivationRepository(self.repository)
         self.saved = SavedCourseSelectionRepository(self.repository)
 
-    async def existing_started_course(self, user_id, version, *, excluding=None):
+    async def existing_started_course(self, user_id: str, version, *, excluding=None):
         return await self.repository.enrollments.find_one({'user_id': user_id, 'course_version': version,
             'state': {'$ne': 'prepared'}, **({'uuid': {'$ne': excluding}} if excluding else {})})
 
-    async def decision_view(self, record):
+    async def decision_view(self, record) -> dict:
         request = record.request
         raw = await self.activations.records.find_one({'decision_id': request.request_id, 'user_id': record.user_id})
         if raw:
@@ -48,7 +48,7 @@ class UpgradeDelivery:
             'activation_request': UpgradeActivationRequest(request_id=activation_id, decision_id=request.request_id,
                 consent='activate_optional_upgrade_preserving_original_work_without_credit_transfer').model_dump(mode='json')}
 
-    async def preview(self, user_id, source_id, target_version):
+    async def preview(self, user_id: str, source_id: str, target_version) -> dict:
         comparison = UpgradeComparison(self.repository)
         public = await comparison.inspect(user_id, source_id, target_version)
         snapshot = await TransitionPreview(self.repository).inspect(user_id, source_id, target_version)
@@ -100,7 +100,7 @@ class UpgradeDelivery:
             'request': request.model_dump(mode='json'), 'recorded': original is not None,
             'decision': await self.decision_view(original) if original else None}}
 
-    async def accept(self, user_id, body):
+    async def accept(self, user_id: str, body):
         request = UpgradeDecisionRequest.model_validate(body)
         existing = await self.decisions.records.find_one({'uuid': request.request_id})
         if existing is None:
@@ -111,13 +111,13 @@ class UpgradeDelivery:
         record = await self.decisions.accept(user_id, request)
         return await self.decision_view(record)
 
-    async def decision(self, user_id, request_id):
+    async def decision(self, user_id: str, request_id: str):
         record = await self.decisions.get(user_id, request_id)
         if record is None:
             raise UpgradeUnavailable('The original saved course choice is unavailable')
         return await self.decision_view(record)
 
-    async def activation(self, user_id, request_id):
+    async def activation(self, user_id: str, request_id: str) -> dict:
         raw = await self.activations.records.find_one({'uuid': request_id, 'user_id': user_id})
         if raw is None:
             raise UpgradeUnavailable('The original course-switch request is unavailable')
@@ -129,13 +129,13 @@ class UpgradeDelivery:
             'confirmation_pending': (selected or {}).get('pending_transition_id') == request_id,
             'receipt': SelectionDelivery.summary(AttemptRepository.payload(raw, 'result'), raw['uuid']) if raw['state'] == 'applied' else None}
 
-    async def result(self, user_id, receipt, request_id):
+    async def result(self, user_id: str, receipt, request_id: str) -> dict:
         selected = await self.repository.selections.find_one({'user_id': user_id})
         return {'receipt': SelectionDelivery.summary(receipt, request_id),
                 'current_enrollment_id': (selected or {}).get('active_enrollment_id'),
                 'confirmation_pending': (selected or {}).get('pending_transition_id') == request_id}
 
-    async def activate(self, user_id, body):
+    async def activate(self, user_id: str, body):
         request = UpgradeActivationRequest.model_validate(body)
         record = await self.decisions.get(user_id, request.decision_id)
         if record is None:
@@ -147,7 +147,7 @@ class UpgradeDelivery:
         receipt = await self.activations.activate(user_id, request)
         return await self.result(user_id, receipt, request.request_id)
 
-    async def saved_options(self, user_id, *, cursor=None):
+    async def saved_options(self, user_id: str, *, cursor=None) -> dict:
         selection = await self.repository.selections.find_one({'user_id': user_id})
         current_id = (selection or {}).get('active_enrollment_id')
         if not current_id:
@@ -181,19 +181,19 @@ class UpgradeDelivery:
         return {'current_enrollment_id': current_id, 'courses': courses, 'read_only': True,
                 'next_cursor': str(rows[49]['_id']) if len(rows) > 50 else None}
 
-    async def saved_preview(self, user_id, activation_id, action):
+    async def saved_preview(self, user_id: str, activation_id, action) -> dict:
         preview = await self.saved.preview(user_id, activation_id, action)
         request = SavedCourseSelectionRequest(request_id=stable_request(user_id, 'select-saved-course', preview['preview_sha256']),
             activation_id=activation_id, action=action, preview_sha256=preview['preview_sha256'],
             consent='select_saved_course_preserving_both_histories_and_credit')
         return {'preview': preview, 'request': request.model_dump(mode='json')}
 
-    async def select_saved(self, user_id, body):
+    async def select_saved(self, user_id: str, body):
         request = SavedCourseSelectionRequest.model_validate(body)
         receipt = await self.saved.select(user_id, request)
         return await self.result(user_id, receipt, request.request_id)
 
-    async def saved_selection(self, user_id, request_id):
+    async def saved_selection(self, user_id: str, request_id: str) -> dict:
         raw = await self.saved.records.find_one({'uuid': request_id, 'user_id': user_id})
         if raw is None:
             raise UpgradeUnavailable('The original saved-course selection is unavailable')

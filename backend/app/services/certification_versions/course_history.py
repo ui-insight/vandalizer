@@ -5,20 +5,20 @@ from .learner_decisions import load_prompt
 
 
 class CourseHistory:
-    def __init__(self, repository=None):
+    def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         self.repository = repository or EnrollmentRepository()
 
-    async def selection(self, user_id):
+    async def selection(self, user_id: str):
         return await self.repository.selections.find_one({'user_id': user_id},
             {'_id': 0, 'active_enrollment_id': 1, 'revision': 1, 'pending_transition_id': 1})
 
     @staticmethod
-    def selection_status(enrollment_id, state, selection):
+    def selection_status(enrollment_id: str, state, selection):
         if (selection or {}).get('active_enrollment_id') == enrollment_id:
             return 'confirmation_pending' if selection.get('pending_transition_id') else 'current'
         return 'prepared' if state == 'prepared' else 'retained'
 
-    async def courses(self, user_id):
+    async def courses(self, user_id: str) -> dict:
         selection = await self.selection(user_id)
         rows = await self.repository.enrollments.find({'user_id': user_id}, {
             '_id': 0, 'uuid': 1, 'course_version': 1, 'manifest_sha256': 1,
@@ -47,7 +47,7 @@ class CourseHistory:
         return {'courses': courses, 'older_courses_available': len(rows) > 50,
                 'read_only': True}
 
-    async def course(self, user_id, enrollment_id):
+    async def course(self, user_id: str, enrollment_id: str) -> dict:
         selection = await self.selection(user_id)
         enrollment = await self.repository._enrollment(user_id, enrollment_id)
         package = self.repository.catalog.load(enrollment.course_version)

@@ -19,20 +19,20 @@ def implementation_digest():
         'files': {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in paths}})[1]
 
 
-def embedded_input(snapshot):
+def embedded_input(snapshot) -> dict:
     serialized, digest = encode(snapshot)
     return {**{key: snapshot[key] for key in ('uuid', 'user_id', 'enrollment_id', 'module_id', 'course_version', 'manifest_sha256', 'artifact_id')},
             'record_json': serialized, 'record_sha256': digest}
 
 
-def _original_run(snapshot, run, phase):
+def _original_run(snapshot, run, phase) -> None:
     if (run is None or run['state'] != 'completed' or run['plan']['phase'] != phase
             or run['plan']['input_snapshot'] != snapshot or run['result']['status'] != 'completed'
             or any(run['plan'][key] != snapshot[key] for key in ('user_id', 'enrollment_id', 'module_id', 'course_version', 'manifest_sha256'))):
         raise EnrollmentConflict('Use the exact complete original run, captured revision and course for this next action')
 
 
-def bind_inputs(snapshot, case, *, run_id, phase, parent=None, failed_source_id=None, previous_retry=None):
+def bind_inputs(snapshot, case, *, run_id: str, phase, parent=None, failed_source_id=None, previous_retry=None) -> dict:
     """Parents must be decoded by the trusted durable-run repository first."""
     snapshot = BatchInputRepository.decode(embedded_input(snapshot))
     if not isinstance(case, BatchCase) or snapshot['case'] != case.public_definition():
@@ -77,7 +77,7 @@ def bind_inputs(snapshot, case, *, run_id, phase, parent=None, failed_source_id=
         'previous_retry_sha256': encode(previous_retry)[1] if previous_retry else None}
 
 
-def item_plans(snapshot, *, run_id, batch_id, phase, source_ids):
+def item_plans(snapshot, *, run_id: str, batch_id, phase, source_ids):
     sources = {s['source_id']: s for s in snapshot['documents']}
     return [{'item_id': item_id(batch_id, sources[sid]['document_id']), 'batch_id': batch_id, 'run_id': run_id,
         'attempt_kind': phase, 'source_id': sid, 'document_id': sources[sid]['document_id'],
@@ -87,7 +87,7 @@ def item_plans(snapshot, *, run_id, batch_id, phase, source_ids):
                            for f in snapshot['artifact']['fields']]} for sid in source_ids]
 
 
-def batch_plan(snapshot, case, system_config, *, run_id, phase, parent=None, failed_source_id=None, previous_retry=None):
+def batch_plan(snapshot, case, system_config, *, run_id: str, phase, parent=None, failed_source_id=None, previous_retry=None) -> dict:
     try:
         binding = bind_inputs(snapshot, case, run_id=run_id, phase=phase, parent=parent,
                               failed_source_id=failed_source_id, previous_retry=previous_retry)

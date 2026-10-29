@@ -28,11 +28,11 @@ class ExecutionSubmission(BaseModel):
 
 
 class PracticalExecution:
-    def __init__(self, repository=None):
+    def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         self.repository = repository or EnrollmentRepository()
         self.runs = LabExecutionRepository()
 
-    async def owned(self, user_id, enrollment_id, run_id):
+    async def owned(self, user_id: str, enrollment_id: str, run_id: str):
         run = await self.runs.get(user_id, run_id)
         if run is None:
             raise ExecutionUnavailable('This saved practical run is unavailable')
@@ -46,7 +46,7 @@ class PracticalExecution:
         return run, package
 
     @staticmethod
-    def public(run, *, can_execute=False, blocked_reason=None):
+    def public(run, *, can_execute: bool=False, blocked_reason=None) -> dict:
         result = run.get('result') or {}
         return {
             **{key: run['plan'][key] for key in ('enrollment_id', 'module_id', 'course_version', 'manifest_sha256', 'input_snapshot_id')},
@@ -58,7 +58,7 @@ class PracticalExecution:
             'credit_awarded': False, 'module_completion_eligible': False,
         }
 
-    async def get(self, user_id, enrollment_id, run_id, *, delivery_enabled=False):
+    async def get(self, user_id: str, enrollment_id: str, run_id: str, *, delivery_enabled: bool=False):
         run, package = await self.owned(user_id, enrollment_id, run_id)
         if run['state'] != 'prepared':
             return self.public(run)
@@ -80,7 +80,7 @@ class PracticalExecution:
             return self.public(run, blocked_reason='Execution settings are unavailable. Your saved work is preserved.')
         return self.public(run, can_execute=True)
 
-    async def execute(self, user_id, enrollment_id, run_id, submission):
+    async def execute(self, user_id: str, enrollment_id: str, run_id: str, submission):
         source = await self.repository.current(user_id)
         if source is None or source.uuid != enrollment_id:
             raise EnrollmentConflict('Select your existing course before executing an assessed run')

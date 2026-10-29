@@ -134,3 +134,12 @@ def package_outcomes(package: "CoursePackage") -> OutcomeContract | None:
     if package.entry.state != 'draft' and contract.state != 'release_candidate':
         raise ValueError('Published outcomes require a verified release candidate')
     return contract
+
+
+def require_package_outcomes(package: "CoursePackage") -> OutcomeContract:
+    """Require the authored contract for operations that assess competency credit."""
+    from .catalog import CourseCatalogError
+    contract = package_outcomes(package)
+    if contract is None:
+        raise CourseCatalogError('This course requires an authored competency outcome contract')
+    return contract

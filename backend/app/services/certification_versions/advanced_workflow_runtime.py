@@ -14,7 +14,7 @@ from .enrollments import EnrollmentConflict
 MAX_EVENT_BYTES = 8 * 1024 * 1024
 
 
-def execute_approved_budget(run, case, system_config, *, checkpoint, should_stop):
+def execute_approved_budget(run, case, system_config, *, checkpoint, should_stop) -> dict:
     from app.services import workflow_engine
 
     try:
@@ -45,7 +45,8 @@ def execute_approved_budget(run, case, system_config, *, checkpoint, should_stop
     engine = workflow_engine.build_workflow_engine(deepcopy(plan['engine_steps']), plan['default_model'],
         user_id=plan['user_id'], system_config_doc=deepcopy(system_config), allow_code_execution=False)
     nodes = engine.get_topological_order()
-    lock, events = Lock(), []
+    lock = Lock()
+    events: list[dict] = []
 
     def emit(event):
         # Parallel tasks share one ordered durable log. Completion means the
@@ -65,6 +66,8 @@ def execute_approved_budget(run, case, system_config, *, checkpoint, should_stop
             return digest
 
     for index, (node, stage) in enumerate(zip(nodes[1:], plan['stage_plans'])):
+        if not isinstance(node, workflow_engine.MultiTaskNode):
+            raise EnrollmentConflict('The budget stage requires the supported task executor')
         original = node.process_task
         task_indices = {id(task): offset for offset, task in enumerate(node.tasks)}
 
@@ -106,7 +109,8 @@ def execute_approved_budget(run, case, system_config, *, checkpoint, should_stop
             emit({**identity, 'kind': 'task_completed', 'started_receipt_sha256': start, 'result': deepcopy(result)})
             return result
 
-        node.process_task = process_task
+        # Instrument this instance's task callback while retaining its engine behavior.
+        setattr(node, 'process_task', process_task)
 
     final, _ = engine.execute(should_cancel=should_stop)
     expected_tasks = sum(len(stage['tasks']) for stage in plan['stage_plans'])

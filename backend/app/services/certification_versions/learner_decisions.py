@@ -3,6 +3,15 @@
 The authenticated HTTP caller supplies the actor; chat tools must not submit on
 behalf of a learner. Saving a decision is evidence capture, never a grade.
 """
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from motor.motor_asyncio import AsyncIOMotorCollection
+    from app.services.certification_versions.runtime import CourseOperation
+    from app.services.certification_versions.catalog import CoursePackage
+
+from typing import Self
 import datetime
 import hashlib
 import json
@@ -39,7 +48,7 @@ class DecisionPrompt(BaseModel):
     execution_choice: str | None = None
 
     @model_validator(mode='after')
-    def valid_fields(self):
+    def valid_fields(self) -> Self:
         if (len(set(self.required_fields)) != len(self.required_fields)
                 or any(not field.strip() for field in self.required_fields)
                 or any(not key.strip() or not value.strip() for key, value in self.choices.items())
@@ -64,7 +73,7 @@ class ValueCheck(BaseModel):
     reason: str = Field(min_length=10, max_length=4000)
 
     @model_validator(mode='after')
-    def actual_content(self):
+    def actual_content(self) -> Self:
         if len(self.reason.strip()) < 10 or (self.decision == 'supported' and not self.source_quote.strip()):
             raise ValueError('Explain the source check; supported values require a source quote')
         return self
@@ -82,13 +91,13 @@ class DecisionSubmission(BaseModel):
     repair_case_sha256: str | None = Field(default=None, pattern=r'^[a-f0-9]{64}$')
 
     @model_validator(mode='after')
-    def actual_reason(self):
+    def actual_reason(self) -> Self:
         if len(self.reason.strip()) < 10:
             raise ValueError('Explain the decision')
         return self
 
 
-def load_prompt(package, module_id, prompt_id):
+def load_prompt(package: CoursePackage, module_id: str, prompt_id: str):
     path = f'decisions/{module_id}.json'
     if path not in package.manifest.artifacts:
         raise EnrollmentConflict('This course has no practical decision prompts for this module')
@@ -107,7 +116,7 @@ def load_prompt(package, module_id, prompt_id):
     return prompt
 
 
-def execution_requirement(package, module_id):
+def execution_requirement(package: CoursePackage, module_id: str) -> None | dict:
     path = f'decisions/{module_id}.json'
     if path not in package.manifest.artifacts:
         return None
@@ -121,17 +130,19 @@ def execution_requirement(package, module_id):
     return {'prompt_id': prompt.id, 'prompt_sha256': prompt.digest, 'choice': prompt.execution_choice}
 
 
-class LearnerDecisionRepository:
+class LearnerDecisionJournal:
     @property
-    def records(self):
+    def records(self) -> AsyncIOMotorCollection:
         return CertificationLearnerDecision.get_motor_collection()
 
     @staticmethod
-    def decode(raw):
+    def decode(raw: dict) -> dict:
         try:
             if hashlib.sha256(raw['record_json'].encode()).hexdigest() != raw['record_sha256']:
                 raise ValueError('Digest mismatch')
             record = json.loads(raw['record_json'])
+            if not isinstance(record, dict):
+                raise ValueError('The saved record must be an object')
             if any(record[key] != raw[key] for key in ('uuid', 'user_id', 'enrollment_id', 'module_id',
                     'course_version', 'manifest_sha256', 'request_sha256', 'run_id', 'prompt_id')):
                 raise ValueError('Decision identity mismatch')
@@ -139,26 +150,26 @@ class LearnerDecisionRepository:
         except (TypeError, ValueError, KeyError) as exc:
             raise CourseCatalogError('The saved learner decision failed integrity verification') from exc
 
-    async def get(self, user_id, decision_id):
+    async def get(self, user_id: str, decision_id) -> dict | None:
         raw = await self.records.find_one({'uuid': decision_id, 'user_id': user_id})
         return self.decode(raw) if raw else None
 
     @staticmethod
-    def read_identity(operation, module_id):
+    def read_identity(operation: CourseOperation, module_id: str) -> dict:
         if module_id not in {item.id for item in operation.package.manifest.modules}:
             raise EnrollmentConflict('This module is not part of the selected course')
         return {'user_id': operation.user_id, 'enrollment_id': operation.progress.enrollment_id,
                 'course_version': operation.package.manifest.release_id,
                 'manifest_sha256': operation.package.manifest_sha256, 'module_id': module_id}
 
-    async def runs(self, operation, module_id):
+    async def runs(self, operation, module_id: str) -> dict:
         query = self.read_identity(operation, module_id)
         records = await CertificationLabExecution.get_motor_collection().find(query,
             {'uuid': 1, 'state': 1}).sort('_id', -1).limit(51).to_list(None)
         return {'runs': [{'run_id': item['uuid'], 'state': item['state']} for item in records[:50]],
                 'older_runs_available': len(records) > 50}
 
-    async def context(self, operation, module_id, prompt_id, run_id):
+    async def context(self, operation: CourseOperation, module_id: str, prompt_id: str, run_id: str) -> dict:
         identity = self.read_identity(operation, module_id)
         prompt = load_prompt(operation.package, module_id, prompt_id)
         run = await LabExecutionRepository().get(operation.user_id, run_id)
@@ -183,7 +194,81 @@ class LearnerDecisionRepository:
                                 if run['plan'].get('repair_case') else None),
                 'latest_decision': self.decode(latest) if latest else None}
 
-    async def submit(self, operation, module_id, prompt_id, submission, *, actor_user_id):
+
+    async def _link_scope(self, operation, record, *, replay) -> None:
+        if record['prompt'].get('execution_choice') is None:
+            return
+        lease = LabExecutionRepository.check_operation(operation, record)
+        runs = CertificationLabExecution.get_motor_collection()
+        current = await LabExecutionRepository().get(operation.user_id, record['run_id'])
+        if current is None:
+            raise EnrollmentConflict('The reviewed run is unavailable')
+        if current.get('scope_decision_id') == record['uuid']:
+            return
+        previous = record['previous_scope_decision_id']
+        if current.get('scope_decision_id') != previous:
+            if replay:
+                return  # Historical replay cannot replace a newer choice.
+            raise EnrollmentConflict('Another scope decision was saved; reload the run before continuing')
+        await LabInputRepository._check_lease(lease)
+        linked = await runs.update_one({'uuid': record['run_id'], 'user_id': operation.user_id,
+            'state': 'prepared', 'plan_sha256': record['plan_sha256'], 'scope_decision_id': previous},
+            {'$set': {'scope_decision_id': record['uuid'], 'scope_decision_sha256': encode(record)[1]}})
+        if linked.modified_count != 1:
+            latest = await runs.find_one({'uuid': record['run_id'], 'scope_decision_id': record['uuid']})
+            if latest is None:
+                raise EnrollmentConflict('The run or scope decision changed before this choice was linked')
+
+    async def authorize(self, operation: CourseOperation, run):
+        """Read the currently linked consent, never an arbitrary passing answer."""
+        LabExecutionRepository.check_operation(operation, run['plan'])
+        return await self.inspect_authorization(operation.user_id, operation.progress.enrollment_id, operation.package, run)
+
+    async def inspect_authorization(self, user_id: str, enrollment_id: str | None, package: CoursePackage, run) -> None | dict:
+        """Validate linked consent without acquiring a write lease or dispatching."""
+        identity = {'user_id': user_id, 'enrollment_id': enrollment_id,
+                    'course_version': package.manifest.release_id, 'manifest_sha256': package.manifest_sha256}
+        if any(run['plan'].get(key) != value for key, value in identity.items()):
+            raise EnrollmentConflict('The saved execution belongs to a different learner or course')
+        requirement = execution_requirement(package, run['plan']['module_id'])
+        if requirement != run['plan'].get('approval_requirement'):
+            raise EnrollmentConflict('Execution approval requirements changed; prepare a new run')
+        if requirement is None:
+            return None
+        record = await self.get(user_id, run.get('scope_decision_id'))
+        if record is None:
+            raise EnrollmentConflict('Record your scope approval for this saved run before execution')
+        if any(record.get(key) != value for key, value in identity.items()):
+            raise EnrollmentConflict('The saved scope decision belongs to a different learner or course')
+        if (encode(record)[1] != run.get('scope_decision_sha256')
+                or record['module_id'] != run['plan']['module_id'] or record['run_id'] != run['run_id']
+                or record['plan_sha256'] != run['plan_sha256']
+                or record['input_snapshot_sha256'] != run['plan']['input_snapshot_sha256']
+                or record['prompt_id'] != requirement['prompt_id'] or record['prompt_sha256'] != requirement['prompt_sha256']
+                or record['run_state_at_submission'] != 'prepared'
+                or record['submission_channel'] != 'authenticated_learner_request'):
+            raise EnrollmentConflict('The saved scope decision does not authorize this exact run')
+        if record['submission']['choice'] != requirement['choice']:
+            raise EnrollmentConflict('Your latest scope decision does not approve execution; review it before running')
+        snapshot = await LabInputRepository().get(user_id, run['plan']['input_snapshot_id'])
+        if snapshot is None or encode(snapshot)[1] != run['plan']['input_snapshot_sha256']:
+            raise EnrollmentConflict('The original run inputs are unavailable or changed')
+        repair = run['plan'].get('repair_case')
+        if (capture_repair_case(package, snapshot) != repair
+                or not repair_reference_matches(repair, record['submission'].get('repair_case_sha256'))):
+            raise EnrollmentConflict('The saved repair decision does not authorize this exact example and run')
+        proposal = run['plan'].get('scope_proposal')
+        if capture_proposal(package, snapshot) != proposal:
+            raise EnrollmentConflict('The saved scope proposal does not match this course and run')
+        if proposal is not None and not selection_matches_run(proposal,
+                DecisionSubmission.model_validate(record['submission']).proposal_selection, snapshot):
+            raise EnrollmentConflict('The source you selected does not match the assigned run; correct the scope before execution')
+        return {'run_id': run['run_id'], 'plan_sha256': run['plan_sha256'], 'decision': record,
+                'decision_sha256': encode(record)[1]}
+
+
+class LearnerDecisionRepository(LearnerDecisionJournal):
+    async def submit(self, operation: CourseOperation, module_id: str, prompt_id: str, submission, *, actor_user_id: str):
         submission = DecisionSubmission.model_validate(submission)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Only the authenticated learner can submit this decision')
@@ -250,77 +335,8 @@ class LearnerDecisionRepository:
             existing = await self.records.find_one({'uuid': submission.request_id})
             if existing is None or existing['request_sha256'] != request_sha256:
                 raise EnrollmentConflict('This learner decision request was already claimed')
-        record = await self.get(actor_user_id, submission.request_id)
-        await self._link_scope(operation, record, replay=False)
-        return record
-
-    async def _link_scope(self, operation, record, *, replay):
-        if record['prompt'].get('execution_choice') is None:
-            return
-        lease = LabExecutionRepository.check_operation(operation, record)
-        runs = CertificationLabExecution.get_motor_collection()
-        current = await LabExecutionRepository().get(operation.user_id, record['run_id'])
-        if current is None:
-            raise EnrollmentConflict('The reviewed run is unavailable')
-        if current.get('scope_decision_id') == record['uuid']:
-            return
-        previous = record['previous_scope_decision_id']
-        if current.get('scope_decision_id') != previous:
-            if replay:
-                return  # Historical replay cannot replace a newer choice.
-            raise EnrollmentConflict('Another scope decision was saved; reload the run before continuing')
-        await LabInputRepository._check_lease(lease)
-        linked = await runs.update_one({'uuid': record['run_id'], 'user_id': operation.user_id,
-            'state': 'prepared', 'plan_sha256': record['plan_sha256'], 'scope_decision_id': previous},
-            {'$set': {'scope_decision_id': record['uuid'], 'scope_decision_sha256': encode(record)[1]}})
-        if linked.modified_count != 1:
-            latest = await runs.find_one({'uuid': record['run_id'], 'scope_decision_id': record['uuid']})
-            if latest is None:
-                raise EnrollmentConflict('The run or scope decision changed before this choice was linked')
-
-    async def authorize(self, operation, run):
-        """Read the currently linked consent, never an arbitrary passing answer."""
-        LabExecutionRepository.check_operation(operation, run['plan'])
-        return await self.inspect_authorization(operation.user_id, operation.progress.enrollment_id, operation.package, run)
-
-    async def inspect_authorization(self, user_id, enrollment_id, package, run):
-        """Validate linked consent without acquiring a write lease or dispatching."""
-        identity = {'user_id': user_id, 'enrollment_id': enrollment_id,
-                    'course_version': package.manifest.release_id, 'manifest_sha256': package.manifest_sha256}
-        if any(run['plan'].get(key) != value for key, value in identity.items()):
-            raise EnrollmentConflict('The saved execution belongs to a different learner or course')
-        requirement = execution_requirement(package, run['plan']['module_id'])
-        if requirement != run['plan'].get('approval_requirement'):
-            raise EnrollmentConflict('Execution approval requirements changed; prepare a new run')
-        if requirement is None:
-            return None
-        record = await self.get(user_id, run.get('scope_decision_id'))
-        if record is None:
-            raise EnrollmentConflict('Record your scope approval for this saved run before execution')
-        if any(record.get(key) != value for key, value in identity.items()):
-            raise EnrollmentConflict('The saved scope decision belongs to a different learner or course')
-        if (encode(record)[1] != run.get('scope_decision_sha256')
-                or record['module_id'] != run['plan']['module_id'] or record['run_id'] != run['run_id']
-                or record['plan_sha256'] != run['plan_sha256']
-                or record['input_snapshot_sha256'] != run['plan']['input_snapshot_sha256']
-                or record['prompt_id'] != requirement['prompt_id'] or record['prompt_sha256'] != requirement['prompt_sha256']
-                or record['run_state_at_submission'] != 'prepared'
-                or record['submission_channel'] != 'authenticated_learner_request'):
-            raise EnrollmentConflict('The saved scope decision does not authorize this exact run')
-        if record['submission']['choice'] != requirement['choice']:
-            raise EnrollmentConflict('Your latest scope decision does not approve execution; review it before running')
-        snapshot = await LabInputRepository().get(user_id, run['plan']['input_snapshot_id'])
-        if snapshot is None or encode(snapshot)[1] != run['plan']['input_snapshot_sha256']:
-            raise EnrollmentConflict('The original run inputs are unavailable or changed')
-        repair = run['plan'].get('repair_case')
-        if (capture_repair_case(package, snapshot) != repair
-                or not repair_reference_matches(repair, record['submission'].get('repair_case_sha256'))):
-            raise EnrollmentConflict('The saved repair decision does not authorize this exact example and run')
-        proposal = run['plan'].get('scope_proposal')
-        if capture_proposal(package, snapshot) != proposal:
-            raise EnrollmentConflict('The saved scope proposal does not match this course and run')
-        if proposal is not None and not selection_matches_run(proposal,
-                DecisionSubmission.model_validate(record['submission']).proposal_selection, snapshot):
-            raise EnrollmentConflict('The source you selected does not match the assigned run; correct the scope before execution')
-        return {'run_id': run['run_id'], 'plan_sha256': run['plan_sha256'], 'decision': record,
-                'decision_sha256': encode(record)[1]}
+        preserved = await self.get(actor_user_id, submission.request_id)
+        if preserved is None:
+            raise EnrollmentConflict('The saved decision is no longer available')
+        await self._link_scope(operation, preserved, replay=False)
+        return preserved

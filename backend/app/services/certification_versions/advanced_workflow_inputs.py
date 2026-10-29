@@ -3,6 +3,13 @@
 This capture preserves evidence only. A separate approved plan is required for
 execution; neither the learner's method claim nor source addition earns credit.
 """
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
+from typing import Self
 import datetime
 from typing import Literal
 
@@ -17,7 +24,7 @@ from .enrollments import EnrollmentConflict
 from .lab_execution import LabExecutionRepository
 from .lab_inputs import LabInputRepository, MAX_SNAPSHOT_BYTES
 from .outcomes import ContractModel
-from .workflow_design_inputs import WorkflowDesignInputRepository
+from .workflow_design_inputs import WorkflowDesignInputJournal
 
 
 class AdvancedWorkflowCapture(ContractModel):
@@ -30,15 +37,15 @@ class AdvancedWorkflowCapture(ContractModel):
     consent: Literal['capture_budget_workflow_and_method']
 
     @model_validator(mode='after')
-    def explained_choice(self):
+    def explained_choice(self) -> Self:
         if len(self.method_choice.strip()) < 30:
             raise ValueError('Explain the interpretation method, arithmetic evidence and available alternative')
         return self
 
 
-class AdvancedWorkflowInputRepository(WorkflowDesignInputRepository):
+class AdvancedWorkflowInputRepository(WorkflowDesignInputJournal):
     @staticmethod
-    def decode(raw):
+    def decode(raw: dict) -> dict:
         saved = LabInputRepository.decode(raw)
         try:
             body = AdvancedWorkflowCapture.model_validate(saved['request'])
@@ -66,7 +73,7 @@ class AdvancedWorkflowInputRepository(WorkflowDesignInputRepository):
         except (KeyError, TypeError, ValueError, AttributeError) as exc:
             raise CourseCatalogError('Saved budget workflow evidence failed integrity verification') from exc
 
-    async def capture(self, operation, body, *, actor_user_id):
+    async def capture(self, operation: CourseOperation, body, *, actor_user_id: str):
         body = AdvancedWorkflowCapture.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Budget workflow capture requires the authenticated learner')

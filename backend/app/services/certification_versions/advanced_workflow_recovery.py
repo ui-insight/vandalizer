@@ -27,7 +27,7 @@ class AdvancedFinalizationRequest(ContractModel):
 
 
 class AdvancedWorkflowRecovery(AdvancedWorkflowPreparation):
-    async def finalize(self, operation, body, *, actor_user_id):
+    async def finalize(self, operation, body, *, actor_user_id: str):
         from app.services.workflow_engine import WorkflowEngine
         body = AdvancedFinalizationRequest.model_validate(body)
         if actor_user_id != operation.user_id:

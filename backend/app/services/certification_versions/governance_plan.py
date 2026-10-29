@@ -30,7 +30,7 @@ def validate_scope_binding(snapshot, correction, case):
     return digest
 
 
-def extraction_input(snapshot, run_id, phase='original'):
+def extraction_input(snapshot, run_id: str, phase: str='original') -> dict:
     # Both complete records jointly inform one result. Preserve exact text and
     # source boundaries; do not let separate per-document outputs masquerade as
     # a reconciled award/amendment interpretation.
@@ -63,7 +63,7 @@ def validate_repair_binding(snapshot, correction, case, finding):
     return original, changed, digest
 
 
-def governance_plan(snapshot, correction, case, system_config, *, run_id, finding=None):
+def governance_plan(snapshot, correction, case, system_config, *, run_id: str, finding=None) -> dict:
     original, changed, finding_hash = None, [], None
     if finding is None:
         digest = validate_scope_binding(snapshot, correction, case)

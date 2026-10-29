@@ -5,10 +5,11 @@ privileges never substitute for that learner's access to new training evidence.
 Previously captured assessment history remains a separate immutable record.
 """
 from app.models.user import User
+from app.models.document import Document
 from app.services.access_control import get_authorized_document
 
 
-async def owned_source(user_id, document_id, *, lab_folder_id=None):
+async def owned_source(user_id: str, document_id: str, *, lab_folder_id: str | None = None) -> Document | None:
     document = await get_authorized_document(document_id, User(user_id=user_id))
     if document is None or document.user_id != user_id or document.soft_deleted:
         return None

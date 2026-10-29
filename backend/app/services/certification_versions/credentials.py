@@ -3,6 +3,15 @@
 The continuation rubric proves stored module completion only. It does not
 supply evidence for the proposed new Vandalizer 5.0 supervision outcomes.
 """
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from motor.motor_asyncio import AsyncIOMotorCollection
+    from app.models.certification import CertificationProgress
+    from app.services.certification_versions.catalog import CoursePackage
+
+from typing import Self
 import datetime
 import hashlib
 import json
@@ -18,9 +27,8 @@ from .enrollments import EnrollmentConflict, EnrollmentRepository
 from .credential_scope import CredentialScope, scope_from_contract
 
 
-class CredentialSnapshot(BaseModel):
+class CredentialSnapshotFields(BaseModel):
     model_config = ConfigDict(extra='forbid', frozen=True)
-    schema_version: Literal[1] = 1
     credential_id: str
     user_id: str
     enrollment_id: str
@@ -42,20 +50,27 @@ class CredentialSnapshot(BaseModel):
     supersedes_credential_id: str | None = None
 
 
-class CompetencyCredentialSnapshot(CredentialSnapshot):
+class CredentialSnapshot(CredentialSnapshotFields):
+    schema_version: Literal[1] = 1
+
+
+class CompetencyCredentialSnapshot(CredentialSnapshotFields):
     """New issuance format; schema-1 records retain their original exact shape."""
     schema_version: Literal[2] = 2
     credential_scope: CredentialScope
 
     @model_validator(mode='after')
-    def competency_identity(self):
+    def competency_identity(self) -> Self:
         if (self.provenance != 'versioned_course_completion' or not self.outcomes or not self.module_ids
                 or not self.course_version or not self.manifest_sha256 or not self.rubric_id):
             raise ValueError('A recorded competency scope requires its original versioned outcome credential')
         return self
 
 
-def parse_credential_snapshot(value):
+CredentialRecord = CredentialSnapshot | CompetencyCredentialSnapshot
+
+
+def parse_credential_snapshot(value: object) -> CredentialRecord:
     if not isinstance(value, dict) or type(value.get('schema_version', 1)) is not int:
         raise ValueError('Invalid credential schema')
     schema = value.get('schema_version', 1)
@@ -67,11 +82,11 @@ def parse_credential_snapshot(value):
 
 class CredentialRepository:
     @property
-    def records(self):
+    def records(self) -> AsyncIOMotorCollection:
         return CertificationCredential.get_motor_collection()
 
     @staticmethod
-    def decode(raw) -> CredentialSnapshot:
+    def decode(raw: dict) -> CredentialRecord:
         try:
             if hashlib.sha256(raw['record_json'].encode()).hexdigest() != raw['record_sha256']:
                 raise CourseCatalogError('The preserved credential failed its integrity check')
@@ -89,11 +104,11 @@ class CredentialRepository:
             raise CourseCatalogError('The preserved credential needs record reconciliation') from exc
         return record
 
-    async def get(self, user_id: str, credential_id: str):
+    async def get(self, user_id: str, credential_id: str) -> CredentialRecord | None:
         raw = await self.records.find_one({'uuid': credential_id, 'user_id': user_id})
         return self.decode(raw) if raw else None
 
-    async def for_enrollment(self, user_id: str, enrollment_id: str):
+    async def for_enrollment(self, user_id: str, enrollment_id: str | None) -> CredentialRecord | None:
         raw = await self.records.find_one({'enrollment_id': enrollment_id, 'user_id': user_id})
         return self.decode(raw) if raw else None
 
@@ -101,7 +116,7 @@ class CredentialRepository:
         rows = await self.records.find({'user_id': user_id}).to_list(None)
         return [self.decode(raw) for raw in rows]
 
-    async def _insert_snapshot(self, progress, package, learner_name: str, *, legacy=False):
+    async def _insert_snapshot(self, progress: CertificationProgress, package, learner_name: str, *, legacy: bool=False):
         """Caller holds the enrollment write boundary; no update path exists."""
         existing = await self.for_enrollment(progress.user_id, progress.enrollment_id)
         if existing:
@@ -109,7 +124,7 @@ class CredentialRepository:
         return await self.persist(self.prepare(progress, package, learner_name, legacy=legacy))
 
     @staticmethod
-    def prepare(progress, package, learner_name: str, *, legacy=False) -> CredentialSnapshot:
+    def prepare(progress: CertificationProgress, package: CoursePackage, learner_name: str, *, legacy: bool=False) -> CredentialRecord:
         if not progress.certified:
             raise EnrollmentConflict('This enrollment has not earned certification')
         if not progress.enrollment_id or progress.course_version != package.manifest.release_id:
@@ -142,7 +157,7 @@ class CredentialRepository:
                     item.update(basis='transferred_required_outcomes', xp_carried=snapshot['xp_carried'], xp_earned=0)
             evidence.append(item)
         snapshot_model = CompetencyCredentialSnapshot if contract else CredentialSnapshot
-        return snapshot_model(
+        return snapshot_model.model_validate(dict(
             credential_id=uuid5(NAMESPACE_URL, 'vandalizer:credential:' + progress.enrollment_id).hex,
             user_id=progress.user_id, enrollment_id=progress.enrollment_id,
             learner_name=learner_name or progress.user_id,
@@ -162,9 +177,9 @@ class CredentialRepository:
             # course keeps the Vandal Workflow Architect title it awarded.
             **({'credential_scope': scope_from_contract(package, contract),
                 'credential_title': package.manifest.title} if contract else {}),
-        )
+        ))
 
-    async def persist(self, record: CredentialSnapshot) -> CredentialSnapshot:
+    async def persist(self, record: CredentialRecord) -> CredentialRecord:
         """Insert the already frozen payload, including on an interrupted retry."""
         serialized = json.dumps(record.model_dump(mode='json'), sort_keys=True, separators=(',', ':'))
         try:

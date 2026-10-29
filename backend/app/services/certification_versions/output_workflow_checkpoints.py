@@ -14,7 +14,7 @@ from .lab_inputs import LabInputRepository
 MAX_CHECKPOINT_BYTES = 4 * 1024 * 1024
 
 
-def validate_event(event, previous, run):
+def validate_event(event, previous, run) -> None:
     from app.services.workflow_engine import _build_combined_context
     sequence = len(previous)
     if sequence >= 8:

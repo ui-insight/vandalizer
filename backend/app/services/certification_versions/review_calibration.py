@@ -1,4 +1,5 @@
 """Run authored synthetic review cases; never infer release readiness from a pass."""
+from typing import Self
 from typing import Literal
 
 from pydantic import Field, model_validator
@@ -24,12 +25,12 @@ class ReviewCalibrationSuite(ContractModel):
     cases: tuple[ReviewCalibrationCase, ...] = Field(min_length=3)
 
     @model_validator(mode='after')
-    def unique_cases(self):
+    def unique_cases(self) -> Self:
         if len({case.id for case in self.cases}) != len(self.cases):
             raise ValueError('Calibration case identities must be unique')
         return self
 
-    def verify_contract(self, contract):
+    def verify_contract(self, contract) -> None:
         module = next((module for module in contract.modules if module.module_id == self.module_id), None)
         required = {outcome.id for outcome in module.outcomes if outcome.method == 'structured_review'} if module else set()
         if not required or contract.rubric_id != self.rubric_id:
@@ -43,7 +44,7 @@ class ReviewCalibrationSuite(ContractModel):
             raise ValueError('Automatic-only grading needs an unclear-evidence calibration case')
 
 
-def measure_calibration_case(case, result):
+def measure_calibration_case(case, result) -> dict:
     """Measure a returned verdict without confusing technical failure with performance."""
     actual = {item['outcome_id']: item['verdict'] for item in result['outcomes']}
     unavailable = result['status'] == 'grading_unavailable'
@@ -57,7 +58,7 @@ def measure_calibration_case(case, result):
             'grading_unavailable': unavailable, 'review_result': result}
 
 
-async def run_review_calibration(contract, suite, *, model_name, system_config, call_model=None):
+async def run_review_calibration(contract, suite, *, model_name, system_config, call_model=None) -> dict:
     suite.verify_contract(contract)
     rows = []
     for case in suite.cases:

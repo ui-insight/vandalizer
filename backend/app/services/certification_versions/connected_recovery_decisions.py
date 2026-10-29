@@ -3,6 +3,13 @@
 The finite choices can be checked directly. Free text is preserved without a
 quality claim; this practice never awards an outcome, XP or module completion.
 """
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
+from typing import Self
 import datetime
 from typing import Literal
 
@@ -17,7 +24,7 @@ from .connected_workflow_reviews import embedded_execution
 from .enrollments import EnrollmentConflict
 from .lab_execution import LabExecutionRepository
 from .lab_inputs import LabInputRepository
-from .learner_decisions import LearnerDecisionRepository
+from .learner_decisions import LearnerDecisionRepository, LearnerDecisionJournal
 from .multi_step_case import load_multi_step_case
 from .outcomes import ContractModel
 
@@ -40,13 +47,13 @@ class ConnectedRecoveryDecisionRequest(ContractModel):
     consent: Literal['save_my_actual_stopped_run_recovery_choices']
 
     @model_validator(mode='after')
-    def nonblank_explanation(self):
+    def nonblank_explanation(self) -> Self:
         if len(self.explanation.strip()) < 40:
             raise ValueError('Explain the evidence you inspected and your recovery choice')
         return self
 
 
-def recovery_checks(run, body):
+def recovery_checks(run, body) -> dict:
     if (not is_failure_practice(run['plan']) or run['state'] != 'failed'
             or not run['result'] or run['result'].get('reason') != STOP_MARKER
             or len(run['stage_events']) != 4
@@ -69,9 +76,9 @@ def recovery_checks(run, body):
             'controlled_rejection_receipt_sha256': run['stage_events'][3]['receipt_sha256']}
 
 
-class ConnectedRecoveryDecisionRepository(LearnerDecisionRepository):
+class ConnectedRecoveryDecisionRepository(LearnerDecisionJournal):
     @staticmethod
-    def decode(raw):
+    def decode(raw: dict) -> dict:
         record = LearnerDecisionRepository.decode(raw)
         try:
             body = ConnectedRecoveryDecisionRequest.model_validate(record['submission'])
@@ -94,12 +101,12 @@ class ConnectedRecoveryDecisionRepository(LearnerDecisionRepository):
         except (KeyError, TypeError, ValueError, EnrollmentConflict) as exc:
             raise CourseCatalogError('The saved stopped-run recovery choices failed integrity verification') from exc
 
-    async def get(self, user_id, submission_id):
+    async def get(self, user_id: str, submission_id) -> dict | None:
         raw = await self.records.find_one({'uuid': submission_id, 'user_id': user_id,
                                           'module_id': 'multi_step', 'prompt_id': PROMPT_ID})
         return self.decode(raw) if raw else None
 
-    async def submit(self, operation, body, *, actor_user_id):
+    async def submit(self, operation: CourseOperation, body, *, actor_user_id: str):
         body = ConnectedRecoveryDecisionRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Only the authenticated learner can record recovery choices')

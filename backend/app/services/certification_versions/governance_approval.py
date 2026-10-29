@@ -1,11 +1,11 @@
 """Approve or hold only the exact saved original diagnostic capstone plan."""
 from typing import Literal
 
-from .connected_workflow_approval import ConnectedScopeRepository, ConnectedScopeRequest
+from .connected_workflow_approval import ConnectedScopeRepository, ScopeRequestFields
 from .governance_preparation import GovernancePreparation
 
 
-class GovernanceApprovalRequest(ConnectedScopeRequest):
+class GovernanceApprovalRequest(ScopeRequestFields):
     consent: Literal['save_bounded_governance_execution_decision']
 
 

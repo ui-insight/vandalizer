@@ -10,14 +10,14 @@ from .catalog import CourseCatalogError
 from .review_attempts import ReviewAttemptRepository
 
 
-def validate_saved_review_result(saved, contract):
+def validate_saved_review_result(saved, contract) -> None:
     try:
         _validate(saved, contract)
     except (KeyError, TypeError, AttributeError, ValueError) as exc:
         raise CourseCatalogError('The saved assessment result needs reconciliation before it can be displayed') from exc
 
 
-def _validate(saved, contract):
+def _validate(saved, contract) -> None:
     if saved['result'] is None:
         if saved['state'] not in ('prepared', 'evaluating'):
             raise ValueError('A terminal review needs its original result')

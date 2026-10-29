@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 class ReprocessRefused(Exception):
     """A reprocess that cannot start, with the HTTP status and reason to show."""
 
-    def __init__(self, status_code: int, detail: str):
+    def __init__(self, status_code: int, detail: str) -> None:
         super().__init__(detail)
         self.status_code = status_code
         self.detail = detail

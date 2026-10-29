@@ -46,11 +46,11 @@ class HealthUnavailable(ValueError):
     pass
 
 
-def allowed(field, values):
+def allowed(field, values) -> dict:
     return {'$cond': [{'$in': [f'${field}', list(values)]}, f'${field}', 'unknown']}
 
 
-def identifier(field, pattern):
+def identifier(field, pattern) -> dict:
     return {'$cond': [
         {'$regexMatch': {'input': {'$cond': [{'$eq': [{'$type': f'${field}'}, 'string']}, f'${field}', '']},
                          'regex': pattern}},
@@ -58,7 +58,7 @@ def identifier(field, pattern):
     ]}
 
 
-def course_identity(*, legacy_unknown=False):
+def course_identity(*, legacy_unknown: bool=False):
     identity = {'course_version': identifier('course_version', VERSION_PATTERN),
                 'manifest_sha256': identifier('manifest_sha256', MANIFEST_PATTERN)}
     if legacy_unknown:
@@ -78,11 +78,11 @@ def pipeline(source):
     return [{'$group': {'_id': identity, 'count': {'$sum': 1}}}, {'$limit': MAX_GROUPS + 1}]
 
 
-def as_date(expression):
+def as_date(expression) -> dict:
     return {'$convert': {'input': expression, 'to': 'date', 'onError': None, 'onNull': None}}
 
 
-def count_if(condition):
+def count_if(condition) -> dict:
     return {'$sum': {'$cond': [condition, 1, 0]}}
 
 
@@ -179,8 +179,8 @@ def course_titles(keys):
     return titles
 
 
-async def journey_success(started, journey_start, journey_rows):
-    courses = {}
+async def journey_success(started, journey_start, journey_rows) -> dict:
+    courses: dict[tuple, dict] = {}
 
     def course(identity):
         return courses.setdefault(course_key(identity), {
@@ -230,9 +230,9 @@ async def journey_success(started, journey_start, journey_rows):
     }
 
 
-async def course_health():
+async def course_health() -> dict:
     started = datetime.now(timezone.utc)
-    rows = []
+    rows: list[dict] = []
     for source, (model, _) in SOURCES.items():
         groups = await aggregate(model, pipeline(source), 'Course health exceeds the bounded report size.')
         rows.extend({'source': source, **group['_id'], 'count': group['count']} for group in groups)
@@ -262,7 +262,7 @@ async def course_health():
     }
 
 
-def release_status(rows):
+def release_status(rows) -> dict:
     """This worker's release fingerprint and any enrolled course it cannot serve.
 
     Each refresh may reach a different worker; differing fingerprints mean the

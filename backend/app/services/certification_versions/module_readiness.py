@@ -15,18 +15,18 @@ from .scenario_submissions import ScenarioSubmissionRepository, module_bank
 
 
 class ModuleReadiness:
-    def __init__(self, repository=None):
+    def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         self.repository = repository or EnrollmentRepository()
 
-    async def preview(self, user_id, enrollment_id, module_id, *, review_attempt_id=None,
-                      scenario_attempt_id=None):
+    async def preview(self, user_id: str, enrollment_id: str, module_id: str, *, review_attempt_id=None,
+                      scenario_attempt_id=None) -> dict:
         enrollment = await self.repository._enrollment(user_id, enrollment_id)
         package = self.repository.catalog.load(enrollment.course_version)
         if package.manifest_sha256 != enrollment.manifest_sha256:
             raise CourseCatalogError('The selected course no longer matches its enrollment')
         contract = package_outcomes(package)
         module = next((item for item in contract.modules if item.module_id == module_id), None) if contract else None
-        if module is None:
+        if contract is None or module is None:
             raise EnrollmentConflict('This course has no competency outcomes for that module')
         methods = {item.method for item in module.outcomes}
         if review_attempt_id is not None and not methods - {'scenario_choice'}:

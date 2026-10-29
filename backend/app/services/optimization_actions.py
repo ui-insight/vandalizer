@@ -30,7 +30,7 @@ class OptimizationActionError(Exception):
     chat tools return it in their error payloads.
     """
 
-    def __init__(self, code: str, message: str, detail: Optional[dict] = None):
+    def __init__(self, code: str, message: str, detail: Optional[dict] = None) -> None:
         super().__init__(message)
         self.code = code
         self.message = message

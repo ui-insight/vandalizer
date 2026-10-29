@@ -10,7 +10,7 @@ from .batch_plan import batch_plan
 from .enrollments import EnrollmentConflict
 
 
-def complete_result(plan, results):
+def complete_result(plan, results) -> dict:
     case = BatchCase.model_validate(plan['input_snapshot']['authored_case'])
     checks = check_inventory(case, plan['input_snapshot'], results, batch_id=plan['batch_id'],
         run_id=plan['uuid'], attempt_kind=plan['phase'], source_ids=plan['source_ids'])

@@ -67,7 +67,7 @@ def verified_chain(case, run):
         raise CourseCatalogError(f'The connected execution evidence does not bind one complete approved chain{reason}') from exc
 
 
-def check_connected_execution(contract, case, run):
+def check_connected_execution(contract, case, run) -> dict:
     module = next((item for item in contract.modules if item.module_id == 'multi_step'), None)
     required = [item for item in module.outcomes if item.method == 'deterministic'] if module else []
     if (len(required) != 1 or required[0].id != OUTCOME_ID
@@ -94,7 +94,7 @@ def check_connected_execution(contract, case, run):
             'credit_awarded': False, 'module_completion_eligible': False}
 
 
-def compare_connected_runs(case, original, corrected):
+def compare_connected_runs(case, original, corrected) -> dict:
     before, _ = verified_chain(case, original)
     after, _ = verified_chain(case, corrected)
     if (original['run_id'] == corrected['run_id'] or before['uuid'] == after['uuid']

@@ -915,7 +915,7 @@ async def complete_module(user_id: str, module_id: str, *, enrollment_id: str | 
     return result
 
 
-async def _finish_pending_credential(progress):
+async def _finish_pending_credential(progress) -> None:
     from app.models.certification import CertificationEnrollment
     from .certification_versions.credentials import CredentialRepository, parse_credential_snapshot
     from .certification_versions.enrollments import EnrollmentConflict

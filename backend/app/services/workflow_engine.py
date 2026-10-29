@@ -42,7 +42,7 @@ class UsageAccumulator:
     """Thread-safe token usage accumulator for workflow/extraction LLM calls."""
     __slots__ = ("tokens_in", "tokens_out", "_lock")
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.tokens_in = 0
         self.tokens_out = 0
         self._lock = threading.Lock()
@@ -629,7 +629,7 @@ class Node:
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(name={self.name})"
 
-    def report_progress(self, detail=None, preview=None):
+    def report_progress(self, detail=None, preview=None) -> None:
         if self.progress_reporter:
             self.progress_reporter(detail, preview)
 

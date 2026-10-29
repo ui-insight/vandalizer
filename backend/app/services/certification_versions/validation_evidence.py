@@ -1,4 +1,10 @@
 """Assemble the original suite, failure, repaired revision and learner rationale."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
 import hashlib
 from pathlib import Path
 
@@ -10,14 +16,14 @@ from .catalog import CourseCatalogError
 from .enrollments import EnrollmentConflict
 from .lab_execution import LabExecutionRepository
 from .lab_inputs import LabInputRepository
-from .outcomes import package_outcomes
+from .outcomes import require_package_outcomes
 from .practical_evidence import EvidenceAssemblyUnavailable
 from .validation_case import load_validation_case
 from .validation_preparation import ValidationPreparation
 from .validation_reviews import ValidationReviewRepository
 
 
-async def assemble_validation_review(operation, submission_id, *, actor_user_id):
+async def assemble_validation_review(operation: CourseOperation, submission_id, *, actor_user_id: str) -> dict:
     if actor_user_id != operation.user_id:
         raise EnrollmentConflict('Validation assessment requires the authenticated learner')
     saved = await ValidationReviewRepository().get(actor_user_id, submission_id)
@@ -25,7 +31,7 @@ async def assemble_validation_review(operation, submission_id, *, actor_user_id)
         raise EvidenceAssemblyUnavailable('Save the actual repair interpretation before requesting assessment')
     lease = LabExecutionRepository.check_operation(operation, saved)
     package = operation.package
-    case, contract = load_validation_case(package), package_outcomes(package)
+    case, contract = load_validation_case(package), require_package_outcomes(package)
     corrected = ValidationPreparation.decode(saved['execution'])
     original = ValidationPreparation.decode(corrected['plan']['original_run_record'])
     suite = corrected['plan']['suite']
@@ -38,13 +44,13 @@ async def assemble_validation_review(operation, submission_id, *, actor_user_id)
         raise EvidenceAssemblyUnavailable('Incomplete or uncomparable case outputs are unavailable evidence; inspect them before assessment')
     evidence = []
 
-    def add(kind, identity, payload):
+    def add(kind, identity, payload) -> None:
         try:
             evidence.append(ReviewEvidence(id=identity, kind=kind, text=encode(payload)[0]).model_dump(mode='json'))
         except ValidationError as exc:
             raise EvidenceAssemblyUnavailable('Validation evidence exceeds review limits; no content was truncated') from exc
 
-    def chunks(kind, identity, text, metadata):
+    def chunks(kind, identity, text, metadata) -> None:
         for offset in range(0, max(1, len(text)), 6000):
             add(kind, f'{identity}:{offset}', {**metadata, 'text_offset': offset, 'text_length': len(text), 'text': text[offset:offset + 6000]})
 

@@ -1,4 +1,10 @@
 """Claim an explicitly approved suite once and preserve its durable case prefix."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
 import asyncio
 from copy import deepcopy
 import datetime
@@ -30,7 +36,7 @@ class ValidationExecutionRequest(ContractModel):
 
 
 class ValidationExecution(ValidationPreparation):
-    async def execute(self, operation, body, system_config_doc, *, actor_user_id):
+    async def execute(self, operation: CourseOperation, body, system_config_doc, *, actor_user_id: str):
         body = ValidationExecutionRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Only the authenticated learner can execute the approved suite')
@@ -61,6 +67,8 @@ class ValidationExecution(ValidationPreparation):
                 raise EnrollmentConflict('The approval changed before this suite was claimed')
             return latest
         run = await self.get(actor_user_id, body.run_id)
+        if run is None:
+            raise EnrollmentConflict('The original execution receipt is no longer available')
         started_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
         stop, loop = threading.Event(), asyncio.get_running_loop()
         checkpoints = ValidationCheckpoints()
@@ -80,6 +88,8 @@ class ValidationExecution(ValidationPreparation):
             result = await asyncio.wait_for(asyncio.to_thread(execute_approved_suite, run, config,
                 checkpoint=checkpoint, should_stop=stop.is_set), timeout=RUN_TIMEOUT_SECONDS)
             latest = await self.get(actor_user_id, body.run_id)
+            if latest is None:
+                raise EnrollmentConflict('The original execution receipt is no longer available')
             if [e['receipt']['result'] for e in latest['case_events'][1::2]] != result['case_results']:
                 raise EnrollmentConflict('The complete result differs from its durable case receipts')
             if len(encode(result)[0].encode()) > MAX_TERMINAL_BYTES:
@@ -97,7 +107,7 @@ class ValidationExecution(ValidationPreparation):
         await self._finish(run, lease, result, started_at)
         return await self.get(actor_user_id, body.run_id)
 
-    async def _finish(self, run, lease, result, started_at):
+    async def _finish(self, run, lease, result, started_at) -> None:
         fenced = await self.records.update_one({'uuid': run['run_id'], 'plan_sha256': run['plan_sha256'],
             'state': 'executing', 'worker_id': lease.write_id, 'authorization_sha256': encode(run['authorization'])[1]},
             {'$set': {'checkpoint_closed': True}})

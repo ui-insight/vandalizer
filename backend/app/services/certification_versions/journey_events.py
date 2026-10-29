@@ -1,4 +1,5 @@
 """Authenticated, bounded client observations, with server-bound course identity."""
+from typing import Self
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -25,7 +26,7 @@ class JourneyEventRequest(BaseModel):
                    'grading_question_opened']
 
     @model_validator(mode='after')
-    def require_identity(self):
+    def require_identity(self) -> Self:
         if bool(self.enrollment_id) != bool(self.manifest_sha256):
             raise ValueError('Provide both enrollment and package identity')
         if not self.enrollment_id and self.event not in ('initial_progress_load_failed', 'progress_refresh_failed'):
@@ -37,7 +38,7 @@ class JourneyEventConflict(ValueError):
     pass
 
 
-async def record(user_id, request: JourneyEventRequest):
+async def record(user_id: str, request: JourneyEventRequest) -> dict[str, bool]:
     version, manifest = None, None
     if request.enrollment_id:
         # Do not initialize or load course assets: failed course reads must be

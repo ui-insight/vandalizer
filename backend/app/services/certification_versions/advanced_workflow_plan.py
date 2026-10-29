@@ -30,14 +30,14 @@ def implementation_digest():
     return encode({str(path.relative_to(folder.parent)): hashlib.sha256(path.read_bytes()).hexdigest() for path in paths})[1]
 
 
-def calculation_context(snapshot):
+def calculation_context(snapshot) -> dict:
     """Only submitted arithmetic and checked facts, never the private answer key."""
     return {'kind': 'saved_learner_calculation_evidence', 'snapshot_id': snapshot['uuid'],
             'snapshot_sha256': encode(snapshot)[1], 'source_sha256': snapshot['document']['source_sha256'],
             'records': snapshot['request']['records'], 'checks': snapshot['checks']}
 
 
-def advanced_workflow_plan(snapshot, case, system_config, *, default_model):
+def advanced_workflow_plan(snapshot, case, system_config, *, default_model) -> dict:
     from app.services.workflow_engine import apply_step_input_config, _resolve_input_sources, build_step_output_keys
 
     try:
@@ -82,7 +82,7 @@ def advanced_workflow_plan(snapshot, case, system_config, *, default_model):
         doc_texts = [budget_text, calculation_text]
         metadata = [{'uuid': source['document_id'], 'title': source['title'], 'text_markers': source['text_markers']},
                     {'uuid': None, 'title': 'Saved learner calculations', 'text_markers': []}]
-        engine_steps = [{'name': 'Document', 'data': {'doc_uuids': [source['document_id']]}, 'tasks': []}]
+        engine_steps: list[dict] = [{'name': 'Document', 'data': {'doc_uuids': [source['document_id']]}, 'tasks': []}]
         stage_plans, used_models = [], set()
         for index, item in enumerate(captured_steps):
             step = item['step']

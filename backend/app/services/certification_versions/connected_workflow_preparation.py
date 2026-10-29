@@ -1,4 +1,10 @@
 """Persist a reviewable connected-run plan; dispatch remains separately gated."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
 from copy import deepcopy
 import datetime
 from typing import Literal
@@ -12,7 +18,7 @@ from .connected_workflow_inputs import ConnectedWorkflowInputRepository
 from .connected_workflow_plan import connected_workflow_plan
 from .connected_failure_practice import approval_question, is_failure_practice, STOP_MARKER, stopped_stage_result
 from .enrollments import EnrollmentConflict
-from .lab_execution import LabExecutionRepository
+from .lab_execution import LabExecutionRepository, LabExecutionJournal
 from .lab_inputs import LabInputRepository
 from .multi_step_case import load_multi_step_case
 from .outcomes import ContractModel
@@ -28,9 +34,9 @@ class ConnectedPlanRequest(ContractModel):
     consent: Literal['prepare_connected_workflow_plan', 'prepare_controlled_failure_rehearsal']
 
 
-class ConnectedWorkflowPreparation(LabExecutionRepository):
+class ConnectedWorkflowPreparation(LabExecutionJournal):
     @staticmethod
-    def decode(raw):
+    def decode(raw: dict) -> dict:
         saved = LabExecutionRepository.decode(raw)
         try:
             plan = saved['plan']
@@ -84,7 +90,7 @@ class ConnectedWorkflowPreparation(LabExecutionRepository):
         except (KeyError, TypeError, ValueError, StopIteration) as exc:
             raise CourseCatalogError('The saved connected-workflow plan failed integrity verification') from exc
 
-    async def prepare(self, operation, body, system_config_doc, *, actor_user_id, default_model):
+    async def prepare(self, operation: CourseOperation, body, system_config_doc, *, actor_user_id: str, default_model):
         body = ConnectedPlanRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Only the authenticated learner can prepare this plan')
@@ -136,5 +142,5 @@ class ConnectedWorkflowPreparation(LabExecutionRepository):
         await LabInputRepository._check_lease(lease)
         return await self.get(operation.user_id, body.request_id)
 
-    async def execute(self, *args, **kwargs):
+    async def execute(self, *args, **kwargs) -> dict:
         raise EnrollmentConflict('Connected workflow dispatch requires its own approved stage-receipt executor')

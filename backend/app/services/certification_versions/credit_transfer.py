@@ -4,6 +4,13 @@ The original enrollment is read only. A target module is eligible only when
 every required outcome has an authored equivalence and original passing credit.
 Carried XP contributes to target-course progress; no new base reward is earned.
 """
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.outcome_credit import CreditProgress
+    from app.services.certification_versions.catalog import CoursePackage
+
 from copy import deepcopy
 from types import SimpleNamespace
 from typing import Literal
@@ -27,7 +34,7 @@ class CreditTransferRequest(ContractModel):
     consent: Literal['transfer_reviewed_module_credit_preserve_original_no_new_xp_reward']
 
 
-def verify_transfer_credit(package, progress, module_id, credit, *, depth=0):
+def verify_transfer_credit(package: CoursePackage, progress: CreditProgress, module_id: str, credit, *, depth: int=0) -> dict:
     """Revalidate frozen original evidence, including before credential issuance."""
     from .outcome_credit import verified_credit_snapshot
     try:
@@ -86,11 +93,11 @@ def verify_transfer_credit(package, progress, module_id, credit, *, depth=0):
 
 
 class CreditTransfer:
-    def __init__(self, repository=None):
+    def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         self.repository = repository or EnrollmentRepository()
         self.journal = AttemptRepository()
 
-    async def saved(self, user_id, request_id):
+    async def saved(self, user_id: str, request_id: str) -> dict:
         from .upgrade_comparison import UpgradeUnavailable
         raw = await self.journal.records.find_one({'uuid': request_id, 'user_id': user_id})
         if raw is None or raw.get('transfer_request_json') is None:
@@ -102,7 +109,7 @@ class CreditTransfer:
         return {'read_only': True, 'request': request.model_dump(mode='json'), 'state': raw['state'],
                 'result': self.journal.payload(raw, 'result') if raw['state'] in ('applied', 'rejected', 'failed') else None}
 
-    async def preview(self, user_id, target_id):
+    async def preview(self, user_id: str, target_id: str):
         repo = self.repository
         target = await repo.current(user_id)
         if (target is None or target.uuid != target_id or target.provenance != 'explicit_upgrade'
@@ -114,7 +121,7 @@ class CreditTransfer:
         source_progress = await repo.read_progress(user_id, source.uuid)
         target_progress = await repo.read_progress(user_id, target.uuid)
         plan = equivalence_plan(source_package, target_package, source_progress)
-        modules = []
+        modules: list[dict] = []
         for module in target_package.manifest.modules:
             rows = [row for row in plan['outcomes'] if row['module_id'] == module.id]
             completed = target_progress.modules.get(module.id, {}).get('completed') is True
@@ -124,9 +131,10 @@ class CreditTransfer:
                 'xp_earned': 0, 'reason': 'Already completed in this course.' if completed else (
                     'All required outcomes have verified equivalent original credit.' if eligible
                     else 'Complete this module’s assessment; not every required outcome has qualifying original evidence.')})
+        current = await repo.current(user_id)
         if (progress_digest(source_progress) != progress_digest(await repo.read_progress(user_id, source.uuid))
                 or progress_digest(target_progress) != progress_digest(await repo.read_progress(user_id, target.uuid))
-                or (await repo.current(user_id)).uuid != target_id):
+                or current is None or current.uuid != target_id):
             raise EnrollmentConflict('Course work changed during review; refresh the transfer preview')
         result = {'source_enrollment_id': source.uuid, 'source_course_title': source_package.manifest.title,
             'target_enrollment_id': target.uuid, 'target_course_title': target_package.manifest.title,
@@ -136,16 +144,16 @@ class CreditTransfer:
             'credit_transferred': False, 'xp_earned': 0,
             'explanation': 'Transfer one eligible module at a time. Carried XP counts toward this course’s progress without earning another base reward. Your original course and certificate stay intact.'}
         result['preview_sha256'] = encode(result)[1]
-        for module in modules:
-            if module['eligible']:
-                module['request'] = CreditTransferRequest(
-                    request_id=uuid5(NAMESPACE_URL, f'vandalizer:credit-transfer:{user_id}:{target_id}:{module["module_id"]}:{result["preview_sha256"]}').hex,
-                    source_enrollment_id=source.uuid, target_enrollment_id=target_id, module_id=module['module_id'],
+        for module_row in modules:
+            if module_row['eligible']:
+                module_row['request'] = CreditTransferRequest(
+                    request_id=uuid5(NAMESPACE_URL, f'vandalizer:credit-transfer:{user_id}:{target_id}:{module_row["module_id"]}:{result["preview_sha256"]}').hex,
+                    source_enrollment_id=source.uuid, target_enrollment_id=target_id, module_id=module_row['module_id'],
                     preview_sha256=result['preview_sha256'],
                     consent='transfer_reviewed_module_credit_preserve_original_no_new_xp_reward').model_dump(mode='json')
         return result
 
-    async def apply(self, user_id, body):
+    async def apply(self, user_id: str, body):
         from .runtime import CourseOperation, _operation
         from app.services.certification_service import complete_module
         request = CreditTransferRequest.model_validate(body)

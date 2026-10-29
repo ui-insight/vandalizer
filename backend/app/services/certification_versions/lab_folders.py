@@ -1,6 +1,7 @@
 """Stable lab-folder creation without a process lock or expiring ownership lease."""
 import hashlib
 import json
+from typing import cast
 
 from bson import ObjectId
 from pymongo import ReturnDocument
@@ -37,4 +38,4 @@ async def ensure_lab_folder(user: User, progress: CertificationProgress, title: 
             or raw.get('uuid') != folder.uuid or raw.get('user_id') != user.user_id
             or raw.get('team_id') is not None or raw.get('created_by') != user.user_id):
         raise EnrollmentConflict('The original lab creation identity is no longer available')
-    return SmartFolder.model_validate(raw)
+    return cast(SmartFolder, SmartFolder.model_validate(raw))

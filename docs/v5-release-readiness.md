@@ -57,16 +57,33 @@ network-policy enforcement and deployment identity still need deployed QA.
 
 ## Typing
 
-The starting mypy run reports 3,141 errors, including 2,345 missing-annotation
-errors. After this pass, 3,098 errors remain; all ten modified modules are clear.
-The workflow remains advisory. The initial cleanup corrects concrete
-types and narrowing in budget reconciliation, page locators, attachment source
-tracking, extraction generation filters, catalog descriptions, templates,
-certificate rendering, scheduling and certification outcome contracts.
-No global checks have been disabled and no blanket error suppression added.
-Clearing the whole backend remains a separate, substantial refactor.
+The original mypy baseline was 3,141 errors. The dependency pass reduced it to
+3,098; the current follow-up reduces it to 2,828 across 524 source files. The
+models, schemas, database helpers, URL helpers and observability setup pass their
+focused type check. The full workflow remains advisory; the backlog is not clear.
+
+The follow-up adds validator, database, record-reader and execution contracts,
+separates shared repository storage from incompatible submission signatures,
+and preserves the distinct credential schema versions. It checks missing
+records explicitly at enrollment, recovery and execution boundaries. Previously
+unchecked bodies exposed additional issues, which were corrected rather than
+suppressed. Frozen legacy rubric artifacts are unchanged. No global checks have
+been disabled and no blanket error suppression added.
 
 ## Verification
+
+- Follow-up full local backend suite: 8,870 passed, 2,130 skipped. The skipped
+  persistence/provider cases are not deployment QA evidence.
+- Foundation regressions: 107 passed. Certification regressions after the
+  repository contracts: 1,556 passed; the subsequent focused selection,
+  recovery, batch and workflow checks: 236 passed. Ruff passes.
+- Execution persistence after the typed read contracts: 92 passed against a
+  disposable MongoDB across validation, connected failure practice, batch,
+  output, governance and advanced workflow execution. The container was removed.
+  Published-course preservation, Bandit and endpoint-map checks also pass.
+- Chroma's disposable container check passes locally and is included in CI.
+  Its Compose renderer uses an empty temporary environment fixture so it
+  never depends on or reads an operator's real `backend/.env`.
 
 - Focused backend regressions: 171 passed, including real PDF form filling,
   budget reconciliation, page provenance, scheduling, source checks and

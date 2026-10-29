@@ -27,7 +27,7 @@ class ConnectedFinalizationRequest(ContractModel):
 
 
 class ConnectedWorkflowRecovery(ConnectedWorkflowPreparation):
-    async def finalize(self, operation, body, *, actor_user_id):
+    async def finalize(self, operation, body, *, actor_user_id: str):
         from app.services.workflow_engine import WorkflowEngine
         body = ConnectedFinalizationRequest.model_validate(body)
         if actor_user_id != operation.user_id:

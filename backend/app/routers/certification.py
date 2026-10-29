@@ -1,4 +1,5 @@
 """Vandal Workflow Architect certification endpoints."""
+from typing import Self
 
 import datetime
 from typing import Annotated, Literal
@@ -22,7 +23,7 @@ from app.services import certification_service as svc
 from app.services.certificate_pdf import render_certificate_pdf
 from app.services.certification_versions.runtime import course_operation
 from app.services.certification_versions.runtime import current_operation
-from app.services.certification_versions.credentials import CredentialRepository, CredentialSnapshot
+from app.services.certification_versions.credentials import CredentialRepository, CredentialRecord, CompetencyCredentialSnapshot
 from app.services.certification_versions.catalog import CourseCatalogError
 from app.services.certification_versions.chat_practice import ChatPracticeCheck
 from app.services.certification_versions.learner_decisions import DecisionSubmission, DecisionValidationError, LearnerDecisionRepository, load_prompt
@@ -77,7 +78,7 @@ class OutcomeCompletionPayload(BaseModel):
     scenario_attempt_id: str | None = Field(default=None, pattern=r'^[a-f0-9]{32}$')
 
     @model_validator(mode='after')
-    def require_selection(self):
+    def require_selection(self) -> Self:
         if self.review_attempt_id is None and self.scenario_attempt_id is None:
             raise ValueError('Explicitly select original saved assessments')
         return self
@@ -123,14 +124,14 @@ async def get_upgrade_preview(enrollment_id: str, target_version: str, user: Use
     return await _upgrade_comparison(user, enrollment_id, target_version)
 
 
-def _credential_response(record: CredentialSnapshot):
+def _credential_response(record: CredentialRecord):
     pdf = render_certificate_pdf(
         name=record.learner_name, level=record.level,
         certified_at=datetime.datetime.fromisoformat(record.certified_at) if record.certified_at else None,
         credential_id=record.credential_id.upper(),
         course_title=record.course_title, course_version=record.course_version,
         module_count=len(record.module_ids), legacy_unknown=record.provenance == 'legacy_completion_unverified',
-        credential_promise=(record.credential_scope.promise if getattr(record, 'credential_scope', None) else None),
+        credential_promise=(record.credential_scope.promise if isinstance(record, CompetencyCredentialSnapshot) else None),
     )
     return Response(content=pdf, media_type='application/pdf', headers={
         'Content-Disposition': content_disposition(f"vandal-certification-{record.credential_id}.pdf"),

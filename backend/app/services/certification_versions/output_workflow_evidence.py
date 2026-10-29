@@ -1,4 +1,10 @@
 """Assemble exact file contents, private receipt facts and learner interpretations."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
 import hashlib
 from pathlib import Path
 
@@ -10,7 +16,7 @@ from .catalog import CourseCatalogError
 from .enrollments import EnrollmentConflict
 from .lab_execution import LabExecutionRepository
 from .lab_inputs import LabInputRepository
-from .outcomes import package_outcomes
+from .outcomes import require_package_outcomes
 from .output_case import load_output_case
 from .output_file_reviews import OutputFileReviewRepository
 from .output_outcome_reviews import OutputOutcomeReviewRepository, restore_handoff
@@ -18,7 +24,7 @@ from .output_workflow_preparation import OutputWorkflowPreparation
 from .practical_evidence import EvidenceAssemblyUnavailable
 
 
-async def assemble_output_review(operation, submission_id, *, actor_user_id):
+async def assemble_output_review(operation: CourseOperation, submission_id, *, actor_user_id: str) -> dict:
     if actor_user_id != operation.user_id:
         raise EnrollmentConflict('Output assessment requires the authenticated learner')
     saved = await OutputOutcomeReviewRepository().get(actor_user_id, submission_id)
@@ -26,7 +32,7 @@ async def assemble_output_review(operation, submission_id, *, actor_user_id):
         raise EvidenceAssemblyUnavailable('Save the actual handoff interpretation before requesting assessment')
     lease = LabExecutionRepository.check_operation(operation, saved)
     package = operation.package
-    case, contract = load_output_case(package), package_outcomes(package)
+    case, contract = load_output_case(package), require_package_outcomes(package)
     review = OutputFileReviewRepository.decode(saved['file_review'])
     run = OutputWorkflowPreparation.decode(review['execution'])
     plan, result = run['plan'], run['result']
@@ -37,7 +43,7 @@ async def assemble_output_review(operation, submission_id, *, actor_user_id):
             or snapshot['rubric_id'] != contract.rubric_id):
         raise CourseCatalogError('Output evidence does not bind the original assignment and rubric')
     evidence = []
-    def add(kind, identity, payload):
+    def add(kind, identity, payload) -> None:
         try:
             evidence.append(ReviewEvidence(id=identity, kind=kind, text=encode(payload)[0]).model_dump(mode='json'))
         except ValidationError as exc:

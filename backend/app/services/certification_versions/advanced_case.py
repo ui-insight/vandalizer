@@ -1,4 +1,11 @@
 """Authored method/calculation/dependency case, never learner execution evidence."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.catalog import CoursePackage
+
+from typing import Self
 from decimal import Decimal
 import hashlib
 from typing import Literal
@@ -89,7 +96,7 @@ class AdvancedNodesCase(ContractModel):
     source_issues: tuple[BudgetSourceIssue, ...] = Field(min_length=2, max_length=6)
 
     @model_validator(mode='after')
-    def coherent_case(self):
+    def coherent_case(self) -> Self:
         if ({q.id for q in self.questions} != set(QUESTIONS)
                 or {g.outcome_id for g in self.review_guidance} != set(EVIDENCE)):
             raise ValueError('Every Advanced Nodes outcome needs its own question and review guidance')
@@ -117,10 +124,10 @@ class AdvancedNodesCase(ContractModel):
     def digest(self):
         return encode(self.model_dump(mode='json'))[1]
 
-    def public_definition(self):
+    def public_definition(self) -> dict:
         return {**self.model_dump(mode='json', exclude={'review_guidance', 'amounts', 'calculations', 'source_issues'}), 'case_sha256': self.digest}
 
-    def verify_contract(self, contract):
+    def verify_contract(self, contract) -> None:
         module = next((m for m in contract.modules if m.module_id == self.module_id), None)
         if module is None or {o.id for o in module.outcomes} != set(EVIDENCE):
             raise ValueError('The case must bind the exact Advanced Nodes outcomes')
@@ -131,7 +138,7 @@ class AdvancedNodesCase(ContractModel):
                     or guidance[outcome.id].critical_failures != outcome.critical_failures):
                 raise ValueError('Authored guidance cannot replace evidence or weaken the outcome rubric')
 
-    def verify_source(self, source_bytes, page_texts):
+    def verify_source(self, source_bytes, page_texts) -> None:
         if hashlib.sha256(source_bytes).hexdigest() != self.source_sha256:
             raise ValueError('The assigned budget source changed')
         anchors = [amount.anchor for amount in self.amounts] + [a for issue in self.source_issues for a in issue.anchors]
@@ -145,7 +152,7 @@ class AdvancedNodesCase(ContractModel):
             if display not in amount.anchor.quote:
                 raise ValueError('A named arithmetic input differs from its quoted source amount')
 
-    def verify_exercise(self, exercise):
+    def verify_exercise(self, exercise) -> None:
         if (exercise.get('documents') != [self.source_filename] or exercise.get('expected_fields') != []
                 or exercise.get('expected_values') != {} or exercise.get('star_criteria') != {}
                 or exercise.get('assessment_case_id') != self.id or exercise.get('advanced_case_sha256') != self.digest
@@ -154,7 +161,7 @@ class AdvancedNodesCase(ContractModel):
             raise ValueError('The exercise must bind the exact case without node-count or reflection-presence credit')
 
 
-def load_advanced_case(package):
+def load_advanced_case(package: CoursePackage):
     from .catalog import CourseCatalogError
     from .outcomes import package_outcomes
     path = 'advanced-cases/advanced_nodes.json'

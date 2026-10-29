@@ -21,7 +21,7 @@ class ValidationFinalizationRequest(ContractModel):
 
 
 class ValidationRecovery(ValidationPreparation):
-    async def finalize(self, operation, body, *, actor_user_id):
+    async def finalize(self, operation, body, *, actor_user_id: str):
         body = ValidationFinalizationRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Only the authenticated learner can finalize this saved suite')

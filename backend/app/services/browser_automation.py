@@ -37,7 +37,7 @@ class SessionState(Enum):
 class BrowserAutomationSession:
     """Represents a single browser automation session tied to a workflow execution."""
 
-    def __init__(self, session_id: str, user_id: str, workflow_result_id: str, allowed_domains: list[str]):
+    def __init__(self, session_id: str, user_id: str, workflow_result_id: str, allowed_domains: list[str]) -> None:
         self.session_id = session_id
         self.user_id = user_id
         self.workflow_result_id = workflow_result_id
@@ -49,7 +49,7 @@ class BrowserAutomationSession:
         self.audit_trail: list[dict] = []
         self.screenshots: list[dict] = []
 
-    def transition_to(self, new_state: SessionState, reason: str | None = None):
+    def transition_to(self, new_state: SessionState, reason: str | None = None) -> None:
         logger.info("Session %s: %s -> %s (%s)", self.session_id, self.state.value, new_state.value, reason)
         self.state = new_state
 
@@ -77,7 +77,7 @@ class BrowserAutomationService:
             cls._instance = BrowserAutomationService()
         return cls._instance
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.sessions: dict[str, BrowserAutomationSession] = {}
         self.websocket_connections: dict[str, object] = {}  # user_id -> WebSocket
         self._redis: redis.Redis | None = None
@@ -123,7 +123,7 @@ class BrowserAutomationService:
 
         return result
 
-    def end_session(self, session_id: str, close_tab: bool = False):
+    def end_session(self, session_id: str, close_tab: bool = False) -> None:
         session = self.get_session(session_id)
         if session:
             try:
@@ -481,19 +481,19 @@ class BrowserAutomationService:
     # Session expiration handling
     # ------------------------------------------------------------------
 
-    def handle_session_expired(self, session_id: str, expired_info: dict):
+    def handle_session_expired(self, session_id: str, expired_info: dict) -> None:
         session = self.get_session(session_id)
         if not session:
             return
         session.transition_to(SessionState.WAITING_FOR_REAUTH, f"Login detected at {expired_info.get('url')}")
 
-    def resume_session_after_reauth(self, session_id: str):
+    def resume_session_after_reauth(self, session_id: str) -> None:
         session = self.get_session(session_id)
         if not session:
             return
         session.transition_to(SessionState.ACTIVE, "User resumed session")
 
-    def _wait_for_reauth(self, session_id: str, timeout: int = 300):
+    def _wait_for_reauth(self, session_id: str, timeout: int = 300) -> None:
         """Block until session is no longer WAITING_FOR_REAUTH."""
         session = self.get_session(session_id)
         if not session:
@@ -508,11 +508,11 @@ class BrowserAutomationService:
     # WebSocket / extension communication
     # ------------------------------------------------------------------
 
-    def register_websocket(self, user_id: str, ws):
+    def register_websocket(self, user_id: str, ws) -> None:
         self.websocket_connections[user_id] = ws
         logger.info("Registered WebSocket for user %s", user_id)
 
-    def unregister_websocket(self, user_id: str):
+    def unregister_websocket(self, user_id: str) -> None:
         self.websocket_connections.pop(user_id, None)
 
     async def send_to_extension_async(self, user_id: str, message: dict) -> bool:
@@ -588,12 +588,12 @@ class BrowserAutomationService:
 
         raise TimeoutError(f"Command {command_name} timed out after {timeout_ms}ms")
 
-    def handle_response(self, request_id: str, payload: dict):
+    def handle_response(self, request_id: str, payload: dict) -> None:
         """Store response from extension in Redis."""
         response_key = f"browser_automation:response:{request_id}"
         self.redis_client.setex(response_key, 60, json.dumps(payload))
 
-    def handle_extension_event(self, session_id: str, event_name: str, payload: dict):
+    def handle_extension_event(self, session_id: str, event_name: str, payload: dict) -> None:
         """Process incoming event from extension."""
         session = self.get_session(session_id)
         if not session:
@@ -612,7 +612,7 @@ class BrowserAutomationService:
         session = self.get_session(session_id)
         return self.send_command(session, "extract", {"extraction_spec": extraction_spec})
 
-    def wait_for_user_login(self, session_id: str, detection_rules: dict, instruction: str):
+    def wait_for_user_login(self, session_id: str, detection_rules: dict, instruction: str) -> None:
         session = self.get_session(session_id)
         if not session:
             raise ValueError(f"Session {session_id} not found")

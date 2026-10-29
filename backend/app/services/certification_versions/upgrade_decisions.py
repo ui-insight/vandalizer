@@ -4,6 +4,12 @@ Internal only. Recording consent neither locks future work nor activates an
 upgrade. A future activation must revalidate the frozen snapshot under its own
 write boundary. A replay returns the original choice, never renewed consent.
 """
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from motor.motor_asyncio import AsyncIOMotorCollection
+
 from contextlib import asynccontextmanager
 import datetime
 import hashlib
@@ -44,15 +50,15 @@ class UpgradeDecisionRecord(BaseModel):
 
 
 class UpgradeDecisionRepository:
-    def __init__(self, repository=None):
+    def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         self.repository = repository or EnrollmentRepository()
 
     @property
-    def records(self):
+    def records(self) -> AsyncIOMotorCollection:
         return CertificationUpgradeDecision.get_motor_collection()
 
     @staticmethod
-    def decode(raw):
+    def decode(raw: dict) -> UpgradeDecisionRecord:
         try:
             if hashlib.sha256(raw['record_json'].encode()).hexdigest() != raw['record_sha256']:
                 raise ValueError('Record digest mismatch')
@@ -74,11 +80,11 @@ class UpgradeDecisionRepository:
         except (KeyError, TypeError, ValueError, ValidationError) as exc:
             raise CourseCatalogError('The saved upgrade decision failed integrity verification') from exc
 
-    async def get(self, user_id, request_id):
+    async def get(self, user_id: str, request_id: str) -> UpgradeDecisionRecord | None:
         raw = await self.records.find_one({'uuid': request_id, 'user_id': user_id})
         return self.decode(raw) if raw else None
 
-    async def accept(self, user_id, body):
+    async def accept(self, user_id: str, body):
         request = UpgradeDecisionRequest.model_validate(body)
         existing = await self.records.find_one({'uuid': request.request_id})
         if existing is not None:
@@ -113,7 +119,7 @@ class UpgradeDecisionRepository:
         return self._replay(saved, user_id, request)
 
     @asynccontextmanager
-    async def hold_reviewed_choice(self, user_id, request_id, *, activation_request=None):
+    async def hold_reviewed_choice(self, user_id: str, request_id: str, *, activation_request=None):
         """Revalidate under the source write lock; this does not switch courses.
 
         External-job reconciliation and a recoverable selection commit remain
@@ -146,7 +152,7 @@ class UpgradeDecisionRepository:
                 raise EnrollmentConflict('The offered course changed during review')
             yield original, progress, package
 
-    def _replay(self, raw, user_id, request):
+    def _replay(self, raw, user_id: str, request):
         if raw['user_id'] != user_id:
             raise EnrollmentConflict('The request reference is unavailable')
         original = self.decode(raw)

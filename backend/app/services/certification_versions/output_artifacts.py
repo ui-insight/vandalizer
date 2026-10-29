@@ -43,9 +43,11 @@ def _filename(name):
     return name
 
 
-def inspect_file(filename, file_type, data):
+def inspect_file(filename: str, file_type: str, data: bytes) -> dict:
     """Read the exact bytes; retain invalid output as repair evidence."""
-    issues, text, details = [], '', {}
+    issues: list[str] = []
+    text = ''
+    details: dict = {}
     if not data:
         issues.append('empty_file')
     elif file_type == 'pdf':
@@ -68,7 +70,7 @@ def inspect_file(filename, file_type, data):
         try:
             text = data.decode('utf-8-sig')
             reader = csv.reader(io.StringIO(text), strict=True)
-            rows = []
+            rows: list[list[str]] = []
             for row in reader:
                 if len(rows) >= 101 or len(row) > 40 or any(len(cell) > 20_000 for cell in row):
                     raise ValueError('Unsupported table size')
@@ -103,7 +105,7 @@ def inspect_file(filename, file_type, data):
             'source_correctness_verified': False, 'visual_inspection_required': True}
 
 
-def _file_record(name, kind, data):
+def _file_record(name, kind, data) -> dict:
     if not isinstance(kind, str) or kind not in FILE_TYPES:
         raise EnrollmentConflict('Unsupported generated file type')
     if len(data) > MAX_FILE_BYTES:

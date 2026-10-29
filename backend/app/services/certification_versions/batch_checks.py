@@ -19,11 +19,11 @@ def canonical(value, comparison):
     return ('value', ' '.join(value.split()).casefold())
 
 
-def item_id(batch_id, document_id):
+def item_id(batch_id, document_id: str):
     return encode({'batch_id': batch_id, 'document_id': document_id})[1][:32]
 
 
-def check_item(case, snapshot, result, *, batch_id, run_id, attempt_kind):
+def check_item(case, snapshot, result, *, batch_id, run_id: str, attempt_kind) -> dict:
     source = next((s for s in snapshot['documents'] if s['source_id'] == result.get('source_id')), None)
     # Each guard names its own reason so a rejection can be traced to it.
     if (source is None or snapshot['case'] != case.public_definition()
@@ -78,7 +78,7 @@ def check_item(case, snapshot, result, *, batch_id, run_id, attempt_kind):
         'source_supported': all(c['matches_source'] for c in checks), 'credit_awarded': False}
 
 
-def check_inventory(case, snapshot, results, *, batch_id, run_id, attempt_kind, source_ids):
+def check_inventory(case, snapshot, results, *, batch_id, run_id: str, attempt_kind, source_ids) -> dict:
     required = tuple(s.id for s in case.sources)
     allowed = case.pilot_source_ids if attempt_kind == 'pilot' else required if attempt_kind == 'batch' else None
     if (attempt_kind not in ('pilot', 'batch', 'retry') or allowed is not None and tuple(source_ids) != allowed
@@ -100,7 +100,7 @@ def check_inventory(case, snapshot, results, *, batch_id, run_id, attempt_kind, 
         'credit_awarded': False, 'module_completion_eligible': False}
 
 
-def check_recovery(case, snapshot, originals, retries, *, batch_id):
+def check_recovery(case, snapshot, originals, retries, *, batch_id) -> dict:
     """Reconcile final retry receipts selected by a trusted saved recovery chain.
 
     Every retry must target an originally failed item. A caller cannot use a

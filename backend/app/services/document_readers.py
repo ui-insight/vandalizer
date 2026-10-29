@@ -692,7 +692,9 @@ def _xml_part_well_formed(stream) -> bool:
     """
     import xml.parsers.expat as expat
 
-    def refuse(*_args):
+    from typing import NoReturn
+
+    def refuse(*_args: object) -> NoReturn:
         raise _EntityDeclared()
 
     parser = expat.ParserCreate()

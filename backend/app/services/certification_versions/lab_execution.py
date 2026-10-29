@@ -4,6 +4,13 @@ Staged integration: explicit approved HTTP dispatch; no grade, XP or credential.
 An uncertain provider call is never silently retried. Recovery requires a
 separate reviewed disposition; this module does not revoke running workers.
 """
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from motor.motor_asyncio import AsyncIOMotorCollection
+    from app.services.certification_versions.runtime import CourseOperation
+
 import asyncio
 from copy import deepcopy
 import datetime
@@ -50,7 +57,7 @@ def runtime_digest(config):
     return encode(without_credentials(config))[1]
 
 
-def execution_plan(snapshot, system_config):
+def execution_plan(snapshot, system_config) -> dict:
     if snapshot.get('record_kind') == 'saved_workflow_design':
         raise EnrollmentConflict('A saved workflow design is not executable lab input')
     if snapshot.get('record_kind') == 'connected_workflow_input':
@@ -83,17 +90,19 @@ def execution_plan(snapshot, system_config):
             'input_snapshot_sha256': encode(snapshot)[1]}
 
 
-class LabExecutionRepository:
+class LabExecutionJournal:
     @property
-    def records(self):
+    def records(self) -> AsyncIOMotorCollection:
         return CertificationLabExecution.get_motor_collection()
 
     @staticmethod
-    def decode(raw):
+    def decode(raw: dict) -> dict:
         try:
             if hashlib.sha256(raw['plan_json'].encode()).hexdigest() != raw['plan_sha256']:
                 raise ValueError('Plan digest mismatch')
             plan = json.loads(raw['plan_json'])
+            if not isinstance(plan, dict):
+                raise ValueError('The saved record must be an object')
             if any(plan[key] != raw[key] for key in ('uuid', 'user_id', 'enrollment_id', 'module_id',
                     'course_version', 'manifest_sha256', 'input_snapshot_id')):
                 raise ValueError('Plan identity mismatch')
@@ -103,6 +112,8 @@ class LabExecutionRepository:
                 if hashlib.sha256(raw['authorization_json'].encode()).hexdigest() != raw.get('authorization_sha256'):
                     raise ValueError('Authorization digest mismatch')
                 authorization = json.loads(raw['authorization_json'])
+                if not isinstance(authorization, dict):
+                    raise ValueError('The saved record must be an object')
                 if (authorization['run_id'] != raw['uuid'] or authorization['plan_sha256'] != raw['plan_sha256']
                         or encode(authorization['decision'])[1] != authorization['decision_sha256']
                         or authorization['decision']['uuid'] != raw.get('scope_decision_id')
@@ -114,6 +125,8 @@ class LabExecutionRepository:
                 if hashlib.sha256(raw['result_json'].encode()).hexdigest() != raw['result_sha256']:
                     raise ValueError('Result digest mismatch')
                 result = json.loads(raw['result_json'])
+                if not isinstance(result, dict):
+                    raise ValueError('The saved record must be an object')
                 if result['run_id'] != raw['uuid'] or result['plan_sha256'] != raw['plan_sha256'] or result['status'] != raw['state']:
                     raise ValueError('Result identity mismatch')
                 if result.get('authorization_sha256') != raw.get('authorization_sha256'):
@@ -126,12 +139,12 @@ class LabExecutionRepository:
         except (ValueError, TypeError, KeyError) as exc:
             raise CourseCatalogError('The saved lab execution failed integrity verification') from exc
 
-    async def get(self, user_id, run_id):
+    async def get(self, user_id: str, run_id: str) -> dict | None:
         raw = await self.records.find_one({'uuid': run_id, 'user_id': user_id})
         return self.decode(raw) if raw else None
 
     @staticmethod
-    def check_operation(operation, identity):
+    def check_operation(operation: CourseOperation, identity):
         progress = operation.progress
         if not operation.writable:
             raise EnrollmentConflict('Assessed execution requires a writable enrollment operation')
@@ -145,7 +158,23 @@ class LabExecutionRepository:
             raise EnrollmentConflict('The saved execution belongs to a different learner or course')
         return lease
 
-    async def prepare(self, operation, input_snapshot_id, run_id, system_config_doc):
+
+
+    async def _finish(self, saved, lease, result, started_at) -> None:
+        payload = {**result, 'run_id': saved['run_id'], 'plan_sha256': saved['plan_sha256'],
+                   'authorization_sha256': encode(saved['authorization'])[1] if saved.get('authorization') is not None else None,
+                   'started_at': started_at, 'finished_at': datetime.datetime.now(datetime.timezone.utc).isoformat()}
+        serialized, digest = encode(payload)
+        updated = await self.records.update_one(
+            {'uuid': saved['run_id'], 'plan_sha256': saved['plan_sha256'], 'state': 'executing', 'worker_id': lease.write_id},
+            {'$set': {'state': result['status'], 'result_json': serialized, 'result_sha256': digest}},
+        )
+        if updated.modified_count != 1:
+            raise EnrollmentConflict('The execution receipt changed; inspect its saved status before continuing')
+
+
+class LabExecutionRepository(LabExecutionJournal):
+    async def prepare(self, operation: CourseOperation, input_snapshot_id, run_id: str, system_config_doc):
         from .learner_decisions import execution_requirement
         from .scope_proposal import capture_proposal
         from .repair_case import capture_repair_case
@@ -183,7 +212,8 @@ class LabExecutionRepository:
                 raise EnrollmentConflict('This run reference was claimed by another operation')
         return await self.get(operation.user_id, run_id)
 
-    async def execute(self, operation, run_id, system_config_doc, *, expected_approval=None):
+
+    async def execute(self, operation, run_id: str, system_config_doc, *, expected_approval=None):
         from app.services.extraction_engine import ExtractionEngine
         from .learner_decisions import LearnerDecisionRepository
         saved = await self.get(operation.user_id, run_id)
@@ -217,10 +247,10 @@ class LabExecutionRepository:
             {'$set': {'state': 'executing', 'worker_id': lease.write_id, **approval_fields}},
         )
         if claimed.modified_count != 1:
-            current = await self.get(operation.user_id, run_id)
-            if current['state'] == 'prepared':
+            current_run = await self.get(operation.user_id, run_id)
+            if current_run is None or current_run['state'] == 'prepared':
                 raise EnrollmentConflict('Your scope decision changed before dispatch; review the saved decision')
-            return current
+            return current_run
         saved['authorization'] = authorization
         engine = ExtractionEngine(system_config_doc=config, domain=snapshot['artifact']['domain'])
         fields, documents = snapshot['artifact']['fields'], snapshot['documents']
@@ -255,15 +285,3 @@ class LabExecutionRepository:
             result = {'status': 'failed', 'reason': 'execution_error', 'error_type': type(exc).__name__, 'credit_awarded': False}
         await self._finish(saved, lease, result, started_at)
         return await self.get(operation.user_id, run_id)
-
-    async def _finish(self, saved, lease, result, started_at):
-        payload = {**result, 'run_id': saved['run_id'], 'plan_sha256': saved['plan_sha256'],
-                   'authorization_sha256': encode(saved['authorization'])[1] if saved.get('authorization') is not None else None,
-                   'started_at': started_at, 'finished_at': datetime.datetime.now(datetime.timezone.utc).isoformat()}
-        serialized, digest = encode(payload)
-        updated = await self.records.update_one(
-            {'uuid': saved['run_id'], 'plan_sha256': saved['plan_sha256'], 'state': 'executing', 'worker_id': lease.write_id},
-            {'$set': {'state': result['status'], 'result_json': serialized, 'result_sha256': digest}},
-        )
-        if updated.modified_count != 1:
-            raise EnrollmentConflict('The execution receipt changed; inspect its saved status before continuing')

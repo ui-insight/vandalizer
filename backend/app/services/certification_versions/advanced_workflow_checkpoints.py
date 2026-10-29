@@ -33,7 +33,7 @@ def review_output(previous, plan):
     return combined
 
 
-def validate_event(event, previous, run):
+def validate_event(event, previous, run) -> None:
     from app.services.workflow_engine import _build_combined_context
     plan = run['plan']
     stage_index, task_index = event['stage_index'], event['task_index']

@@ -19,7 +19,7 @@ COLLECTION = 'certification_legacy_completion_receipts'
 KIND = 'legacy_completion.1'
 
 
-def validate_request_id(request_id):
+def validate_request_id(request_id: object) -> None:
     if not isinstance(request_id, str) or not re.fullmatch(r'[a-f0-9]{32}', request_id):
         raise EnrollmentConflict('Completion requires a valid original request reference')
 
@@ -28,11 +28,11 @@ def records():
     return CertificationProgress.get_motor_collection().database[COLLECTION]
 
 
-def record_id(user_id, progress_id, request_id):
+def record_id(user_id: str, progress_id, request_id: str):
     return hashlib.sha256(json.dumps([user_id, progress_id, request_id], separators=(',', ':')).encode()).hexdigest()
 
 
-def payload(progress, receipt, module_id=None, request_id=None):
+def payload(progress, receipt, module_id: str | None=None, request_id: str | None=None):
     if (not isinstance(receipt, dict) or receipt.get('kind') != KIND
             or receipt.get('user_id') != progress.user_id or receipt.get('progress_id') != str(progress.id)
             or not isinstance(receipt.get('module_id'), str) or not receipt['module_id']
@@ -48,7 +48,7 @@ def payload(progress, receipt, module_id=None, request_id=None):
     return result
 
 
-async def persist_pending(progress):
+async def persist_pending(progress) -> None:
     receipt = progress.completion_receipt
     if not isinstance(receipt, dict) or receipt.get('kind') != KIND:
         return
@@ -62,14 +62,14 @@ async def persist_pending(progress):
             raise EnrollmentConflict('The original completion receipt changed; do not repeat this assessment')
 
 
-async def previous(progress, module_id, request_id):
+async def previous(progress, module_id: str, request_id: str):
     validate_request_id(request_id)
     await persist_pending(progress)
     receipt = await records().find_one({'_id': record_id(progress.user_id, str(progress.id), request_id)})
     return payload(progress, receipt, module_id, request_id) if receipt else None
 
 
-def prepare(progress, module_id, request_id, result):
+def prepare(progress, module_id: str, request_id: str, result):
     validate_request_id(request_id)
     result = {**result, 'module_id': module_id, 'attempt_id': request_id}
     serialized, digest = encode(result)

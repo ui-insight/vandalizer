@@ -5,6 +5,7 @@ This module is not an HTTP payload validator or a completed practical grader.
 A model verdict cannot replace missing evidence, deterministic checks, calibrated
 release requirements or authenticated learner decisions.
 """
+from typing import Self
 import asyncio
 from copy import deepcopy
 from datetime import datetime
@@ -76,7 +77,7 @@ class OutcomeDecision(ContractModel):
     revision_instruction: str = Field(max_length=1000)
 
     @model_validator(mode='after')
-    def require_revision_guidance(self):
+    def require_revision_guidance(self) -> Self:
         if self.verdict != 'supported' and len(self.revision_instruction.strip()) < 10:
             raise ValueError('Unmet or unclear evidence requires a concrete revision instruction')
         if self.verdict == 'supported' and (not self.citations or self.revision_instruction.strip()):
@@ -95,7 +96,7 @@ def _spaced(text):
     return ' '.join(text.split())
 
 
-def quote_found(quote, text):
+def quote_found(quote, text) -> bool:
     """Whether a citation is a verbatim span of the evidence as a person reads it.
 
     Evidence records are JSON, often with JSON nested inside strings, so a
@@ -139,7 +140,7 @@ def _timestamps(evidence, point):
     """Every ``point.key`` value in evidence of ``point.kind``, with its verbatim source text."""
     found = []
 
-    def walk(value, item):
+    def walk(value, item) -> None:
         if isinstance(value, dict):
             for key, child in value.items():
                 if key == point.key and isinstance(child, str):
@@ -282,7 +283,7 @@ async def _call_model(model_name, system_config, payload):
     return result.output
 
 
-def review_packet(contract, module_id, evidence):
+def review_packet(contract, module_id: str, evidence):
     module = next((module for module in contract.modules if module.module_id == module_id), None)
     outcomes = tuple(outcome for outcome in module.outcomes if outcome.method == 'structured_review') if module else ()
     if not outcomes:
@@ -299,7 +300,7 @@ def review_packet(contract, module_id, evidence):
     return outcomes, evidence, evidence_digest
 
 
-def reviewer_identity(model_name, system_config):
+def reviewer_identity(model_name, system_config) -> dict:
     paths = [Path(__file__), Path(__file__).with_name('review_attempts.py'), Path(__file__).with_name('review_recovery.py'),
              Path(__file__).parents[1] / 'llm_service.py']
     implementation = encode({'files': {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in paths},
@@ -310,7 +311,7 @@ def reviewer_identity(model_name, system_config):
             'sdk_version': version('pydantic-ai-slim'), 'temperature': 0.0}
 
 
-async def evaluate_draft_structured_review(contract, module_id, evidence, *, model_name, system_config, call_model=None):
+async def evaluate_draft_structured_review(contract, module_id: str, evidence, *, model_name, system_config, call_model=None) -> dict:
     """Review structured outcomes only, using a caller-verified evidence packet.
 
     No API/chat integration exists. Deterministic outcomes are deliberately not

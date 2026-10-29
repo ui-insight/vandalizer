@@ -9,17 +9,18 @@ from datetime import date, datetime, timezone
 import hashlib
 
 from bson import json_util
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
 
 class InventoryChanged(ValueError):
     pass
 
 
-def present(path):
+def present(path: str) -> dict:
     return {'$not': [{'$in': [{'$ifNull': [path, None]}, [None, False, {}, [], '']]}]}
 
 
-def fields(*names):
+def fields(*names: str) -> dict[str, int]:
     return dict.fromkeys(('_id', 'user_id', *names), 1)
 
 
@@ -55,18 +56,18 @@ PROJECTIONS = {
 }
 
 
-def digest(data):
+def digest(data: object) -> str:
     return hashlib.sha256(json_util.dumps(data, sort_keys=True).encode()).hexdigest()
 
 
-def positive(value):
+def positive(value: object) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool) and value > 0
 
 
-def classify(metadata):
+def classify(metadata: dict[str, list[dict]]) -> dict:
     """Aggregate projected rows; never return user/record IDs or learner content."""
-    groups = defaultdict(lambda: defaultdict(list))
-    malformed_owners = Counter()
+    groups: dict[str, dict[str, list[dict]]] = defaultdict(lambda: defaultdict(list))
+    malformed_owners: Counter[str] = Counter()
     for kind in PROJECTIONS:
         for row in metadata.get(kind, []):
             owner = row.get('user_id')
@@ -74,7 +75,10 @@ def classify(metadata):
                 malformed_owners[kind] += 1
             else:
                 groups[owner][kind].append(row)
-    cohorts, flags, versions, activity = Counter(), Counter(), Counter(), Counter()
+    cohorts: Counter[str] = Counter()
+    flags: Counter[str] = Counter()
+    versions: Counter[str] = Counter()
+    activity: Counter[str] = Counter()
     activity_dates = []
     for owner, records in groups.items():
         problems, notes = set(), set()
@@ -82,7 +86,7 @@ def classify(metadata):
         enrollments = records['enrollments']
         selections = records['selections']
         enrollment_map = defaultdict(list)
-        progress_map = defaultdict(list)
+        progress_map: dict[str | None, list[dict]] = defaultdict(list)
         for row in enrollments:
             enrollment_map[row.get('uuid')].append(row)
         for row in progress:
@@ -99,7 +103,7 @@ def classify(metadata):
             problems.add('duplicate_legacy_progress')
         if legacy:
             notes.add('unknown_historical_version')
-        bound_progress = Counter()
+        bound_progress: Counter[str | None] = Counter()
         for enrollment in enrollments:
             matches = progress_map.get(enrollment.get('progress_id'), [])
             bound_progress[enrollment.get('progress_id')] += 1
@@ -232,7 +236,7 @@ def classify(metadata):
     }
 
 
-async def read_metadata(database, *, max_records=100000):
+async def read_metadata(database: AsyncIOMotorDatabase, *, max_records: int = 100000) -> dict[str, list[dict]]:
     if max_records < 1:
         raise ValueError('The record limit must be positive')
     result, count = {}, 0
@@ -247,7 +251,7 @@ async def read_metadata(database, *, max_records=100000):
     return result
 
 
-async def inventory(database, *, max_records=100000):
+async def inventory(database: AsyncIOMotorDatabase, *, max_records: int = 100000) -> dict:
     started = datetime.now(timezone.utc).isoformat()
     first = await read_metadata(database, max_records=max_records)
     second = await read_metadata(database, max_records=max_records)

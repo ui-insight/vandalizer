@@ -1,4 +1,11 @@
 """Authenticated source-checked test expectations, distinct from run approval."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
+from typing import Self
 import datetime
 from typing import Annotated, Literal
 
@@ -10,7 +17,7 @@ from .catalog import CourseCatalogError
 from .enrollments import EnrollmentConflict
 from .lab_execution import LabExecutionRepository
 from .lab_inputs import LabInputRepository
-from .learner_decisions import LearnerDecisionRepository
+from .learner_decisions import LearnerDecisionRepository, LearnerDecisionJournal
 from .outcomes import ContractModel
 from .repair_case import SourceAnchor
 from .validation_case import FIELDS, SOURCES, load_validation_case
@@ -31,7 +38,7 @@ class LearnerExpectation(ContractModel):
     source_reason: str = Field(min_length=20, max_length=3000)
 
     @model_validator(mode='after')
-    def meaningful_expectation(self):
+    def meaningful_expectation(self) -> Self:
         if (self.expected_kind == 'explicit_absence') != (self.expected_value is None):
             raise ValueError('An explicit absence requires null; a known value requires nonempty text')
         if self.expected_value is not None and not self.expected_value.strip():
@@ -53,7 +60,7 @@ class ValidationSuiteRequest(ContractModel):
     consent: Literal['save_checked_representative_expectations_before_execution']
 
     @model_validator(mode='after')
-    def full_suite(self):
+    def full_suite(self) -> Self:
         if {(e.source_id, e.field) for e in self.expectations} != {(s, f) for s in SOURCES for f in FIELDS}:
             raise ValueError('Include one checked expectation for every required field in both sources')
         if len(self.suite_design.strip()) < 40:
@@ -61,7 +68,7 @@ class ValidationSuiteRequest(ContractModel):
         return self
 
 
-def embedded_input(snapshot):
+def embedded_input(snapshot) -> dict:
     serialized, digest = encode(snapshot)
     return {**{key: snapshot[key] for key in ('uuid', 'user_id', 'enrollment_id', 'module_id', 'course_version', 'manifest_sha256', 'artifact_id')},
             'record_json': serialized, 'record_sha256': digest}
@@ -93,9 +100,9 @@ def test_cases(body, snapshot):
     return cases
 
 
-class ValidationSuiteRepository(LearnerDecisionRepository):
+class ValidationSuiteRepository(LearnerDecisionJournal):
     @staticmethod
-    def decode(raw):
+    def decode(raw: dict) -> dict:
         saved = LearnerDecisionRepository.decode(raw)
         try:
             body = ValidationSuiteRequest.model_validate(saved['submission'])
@@ -115,11 +122,11 @@ class ValidationSuiteRepository(LearnerDecisionRepository):
         except (KeyError, TypeError, ValueError, AttributeError) as exc:
             raise CourseCatalogError('The saved representative suite failed integrity verification') from exc
 
-    async def get(self, user_id, submission_id):
+    async def get(self, user_id: str, submission_id) -> dict | None:
         raw = await self.records.find_one({'uuid': submission_id, 'user_id': user_id, 'module_id': 'validation_qa', 'prompt_id': PROMPT_ID})
         return self.decode(raw) if raw else None
 
-    async def submit(self, operation, body, *, actor_user_id):
+    async def submit(self, operation: CourseOperation, body, *, actor_user_id: str):
         body = ValidationSuiteRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Test expectations require the authenticated learner')

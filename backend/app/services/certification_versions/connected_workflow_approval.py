@@ -1,4 +1,11 @@
 """Explicit learner scope choices for an exact saved connected-workflow plan."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
+from typing import Self
 import datetime
 from typing import Literal
 
@@ -9,37 +16,40 @@ from .attempts import encode
 from .catalog import CourseCatalogError
 from .connected_workflow_preparation import ConnectedWorkflowPreparation
 from .enrollments import EnrollmentConflict
-from .lab_execution import LabExecutionRepository
+from .lab_execution import LabExecutionRepository, LabExecutionJournal
 from .lab_inputs import LabInputRepository
-from .learner_decisions import LearnerDecisionRepository
+from .learner_decisions import LearnerDecisionRepository, LearnerDecisionJournal
 from .outcomes import ContractModel
 
 
-class ConnectedScopeRequest(ContractModel):
+class ScopeRequestFields(ContractModel):
     request_id: str = Field(pattern=r'^[a-f0-9]{32}$')
     run_id: str = Field(pattern=r'^[a-f0-9]{32}$')
     plan_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
     case_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
     choice: Literal['approve', 'hold']
     reason: str = Field(min_length=10, max_length=4000)
-    consent: Literal['save_connected_workflow_scope_decision']
 
     @model_validator(mode='after')
-    def nonempty_reason(self):
+    def nonempty_reason(self) -> Self:
         if len(self.reason.strip()) < 10:
             raise ValueError('Explain the scope choice for this saved revision')
         return self
 
 
-class ConnectedScopeRepository(LearnerDecisionRepository):
-    request_model = ConnectedScopeRequest
-    preparation_type = ConnectedWorkflowPreparation
+class ConnectedScopeRequest(ScopeRequestFields):
+    consent: Literal['save_connected_workflow_scope_decision']
+
+
+class ConnectedScopeRepository(LearnerDecisionJournal):
+    request_model: type[ScopeRequestFields] = ConnectedScopeRequest
+    preparation_type: type[LabExecutionJournal] = ConnectedWorkflowPreparation
     module_id = 'multi_step'
     record_kind = 'connected_workflow_scope'
     scope_prompt_id = 'scope_approval'
 
     @classmethod
-    def decode(cls, raw):
+    def decode(cls, raw: dict) -> dict:
         record = LearnerDecisionRepository.decode(raw)
         try:
             body = cls.request_model.model_validate(record['submission'])
@@ -58,7 +68,7 @@ class ConnectedScopeRepository(LearnerDecisionRepository):
         except (KeyError, TypeError, ValueError) as exc:
             raise CourseCatalogError('The saved connected-workflow scope decision failed integrity verification') from exc
 
-    async def submit(self, operation, body, *, actor_user_id):
+    async def submit(self, operation: CourseOperation, body, *, actor_user_id: str):
         body = self.request_model.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Only the authenticated learner can approve the saved revision')
@@ -110,7 +120,7 @@ class ConnectedScopeRepository(LearnerDecisionRepository):
         await self._link_scope(operation, record, replay=False)
         return record
 
-    async def authorize(self, operation, run):
+    async def authorize(self, operation, run) -> dict:
         """Validate currently linked consent; this method never dispatches."""
         LabExecutionRepository.check_operation(operation, run['plan'])
         record = await self.get(operation.user_id, run.get('scope_decision_id'))

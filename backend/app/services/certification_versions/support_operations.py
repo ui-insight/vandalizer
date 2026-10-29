@@ -1,4 +1,10 @@
 """Bounded, read-only operation summaries with no source text or provider errors."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.catalog import CoursePackage
+
 import re
 
 from app.models.certification import CertificationEnrollmentSelection
@@ -30,7 +36,7 @@ def reference(value):
     return value
 
 
-def run_decoder(module_id):
+def run_decoder(module_id: str):
     # Each workflow owns additional evidence checks beyond the common envelope.
     from .advanced_workflow_preparation import AdvancedWorkflowPreparation
     from .batch_preparation import BatchPreparation
@@ -58,25 +64,27 @@ async def bounded_records(collection, identity, pending_states):
     return rows, len(pending) > 5, len(recent) > 5
 
 
-async def support_operations(enrollment, package):
+async def support_operations(enrollment, package: CoursePackage):
     identity = {'user_id': enrollment.user_id, 'enrollment_id': enrollment.uuid}
     modules = {module.id: module for module in package.manifest.modules}
     contract = package_outcomes(package)
     selection = await CertificationEnrollmentSelection.get_motor_collection().find_one({'user_id': enrollment.user_id})
     selected = bool(selection and selection.get('active_enrollment_id') == enrollment.uuid)
-    in_flight = selection.get('in_flight_writes') if selected else 0
-    result = {'worker_marked_in_flight': type(in_flight) is int and in_flight > 0,
-              'course_change_pending': bool(selected and selection.get('pending_transition_id')),
+    in_flight = selection.get('in_flight_writes') if selected and selection is not None else 0
+    result: dict = {'worker_marked_in_flight': type(in_flight) is int and in_flight > 0,
+              'course_change_pending': bool(selected and selection is not None and selection.get('pending_transition_id')),
               'groups': []}
     for kind, journal, pending, steps in (
         ('automatic_review', ReviewAttemptRepository(), ['prepared', 'evaluating', 'unavailable'], REVIEW_STEPS),
         ('lab_run', LabExecutionRepository(), ['prepared', 'executing', 'uncertain'], RUN_STEPS),
     ):
         rows, more_pending, more_recent = await bounded_records(journal.records, identity, pending)
-        group = {'kind': kind, 'records': [], 'more_pending': more_pending, 'more_recent': more_recent}
+        group: dict = {'kind': kind, 'records': [], 'more_pending': more_pending, 'more_recent': more_recent}
         for marker in rows:
             try:
                 row = await journal.records.find_one({**identity, '_id': marker['_id']})
+                if row is None:
+                    raise CourseCatalogError('The original operation is no longer available')
                 request_id = reference(row.get('uuid'))
                 module_id = row.get('module_id')
                 if (module_id not in modules or any(row.get(key) != value for key, value in {

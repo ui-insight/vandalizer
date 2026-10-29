@@ -1,4 +1,10 @@
 """Freeze an owned workflow and assigned subaward; this grants no run authority."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
 import datetime
 import hashlib
 from typing import Literal
@@ -13,7 +19,7 @@ from .enrollments import EnrollmentConflict
 from .lab_inputs import LabInputRepository, MAX_SNAPSHOT_BYTES
 from .multi_step_case import load_multi_step_case
 from .outcomes import ContractModel
-from .workflow_design_inputs import WorkflowDesignInputRepository
+from .workflow_design_inputs import WorkflowDesignInputJournal
 from .writes import require_lease
 
 
@@ -24,11 +30,11 @@ class ConnectedCaptureRequest(ContractModel):
     consent: Literal['capture_connected_workflow_inputs']
 
 
-class ConnectedWorkflowInputRepository(WorkflowDesignInputRepository):
+class ConnectedWorkflowInputRepository(WorkflowDesignInputJournal):
     """Reuse only the owned configuration reader; capture has its own contract."""
 
     @staticmethod
-    def decode(record):
+    def decode(record: dict) -> dict:
         saved = LabInputRepository.decode(record)
         try:
             body = ConnectedCaptureRequest.model_validate(saved['request'])
@@ -56,7 +62,7 @@ class ConnectedWorkflowInputRepository(WorkflowDesignInputRepository):
         except (KeyError, TypeError, ValueError, IndexError, AttributeError) as exc:
             raise CourseCatalogError('Saved connected-workflow inputs failed integrity verification') from exc
 
-    async def capture(self, operation, body, *, actor_user_id, storage):
+    async def capture(self, operation: CourseOperation, body, *, actor_user_id: str, storage):
         body = ConnectedCaptureRequest.model_validate(body)
         progress, package = operation.progress, operation.package
         if (not operation.writable or actor_user_id != operation.user_id or progress.user_id != operation.user_id

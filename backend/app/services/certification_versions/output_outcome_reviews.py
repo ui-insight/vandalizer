@@ -1,4 +1,11 @@
 """Preserve the learner's delivery interpretation alongside the exact file review."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
+from typing import Self
 from copy import deepcopy
 import datetime
 from typing import Annotated, Literal
@@ -11,7 +18,7 @@ from .catalog import CourseCatalogError
 from .enrollments import EnrollmentConflict
 from .lab_execution import LabExecutionRepository
 from .lab_inputs import LabInputRepository
-from .learner_decisions import LearnerDecisionRepository
+from .learner_decisions import LearnerDecisionRepository, LearnerDecisionJournal
 from .outcomes import ContractModel
 from .output_case import load_output_case
 from .output_file_reviews import OutputFileReviewRepository
@@ -36,7 +43,7 @@ class OutputOutcomeReviewRequest(ContractModel):
     consent: Literal['save_output_delivery_interpretation']
 
     @model_validator(mode='after')
-    def actual_answer(self):
+    def actual_answer(self) -> Self:
         if len(self.delivery_review.strip()) < 10 or self.previous_submission_id == self.request_id:
             raise ValueError('Explain the actual delivery result; a revision needs a new request identity')
         return self
@@ -59,15 +66,15 @@ def restore_handoff(value, artifacts):
     return OutputPrivateHandoffRepository.decode({**value, 'record_json': serialized, 'record_sha256': digest})
 
 
-def embedded_review(review):
+def embedded_review(review) -> dict:
     serialized, digest = encode(review)
     return {**{key: review[key] for key in ('uuid', 'user_id', 'enrollment_id', 'module_id', 'course_version',
         'manifest_sha256', 'request_sha256', 'run_id', 'prompt_id')}, 'record_json': serialized, 'record_sha256': digest}
 
 
-class OutputOutcomeReviewRepository(LearnerDecisionRepository):
+class OutputOutcomeReviewRepository(LearnerDecisionJournal):
     @staticmethod
-    def decode(raw):
+    def decode(raw: dict) -> dict:
         saved = LearnerDecisionRepository.decode(raw)
         try:
             body = OutputOutcomeReviewRequest.model_validate(saved['submission'])
@@ -91,11 +98,11 @@ class OutputOutcomeReviewRepository(LearnerDecisionRepository):
         except (KeyError, TypeError, ValueError, EnrollmentConflict) as exc:
             raise CourseCatalogError('The saved output outcome review failed integrity verification') from exc
 
-    async def get(self, user_id, submission_id):
+    async def get(self, user_id: str, submission_id) -> dict | None:
         raw = await self.records.find_one({'uuid': submission_id, 'user_id': user_id, 'module_id': 'output_delivery', 'prompt_id': PROMPT_ID})
         return self.decode(raw) if raw else None
 
-    async def submit(self, operation, body, *, actor_user_id):
+    async def submit(self, operation: CourseOperation, body, *, actor_user_id: str):
         body = OutputOutcomeReviewRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Output interpretation requires the authenticated learner')

@@ -21,7 +21,7 @@ class BatchFinalizationRequest(ContractModel):
 
 
 class BatchRecovery(BatchPreparation):
-    async def finalize(self, operation, body, *, actor_user_id):
+    async def finalize(self, operation, body, *, actor_user_id: str):
         body = BatchFinalizationRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Only the authenticated learner can finalize this saved batch action')

@@ -3,6 +3,7 @@
 No XP or certification is awarded here. A delivery integration must persist an
 explicit learner submission against the pinned bank before using this result.
 """
+from typing import Self
 from typing import Literal
 
 from pydantic import Field, model_validator
@@ -25,7 +26,7 @@ class ScenarioQuestion(ContractModel):
     correct_choice_id: str
 
     @model_validator(mode='after')
-    def unique_choices(self):
+    def unique_choices(self) -> Self:
         ids = [choice.id for choice in self.choices]
         if len(ids) != len(set(ids)) or self.correct_choice_id not in ids:
             raise ValueError('Scenario choices must be unique and contain the keyed answer')
@@ -42,7 +43,7 @@ class ScenarioBank(ContractModel):
     questions: tuple[ScenarioQuestion, ...] = Field(min_length=1)
 
     @model_validator(mode='after')
-    def coverage(self):
+    def coverage(self) -> Self:
         ids = [question.id for question in self.questions]
         if len(ids) != len(set(ids)) or len(self.outcome_ids) != len(set(self.outcome_ids)):
             raise ValueError('Scenario and outcome identities must be unique')
@@ -56,13 +57,13 @@ class ScenarioBank(ContractModel):
     def digest(self):
         return encode(self.model_dump(mode='json'))[1]
 
-    def verify_contract(self, contract):
+    def verify_contract(self, contract) -> None:
         module = next((module for module in contract.modules if module.module_id == self.module_id), None)
         required = {outcome.id for outcome in module.outcomes if outcome.method == 'scenario_choice'} if module else set()
         if self.rubric_id != contract.rubric_id or set(self.outcome_ids) != required:
             raise ValueError('Scenario bank does not match the declared recognition outcomes and rubric')
 
-    def public_definition(self):
+    def public_definition(self) -> dict:
         return {
             'bank_id': self.bank_id, 'revision': self.revision, 'bank_sha256': self.digest,
             'module_id': self.module_id,
@@ -71,7 +72,7 @@ class ScenarioBank(ContractModel):
                           for question in self.questions],
         }
 
-    def grade(self, answers: dict[str, str], *, expected_sha256: str):
+    def grade(self, answers: dict[str, str], *, expected_sha256: str) -> dict:
         if expected_sha256 != self.digest:
             raise ValueError('Scenario requirements changed; use the pinned assessment bank')
         if not isinstance(answers, dict) or set(answers) - {question.id for question in self.questions}:

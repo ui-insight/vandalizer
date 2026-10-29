@@ -3,6 +3,12 @@
 Internal only. Coverage is not a grade. In particular, an approved execution plan
 does not establish the original intentional mismatch or the learner's correction.
 """
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
 import hashlib
 from pathlib import Path
 
@@ -25,7 +31,7 @@ class EvidenceAssemblyUnavailable(EnrollmentConflict):
 
 
 class PracticalEvidenceRepository:
-    async def assemble_foundations(self, operation, run_id, *, actor_user_id):
+    async def assemble_foundations(self, operation: CourseOperation, run_id: str, *, actor_user_id: str) -> dict:
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Evidence assembly requires the authenticated learner')
         run = await LabExecutionRepository().get(actor_user_id, run_id)
@@ -89,7 +95,7 @@ class PracticalEvidenceRepository:
 
         evidence = []
 
-        def add(kind, identity, payload):
+        def add(kind, identity, payload) -> None:
             try:
                 evidence.append(ReviewEvidence(id=identity, kind=kind, text=encode(payload)[0]).model_dump(mode='json'))
             except ValidationError as exc:
@@ -145,7 +151,7 @@ class PracticalEvidenceRepository:
                     'value_decision_sha256': encode(values)[1] if values else None}}
 
     @staticmethod
-    def _check_decision(operation, run, decision, prompt_id, state):
+    def _check_decision(operation: CourseOperation, run, decision, prompt_id: str, state) -> None:
         LabExecutionRepository.check_operation(operation, decision)
         prompt = load_prompt(operation.package, 'foundations', prompt_id)
         try:

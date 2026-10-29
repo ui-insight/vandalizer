@@ -12,7 +12,7 @@ from app.services.access_control import get_authorized_search_set
 
 
 class _ReadableQuery:
-    def __init__(self, query, user_id, reference):
+    def __init__(self, query, user_id: str, reference: str) -> None:
         self.query, self.user_id, self.reference = query, user_id, reference
 
     async def to_list(self, *args, **kwargs):
@@ -32,7 +32,7 @@ class _ReadableQuery:
 
 
 class _ReadableModel:
-    def __init__(self, model, user_id, reference):
+    def __init__(self, model, user_id: str, reference: str) -> None:
         self.model, self.user_id, self.reference = model, user_id, reference
 
     def __getattr__(self, name):
@@ -42,7 +42,7 @@ class _ReadableModel:
         return _ReadableQuery(self.model.find(*args, **kwargs), self.user_id, self.reference)
 
 
-def with_legacy_field_access(validator, user_id):
+def with_legacy_field_access(validator, user_id: str):
     """Bind only the affected collectors; leave their executable rules intact.
 
     Works with the current legacy validator and the hash-verified frozen runner.

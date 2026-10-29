@@ -3,6 +3,13 @@
 This validates a draft case and its package binding. It does not enable practical
 delivery, collect learner work, grade a response or award credit.
 """
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.catalog import CoursePackage
+
+from typing import Self
 import hashlib
 from typing import Literal
 
@@ -30,7 +37,7 @@ class FlawedSpecimen(CaseModel):
     output: dict[str, str | None]
 
     @model_validator(mode='after')
-    def matching_fields(self):
+    def matching_fields(self) -> Self:
         titles = [field.title for field in self.fields]
         if len(set(titles)) != len(titles) or set(titles) != set(self.output):
             raise ValueError('The authored specimen needs one output for each unique field')
@@ -51,7 +58,7 @@ class RepairExpectation(CaseModel):
     anchors: tuple[SourceAnchor, ...] = Field(min_length=1, max_length=5)
 
     @model_validator(mode='after')
-    def consistent_expectation(self):
+    def consistent_expectation(self) -> Self:
         if ((self.expected_value is None) != (self.absence_policy == 'absent_when_unnamed')
                 or (self.allowed_categories and self.expected_value not in self.allowed_categories)
                 or len(set(self.allowed_categories)) != len(self.allowed_categories)):
@@ -75,7 +82,7 @@ class ExtractionRepairCase(CaseModel):
     evidence_rule: Literal['authored_baseline_plus_owned_revised_run_and_authenticated_source_checks']
 
     @model_validator(mode='after')
-    def coherent_case(self):
+    def coherent_case(self) -> Self:
         fields = [item.field for item in self.expectations]
         if (len(set(fields)) != len(fields) or set(fields) != set(self.baseline.output)
                 or len(set(self.outcome_ids)) != len(self.outcome_ids)
@@ -90,7 +97,7 @@ class ExtractionRepairCase(CaseModel):
     def digest(self):
         return encode(self.model_dump(mode='json'))[1]
 
-    def verify_contract(self, contract, prompts):
+    def verify_contract(self, contract, prompts) -> None:
         module = next((module for module in contract.modules if module.module_id == self.module_id), None)
         by_prompt = {prompt.id: prompt for prompt in prompts}
         if module is None or set(self.outcome_ids) != {outcome.id for outcome in module.outcomes}:
@@ -106,7 +113,7 @@ class ExtractionRepairCase(CaseModel):
                 or set(values.required_fields) != {item.field for item in self.expectations}):
             raise ValueError('Repair decisions must authorize scope and check every revised value')
 
-    def verify_source(self, pdf_bytes, page_texts):
+    def verify_source(self, pdf_bytes, page_texts) -> None:
         """Authoring check only; text presence is not learner source verification."""
         if hashlib.sha256(pdf_bytes).hexdigest() != self.source_sha256:
             raise ValueError('Repair case source bytes changed')
@@ -116,11 +123,11 @@ class ExtractionRepairCase(CaseModel):
                         or ' '.join(anchor.quote.split()) not in ' '.join(page_texts[anchor.page - 1].split())):
                     raise ValueError('A repair expectation has an unavailable source anchor')
 
-    def public_definition(self):
+    def public_definition(self) -> dict:
         """Task and deliberately flawed specimen only; no expected answers."""
         return {**self.model_dump(mode='json', exclude={'expectations'}), 'case_sha256': self.digest}
 
-    def verify_exercise(self, exercise):
+    def verify_exercise(self, exercise) -> None:
         if (exercise.get('documents') != [self.source_filename]
                 or exercise.get('assessment_case_id') != self.id
                 or exercise.get('repair_case_sha256') != self.digest
@@ -130,7 +137,7 @@ class ExtractionRepairCase(CaseModel):
             raise ValueError('The exercise must describe the pinned repair task without legacy count credit or answer keys')
 
 
-def load_repair_case(package, module_id):
+def load_repair_case(package: CoursePackage, module_id: str):
     path = f'repair-cases/{module_id}.json'
     if path not in package.manifest.artifacts:
         return None
@@ -151,7 +158,7 @@ def load_repair_case(package, module_id):
         raise CourseCatalogError('The packaged Extraction Engine repair case is invalid') from exc
 
 
-def capture_repair_case(package, snapshot):
+def capture_repair_case(package, snapshot) -> None | dict:
     """Bind the public authored baseline to these exact inputs, not a fake run."""
     case = load_repair_case(package, snapshot['module_id'])
     if case is None:
@@ -166,5 +173,5 @@ def capture_repair_case(package, snapshot):
             'source_document_id': documents[0]['document_id']}
 
 
-def repair_reference_matches(captured, reference):
+def repair_reference_matches(captured: object, reference: str | None) -> bool:
     return reference == (encode(captured)[1] if captured is not None else None)

@@ -34,7 +34,7 @@ async def active_validation(kb_uuid: str, user_id: str):
     return {"task": {**outcome, "options": receipt.options}}
 
 
-async def finish_receipt(receipt, status):
+async def finish_receipt(receipt, status) -> None:
     if receipt.active or receipt.terminal_status != status:
         await receipt.set({"active": False, "terminal_status": status})
 

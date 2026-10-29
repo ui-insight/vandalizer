@@ -1,4 +1,5 @@
 """Supplement historical teaching without rewriting its package or requirements."""
+from typing import Self
 from functools import lru_cache
 import hashlib
 from pathlib import Path
@@ -38,8 +39,8 @@ class EditorialNotices(BaseModel):
     module_notices: list[ModuleEditorialNotice] = Field(default_factory=list)
 
     @model_validator(mode='after')
-    def unambiguous(self):
-        all_notices = [*self.notices, *self.module_notices]
+    def unambiguous(self) -> Self:
+        all_notices: list[EditorialNotice | ModuleEditorialNotice] = [*self.notices, *self.module_notices]
         if len({notice.id for notice in all_notices}) != len(all_notices):
             raise ValueError('Editorial notice identities must be unique')
         for notice in all_notices:
@@ -50,7 +51,7 @@ class EditorialNotices(BaseModel):
 
 
 @lru_cache(maxsize=1)
-def _load():
+def _load() -> EditorialNotices:
     try:
         return EditorialNotices.model_validate_json(SOURCE.read_bytes())
     except (OSError, ValueError) as exc:

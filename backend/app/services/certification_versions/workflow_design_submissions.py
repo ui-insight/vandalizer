@@ -1,4 +1,12 @@
 """Learner approval of an exact captured design, never execution authority."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from motor.motor_asyncio import AsyncIOMotorCollection
+    from app.services.certification_versions.runtime import CourseOperation
+
+from typing import Self
 import datetime
 import hashlib
 import json
@@ -29,7 +37,7 @@ class WorkflowDesignSubmission(ContractModel):
     previous_submission_id: str | None = Field(default=None, pattern=r'^[a-f0-9]{32}$')
 
     @model_validator(mode='after')
-    def require_decisions(self):
+    def require_decisions(self) -> Self:
         if set(self.answers) != {'data_flow', 'approval_boundary', 'reviewable_design'} or any(not v.strip() for v in self.answers.values()):
             raise ValueError('Provide all three decisions about the saved workflow revision')
         return self
@@ -37,15 +45,17 @@ class WorkflowDesignSubmission(ContractModel):
 
 class WorkflowDesignSubmissionRepository:
     @property
-    def records(self):
+    def records(self) -> AsyncIOMotorCollection:
         return CertificationWorkflowDesignSubmission.get_motor_collection()
 
     @staticmethod
-    def decode(raw):
+    def decode(raw: dict) -> dict:
         try:
             if hashlib.sha256(raw['record_json'].encode()).hexdigest() != raw['record_sha256']:
                 raise ValueError('Digest mismatch')
             saved = json.loads(raw['record_json'])
+            if not isinstance(saved, dict):
+                raise ValueError('The saved record must be an object')
             keys = ('uuid', 'user_id', 'enrollment_id', 'module_id', 'course_version', 'manifest_sha256')
             if any(saved[key] != raw[key] for key in (*keys, 'request_sha256')):
                 raise ValueError('Identity mismatch')
@@ -66,11 +76,11 @@ class WorkflowDesignSubmissionRepository:
         except (KeyError, TypeError, ValueError) as exc:
             raise CourseCatalogError('The saved workflow approval failed integrity verification') from exc
 
-    async def get(self, user_id, submission_id):
+    async def get(self, user_id: str, submission_id) -> dict | None:
         raw = await self.records.find_one({'uuid': submission_id, 'user_id': user_id})
         return self.decode(raw) if raw else None
 
-    async def submit(self, operation, body, *, actor_user_id):
+    async def submit(self, operation: CourseOperation, body, *, actor_user_id: str):
         body = WorkflowDesignSubmission.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Workflow Design approval requires the authenticated learner')

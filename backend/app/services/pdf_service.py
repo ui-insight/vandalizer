@@ -290,7 +290,7 @@ _WORKFLOW_FONT_LOCK = Lock()
 _WORKFLOW_FONTS_READY = False
 
 
-def _register_workflow_fonts():
+def _register_workflow_fonts() -> None:
     """Embed bundled report text faces instead of relying on viewer substitutes."""
     global _WORKFLOW_FONTS_READY
     with _WORKFLOW_FONT_LOCK:

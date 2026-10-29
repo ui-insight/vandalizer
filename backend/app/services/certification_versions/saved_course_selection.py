@@ -3,6 +3,12 @@
 Returning never copies old credit over new work, creates a replacement target,
 revokes a credential or replays an assessment. Public delivery remains gated.
 """
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from motor.motor_asyncio import AsyncIOMotorCollection
+
 from copy import deepcopy
 import datetime
 import hashlib
@@ -42,16 +48,16 @@ class SavedCourseSelectionRequest(BaseModel):
 class SavedCourseSelectionRepository(SelectionJournal):
     receipt_id_field = 'selection_id'
 
-    def __init__(self, repository=None):
+    def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         self.repository = repository or EnrollmentRepository()
         self.activations = UpgradeActivationRepository(self.repository)
         self.work = TransitionRecordReconciliation(self.repository)
 
     @property
-    def records(self):
+    def records(self) -> AsyncIOMotorCollection:
         return CertificationSavedCourseSelection.get_motor_collection()
 
-    async def pair(self, user_id, activation_id, action):
+    async def pair(self, user_id: str, activation_id: str, action: str) -> tuple[str, str]:
         if action not in ('return_to_original_course', 'resume_upgraded_course'):
             raise EnrollmentConflict('Choose whether to return to the original course or resume the saved upgrade')
         raw = await self.activations.records.find_one({'uuid': activation_id, 'user_id': user_id})
@@ -62,9 +68,11 @@ class SavedCourseSelectionRepository(SelectionJournal):
             raise EnrollmentConflict('Confirm the original upgrade receipt before choosing another saved course')
         result = AttemptRepository.payload(raw, 'result')
         original, upgraded = result['source_enrollment_id'], result['target_enrollment_id']
+        if not isinstance(original, str) or not isinstance(upgraded, str):
+            raise CourseCatalogError('The original course receipt has invalid enrollment identities')
         return (upgraded, original) if action == 'return_to_original_course' else (original, upgraded)
 
-    async def collect(self, user_id, source_id, target_id, *, held=False):
+    async def collect(self, user_id: str, source_id: str, target_id: str, *, held: bool=False):
         repo = self.repository
         selection = await repo.selections.find_one({'user_id': user_id})
         if (not selection or selection['active_enrollment_id'] != source_id
@@ -103,7 +111,7 @@ class SavedCourseSelectionRepository(SelectionJournal):
             raise EnrollmentConflict('Finish or reconcile the current course operation before choosing a saved course')
         return state, summaries
 
-    async def preview(self, user_id, activation_id, action, *, _held=False):
+    async def preview(self, user_id: str, activation_id, action, *, _held: bool=False) -> dict:
         source_id, target_id = await self.pair(user_id, activation_id, action)
         before, summaries = await self.collect(user_id, source_id, target_id, held=_held)
         after, current = await self.collect(user_id, source_id, target_id, held=_held)
@@ -121,11 +129,13 @@ class SavedCourseSelectionRepository(SelectionJournal):
         return {**result, 'preview_sha256': encode(result)[1]}
 
     @staticmethod
-    def decode(raw):
+    def decode(raw: dict) -> dict:
         try:
             if hashlib.sha256(raw['record_json'].encode()).hexdigest() != raw['record_sha256']:
                 raise ValueError('Saved course choice changed')
             intent = json.loads(raw['record_json'])
+            if not isinstance(intent, dict):
+                raise ValueError('The saved record must be an object')
             request = SavedCourseSelectionRequest.model_validate(intent['request'])
             preview = intent['preview']
             if (intent['schema_version'] != 1 or intent['user_id'] != raw['user_id'] or request.request_id != raw['uuid']
@@ -164,7 +174,7 @@ class SavedCourseSelectionRepository(SelectionJournal):
         datetime.datetime.fromisoformat(result['selected_at'])
         return result
 
-    async def owned(self, user_id, request):
+    async def owned(self, user_id: str, request):
         raw = await self.records.find_one({'uuid': request.request_id})
         if raw is None:
             return None
@@ -174,7 +184,7 @@ class SavedCourseSelectionRepository(SelectionJournal):
             raise EnrollmentConflict('This request already belongs to a different saved-course choice')
         return raw
 
-    async def select(self, user_id, body):
+    async def select(self, user_id: str, body):
         request = SavedCourseSelectionRequest.model_validate(body)
         existing = await self.owned(user_id, request)
         if existing:

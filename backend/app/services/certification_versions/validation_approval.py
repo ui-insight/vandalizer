@@ -1,11 +1,11 @@
 """Explicit suite-specific consent using the shared saved-plan approval protocol."""
 from typing import Literal
 
-from .connected_workflow_approval import ConnectedScopeRepository, ConnectedScopeRequest
+from .connected_workflow_approval import ConnectedScopeRepository, ScopeRequestFields
 from .validation_preparation import ValidationPreparation
 
 
-class ValidationScopeRequest(ConnectedScopeRequest):
+class ValidationScopeRequest(ScopeRequestFields):
     consent: Literal['save_validation_suite_scope_decision']
 
 

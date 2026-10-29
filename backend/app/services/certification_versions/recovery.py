@@ -4,6 +4,13 @@ No timeout or public recovery endpoint. The caller must review the exact active
 write and selection revision. Provisioning and external jobs are not recoverable
 here because revoking progress writes cannot undo their external side effects.
 """
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.models.certification import CertificationProgress
+    from app.services.certification_versions.catalog import CoursePackage
+
 import datetime
 from uuid import NAMESPACE_URL, uuid5
 
@@ -21,11 +28,11 @@ COMPLETION_OPERATIONS = {'complete_module', 'complete_certification_module', 're
 
 
 class CompletionRecovery:
-    def __init__(self, repository: EnrollmentRepository):
+    def __init__(self, repository: EnrollmentRepository) -> None:
         self.repository = repository
         self.journal = AttemptRepository()
 
-    async def recover_worker(self, user_id, enrollment_id, *, expected_write_id, expected_revision, reason):
+    async def recover_worker(self, user_id: str, enrollment_id: str, *, expected_write_id, expected_revision, reason):
         """Revoke one reviewed completion worker, then reconcile its journal.
 
         Failures retain the recovery marker. Repeat with the same write ID to
@@ -122,7 +129,7 @@ class CompletionRecovery:
         finally:
             lease_context.reset(token)
 
-    async def reconcile_attempt(self, user_id, enrollment_id, *, attempt_id, reason, expected_revision=None, recovery_request_id=None):
+    async def reconcile_attempt(self, user_id: str, enrollment_id: str, *, attempt_id: str, reason, expected_revision=None, recovery_request_id=None):
         """Explicit reconciliation when normal cleanup already released a lock."""
         if not isinstance(reason, str) or not reason.strip():
             raise EnrollmentConflict('Record a reason for explicit assessment recovery')
@@ -131,6 +138,8 @@ class CompletionRecovery:
                 **require_lease(user_id, enrollment_id).selection_filter(), 'revision': expected_revision,
             }) is None:
                 raise EnrollmentConflict('The reviewed course selection changed')
+            if progress.course_version is None:
+                raise EnrollmentConflict('This operation requires a bound course version')
             package = self.repository.catalog.load(progress.course_version)
             record = await self.journal.records.find_one({'uuid': attempt_id, 'user_id': user_id, 'enrollment_id': enrollment_id})
             if record is None:
@@ -139,7 +148,7 @@ class CompletionRecovery:
             return await self._reconcile(progress, package, attempt_id, reason.strip(),
                 expected_owners=[record.get('write_id'), require_lease(user_id, enrollment_id).write_id])
 
-    async def _reconcile(self, progress, package, attempt_id, reason, expected_owners=None):
+    async def _reconcile(self, progress: CertificationProgress, package: CoursePackage, attempt_id: str, reason, expected_owners=None) -> dict:
         lease = require_lease(progress.user_id, progress.enrollment_id)
         record = await self.journal.records.find_one({'uuid': attempt_id})
         if record is None or (record.get('user_id'), record.get('enrollment_id'), record.get('course_version'), record.get('manifest_sha256')) != (
@@ -158,6 +167,8 @@ class CompletionRecovery:
             {'$set': {'write_id': lease.write_id, 'recovery': {'reason': reason, 'write_id': lease.write_id}}},
             return_document=ReturnDocument.AFTER,
         ) or await self.journal.records.find_one({'uuid': attempt_id})
+        if record is None:
+            raise EnrollmentConflict('The original assessment disappeared during reconciliation')
         if record['state'] in ('applied', 'rejected', 'failed'):
             self.journal.payload(record, 'result')
             return {'status': 'saved_result', 'attempt_id': attempt_id}

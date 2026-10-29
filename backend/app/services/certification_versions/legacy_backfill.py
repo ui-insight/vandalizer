@@ -39,7 +39,7 @@ def digest(value):
     return hashlib.sha256(json_util.dumps(value, sort_keys=True).encode()).hexdigest()
 
 
-def user_key(user_id):
+def user_key(user_id: str):
     """Stable pseudonymous key; reports never print account identifiers."""
     return hashlib.sha256(('vandalizer:certification:backfill:' + user_id).encode()).hexdigest()[:16]
 
@@ -77,7 +77,7 @@ def summarize(raw, package=None):
     return summary
 
 
-def classify(user_id, progress, enrollments, selections):
+def classify(user_id: str, progress, enrollments, selections):
     legacy = [row for row in progress if not row.get('enrollment_id')]
     reasons = set()
     if len(legacy) > 1:
@@ -110,7 +110,7 @@ def classify(user_id, progress, enrollments, selections):
     return ('needs_reconciliation' if reasons else status), sorted(reasons)
 
 
-async def read_records(database, *, max_records=100000):
+async def read_records(database, *, max_records: int=100000):
     result, count = {}, 0
     for kind, name in COLLECTIONS.items():
         rows = await database[name].find({}).sort('_id', 1).limit(max_records - count + 1).to_list(None)
@@ -181,7 +181,7 @@ def build_plan(records, catalog):
     return plan, internal
 
 
-async def dry_run(database, catalog, *, max_records=100000):
+async def dry_run(database, catalog, *, max_records: int=100000) -> dict:
     first = await read_records(database, max_records=max_records)
     second = await read_records(database, max_records=max_records)
     if digest(first) != digest(second):
@@ -190,14 +190,14 @@ async def dry_run(database, catalog, *, max_records=100000):
     return {**plan, 'dry_run': True, 'observed_at': datetime.now(timezone.utc).isoformat()}
 
 
-async def apply(repository, database, *, expected_plan_sha256, max_records=100000):
+async def apply(repository, database, *, expected_plan_sha256, max_records: int=100000) -> dict:
     """Backfill the reviewed plan's ready/resume users, then reconcile before/after."""
     before, internal = build_plan(await read_records(database, max_records=max_records), repository.catalog)
     if before['plan_sha256'] != expected_plan_sha256:
         raise BackfillChanged('Records or catalog changed since the reviewed dry run; review a new dry run')
     if not before['can_apply']:
         raise CourseCatalogError('Configure a supported legacy continuation course before backfilling')
-    outcomes = {}
+    outcomes: dict[str, str | None] = {}
     for row in before['users']:
         if row['status'] not in ('ready', 'resume'):
             continue

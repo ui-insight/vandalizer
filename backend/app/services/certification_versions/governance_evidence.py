@@ -1,4 +1,10 @@
 """Collect complete observed capstone work and authenticated learner explanations for automatic review."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
 import hashlib
 from pathlib import Path
 
@@ -13,11 +19,11 @@ from .governance_preparation import GovernancePreparation
 from .governance_reviews import GovernanceReviewRepository
 from .lab_execution import LabExecutionRepository
 from .lab_inputs import LabInputRepository
-from .outcomes import package_outcomes
+from .outcomes import require_package_outcomes
 from .practical_evidence import EvidenceAssemblyUnavailable
 
 
-async def assemble_governance_review(operation, submission_id, *, actor_user_id):
+async def assemble_governance_review(operation: CourseOperation, submission_id, *, actor_user_id: str) -> dict:
     if actor_user_id != operation.user_id:
         raise EnrollmentConflict('Governance assessment requires the authenticated learner')
     saved = await GovernanceReviewRepository().get(actor_user_id, submission_id)
@@ -25,7 +31,7 @@ async def assemble_governance_review(operation, submission_id, *, actor_user_id)
         raise EvidenceAssemblyUnavailable('Save the actual capstone interpretation before requesting assessment')
     lease = LabExecutionRepository.check_operation(operation, saved)
     package = operation.package
-    case, contract = load_governance_case(package), package_outcomes(package)
+    case, contract = load_governance_case(package), require_package_outcomes(package)
     handoff = saved['handoff']
     release, memo = handoff['release'], handoff['release']['memo']
     repaired = GovernancePreparation.decode(memo['execution'])
@@ -40,13 +46,13 @@ async def assemble_governance_review(operation, submission_id, *, actor_user_id)
         raise EvidenceAssemblyUnavailable('Missing or uncomparable values are unavailable evidence, not learner failure')
     evidence = []
 
-    def add(kind, identity, payload):
+    def add(kind, identity, payload) -> None:
         try:
             evidence.append(ReviewEvidence(id=identity, kind=kind, text=encode(payload)[0]).model_dump(mode='json'))
         except ValidationError as exc:
             raise EvidenceAssemblyUnavailable('Complete capstone evidence exceeds review limits; nothing was truncated') from exc
 
-    def chunks(kind, identity, text, metadata):
+    def chunks(kind, identity, text, metadata) -> None:
         for offset in range(0, max(1, len(text)), 6000):
             add(kind, f'{identity}:{offset}', {**metadata, 'text_offset': offset, 'text_length': len(text), 'text': text[offset:offset + 6000]})
 

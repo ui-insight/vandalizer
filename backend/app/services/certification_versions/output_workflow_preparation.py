@@ -1,4 +1,10 @@
 """Persist an output plan for separate explicit scope approval, without dispatch."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
 from copy import deepcopy
 import datetime
 from typing import Literal
@@ -12,7 +18,7 @@ from .output_workflow_plan import output_workflow_plan
 from .attempts import encode
 from .catalog import CourseCatalogError
 from .enrollments import EnrollmentConflict
-from .lab_execution import LabExecutionRepository
+from .lab_execution import LabExecutionRepository, LabExecutionJournal
 from .lab_inputs import LabInputRepository
 from .outcomes import ContractModel
 
@@ -31,9 +37,9 @@ class OutputPlanRequest(ContractModel):
     consent: Literal['prepare_output_workflow_plan']
 
 
-class OutputWorkflowPreparation(LabExecutionRepository):
+class OutputWorkflowPreparation(LabExecutionJournal):
     @staticmethod
-    def decode(raw):
+    def decode(raw: dict) -> dict:
         saved = LabExecutionRepository.decode(raw)
         try:
             plan = saved['plan']
@@ -92,7 +98,7 @@ class OutputWorkflowPreparation(LabExecutionRepository):
         except (KeyError, TypeError, ValueError, EnrollmentConflict) as exc:
             raise CourseCatalogError('The saved output workflow plan failed integrity verification') from exc
 
-    async def prepare(self, operation, body, system_config_doc, *, actor_user_id, default_model):
+    async def prepare(self, operation: CourseOperation, body, system_config_doc, *, actor_user_id: str, default_model):
         body = OutputPlanRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Only the authenticated learner can prepare this output plan')
@@ -139,5 +145,5 @@ class OutputWorkflowPreparation(LabExecutionRepository):
         await LabInputRepository._check_lease(lease)
         return await self.get(actor_user_id, body.request_id)
 
-    async def execute(self, *args, **kwargs):
+    async def execute(self, *args, **kwargs) -> dict:
         raise EnrollmentConflict('Output dispatch requires its approved generation executor')

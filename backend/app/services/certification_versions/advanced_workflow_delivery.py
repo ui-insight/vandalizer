@@ -6,6 +6,7 @@ from app.services.storage import get_storage
 from . import practical_preparation
 from .attempts import encode
 from .advanced_calculation_records import AdvancedCalculationRepository
+from .repository_protocols import RecordReader
 from .catalog import CourseCatalogError
 from .advanced_workflow_approval import AdvancedScopeRepository
 from .advanced_workflow_execution import AdvancedWorkflowExecution
@@ -23,7 +24,7 @@ class AdvancedWorkflowUnavailable(ValueError):
 
 
 class AdvancedWorkflowDelivery:
-    def __init__(self, repository=None):
+    def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         self.repository = repository or EnrollmentRepository()
         self.inputs = AdvancedWorkflowInputRepository()
         self.calculations = AdvancedCalculationRepository()
@@ -31,7 +32,7 @@ class AdvancedWorkflowDelivery:
         self.reviews = AdvancedReviewRepository()
         self.scopes = AdvancedScopeRepository()
 
-    async def course(self, user_id, enrollment_id):
+    async def course(self, user_id: str, enrollment_id: str):
         enrollment = await self.repository._enrollment(user_id, enrollment_id)
         package = self.repository.catalog.load(enrollment.course_version)
         if 'advanced-cases/advanced_nodes.json' not in package.manifest.artifacts:
@@ -47,7 +48,7 @@ class AdvancedWorkflowDelivery:
             raise CourseCatalogError('This saved budget work does not match its original course')
         return record
 
-    async def writable(self, enrollment, delivery_enabled):
+    async def writable(self, enrollment, delivery_enabled) -> bool:
         selection = await self.repository.selections.find_one({'user_id': enrollment.user_id})
         return bool(delivery_enabled and enrollment.state in ('active', 'completed')
                     and selection and selection.get('active_enrollment_id') == enrollment.uuid)
@@ -66,7 +67,7 @@ class AdvancedWorkflowDelivery:
             'method_choice': snapshot['request']['method_choice'],
             'input_snapshot_sha256': encode(snapshot)[1], 'execution_authorized': False, 'credit_awarded': False}
 
-    async def run_view(self, run, *, writable=False):
+    async def run_view(self, run, *, writable: bool=False) -> dict:
         plan = run['plan']
         scope = run['authorization']['decision'] if run['authorization'] else None
         if scope is None and run['scope_decision_id']:
@@ -89,9 +90,10 @@ class AdvancedWorkflowDelivery:
                     and not any(item['receipt']['kind'] == 'task_failed' for item in run['task_events']),
                 'credit_awarded': False, 'module_completion_eligible': False}
 
-    async def get(self, user_id, enrollment_id, reference, *, kind='review', delivery_enabled=False):
+    async def get(self, user_id: str, enrollment_id: str, reference: str, *, kind: str='review', delivery_enabled: bool=False):
         enrollment, _, case = await self.course(user_id, enrollment_id)
-        repository = {'calculation': self.calculations, 'capture': self.inputs, 'run': self.runs, 'review': self.reviews, 'scope': self.scopes}[kind]
+        repositories: dict[str, RecordReader] = {'calculation': self.calculations, 'capture': self.inputs, 'run': self.runs, 'review': self.reviews, 'scope': self.scopes}
+        repository = repositories[kind]
         saved = await repository.get(user_id, reference)
         if saved is None:
             raise AdvancedWorkflowUnavailable('This saved budget workflow record is unavailable')
@@ -112,7 +114,7 @@ class AdvancedWorkflowDelivery:
             'case', 'submission', 'submitted_at', 'credit_awarded', 'module_completion_eligible')} | {
             'run': await self.run_view(AdvancedWorkflowPreparation.decode(saved['execution']))}
 
-    async def list(self, user_id, enrollment_id, *, delivery_enabled=False):
+    async def list(self, user_id: str, enrollment_id: str, *, delivery_enabled: bool=False) -> dict:
         enrollment, _, case = await self.course(user_id, enrollment_id)
         query = {'user_id': user_id, 'enrollment_id': enrollment_id, 'module_id': 'advanced_nodes'}
         result = {'enrollment_id': enrollment_id, 'module_id': 'advanced_nodes', 'course_version': enrollment.course_version,
@@ -162,7 +164,7 @@ class AdvancedWorkflowDelivery:
                 'older_workflows_available': len(owned) > 50, 'can_submit': writable,
                 'read_only_reason': None if writable else 'This is preserved course history. Select an available current course before saving new work.'}
 
-    async def save(self, user_id, enrollment_id, payload, *, action):
+    async def save(self, user_id: str, enrollment_id: str, payload, *, action):
         current = await self.repository.current(user_id)
         if current is None or current.uuid != enrollment_id:
             raise EnrollmentConflict('Select your existing course before saving or executing budget work')
@@ -207,5 +209,5 @@ class AdvancedWorkflowAssessment(ProcessAssessment):
     delivery_class = AdvancedWorkflowDelivery
     prepare_method = 'prepare_from_budget_review'
 
-    def __init__(self, repository=None):
+    def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         super().__init__(repository or EnrollmentRepository())

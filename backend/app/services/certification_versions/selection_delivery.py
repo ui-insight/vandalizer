@@ -27,7 +27,7 @@ class SelectionConfirmation(BaseModel):
 
 
 class SelectionDelivery:
-    def __init__(self, repository=None):
+    def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         self.repository = repository or EnrollmentRepository()
 
     def journal(self, kind):
@@ -37,7 +37,7 @@ class SelectionDelivery:
             return SavedCourseSelectionRepository(self.repository)
         raise CourseCatalogError('The saved course switch has an unknown receipt type')
 
-    async def original(self, user_id, kind, request_id):
+    async def original(self, user_id: str, kind, request_id: str):
         journal = self.journal(kind)
         raw = await journal.records.find_one({'uuid': request_id, 'user_id': user_id})
         if raw is None:
@@ -55,7 +55,7 @@ class SelectionDelivery:
             raise CourseCatalogError('The saved course switch receipt failed integrity verification') from exc
 
     @staticmethod
-    def matches_selection(selection, receipt, request_id):
+    def matches_selection(selection, receipt, request_id: str) -> None:
         if (selection.get('pending_transition_id') != request_id
                 or selection.get('active_enrollment_id') != receipt.get('target_enrollment_id')
                 or selection.get('revision') != receipt.get('revision')
@@ -63,7 +63,7 @@ class SelectionDelivery:
             raise EnrollmentConflict('The selected course no longer matches this unconfirmed switch')
 
     @staticmethod
-    def summary(receipt, request_id):
+    def summary(receipt, request_id: str) -> dict:
         # Allowlist: no original answers, grading payloads or learner identity.
         return {'request_id': request_id, **{key: receipt[key] for key in (
             'kind', 'receipt_sha256', 'source_enrollment_id', 'target_enrollment_id',
@@ -71,7 +71,7 @@ class SelectionDelivery:
             'action': receipt.get('action', 'activate_optional_upgrade'),
             'credit_transferred': False, 'histories_preserved': True}
 
-    async def status(self, user_id):
+    async def status(self, user_id: str):
         selection = await self.repository.selections.find_one({'user_id': user_id})
         result = {'read_only': True, 'current_enrollment_id': (selection or {}).get('active_enrollment_id'),
                   'pending': None}
@@ -97,13 +97,13 @@ class SelectionDelivery:
         result['pending'] = self.summary(receipt, request_id)
         return result
 
-    async def confirm(self, user_id, body):
+    async def confirm(self, user_id: str, body) -> dict:
         request = SelectionConfirmation.model_validate(body)
         journal, raw = await self.original(user_id, request.kind, request.request_id)
         if raw['state'] == 'applied':
             receipt = AttemptRepository.payload(raw, 'result')
             selection = await self.repository.selections.find_one({'user_id': user_id})
-            if (selection or {}).get('pending_transition_id') == request.request_id:
+            if selection is not None and selection.get('pending_transition_id') == request.request_id:
                 self.matches_selection(selection, receipt, request.request_id)
                 if selection.get('last_transition') != receipt:
                     raise CourseCatalogError('The pending switch differs from its original confirmed receipt')

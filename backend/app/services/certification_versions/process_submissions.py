@@ -1,4 +1,12 @@
 """Preserve authenticated design decisions; no model, execution or credit here."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from motor.motor_asyncio import AsyncIOMotorCollection
+    from app.services.certification_versions.runtime import CourseOperation
+
+from typing import Self
 import datetime
 import hashlib
 import json
@@ -27,7 +35,7 @@ class ProcessSubmission(ContractModel):
     previous_submission_id: str | None = Field(default=None, pattern=r'^[a-f0-9]{32}$')
 
     @model_validator(mode='after')
-    def nonblank_submission(self):
+    def nonblank_submission(self) -> Self:
         if any(not answer.strip() for answer in self.answers.values()):
             raise ValueError('Provide each requested decision and map before saving')
         # This only validates a usable submission, never its correctness.
@@ -36,15 +44,17 @@ class ProcessSubmission(ContractModel):
 
 class ProcessSubmissionRepository:
     @property
-    def records(self):
+    def records(self) -> AsyncIOMotorCollection:
         return CertificationProcessSubmission.get_motor_collection()
 
     @staticmethod
-    def decode(raw):
+    def decode(raw: dict) -> dict:
         try:
             if hashlib.sha256(raw['record_json'].encode()).hexdigest() != raw['record_sha256']:
                 raise ValueError('Digest mismatch')
             record = json.loads(raw['record_json'])
+            if not isinstance(record, dict):
+                raise ValueError('The saved record must be an object')
             if any(record[key] != raw[key] for key in ('uuid', 'user_id', 'enrollment_id', 'module_id',
                     'course_version', 'manifest_sha256', 'request_sha256')):
                 raise ValueError('Identity mismatch')
@@ -65,11 +75,11 @@ class ProcessSubmissionRepository:
         except (ValueError, TypeError, KeyError) as exc:
             raise CourseCatalogError('The saved process design failed integrity verification') from exc
 
-    async def get(self, user_id, submission_id):
+    async def get(self, user_id: str, submission_id) -> dict | None:
         raw = await self.records.find_one({'user_id': user_id, 'uuid': submission_id})
         return self.decode(raw) if raw else None
 
-    async def submit(self, operation, body, *, actor_user_id):
+    async def submit(self, operation: CourseOperation, body, *, actor_user_id: str):
         submission = ProcessSubmission.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Process design requires the authenticated learner')

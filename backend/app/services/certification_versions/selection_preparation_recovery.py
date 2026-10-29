@@ -5,6 +5,12 @@ write marker. Generic assessment, workspace and review operations are excluded.
 The replacement marker is claimed before fencing progress, preventing a late
 selection CAS. The recovery journal commits before the marker is released.
 """
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from motor.motor_asyncio import AsyncIOMotorCollection
+
 import datetime
 import json
 import re
@@ -37,14 +43,14 @@ class PreparationRecoveryRequest(BaseModel):
 
 
 class SelectionPreparationRecovery:
-    def __init__(self, repository=None):
+    def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         self.repository = repository or EnrollmentRepository()
 
     @property
-    def records(self):
+    def records(self) -> AsyncIOMotorCollection:
         return CertificationSelectionPreparationRecovery.get_motor_collection()
 
-    async def inspect(self, user_id):
+    async def inspect(self, user_id: str):
         selection = await self.repository.selections.find_one({'user_id': user_id})
         marker = (selection or {}).get('active_write') or {}
         if (not selection or selection.get('in_flight_writes') != 1 or selection.get('pending_transition_id')
@@ -66,27 +72,28 @@ class SelectionPreparationRecovery:
                     'progress_id': source.progress_id, 'progress_fence': progress.get('_certification_write_fence')}
         return snapshot
 
-    async def original_source(self, user_id, marker):
+    async def original_source(self, user_id: str, marker: dict) -> str:
         try:
             if marker['operation'] == 'activate_optional_upgrade':
-                request = UpgradeActivationRequest.model_validate(marker['selection_request'])
-                service = UpgradeActivationRepository(self.repository)
-                decision = await service.decisions.get(user_id, request.decision_id)
+                activation_request = UpgradeActivationRequest.model_validate(marker['selection_request'])
+                activation_service = UpgradeActivationRepository(self.repository)
+                decision = await activation_service.decisions.get(user_id, activation_request.decision_id)
                 if decision is None:
                     raise EnrollmentConflict('The original preservation choice is unavailable')
                 source_id = decision.request.source_enrollment_id
+                original = await activation_service.owned(user_id, activation_request)
             else:
-                request = SavedCourseSelectionRequest.model_validate(marker['selection_request'])
-                service = SavedCourseSelectionRepository(self.repository)
-                source_id, _ = await service.pair(user_id, request.activation_id, request.action)
-            original = await service.owned(user_id, request)
+                selection_request = SavedCourseSelectionRequest.model_validate(marker['selection_request'])
+                selection_service = SavedCourseSelectionRepository(self.repository)
+                source_id, _ = await selection_service.pair(user_id, selection_request.activation_id, selection_request.action)
+                original = await selection_service.owned(user_id, selection_request)
             if original and original['state'] == 'applied':
                 raise EnrollmentConflict('This selection already committed; confirm its original saved receipt')
             return source_id
         except (KeyError, TypeError, ValueError) as exc:
             raise EnrollmentConflict('The preparation does not contain a valid owned selection request') from exc
 
-    async def preview(self, user_id):
+    async def preview(self, user_id: str) -> dict:
         first = await self.inspect(user_id)
         if await self.inspect(user_id) != first:
             raise EnrollmentConflict('The preparation changed; refresh its recovery review')
@@ -96,7 +103,7 @@ class SelectionPreparationRecovery:
                 'original_request_id': marker['selection_request']['request_id'], 'write_id': marker['id'],
                 'operation': marker['operation'], 'preview_sha256': encode(first)[1]}
 
-    async def delivery_status(self, user_id, selection):
+    async def delivery_status(self, user_id: str, selection):
         marker = selection.get('active_write') or {}
         if marker.get('operation') == 'recover_selection_preparation':
             raw = await self.records.find_one({'uuid': marker.get('recovery_id'), 'user_id': user_id})
@@ -124,7 +131,7 @@ class SelectionPreparationRecovery:
         return result
 
     @staticmethod
-    def decode(raw):
+    def decode(raw: dict) -> dict:
         try:
             intent = AttemptRepository.payload(raw, 'record')
             request = PreparationRecoveryRequest.model_validate(intent['request'])
@@ -158,7 +165,7 @@ class SelectionPreparationRecovery:
             raise CourseCatalogError('The preparation recovery record failed integrity verification') from exc
 
     @staticmethod
-    def result(raw, intent):
+    def result(raw, intent) -> dict:
         selection = intent['snapshot']['selection']
         marker = selection['active_write']
         return {'kind': 'selection_preparation_recovery.1', 'recovery_id': raw['uuid'],
@@ -169,24 +176,24 @@ class SelectionPreparationRecovery:
                 'selection_changed': False, 'credit_changed': False, 'assessments_repeated': False}
 
     @staticmethod
-    def marker(raw, intent):
+    def marker(raw, intent) -> dict:
         snapshot = intent['snapshot']
         original = snapshot['selection']['active_write']
         return {'id': raw['uuid'], 'operation': 'recover_selection_preparation', 'recovery_id': raw['uuid'],
                 'enrollment_id': snapshot['selection']['active_enrollment_id'], 'original_write_id': original['id'],
                 'original_marker_sha256': encode(original)[1]}
 
-    def query(self, raw, intent):
+    def query(self, raw, intent) -> dict:
         selection = intent['snapshot']['selection']
         return {'user_id': raw['user_id'], 'active_enrollment_id': selection['active_enrollment_id'],
                 'revision': selection['revision'], 'in_flight_writes': 1, 'pending_transition_id': None,
                 'active_write': self.marker(raw, intent)}
 
-    async def clear(self, raw, intent):
+    async def clear(self, raw, intent) -> None:
         await self.repository.selections.update_one(self.query(raw, intent),
             {'$set': {'in_flight_writes': 0}, '$unset': {'active_write': ''}})
 
-    async def recover(self, user_id, body):
+    async def recover(self, user_id: str, body):
         request = PreparationRecoveryRequest.model_validate(body)
         raw = await self.records.find_one({'uuid': request.request_id})
         if raw is None:
@@ -220,7 +227,7 @@ class SelectionPreparationRecovery:
             raise CourseCatalogError('Recovery must retain its original source enrollment and progress identity')
         selection = await self.repository.selections.find_one({'user_id': user_id})
         expected = intent['snapshot']['selection']
-        if plain(selection) == expected:
+        if selection is not None and plain(selection) == expected:
             # Claim selection first. A late original worker's commit and cleanup
             # require its old marker ID and cannot affect the replacement.
             selected = await self.repository.selections.find_one_and_update({

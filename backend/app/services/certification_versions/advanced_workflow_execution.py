@@ -1,4 +1,10 @@
 """Claim one approved internal run and retain its bounded task evidence."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
 import asyncio
 from copy import deepcopy
 import datetime
@@ -31,7 +37,7 @@ class AdvancedExecutionRequest(ContractModel):
 
 
 class AdvancedWorkflowExecution(AdvancedWorkflowPreparation):
-    async def execute(self, operation, body, system_config_doc, *, actor_user_id):
+    async def execute(self, operation: CourseOperation, body, system_config_doc, *, actor_user_id: str):
         body = AdvancedExecutionRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Only the authenticated learner can dispatch this approved run')
@@ -63,6 +69,8 @@ class AdvancedWorkflowExecution(AdvancedWorkflowPreparation):
                 raise EnrollmentConflict('The saved scope choice changed before this run was claimed')
             return latest
         run = await self.get(operation.user_id, body.run_id)
+        if run is None:
+            raise EnrollmentConflict('The original execution receipt is no longer available')
         started_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
         stop = threading.Event()
         loop = asyncio.get_running_loop()
@@ -85,6 +93,8 @@ class AdvancedWorkflowExecution(AdvancedWorkflowPreparation):
             output = await asyncio.wait_for(asyncio.to_thread(execute_approved_budget, run, case, config,
                 checkpoint=checkpoint, should_stop=stop.is_set), timeout=RUN_TIMEOUT_SECONDS)
             saved = await self.get(operation.user_id, body.run_id)
+            if saved is None:
+                raise EnrollmentConflict('The original execution receipt is no longer available')
             completed = [item for item in saved['task_events'] if item['receipt']['kind'] == 'task_completed']
             if saved['task_events'] != output['task_events']:
                 raise EnrollmentConflict('The final output does not match every durable completed stage')
@@ -108,7 +118,7 @@ class AdvancedWorkflowExecution(AdvancedWorkflowPreparation):
         await self._finish_budget(run, lease, result, started_at)
         return await self.get(operation.user_id, body.run_id)
 
-    async def _finish_budget(self, run, lease, result, started_at):
+    async def _finish_budget(self, run, lease, result, started_at) -> None:
         # Close the log atomically before reading the terminal prefix. A sibling
         # checkpoint may already be queued when the caller cancels; it must
         # either land before this fence or fail without changing the prefix.

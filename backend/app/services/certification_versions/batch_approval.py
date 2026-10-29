@@ -1,11 +1,11 @@
 """Phase-bound explicit learner approval using the saved-plan protocol."""
 from typing import Literal
 
-from .connected_workflow_approval import ConnectedScopeRepository, ConnectedScopeRequest
+from .connected_workflow_approval import ConnectedScopeRepository, ScopeRequestFields
 from .batch_preparation import BatchPreparation
 
 
-class BatchScopeRequest(ConnectedScopeRequest):
+class BatchScopeRequest(ScopeRequestFields):
     consent: Literal['save_bounded_batch_scope_decision']
 
 
