@@ -17,6 +17,7 @@ from app.services.page_links import prepare_page_links
 from app.services import access_control, artifacts
 from app.services import transcript_pages
 from app.services.page_printing import render_page
+from app.services.page_embedding import prepare_page_embed
 from app.tasks import get_sync_db
 from app.utils.content_disposition import content_disposition
 
@@ -83,6 +84,8 @@ def content_response(rev, download=False, *, version=1, view="content"):
     filename = title if title.lower().endswith(".html") else f"{title}.html"
     html, csp = render_page(rev, version, "content" if download else view)
     html, csp = prepare_page_links(html, csp)
+    if view == "embed" and not download:
+        html, csp = prepare_page_embed(html, csp)
     return HTMLResponse(html, headers={
         "Content-Security-Policy": csp, "X-Frame-Options": "SAMEORIGIN",
         "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Robots-Tag": "noindex, nofollow",
@@ -162,7 +165,7 @@ async def get_public(token: str, response: Response, settings: Settings = Depend
 
 @router.get("/public/{token}/content")
 async def public_content(token: str, download: bool = False, revision: str | None = None,
-                         view: Literal["content", "full", "print"] = "content", settings: Settings = Depends(get_settings)):
+                         view: Literal["content", "full", "print", "embed"] = "content", settings: Settings = Depends(get_settings)):
     doc, rev = await public_doc(token, settings)
     # Keep a viewer's version/date label matched to the HTML even if the owner
     # publishes again between the metadata request and the iframe request.
@@ -180,7 +183,7 @@ async def get_artifact(uuid: str, user: User = Depends(get_current_user), settin
 
 @router.get("/{uuid}/revisions/{revision}/content")
 async def private_content(uuid: str, revision: str, download: bool = False,
-                          view: Literal["content", "full", "print"] = "content", user: User = Depends(get_current_user)):
+                          view: Literal["content", "full", "print", "embed"] = "content", user: User = Depends(get_current_user)):
     doc = await authorized(uuid, user)
     rev = artifacts.revision(doc, revision)
     version = rev.get("version") or next(i for i, item in enumerate(doc["revisions"], 1) if item["uuid"] == revision)

@@ -49,6 +49,12 @@ The main public link shows the version last published to it; **Publish updates**
 
 **Remove public link** disables the main token; **Remove version N link** disables only that separate link. Other public links stay active. Republishing a removed link creates a new token, so old revoked links remain invalid. Deleting clears all revisions and revokes every public link, retaining only a tombstone to prevent delayed retries from recreating the page. Previously downloaded files or already loaded pages cannot be recalled. Sharing a page does not grant access to its source chat, documents, or workflow. Quotations included in the page itself are disclosed when that page is published.
 
+## Reading published Pages
+
+Published links use a full-height reader with one normal vertical page scroll, including at phone widths. Wide tables have their own horizontal scroll region. The reader adjusts when the viewport changes or notes expand/collapse, so charts, tables and the end of the report remain reachable. Saved HTML and version history are unchanged.
+
+The published reader keeps HTML inside an opaque sandbox. Its delivery view permits only a nonce-authorized sizing helper; the parent accepts bounded height messages only from its own iframe. Authored scripts, network requests and access to the application's DOM remain blocked. Compact/private previews and downloads keep their existing script restrictions.
+
 ## Printing
 
 Use **Print / Save as PDF** in the viewer to open the selected version's print dialog in a separate tab. **Open full page** also includes a print button. Choose a printer or the browser's PDF destination in that dialog.

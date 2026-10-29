@@ -8,6 +8,7 @@ import { PageDeleteDialog } from '../components/artifacts/PageDeleteDialog'
 import { PageBadge, PageDialog, PagePreview, pagesUrl } from '../components/artifacts/PagePrimitives'
 import { listTeams } from '../api/teams'
 import { PagePrintLink, pageViewUrl } from '../components/artifacts/PagePrintLink'
+import { PublishedPageContent } from '../components/artifacts/PublishedPageContent'
 
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : 'Could not complete this action. Please try again.'
 
@@ -124,7 +125,7 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
       {artifact && <div className="page-revision-bar">{artifact.can_manage ? <label>Version<select aria-label="Page version" disabled={busy || !!editor} value={selected} onChange={e => setSelected(e.target.value)}>{artifact.revisions.map((r, index) => <option key={r.uuid} value={r.uuid}>Version {r.version ?? index + 1}{isPublished(r.uuid) ? ' · published' : ''}{r.uuid === artifact.latest_revision ? ' · latest' : ''}</option>)}</select></label> : <span>Shared version {version}</span>}<a className="page-text-button" href={pageViewUrl(contentUrl, 'full')} target="_blank" rel="noreferrer"><ArrowUpRight size={14} />Open full page</a></div>}
       {hasDraft && publishedVersion > 0 && !selectedIsPublished && <p className="page-revision-note">You’re previewing version {version}. The public link still shows version {publishedVersion}. Share → Publish updates when you’re ready.</p>}
       {!!revision?.warnings.length && <div className="page-revision-note"><strong>Some content was removed to keep this page safe.</strong>{revision.warnings.map(w => <p key={w}>{w}</p>)}</div>}
-      <PagePreview key={contentUrl} src={contentUrl} title={title} />
+      {publicToken ? <PublishedPageContent key={contentUrl} src={contentUrl} /> : <PagePreview key={contentUrl} src={contentUrl} title={title} />}
       {artifact?.source && <nav aria-label="Page source" className="page-source">
         {artifact.source.conversation_uuid && <a href={`/?conversation=${encodeURIComponent(artifact.source.conversation_uuid)}${artifact.source.project_uuid ? `&project=${encodeURIComponent(artifact.source.project_uuid)}` : ''}`}><MessageSquare size={14} />Open originating chat</a>}
         {artifact.source.workflow_id && <a href={`/?mode=files&workflow=${encodeURIComponent(artifact.source.workflow_id)}${artifact.source.session_id ? `&run=${encodeURIComponent(artifact.source.session_id)}` : ''}${artifact.source.project_uuid ? `&project=${encodeURIComponent(artifact.source.project_uuid)}` : ''}`}><Workflow size={14} />Open originating workflow run</a>}
