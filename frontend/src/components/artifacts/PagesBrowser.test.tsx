@@ -68,6 +68,7 @@ it('refreshes a visible library after a workflow or transcript save', async () =
 
 it.each([
   ['chat', 'From chat'],
+  ['chat_export', 'From chat'],
   ['workflow', 'From a workflow'],
   ['editor', 'Created in Pages'],
 ])('shows the same %s origin for owners and team members', async (kind, label) => {

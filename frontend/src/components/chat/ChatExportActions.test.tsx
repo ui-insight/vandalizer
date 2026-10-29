@@ -46,6 +46,26 @@ describe('shared chat export actions', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 
+  it('offers the same saved Page after reopening instead of reporting another copy', async () => {
+    const saved = { uuid: 'same-transcript', title: 'NIH subaward conversation', reused: false } as Awaited<ReturnType<typeof saveChatArtifact>>
+    vi.mocked(saveChatArtifact).mockResolvedValueOnce(saved).mockResolvedValueOnce({ ...saved, reused: true })
+    const source = { conversation_uuid: 'nih-chat' }
+    const first = render(<ChatExportActions messages={messages} scope="conversation" artifactSource={source} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Export conversation' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Save transcript as page' }))
+    expect(await screen.findByRole('link', { name: 'Open saved page' })).toHaveAttribute('href', '/pages/same-transcript')
+    first.unmount()
+    render(<ChatExportActions messages={messages} scope="conversation" artifactSource={source} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Export conversation' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Save transcript as page' }))
+    expect(await screen.findByText('This transcript is already saved.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Open saved page' })).toHaveAttribute('href', '/pages/same-transcript')
+    const calls = vi.mocked(saveChatArtifact).mock.calls
+    expect(calls[0][0]).toEqual(calls[1][0])
+    expect(calls[0][1]).not.toBe(calls[1][1]) // The server identity survives a new browser request.
+    expect(calls[1][2]).toEqual(source)
+  })
+
   it('saves only the selected bubble as a private artifact and reuses the retry identity', async () => {
     vi.mocked(saveChatArtifact).mockRejectedValueOnce(new Error('Connection lost')).mockResolvedValueOnce({ uuid: 'artifact1' } as Awaited<ReturnType<typeof saveChatArtifact>>)
     render(<ChatExportActions messages={[messages[1]]} />)

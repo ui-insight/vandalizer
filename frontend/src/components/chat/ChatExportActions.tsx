@@ -34,6 +34,7 @@ export function ChatExportActions({ messages, scope = 'message', names = {}, dis
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState('')
   const [savedArtifact, setSavedArtifact] = useState<string | null>(null)
+  const [reusedArtifact, setReusedArtifact] = useState(false)
   const artifactRequest = useRef<{ content: string; id: string } | null>(null)
   const button = useRef<HTMLButtonElement>(null)
   const menu = useRef<HTMLDivElement>(null)
@@ -69,11 +70,14 @@ export function ChatExportActions({ messages, scope = 'message', names = {}, dis
     setError('')
     try {
       if (format === 'artifact') {
+        setSavedArtifact(null)
+        setReusedArtifact(false)
         const normalized = exportMessages(messages, names)
         const content = JSON.stringify({ normalized, artifactSource })
         if (artifactRequest.current?.content !== content) artifactRequest.current = { content, id: crypto.randomUUID() }
         const artifact = await saveChatArtifact(normalized, artifactRequest.current.id, artifactSource)
         setSavedArtifact(artifact.uuid)
+        setReusedArtifact(artifact.reused === true)
         announceWorkspaceWrite('pages')
       } else if (format === 'html' || format === 'docx' || format === 'xlsx') {
         download(await exportChat(format, exportMessages(messages, names)), `${scope}.${format}`)
@@ -116,6 +120,6 @@ export function ChatExportActions({ messages, scope = 'message', names = {}, dis
       {formats.map(([format, label]) => <button key={format} type="button" role="menuitem" disabled={disabled} className={`block min-h-10 w-full rounded px-3 py-2 text-left text-sm hover:bg-gray-100 focus:bg-gray-100 disabled:opacity-50 ${format === 'artifact' ? 'mt-1 border-t border-slate-200 pt-3' : ''}`} onClick={() => void run(format)}>{label}</button>)}
     </div>, document.body)}
     {error && <p role="alert" className="w-full text-xs">{error}</p>}
-    {savedArtifact && <a className="text-xs underline" href={`/pages/${savedArtifact}`} target="_blank" rel="noreferrer">Open saved page</a>}
+    {savedArtifact && <>{reusedArtifact && <span role="status" className="text-xs">This transcript is already saved.</span>}<a className="text-xs underline" href={`/pages/${savedArtifact}`} target="_blank" rel="noreferrer">Open saved page</a></>}
   </div>
 }

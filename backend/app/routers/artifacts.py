@@ -13,10 +13,9 @@ from app.dependencies import get_current_user, get_settings
 from app.models.user import User
 from app.rate_limit import limiter
 from app.schemas.artifact import ChatArtifactRequest, CreateArtifactRequest, DuplicateArtifactRequest, PublishArtifactRequest, RenameArtifactRequest, ReviseArtifactRequest, ShareArtifactRequest
-from app.schemas.chat_export import ChatExportRequest
 from app.services.page_links import prepare_page_links
 from app.services import access_control, artifacts
-from app.services.chat_export import render_chat_export
+from app.services import transcript_pages
 from app.services.page_printing import render_page
 from app.tasks import get_sync_db
 from app.utils.content_disposition import content_disposition
@@ -109,18 +108,17 @@ async def create_artifact(request: Request, body: CreateArtifactRequest, user: U
 @limiter.limit("20/minute")
 async def chat_artifact(request: Request, body: ChatArtifactRequest, user: User = Depends(get_current_user)):
     await authorized_project(body.project_uuid, user)
+    conversation = None
     if body.conversation_uuid:
         from app.models.chat import ChatConversation
-        if not await ChatConversation.find_one({"uuid": body.conversation_uuid, "user_id": user.user_id}):
+        conversation = await ChatConversation.find_one({"uuid": body.conversation_uuid, "user_id": user.user_id})
+        if not conversation:
             raise HTTPException(404, "Conversation not found")
     try:
-        transcript = ChatExportRequest(format="html", messages=body.messages)
-        html = await anyio.to_thread.run_sync(render_chat_export, transcript)
+        saved, reused = await run(transcript_pages.save, user.user_id, body, getattr(conversation, 'title', None))
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
-    return artifacts.metadata(await run(artifacts.create, user.user_id, body.title, html.decode(), body.request_id,
-                                        {"kind": "chat_export", "conversation_uuid": body.conversation_uuid,
-                                         "project_uuid": body.project_uuid}), True)
+    return {**artifacts.metadata(saved, True), 'reused': reused}
 
 
 @router.post("/from-workflow/{session_id}")

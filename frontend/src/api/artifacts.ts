@@ -29,7 +29,7 @@ export const listArtifacts = () => apiFetch<Artifact[]>('/api/pages')
 export const getArtifact = (id: string) => apiFetch<Artifact>(path(id))
 export const getPublicArtifact = (token: string) => apiFetch<PublicArtifact>(`${path('public')}/${encodeURIComponent(token)}`)
 export const createArtifact = (title: string, html: string, requestId: string, projectUuid?: string) => apiFetch<Artifact>('/api/pages', { method: 'POST', body: JSON.stringify({ title, html, request_id: requestId, project_uuid: projectUuid }) })
-export const saveChatArtifact = (messages: ExportMessage[], requestId: string, source?: { project_uuid?: string; conversation_uuid?: string }) => apiFetch<Artifact>('/api/pages/from-chat', { method: 'POST', body: JSON.stringify({ messages, request_id: requestId, ...source }) })
+export const saveChatArtifact = (messages: ExportMessage[], requestId: string, source?: { project_uuid?: string; conversation_uuid?: string }) => apiFetch<Artifact & { reused?: boolean }>('/api/pages/from-chat', { method: 'POST', body: JSON.stringify({ messages, request_id: requestId, ...source }) })
 export const saveWorkflowArtifact = (sessionId: string) => apiFetch<Artifact>(`${path('from-workflow')}/${encodeURIComponent(sessionId)}`, { method: 'POST' })
 export const artifactContentUrl = (id: string, revision: string) => `${path(id)}/revisions/${encodeURIComponent(revision)}/content`
 export const publicArtifactContentUrl = (token: string, revision?: string) => `${path('public')}/${encodeURIComponent(token)}/content${revision ? `?revision=${encodeURIComponent(revision)}` : ''}`

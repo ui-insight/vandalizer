@@ -142,7 +142,7 @@ def _xlsx(body, soup):
     return out.getvalue()
 
 
-def render_chat_export(body: ChatExportRequest) -> bytes:
+def render_chat_export(body: ChatExportRequest, *, title: str = 'Chat export') -> bytes:
     content = "".join(_message_html(m) for m in body.messages)
     soup = BeautifulSoup(content, "html.parser")
     tables = soup.select("table")
@@ -157,7 +157,7 @@ def render_chat_export(body: ChatExportRequest) -> bytes:
     page = f'''<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
-<title>Chat export</title><style>
+<title>{escape(title)}</title><style>
 body{{font:16px/1.6 system-ui,sans-serif;color:#1e293b;max-width:900px;margin:auto;padding:24px}}
 section{{border-top:1px solid #cbd5e1;padding:12px 0;overflow-wrap:anywhere}}
 table{{display:block;overflow-x:auto;border-collapse:collapse;max-width:100%}}
@@ -165,5 +165,5 @@ th,td{{border:1px solid #cbd5e1;padding:8px;text-align:left}}th{{background:#f1f
 pre{{white-space:pre-wrap;overflow-wrap:anywhere;background:#f8fafc;padding:12px}}
 .evidence,.tool{{font-size:13px;color:#475569;white-space:pre-wrap}}h1,h2,h3{{line-height:1.3}}
 @media print{{body{{padding:0}}table{{display:table}}}}
-</style></head><body><h1>Chat export</h1>{content}</body></html>'''
+</style></head><body><h1>{escape(title)}</h1>{content}</body></html>'''
     return page.encode("utf-8")
