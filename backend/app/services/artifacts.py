@@ -256,7 +256,7 @@ def unpublish(db, doc):
 
 
 def workflow_html(output, title):
-    """HTML strings stay HTML; structured/text output uses the shared transcript renderer."""
+    """Render report content without chat transcript titles or role headings."""
     def has_file(value):
         if isinstance(value, dict):
             return value.get("type") == "file_download" or any(has_file(v) for v in value.values())
@@ -269,18 +269,29 @@ def workflow_html(output, title):
             text = text[7:-3].strip()
         if re.match(r"<(?:!doctype|html|head|body|main|section|article|div|style|h[1-6])\b", text, re.I):
             return text
-    from app.schemas.chat_export import ChatExportRequest
-    from app.services.chat_export import render_chat_export
+    from app.services.workflow_pages import render_report_markdown
     from app.services.output_handlers import _render_chainable_text
     content = _render_chainable_text(output, title)
-    return render_chat_export(ChatExportRequest(format="html", messages=[{"role": "assistant", "content": content}])).decode()
+    return render_report_markdown(content)
 
 
 def from_workflow(db, result, user_id, step=None):
     if result.get("status") != "completed":
         raise HTTPException(409, "Finish the workflow before creating its page.")
+    session_id = result["session_id"]
+    request_id = f"workflow:{session_id}:{step or 'final'}"
+    uid = hashlib.sha256(f"{user_id}\0{request_id}".encode()).hexdigest()[:32]
+    existing = db.html_artifacts.find_one({"uuid": uid, "user_id": user_id})
+    if existing:
+        if existing.get("deleted_at"):
+            raise HTTPException(410, "This page was deleted. Start a new page.")
+        # Retries reuse immutable saved content, even after a renderer update
+        # or a source rename. Never replace an edited or published page.
+        return existing
     workflow = db.workflow.find_one({"_id": result.get("workflow")}) or {}
-    title = (workflow.get("name") or "Workflow output")[:200]
+    from app.services.workflow_pages import report_page, workflow_source
+    source = workflow_source(db, result, workflow)
+    title = source["workflow_name"][:200]
     output = (result.get("final_output") or {}).get("output")
     if step:
         if step not in (result.get("steps_output") or {}):
@@ -288,9 +299,10 @@ def from_workflow(db, result, user_id, step=None):
         output = result["steps_output"][step].get("output")
     if output is None or output == "":
         raise HTTPException(422, "This workflow has no output to save.")
-    session_id = result["session_id"]
     activity = db.activity_event.find_one({"workflow_session_id": session_id, "user_id": user_id}) or {}
-    return create(db, user_id, title, workflow_html(output, title), f"workflow:{session_id}:{step or 'final'}", {
+    title, html = report_page(workflow_html(output, title), title, source)
+    return create(db, user_id, title, html, request_id, {
+        **source,
         "kind": "workflow", "workflow_id": str(result.get("workflow", "")), "session_id": session_id, "step": step,
         "project_uuid": activity.get("project_uuid"),
     })
