@@ -9,7 +9,9 @@ import argparse
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
+from tempfile import TemporaryDirectory
 from uuid import uuid4
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -23,10 +25,19 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--pull', action='store_true', help='Pull the required test images first')
     args = parser.parse_args()
-    config = json.loads(subprocess.check_output(
-        ['docker', 'compose', '-f', 'compose.yaml', '-f', 'compose.prod.yaml',
-         'config', '--no-env-resolution', '--format', 'json'], cwd=ROOT,
-        env={**os.environ, 'VANDALIZER_VERSION': 'security-review'}, text=True))
+    # Some Compose versions require env_file paths to exist even with
+    # --no-env-resolution. Render unchanged manifests beside an empty fixture;
+    # never read, create, or replace the operator's real backend/.env.
+    with TemporaryDirectory(prefix='vandalizer-chroma-config-') as directory:
+        fixture = Path(directory)
+        for name in ('compose.yaml', 'compose.prod.yaml'):
+            shutil.copyfile(ROOT / name, fixture / name)
+        (fixture / 'backend').mkdir()
+        (fixture / 'backend' / '.env').touch()
+        config = json.loads(subprocess.check_output(
+            ['docker', 'compose', '-f', 'compose.yaml', '-f', 'compose.prod.yaml',
+             'config', '--no-env-resolution', '--format', 'json'], cwd=fixture,
+            env={**os.environ, 'VANDALIZER_VERSION': 'security-review'}, text=True))
     services = config['services']
     assert set(services['chromadb']['networks']) == {'chroma-private'}
     assert config['networks']['chroma-private']['internal'] is True
