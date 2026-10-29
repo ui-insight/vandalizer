@@ -222,9 +222,14 @@ TRIVY ?= trivy
 # absent: its packages never reach a shipped artifact, and including it would
 # put findings in front of reviewers that they cannot act on and should not
 # care about. Scan what runs in production.
-RUNTIME_IMAGES := python:3.12-slim nginx:alpine nginxinc/nginx-unprivileged:alpine
+RUNTIME_IMAGES := python:3.12-slim vandalizer-frontend-base vandalizer-frontend-unprivileged-base
 
-security:
+.PHONY: security-runtime-images
+security-runtime-images:
+	docker build --pull --no-cache --target runtime-base -t vandalizer-frontend-base $(FRONTEND_DIR)
+	docker build --pull --no-cache --target runtime-unprivileged-base -t vandalizer-frontend-unprivileged-base $(FRONTEND_DIR)
+
+security: security-runtime-images
 	@printf "\n=== Dependencies, secrets, and config ===\n"
 	-$(TRIVY) fs --scanners vuln,secret,misconfig --severity HIGH,CRITICAL .
 	@printf "\n=== Runtime base images ===\n"
@@ -246,7 +251,11 @@ security:
 #   protect nothing. `make security` still reports them; the *gate* is scoped
 #   to what someone can actually act on.
 #
-#   The image loop scans the upstream tags, not what we build, and Debian ships
+#   The frontend images are the patched runtime stages used by our Dockerfile,
+#   including curl. Scanning raw nginx tags would flag already-fixed Alpine
+#   packages until the upstream tag is rebuilt. Build without cache so security
+#   updates are fetched even when the Dockerfile itself has not changed.
+#   The Python image loop still scans the upstream tag, and Debian ships
 #   fixes before Docker rebuilds those tags (2026-09-16: three perl-base CVEs
 #   went from unfixed to fixed while python:3.12-slim was still the 09-02
 #   build). backend/Dockerfile runs `apt-get upgrade` so the shipped image has
@@ -262,7 +271,7 @@ security:
 #   The ignore file is named explicitly: Trivy auto-loads a plain `.trivyignore`
 #   but not the YAML form, and only the YAML form carries an expiry.
 TRIVY_IGNOREFILE := .trivyignore.yaml
-security-gate:
+security-gate: security-runtime-images
 	$(TRIVY) fs --scanners vuln --severity CRITICAL --ignore-unfixed --ignorefile $(TRIVY_IGNOREFILE) --exit-code 1 .
 	$(TRIVY) fs --scanners secret --exit-code 1 .
 	@for img in $(RUNTIME_IMAGES); do \

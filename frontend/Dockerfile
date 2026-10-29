@@ -1,3 +1,14 @@
+# Patch runtime packages before adding application assets. These independent
+# stages let the release gate scan exactly the OS layers we ship without
+# compiling the frontend. Upstream nginx tags can lag Alpine security fixes.
+FROM docker.io/library/nginx:alpine AS runtime-base
+RUN apk upgrade --no-cache && apk add --no-cache curl
+
+FROM docker.io/nginxinc/nginx-unprivileged:alpine AS runtime-unprivileged-base
+USER root
+RUN apk upgrade --no-cache && apk add --no-cache curl
+USER 101:101
+
 # Stage 1: Build the React app
 # Node 24 bundles npm 11, which is required to read this package-lock.json
 # (see the note above `npm ci` below). Build-stage only — the runtime image
@@ -50,10 +61,9 @@ RUN npm run build
 # targeted (`--target runtime-unprivileged`); this stage sits BEFORE the
 # default `runtime` stage so a plain `docker build` still produces the
 # root-nginx port-80 image that compose users expect.
-FROM docker.io/nginxinc/nginx-unprivileged:alpine AS runtime-unprivileged
+FROM runtime-unprivileged-base AS runtime-unprivileged
 
 USER root
-RUN apk add --no-cache curl
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 # The shared nginx.conf listens on 80 for the default image; non-root nginx
@@ -71,9 +81,7 @@ HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
 CMD ["nginx", "-g", "daemon off;"]
 
 # Stage 2b: Serve with nginx (default image: root nginx on port 80)
-FROM docker.io/library/nginx:alpine AS runtime
-
-RUN apk add --no-cache curl
+FROM runtime-base AS runtime
 
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
