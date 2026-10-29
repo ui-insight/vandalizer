@@ -8,15 +8,16 @@ from pydantic_ai.tools import RunContext
 
 from app.services.chat_deps import AgenticChatDeps
 from app.services import artifacts, chat_page_previews
-from app.services.page_authoring import PAGE_LANGUAGE_RULES, PAGE_SOURCE_FIDELITY_RULES
+from app.services.page_authoring import PAGE_INTERACTION_RULES, PAGE_LANGUAGE_RULES, PAGE_SOURCE_FIDELITY_RULES
 from app.tasks import get_sync_db
 
 
 RENDERING_NOTE = (
-    "Pages render static HTML/CSS only. JavaScript charts, filters and table sorting are not supported, "
-    "including client-side scripts. Describe the actual static preview, never claim it is fully interactive. "
+    "Pages render HTML/CSS with native links and expandable sections. JavaScript charts, filters and table sorting are not supported, "
+    "including client-side scripts. Describe the actual preview and its working controls. "
     "If warnings are present, explain what was removed and any missing data before asking to save or reporting success. "
-    "Put all chart values and table rows directly in the HTML; use CSS bars and complete tables instead of scripts."
+    "Put all chart values and table rows directly in the HTML; use CSS bars and complete tables instead of scripts. "
+    + PAGE_INTERACTION_RULES
 )
 
 
@@ -58,8 +59,10 @@ async def create_html_artifact(context: RunContext[AgenticChatDeps], title: str,
     Preview first and await a later user approval. Include only the intended report/page,
     not the whole chat or private source documents. Does not publish or share anything.
     For dashboards, embed all data in full HTML tables and static CSS bars. No canvas,
-    SVG, JavaScript charts, filter controls or sortable tables. Explain these limits
-    when interactivity is requested, and disclose returned warnings before saving.
+    SVG, JavaScript charts, filter controls or sortable tables. For interactivity, include
+    a linked table of contents, KPI-to-chart jump links, details/summary disclosures
+    for Source notes and Calculated summary, and known web/mailto links. Explain
+    which controls work without scripts; disclose returned warnings before saving.
     Read the original source and preserve every category/year value in its own
     table cell, including repeated values. Label calculated summaries separately;
     never invent source notes or call exact source values ranges. Compare all
@@ -75,7 +78,9 @@ async def revise_html_artifact(context: RunContext[AgenticChatDeps], artifact_uu
     Send full replacement HTML and the exact base_revision read. The prior published
     revision remains unchanged. Publication is an explicit owner action in the viewer.
     Static HTML/CSS only: embed all table rows and chart values directly in the HTML.
-    JavaScript charts, filters and table sorting are unsupported. Disclose returned warnings.
+    Preserve and offer native jump links, details/summary expandable sections and
+    known web/mailto links. JavaScript charts, filters and table sorting are
+    unsupported. Disclose returned warnings.
     Re-read the original source, not just the old page: preserve every category/year
     value in separate cells, including repeated values. Label calculated summaries
     separately and verify source notes instead of carrying forward earlier inventions.

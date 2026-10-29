@@ -28,7 +28,7 @@ it('shows the pinned public page without loading private metadata or management 
   expect(updated).toHaveTextContent('2026')
   expect(updated).toHaveTextContent('UTC')
   const frame = screen.getByTitle('Page preview')
-  expect(frame).toHaveAttribute('sandbox', '')
+  expect(frame).toHaveAttribute('sandbox', 'allow-popups allow-popups-to-escape-sandbox')
   expect(frame).toHaveAttribute('referrerpolicy', 'no-referrer')
   expect(frame).toHaveAttribute('src', '/api/pages/public/public-link/content?revision=r2')
   expect(screen.getByRole('link', { name: 'Download HTML' })).toHaveAttribute('href', '/api/pages/public/public-link/content?revision=r2&download=true')

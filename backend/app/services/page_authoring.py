@@ -34,3 +34,20 @@ PAGE_SOURCE_FIDELITY_RULES = (
     "A failed read, a document listing, or an earlier assistant summary is not evidence of verification. "
     "If only part of a large source was read, describe that limited scope instead of claiming a complete check."
 )
+
+
+PAGE_INTERACTION_RULES = (
+    "Pages support useful interactivity without JavaScript. When interactivity is requested, offer and include "
+    "appropriate native HTML controls in the preview: a clickable table of contents for long pages, KPI cards "
+    "linked to their corresponding chart or table, expandable 'Source notes' and 'Calculated summary' sections, "
+    "and normal web or email links to supplied sources or contacts. Do not say all interactivity is impossible. "
+    "Use real <a href='#budget-chart'> links with matching unique id='budget-chart' targets; keep target headings "
+    "outside collapsed details. Use <details><summary>Source notes</summary>...</details> and a separate "
+    "Calculated summary disclosure when those sections have content. Keep essential figures and full data tables "
+    "visible, and preserve existing links, IDs and disclosures when revising. Use http/https links and mailto links "
+    "only for known destinations; never invent source URLs or contact addresses. Web/contact links open separately. "
+    "Use descriptive link labels, visible focus styling, and clear clickable summary labels. No onclick handlers, "
+    "fake filter/sort controls, forms, scripts, or remote assets. Explain briefly that these links and expandable "
+    "sections work without scripts; live charts, filters and table sorting remain unsupported. Describe only the "
+    "controls actually included in the preview, not a fully interactive application."
+)

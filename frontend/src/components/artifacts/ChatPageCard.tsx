@@ -16,7 +16,7 @@ export function ChatPageCard({ title, html, uuid, revision, warnings = [], runni
     <header className="chat-page-header"><span className="page-mark"><Icon size={20} className={running ? 'animate-spin' : undefined} aria-hidden="true" /></span><div><p role="status" className="page-eyebrow">{status}</p><h3>{title}</h3></div></header>
     {running && <div className="page-building"><div /><div /><div /><p>{saving ? 'Saving the approved page to your private Pages library.' : 'Preparing a preview for you to review before saving.'}</p></div>}
     {!running && !error && !canceled && (html || saved) && <div className="chat-page-footer">
-      <p>Pages support static HTML and CSS. JavaScript charts, filters and table sorting are not supported.</p>
+      <p>Pages support jump links, expandable sections, and web or email links without scripts. JavaScript charts, filters and table sorting are not supported.</p>
       {warnings.length > 0 && <div className="page-revision-note" role="alert"><strong>Some content was removed to keep this page safe.</strong>{warnings.map((warning, index) => <p key={index}>{warning}</p>)}</div>}
     </div>}
     {!running && !error && !canceled && (html || saved) && (history ? <details className="page-history-preview"><summary>View earlier preview</summary><PagePreview title={title} html={html} compact /></details> : <PagePreview title={title} html={needsApproval ? html : undefined} src={saved ? artifactContentUrl(uuid!, revision!) : undefined} compact />)}

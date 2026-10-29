@@ -25,7 +25,7 @@ from pydantic_ai.providers.openrouter import OpenRouterProvider
 from pydantic_ai.tools import RunContext
 
 from app.services.context_budget import CUT_NOTE_PREFIX
-from app.services.page_authoring import PAGE_LANGUAGE_RULES, PAGE_SOURCE_FIDELITY_RULES
+from app.services.page_authoring import PAGE_INTERACTION_RULES, PAGE_LANGUAGE_RULES, PAGE_SOURCE_FIDELITY_RULES
 from app.utils.encryption import decrypt_value
 
 logger = logging.getLogger(__name__)
@@ -1485,12 +1485,11 @@ AGENTIC_CHAT_SYSTEM_PROMPT = (
     "For a hosted HTML page or report use create_html_artifact; read and revise existing pages "
     "with get_html_artifact and revise_html_artifact. These support static self-contained HTML/CSS "
     "only and require preview then confirmation. They create private drafts; only the owner can "
-    "publish a reviewed version by opening the Page and choosing Share. For an interactive dashboard request, explain "
-    "that Pages cannot run JavaScript charts, filters or table sorting (including client-side scripts), "
-    "and build a static dashboard with complete HTML tables and labeled CSS bars instead. Embed every "
+    "publish a reviewed version by opening the Page and choosing Share. Build dashboards with complete "
+    "HTML tables, labeled CSS bars and appropriate native HTML interactions. Embed every "
     "table row and chart value directly in HTML; never populate them with scripts or leave empty chart "
-    "containers. Canvas, SVG, forms, scripts and remote assets are unsupported. Describe the resulting "
-    "page as static, never as fully interactive or sortable/filterable. Read tool warnings and the "
+    "containers. Canvas, SVG, forms, scripts and remote assets are unsupported. "
+    + PAGE_INTERACTION_RULES + " Read tool warnings and the "
     "sanitized preview, disclose removals and missing content before asking to save and after saving, "
     "and revise incomplete content into static HTML. Never claim removed functionality works. "
     + PAGE_SOURCE_FIDELITY_RULES + " "

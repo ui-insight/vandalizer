@@ -14,6 +14,7 @@ from app.models.user import User
 from app.rate_limit import limiter
 from app.schemas.artifact import ChatArtifactRequest, CreateArtifactRequest, PublishArtifactRequest, ReviseArtifactRequest, ShareArtifactRequest
 from app.schemas.chat_export import ChatExportRequest
+from app.services.page_links import prepare_page_links
 from app.services import access_control, artifacts
 from app.services.chat_export import render_chat_export
 from app.services.page_printing import render_page
@@ -82,6 +83,7 @@ def content_response(rev, download=False, *, version=1, view="content"):
     title = rev["title"].strip() or "Page"
     filename = title if title.lower().endswith(".html") else f"{title}.html"
     html, csp = render_page(rev, version, "content" if download else view)
+    html, csp = prepare_page_links(html, csp)
     return HTMLResponse(html, headers={
         "Content-Security-Policy": csp, "X-Frame-Options": "SAMEORIGIN",
         "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Robots-Tag": "noindex, nofollow",

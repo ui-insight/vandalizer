@@ -1,4 +1,4 @@
-import { useId, useState, type ReactNode } from 'react'
+import { useId, useMemo, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowUpRight, Download, Expand, FileText, Globe2, LockKeyhole, Share2, X } from 'lucide-react'
 import { FocusTrap } from '../shared/PanelFocusTrap'
@@ -27,8 +27,18 @@ export function PagePreview({ src, html, title, compact = false, thumbnail = fal
   src?: string; html?: string; title: string; compact?: boolean; thumbnail?: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
+  const previewHtml = useMemo(() => {
+    if (!html) return html
+    // srcdoc otherwise resolves #links against the surrounding app URL.
+    // Keep navigation inside this isolated, unsaved document.
+    const document = new DOMParser().parseFromString(html, 'text/html')
+    document.querySelectorAll('a[href^="#"]').forEach(link => {
+      link.setAttribute('href', `about:srcdoc${link.getAttribute('href')}`)
+    })
+    return `<!doctype html>${document.documentElement.outerHTML}`
+  }, [html])
   if (thumbnail) return <div className="page-thumbnail" aria-hidden="true"><iframe src={src} title={`${title} thumbnail`} sandbox="" referrerPolicy="no-referrer" loading="lazy" tabIndex={-1} /></div>
-  const frame = (large: boolean) => <iframe src={src} srcDoc={html} title={large ? `${title} expanded preview` : 'Page preview'} sandbox="" referrerPolicy="no-referrer" className={large ? 'page-preview-expanded' : 'page-preview-frame'} />
+  const frame = (large: boolean) => <iframe src={src} srcDoc={previewHtml} title={large ? `${title} expanded preview` : 'Page preview'} sandbox="allow-popups allow-popups-to-escape-sandbox" referrerPolicy="no-referrer" className={large ? 'page-preview-expanded' : 'page-preview-frame'} />
   return <div className={`page-preview${compact ? ' page-preview-compact' : ''}`}>
     <div className="page-preview-bar"><span><FileText size={14} aria-hidden="true" />{compact ? 'Page preview' : 'Preview'}</span><button type="button" className="page-text-button" onClick={() => setExpanded(true)}><Expand size={15} aria-hidden="true" />Expand preview</button></div>
     {frame(false)}

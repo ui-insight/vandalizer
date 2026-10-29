@@ -319,7 +319,7 @@ async def test_public_revision_no_private_metadata_revocation_rotation_and_opera
     assert "private-chat" not in content.text
     assert content.headers["cache-control"] == "no-store"
     assert content.headers["x-frame-options"] == "SAMEORIGIN"
-    assert content.headers["content-security-policy"] == artifacts.CONTENT_CSP
+    assert content.headers["content-security-policy"] == artifacts.prepare_page_links("", artifacts.CONTENT_CSP)[1]
     route_env.settings.artifact_public_sharing_enabled = False
     assert (await client.get(f"/api/pages/public/{token}/content")).status_code == 404
     assert (await client.put(f"/api/pages/{uid}/publication", json={"revision": rev}, cookies=cookies, headers=headers)).status_code == 403

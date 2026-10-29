@@ -17,10 +17,10 @@ it('sends the stored revision preview ID when Save new version is clicked', () =
 it('lets a user inspect an isolated preview and approve exactly once', () => {
   const confirm = vi.fn()
   render(<ToolStatusLine call={call} result={result} onConfirm={confirm} />)
-  expect(screen.getByTitle('Page preview')).toHaveAttribute('sandbox', '')
+  expect(screen.getByTitle('Page preview')).toHaveAttribute('sandbox', 'allow-popups allow-popups-to-escape-sandbox')
   fireEvent.click(screen.getByRole('button', { name: 'Expand preview' }))
   const dialog = screen.getByRole('dialog', { name: 'Award report' })
-  expect(screen.getByTitle('Award report expanded preview')).toHaveAttribute('sandbox', '')
+  expect(screen.getByTitle('Award report expanded preview')).toHaveAttribute('sandbox', 'allow-popups allow-popups-to-escape-sandbox')
   fireEvent.keyDown(dialog, { key: 'Escape' })
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Save page' }))
@@ -60,7 +60,7 @@ it.each(['create_html_artifact', 'revise_html_artifact'])('shows removal warning
   expect(screen.getByRole('button', { name: toolName === 'create_html_artifact' ? 'Save page' : 'Save new version' })).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Expand preview' }))
   expect(screen.getByRole('alert')).toHaveTextContent(warning)
-  expect(screen.getByTitle('Award report expanded preview')).toHaveAttribute('sandbox', '')
+  expect(screen.getByTitle('Award report expanded preview')).toHaveAttribute('sandbox', 'allow-popups allow-popups-to-escape-sandbox')
 })
 
 it('keeps warnings visible in saved and historical chat cards', () => {
@@ -75,7 +75,21 @@ it('keeps warnings visible in saved and historical chat cards', () => {
 it('handles legacy results and malformed warnings without inventing removals', () => {
   const { rerender } = render(<ToolStatusLine call={call} result={result} />)
   expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-  expect(screen.getByText(/Pages support static HTML and CSS/)).toBeInTheDocument()
+  expect(screen.getByText(/Pages support jump links, expandable sections, and web or email links/)).toBeInTheDocument()
   rerender(<ToolStatusLine call={call} result={{ ...result, content: { ...result.content, warnings: [null, { message: 'invalid' }, 42] } }} />)
   expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+})
+
+
+it('keeps jump links inside the unsaved and expanded preview', () => {
+  const html = '<a href="#chart">Budget chart</a><h2 id="chart">Budget chart</h2><details><summary>Source notes</summary>Notes</details>'
+  render(<ToolStatusLine call={call} result={{ ...result, content: { ...result.content, artifact_preview_html: html } }} onConfirm={vi.fn()} />)
+  const frame = screen.getByTitle('Page preview')
+  const preview = new DOMParser().parseFromString(frame.getAttribute('srcdoc')!, 'text/html')
+  expect(preview.querySelector('a')?.getAttribute('href')).toBe('about:srcdoc#chart')
+  expect(preview.getElementById('chart')).not.toBeNull()
+  expect(preview.querySelector('details summary')?.textContent).toBe('Source notes')
+  fireEvent.click(screen.getByRole('button', { name: 'Expand preview' }))
+  expect(screen.getByTitle('Award report expanded preview')).toHaveAttribute('srcdoc', frame.getAttribute('srcdoc'))
+  expect(frame.getAttribute('sandbox')).not.toMatch(/allow-scripts|allow-same-origin|allow-top-navigation(?: |$)/)
 })

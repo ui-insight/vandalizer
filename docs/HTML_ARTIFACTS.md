@@ -15,6 +15,12 @@ Owners see **Open originating chat** or **Open originating workflow run** when a
 
 Workflow pages contain the intended final output. HTML documents/fragments and fenced HTML are rendered as pages. Other text and structured output use the shared export renderer. Binary file-download payloads, including nested ones, are rejected; use the preceding text/HTML step. A caller may select an authorized completed step with the API's `step` query parameter. Workflow delivery is an output setting, not a new graph node.
 
+## Clickable Pages
+
+When interactivity is requested, the Assistant can include a linked table of contents, KPI cards that jump to their chart or table, and native expandable **Source notes** and **Calculated summary** sections. These use anchors with matching section IDs and `<details><summary>` disclosures, so they work without scripts in previews, saved Pages, and published versions. Essential figures and complete data tables stay visible. Revisions should preserve these controls and their destinations.
+
+Web and email links use known source URLs or contact addresses. They open separately without access to the Page's opener or referrer; jump links stay within the Page. Publication does not grant readers access to private linked sources. JavaScript charts, live filtering, table sorting, forms, and remote assets remain unsupported.
+
 ## Ownership and links
 
 New pages are owner-private. The owner can grant read access to one team they belong to; membership is checked on every private read. Only the owner can edit, publish, change access, or delete. Neither being a site administrator nor holding a workflow share token bypasses page ownership.
@@ -35,7 +41,7 @@ Previews and downloads remain script-free. Full-page and print views permit only
 
 ## Rendering and storage
 
-Page content is served with a restrictive CSP including `sandbox`, `script-src 'none'`, `connect-src 'none'`, `frame-src 'none'`, `form-action 'none'`, and `base-uri 'none'`. The viewer also uses an iframe with an empty `sandbox` attribute. Raw HTML is reconstructed with an allowlist: scripts, event handlers, forms, embedded frames, SVG/MathML, remote images, and external stylesheet elements are removed. CSS may be inline; CSP blocks remote resources referenced by CSS. Small raster images can be embedded as data URLs. Warnings report removed unsupported content so owners can inspect the actual saved result.
+Page content is served with a restrictive CSP including `sandbox`, `script-src 'none'`, `connect-src 'none'`, `frame-src 'none'`, `form-action 'none'`, and `base-uri 'none'`. The viewer also uses a sandboxed iframe. Page delivery and interactive previews allow only link popups (`allow-popups allow-popups-to-escape-sandbox`); scripts, same-origin privileges, forms and top-level navigation remain blocked. Web/email anchors are normalized to open separately with `noopener noreferrer`. Raw HTML is reconstructed with an allowlist: scripts, event handlers, forms, embedded frames, SVG/MathML, remote images, and external stylesheet elements are removed. CSS may be inline; CSP blocks remote resources referenced by CSS. Small raster images can be embedded as data URLs. Warnings report removed unsupported content so owners can inspect the actual saved result.
 
 Storage is the MongoDB `html_artifacts` collection, registered with the existing database initialization. One bounded document holds append-only revisions, ownership, source provenance, and publication pointers. Atomic compare-and-set appends prevent competing saves from overwriting one another. Each revision is limited to 256 KiB of rendered HTML; each page supports at most 25 revisions, staying below MongoDB's document-size limit. There are no external asset objects to back up in this release. Chat-created pages record the source conversation/turn and selected Skill UUID/version without copying Skill instructions. Workflow pages record the workflow, session, and selected step. Client-normalized transcript saves are labeled `chat_export`; they are not authenticated copies of database history.
 

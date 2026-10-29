@@ -15,6 +15,8 @@ from bs4 import BeautifulSoup, Comment
 from fastapi import HTTPException
 from pymongo import ReturnDocument
 
+from app.services.page_links import prepare_page_links
+
 MAX_HTML_BYTES = 262144
 PAGE_TOO_LARGE_MESSAGE = "This page is too large; try fewer rows or tabs, or split it into pages."
 MAX_REVISIONS = 25
@@ -58,6 +60,9 @@ def clean_html(html: str, title: str) -> tuple[str, list[str]]:
                     scheme = ""
                 if value.startswith("#") or scheme in {"https", "http", "mailto"}:
                     continue
+            elif tag.name == "a" and attr in {"target", "rel", "referrerpolicy"}:
+                # Replaced by prepare_page_links, never trusted as authored.
+                continue
             elif attr == "src" and tag.name == "img" and isinstance(value, str):
                 if value.lower().startswith(("data:image/png;base64,", "data:image/jpeg;base64,", "data:image/gif;base64,", "data:image/webp;base64,")):
                     continue
@@ -74,12 +79,14 @@ def clean_html(html: str, title: str) -> tuple[str, list[str]]:
             tag.unwrap()
     body = soup.body.decode_contents() if soup.body else str(soup)
     result = f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="{CONTENT_CSP}"><title>{escape(title)}</title>{styles}</head><body>{body}</body></html>'
+    result, _ = prepare_page_links(result, CONTENT_CSP)
     if len(result.encode("utf-8")) > MAX_HTML_BYTES:
         raise HTTPException(422, PAGE_TOO_LARGE_MESSAGE + " Rendered page exceeds 256 KiB. Reduce content or inline images.")
     return result, [
         "Unsupported HTML, scripts, or remote assets were removed. Review this preview before saving or sharing. "
         "Data rendered only by scripts will be missing. Use full HTML tables and static CSS charts; "
-        "JavaScript charts, filters and table sorting are not supported."
+        "JavaScript charts, filters and table sorting are not supported. "
+        "Jump links, expandable sections, and web or email links can still be used."
     ] if removed else []
 
 

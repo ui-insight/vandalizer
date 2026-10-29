@@ -55,7 +55,7 @@ async def test_original_and_revised_budgets_remain_public_side_by_side(client, d
             assert content.status_code == 200 and text in content.text
             assert 'Confidential' not in content.text and 'Secret' not in content.text
             assert 'private-chat' not in content.text
-            assert content.headers['content-security-policy'] == artifacts.CONTENT_CSP
+            assert content.headers['content-security-policy'] == artifacts.prepare_page_links("", artifacts.CONTENT_CSP)[1]
         assert (await client.get(f'{url}/content', params={'revision': private})).status_code == 409
     assert (await client.get(f'/api/pages/public/{main["public_token"]}')).json()['version'] == 3
 
