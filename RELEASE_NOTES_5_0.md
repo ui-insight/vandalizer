@@ -1,6 +1,6 @@
 # Vandalizer 5.0 — Fully Agentic
 
-**Status:** unreleased — pending merge of `major/agentic-chat`. Set the release date at tag time and mirror it into `CHANGELOG.md`.
+**Status:** unreleased — `major/agentic-chat` remains a draft PR. See [release readiness](docs/v5-release-readiness.md) for verification and outstanding gates. Set the release date at tag time and mirror it into `CHANGELOG.md`.
 
 The biggest change to Vandalizer since launch: the chat now drives the entire platform. Documents, knowledge bases, extractions, workflows, projects, automations, and the certification program are all reachable through one conversation — with quality scores, source citations, and confirmation flows built in.
 
@@ -10,13 +10,13 @@ The dedicated editors are unchanged and remain the precision surface. Chat is a 
 
 ## Highlights
 
-- **Chat is the product.** 49 pydantic-ai tools let the agent search documents, query knowledge bases, run extractions, dispatch workflows, manage projects, and run validation — all from plain-English prompts.
+- **Chat is the product.** Registered pydantic-ai tools let the agent search documents, query knowledge bases, run extractions, dispatch workflows, manage projects, and run validation — all from plain-English prompts.
 - **Chat builds, not just runs.** Describe a process and the agent authors a real multi-step workflow, an extraction template, or an automation. This is the single biggest capability jump in the release.
 - **Projects.** A goal-scoped workspace per grant or effort. Files added are auto-indexed into the project's implicit knowledge base, so "chat across all my files" works with no knowledge base to build.
 - **Answers carry measured quality.** Results from validated templates carry a `QualityBadge` with tier, accuracy, consistency, and active alerts; unvalidated templates show Unscored. The model never sees the number — it comes from stored `ValidationRun` records and is stripped before the payload reaches the LLM, so the agent cannot inflate its own grade.
 - **Source-linked answers.** Knowledge-base replies show the passages they used. Click any passage to jump to the source.
-- **Writes require confirmation.** All 19 state-changing tools preview first and execute only after approval. Every tool call runs as the calling user, in that user's team scope — the agent holds no privileges of its own.
-- **Guided verification.** Turn any good extraction into a test case in one click. The more your team verifies, the higher the tier climbs.
+- **Writes require confirmation.** Confirmation-gated operations preview their proposed changes before execution. Every tool call runs as the calling user, in that user's team scope — the agent holds no privileges of its own.
+- **Guided verification.** Turn an extraction into a test case, review the expected values, and measure later runs against them. Results describe the tested cases; adding cases does not guarantee a higher score or accuracy on unseen documents.
 - **Certification runs in chat.** The full Vandal Workflow Architect program — lessons, practice documents, grading — happens in the conversation, sharing one progress store with the panel.
 - **Web access.** The agent can search the public web and read pasted URLs, with your own documents always checked first. Off until an admin configures a provider.
 - **Built to survive long sessions.** Auto-compaction, prompt-cache-aware assembly, parallel read execution, a live progress checklist, and a mid-run message queue so you can keep typing while it works.
@@ -42,7 +42,7 @@ The dedicated editors are unchanged and remain the precision surface. Chat is a 
 ## Documentation
 
 - New: `docs/AGENTIC_CHAT_USER_GUIDE.md` — end-user guide to what the chat can do.
-- New: `docs/AGENTIC_CHAT_TOOLS_REFERENCE.md` — developer reference for all 49 tools, with params, auth rules, execution model, and the quality sidecar shape.
+- New: `docs/AGENTIC_CHAT_TOOLS_REFERENCE.md` — developer reference for chat tools, with params, auth rules, execution model, and the quality sidecar shape. The executable registry in `backend/app/services/chat_tools.py` defines the current catalog.
 - New: `docs/QUALITY_SIGNALS_EXPLAINED.md` — explainer for the trust layer.
 - README gains an agentic-chat section and web-search configuration.
 - DEPLOY.md gains an **Agentic Chat** section: model choice, token cost, the team-context requirement, and web-access egress posture.
@@ -65,9 +65,13 @@ The dedicated editors are unchanged and remain the precision surface. Chat is a 
   1. Deploy code, run a dry-run on the announcement blast to verify the eligible count.
   2. Run the drip backfill (admin panel) so existing users are enrolled.
   3. Send the announcement in batches (admin panel) until `sent == 0`.
-- **Rollback:** Safe to revert the branch. New User fields are additive. Already-sent announcement emails are idempotently tracked per-user, so a re-run after revert-then-reapply won't double-send.
+- **Certification activation is separate from deployment.** Keep the v5 course draft until its publication requirements are met. The [QA staging runbook](docs/certification-v5-qa-staging.md) uses a separate catalog and synthetic evidence that is explicitly forbidden in production.
+- **Rollback:** Retain published course packages and learner records. Follow the certification runbook to switch the default for new enrollments while preserving existing learners' course access; reverting application code alone is not a complete certification rollback. Announcement sends remain tracked per user.
 
 ## Known gaps
+
+- The Python audit still reports three Chroma advisories without a patched version. Local development binds Chroma to loopback; Helm restricts datastore ingress to backend pods by default. These controls limit exposure but do not remove the vulnerable dependency. See [release readiness](docs/v5-release-readiness.md).
+- Backend mypy remains advisory while the existing typing backlog is corrected. Uncompleted live-model workflow baselines and observed RA usability work are recorded in [#1056](https://github.com/ui-insight/vandalizer/issues/1056), which was closed as not planned.
 
 - No recorded walkthrough / video on the landing page yet (visual is a stylized chat mock).
 - The landing page is slated for a full redesign; treat its current copy as provisional.

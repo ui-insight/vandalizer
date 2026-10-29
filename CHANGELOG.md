@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Security
+- Upgrade audited frontend and Python dependencies, including the compatible MSAL/cryptography and FastAPI/Starlette stacks. Replace unmaintained PyPDF2 with pypdf and verify saved PDF form values. Chroma's development port now binds to localhost. Three Chroma advisories still have no published fix; see `docs/v5-release-readiness.md` for residual risk and release gates.
+
 ### Added
 - **Pin projects to Home.** In the Projects drawer, a project's **⋯** menu has **Pin to Home** (#1014 item 58). Pinned projects, up to five, appear on Home with an **Open** button, so the proposals and awards you work on every day are one click away. Pins are saved in this browser. A project you can no longer open drops off Home.
 - **Assistant memory can be turned off.** The brain button by the chat box listed what the assistant remembers about your habits and could forget it, but memory was always on and the button didn't show its state (#1014 item 48). A switch in the panel now turns memory off for your current team: nothing new is recorded, and the assistant stops using what's stored. Turning it back on restores what was kept. The button is named "Assistant memory: on/off" and shows "Off" while memory is off, and **Forget all** no longer turns memory back on.
