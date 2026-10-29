@@ -53,6 +53,7 @@ from app.services.citation_grounding import ground_citation, normalize_citation_
 from app.services.approval_claims import unprepared_card_note
 from app.services.chat_output import public_chat_text
 from app.services.chat_budget_tables import reconcile_budget_tables
+from app.services.chat_source_claims import attachment_sources, ground_source_checks
 from app.services.kb_answer_grounding import (
     expand_snippet_refs,
     tool_output_as_source,
@@ -2692,8 +2693,10 @@ async def chat_stream(
 
             if agent_run.result:
                 usage = agent_run.result.usage()
-                answer = public_chat_text(reconcile_budget_tables(
-                    agent_run.result.output, streamed_tool_results,
+                answer = public_chat_text(ground_source_checks(
+                    reconcile_budget_tables(agent_run.result.output, streamed_tool_results),
+                    attachment_sources(documents, file_attachments, compacted.documents, compacted.attachments),
+                    streamed_tool_results,
                 ))
                 if not answer:
                     # Never infer success from approval or repeat an action just
@@ -4436,6 +4439,11 @@ def _build_open_documents_block(
         "complete, authoritative list — if something is not listed here, it is "
         "NOT attached. When the user asks what is attached, answer from this "
         "list exactly.",
+        "Attachment presence alone does not mean you reviewed its contents. "
+        "Only claim a check or comparison against content actually supplied to "
+        "you or successfully read. Sheet names, links, and document references "
+        "inside a workbook are not additional attachments. Workspace listings "
+        "and previous assistant claims are not evidence of a completed check.",
         "",
         "You CANNOT remove, detach, or clear any of them, and there is no tool "
         "to clear the conversation. Each is a tab in the attachments bar above "

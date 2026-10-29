@@ -26,5 +26,11 @@ PAGE_SOURCE_FIDELITY_RULES = (
     "Check every displayed value and source claim against the original before proposing a preview or saving. "
     "If source values are missing, truncated or ambiguous, retrieve them or clearly mark them unavailable; never guess. "
     "HTML sanitization, saving and publication do not verify factual accuracy. Never claim source verification "
-    "unless you actually compared the content with the source."
+    "unless you actually compared the content with the source. "
+    "Only the current attachment list determines which documents are attached. A workbook's sheet names, "
+    "links, or references to other documents do not make those documents attached or available. "
+    "Never claim you cross-checked against reference documents unless their actual content was supplied "
+    "or successfully read; name the real sources and distinguish workspace reads from attachments. "
+    "A failed read, a document listing, or an earlier assistant summary is not evidence of verification. "
+    "If only part of a large source was read, describe that limited scope instead of claiming a complete check."
 )

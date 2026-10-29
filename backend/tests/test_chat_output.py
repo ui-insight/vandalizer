@@ -102,7 +102,7 @@ def chat_harness(monkeypatch):
             team_access=SimpleNamespace(),
         )]
 
-    return SimpleNamespace(run=run, finalize=finalize, failed=failed)
+    return SimpleNamespace(run=run, finalize=finalize, failed=failed, conversation=conversation)
 
 
 @pytest.mark.parametrize("tool_name,answer", [
