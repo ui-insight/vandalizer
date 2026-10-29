@@ -637,7 +637,7 @@ async def upload_pdf_template(
     """Attach a fillable PDF template; auto-generate extraction items from its form fields."""
     from pathlib import Path
     from pydantic import BaseModel as PydanticBase
-    from PyPDF2 import PdfReader
+    from pypdf import PdfReader
     from app.config import Settings
     from app.models.search_set import SearchSetItem
     from app.services.llm_service import create_chat_agent
@@ -821,7 +821,7 @@ async def export_pdf(
     if ss.fillable_pdf_url:
         # Fill the PDF template
         from io import BytesIO
-        from PyPDF2 import PdfReader, PdfWriter
+        from pypdf import PdfReader, PdfWriter
 
         settings = Settings()
         template_path = Path(settings.upload_dir) / ss.fillable_pdf_url

@@ -73,7 +73,7 @@ async def _post_template(client, tmp_path, *, reader):
               new_callable=AsyncMock, return_value=ss),
         patch("app.config.Settings",
               MagicMock(return_value=SimpleNamespace(upload_dir=str(tmp_path)))),
-        patch("PyPDF2.PdfReader", reader),
+        patch("pypdf.PdfReader", reader),
     ):
         MockUser.find_one = AsyncMock(return_value=user)
         return await client.post(
@@ -116,3 +116,38 @@ class TestUploadTemplateWithoutFormFields:
         assert resp.status_code == 400
         assert "could not be read" in resp.json()["detail"].lower()
         assert list(tmp_path.iterdir()) == []
+
+
+async def test_exports_filled_template_using_saved_bindings(client, tmp_path):
+    from io import BytesIO
+
+    from pypdf import PdfReader
+    from reportlab.pdfgen import canvas
+
+    template = tmp_path / "template.pdf"
+    pdf = canvas.Canvas(str(template))
+    pdf.acroForm.textfield(name="investigator", x=40, y=700)
+    pdf.showPage()
+    pdf.save()
+    ss = SimpleNamespace(title="Award", item_order=[], fillable_pdf_url=template.name)
+    item = SimpleNamespace(pdf_binding="investigator", searchphrase="PI")
+    cookies, headers = _auth()
+
+    with (
+        patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+        patch("app.dependencies.User") as users,
+        patch("app.routers.extractions._get_search_set_or_404", new_callable=AsyncMock, return_value=ss),
+        patch("app.config.Settings", return_value=SimpleNamespace(upload_dir=str(tmp_path))),
+        patch("app.models.search_set.SearchSetItem") as items,
+    ):
+        users.find_one = AsyncMock(return_value=_make_user())
+        items.find.return_value.to_list = AsyncMock(return_value=[item])
+        response = await client.post(
+            "/api/extractions/search-sets/ss-uuid-1/export-pdf",
+            json={"results": {"PI": "Alice"}}, cookies=cookies, headers=headers,
+        )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/pdf"
+    filled = PdfReader(BytesIO(response.content))
+    assert filled.get_fields()["investigator"]["/V"] == "Alice"

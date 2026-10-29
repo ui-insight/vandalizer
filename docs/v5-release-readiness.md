@@ -51,6 +51,9 @@ Clearing the whole backend remains a separate, substantial refactor.
   budget reconciliation, page provenance, scheduling, source checks and
   certificate rendering. Ruff passes.
 - The additional malformed-schedule regression passes (37 schedule tests).
+- PDF upload/export/task and Sentry startup regressions pass (29 tests),
+  including filling a real form through the export endpoint. Sentry 2.73 handles
+  Starlette's optional template dependency without requiring Jinja2 for this API.
 - Frontend production build passes. Four suites that timed out under concurrent
   local workloads pass in isolation (110 tests, one worker and a 30-second
   local timeout). The broad local duplicate runs were stopped; full-suite
