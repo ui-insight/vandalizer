@@ -1,3 +1,4 @@
+import { PageVersionLinks } from '../components/artifacts/PageVersionLinks'
 import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, ArrowUpRight, Check, ChevronRight, Code2, Copy, Download, FileText, Globe2, Link2, LockKeyhole, MessageSquare, Share2, Trash2, Workflow } from 'lucide-react'
 import * as api from '../api/artifacts'
@@ -76,8 +77,11 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
   const publicVersion = versionNumber(publicRevision)
   const latestVersion = artifact ? versionNumber(artifact.latest_revision) : 0
   const publicSelectionIsPublished = !!artifact?.published_revision && publicRevision === artifact.published_revision
-  const selectedIsPublished = !!artifact?.published_revision && selected === artifact.published_revision
-  const hasDraft = !!artifact?.can_manage && !!artifact.published_revision && artifact.latest_revision !== artifact.published_revision
+  const hasSeparateLinks = !!artifact?.publications?.length
+  const hasPublicLinks = !!artifact?.published_revision || hasSeparateLinks
+  const isPublished = (id: string) => id === artifact?.published_revision || !!artifact?.publications?.some(link => link.revision === id)
+  const selectedIsPublished = isPublished(selected)
+  const hasDraft = !!artifact?.can_manage && hasPublicLinks && !isPublished(artifact.latest_revision)
   const contentUrl = publicToken ? api.publicArtifactContentUrl(publicToken, publicInfo?.revision) : uuid && selected ? api.artifactContentUrl(uuid, selected) : ''
   const publicUpdated = publicInfo?.updated_at ? new Date(publicInfo.updated_at) : null
   const publicUpdatedLabel = publicUpdated && !Number.isNaN(publicUpdated.getTime())
@@ -95,10 +99,10 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
     <header className="page-heading"><div className="page-heading-copy"><p className="page-eyebrow">{publicToken ? 'SHARED PAGE' : 'SAVED PAGE'}</p><h1>{title}</h1>
       {(artifact || publicInfo) && <div className="page-meta">
         {publicToken ? <><PageBadge published>Published · version {publicInfo?.version}</PageBadge><span>Anyone with the link</span>{publicUpdatedLabel ? <span>Last updated <time dateTime={publicInfo!.updated_at}>{publicUpdatedLabel}</time></span> : <span>Last updated date unavailable</span>}</> : artifact && !artifact.can_manage ? <PageBadge>Team access · version {version}</PageBadge> : <>
-          {artifact?.published_revision ? <PageBadge published>Published · version {publishedVersion}</PageBadge> : <PageBadge>{artifact?.team_id ? 'Team access' : 'Private · only you'}</PageBadge>}
+          {artifact?.published_revision ? <PageBadge published>Published · version {publishedVersion}</PageBadge> : hasSeparateLinks ? <PageBadge published>Published version links</PageBadge> : <PageBadge>{artifact?.team_id ? 'Team access' : 'Private · only you'}</PageBadge>}
           {hasDraft && <PageBadge>Unpublished changes</PageBadge>}
-          {artifact?.published_revision && <span>Workspace access: {artifact.team_id ? 'you and your team' : 'only you'}</span>}
-          {!artifact?.published_revision && <span>Share only when you’re ready</span>}
+          {hasPublicLinks && <span>Workspace access: {artifact?.team_id ? 'you and your team' : 'only you'}</span>}
+          {!hasPublicLinks && <span>Share only when you’re ready</span>}
         </>}
       </div>}
     </div>
@@ -111,8 +115,8 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
     {loading && <p role="status" className="pages-loading">Loading your page…</p>}
     {!loading && !artifact && !publicInfo && <div className="pages-empty"><FileText size={32} /><h2>Page unavailable</h2><p>{publicToken ? 'This link may have been removed. Ask the owner for a current link.' : 'The page may have been removed, or your access may have changed.'}</p><button className="page-button" onClick={() => setAttempt(n => n + 1)}>Try again</button></div>}
     {!loading && (artifact || publicInfo) && <>
-      {artifact && <div className="page-revision-bar">{artifact.can_manage ? <label>Version<select aria-label="Page version" disabled={busy || !!editor} value={selected} onChange={e => setSelected(e.target.value)}>{artifact.revisions.map((r, index) => <option key={r.uuid} value={r.uuid}>Version {r.version ?? index + 1}{r.uuid === artifact.published_revision ? ' · published' : ''}{r.uuid === artifact.latest_revision ? ' · latest' : ''}</option>)}</select></label> : <span>Shared version {version}</span>}<a className="page-text-button" href={contentUrl} target="_blank" rel="noreferrer"><ArrowUpRight size={14} />Open full page</a></div>}
-      {hasDraft && !selectedIsPublished && <p className="page-revision-note">You’re previewing version {version}. The public link still shows version {publishedVersion}. Share → Publish updates when you’re ready.</p>}
+      {artifact && <div className="page-revision-bar">{artifact.can_manage ? <label>Version<select aria-label="Page version" disabled={busy || !!editor} value={selected} onChange={e => setSelected(e.target.value)}>{artifact.revisions.map((r, index) => <option key={r.uuid} value={r.uuid}>Version {r.version ?? index + 1}{isPublished(r.uuid) ? ' · published' : ''}{r.uuid === artifact.latest_revision ? ' · latest' : ''}</option>)}</select></label> : <span>Shared version {version}</span>}<a className="page-text-button" href={contentUrl} target="_blank" rel="noreferrer"><ArrowUpRight size={14} />Open full page</a></div>}
+      {hasDraft && publishedVersion > 0 && !selectedIsPublished && <p className="page-revision-note">You’re previewing version {version}. The public link still shows version {publishedVersion}. Share → Publish updates when you’re ready.</p>}
       {!!revision?.warnings.length && <div className="page-revision-note"><strong>Some content was removed to keep this page safe.</strong>{revision.warnings.map(w => <p key={w}>{w}</p>)}</div>}
       <PagePreview key={contentUrl} src={contentUrl} title={title} />
       {artifact?.source && <nav aria-label="Page source" className="page-source">
@@ -139,12 +143,12 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
         {accessDirty && <p id="page-unsaved-access" role="status">You have unsaved workspace access changes. Save access or discard these changes before publishing.</p>}
         <div className="page-actions"><button className="page-button" disabled={busy || teamError || !accessDirty} onClick={() => void action(async () => { await api.shareArtifactTeam(uuid, team || null, team ? teamRevision : undefined); await reload(true); setNotice('Workspace access updated.') })}>Save access</button>{accessDirty && <button className="page-button" disabled={busy} onClick={discardAccessChanges}>Discard access changes</button>}<button className="page-button" disabled={busy} onClick={() => copy(`${window.location.origin}/pages/${uuid}`, 'Workspace link copied. The recipient still needs access.')}><Copy size={15} />Copy private link</button></div>
       </section>
-      <section className="page-share-section"><h3><Globe2 size={17} />Public link {publishedVersion > 0 && <PageBadge published>Version {publishedVersion} is live</PageBadge>}</h3>
+      <section className="page-share-section"><h3><Globe2 size={17} />Main public link {publishedVersion > 0 && <PageBadge published>Version {publishedVersion} is live</PageBadge>}</h3>
         <p>Before publishing, compare figures and source notes with the original documents. Saving a page does not verify its accuracy.</p>
-        <p>{publishedVersion ? `Anyone with this link can view version ${publishedVersion}. Later edits stay private until you publish them.` : `Publish version ${publicVersion} so anyone with its link can view it. Check the page for private information before publishing.`}</p>
-        {hasDraft && <p className="page-revision-note">Version {latestVersion} is newer than the published version.</p>}
+        <p>{publishedVersion ? `Anyone with this link can view version ${publishedVersion}. Saving edits does not change this link.` : `Publish version ${publicVersion} so anyone with its link can view it. Check the page for private information before publishing.`}</p>
+        {hasDraft && publishedVersion > 0 && <p className="page-revision-note">Version {latestVersion} is newer than the published version.</p>}
         <label>Version to publish<select aria-label="Version to publish" value={publicRevision} disabled={busy || !!editor || !artifact.public_sharing_enabled} onChange={e => setPublicRevision(e.target.value)}>{artifact.revisions.map((r, index) => <option key={r.uuid} value={r.uuid}>Version {r.version ?? index + 1}{r.uuid === artifact.published_revision ? ' · public now' : ''}{r.uuid === artifact.latest_revision ? ' · latest saved' : ''}</option>)}</select></label>
-        <p>Choosing a version does not change the public link until you publish it. Team access stays unchanged.</p>
+        <p>Publishing updates changes what everyone sees at the main public link. To keep a version available at its own fixed link, choose Publish as separate link below. Team access stays unchanged.</p>
         <a className="page-text-button" href={api.artifactContentUrl(uuid, publicRevision)} target="_blank" rel="noreferrer"><ArrowUpRight size={14} />Preview version {publicVersion}</a>
         {publicLink && <div className="page-share-link"><label>Published page link<input aria-label="Published page link" readOnly value={publicLink} onFocus={e => e.target.select()} /></label><button className="page-icon-button" aria-label="Copy public link" disabled={busy} onClick={() => copy(publicLink, 'Public link copied.')}><Copy size={17} /></button></div>}
         <div className="page-actions"><button className="page-button page-button-primary" disabled={busy || !!editor || !artifact.public_sharing_enabled || publicSelectionIsPublished || accessDirty} aria-describedby={accessDirty ? 'page-unsaved-access' : undefined} onClick={() => void action(async () => { await api.publishArtifact(uuid, publicRevision); await reload(); setNotice(`Version ${publicVersion} published. Anyone with the link can view it.`) })}>{publicSelectionIsPublished ? <><Check size={16} />Published</> : publishedVersion ? `Publish updates · version ${publicVersion}` : `Publish version ${publicVersion}`}</button>{publicLink && <a className="page-button" href={`/a/${artifact.public_token}`} target="_blank" rel="noreferrer"><ArrowUpRight size={16} />Open published page</a>}</div>
@@ -152,10 +156,23 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
         {editor && <p>Save or cancel your HTML edits before publishing.</p>}
         {publicLink && <button className="page-text-button mt-3" disabled={busy} onClick={() => void action(async () => { await api.unpublishArtifact(uuid); await reload(); setNotice('Public link removed. Downloaded copies cannot be recalled.') })}><Link2 size={14} />Remove public link</button>}
       </section>
+      <PageVersionLinks artifact={artifact} revision={publicRevision} busy={busy}
+        publishDisabled={!!editor || !artifact.public_sharing_enabled || accessDirty}
+        onPublish={() => void action(async () => {
+          await api.publishArtifactVersion(uuid, publicRevision)
+          await reload()
+          setNotice(`Version ${publicVersion} has its own public link. Other public links are unchanged.`)
+        })}
+        onRemove={revision => void action(async () => {
+          await api.unpublishArtifactVersion(uuid, revision)
+          await reload()
+          setNotice(`Version ${versionNumber(revision)} link removed. Other public links are unchanged. Downloaded copies cannot be recalled.`)
+        })}
+        onCopy={url => copy(url, 'Version link copied.')} />
     </PageDialog>}
     {requestChanges && uuid && artifact?.can_manage && <PageDialog title="Request changes" onClose={() => setRequestChanges(false)}>
       <p>Describe what you’d like to change in <strong>{title}</strong>. You’ll review the message in chat before sending it.</p>{feedback}<label className="block text-sm font-medium">What would you like to change?<textarea className="mt-2 min-h-36 w-full rounded-lg border border-slate-300 p-3 text-sm" value={changes} maxLength={8000} onChange={e => setChanges(e.target.value)} placeholder="Make the funding summary easier to scan, add a next-steps section…" autoFocus /></label><div className="page-actions"><button className="page-button page-button-primary" disabled={!changes.trim()} onClick={() => { try { sessionStorage.setItem(`pages:edit-request:${uuid}`, changes.trim()); window.location.assign(chatUrl) } catch { setError('Could not open chat. Copy your request and return to the originating chat.') } }}><MessageSquare size={16} />Continue in chat</button><button className="page-button" onClick={() => setRequestChanges(false)}>Cancel</button></div>
     </PageDialog>}
-    {confirmDelete && uuid && artifact?.can_manage && <PageDialog title="Delete this page?" busy={busy} onClose={() => setConfirmDelete(false)}><p>This deletes every saved version of <strong>{title}</strong> and removes its public link. This cannot be undone.</p>{feedback}<div className="page-actions"><button className="page-button" disabled={busy} autoFocus onClick={() => setConfirmDelete(false)}>Keep page</button><button className="page-button page-button-danger" disabled={busy} onClick={() => void action(async () => { await api.deleteArtifact(uuid); window.location.assign(backUrl) })}>Delete permanently</button></div></PageDialog>}
+    {confirmDelete && uuid && artifact?.can_manage && <PageDialog title="Delete this page?" busy={busy} onClose={() => setConfirmDelete(false)}><p>This deletes every saved version of <strong>{title}</strong> and removes all its public links. This cannot be undone.</p>{feedback}<div className="page-actions"><button className="page-button" disabled={busy} autoFocus onClick={() => setConfirmDelete(false)}>Keep page</button><button className="page-button page-button-danger" disabled={busy} onClick={() => void action(async () => { await api.deleteArtifact(uuid); window.location.assign(backUrl) })}>Delete permanently</button></div></PageDialog>}
   </div></main>
 }

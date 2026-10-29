@@ -20,6 +20,7 @@ class ReviseArtifactRequest(BaseModel):
 
 class PublishArtifactRequest(BaseModel):
     revision: str = Field(min_length=1, max_length=64)
+    separate_link: bool = False
 
 
 class ShareArtifactRequest(BaseModel):

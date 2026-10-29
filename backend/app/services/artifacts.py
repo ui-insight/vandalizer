@@ -98,7 +98,7 @@ def create(db, user_id, title, html, request_id, source=None):
     doc = db.html_artifacts.find_one_and_update({"uuid": uid}, {"$setOnInsert": {
         "uuid": uid, "user_id": user_id, "team_id": None, "team_revision": None, "revisions": [revision],
         "title": title, "source": source or {"kind": "editor"}, "project_uuid": (source or {}).get("project_uuid"),
-        "latest_revision": revision["uuid"], "published_revision": None, "public_token": None,
+        "latest_revision": revision["uuid"], "published_revision": None, "public_token": None, "publications": [],
         "created_at": now, "updated_at": now, "deleted_at": None,
     }}, upsert=True, return_document=ReturnDocument.AFTER)
     if doc.get("deleted_at"):
@@ -216,7 +216,29 @@ def metadata(doc, owner=False):
     result["source"] = source if owner else {"kind": source.get("kind", "editor")}
     if owner:
         result["public_token"] = doc.get("public_token")
+        result["publications"] = doc.get("publications", [])
     return result
+
+
+def publish_separate(db, doc, selected):
+    """One revocable, immutable public link per explicitly published revision."""
+    revision(doc, selected)
+    saved = db.html_artifacts.find_one_and_update({
+        "uuid": doc["uuid"], "user_id": doc["user_id"], "deleted_at": None,
+        "publications.revision": {"$ne": selected},
+    }, {"$push": {"publications": {
+        "revision": selected, "token": secrets.token_urlsafe(32),
+        "published_at": datetime.now(timezone.utc),
+    }}}, return_document=ReturnDocument.AFTER)
+    # Concurrent/retried publication reuses the winning link. Never append a
+    # second token for the same version or overwrite another version's link.
+    return saved if saved is not None else get(db, doc["uuid"])
+
+
+def unpublish_separate(db, doc, selected):
+    revision(doc, selected)
+    db.html_artifacts.update_one({"uuid": doc["uuid"], "user_id": doc["user_id"], "deleted_at": None},
+        {"$pull": {"publications": {"revision": selected}}})
 
 
 def publish(db, doc, selected):

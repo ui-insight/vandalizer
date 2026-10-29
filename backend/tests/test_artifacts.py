@@ -18,15 +18,26 @@ class Collection:
     def __init__(self):
         self.docs = []
 
+    def values(self, doc, path):
+        if isinstance(doc, list):
+            return [value for item in doc for value in self.values(item, path)]
+        if not isinstance(doc, dict):
+            return [None]
+        key, _, rest = path.partition(".")
+        return self.values(doc.get(key), rest) if rest else [doc.get(key)]
+
     def matches(self, doc, query):
         for key, value in query.items():
             if key == "$or":
                 if not any(self.matches(doc, q) for q in value):
                     return False
             elif isinstance(value, dict) and "$in" in value:
-                if doc.get(key) not in value["$in"]:
+                if not any(v in value["$in"] for v in self.values(doc, key)):
                     return False
-            elif doc.get(key) != value:
+            elif isinstance(value, dict) and "$ne" in value:
+                if value["$ne"] in self.values(doc, key):
+                    return False
+            elif value not in self.values(doc, key):
                 return False
         return True
 
@@ -47,7 +58,7 @@ class Collection:
             if value not in doc.setdefault(key, []):
                 doc[key].append(value)
         for key, value in update.get("$pull", {}).items():
-            doc[key] = [v for v in doc.get(key, []) if v != value]
+            doc[key] = [v for v in doc.get(key, []) if not (self.matches(v, value) if isinstance(value, dict) else v == value)]
         return deepcopy(doc)
 
     def update_one(self, query, update):

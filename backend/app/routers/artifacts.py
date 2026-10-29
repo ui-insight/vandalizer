@@ -132,10 +132,16 @@ async def workflow_artifact(request: Request, session_id: str, step: str | None 
 async def public_doc(token, settings):
     if not settings.artifact_public_sharing_enabled:
         raise HTTPException(404, "Page not found")
-    doc = await run(lambda db: db.html_artifacts.find_one({"public_token": token, "deleted_at": None}))
-    if not doc or not doc.get("published_revision"):
+    doc = await run(lambda db: db.html_artifacts.find_one({
+        "$or": [{"public_token": token}, {"publications.token": token}], "deleted_at": None,
+    }))
+    if not doc:
         raise HTTPException(404, "Page not found")
-    return doc, artifacts.revision(doc, doc["published_revision"])
+    selected = doc.get("published_revision") if doc.get("public_token") == token else next(
+        (p["revision"] for p in doc.get("publications", []) if p["token"] == token), None)
+    if not selected:
+        raise HTTPException(404, "Page not found")
+    return doc, artifacts.revision(doc, selected)
 
 
 @router.get("/public/{token}")
@@ -200,16 +206,19 @@ async def publish(uuid: str, body: PublishArtifactRequest, user: User = Depends(
     if not settings.artifact_public_sharing_enabled:
         raise HTTPException(403, "Public page sharing is disabled on this deployment.")
     doc = await authorized(uuid, user, manage=True)
-    saved = await run(artifacts.publish, doc, body.revision)
+    saved = await run(artifacts.publish_separate if body.separate_link else artifacts.publish, doc, body.revision)
     if not saved:
         raise HTTPException(404, "Page not found")
     return artifacts.metadata(saved, True)
 
 
 @router.delete("/{uuid}/publication")
-async def unpublish(uuid: str, user: User = Depends(get_current_user)):
+async def unpublish(uuid: str, revision: str | None = Query(default=None, min_length=1, max_length=64), user: User = Depends(get_current_user)):
     doc = await authorized(uuid, user, manage=True)
-    await run(artifacts.unpublish, doc)
+    if revision is not None:
+        await run(artifacts.unpublish_separate, doc, revision)
+    else:
+        await run(artifacts.unpublish, doc)
     return {"ok": True}
 
 
@@ -218,6 +227,6 @@ async def delete_artifact(uuid: str, user: User = Depends(get_current_user)):
     from datetime import datetime, timezone
     await authorized(uuid, user, manage=True)
     await run(lambda db: db.html_artifacts.update_one({"uuid": uuid, "user_id": user.user_id}, {"$set": {
-        "deleted_at": datetime.now(timezone.utc), "public_token": None, "published_revision": None, "revisions": [],
+        "deleted_at": datetime.now(timezone.utc), "public_token": None, "published_revision": None, "publications": [], "revisions": [],
     }}))
     return {"ok": True}

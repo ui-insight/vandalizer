@@ -84,3 +84,12 @@ it.each([
   expect(await screen.findByText(label)).toBeInTheDocument()
   if (kind !== 'editor') expect(screen.queryByText('Created in Pages')).not.toBeInTheDocument()
 })
+
+it('marks a page as published when it has only separate version links', async () => {
+  const data = result()
+  data.items[0].publications = [{ revision: 'r1', token: 'version-link', published_at: '2026-10-29T00:00:00Z' }]
+  vi.mocked(browseArtifacts).mockResolvedValue(data)
+  render(<PagesBrowser />)
+  expect(await screen.findByText('Published')).toBeInTheDocument()
+  expect(screen.queryByText('Private')).not.toBeInTheDocument()
+})

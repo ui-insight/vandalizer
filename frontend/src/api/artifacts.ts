@@ -10,6 +10,7 @@ export interface Artifact {
   latest_revision: string
   published_revision: string | null
   public_token?: string | null
+  publications?: { revision: string; token: string; published_at: string }[]
   team_id: string | null
   team_revision?: string | null
   can_manage: boolean
@@ -36,5 +37,7 @@ export const artifactSource = (id: string, revision: string) => apiFetch<{ title
 export const reviseArtifact = (id: string, title: string, html: string, baseRevision: string) => apiFetch<Artifact>(`${path(id)}/revisions`, { method: 'POST', body: JSON.stringify({ title, html, base_revision: baseRevision }) })
 export const publishArtifact = (id: string, revision: string) => apiFetch<Artifact>(`${path(id)}/publication`, { method: 'PUT', body: JSON.stringify({ revision }) })
 export const unpublishArtifact = (id: string) => apiFetch(`${path(id)}/publication`, { method: 'DELETE' })
+export const publishArtifactVersion = (id: string, revision: string) => apiFetch<Artifact>(`${path(id)}/publication`, { method: 'PUT', body: JSON.stringify({ revision, separate_link: true }) })
+export const unpublishArtifactVersion = (id: string, revision: string) => apiFetch(`${path(id)}/publication?revision=${encodeURIComponent(revision)}`, { method: 'DELETE' })
 export const shareArtifactTeam = (id: string, teamId: string | null, revision?: string) => apiFetch(`${path(id)}/team`, { method: 'PUT', body: JSON.stringify({ team_id: teamId, revision }) })
 export const deleteArtifact = (id: string) => apiFetch(path(id), { method: 'DELETE' })

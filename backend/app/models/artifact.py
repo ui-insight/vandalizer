@@ -19,10 +19,11 @@ class Artifact(Document):
     revisions: list[dict] = Field(default_factory=list)
     published_revision: Optional[str] = None
     public_token: Optional[str] = None
+    publications: list[dict] = Field(default_factory=list)
     deleted_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     class Settings:
         name = "html_artifacts"
-        indexes = [IndexModel("uuid", unique=True), "user_id", "team_id", "public_token", "project_uuid", "updated_at"]
+        indexes = [IndexModel("uuid", unique=True), "user_id", "team_id", "public_token", "publications.token", "project_uuid", "updated_at"]
