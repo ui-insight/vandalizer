@@ -66,8 +66,8 @@ async def browse_artifacts(
     return await run(query)
 
 
-async def run(fn, *args):
-    return await anyio.to_thread.run_sync(functools.partial(fn, get_sync_db(), *args))
+async def run(fn, *args, **kwargs):
+    return await anyio.to_thread.run_sync(functools.partial(fn, get_sync_db(), *args, **kwargs))
 
 
 async def authorized(uuid, user, manage=False):
@@ -130,7 +130,7 @@ async def workflow_artifact(request: Request, session_id: str, step: str | None 
     result = await _get_authorized_workflow_result(session_id, user)
     if not result:
         raise HTTPException(404, "Workflow run not found")
-    return artifacts.metadata(await run(artifacts.from_workflow, result.model_dump(), user.user_id, step), True)
+    return artifacts.metadata(await run(artifacts.from_workflow, result.model_dump(), user.user_id, step, recreate_deleted=True), True)
 
 
 async def public_doc(token, settings):

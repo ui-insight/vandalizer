@@ -282,16 +282,26 @@ def workflow_html(output, title):
     return render_report_markdown(content)
 
 
-def from_workflow(db, result, user_id, step=None):
+def from_workflow(db, result, user_id, step=None, *, recreate_deleted=False):
     if result.get("status") != "completed":
         raise HTTPException(409, "Finish the workflow before creating its page.")
     session_id = result["session_id"]
     request_id = f"workflow:{session_id}:{step or 'final'}"
-    uid = hashlib.sha256(f"{user_id}\0{request_id}".encode()).hexdigest()[:32]
-    existing = db.html_artifacts.find_one({"uuid": uid, "user_id": user_id})
-    if existing:
+    base_request_id = request_id
+    replacing_deleted = False
+    while True:
+        uid = hashlib.sha256(f"{user_id}\0{request_id}".encode()).hexdigest()[:32]
+        existing = db.html_artifacts.find_one({"uuid": uid, "user_id": user_id})
+        if existing is None:
+            if replacing_deleted and not recreate_deleted:
+                raise HTTPException(410, "This page was deleted. Use Save as page on the completed run to create a new page.")
+            break
         if existing.get("deleted_at"):
-            raise HTTPException(410, "This page was deleted. Start a new page.")
+            # A deterministic successor keeps repeated/concurrent saves on one
+            # new Page, without reviving the deleted Page or its shared links.
+            request_id = f"{base_request_id}:after:{existing['uuid']}"
+            replacing_deleted = True
+            continue
         # Retries reuse immutable saved content, even after a renderer update
         # or a source rename. Never replace an edited or published page.
         return existing
