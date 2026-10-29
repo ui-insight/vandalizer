@@ -1,7 +1,7 @@
 import datetime
-from typing import Optional
+from typing import Optional, Self
 
-from pydantic import Field, PrivateAttr, model_validator
+from pydantic import Field, ModelWrapValidatorHandler, PrivateAttr, model_validator
 from beanie import Document
 from pymongo import IndexModel
 
@@ -111,7 +111,7 @@ class SmartDocument(Document):
 
     @model_validator(mode='wrap')
     @classmethod
-    def remember_restart_revision(cls, value, handler):
+    def remember_restart_revision(cls, value: object, handler: ModelWrapValidatorHandler[Self]) -> Self:
         document = handler(value)
         if isinstance(value, dict):
             revision = value.get('_extraction_restart_revision', 0)

@@ -8,7 +8,7 @@ from typing import Optional
 from beanie import Document
 
 
-DEFAULT_QUALITY_CONFIG = {
+DEFAULT_QUALITY_CONFIG: dict = {
     "verification_gates": {
         "require_validation": False,
         "min_extraction_accuracy": 0.7,
@@ -134,7 +134,7 @@ def _deep_merge(base: dict, override: dict) -> dict:
     return base
 
 
-def _apply_legacy_strategy(config: dict, strategy: str):
+def _apply_legacy_strategy(config: dict, strategy: str) -> None:
     """Map old extraction_strategy string to new config structure."""
     if strategy == "two_pass":
         config["mode"] = "two_pass"

@@ -99,7 +99,7 @@ class ChatMessage(Document):
         name = "chat_message"
 
     def to_dict(self) -> dict:
-        d = {"role": self.role.value, "content": self.message}
+        d: dict[str, object] = {"role": self.role.value, "content": self.message}
         if self.active_skill:
             d["active_skill"] = self.active_skill.model_dump()
         if self.thinking:
@@ -389,6 +389,8 @@ class ChatConversation(Document):
             source_documents=_cap_source_documents(source_documents),
         )
         await msg.insert()
+        if msg.id is None:
+            raise RuntimeError("Inserted chat message has no database ID")
         self.messages.append(msg.id)
         self.updated_at = datetime.datetime.now()
         await self.save()
@@ -397,7 +399,7 @@ class ChatConversation(Document):
     async def get_messages(self) -> list[dict]:
         msgs = await ChatMessage.find({"_id": {"$in": self.messages}}).to_list()
         order = {mid: i for i, mid in enumerate(self.messages)}
-        msgs.sort(key=lambda m: order.get(m.id, 0))
+        msgs.sort(key=lambda m: order.get(m.id, 0) if m.id is not None else 0)
         return [m.to_dict() for m in msgs]
 
     def _cleared_tool_call_ids(
@@ -448,7 +450,7 @@ class ChatConversation(Document):
     ) -> list[ModelMessage]:
         msgs = await ChatMessage.find({"_id": {"$in": self.messages}}).to_list()
         order = {mid: i for i, mid in enumerate(self.messages)}
-        msgs.sort(key=lambda m: order.get(m.id, 0))
+        msgs.sort(key=lambda m: order.get(m.id, 0) if m.id is not None else 0)
 
         result: list[ModelMessage] = []
 

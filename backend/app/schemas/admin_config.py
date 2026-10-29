@@ -8,12 +8,13 @@ import math
 from app.models.system_config import DEFAULT_QUALITY_CONFIG
 
 
-def _number(value, label: str, minimum: float, maximum: float, *, integer=False):
+def _number(value: object, label: str, minimum: float, maximum: float, *, integer: bool = False) -> float:
     if (isinstance(value, bool) or not isinstance(value, (int, float))
             or not minimum <= value <= maximum or not math.isfinite(value)
             or (integer and int(value) != value)):
         kind = "a whole number" if integer else "a number"
         raise ValueError(f"{label} must be {kind} between {minimum} and {maximum}")
+    return float(value)
 
 
 def validate_quality_config(value: dict | None) -> dict | None:
@@ -34,8 +35,7 @@ def validate_quality_config(value: dict | None) -> dict | None:
         if not isinstance(tier, dict):
             raise ValueError(f"{key} tier must be an object")
         score = tier.get("min_score", DEFAULT_QUALITY_CONFIG["quality_tiers"][key]["min_score"])
-        _number(score, f"{key} threshold", 0, 100)
-        scores.append(score)
+        scores.append(_number(score, f"{key} threshold", 0, 100))
     if not scores[0] > scores[1] > scores[2]:
         raise ValueError("Thresholds must decrease: Excellent > Good > Fair")
     return value

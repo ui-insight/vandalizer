@@ -4,7 +4,10 @@ import ipaddress
 import logging
 import re
 import socket
+from collections.abc import Callable
 from urllib.parse import urlparse
+
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -189,7 +192,10 @@ def validate_outbound_url(url: str, allowed_hosts: frozenset[str] | None = None)
     return url
 
 
-async def safe_get(client, url: str, *, max_redirects: int = 5, validate=None):
+async def safe_get(
+    client: httpx.AsyncClient, url: str, *, max_redirects: int = 5,
+    validate: Callable[[str], str] | None = None,
+) -> httpx.Response:
     """GET *url*, re-validating every redirect hop against the SSRF policy.
 
     ``httpx``'s built-in ``follow_redirects`` validates nothing, so a public

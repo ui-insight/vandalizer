@@ -42,7 +42,7 @@ class RegressionSuiteRun(Document):
     class Settings:
         name = "regression_suite_runs"
 
-    def __init__(self, **data):
+    def __init__(self, **data: object) -> None:
         super().__init__(**data)
         if not self.uuid:
             self.uuid = uuid4().hex

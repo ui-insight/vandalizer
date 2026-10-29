@@ -1,3 +1,5 @@
+from typing import Self
+
 from pydantic import BaseModel, Field, model_validator
 
 
@@ -7,7 +9,7 @@ class TemplateSource(BaseModel):
     preview_id: str | None = Field(default=None, max_length=64)
 
     @model_validator(mode='after')
-    def one_source(self):
+    def one_source(self) -> Self:
         if bool(self.artifact_uuid) == bool(self.preview_id) or (self.artifact_uuid and not self.revision):
             raise ValueError('Choose one saved Page version or chat preview.')
         return self

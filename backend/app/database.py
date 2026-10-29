@@ -1,7 +1,7 @@
 import logging
 
-from beanie import init_beanie
-from motor.motor_asyncio import AsyncIOMotorClient
+from beanie import Document, init_beanie
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
 from app.config import Settings
 from app.models.user import User
@@ -70,7 +70,7 @@ from app.models.project import Project, ProjectMembership, ProjectPin, ProjectJo
 from app.models.telemetry import TelemetryHeartbeat
 from app.models.web_search_usage import WebSearchUsage
 
-ALL_MODELS = [
+ALL_MODELS: list[type[Document]] = [
     Obligation,
     User,
     Artifact,
@@ -209,7 +209,7 @@ def get_client() -> AsyncIOMotorClient:
     return _client
 
 
-async def _run_pre_index_migrations(db) -> None:
+async def _run_pre_index_migrations(db: AsyncIOMotorDatabase) -> None:
     """Data fixes that must land before Beanie builds indexes.
 
     A unique index declared in a model's ``Settings.indexes`` is built by
@@ -293,7 +293,7 @@ async def init_db(
         _indexes_ensured = True
 
 
-def _rebind_models(db) -> bool:
+def _rebind_models(db: AsyncIOMotorDatabase) -> bool:
     """Point every already-initialized model at ``db``; False to fall back.
 
     This is the part of ``init_beanie`` that depends on the client
@@ -304,15 +304,17 @@ def _rebind_models(db) -> bool:
     back to the full ``init_beanie``.
     """
     try:
+        collections: list[tuple[type[Document], str]] = []
         for model in ALL_MODELS:
             model_settings = model.get_settings()
             if model_settings.timeseries is not None or model_settings.union_doc is not None:
                 return False
             if not model_settings.name:
                 return False
-        for model in ALL_MODELS:
+            collections.append((model, model_settings.name))
+        for model, collection_name in collections:
             model.set_database(db)
-            model.set_collection(db[model.get_settings().name])
+            model.set_collection(db[collection_name])
     except Exception:
         logger.warning("Rebinding Beanie models failed; running init_beanie", exc_info=True)
         return False
