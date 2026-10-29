@@ -45,7 +45,8 @@ def _repair(changed="1", answer=FIXED):
 
 def _asker(replies, delays=None):
     """An ask that answers each checker by model name and the repair by
-    "repair": a reply string, or an exception to raise. Records each call."""
+    "repair": a reply string, an exception to raise, or a list of them given
+    in turn (the last one repeats). Records each call."""
     calls = []
 
     async def ask(model, instructions, prompt, max_tokens):
@@ -53,6 +54,8 @@ def _asker(replies, delays=None):
         calls.append({"role": role, "model": model, "prompt": prompt})
         await asyncio.sleep((delays or {}).get(role, 0))
         reply = replies[role]
+        if isinstance(reply, list):
+            reply = reply.pop(0) if len(reply) > 1 else reply[0]
         if isinstance(reply, BaseException):
             raise reply
         return reply
@@ -158,6 +161,14 @@ def test_an_unreadable_checker_reply_raises(reply):
         R.parse_check(reply)
 
 
+def test_a_checker_reply_with_a_raw_newline_or_tab_inside_a_string_is_read():
+    # qwen's most common unreadable reply in the A/B: "Invalid control character".
+    reply = '{"sentences": [{"n": 1, "label": "contradicted", "passage": "P2", "why": "it says\n\t\'should\'"}]}'
+    with pytest.raises(json.JSONDecodeError):
+        json.loads(reply)
+    assert R.parse_check(reply) == [{"n": 1, "label": "contradicted", "passage": 2, "why": "it says\n\t'should'"}]
+
+
 def test_a_repair_reply_gives_the_answer_and_the_sentences_it_changed_and_kept():
     answer, changed, kept = R.parse_repair(f"CHANGED: 1, 3\nKEPT: 2\nANSWER:\n{FIXED}\n", PASSAGES)
     assert (answer, changed, kept) == (FIXED, [1, 3], [2])
@@ -241,6 +252,38 @@ async def test_a_failed_or_unreadable_first_check_keeps_the_answer(first, outcom
     answer, rec = await R.check_and_repair(ANSWER, "q", PASSAGES, CONFIG, ask)
     assert answer == ANSWER and rec["outcome"] == outcome and rec["checks"][0]["error"]
     assert rec["checks"][1] == {"model": "kimi", "cancelled": True}
+
+
+async def test_an_unreadable_check_is_asked_for_once_more_and_then_counts():
+    ask = _asker({"qwen": ['{"sentences": [{"n": 1,', _labels(1)], "kimi": _labels(1), "repair": _repair()})
+    answer, rec = await R.check_and_repair(ANSWER, "q", PASSAGES, CONFIG, ask)
+    assert answer == FIXED and rec["outcome"] == "repaired"
+    assert [c["role"] for c in ask.calls].count("qwen") == 2
+    assert rec["checks"][0]["flagged"] == [1] and rec["checks"][0]["retried"].startswith("JSONDecodeError")
+    assert "error" not in rec["checks"][0] and "retried" not in rec["checks"][1]
+
+
+async def test_a_second_unreadable_reply_keeps_the_answer():
+    ask = _asker({"qwen": "I could not read the passages.", "kimi": _labels(1)})
+    answer, rec = await R.check_and_repair(ANSWER, "q", PASSAGES, CONFIG, ask)
+    assert answer == ANSWER and rec["outcome"] == "check_failed"
+    assert [c["role"] for c in ask.calls].count("qwen") == 2
+    assert rec["checks"][0]["retried"] and rec["checks"][0]["error"]
+
+
+async def test_the_retry_runs_inside_the_checks_cap(monkeypatch):
+    monkeypatch.setattr(R, "CHECK_SECONDS", 0.3)
+    ask = _asker({"qwen": ["not json", _labels(1)], "kimi": _labels(1)}, delays={"qwen": 0.2})
+    answer, rec = await R.check_and_repair(ANSWER, "q", PASSAGES, CONFIG, ask)
+    assert answer == ANSWER and rec["outcome"] == "check_failed"
+    assert rec["checks"][0]["error"] == "timed_out" and rec["checks"][0]["seconds"] < 0.5
+
+
+async def test_a_failed_call_is_not_asked_for_again():
+    ask = _asker({"qwen": RuntimeError("503 from the endpoint"), "kimi": _labels(1)})
+    _, rec = await R.check_and_repair(ANSWER, "q", PASSAGES, CONFIG, ask)
+    assert rec["outcome"] == "check_failed" and "retried" not in rec["checks"][0]
+    assert [c["role"] for c in ask.calls].count("qwen") == 1
 
 
 async def test_a_failed_second_check_keeps_the_answer():

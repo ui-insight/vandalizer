@@ -20,7 +20,8 @@ default):
    answers. When the fast checker flags nothing, the slow one is not
    waited for.
 3. A repair that changes nothing, a late or failed call, or a reply that
-   cannot be read keeps the answer as it was.
+   cannot be read keeps the answer as it was. A checker's unreadable reply
+   is asked for once more first, within the same cap.
 
 A checker or repairer named here but not configured in System Config is
 called on the answering model's endpoint, with its key, as the study called
@@ -253,7 +254,10 @@ _THINK_RE = re.compile(r"<think>.*?</think>", re.S)
 
 
 def parse_json(text: str):
-    """The first JSON value in a reply, past any think block or code fence."""
+    """The first JSON value in a reply, past any think block or code fence.
+    Control characters inside a string (a raw newline in a ``why``) are read
+    as they are: strict parsing failed 2.0% of qwen's checks in the A/B of
+    2026-10-28."""
     t = _THINK_RE.sub("", text or "").strip()
     m = re.search(r"```(?:json)?\s*(.*?)```", t, re.S)
     if m:
@@ -261,7 +265,7 @@ def parse_json(text: str):
     start = min([i for i in (t.find("{"), t.find("[")) if i >= 0], default=-1)
     if start < 0:
         raise ValueError("no JSON in reply")
-    obj, _ = json.JSONDecoder().raw_decode(t[start:])
+    obj, _ = json.JSONDecoder(strict=False).raw_decode(t[start:])
     return obj
 
 
@@ -355,8 +359,19 @@ Ask = Callable[[str, str, str, int], Awaitable[str]]
 async def _check(ask: Ask, model: str, prompt: str, n_sentences: int, timeout: float) -> dict:
     started = time.monotonic()
     rec: dict = {"model": model}
+
+    async def read() -> list[dict]:
+        # A reply that cannot be read is asked for once more, inside the same
+        # cap, as the study's probe did; ``retried`` keeps why.
+        reply = await ask(model, CHECK_INSTRUCTIONS, prompt, CHECK_MAX_TOKENS)
+        try:
+            return parse_check(reply)
+        except ValueError as e:
+            rec["retried"] = f"{type(e).__name__}: {e}"[:300]
+        return parse_check(await ask(model, CHECK_INSTRUCTIONS, prompt, CHECK_MAX_TOKENS))
+
     try:
-        labels = parse_check(await asyncio.wait_for(ask(model, CHECK_INSTRUCTIONS, prompt, CHECK_MAX_TOKENS), timeout))
+        labels = await asyncio.wait_for(read(), timeout)
         rec.update(labels=labels, flagged=[s["n"] for s in contradicted(labels, n_sentences)])
     except asyncio.TimeoutError:
         rec["error"] = "timed_out"
