@@ -13,7 +13,8 @@ from tests.test_page_interactions import DASHBOARD
 
 
 @pytest.mark.skipif(os.environ.get('PAGE_INTERACTION_BROWSER_TESTS') != '1', reason='Requires local Playwright Chromium')
-def test_clickable_controls_in_preview_saved_and_public_pages(db):
+@pytest.mark.parametrize('parent_csp', [None, "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'"])
+def test_clickable_controls_in_preview_saved_and_public_pages(db, parent_csp):
     from playwright.sync_api import sync_playwright, expect
 
     preview = chat_page_previews.prepare(db, 'owner', 'chat', 'Budget', DASHBOARD, None, None, {'kind': 'chat'})
@@ -45,7 +46,7 @@ def test_clickable_controls_in_preview_saved_and_public_pages(db):
                     body=rendered.body.decode().replace('</body>', '<script>window.untrustedRan = true;</script></body>'),
                     headers=dict(rendered.headers)))
                 frame = f'<iframe title="Page preview" sandbox="{PAGE_LINK_SANDBOX}" src="{content_url}" style="width:900px;height:600px"></iframe>'
-            page.route(f'http://pages.test/{view}', lambda route, request, frame=frame: route.fulfill(body=frame, content_type='text/html'))
+            page.route(f'http://pages.test/{view}', lambda route, request, frame=frame: route.fulfill(body=frame, content_type='text/html', headers={'Content-Security-Policy': parent_csp} if parent_csp else {}))
             page.goto(f'http://pages.test/{view}')
             content = page.frame_locator('iframe')
             expect(content.get_by_role('heading', name='Budget dashboard')).to_be_visible()
