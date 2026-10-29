@@ -51,6 +51,7 @@ from app.services.context_budget import (
 )
 from app.services.citation_grounding import ground_citation, normalize_citation_markup
 from app.services.approval_claims import unprepared_card_note
+from app.services.chat_output import public_chat_text
 from app.services.kb_answer_grounding import (
     expand_snippet_refs,
     tool_output_as_source,
@@ -2495,10 +2496,8 @@ async def chat_stream(
 
     # Stream the response
     full_response: list[str] = []
-    full_thinking: list[str] = []
     thinking_started_at: float | None = None
     thinking_duration: float | None = None
-    thinking_done_emitted = False
     streamed_tool_calls: list[dict] = []
     streamed_tool_results: list[dict] = []
     streamed_segments: list[dict] = []
@@ -2538,7 +2537,6 @@ async def chat_stream(
         # A Stop that arrived after the previous turn already finished must
         # not label this one.
         await _consume_stop_request(conversation)
-        think_parser = _ThinkTagParser()
 
         iter_kwargs: dict = {
             "message_history": previous_messages,
@@ -2604,54 +2602,20 @@ async def chat_stream(
                                 continue
 
                             if is_api_thinking:
-                                # Native API-level thinking (e.g. Claude extended thinking)
-                                full_thinking.append(content)
+                                # Retain timing, never publish or persist raw reasoning.
                                 if thinking_started_at is None:
                                     thinking_started_at = time.monotonic()
-                                yield json.dumps({"kind": "thinking", "content": content}) + "\n"
-                            else:
-                                # Text — parse for embedded <think> tags
-                                for kind, text in think_parser.feed(content):
-                                    if kind == "thinking":
-                                        full_thinking.append(text)
-                                        if thinking_started_at is None:
-                                            thinking_started_at = time.monotonic()
-                                        yield json.dumps({"kind": "thinking", "content": text}) + "\n"
-                                    else:
-                                        if thinking_started_at and not thinking_done_emitted:
-                                            thinking_duration = round(
-                                                time.monotonic() - thinking_started_at, 1
-                                            )
-                                            thinking_done_emitted = True
-                                            yield json.dumps({
-                                                "kind": "thinking_done",
-                                                "content": "",
-                                                "duration": thinking_duration,
-                                            }) + "\n"
-                                        full_response.append(text)
-                                        # Build segment — merge consecutive text
-                                        if streamed_segments and streamed_segments[-1].get("kind") == "text":
-                                            streamed_segments[-1]["content"] += text
-                                        else:
-                                            streamed_segments.append({"kind": "text", "content": text})
-                                        yield json.dumps({"kind": "text", "content": text}) + "\n"
+                            elif thinking_started_at is not None:
+                                thinking_duration = round(time.monotonic() - thinking_started_at, 1)
+                                thinking_started_at = None
+                            # Text is not public yet. It can precede a tool call,
+                            # contain untagged deliberation, or fail an output
+                            # validator. Publish only the accepted final answer
+                            # below; tool activity continues streaming meanwhile.
 
                     # Check before advancing to the tool node: even parseable
                     # JSON can contain incomplete HTML at the output cap.
                     _check_response_size(stream.response)
-
-                    # Flush any remaining buffered content from the parser
-                    for kind, text in think_parser.flush():
-                        if kind == "thinking":
-                            full_thinking.append(text)
-                            yield json.dumps({"kind": "thinking", "content": text}) + "\n"
-                        else:
-                            full_response.append(text)
-                            if streamed_segments and streamed_segments[-1].get("kind") == "text":
-                                streamed_segments[-1]["content"] += text
-                            else:
-                                streamed_segments.append({"kind": "text", "content": text})
-                            yield json.dumps({"kind": "text", "content": text}) + "\n"
 
                 elif Agent.is_call_tools_node(node):
                     # Stream tool call / result events to the frontend
@@ -2727,6 +2691,18 @@ async def chat_stream(
 
             if agent_run.result:
                 usage = agent_run.result.usage()
+                answer = public_chat_text(agent_run.result.output)
+                if not answer:
+                    # Never infer success from approval or repeat an action just
+                    # because its prose was withheld. Receipts remain visible.
+                    answer = (
+                        "Please review the action results above. I couldn't produce a summary."
+                        if streamed_tool_results else
+                        "I couldn't produce a reply. Please try again."
+                    )
+                full_response.append(answer)
+                streamed_segments.append({"kind": "text", "content": answer})
+                yield json.dumps({"kind": "text", "content": answer}) + "\n"
                 # The model was sent back once for pointing at an approval card
                 # it never prepared; if the reply still does, say so instead of
                 # leaving the user hunting for the button.
@@ -2745,7 +2721,6 @@ async def chat_stream(
                 assistant_message = normalize_citation_markup(
                     _THINK_BLOCK_RE.sub("", "".join(full_response)).strip()
                 )
-                thinking_text = "".join(full_thinking) or None
 
                 # Only the snippets the answer cites are its sources; the rest
                 # were searched and not used. Stored with the numbers expanded,
@@ -2843,7 +2818,7 @@ async def chat_stream(
                 await _finalize(
                     conversation, assistant_message, documents,
                     usage, activity_id, user_id,
-                    thinking=thinking_text,
+                    thinking=None,
                     thinking_duration=thinking_duration,
                     tool_calls=streamed_tool_calls or None,
                     tool_results=streamed_tool_results or None,
@@ -2935,7 +2910,7 @@ async def chat_stream(
                 ),
                 activity_id,
                 "usage limit",
-                thinking="".join(full_thinking) or None,
+                thinking=None,
                 thinking_duration=thinking_duration,
                 **_completed_work(),
             )
@@ -2969,7 +2944,7 @@ async def chat_stream(
     except asyncio.CancelledError:
         await _save_cancelled_turn(
             conversation, full_response, kb_sources, activity_id,
-            thinking="".join(full_thinking) or None,
+            thinking=None,
             thinking_duration=thinking_duration,
             completed_work=_completed_work(),
         )
@@ -2988,7 +2963,7 @@ async def chat_stream(
                 _build_interrupted_body(full_response, user_message[:200], kb_sources),
                 activity_id,
                 str(e),
-                thinking="".join(full_thinking) or None,
+                thinking=None,
                 thinking_duration=thinking_duration,
                 **_completed_work(),
             )
