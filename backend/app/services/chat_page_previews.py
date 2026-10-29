@@ -13,6 +13,8 @@ def prepare(db, user_id, conversation_uuid, title, html, artifact_uuid, base_rev
     prepared, warnings = artifacts.clean_html(html, title)
     # Equivalent sanitized HTML reuses the original proposal and its warnings.
     identity = [user_id, conversation_uuid, artifact_uuid, base_revision, title, prepared]
+    if source.get('template_uuid'):
+        identity.append([source['template_uuid'], source.get('template_check')])
     preview_id = hashlib.sha256(json.dumps(identity, ensure_ascii=False).encode()).hexdigest()[:32]
     return db.chat_page_previews.find_one_and_update({"_id": preview_id}, {"$setOnInsert": {
         "user_id": user_id, "conversation_uuid": conversation_uuid,
@@ -51,4 +53,4 @@ def save(db, user_id, conversation_uuid, preview_id):
             "title": revision["title"], "revision": revision["uuid"],
             "version": version, "message": f'Saved "{revision["title"]}" as Page version {version}.',
             "url": f'/pages/{saved["uuid"]}', "visibility": "private",
-            "warnings": revision["warnings"]}
+            "warnings": revision["warnings"], "template_check": preview["source"].get("template_check")}

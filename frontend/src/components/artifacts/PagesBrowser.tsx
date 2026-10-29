@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ArrowUpRight, FileText, FolderOpen, Loader2, MessageSquare, Plus, Search, Workflow } from 'lucide-react'
 import { artifactContentUrl, browseArtifacts, createArtifact, type ArtifactPageResult } from '../../api/artifacts'
 import { addProjectPin } from '../../api/projects'
-import { PageBadge, PagePreview } from './PagePrimitives'
+import { PageBadge, PageDialog, PagePreview } from './PagePrimitives'
 import { announceWorkspaceWrite, useRefreshOnChatWrite } from '../../lib/chatWrites'
 import { PageCardActions, type PageCardNotice } from './PageCardActions'
 
@@ -21,6 +21,7 @@ export function PagesBrowser({ projectUuid, canManage = false }: { projectUuid?:
   const [query, setQuery] = useState(initial.search.trim())
   const [sort, setSort] = useState(initial.sort)
   const [page, setPage] = useState(initial.page)
+  const [starting, setStarting] = useState(false)
   const [adding, setAdding] = useState(false)
   const [result, setResult] = useState<ArtifactPageResult | null>(null)
   const [loading, setLoading] = useState(true)
@@ -58,14 +59,15 @@ export function PagesBrowser({ projectUuid, canManage = false }: { projectUuid?:
     window.location.assign(`/pages/${saved.uuid}`)
   })
   return <section aria-label={projectUuid ? 'Project pages' : 'Saved pages'} className="pages-library">
-    <header className="pages-library-heading"><div><p className="page-eyebrow">{projectUuid ? 'PROJECT LIBRARY' : 'YOUR LIBRARY'}</p><h2>{adding ? 'Add an existing page' : projectUuid ? 'Project pages' : 'Pages'}</h2></div><button className="page-button page-button-primary" disabled={busy} onClick={newPage}><Plus size={16} />{busy ? 'Working…' : 'New page'}</button></header>
+    <header className="pages-library-heading"><div><p className="page-eyebrow">{projectUuid ? 'PROJECT LIBRARY' : 'YOUR LIBRARY'}</p><h2>{adding ? 'Add an existing page' : projectUuid ? 'Project pages' : 'Pages'}</h2></div><button className="page-button page-button-primary" disabled={busy} onClick={() => setStarting(true)}><Plus size={16} />{busy ? 'Working…' : 'New page'}</button></header>
+    {starting && <PageDialog title="New page" onClose={() => setStarting(false)} busy={busy}><p>Start with a reusable design and a new file, or create a blank Page.</p>{error && <p role="alert">{error}</p>}<div className="page-actions"><a className="page-button page-button-primary" href="/?mode=files&files=templates">Start from template</a><button className="page-button" disabled={busy} onClick={newPage}>Create blank page</button></div></PageDialog>}
     <p className="pages-library-intro">Your finished work, ready to revisit and share. Pages from chat and workflows start private.</p>
     {projectUuid && canManage && <button className="page-button mb-4" disabled={busy} onClick={() => { setAdding(!adding); setSearch(''); setQuery(''); setPage(1) }}><FolderOpen size={16} />{adding ? 'Back to project pages' : 'Add existing page'}</button>}
     <div className="pages-toolbar"><label className="pages-search">Search pages<input type="search" placeholder="Find a page…" value={search} onChange={e => setSearch(e.target.value)} /></label><label>Sort pages<select value={sort} onChange={e => { setSort(e.target.value); setPage(1) }}><option value="updated">Recently updated</option><option value="newest">Newest first</option><option value="title">Title</option></select></label></div>
     {notice && <p role="status" className="page-notice">{notice.message}{notice.href && <> <a className="underline" href={notice.href}>Open copy</a></>}</p>}
     {error && <div role="alert" className="page-alert">{error} <button className="underline" onClick={() => setRefresh(n => n + 1)}>Retry pages</button></div>}
     {loading ? <p role="status" className="pages-loading"><Loader2 size={18} className="animate-spin" />Loading your pages…</p> : result && <>
-      {!result.items.length && <div className="pages-empty">{query ? <Search size={30} /> : <FileText size={30} />}<h3>{query ? 'No pages match your search.' : 'A home for your finished work'}</h3><p>{query ? 'Try a different title, or clear the search to see all your pages.' : 'Ask the assistant to create a page, save a workflow result, or start with a blank page.'}</p>{query ? <button className="page-button" onClick={() => setSearch('')}>Clear search</button> : <button className="page-button page-button-primary" disabled={busy} onClick={newPage}><Plus size={16} />Create your first page</button>}</div>}
+      {!result.items.length && <div className="pages-empty">{query ? <Search size={30} /> : <FileText size={30} />}<h3>{query ? 'No pages match your search.' : 'A home for your finished work'}</h3><p>{query ? 'Try a different title, or clear the search to see all your pages.' : 'Ask the assistant to create a page, save a workflow result, or start with a blank page.'}</p>{query ? <button className="page-button" onClick={() => setSearch('')}>Clear search</button> : <button className="page-button page-button-primary" disabled={busy} onClick={() => setStarting(true)}><Plus size={16} />Create your first page</button>}</div>}
       <ul className="pages-results">{result.items.map(item => {
         const href = `/pages/${encodeURIComponent(item.uuid)}`
         const date = item.updated_at ? new Date(item.updated_at) : null

@@ -10,6 +10,7 @@ from app.services.chat_deps import AgenticChatDeps
 from app.services import artifacts, chat_page_previews
 from app.services.page_authoring import PAGE_INTERACTION_RULES, PAGE_LANGUAGE_RULES, PAGE_SOURCE_FIDELITY_RULES
 from app.tasks import get_sync_db
+from app.schemas.page_template import TemplateTable, TemplateValue
 
 
 RENDERING_NOTE = (
@@ -53,7 +54,7 @@ async def get_html_artifact(context: RunContext[AgenticChatDeps], artifact_uuid:
         return {"error": exc.detail}
 
 
-async def create_html_artifact(context: RunContext[AgenticChatDeps], title: str, html: str, confirmed: bool = False) -> dict:
+async def create_html_artifact(context: RunContext[AgenticChatDeps], title: str, html: str = "", confirmed: bool = False, template_uuid: str | None = None, source_document_uuid: str | None = None, template_values: list[TemplateValue] | None = None, template_tables: list[TemplateTable] | None = None) -> dict:
     """Create a private hosted HTML/CSS page. Self-contained static HTML only; no JS or remote assets.
 
     Preview first and await a later user approval. Include only the intended report/page,
@@ -67,8 +68,35 @@ async def create_html_artifact(context: RunContext[AgenticChatDeps], title: str,
     table cell, including repeated values. Label calculated summaries separately;
     never invent source notes or call exact source values ranges. Compare all
     displayed values and source claims with the original before previewing.
+    To reuse a template, read get_page_template, then supply template_uuid,
+    source_document_uuid and template_values (field_id, exact value, supporting
+    quote from that file). For tables, supply template_tables with all relevant
+    rows from the new file, in template column order (value/quote per cell, null
+    for missing). This replaces old data rows; do not fill their scalar fields too.
+    HTML is ignored for template use; the server preserves
+    the design, verifies evidence, marks missing fields and reports fill counts.
+    Never carry values from another file or calculate unsupported source values.
     Call it a Page in replies; name the Save page button, never the tool or flags.
     """
+    if template_uuid:
+        from app.routers.page_templates import authorized
+        from app.services import access_control, page_templates
+        try:
+            template = await authorized(template_uuid, context.deps.user)
+            document = await access_control.get_authorized_document(source_document_uuid or '', context.deps.user)
+            if not document:
+                return {'error': 'Choose a file you can access for this template.'}
+            if context.deps.context_document_uuids and source_document_uuid not in context.deps.context_document_uuids:
+                return {'error': 'Use the newly attached file for this template, or attach the file you want to use.'}
+            html, check = page_templates.fill(template, document, template_values or [], template_tables)
+            title = f"{template['name']} — {document.title}"[:200]
+            return await _save(context, title, html, confirmed, template_source={
+                'template_uuid': template_uuid, 'template_check': check,
+            })
+        except HTTPException as exc:
+            return {'error': exc.detail}
+    if source_document_uuid or template_values or template_tables:
+        return {'error': 'Choose a template before filling its fields.'}
     return await _save(context, title, html, confirmed)
 
 
@@ -89,7 +117,7 @@ async def revise_html_artifact(context: RunContext[AgenticChatDeps], artifact_uu
     return await _save(context, title, html, confirmed, artifact_uuid, base_revision)
 
 
-async def _save(context, title, html, confirmed, artifact_uuid=None, base_revision=None):
+async def _save(context, title, html, confirmed, artifact_uuid=None, base_revision=None, template_source=None):
     from app.services.chat_tools import _confirm_gate
     try:
         if len(title) > 200:
@@ -103,13 +131,14 @@ async def _save(context, title, html, confirmed, artifact_uuid=None, base_revisi
                 return {"error": "Page changed. Read the latest revision before proposing an edit."}
         name = "revise_html_artifact" if artifact_uuid else "create_html_artifact"
         snapshot = await _call(chat_page_previews.prepare, context.deps.user_id,
-            context.deps.conversation.uuid, title, html, artifact_uuid, base_revision, _source(context))
+            context.deps.conversation.uuid, title, html, artifact_uuid, base_revision, {**_source(context), **(template_source or {})})
         digest = hashlib.sha256((title + snapshot["prepared_html"]).encode()).hexdigest()
         gate = await _confirm_gate(context, tool_name=name,
             key={"artifact": artifact_uuid, "base": base_revision, "sha256": digest}, confirmed=confirmed,
             preview={"needs_confirmation": True, "action": name,
                      "preview": f'Save a private Page: {title}. This does not publish it.',
                      "preview_id": snapshot["_id"], "title": snapshot["title"],
+                     "template_check": snapshot["source"].get("template_check"),
                      "artifact_preview_html": snapshot["prepared_html"], "warnings": snapshot["warnings"], "rendering_note": RENDERING_NOTE,
                      "source_fidelity_note": PAGE_SOURCE_FIDELITY_RULES, "language_note": PAGE_LANGUAGE_RULES})
         if gate is not None:

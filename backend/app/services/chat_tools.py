@@ -29,6 +29,7 @@ from app.models.validation_run import ValidationRun
 from app.models.verification_session import VerificationField, VerificationSession
 from app.models.workflow import Workflow
 from app.services.chat_deps import AgenticChatDeps
+from app.services.chat_page_templates import find_page_templates, get_page_template
 from app.services.chat_artifact_tools import create_html_artifact, get_html_artifact, revise_html_artifact
 from app.services.chat_skill_tools import get_skill, list_skills, select_skill
 from app.services.certification_versions.runtime import course_operation
@@ -6896,6 +6897,8 @@ TOOLS = [
     list_skills,
     get_skill,
     select_skill,
+    find_page_templates,
+    get_page_template,
     create_html_artifact,
     get_html_artifact,
     revise_html_artifact,

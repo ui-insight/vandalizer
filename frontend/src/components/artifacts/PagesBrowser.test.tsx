@@ -93,3 +93,12 @@ it('marks a page as published when it has only separate version links', async ()
   expect(await screen.findByText('Published')).toBeInTheDocument()
   expect(screen.queryByText('Private')).not.toBeInTheDocument()
 })
+
+it('offers a template or a blank Page when starting a new Page', async () => {
+  render(<PagesBrowser />)
+  await screen.findByRole('link', { name: 'Award report' })
+  fireEvent.click(screen.getByRole('button', { name: 'New page' }))
+  expect(screen.getByRole('dialog', { name: 'New page' })).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Start from template' })).toHaveAttribute('href', '/?mode=files&files=templates')
+  expect(screen.getByRole('button', { name: 'Create blank page' })).toBeEnabled()
+})

@@ -15,7 +15,7 @@ from app.database import init_db
 from app.exceptions import AppError
 from app.middleware.csrf import CSRFMiddleware
 from app.observability import init_sentry
-from app.routers import artifacts
+from app.routers import artifacts, page_templates
 from app.rate_limit import limiter
 from app.routers import activity, admin, audit, auth, automations, browser_automation, certification, chat, config, contact, credentials, demo, documents, extractions, feedback, feedback_admin, feedback_prompt, files, folders, graph_webhooks, knowledge, library, mgmt, notifications, obligations, office, optimizer_inbox, organizations, projects, reviews, spaces, support, teams, telemetry, verification, verification_sessions, workflows
 
@@ -231,6 +231,7 @@ app.include_router(workflows.router, prefix="/api/workflows", tags=["workflows"]
 app.include_router(config.router, prefix="/api/config", tags=["config"])
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(artifacts.router, prefix="/api/pages", tags=["pages"])
+app.include_router(page_templates.router, prefix="/api/page-templates", tags=["page-templates"])
 app.include_router(activity.router, prefix="/api/activity", tags=["activity"])
 app.include_router(library.router, prefix="/api/library", tags=["library"])
 app.include_router(feedback.router, prefix="/api/feedback", tags=["feedback"])

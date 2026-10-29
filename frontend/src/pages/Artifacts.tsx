@@ -1,3 +1,4 @@
+import { SavePageTemplate } from '../components/artifacts/SavePageTemplate'
 import { PageVersionLinks } from '../components/artifacts/PageVersionLinks'
 import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, ArrowUpRight, Check, ChevronRight, Code2, Copy, Download, FileText, Globe2, Link2, LockKeyhole, MessageSquare, Share2, Trash2, Workflow } from 'lucide-react'
@@ -31,6 +32,7 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
   const [teamRevision, setTeamRevision] = useState('')
   const [publicRevision, setPublicRevision] = useState('')
   const [sharing, setSharing] = useState(() => window.location.hash === '#share')
+  const [saveTemplate, setSaveTemplate] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [requestChanges, setRequestChanges] = useState(false)
   const [changes, setChanges] = useState('')
@@ -110,6 +112,7 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
     </div>
     {!loading && (artifact || publicInfo) && <div className="page-actions">
       <PagePrintLink contentUrl={contentUrl} />
+      {artifact && <button className="page-button" disabled={busy || !!editor} onClick={() => setSaveTemplate(true)}>Save as template</button>}
       <a className="page-button" href={`${contentUrl}${contentUrl.includes('?') ? '&' : '?'}download=true`}><Download size={16} />Download HTML</a>
       {artifact?.can_manage && <><button className="page-button" disabled={busy || !!editor} onClick={() => { setNotice(''); setError(''); setRequestChanges(true) }}><MessageSquare size={16} />Request changes</button><button className="page-button page-button-primary" disabled={busy} onClick={openSharing}><Share2 size={16} />Share</button></>}
       {publicToken && <a className="page-button page-button-primary" href={pageViewUrl(contentUrl, 'full')} target="_blank" rel="noreferrer"><ArrowUpRight size={16} />Open full page</a>}
@@ -132,6 +135,7 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
         <details className="page-advanced"><summary>Advanced page options</summary><p>Pages support static HTML and CSS. Scripts, forms and remote assets are blocked.</p><div className="page-actions">{!editor && <button className="page-button" disabled={busy} onClick={() => void action(async () => { const source = await api.artifactSource(uuid, selected); setEditor({ ...source, base: artifact.latest_revision }) })}><Code2 size={16} />Edit HTML</button>}<button className="page-button page-button-danger" disabled={busy} onClick={() => { setNotice(''); setError(''); setConfirmDelete(true) }}><Trash2 size={16} />Delete page</button></div></details>
       </>}
     </>}
+    {saveTemplate && uuid && selected && <SavePageTemplate source={{ artifact_uuid: uuid, revision: selected }} onClose={() => setSaveTemplate(false)} />}
     {sharing && artifact?.can_manage && uuid && <PageDialog title="Share page" onClose={closeSharing} busy={busy}>
       <p>Choose who can open <strong>{title}</strong>.</p>{feedback}
       <dl className="page-share-summary" aria-label="Current audience versions">

@@ -1,3 +1,4 @@
+import { TemplatesBrowser } from '../artifacts/TemplatesBrowser'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { PanelsTopLeft } from 'lucide-react'
 import { PagesBrowser } from '../artifacts/PagesBrowser'
@@ -45,8 +46,8 @@ export function LeftPanel() {
   } | null>(null)
   const filesSearch = useSearch({ from: '/' })
   const navigateFiles = useNavigate({ from: '/' })
-  const filesView = filesSearch.files === 'pages' ? 'pages' : 'documents'
-  const setFilesView = useCallback((view: 'documents' | 'pages') => { void navigateFiles({ to: '/', search: prev => ({ ...prev, files: view === 'pages' ? 'pages' : undefined }) }) }, [navigateFiles])
+  const filesView = filesSearch.files === 'templates' ? 'templates' : filesSearch.files === 'pages' ? 'pages' : 'documents'
+  const setFilesView = useCallback((view: 'documents' | 'pages' | 'templates') => { void navigateFiles({ to: '/', search: prev => ({ ...prev, files: view === 'documents' ? undefined : view }) }) }, [navigateFiles])
   const [showRawText, setShowRawText] = useState(false)
   const [showUsage, setShowUsage] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -308,7 +309,9 @@ export function LeftPanel() {
       <nav aria-label="Files views" className="files-view-tabs">
         <button aria-pressed={filesView === 'documents'} onClick={() => setFilesView('documents')}><FileText size={16} aria-hidden="true" />Documents</button>
         <button aria-pressed={filesView === 'pages'} onClick={() => setFilesView('pages')}><PanelsTopLeft size={16} aria-hidden="true" />Pages</button>
+        <button aria-pressed={filesView === 'templates'} onClick={() => setFilesView('templates')}><PanelsTopLeft size={16} aria-hidden="true" />Templates</button>
       </nav>
+      {filesView === 'templates' && <div className="min-h-0 flex-1 overflow-auto"><TemplatesBrowser /></div>}
       {filesView === 'pages' && <div className="min-h-0 flex-1 overflow-auto"><PagesBrowser key={activeProjectUuid ?? 'all'} projectUuid={activeProjectUuid ?? undefined} canManage={activeProjectRole === 'owner' || activeProjectRole === 'editor'} /></div>}
       <div className="min-h-0 flex-1 flex-col" style={{ display: filesView === 'documents' ? 'flex' : 'none' }}>
       {viewingDoc && <header className="workspace-document-header">

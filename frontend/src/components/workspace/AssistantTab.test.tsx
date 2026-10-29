@@ -1,15 +1,16 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
-const state = vi.hoisted(() => ({ project: 'project-a' as string | null, signal: 0, team: 'team-a' as string | null, loading: false, convo: null as string | null }))
-vi.mock('../../contexts/WorkspaceContext', () => ({ useWorkspace: () => ({ activeProjectUuid: state.project, newChatSignal: state.signal, currentConversationUuid: state.convo }) }))
+const state = vi.hoisted(() => ({ project: 'project-a' as string | null, signal: 0, team: 'team-a' as string | null, loading: false, convo: null as string | null, pending: null as { message: string } | null, sent: vi.fn() }))
+vi.mock('../../contexts/WorkspaceContext', () => ({ useWorkspace: () => ({ activeProjectUuid: state.project, newChatSignal: state.signal, currentConversationUuid: state.convo, pendingChatMessage: state.pending }) }))
 vi.mock('../../hooks/useTeams', () => ({ useTeams: () => ({ currentTeam: state.team ? { uuid: state.team } : null, loading: state.loading }) }))
-vi.mock('../chat/ChatPanel', () => ({ ChatPanel: ({ initialDraft, onDraftChange, conversationToLoad }: { initialDraft: string; onDraftChange: (value: string) => void; conversationToLoad: string | null }) => {
+vi.mock('../chat/ChatPanel', () => ({ ChatPanel: ({ initialDraft, onDraftChange, conversationToLoad, pendingMessage }: { initialDraft: string; onDraftChange: (value: string) => void; conversationToLoad: string | null; pendingMessage?: { message: string } | null }) => {
   const [text, setText] = useState(initialDraft)
+  useEffect(() => { if (pendingMessage) state.sent(pendingMessage.message, conversationToLoad) }, [pendingMessage, conversationToLoad])
   return <><input aria-label="Draft" value={text} onChange={e => { setText(e.target.value); onDraftChange(e.target.value) }} /><output aria-label="Loads">{conversationToLoad ?? 'none'}</output></>
 } }))
 import { AssistantTab } from './AssistantTab'
-beforeEach(() => { state.project = 'project-a'; state.signal = 0; state.team = 'team-a'; state.loading = false; state.convo = null; sessionStorage.clear() })
+beforeEach(() => { state.project = 'project-a'; state.signal = 0; state.team = 'team-a'; state.loading = false; state.convo = null; state.pending = null; state.sent.mockClear(); sessionStorage.clear() })
 it('waits for initial scope and preserves typing across background team refresh', () => {
   state.team = null; state.loading = true
   const { rerender } = render(<AssistantTab />)
@@ -78,4 +79,13 @@ it('keeps the draft when the Assistant remounts after an earlier New Chat', () =
   first.unmount()
   render(<AssistantTab />)
   expect(screen.getByLabelText('Draft')).toHaveValue('Still here')
+})
+
+it('sends a template handoff only after resetting the earlier conversation', () => {
+  const { rerender } = render(<AssistantTab />)
+  state.convo = 'old-award'; rerender(<AssistantTab />)
+  state.signal++
+  state.pending = { message: 'Use this template with the new file' }
+  rerender(<AssistantTab />)
+  expect(state.sent).toHaveBeenCalledExactlyOnceWith('Use this template with the new file', null)
 })

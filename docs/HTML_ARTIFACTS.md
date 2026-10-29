@@ -25,6 +25,20 @@ When interactivity is requested, the Assistant can include a linked table of con
 
 Web and email links use known source URLs or contact addresses. They open separately without access to the Page's opener or referrer; jump links stay within the Page. Publication does not grant readers access to private linked sources. JavaScript charts, live filtering, table sorting, forms, and remote assets remain unsupported.
 
+## Reusable Page templates
+
+Choose **Save as template** beside **Save page / Save new version** in chat, or on a saved Page's screen. The selected saved version or immutable chat preview supplies the design; saving a template does not approve or save the original Page. Review the cleared preview, name the design, add an optional description and reusable guidance, and review field meanings before saving. **Files → Templates** shows thumbnails, descriptions, owners, and Private/Team access. **New page → Start from template** opens the same collection.
+
+Conversion is deliberately conservative: it preserves supported layout, theme, standard section labels, table columns, native jump links and disclosures. Source-specific text becomes empty fields; original links, images, metadata and chart dimensions are removed. Original guidance may contain award facts, so its box stays but the owner supplies reusable guidance during review. Unrecognized labels and unsupported CSS may need adjustment in the original Page before saving the template. Field meanings describe the expected data, never sample values. No original Page HTML or source-file reference is stored in either the template or its temporary design draft.
+
+**Use template** selects a new accessible file and starts a new chat. Chat also supports requests such as “Use my NIH Budget Dashboard template with this file,” using `find_page_templates` and `get_page_template`. The Assistant reads that file and supplies field/table values with exact supporting quotes. The server checks every supplied value against the selected file's readable text and fills the stored design itself; model-supplied replacement HTML is ignored. Tables accept complete new rows instead of retaining the old file's row count. Recognized CSS bars are scaled from newly supplied numeric values. Missing values show **Not in this file**. Derived numbers absent from the source are not invented.
+
+The preview shows server-counted values filled from the named file, missing fields, and **0 kept from the template**. This checks source presence, not semantic placement or completeness: review the preview against the file before saving. **Save page** saves the exact preview once through the existing approval flow. The resulting Page starts private, including when its template is team-shared; publication remains a separate owner action.
+
+Templates start private. Owners can use **Share template** to grant use to one team they belong to or return it to **Only me**. Team access is checked on every read; sharing the design grants no access to its original Page or files. Deleting a template revokes template access without deleting Pages already made from it. This release does not bundle starter templates.
+
+Storage uses additive `page_templates` and `page_template_drafts` collections; drafts expire after 24 hours. Include `page_templates` in regular backups. Deploy API and frontend together; database initialization registers the collections and indexes without migrating existing Pages. Regression coverage uses synthetic files, in-memory storage and a local browser; live-model matching and production MongoDB require deployment smoke testing.
+
 ## Ownership and links
 
 New pages are owner-private. The owner can grant read access to one team they belong to; membership is checked on every private read. Only the owner can edit, publish, change access, or delete. Neither being a site administrator nor holding a workflow share token bypasses page ownership.

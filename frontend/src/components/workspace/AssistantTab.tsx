@@ -48,7 +48,7 @@ export function AssistantTab() {
   const drafts = useRef(sessionDrafts)
   const previousScope = useRef(draftScope)
   const lastLoadedRef = useRef<string | null>(null)
-  const [resetKey, setResetKey] = useState(0)
+  const [resetKey, setResetKey] = useState(newChatSignal)
 
   // Remember the scope's conversation when the panel's conversation changes,
   // not when the scope does: right after a scope switch the context still
@@ -114,7 +114,9 @@ export function AssistantTab() {
         initialDraft={drafts.current.get(draftScope) ?? ''}
         onDraftChange={draft => { if (draft) drafts.current.set(draftScope, draft); else drafts.current.delete(draftScope) }}
         conversationToLoad={lastLoadedRef.current ?? sessionConversations.get(draftScope) ?? null}
-        pendingMessage={pendingChatMessage}
+        // A template can request a fresh chat and send its first message in
+        // one render. Let the reset complete before the old panel sees it.
+        pendingMessage={resetKey === newChatSignal ? pendingChatMessage : null}
         onPendingMessageConsumed={clearPendingChatMessage}
       />
     </div>

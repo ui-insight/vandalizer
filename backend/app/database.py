@@ -6,6 +6,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from app.config import Settings
 from app.models.user import User
 from app.models.artifact import Artifact
+from app.models.page_template import PageTemplate, PageTemplateDraft
 from app.models.team import Team, TeamMembership, TeamInvite, TeamJoinLink
 from app.models.document import SmartDocument
 from app.models.folder import SmartFolder
@@ -73,6 +74,8 @@ ALL_MODELS = [
     Obligation,
     User,
     Artifact,
+    PageTemplate,
+    PageTemplateDraft,
     Team,
     TeamMembership,
     TeamInvite,
