@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useCallback, type DragEve
 import { Loader2, BookOpen, X, ArrowDown, Upload, Zap, Sparkles, FolderKanban } from 'lucide-react'
 import { useQueryClient, useQueries } from '@tanstack/react-query'
 import { ChatMessage } from './ChatMessage'
+import { ChatScrollRegion } from './ChatScrollRegion'
 import { ChatInput } from './ChatInput'
 import { AttachmentList } from './AttachmentList'
 import { ChatSkillDialog } from './ChatSkillDialog'
@@ -935,8 +936,10 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       </div>
 
       {/* Messages area */}
-      <div
-        ref={scrollContainerRef}
+      <ChatScrollRegion
+        scrollRef={scrollContainerRef}
+        isStreaming={isStreaming}
+        conversationUuid={conversationUuid}
         role="region"
         aria-label="Conversation"
         tabIndex={0}
@@ -1263,24 +1266,9 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           <FileProcessingCell docs={processingCellDocs} />
         )}
 
-        {/* Streaming: thinking-only phase (no text or tools yet) */}
-        {isStreaming && thinkingContent && !streamingContent && segments.length === 0 && (
-          <ChatMessage
-                artifactSource={{ conversation_uuid: conversationUuid ?? undefined, project_uuid: activeProjectUuid ?? undefined }}
-            message={{ role: 'assistant', content: '' }}
-            exportNames={scopeNamesRef.current}
-            activity={activity}
-            compactionStatus={compactionStatus}
-            streamingThinking={thinkingContent}
-            activeToolCalls={activeToolCalls}
-            toolResults={toolResults}
-            streamSegments={segments}
-            isStreaming
-          />
-        )}
-
-        {/* Streaming: segments have started (text and/or tools) */}
-        {isStreaming && segments.length > 0 && (
+        {/* Keep the same live message when thinking becomes text/tools, so
+            expanded reasoning and its height survive the transition. */}
+        {isStreaming && (thinkingContent || streamingContent || segments.length > 0) && (
           <ChatMessage
                 artifactSource={{ conversation_uuid: conversationUuid ?? undefined, project_uuid: activeProjectUuid ?? undefined }}
             message={{ role: 'assistant', content: streamingContent }}
@@ -1567,7 +1555,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         })()}
         </div>{/* end centering wrapper */}
 
-      </div>
+      </ChatScrollRegion>
 
       {/* Project active badge — entering a project clears the KB, so normally
           only one of these shows; render project-first for deterministic order. */}

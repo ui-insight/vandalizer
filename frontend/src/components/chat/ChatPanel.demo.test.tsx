@@ -310,6 +310,20 @@ it('keeps queued requests visibly unsent when a stream fails and offers to resum
   expect(mocks.resumeQueuedMessages).toHaveBeenCalledOnce()
 })
 
+it('keeps expanded reasoning mounted when the first response text arrives', () => {
+  mocks.isStreaming = true
+  mocks.thinkingContent = 'Reviewing the request'
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const { rerender } = render(<QueryClientProvider client={client}><ChatPanel /></QueryClientProvider>)
+  fireEvent.click(screen.getByRole('button', { name: 'Expand thinking' }))
+  const disclosure = screen.getByRole('button', { name: 'Collapse thinking' })
+  mocks.segments = [{ kind: 'text', content: 'Here is the response.' }]
+  rerender(<QueryClientProvider client={client}><ChatPanel /></QueryClientProvider>)
+  expect(screen.getByRole('button', { name: 'Collapse thinking' })).toBe(disclosure)
+  expect(screen.getByText('Reviewing the request')).toBeVisible()
+  expect(screen.getByText('Here is the response.')).toBeVisible()
+})
+
 it('does not add a second progress indicator alongside an existing thinking or active-tool entry', () => {
   mocks.isStreaming = true
   mocks.thinkingContent = 'Reviewing the request'
