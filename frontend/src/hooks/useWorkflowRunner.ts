@@ -109,6 +109,8 @@ export function useWorkflowRunner() {
 
   const loadSession = useCallback(async (sid: string) => {
     stopPolling()
+    setStatus(null)
+    setRunning(false)
     setSessionId(sid)
     setBatchId(null)
     setBatchStatus(null)
@@ -121,9 +123,12 @@ export function useWorkflowRunner() {
       if (!isTerminal) {
         intervalRef.current = setInterval(() => poll(sid), 2000)
       }
+      return true
     } catch {
+      setSessionId(null)
       setStatus(null)
       setRunning(false)
+      return false
     }
   }, [poll, stopPolling, shareToken])
 

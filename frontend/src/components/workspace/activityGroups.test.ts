@@ -20,6 +20,14 @@ const chatB = ev({ id: 'chat-b', type: 'conversation', conversation_id: 'conv-b'
   started_at: '2026-10-15T08:00:00Z', last_updated_at: '2026-10-15T08:10:00Z' })
 
 describe('groupActivities (ticket: which chat produced each run)', () => {
+  it('interleaves standalone runs by recency while keeping the current chat pinned', () => {
+    const older = ev({ id: 'old', started_at: '2026-10-14T12:00:00Z' })
+    const editor = ev({ id: 'editor', started_at: '2026-10-15T12:00:00' })
+    const { timeline } = groupActivities([older, chatA, editor, chatB], 'conv-b')
+    expect(timeline.map(item => item.kind === 'run' ? item.run.id : item.group.chat.id))
+      .toEqual(['chat-b', 'editor', 'chat-a', 'old'])
+  })
+
   it('puts each run under the chat that started it, newest first', () => {
     const r1 = ev({ id: 'r1', source_conversation_id: 'conv-a', started_at: '2026-10-15T10:42:00Z' })
     const r2 = ev({ id: 'r2', type: 'workflow_run', source_conversation_id: 'conv-a', started_at: '2026-10-15T11:05:00Z' })

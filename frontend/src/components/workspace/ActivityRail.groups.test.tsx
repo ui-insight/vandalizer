@@ -105,14 +105,15 @@ describe("activity list groups a chat's runs under it (ticket)", () => {
     expect(opens[0]).toMatch(/^Open Full Life Cycle Test/)
   })
 
-  it('lists runs started outside chat under Other runs, with a count', () => {
+  it('shows a recent editor run above 42 older conversations after a fresh mount', () => {
+    const editorRun = run({ id: 'editor-run', type: 'workflow_run', title: 'Subaward report', workflow_id: 'wf-1', workflow_session_id: 'session-1' })
+    activities = [...Array.from({ length: 42 }, (_, i) => chat({ id: `chat-${i}`, conversation_id: `conv-${i}`, title: `Conversation ${i}` })), editorRun]
     render(<ActivityRail />)
-
-    const section = screen.getByRole('button', { name: /Other runs/ })
-    expect(section).toHaveTextContent('1')
-    expect(screen.getByText('Budget Extraction')).toBeInTheDocument()
-    fireEvent.click(section)
-    expect(screen.queryByText('Budget Extraction')).not.toBeInTheDocument()
+    const opens = screen.getAllByRole('button', { name: /^Open (Workflow|Conversation)/ })
+    expect(opens[0]).toHaveAccessibleName('Open Workflow Subaward report: Completed')
+    expect(screen.queryByRole('button', { name: /Other runs/ })).not.toBeInTheDocument()
+    fireEvent.click(opens[0])
+    expect(openActivity).toHaveBeenCalledWith(editorRun)
   })
 
   it('shows one line of a long error and the rest on Details', () => {

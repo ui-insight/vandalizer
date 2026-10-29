@@ -201,7 +201,6 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
   const [chatOpen, setChatOpen] = useState<Record<string, boolean>>({})
   const isChatExpanded = (group: ChatGroup) =>
     chatOpen[group.chat.id] ?? (!!currentConversationUuid && group.chat.conversation_id === currentConversationUuid)
-  const [otherRunsOpen, setOtherRunsOpen] = useState(true)
   const [errorOpen, setErrorOpen] = useState<Record<string, boolean>>({})
   const [filter, setFilter] = useState<'all' | 'active' | 'issues'>('all')
   const matchesFilter = (activity: ActivityEvent, value = filter) => {
@@ -217,8 +216,8 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
     [activities, currentConversationUuid],
   )
   // Retain the parent chat when a child matches, so a filtered run never loses its context.
-  const chats = grouped.chats.filter(g => matchesFilter(g.chat) || g.runs.some(r => matchesFilter(r)))
-  const otherRuns = grouped.otherRuns.filter(r => matchesFilter(r))
+  const timeline = grouped.timeline.filter(item => item.kind === 'run' ? matchesFilter(item.run)
+    : matchesFilter(item.group.chat) || item.group.runs.some(r => matchesFilter(r)))
   const expandRail = forceDocked && onExpand ? onExpand : toggleRailDocked
   const selectFilter = (value: typeof filter) => {
     setFilter(value)
@@ -475,15 +474,17 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
             <h3>Your work starts here</h3><p>Conversations and tool runs will appear here, ready to pick up later.</p>
             <button type="button" onClick={() => { onNavigate?.(); triggerNewChat(); focusChat() }}>Start a conversation <ChevronRight size={14} aria-hidden="true" /></button>
           </div>}
-          {!visualDocked && activities.length > 0 && chats.length === 0 && otherRuns.length === 0 && <div className="activity-rail__empty">
+          {!visualDocked && activities.length > 0 && timeline.length === 0 && <div className="activity-rail__empty">
             <CircleCheck size={24} aria-hidden="true" /><h3>{filter === 'issues' ? 'No issues to resolve' : 'Nothing in progress'}</h3>
             <p>{filter === 'issues' ? 'Your recent activity has no failed or timed-out work.' : 'Completed work is ready to revisit in All activity.'}</p>
             <button type="button" onClick={() => selectFilter('all')}>View all activity</button>
           </div>}
-          {!visualDocked && chats.length > 0 && <div className="activity-rail__section-label"><span>Conversations</span><span>{chats.length}</span></div>}
+          {!visualDocked && timeline.length > 0 && <div className="activity-rail__section-label"><span>Recent activity</span><span>{timeline.length}</span></div>}
 
 
-          {!visualDocked && chats.map(group => {
+          {!visualDocked && timeline.map(item => {
+            if (item.kind === 'run') return renderEntry(item.run)
+            const group = item.group
             const expanded = filter !== 'all' ? group.runs.some(run => matchesFilter(run)) : group.runs.length > 0 && isChatExpanded(group)
             return (
               <div key={group.chat.id}>
@@ -497,20 +498,6 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
             )
           })}
 
-          {otherRuns.length > 0 && !visualDocked && (
-            <button
-              type="button"
-              aria-expanded={filter !== 'all' || otherRunsOpen}
-              onClick={() => { if (filter !== 'all') { setFilter('all'); setOtherRunsOpen(false) } else setOtherRunsOpen(open => !open) }}
-              className="activity-section"
-              title="Runs started from the editors, automations or the API"
-            >
-              {(filter !== 'all' || otherRunsOpen) ? <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" /> : <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />}
-              <span className="flex-1">Other runs</span>
-              <span className="activity-count">{otherRuns.length}</span>
-            </button>
-          )}
-          {!visualDocked && (filter !== 'all' || otherRunsOpen) && otherRuns.map(run => renderEntry(run))}
         </div>
       </div>
 

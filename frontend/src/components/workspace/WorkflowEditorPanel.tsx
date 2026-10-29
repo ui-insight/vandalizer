@@ -35,7 +35,7 @@ import {
   getValidationInputs, updateValidationInputs,
   proposeTestCases, synthesizeTestCase, acceptTestCases,
   getExpectedOutputs, deleteExpectedOutput,
-  exportWorkflowUrl, importIntoWorkflow, getWorkflowHistory, getWorkflowStatus, duplicateWorkflow,
+  exportWorkflowUrl, importIntoWorkflow, getWorkflowHistory, duplicateWorkflow,
   improvePrompt,
 } from '../../api/workflows'
 import { RunHistoryTab } from './RunHistoryTab'
@@ -57,6 +57,8 @@ import { listAllFolders } from '../../api/folders'
 import type { KnowledgeBase } from '../../types/knowledge'
 import { listItems as listSearchSetItems, suggestFields, getSearchSet } from '../../api/extractions'
 import { useWorkflowRunner } from '../../hooks/useWorkflowRunner'
+import { useLastWorkflowRun } from '../../hooks/useLastWorkflowRun'
+import { WorkflowLastRunNotice } from './WorkflowLastRunNotice'
 import { ApiError } from '../../api/client'
 import { MAX_NAME_LENGTH, normalizeName } from '../../utils/nameValidation'
 import { computeReorderedIds } from '../../utils/reorder'
@@ -269,15 +271,27 @@ export function WorkflowEditorPanel() {
   const [nudgeDismissed, setNudgeDismissed] = useState(false)
   // Per-step output from the most recent run, fetched lazily so a step's last
   // output is viewable even on a fresh editor open (no run started this session).
-  const [lastRunStepsOutput, setLastRunStepsOutput] = useState<Record<string, unknown> | null>(null)
-  const [lastRunMeta, setLastRunMeta] = useState<{ finishedAt: string | null; status: string } | null>(null)
+  const lastRun = useLastWorkflowRun(openWorkflowId, openWorkflowShareToken ?? undefined)
+  const lastRunStepsOutput = (lastRun.status?.steps_output ?? null) as Record<string, unknown> | null
+  const lastRunMeta = lastRun.lastRun ? { finishedAt: lastRun.lastRun.finished_at, status: lastRun.lastRun.status } : null
   const runTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const titleInputRef = useRef<HTMLInputElement>(null)
   const descInputRef = useRef<HTMLTextAreaElement>(null)
   const newStepInputRef = useRef<HTMLInputElement>(null)
   const importInputRef = useRef<HTMLInputElement>(null)
   const tabBarRef = useRef<HTMLDivElement>(null)
+  const editorRef = useRef<HTMLDivElement>(null)
+  const revealSessionRef = useRef<string | null>(null)
   const [tabsCompact, setTabsCompact] = useState(false)
+
+  useEffect(() => {
+    if (!runner.status || runner.sessionId !== revealSessionRef.current) return
+    const output = editorRef.current?.querySelector<HTMLElement>('[data-workflow-results]')
+    if (!output) return
+    revealSessionRef.current = null
+    output.scrollIntoView({ block: 'start' })
+    output.focus({ preventScroll: true })
+  }, [runner.sessionId, runner.status, activeTab])
 
   useEffect(() => {
     const el = tabBarRef.current
@@ -348,35 +362,6 @@ export function WorkflowEditorPanel() {
     getWorkflowQualityStatus(openWorkflowId).then(setQualityStatus).catch(() => {})
     const key = `quality-nudge-dismissed-wf-${openWorkflowId}`
     setNudgeDismissed(!!localStorage.getItem(key))
-  }, [openWorkflowId])
-
-  // Fetch the most recent run's per-step output so the step editor can show what
-  // each step last produced without re-running. The live runner status (a run
-  // started this session) is preferred over this when present.
-  useEffect(() => {
-    if (!openWorkflowId) {
-      setLastRunStepsOutput(null)
-      setLastRunMeta(null)
-      return
-    }
-    let cancelled = false
-    ;(async () => {
-      try {
-        const { runs } = await getWorkflowHistory(openWorkflowId, 1)
-        const latest = runs.find(r => r.session_id)
-        if (!latest?.session_id) {
-          if (!cancelled) { setLastRunStepsOutput(null); setLastRunMeta(null) }
-          return
-        }
-        const status = await getWorkflowStatus(latest.session_id)
-        if (cancelled) return
-        setLastRunStepsOutput((status.steps_output ?? null) as Record<string, unknown> | null)
-        setLastRunMeta({ finishedAt: latest.finished_at, status: latest.status })
-      } catch {
-        if (!cancelled) { setLastRunStepsOutput(null); setLastRunMeta(null) }
-      }
-    })()
-    return () => { cancelled = true }
   }, [openWorkflowId])
 
   // --- run elapsed timer ---
@@ -771,7 +756,7 @@ export function WorkflowEditorPanel() {
   // --- render ---
 
   return (
-    <div className="workflow-editor flex h-full flex-col" style={{ backgroundColor: '#fff', position: 'relative', containerType: 'inline-size' }}>
+    <div ref={editorRef} className="workflow-editor flex h-full flex-col" style={{ backgroundColor: '#fff', position: 'relative', containerType: 'inline-size' }}>
       {/* Keep a usable canvas when enlarged text makes the header/run controls
           taller than the pane. The whole setup can scroll; editors still cover
           the visible pane rather than an off-screen part of that scroll area. */}
@@ -943,6 +928,18 @@ export function WorkflowEditorPanel() {
       </div>
 
       {/* ===== TAB BAR ===== */}
+      {!runner.sessionId && !runner.batchId && !runner.running && <WorkflowLastRunNotice
+        run={lastRun.lastRun} error={lastRun.error} onRetry={lastRun.retry}
+        onShow={async sessionId => {
+          revealSessionRef.current = sessionId
+          setActiveTab('design')
+          const loaded = await runner.loadSession(sessionId)
+          if (!loaded) {
+            revealSessionRef.current = null
+            toast('Could not open this run. Try Show last run again.', 'error')
+          }
+        }}
+      />}
       <div ref={tabBarRef} role="tablist" aria-label="Workflow editor sections" style={{ display: 'flex', flexWrap: 'wrap', borderBottom: "1px solid var(--workspace-border)", padding: tabsCompact ? '0 8px' : '0 24px', backgroundColor: '#fff', flexShrink: 0 }}>
         {TABS.map(tab => {
           const TabIcon = tab.icon
@@ -1686,7 +1683,7 @@ function DesignCanvas({
 
       {/* Workflow output (during/after run) */}
       {(runnerRunning || runnerStatus) && !batchStatus && (
-        <>
+        <div data-workflow-results role="region" aria-label="Workflow run results" tabIndex={-1}>
           <ConnectionLine />
           <WorkflowOutputCard
             status={runnerStatus}
@@ -1697,7 +1694,7 @@ function DesignCanvas({
             showDownloadPopup={showDownloadPopup}
             setShowDownloadPopup={setShowDownloadPopup}
           />
-        </>
+        </div>
       )}
 
       {/* Batch output (during/after batch run) */}
