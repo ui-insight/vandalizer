@@ -52,6 +52,7 @@ from app.services.context_budget import (
 from app.services.citation_grounding import ground_citation, normalize_citation_markup
 from app.services.approval_claims import unprepared_card_note
 from app.services.chat_output import public_chat_text
+from app.services.chat_budget_tables import reconcile_budget_tables
 from app.services.kb_answer_grounding import (
     expand_snippet_refs,
     tool_output_as_source,
@@ -2691,7 +2692,9 @@ async def chat_stream(
 
             if agent_run.result:
                 usage = agent_run.result.usage()
-                answer = public_chat_text(agent_run.result.output)
+                answer = public_chat_text(reconcile_budget_tables(
+                    agent_run.result.output, streamed_tool_results,
+                ))
                 if not answer:
                     # Never infer success from approval or repeat an action just
                     # because its prose was withheld. Receipts remain visible.
