@@ -1321,6 +1321,8 @@ class TestCreateProject:
 
         assert result["needs_confirmation"] is True
         assert result["action"] == "create_project"
+        assert '"Create project" button' in result["assistant_instruction"]
+        assert "Approve create project" not in result["assistant_instruction"]
         assert "NSF Grant 2026" in result["preview"]
 
     @pytest.mark.asyncio

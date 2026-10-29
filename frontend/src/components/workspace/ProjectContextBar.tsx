@@ -4,7 +4,7 @@ import { useProject } from '../../hooks/useProjects'
 import { ProjectStateBadge } from '../projects/ProjectStateBadge'
 
 export function ProjectContextBar({ onOpenManage, railWidth: fittedRailWidth }: { onOpenManage?: () => void; railWidth?: number }) {
-  const { activeProjectUuid, activeProjectTitle, activeProjectRole, deactivateProject, railDocked, setWorkspaceMode } = useWorkspace()
+  const { activeProjectUuid, activeProjectTitle, activeProjectRole, deactivateProject, railDocked, workspaceMode, setWorkspaceMode } = useWorkspace()
   const { project, error, refresh } = useProject(activeProjectUuid ?? '')
   if (!activeProjectUuid) return null
   const railWidth = fittedRailWidth ?? (railDocked ? 64 : 320)
@@ -15,7 +15,7 @@ export function ProjectContextBar({ onOpenManage, railWidth: fittedRailWidth }: 
       {project && <ProjectStateBadge state={project.state} />}
     </div>
     <div className="project-header-actions">
-      {activeProjectRole !== 'viewer' && <button className="project-button" type="button" onClick={() => setWorkspaceMode('files')}><FolderOpen size={16} />Open files</button>}
+      {activeProjectRole !== 'viewer' && workspaceMode !== 'files' && <button className="project-button" type="button" onClick={() => setWorkspaceMode('files')}><FolderOpen size={16} />Open files</button>}
       {onOpenManage && <button className="project-button" type="button" onClick={onOpenManage} title="View details, tools and sharing"><Settings size={16} />Manage project</button>}
       <button className="project-button project-button-quiet" type="button" onClick={deactivateProject} title="Exit project scope"><LogOut size={15} />Exit project</button>
     </div>

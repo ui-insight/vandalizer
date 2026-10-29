@@ -316,6 +316,7 @@ _APPROVE_BUTTON_LABELS = {
     "revise_html_artifact": "Save new version",
     "select_skill": "Apply Skill selection",
     "propose_obligations": "Add to inbox",
+    "create_project": "Create project",
     "create_workflow": "Create workflow",
     "update_workflow": "Update workflow",
     "create_automation": "Create automation",

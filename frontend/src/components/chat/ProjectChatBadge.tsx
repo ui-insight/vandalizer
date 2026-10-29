@@ -24,14 +24,19 @@ export function ProjectChatBadge({
   const { project } = useProject(projectUuid)
   const [viewingContext, setViewingContext] = useState(false)
   const title = project?.title ?? fallbackTitle ?? 'Project'
-  const kbReady = project?.capabilities?.knowledge.ready
+  const knowledge = project?.capabilities?.knowledge
+  const sourceStatus = !project ? 'Checking availability…'
+    : project.capabilities.files?.count === 0 && knowledge?.documents === 0 ? 'No documents yet'
+    : !knowledge?.ready ? 'Knowledge not ready'
+    : knowledge.documents === 0 ? 'No documents indexed yet'
+    : `Knowledge available${knowledge.documents != null ? ` · ${knowledge.documents} indexed document${knowledge.documents === 1 ? '' : 's'}` : ''}`
 
   return (
     <div className="project-source-bar">
       <BookOpen size={14} aria-hidden="true" style={{ flexShrink: 0 }} />
       <div className="project-source-copy" style={{ display: 'flex', flexWrap: 'wrap', gap: "var(--workspace-space-2) var(--workspace-space-8)", minWidth: 0 }}>
         <span className="project-source-title" title={`Sources for ${title}`}>Project sources</span>
-        <span style={{ fontWeight: 400 }}>{project ? kbReady ? `Knowledge available${project.capabilities.knowledge.documents != null ? ` · ${project.capabilities.knowledge.documents} indexed document${project.capabilities.knowledge.documents === 1 ? '' : 's'}` : ''}` : 'Knowledge not ready' : 'Checking availability…'}</span>
+        <span style={{ fontWeight: 400 }}>{sourceStatus}</span>
         {project?.context && <button type="button" className="min-h-9 rounded border border-slate-300 bg-white px-2 text-xs font-medium text-slate-700" onClick={() => setViewingContext(true)} aria-label="View project context">Project context on</button>}
       </div>
       {viewingContext && project?.context && <PageDialog title="Project context" onClose={() => setViewingContext(false)}><p>Saved guidance for <strong>{title}</strong>. Your current request takes precedence. Edit this brief in Manage project.</p><p className="whitespace-pre-wrap break-words rounded-lg border border-slate-200 bg-slate-50 p-4">{project.context}</p></PageDialog>}

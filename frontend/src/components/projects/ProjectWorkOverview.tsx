@@ -10,7 +10,7 @@ import type { ProjectPin } from '../../types/project'
 /** Routine project work belongs beside the document/tool workspace. */
 export function ProjectWorkOverview({ uuid }: { uuid: string }) {
   const { project, loading, error, refresh } = useProject(uuid)
-  const { activeProjectRole, setWorkspaceMode, focusChat } = useWorkspace()
+  const { activeProjectRole, workspaceMode, setWorkspaceMode, focusChat } = useWorkspace()
   const [expanded, setExpanded] = useState(false)
   const navigate = useNavigate()
   const viewer = activeProjectRole === 'viewer'
@@ -30,7 +30,7 @@ export function ProjectWorkOverview({ uuid }: { uuid: string }) {
       {loading && <span role="status">Loading project overview…</span>}
       {error && <span role="alert">Project overview unavailable. <button type="button" onClick={() => void refresh()}>Retry</button></span>}
       <div className="project-work-overview__actions">
-        {!viewer && <button type="button" onClick={() => setWorkspaceMode('files')}>Open files</button>}
+        {!viewer && workspaceMode !== 'files' && <button type="button" onClick={() => setWorkspaceMode('files')}>Open files</button>}
         <button type="button" onClick={() => { setWorkspaceMode('chat'); focusChat() }}>Ask about project</button>
         {!viewer && <button type="button" aria-expanded={expanded} aria-controls="project-pinned-work" onClick={() => setExpanded(v => !v)}>Pinned tools{!pinsLoading && !pinsError ? ` (${pins.length})` : ''}</button>}
       </div>
