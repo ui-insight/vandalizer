@@ -44,3 +44,18 @@ describe('historical approval evidence', () => {
     expect(approvalHistoryFor(preview, [approval, failed]).preview.label).toBe('Failed')
   })
 })
+
+
+describe('obligation approval receipts', () => {
+  it.each([true, false])('matches the saved batch even when rejected inputs were omitted (same batch: %s)', same => {
+    const original: ChatMessage = { role: 'assistant', content: '',
+      tool_calls: [{ tool_name: 'propose_obligations', tool_call_id: 'batch', args: { obligations: ['accepted', 'rejected'] } }],
+      tool_results: [{ tool_name: 'propose_obligations', tool_call_id: 'batch', quality: null, content: { needs_confirmation: true, approval_key: 'reviewed-batch' } }],
+    }
+    const receipt: ChatMessage = { role: 'assistant', content: '',
+      tool_calls: [{ tool_name: 'propose_obligations', tool_call_id: 'saved', args: { obligations: ['accepted'], confirmed: true } }],
+      tool_results: [{ tool_name: 'propose_obligations', tool_call_id: 'saved', quality: null, content: { ok: true, approval_key: same ? 'reviewed-batch' : 'another-batch', added: [{ title: 'Report' }] } }],
+    }
+    expect(approvalHistoryFor(original, [approval, receipt]).batch.label).toBe(same ? 'Added to inbox' : 'Approval requested')
+  })
+})

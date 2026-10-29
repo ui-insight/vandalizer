@@ -16,6 +16,27 @@ const result = (content: unknown) => ({tool_name:'create_workflow',tool_call_id:
 beforeEach(() => { vi.clearAllMocks() })
 
 describe('tool states and recovery', () => {
+  it('shows a readable mixed obligation batch once without raw checker text or IDs', () => {
+    const onConfirm = vi.fn()
+    const descriptions = ['Final report: Jun 30, 2026 (Award.pdf, p. 2)', 'Invoice: Aug 31, 2026 (Award.pdf, p. 3)', 'Closeout: Sep 30, 2026 (Award.pdf, p. 4)']
+    const { container } = render(<ToolStatusLine call={{ tool_name: 'propose_obligations', tool_call_id: 'mixed', args: {} }}
+      result={{ tool_name: 'propose_obligations', tool_call_id: 'mixed', quality: null, content: {
+        needs_confirmation: true, approval_key: 'internal-fingerprint',
+        preview: 'Raw legacy preview should not be repeated',
+        rejected: [{ title: 'Unsupported report', reason: 'the quote does not state July 30; cite the passage that gives the date' }],
+        obligation_review: { project: 'Award', items: descriptions,
+          excluded: ['Unsupported report', 'RPPR', 'Other report'].map(title => ({ title, explanation: 'The deadline needs clearer source evidence before it can be added.' })) },
+      } }} onConfirm={onConfirm} />)
+    expect(screen.getByRole('list', { name: 'Items to add' }).children).toHaveLength(3)
+    expect(screen.getByRole('list', { name: 'Items not included' }).children).toHaveLength(3)
+    for (const description of descriptions) expect(screen.getAllByText(description)).toHaveLength(1)
+    expect(container).not.toHaveTextContent('cite the passage')
+    expect(container).not.toHaveTextContent('internal-fingerprint')
+    expect(container).not.toHaveTextContent('Raw legacy preview')
+    fireEvent.click(screen.getByRole('button', { name: 'Add to inbox' }))
+    expect(onConfirm).toHaveBeenCalledOnce()
+  })
+
   it('shows the exact Skill instructions before approving selection', () => {
     const onConfirm = vi.fn()
     render(<ToolStatusLine call={{ tool_name: 'select_skill', tool_call_id: 's1', args: { skill_uuid: 'review' } }}

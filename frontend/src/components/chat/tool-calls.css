@@ -24,3 +24,11 @@
 @keyframes agent-tool-spin { to { transform:rotate(360deg); } }
 @media (max-width:600px) { .agent-tool-card { padding:12px; } .agent-tool-heading { gap:5px 8px; } .agent-tool-status { margin-left:0; } }
 @media (prefers-reduced-motion:reduce) { .agent-tool-spin { animation:none; } }
+
+
+/* Keep each reviewed inbox item and its source readable at narrow widths. */
+.agent-obligation-review { line-height: 1.55; overflow-wrap: anywhere; }
+.agent-obligation-review p { margin: 10px 0; }
+.agent-obligation-review ul { list-style: disc; padding-left: 20px; margin: 10px 0 16px; }
+.agent-obligation-review li { margin-bottom: 10px; }
+.agent-obligation-item { white-space: pre-line; }

@@ -144,3 +144,13 @@ def test_explicit_standard_time_is_not_silently_changed_to_daylight_time():
 
 def test_invalid_iso_suffix_is_not_discarded():
     assert _rejected('2026-11-19garbage', 'Due November 19, 2026 at midnight Pacific Time.')
+
+
+def test_date_phrase_is_not_repeated_in_due_text():
+    checked = _ok("2026-06-30", "Reports are due June 30, 2026.", "due June 30, 2026")
+    assert checked["due_text"] is None
+
+
+def test_full_deadline_phrase_keeps_only_the_verified_time_and_zone():
+    checked = _ok("2026-11-19T17:00", NOTICE, "November 19, 2026 at 5:00 p.m. Pacific Time")
+    assert checked["due_text"] == "5:00 p.m. Pacific Time"

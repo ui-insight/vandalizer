@@ -315,6 +315,7 @@ _APPROVE_BUTTON_LABELS = {
     "create_html_artifact": "Save page",
     "revise_html_artifact": "Save new version",
     "select_skill": "Apply Skill selection",
+    "propose_obligations": "Add to inbox",
     "create_workflow": "Create workflow",
     "update_workflow": "Update workflow",
     "create_automation": "Create automation",
@@ -5158,6 +5159,21 @@ def _describe_obligation(clean: dict) -> str:
     return f'{clean["title"]} ({where})'
 
 
+def _obligation_review_reason(reason: str) -> str:
+    """User-facing explanation; checker instructions stay in the tool result."""
+    if "already in" in reason:
+        return "Already included in this inbox or proposal."
+    if "can't open" in reason:
+        return "The source document could not be opened."
+    if "quote was not found" in reason or "page" in reason:
+        return "The supporting passage could not be verified in the document."
+    if any(word in reason for word in ("date", "year", "time", "period", "calendar", "relative", "day")):
+        return "The deadline needs clearer source evidence before it can be added."
+    if "value" in reason or "limit" in reason:
+        return "The figures could not be verified in the supporting passages."
+    return "More supporting information is needed before this item can be added."
+
+
 async def propose_obligations(
     context: RunContext[AgenticChatDeps],
     obligations: list[dict],
@@ -5224,14 +5240,19 @@ async def propose_obligations(
 
     checked = await obligation_service.propose(project, context.deps.user, obligations)
     accepted, rejected = checked["accepted"], checked["rejected"]
-    lines = []
+    descriptions = []
     for a in accepted:
-        line = f"Add: {_describe_obligation(a['clean'])}"
+        line = _describe_obligation(a['clean'])
         if a["replaces"]:
             old = a["replaces"]
             line += f" — replaces {old['due_at'][:10]} ({old['sources'][0]['document_title']})"
-        lines.append(line)
-    lines += [f"Not added: {r['title'] or 'item'} — {r['reason']}" for r in rejected]
+        descriptions.append(line)
+    excluded = [
+        {"title": r["title"] or "Item", "explanation": _obligation_review_reason(r["reason"])}
+        for r in rejected
+    ]
+    lines = [f"Add: {description}" for description in descriptions]
+    lines += [f"Not included: {r['title']} — {r['explanation']}" for r in excluded]
     if not accepted:
         return {
             "error": "None of the proposed items could be checked against their documents.",
@@ -5239,9 +5260,16 @@ async def propose_obligations(
             "hint": "Fix each item using its reason (usually the exact quote or its page) and propose again.",
         }
 
+    from fastapi.encoders import jsonable_encoder
+
+    # Approval covers the actual write, not rejected inputs or model formatting.
+    # Rechecking still enforces access and source evidence. Changed accepted
+    # dates, sources, or replacements require a fresh preview; dropping rejected
+    # items or reordering the same accepted batch does not.
     digest = hashlib.sha256(
-        json.dumps(obligations, sort_keys=True, default=str).encode()
+        json.dumps(sorted(json.dumps(row, sort_keys=True) for row in jsonable_encoder(accepted))).encode()
     ).hexdigest()[:16]
+    approval_key = _confirm_fingerprint("propose_obligations", {"project": project.uuid, "items": digest})
     gate = await _confirm_gate(
         context,
         tool_name="propose_obligations",
@@ -5251,6 +5279,8 @@ async def propose_obligations(
             "preview": f'Add {len(accepted)} item{"s" if len(accepted) != 1 else ""} to the inbox for "{project.title}":\n' + "\n".join(lines),
             "needs_confirmation": True,
             "rejected": rejected,
+            "approval_key": approval_key,
+            "obligation_review": {"project": project.title, "items": descriptions, "excluded": excluded},
         },
         confirmed=confirmed,
     )
@@ -5260,6 +5290,7 @@ async def propose_obligations(
     saved = [await obligation_service.save_checked(project, context.deps.user, a["clean"]) for a in accepted]
     return {
         "ok": True,
+        "approval_key": approval_key,
         "project": project.title,
         "added": [obligation_service.serialize(o, context.deps.user, project.title) for o in saved],
         "rejected": rejected,

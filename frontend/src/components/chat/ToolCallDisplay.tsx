@@ -1182,6 +1182,21 @@ function VerificationLauncher({
 // Exported single-tool status line — used for interleaved segment rendering
 // ---------------------------------------------------------------------------
 
+function ObligationReview({ review }: { review: Record<string, unknown> }) {
+  const items = Array.isArray(review.items) ? review.items.filter((item): item is string => typeof item === 'string') : []
+  const excluded = Array.isArray(review.excluded) ? review.excluded.filter((item): item is Record<string, unknown> => !!item && typeof item === 'object') : []
+  return <div className="agent-obligation-review">
+    <p>{items.length} {items.length === 1 ? 'item' : 'items'} to add to <strong>{String(review.project || 'this project')}</strong></p>
+    <ul aria-label="Items to add">{items.map((item, i) => <li key={i} className="agent-obligation-item">{item}</li>)}</ul>
+    {excluded.length > 0 && <>
+      <p><strong>Not included ({excluded.length})</strong></p>
+      <ul aria-label="Items not included">{excluded.map((item, i) => <li key={i}>
+        <strong>{String(item.title || 'Item')}</strong> — {String(item.explanation || 'More supporting information is needed.')}
+      </li>)}</ul>
+    </>}
+  </div>
+}
+
 /** Whether a tool result reports a failure: the test the status line uses. */
 export function toolResultFailed(name: string, content: unknown): boolean {
   if (certificationPayloadIssue(name, content)) return true
@@ -1271,7 +1286,7 @@ export function ToolStatusLine({
     : obj?.status === 'queued' || obj?.status === 'pending' ? 'Queued'
     : obj?.status === 'running' ? 'Running' : obj?.status === 'paused' ? 'Awaiting approval' : obj?.status && obj.status !== 'completed' ? 'Result received' : 'Completed'
 
-  const actionLabel = ({ select_skill: 'Apply Skill selection', create_workflow: 'Create workflow', update_workflow: 'Update workflow', create_automation: 'Create automation', create_extraction_from_document: 'Create extraction', run_workflow: 'Run workflow', run_validation: 'Run validation', approve_workflow_step: 'Approve step', complete_certification_module: 'Complete module' } as Record<string, string>)[name] ?? approveLabel(name)
+  const actionLabel = ({ propose_obligations: 'Add to inbox', select_skill: 'Apply Skill selection', create_workflow: 'Create workflow', update_workflow: 'Update workflow', create_automation: 'Create automation', create_extraction_from_document: 'Create extraction', run_workflow: 'Run workflow', run_validation: 'Run validation', approve_workflow_step: 'Approve step', complete_certification_module: 'Complete module' } as Record<string, string>)[name] ?? approveLabel(name)
   const target = args.name ?? args.title ?? obj?.default_title
   const artifact = !isActive && !needsConfirmation && !isError && obj
     ? (name === 'create_workflow' || name === 'update_workflow') && typeof obj.workflow_id === 'string' ? { label: 'Open workflow', open: () => openWorkflow(obj.workflow_id as string) }
@@ -1352,7 +1367,7 @@ export function ToolStatusLine({
           {(sourceTarget || activeHint) && <p className="agent-tool-target">{sourceTarget || activeHint}</p>}
         </div>
       </div>
-      {(!isActive || activeHint) && (summaryText || unconfirmed) && <p className="agent-tool-summary">{unconfirmed ? 'No result was received for this call.' : summaryText}</p>}
+      {!(needsConfirmation && name === 'propose_obligations') && (!isActive || activeHint) && (summaryText || unconfirmed) && <p className="agent-tool-summary">{unconfirmed ? 'No result was received for this call.' : summaryText}</p>}
       {result && !isActive && !isError && !needsConfirmation && !canceled && result.quality && (
         <div className="agent-tool-evaluation"><QualityBadge quality={result.quality} showGrade /></div>
       )}
@@ -1401,6 +1416,7 @@ export function ToolStatusLine({
       {artifact && <button type="button" className="chat-action-btn" style={{ margin: "var(--workspace-space-8) 0 var(--workspace-space-8) var(--workspace-space-20)" }} onClick={artifact.open}>{artifact.label}</button>}
       {needsConfirmation && approvalHistory && <section className="agent-approval" aria-label="Earlier action decision">
         <strong>{approvalHistory.label}</strong><p>{approvalHistory.detail}</p>
+        {name === 'propose_obligations' && !!obj?.obligation_review && typeof obj.obligation_review === 'object' && <ObligationReview review={obj.obligation_review as Record<string, unknown>} />}
       </section>}
       {needsConfirmation && !approvalHistory && (
         <section className="agent-approval" aria-label="Review proposed action">
@@ -1409,7 +1425,9 @@ export function ToolStatusLine({
             <summary>Inspect Skill instructions</summary>
             <pre className="max-h-60 overflow-auto whitespace-pre-wrap break-words text-sm">{obj.skill_instructions}</pre>
           </details>}
-          <dl><dt>Action</dt><dd>{actionLabel}</dd>{typeof target === 'string' && <><dt>Name</dt><dd>{target}</dd></>}<dt>Change</dt><dd>{typeof obj?.preview === 'string' ? obj.preview : 'Review the proposed action above before approving.'}</dd></dl>
+          {name === 'propose_obligations' && obj?.obligation_review && typeof obj.obligation_review === 'object'
+            ? <ObligationReview review={obj.obligation_review as Record<string, unknown>} />
+            : <dl><dt>Action</dt><dd>{actionLabel}</dd>{typeof target === 'string' && <><dt>Name</dt><dd>{target}</dd></>}<dt>Change</dt><dd>{typeof obj?.preview === 'string' ? obj.preview : 'Review the proposed action above before approving.'}</dd></dl>}
           {decision && <p>Check the Assistant’s next response for the outcome.</p>}
           {decisionError && <p role="alert">{decisionError}</p>}
           {!decision && !onConfirm && <p>Continue from the latest Assistant response to make a decision about this preview.</p>}

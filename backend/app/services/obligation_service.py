@@ -209,8 +209,9 @@ def check_deadline(
         expected = (stated_time['hour'], stated_time['minute'], stated_time['zone'], stated_time['offset'])
         if len(described) != 1 or (described[0]['hour'], described[0]['minute'], described[0]['zone'], described[0]['offset']) != expected:
             return None, "due_text must describe the same verified time and time zone as due_at"
-    if not text and stated_time is not None:
-        text = stated_time["text"]
+    # Store only the verified time/zone. The date is already in due_at; keeping
+    # the model's full "due June 30, 2026" phrase repeats it in every inbox/card.
+    text = stated_time["text"] if stated_time is not None else None
     if not has_time:
         due = datetime.datetime.combine(due.date(), datetime.time())
     return {"due_at": due, "due_text": text or None}, None
@@ -294,7 +295,7 @@ async def _check_source(raw: dict, user: User, project: Project) -> tuple[Option
         return None, "every source needs a document_uuid and the exact quote"
     doc = await _readable_document(document_uuid, user, project)
     if doc is None:
-        return None, f"document {document_uuid} was not found or you can't open it"
+        return None, "the source document was not found or you can't open it"
     page = raw.get("page") if isinstance(raw.get("page"), int) else None
     text, page = _page_text(doc, page)
     if text is None:

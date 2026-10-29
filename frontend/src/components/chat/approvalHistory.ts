@@ -81,6 +81,22 @@ export function approvalHistoryFor(message: ChatMessage, following: ChatMessage[
         // Retry reuses the user message; the last receipt in this turn wins.
         if (!storedPage) break
       }
+      if (preview.tool_name === 'propose_obligations') {
+        // The model may omit rejected items or reorder accepted ones. Match
+        // the server's write fingerprint, not the model's original arguments.
+        const key = object(preview.content).approval_key
+        if (typeof key === 'string' && key) {
+          for (const response of responses) {
+            const saved = results(response).some(result => {
+              const receipt = object(result.content)
+              return result.tool_name === 'propose_obligations' && receipt.approval_key === key
+                && receipt.ok === true && !receipt.error && !receipt.needs_confirmation
+                && Array.isArray(receipt.added) && receipt.added.length > 0
+            })
+            if (saved) record = { label: 'Added to inbox', detail: 'The reviewed items were saved. This preview is retained as history; see the result below.' }
+          }
+        }
+      }
     }
     output[preview.tool_call_id] = record
   }
