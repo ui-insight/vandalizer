@@ -24,7 +24,9 @@ def test_page_title_is_encoded_as_a_download_filename(title, expected):
     assert response.headers["content-disposition"].startswith('attachment;')
     assert '\r' not in response.headers["content-disposition"]
     assert '\n' not in response.headers["content-disposition"]
-    assert response.body == b'<h1>Budget</h1>'
+    # Downloads receive the same standalone HTML document as the preview.
+    assert b'<h1>Budget</h1>' in response.body
+    assert response.body.startswith(b'<!DOCTYPE html>')
 
 
 @pytest.mark.asyncio

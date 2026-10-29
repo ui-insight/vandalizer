@@ -302,6 +302,7 @@ class TestChatRecordsItsProject:
 
         project = MagicMock()
         project.kb_uuid = None
+        project.default_skill_uuid = None
         project.title = "NSF CAREER 2027"
         with (
             patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),

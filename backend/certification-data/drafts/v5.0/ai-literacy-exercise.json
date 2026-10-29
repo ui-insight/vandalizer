@@ -23,7 +23,7 @@
   "star_criteria": {},
   "assessment_method": "authenticated_scenario_recognition",
   "scenario_bank_id": "v5.0.ai_literacy.scenarios",
-  "scenario_bank_sha256": "046920c6255716a79f03244c9c22b8bedde3a0777db72a9c59cfbfd119a80a18",
+  "scenario_bank_sha256": "5fa53f02bad9065fd1b97e362acd7ef49a1e5e2e07a85af069c7e9c9b2b1520b",
   "chat_practice": {
     "document": "nsf-proposal-alpine-ecology.pdf",
     "bounded_question": "What total amount does this proposal request?",

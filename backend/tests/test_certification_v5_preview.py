@@ -79,7 +79,7 @@ def test_preview_cannot_write_to_application_registry(location):
         preview.assemble(location, VERSION)
 
 
-@pytest.mark.parametrize('problem', ['missing_case', 'mismatched_case', 'stale_lesson', 'legacy_scoring'])
+@pytest.mark.parametrize('problem', ['missing_case', 'mismatched_case', 'stale_lesson', 'legacy_scoring', 'stale_scenario_bank'])
 def test_incomplete_or_contradictory_preview_leaves_no_partial_output(tmp_path, problem):
     data = tmp_path / 'data'
     data.mkdir()
@@ -90,6 +90,11 @@ def test_incomplete_or_contradictory_preview_leaves_no_partial_output(tmp_path, 
     draft = data / 'drafts/v5.0'
     if problem == 'missing_case':
         (draft / 'governance-capstone-case.json').unlink()
+    elif problem == 'stale_scenario_bank':
+        path = draft / 'ai-literacy-exercise.json'
+        value = json.loads(path.read_text())
+        value['scenario_bank_sha256'] = '0' * 64
+        path.write_text(json.dumps(value))
     elif problem == 'stale_lesson':
         path = draft / 'foundations-teaching.json'
         value = json.loads(path.read_text())

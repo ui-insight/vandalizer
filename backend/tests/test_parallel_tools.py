@@ -19,6 +19,7 @@ from app.services.chat_tools import (
 WRITE_TOOLS = {
     "select_skill",
     "create_html_artifact", "revise_html_artifact",
+    "move_documents_to_project",
     # Not a user-data write, but must serialize: it mutates shared
     # deps.plan_state (Phase 8).
     "update_plan",
@@ -38,7 +39,7 @@ WRITE_TOOLS = {
 
 # Page reads already use the conservative sequential default and are excluded
 # from compaction. Classify them without changing their runtime behavior.
-SEQUENTIAL_READ_TOOLS = {"get_html_artifact"}
+SEQUENTIAL_READ_TOOLS = {"get_html_artifact", "find_page_templates", "get_page_template"}
 
 
 class TestParallelSafeClassification:
@@ -78,6 +79,8 @@ class TestAgentRegistration:
         flags = {name: t.sequential for name, t in agent._function_toolset.tools.items()}
         for name in WRITE_TOOLS:
             assert flags[name] is True, f"{name} must be sequential"
+        for name in SEQUENTIAL_READ_TOOLS:
+            assert flags[name] is True, f"{name} must remain sequential"
         for name in PARALLEL_SAFE_TOOLS:
             assert flags[name] is False, f"{name} should run concurrently"
 

@@ -145,6 +145,8 @@ async def test_quality_status_route_returns_drift():
         patch("app.models.verification.VerifiedItemMetadata", verified),
         patch("app.services.quality_service.get_latest_validation", AsyncMock(return_value=latest)),
         patch("app.services.quality_service.item_validation_drift", AsyncMock(return_value=drift)),
+        patch("app.models.system_config.SystemConfig.get_config", AsyncMock(
+            return_value=SimpleNamespace(get_quality_config=lambda: {}))),
         patch.object(workflows_router, "get_authorized_workflow",
                      AsyncMock(return_value=SimpleNamespace(validation_plan=[], steps=[], input_config={}))),
     ):
