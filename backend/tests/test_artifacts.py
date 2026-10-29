@@ -271,7 +271,8 @@ async def test_exact_yearly_budget_values_survive_revision_and_publication(clien
     assert published.status_code == 200
     response = await client.get(f'/api/pages/public/{published.json()["public_token"]}/content')
     assert response.status_code == 200
-    assert response.text == artifacts.revision(second)["html"]
+    assert "vandalizer-print-style" in response.text
+    assert "vandalizer-print-style" not in artifacts.revision(second)["html"]
     soup = BeautifulSoup(response.text, 'html.parser')
     rows = [[cell.get_text(strip=True) for cell in row.select('th, td')] for row in soup.select('tr')]
     assert rows == [

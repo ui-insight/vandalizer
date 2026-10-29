@@ -1,6 +1,6 @@
 # Pages
 
-Implementation for [roadmap #1059](https://github.com/ui-insight/vandalizer/issues/1059). This first release hosts self-contained **static HTML/CSS pages**. It does not execute JavaScript, host server applications, load remote assets, or install Skill scripts.
+Implementation for [roadmap #1059](https://github.com/ui-insight/vandalizer/issues/1059). This first release hosts self-contained **static HTML/CSS pages**. It does not execute authored JavaScript, host server applications, load remote assets, or install Skill scripts.
 
 ## Creating and reviewing
 
@@ -25,6 +25,14 @@ The main public link shows the version last published to it; **Publish updates**
 
 **Remove public link** disables the main token; **Remove version N link** disables only that separate link. Other public links stay active. Republishing a removed link creates a new token, so old revoked links remain invalid. Deleting clears all revisions and revokes every public link, retaining only a tombstone to prevent delayed retries from recreating the page. Previously downloaded files or already loaded pages cannot be recalled. Sharing a page does not grant access to its source chat, documents, or workflow. Quotations included in the page itself are disclosed when that page is published.
 
+## Printing
+
+Use **Print / Save as PDF** in the viewer to open the selected version's print dialog in a separate tab. **Open full page** also includes a print button. Choose a printer or the browser's PDF destination in that dialog.
+
+Delivered Pages include print colour preservation rules so CSS chart bars print with background graphics disabled. Existing saved versions and HTML downloads receive the same print styling without changing stored source or creating a revision. Browsers supporting [CSS page margin boxes](https://developer.chrome.com/blog/print-margins) (including Chrome 131+) include the selected revision's title, version number, and saved date in UTC on each printed sheet. Browser or printer preferences can still override colour handling.
+
+Previews and downloads remain script-free. Full-page and print views permit only a nonce-authorized application print handler, with sandbox permission for the print dialog. Authored scripts, network requests, and same-origin privileges remain blocked.
+
 ## Rendering and storage
 
 Page content is served with a restrictive CSP including `sandbox`, `script-src 'none'`, `connect-src 'none'`, `frame-src 'none'`, `form-action 'none'`, and `base-uri 'none'`. The viewer also uses an iframe with an empty `sandbox` attribute. Raw HTML is reconstructed with an allowlist: scripts, event handlers, forms, embedded frames, SVG/MathML, remote images, and external stylesheet elements are removed. CSS may be inline; CSP blocks remote resources referenced by CSS. Small raster images can be embedded as data URLs. Warnings report removed unsupported content so owners can inspect the actual saved result.
@@ -34,7 +42,7 @@ Storage is the MongoDB `html_artifacts` collection, registered with the existing
 ## Deployment
 
 - Deploy the API and frontend together and restart workflow workers for automatic page delivery.
-- Keep existing same-origin `/api/` proxying and SPA fallback routes for `/pages/*` and `/a/*`. No extra domain is required for this static, script-free release.
+- Keep existing same-origin `/api/` proxying and SPA fallback routes for `/pages/*` and `/a/*`. No extra domain is required for this static HTML release.
 - Preserve API `Content-Security-Policy`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store`, and `X-Robots-Tag` headers. Do not add a blanket `X-Frame-Options: DENY` to API responses, and do not cache page content at a CDN or proxy.
 - `ARTIFACT_PUBLIC_SHARING_ENABLED=false` disables new publishing **and all existing public link reads**. Private links continue to work. Default is `true`; owners must still explicitly publish each page.
 - Include `html_artifacts` in normal MongoDB backups. Restore publication state deliberately, since restoring older backups also restores their access settings.

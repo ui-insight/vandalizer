@@ -5,6 +5,7 @@ import * as api from '../api/artifacts'
 import { PagesBrowser } from '../components/artifacts/PagesBrowser'
 import { PageBadge, PageDialog, PagePreview, pagesUrl } from '../components/artifacts/PagePrimitives'
 import { listTeams } from '../api/teams'
+import { PagePrintLink, pageViewUrl } from '../components/artifacts/PagePrintLink'
 
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : 'Could not complete this action. Please try again.'
 
@@ -107,15 +108,16 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
       </div>}
     </div>
     {!loading && (artifact || publicInfo) && <div className="page-actions">
+      <PagePrintLink contentUrl={contentUrl} />
       <a className="page-button" href={`${contentUrl}${contentUrl.includes('?') ? '&' : '?'}download=true`}><Download size={16} />Download HTML</a>
       {artifact?.can_manage && <><button className="page-button" disabled={busy || !!editor} onClick={() => { setNotice(''); setError(''); setRequestChanges(true) }}><MessageSquare size={16} />Request changes</button><button className="page-button page-button-primary" disabled={busy} onClick={openSharing}><Share2 size={16} />Share</button></>}
-      {publicToken && <a className="page-button page-button-primary" href={contentUrl} target="_blank" rel="noreferrer"><ArrowUpRight size={16} />Open full page</a>}
+      {publicToken && <a className="page-button page-button-primary" href={pageViewUrl(contentUrl, 'full')} target="_blank" rel="noreferrer"><ArrowUpRight size={16} />Open full page</a>}
     </div>}</header>
     {!sharing && !requestChanges && !confirmDelete && !editor && feedback}
     {loading && <p role="status" className="pages-loading">Loading your page…</p>}
     {!loading && !artifact && !publicInfo && <div className="pages-empty"><FileText size={32} /><h2>Page unavailable</h2><p>{publicToken ? 'This link may have been removed. Ask the owner for a current link.' : 'The page may have been removed, or your access may have changed.'}</p><button className="page-button" onClick={() => setAttempt(n => n + 1)}>Try again</button></div>}
     {!loading && (artifact || publicInfo) && <>
-      {artifact && <div className="page-revision-bar">{artifact.can_manage ? <label>Version<select aria-label="Page version" disabled={busy || !!editor} value={selected} onChange={e => setSelected(e.target.value)}>{artifact.revisions.map((r, index) => <option key={r.uuid} value={r.uuid}>Version {r.version ?? index + 1}{isPublished(r.uuid) ? ' · published' : ''}{r.uuid === artifact.latest_revision ? ' · latest' : ''}</option>)}</select></label> : <span>Shared version {version}</span>}<a className="page-text-button" href={contentUrl} target="_blank" rel="noreferrer"><ArrowUpRight size={14} />Open full page</a></div>}
+      {artifact && <div className="page-revision-bar">{artifact.can_manage ? <label>Version<select aria-label="Page version" disabled={busy || !!editor} value={selected} onChange={e => setSelected(e.target.value)}>{artifact.revisions.map((r, index) => <option key={r.uuid} value={r.uuid}>Version {r.version ?? index + 1}{isPublished(r.uuid) ? ' · published' : ''}{r.uuid === artifact.latest_revision ? ' · latest' : ''}</option>)}</select></label> : <span>Shared version {version}</span>}<a className="page-text-button" href={pageViewUrl(contentUrl, 'full')} target="_blank" rel="noreferrer"><ArrowUpRight size={14} />Open full page</a></div>}
       {hasDraft && publishedVersion > 0 && !selectedIsPublished && <p className="page-revision-note">You’re previewing version {version}. The public link still shows version {publishedVersion}. Share → Publish updates when you’re ready.</p>}
       {!!revision?.warnings.length && <div className="page-revision-note"><strong>Some content was removed to keep this page safe.</strong>{revision.warnings.map(w => <p key={w}>{w}</p>)}</div>}
       <PagePreview key={contentUrl} src={contentUrl} title={title} />

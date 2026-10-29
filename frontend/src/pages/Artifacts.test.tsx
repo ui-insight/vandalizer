@@ -32,7 +32,7 @@ it('shows the pinned public page without loading private metadata or management 
   expect(frame).toHaveAttribute('referrerpolicy', 'no-referrer')
   expect(frame).toHaveAttribute('src', '/api/pages/public/public-link/content?revision=r2')
   expect(screen.getByRole('link', { name: 'Download HTML' })).toHaveAttribute('href', '/api/pages/public/public-link/content?revision=r2&download=true')
-  expect(screen.getByRole('link', { name: 'Open full page' })).toHaveAttribute('href', '/api/pages/public/public-link/content?revision=r2')
+  expect(screen.getByRole('link', { name: 'Open full page' })).toHaveAttribute('href', '/api/pages/public/public-link/content?revision=r2&view=full')
 })
 
 it('does not invent an update date when public metadata has an invalid timestamp', async () => {

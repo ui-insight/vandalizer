@@ -16,6 +16,7 @@ from app.schemas.artifact import ChatArtifactRequest, CreateArtifactRequest, Pub
 from app.schemas.chat_export import ChatExportRequest
 from app.services import access_control, artifacts
 from app.services.chat_export import render_chat_export
+from app.services.page_printing import render_page
 from app.tasks import get_sync_db
 from app.utils.content_disposition import content_disposition
 
@@ -77,11 +78,12 @@ async def authorized(uuid, user, manage=False):
     raise HTTPException(404, "Page not found")
 
 
-def content_response(rev, download=False):
+def content_response(rev, download=False, *, version=1, view="content"):
     title = rev["title"].strip() or "Page"
     filename = title if title.lower().endswith(".html") else f"{title}.html"
-    return HTMLResponse(rev["html"], headers={
-        "Content-Security-Policy": artifacts.CONTENT_CSP, "X-Frame-Options": "SAMEORIGIN",
+    html, csp = render_page(rev, version, "content" if download else view)
+    return HTMLResponse(html, headers={
+        "Content-Security-Policy": csp, "X-Frame-Options": "SAMEORIGIN",
         "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Robots-Tag": "noindex, nofollow",
         **({"Content-Disposition": content_disposition(filename)} if download else {}),
     })
@@ -159,13 +161,15 @@ async def get_public(token: str, response: Response, settings: Settings = Depend
 
 
 @router.get("/public/{token}/content")
-async def public_content(token: str, download: bool = False, revision: str | None = None, settings: Settings = Depends(get_settings)):
-    _, rev = await public_doc(token, settings)
+async def public_content(token: str, download: bool = False, revision: str | None = None,
+                         view: Literal["content", "full", "print"] = "content", settings: Settings = Depends(get_settings)):
+    doc, rev = await public_doc(token, settings)
     # Keep a viewer's version/date label matched to the HTML even if the owner
     # publishes again between the metadata request and the iframe request.
     if revision is not None and revision != rev["uuid"]:
         raise HTTPException(409, "The published page changed. Reload the page to view the current version.")
-    return content_response(rev, download)
+    version = next(i for i, item in enumerate(doc["revisions"], 1) if item["uuid"] == rev["uuid"])
+    return content_response(rev, download, version=version, view=view)
 
 
 @router.get("/{uuid}")
@@ -175,8 +179,12 @@ async def get_artifact(uuid: str, user: User = Depends(get_current_user), settin
 
 
 @router.get("/{uuid}/revisions/{revision}/content")
-async def private_content(uuid: str, revision: str, download: bool = False, user: User = Depends(get_current_user)):
-    return content_response(artifacts.revision(await authorized(uuid, user), revision), download)
+async def private_content(uuid: str, revision: str, download: bool = False,
+                          view: Literal["content", "full", "print"] = "content", user: User = Depends(get_current_user)):
+    doc = await authorized(uuid, user)
+    rev = artifacts.revision(doc, revision)
+    version = rev.get("version") or next(i for i, item in enumerate(doc["revisions"], 1) if item["uuid"] == revision)
+    return content_response(rev, download, version=version, view=view)
 
 
 @router.get("/{uuid}/revisions/{revision}/source")
