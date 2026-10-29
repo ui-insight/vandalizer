@@ -102,8 +102,9 @@ backend-static: certification-release-check backend-lint backend-security endpoi
 backend-backlog: backend-typecheck backend-audit
 
 # Advisory jobs split for independent progress tracking. Both are non-blocking
-# in CI today: backend-typecheck has ~924 errors (mypy was added late), and
-# backend-audit has open CVEs in indirect deps. As either reaches zero, flip
+# in CI today: backend-typecheck has an existing typing backlog, and
+# backend-audit has unresolved Chroma CVEs. See docs/v5-release-readiness.md.
+# As either reaches zero, flip
 # the corresponding `continue-on-error` to `false` in .github/workflows/ci.yaml.
 
 backend-test-integration-t1:

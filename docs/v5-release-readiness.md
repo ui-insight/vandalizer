@@ -37,7 +37,8 @@ patched. Re-audit before release and retain this as an unresolved security item.
 ## Typing
 
 The starting mypy run reports 3,141 errors, including 2,345 missing-annotation
-errors. The workflow remains advisory. The initial cleanup corrects concrete
+errors. After this pass, 3,098 errors remain; all ten modified modules are clear.
+The workflow remains advisory. The initial cleanup corrects concrete
 types and narrowing in budget reconciliation, page locators, attachment source
 tracking, extraction generation filters, catalog descriptions, templates,
 certificate rendering, scheduling and certification outcome contracts.
@@ -49,6 +50,11 @@ Clearing the whole backend remains a separate, substantial refactor.
 - Focused backend regressions: 171 passed, including real PDF form filling,
   budget reconciliation, page provenance, scheduling, source checks and
   certificate rendering. Ruff passes.
+- The additional malformed-schedule regression passes (37 schedule tests).
+- Frontend production build passes. Four suites that timed out under concurrent
+  local workloads pass in isolation (110 tests, one worker and a 30-second
+  local timeout). The broad local duplicate runs were stopped; full-suite
+  results are taken from CI with its unchanged timeout settings.
 - Local certification release rehearsal: passed against a disposable MongoDB
   and temporary catalog. It exercises publication, default selection, existing
   learner preservation, worker release mismatch, production refusal,

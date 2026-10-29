@@ -65,7 +65,6 @@ def scan_backend():
     os.environ.setdefault("ENABLE_TRIAL_SYSTEM", "true")
     os.environ.setdefault("TELEMETRY_COLLECTOR_ENABLED", "true")
     sys.path.insert(0, str(REPO / "backend"))
-    from fastapi.routing import APIRoute
     from app.main import app, get_settings
 
     # setdefault loses to a shell or .env that already sets these false; the
@@ -79,9 +78,17 @@ def scan_backend():
             print(f"warning: {flag} resolved false (set in your shell or .env) "
                   f"— its routes are missing from this map", file=sys.stderr)
 
+    return _route_records(app)
+
+
+def _route_records(app):
+    from fastapi.routing import APIRoute, iter_route_contexts
+
     routes = []
-    for route in app.routes:
-        if not isinstance(route, APIRoute):
+    # Included routers are lazy in current FastAPI. The public context iterator
+    # applies nested mount prefixes and inherited dependencies, as OpenAPI does.
+    for route in iter_route_contexts(app.routes):
+        if not isinstance(route.original_route, APIRoute):
             continue
         fn = route.endpoint
         try:

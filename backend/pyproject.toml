@@ -4,7 +4,7 @@ version = "5.0.0"
 description = "Vandalizer Next - FastAPI backend"
 requires-python = ">=3.11,<3.13"
 dependencies = [
-    "fastapi>=0.115,<1",
+    "fastapi>=0.162,<1",
     "uvicorn[standard]>=0.34,<1",
     "beanie>=1.27,<3",
     "motor>=3.6,<4",
