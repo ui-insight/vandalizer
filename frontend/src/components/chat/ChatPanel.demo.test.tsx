@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   messages: [] as ChatMessage[],
   error: null as string | null,
   queuedMessages: [] as string[],
+  awaitingPageApproval: false,
   isStreaming: false,
   segments: [] as StreamSegment[],
   thinkingContent: '',
@@ -54,7 +55,7 @@ vi.mock('../../hooks/useProjects', () => ({ useProject: () => ({ project: null }
 vi.mock('../../hooks/useOnboarding', () => ({ useOnboarding: () => ({ pills: [], isFirstSession: true, loading: false, status: null }) }))
 vi.mock('../../hooks/useChat', () => ({ useChat: () => ({
   activity: mocks.activity, streamingContent: mocks.streamingContent, toolResults: mocks.toolResults,
-  messages: mocks.messages, activityId: mocks.activityId, segments: mocks.segments, thinkingContent: mocks.thinkingContent, activeToolCalls: mocks.activeToolCalls, queuedMessages: mocks.queuedMessages, error: mocks.error, planTasks: [], contextNotices: [],
+  messages: mocks.messages, activityId: mocks.activityId, segments: mocks.segments, thinkingContent: mocks.thinkingContent, activeToolCalls: mocks.activeToolCalls, queuedMessages: mocks.queuedMessages, awaitingPageApproval: mocks.awaitingPageApproval, error: mocks.error, planTasks: [], contextNotices: [],
   activeSkill: mocks.activeSkill, isSelectingSkill: mocks.isSelectingSkill,
   projectSkillBlocked: mocks.blocked, conversationUuid: mocks.conversationUuid, isStreaming: mocks.isStreaming, loadHistory: mocks.loadHistory, contextTokens: 0, initializeProjectSkill: vi.fn(), send: mocks.send, selectSkill: mocks.selectSkill, resumeQueuedMessages: mocks.resumeQueuedMessages,
 }) }))
@@ -88,6 +89,7 @@ beforeEach(() => {
   mocks.listSearchSets.mockResolvedValue([])
   mocks.error = null
   mocks.queuedMessages = []
+  mocks.awaitingPageApproval = false
   mocks.conversationUuid = null
   mocks.activityId = null
   mocks.messages = []
@@ -406,4 +408,22 @@ describe('Page preparation progress in the conversation', () => {
     expect(screen.queryByRole('status', { name: 'Assistant progress' })).not.toBeInTheDocument()
     expect(screen.queryByText(/elapsed/)).not.toBeInTheDocument()
   })
+})
+
+it('explains why a queued edit waits and keeps Save available', () => {
+  mocks.conversationUuid = 'pages'
+  mocks.activityId = 'page-activity'
+  mocks.queuedMessages = ['Add a summary at the top']
+  mocks.awaitingPageApproval = true
+  mocks.messages = [{ role: 'assistant', content: 'Click Save new version to save it.',
+    tool_calls: [{ tool_name: 'revise_html_artifact', tool_call_id: 'footer', args: { title: 'Budget' } }],
+    tool_results: [{ tool_name: 'revise_html_artifact', tool_call_id: 'footer', quality: null, content: {
+      needs_confirmation: true, preview_id: 'footer-preview', artifact_preview_html: '<footer>Prepared for grant admins</footer>',
+    } }],
+  }]
+  renderPanel()
+  expect(screen.getByText(/Queued messages are waiting for your Page decision/)).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Send queued messages' })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Save new version' })).toBeEnabled()
+  expect(screen.queryByText('Earlier action preview')).not.toBeInTheDocument()
 })

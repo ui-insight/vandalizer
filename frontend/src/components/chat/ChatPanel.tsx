@@ -89,6 +89,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     compactionStatus,
     planTasks,
     queuedMessages,
+    awaitingPageApproval,
     queueMessage,
     resumeQueuedMessages,
     suggestedModel,
@@ -1419,13 +1420,15 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         {/* Pending requests wait for their own turns. */}
         {queuedMessages.length > 0 && (
           <div className="mt-2 space-y-1">
-            {!isStreaming && <div className="text-xs text-gray-600"><p>These messages have not been sent yet.</p><button type="button" className="underline" onClick={resumeQueuedMessages}>Send queued messages</button></div>}
+            {!isStreaming && <div className="text-xs text-gray-600">{awaitingPageApproval
+              ? <p role="status">Queued messages are waiting for your Page decision. Save or cancel the preview above before continuing. If saving failed, retry the save first.</p>
+              : <><p>These messages have not been sent yet.</p><button type="button" className="underline" onClick={resumeQueuedMessages}>Send queued messages</button></>}</div>}
             {queuedMessages.map((m, i) => (
               <div key={`${i}-${m.slice(0, 24)}`} className="flex justify-end">
                 <div className="max-w-[80%] rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-1.5 text-sm text-gray-600">
                   {m}
                   <span className="ml-2 text-xs font-medium uppercase tracking-wide text-gray-600">
-                    {isStreaming ? 'Queued' : 'Waiting for next turn'}
+                    {isStreaming ? 'Queued' : awaitingPageApproval ? 'Waiting for Page decision' : 'Waiting for next turn'}
                   </span>
                 </div>
               </div>

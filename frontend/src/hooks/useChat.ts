@@ -1,3 +1,4 @@
+import { hasPendingPageApproval, pageDecision } from '../lib/pageApprovals'
 import { isPagePreparation } from '../lib/chatProgress'
 import { getProjectDefaultSkill } from '../api/projects'
 import { useState, useCallback, useEffect, useRef } from 'react'
@@ -107,6 +108,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
   const [queuedMessages, setQueuedMessages] = useState<string[]>([])
   const queuedRequestsRef = useRef<SendArgs[]>([])
   const [queuePaused, setQueuePaused] = useState(false)
+  const awaitingPageApproval = hasPendingPageApproval(messages)
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const historyLoadVersion = useRef(0)
   const [activeSkill, setActiveSkill] = useState<SkillSnapshot | null>(null)
@@ -207,7 +209,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
 
   const send = useCallback(
     async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuids?: string[], includeOnboardingContext?: boolean, folderUuids?: string[], isFirstSession?: boolean, runDemo?: boolean, projectUuid?: string, skillUuid?: string, pageApproval?: string, retry = false) => {
-      if (abortRef.current) {
+      if (abortRef.current || (awaitingPageApproval && !pageApproval && !pageDecision(message) && !retry)) {
         await queueMessage(message, documentUuids, model, knowledgeBaseUuids, includeOnboardingContext, folderUuids, isFirstSession, runDemo, projectUuid, skillUuid, pageApproval)
         return
       }
@@ -530,23 +532,24 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
         if (ownsView()) clearLiveTurn()
       }
     },
-    [activityId, conversationUuid, isLoadingHistory, isSelectingSkill, projectSkillBlocked, activeSkill, clearLiveTurn, queueMessage],
+    [activityId, conversationUuid, isLoadingHistory, isSelectingSkill, projectSkillBlocked, activeSkill, clearLiveTurn, queueMessage, awaitingPageApproval],
   )
 
   useEffect(() => {
-    if (isStreaming || abortRef.current || isLoadingHistory || isSelectingSkill || projectSkillBlocked || error || queuePaused) return
+    if (isStreaming || abortRef.current || isLoadingHistory || isSelectingSkill || projectSkillBlocked || error || queuePaused || awaitingPageApproval) return
     if (conversationUuid && !activityId) return
     const next = queuedRequestsRef.current.shift()
     if (!next) return
     setQueuedMessages(queuedRequestsRef.current.map(request => request[0]))
     void send(...next)
-  }, [queuedMessages, isStreaming, isLoadingHistory, isSelectingSkill, projectSkillBlocked, error, queuePaused, conversationUuid, activityId, send])
+  }, [queuedMessages, isStreaming, isLoadingHistory, isSelectingSkill, projectSkillBlocked, error, queuePaused, awaitingPageApproval, conversationUuid, activityId, send])
 
   const resumeQueuedMessages = useCallback(() => {
+    if (awaitingPageApproval) return
     setError(null)
     setErrorDetails(null)
     setQueuePaused(false)
-  }, [])
+  }, [awaitingPageApproval])
 
   /** Hand the view over to another conversation. The in-flight stream keeps
    * running server-side and its turn is saved there; it just stops writing
@@ -698,6 +701,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
     compactionStatus,
     planTasks,
     queuedMessages,
+    awaitingPageApproval,
     queueMessage,
     resumeQueuedMessages,
     setContextTokens,
