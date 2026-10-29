@@ -32,6 +32,7 @@ from app.services.chat_deps import AgenticChatDeps
 from app.services.chat_page_templates import find_page_templates, get_page_template
 from app.services.chat_artifact_tools import create_html_artifact, get_html_artifact, revise_html_artifact
 from app.services.chat_skill_tools import get_skill, list_skills, select_skill
+from app.services.chat_file_tools import list_projects, move_documents_to_project
 from app.services.certification_versions.runtime import course_operation
 from app.services.certification_versions.tool_results import (
     CheckResult, CompletionResult, LessonResult, ModuleResult, ProgressResult,
@@ -315,7 +316,7 @@ def _doc_text_unavailable_err(doc: "SmartDocument") -> dict:
 _APPROVE_BUTTON_LABELS = {
     "create_html_artifact": "Save page",
     "revise_html_artifact": "Save new version",
-    "select_skill": "Apply Skill selection",
+    "select_skill": "Use Skill",
     "propose_obligations": "Add to inbox",
     "create_project": "Create project",
     "create_workflow": "Create workflow",
@@ -325,6 +326,7 @@ _APPROVE_BUTTON_LABELS = {
     "run_workflow": "Run workflow",
     "run_validation": "Run validation",
     "complete_certification_module": "Complete module",
+    "move_documents_to_project": "Move files",
 }
 
 
@@ -436,7 +438,7 @@ async def _confirm_gate(
     # are now indexed") on the preview turn even though nothing was written,
     # leaving the user thinking the write happened when it did not.
     out["status"] = "awaiting_user_confirmation"
-    label = approve_button_label(tool_name)
+    label = preview.get("approval_label") or approve_button_label(tool_name)
     staged_action = "The Page" if tool_name in {"create_html_artifact", "revise_html_artifact"} else f"'{tool_name}'"
     out["assistant_instruction"] = (
         f"This action has NOT been performed. {staged_action} is only staged and "
@@ -5154,6 +5156,15 @@ def _describe_obligation(clean: dict) -> str:
         when = f'{clean["due_at"]:%b %-d, %Y}'
         if clean.get("due_text"):
             when += f', {clean["due_text"]}'
+        if clean.get("deadline_calculation"):
+            calculation = clean["deadline_calculation"]
+            evidence = "; ".join(
+                f'{s.role.replace("_", " ")}: "{s.quote}" ({s.document_title}'
+                + (f', p. {s.page}' if s.page else '') + ')'
+                for s in clean["sources"]
+            )
+            return (f'{clean["title"]}: {when}\nFormula: {calculation.formula}. '
+                    f'Anchor day excluded; no weekend/holiday adjustment.\n{evidence}')
         return f'{clean["title"]}: {when} ({where})'
     if clean["kind"] == "limit":
         unit = clean.get("unit") or ""
@@ -5191,13 +5202,21 @@ async def propose_obligations(
     to a project. Read the documents first (get_document_text), then propose
     each item with the exact quote it comes from. Each item is checked against
     its document: the quote must be on the cited page, a deadline's date must
-    be in its quote, and a limit's figures in theirs. Items that fail come back
+    be stated or calculated by the server from a relative rule and dated periods,
+    and a limit's figures in theirs. Items that fail come back
     with the reason and are not saved. Call with confirmed=false to show the
     user what will be added; save only after they approve.
 
     Rules:
     - Only what the documents state. No deadline, page limit or rule the
       sources don't give; the project period is not a deadline.
+    - For relative reporting deadlines, set relative_deadline=true. The server
+      computes calendar dates, including leap years, and expands recurring rules.
+      Do not do date arithmetic yourself. Every formula and source is shown for
+      RA approval before saving. Do not treat a rejected relative rule as absent.
+    - Use one timing source per rule, one period_of_performance source with the
+      quoted start/end dates, and (for RPPR) a budget_period source per explicitly
+      dated budget period. Never assume budget periods from the performance period.
     - When an amendment changes a date, propose the new date: the inbox shows
       it replacing the old one.
     - A promised item is not a received one: a letter that is "promised" is
@@ -5218,6 +5237,13 @@ async def propose_obligations(
             stated time only if the quote gives one, with no UTC offset. Never
             add a year, time or zone the quotes don't state; if the deadline's
             quote lacks the year, add a second source quote that states it.
+            Relative deadlines instead add "relative_deadline": true and omit
+            due_at/due_text. Sources use roles "timing", "period_of_performance",
+            and "budget_period". Supported rules: N days before/after the end of
+            each budget period; N days after the end of the Period of Performance;
+            within N days of each June 30 and December 31 (or other annual dates).
+            Cite one period per passage, with full dates and its period label.
+            Business-day rules, exceptions, and missing period dates need clarification.
             Limits add "limit_value", "observed_value" and "unit" ("$" or "%").
         project_uuid: The project; defaults to the one open in chat.
         confirmed: Must be true to save; false returns a preview.
@@ -5326,7 +5352,9 @@ async def create_project(
 
     Call first with confirmed=false to preview. Then call again with confirmed=true
     after the user approves — this creates a folder plus a knowledge base and
-    mutates workspace state.
+    mutates workspace state. It does not move attached files. Use
+    move_documents_to_project with the returned project_uuid to preview that
+    separate action when the user wants existing files added.
 
     Args:
         context: The call context.
@@ -5371,10 +5399,10 @@ async def create_project(
         "kb_uuid": project.kb_uuid,
         "state": project.state,
         "message": (
-            f'Created the project "{project.title}". Add files to it as they come in — '
-            "each one is automatically indexed into the project's knowledge base, so you "
-            "can chat across the entire project without building a separate KB. Open the "
-            "project to start adding documents."
+            f'Created the project "{project.title}". Attached files have not been moved. '
+            "Existing files can be moved here after a separate approval, or through "
+            "the project's Files → Add → From my files. Added files are automatically "
+            "indexed in the background for project-wide chat."
         ),
     }
 
@@ -6944,8 +6972,10 @@ TOOLS = [
     regenerate_validation_plan,
     # Phase 7 — Output artifacts
     save_to_folder,
-    # Phase 8 — Projects. create_project works anytime; the rest need a project open.
+    # Phase 8 — Projects. Discovery, creation and moves also work outside a project.
     create_project,
+    list_projects,
+    move_documents_to_project,
     list_project_documents,
     run_pin_on_project,
     pin_to_project,
@@ -7001,6 +7031,7 @@ COMPACTABLE_TOOLS: frozenset[str] = frozenset({
     "list_test_cases",
     "list_optimization_recommendations",
     "list_project_documents",
+    "list_projects",
     "get_certification_progress",
     "get_certification_module",
     "get_certification_lesson",

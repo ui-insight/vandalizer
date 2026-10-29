@@ -305,9 +305,14 @@ HELP_TOPICS: list[dict] = [
         "aliases": [
             "upload", "uploading", "upload documents", "upload pdf", "files tab",
             "folder", "team folder", "shared folder", "how to upload",
-            "supported formats",
+            "supported formats", "from my files", "existing files", "attach existing files",
         ],
         "body": (
+            "**To reuse an existing file:** in chat, choose **Add → From my files**, "
+            "search, select files, and click **Attach**. This uses the existing documents "
+            "without moving or uploading them again. In a project's Files tab, "
+            "**Add → From my files** lets you select and move files into the displayed "
+            "folder. Review the destination before clicking **Move files here**.\n\n"
             "**To upload:**\n"
             "1. Click **Files** in the left sidebar\n"
             "2. Click **Upload** (or drag-and-drop onto the file list)\n"
@@ -590,11 +595,17 @@ HELP_TOPICS: list[dict] = [
             "**Why it beats a plain folder:** every file you add to a project "
             "is automatically indexed into the project's knowledge base. So "
             "project-wide chat — *\"what do all these documents say about "
-            "cost share?\"* — works immediately, with **no separate knowledge "
+            "cost share?\"* — works once indexing finishes, with **no separate knowledge "
             "base to build or maintain**. Drop files in as they arrive and the "
             "answers stay current.\n\n"
             "**You can:**\n"
             "- Ask the chat to *\"start a project for the Smith R01\"*\n"
+            "- Reuse existing files through **Files → Add → From my files**, or ask "
+            "chat to *\"move this attached PDF into the project\"*. Chat previews the "
+            "files and destination, then waits for your approval. Files leave their "
+            "current folders; no duplicate is created. Project members can access "
+            "them. You need permission to move the files and add to the destination; "
+            "moves between personal and team ownership are not supported.\n"
             "- Pin the workflows and extraction templates you use on it, then "
             "*\"run the intake workflow on everything in this project\"* — the "
             "agent resolves the file set itself\n"

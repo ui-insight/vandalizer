@@ -1,4 +1,5 @@
 import type { ChatMessage, ToolCallInfo, ToolResultInfo } from '../../types/chat'
+import { completedSkillSelection } from '../../lib/skillSelection'
 
 export type ApprovalRecord = { label: string; detail: string }
 
@@ -21,9 +22,9 @@ function actionKey(call: ToolCallInfo): string {
   return `${call.tool_name}:${canonical(args)}`
 }
 
-/** Only associate an execution with a preview when the next turn contains the
- * same tool and exact arguments (apart from its confirmation flag). A later
- * unrelated run must never make an old approval look completed.
+/** Associate an execution with a preview in the next turn by matching its
+ * arguments, a stored Page preview ID, or a successful Skill receipt's target.
+ * A later unrelated run must never make an old approval look completed.
  *
  * `turnActive` is true while the newest turn is still streaming: until it
  * ends, an approval with no result yet is only "requested". Once it ends, an
@@ -94,6 +95,27 @@ export function approvalHistoryFor(message: ChatMessage, following: ChatMessage[
                 && Array.isArray(receipt.added) && receipt.added.length > 0
             })
             if (saved) record = { label: 'Added to inbox', detail: 'The reviewed items were saved. This preview is retained as history; see the result below.' }
+          }
+        }
+      }
+      if (preview.tool_name === 'select_skill') {
+        // Old/replayed transcripts may omit a call or its confirmed flag.
+        // A successful server receipt for the exact target is stronger evidence.
+        const target = Object.hasOwn(object(preview.content), 'skill_uuid')
+          ? object(preview.content).skill_uuid : original?.args.skill_uuid
+        if (record.label === 'Not done') record = {
+          label: 'Change not confirmed',
+          detail: 'No matching Skill change result reached this chat. Check the active Skill above the composer before trying again.',
+        }
+        for (const response of responses) {
+          for (const result of results(response)) {
+            if (result.tool_name !== 'select_skill') continue
+            const selected = completedSkillSelection(result.content)
+            if (selected === undefined || (selected?.uuid ?? null) !== target) continue
+            record = {
+              label: selected === null ? 'Skill removed' : 'Skill selected',
+              detail: 'The matching Skill change completed. This preview is retained as history; see the result below.',
+            }
           }
         }
       }

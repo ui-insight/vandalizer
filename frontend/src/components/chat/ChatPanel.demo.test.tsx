@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ChatPanel } from './ChatPanel'
 import type { ChatActivity, ChatMessage, StreamSegment, SkillSnapshot, ToolResultInfo } from '../../types/chat'
-import { pollStatus } from '../../api/documents'
+import { pollStatus, searchDocuments, type SearchResult } from '../../api/documents'
 
 const mocks = vi.hoisted(() => ({
   send: vi.fn(),
@@ -64,9 +64,9 @@ vi.mock('../../hooks/useChatUploads', () => ({ useChatUploads: (onUploaded: (uui
   add: (files: File[]) => onUploaded('uploaded-doc', files[0]),
 }) }))
 vi.mock('../../api/config', () => ({ getUserConfig: async () => ({}), markFirstSessionComplete: async () => {} }))
-vi.mock('../../api/documents', () => ({ pollStatus: vi.fn() }))
+vi.mock('../../api/documents', () => ({ pollStatus: vi.fn(), searchDocuments: vi.fn() }))
 vi.mock('../../api/knowledge', () => ({ getKnowledgeBase: async () => ({ sources_ready: 1, total_sources: 1 }) }))
-vi.mock('./ChatInput', () => ({ ChatInput: () => null }))
+vi.mock('./ChatInput', () => ({ ChatInput: ({ onAddExistingFiles }: { onAddExistingFiles: () => void }) => <button onClick={onAddExistingFiles}>From my files</button> }))
 vi.mock('./ContextLimitDialog', () => ({ ContextLimitDialog: () => null }))
 vi.mock('./HomeExperience', () => ({
   FirstSessionHome: ({ onAttachFiles, onRunDemo, disabled }: {
@@ -127,6 +127,19 @@ function expectDocumentRequest() {
 }
 
 describe('Show me what you can do', () => {
+  it('attaches an existing file to chat without sending a message or losing current selections', async () => {
+    mocks.workspace.selectedDocUuids = ['already-attached']
+    mocks.workspace.selectedDocNames = { 'already-attached': 'Existing.pdf' }
+    vi.mocked(searchDocuments).mockResolvedValueOnce({ items: [{ uuid: 'award', title: 'Subaward.pdf' } as SearchResult], total: 1 })
+    renderPanel()
+    fireEvent.click(screen.getByRole('button', { name: 'From my files' }))
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Subaward.pdf' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Attach 1 file' }))
+    expect(mocks.workspace.selectedDocUuids).toEqual(['already-attached', 'award'])
+    expect(mocks.workspace.selectedDocNames).toEqual({ 'already-attached': 'Existing.pdf', award: 'Subaward.pdf' })
+    expect(mocks.send).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
   it('passes a page Save decision through to the request as an immutable preview ID', () => {
     const previewId = 'b'.repeat(32)
     mocks.conversationUuid = 'pages'

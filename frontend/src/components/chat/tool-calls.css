@@ -25,7 +25,6 @@
 @media (max-width:600px) { .agent-tool-card { padding:12px; } .agent-tool-heading { gap:5px 8px; } .agent-tool-status { margin-left:0; } }
 @media (prefers-reduced-motion:reduce) { .agent-tool-spin { animation:none; } }
 
-
 /* Keep each reviewed inbox item and its source readable at narrow widths. */
 .agent-obligation-review { line-height: 1.55; overflow-wrap: anywhere; }
 .agent-obligation-review p { margin: 10px 0; }

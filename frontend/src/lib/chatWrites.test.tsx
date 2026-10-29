@@ -9,6 +9,12 @@ const result = (tool_name: string, content: unknown): ToolResultInfo =>
   ({ tool_name, tool_call_id: 'call-1', content, quality: null }) as ToolResultInfo
 
 describe('chatWriteTargets', () => {
+  it('refreshes project and file views after confirmed moves, including partial success', () => {
+    const moved = { status: 'partial', moved_documents: [{ uuid: 'award' }], failed_documents: [{ uuid: 'budget' }] }
+    expect(chatWriteTargets(result('move_documents_to_project', moved))).toEqual(['projects', 'knowledgeBases', 'documents'])
+    expect(chatWriteTargets(result('move_documents_to_project', { ...moved, needs_confirmation: true }))).toEqual([])
+    expect(chatWriteTargets(result('move_documents_to_project', { moved_documents: [] }))).toEqual([])
+  })
   it('maps a created knowledge base to the KB list', () => {
     expect(chatWriteTargets(result('create_knowledge_base', { uuid: 'kb-1', title: 'QA Smoke' }))).toEqual(['knowledgeBases'])
   })

@@ -198,6 +198,57 @@ class TestParseDoclingResponse:
 
 
 class TestConvertRaw:
+    @pytest.mark.parametrize("content_type", [None, "text/plain", "application/json; charset=utf-8"])
+    def test_ocr_result_envelope_returns_only_decoded_content(self, pdf, content_type):
+        content = '# RESEARCH SUBAWARD AGREEMENT\n\nTotal: $250,000.\nCafé — "approved".\nLiteral: \\n'
+        client = MagicMock()
+        client.post.return_value = _response(
+            text=json.dumps({
+                "id": "ocr-3dae4668a07d4d02a24cdf5b",
+                "object": "ocr.result", "created": 1791837603,
+                "model": "dots.MOCR", "content": content,
+            }),
+            headers={"Content-Type": content_type} if content_type else {},
+        )
+
+        assert ocr_client.convert(client, pdf_path=pdf, endpoint="https://ocr.example") == content
+
+    @pytest.mark.parametrize("content", [None, 123, [], {"text": "not the supported contract"}])
+    def test_invalid_ocr_result_content_is_not_saved_as_text(self, pdf, content):
+        client = MagicMock()
+        client.post.return_value = _response(text=json.dumps({"object": "ocr.result", "content": content}))
+        with pytest.raises(OcrRequestError):
+            ocr_client.convert(client, pdf_path=pdf, endpoint="https://ocr.example")
+
+    def test_missing_ocr_result_content_is_not_saved_as_text(self, pdf):
+        client = MagicMock()
+        client.post.return_value = _response(text='{"object":"ocr.result","model":"dots.MOCR"}')
+        with pytest.raises(OcrRequestError):
+            ocr_client.convert(client, pdf_path=pdf, endpoint="https://ocr.example")
+
+    def test_empty_ocr_result_does_not_count_metadata_as_document_text(self, pdf):
+        client = MagicMock()
+        client.post.return_value = _response(text='{"object":"ocr.result","content":""}')
+        assert ocr_client.convert(client, pdf_path=pdf, endpoint="https://ocr.example") == ""
+
+    @pytest.mark.parametrize("body", [
+        '{"content":"A JSON example in the document","total":250000}',
+        'Example: {"object":"ocr.result","content":"quoted API example"}',
+        'Plain text with literal \\n and an unmatched { brace.',
+    ])
+    def test_document_text_is_not_mistaken_for_an_ocr_envelope(self, pdf, body):
+        client = MagicMock()
+        client.post.return_value = _response(text=body)
+        assert ocr_client.convert(client, pdf_path=pdf, endpoint="https://ocr.example") == body
+
+    def test_enveloped_layout_content_is_also_decoded(self, pdf):
+        client = MagicMock()
+        client.post.return_value = _response(text="\ufeff " + json.dumps({
+            "object": "ocr.result",
+            "content": json.dumps([{"bbox": [1, 2, 3, 4], "category": "Text", "text": "Award amount: $250,000."}]),
+        }))
+        assert ocr_client.convert(client, pdf_path=pdf, endpoint="https://ocr.example") == "Award amount: $250,000."
+
     def test_posts_file_field_and_returns_body(self, pdf):
         client = MagicMock()
         client.post.return_value = _response(200, text="extracted text")

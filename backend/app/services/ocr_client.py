@@ -5,9 +5,10 @@ already runs, and those services do not share a request contract. Two are
 supported:
 
 ``raw``
-    POST the PDF as multipart field ``file``; the response *body* is the
-    extracted text/markdown. This is the shape Vandalizer shipped with (UIPDF,
-    Marker/Surya wrappers, a Tesseract wrapper, a cloud-OCR proxy).
+    POST the PDF as multipart field ``file``; read text/markdown from the
+    response body or the ``content`` field of an ``ocr.result`` JSON envelope.
+    This is the shape Vandalizer shipped with (UIPDF, Marker/Surya wrappers,
+    a Tesseract wrapper, a cloud-OCR proxy).
 
 ``docling``
     `docling-serve <https://github.com/docling-project/docling-serve>`_'s
@@ -486,6 +487,28 @@ def layout_json_to_text(body: str) -> str:
     return "".join(out).strip()
 
 
+def parse_raw_response(body: str) -> str:
+    """Decode a known OCR envelope before layout cleanup and page mapping.
+
+    The raw endpoint can return an ``ocr.result`` object even with a plain
+    text Content-Type. JSON decoding restores its content's real line breaks;
+    replacing escape sequences by hand would corrupt literal backslashes.
+    Require the envelope's discriminator so JSON examples in a document are
+    left intact. Invalid content in a recognized envelope is an OCR failure,
+    never document text.
+    """
+    try:
+        payload = json.loads(body.lstrip("\ufeff \t\r\n"))
+    except ValueError:
+        payload = None
+    if isinstance(payload, dict) and payload.get("object") == "ocr.result":
+        content = payload.get("content")
+        if not isinstance(content, str):
+            raise OcrRequestError("OCR result had no string content")
+        body = content
+    return layout_json_to_text(body)
+
+
 def _post_pdf(client, url: str, headers: dict, pdf_path: str, field: str, data=None):
     """POST the PDF as multipart, returning the httpx response.
 
@@ -579,7 +602,7 @@ def convert(
                 retry_after=parse_retry_after(resp.headers.get("Retry-After")),
             )
         _reject_non_text_body(resp)
-        return layout_json_to_text(resp.text)
+        return parse_raw_response(resp.text)
 
     url = normalize_endpoint(endpoint, provider, use_async=use_async)
     data = encode_docling_options(options)

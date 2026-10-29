@@ -15,6 +15,7 @@ import { RenameDialog } from './RenameDialog'
 import { CreateFolderDialog } from './CreateFolderDialog'
 import { MoveFolderDialog } from './MoveFolderDialog'
 import { MoveFileDialog } from './MoveFileDialog'
+import { ExistingFilesDialog } from './ExistingFilesDialog'
 import { useConfirm } from '../shared/useConfirm'
 import { useToast } from '../../contexts/ToastContext'
 import { deleteFile, renameFile, downloadFile, downloadFilesAsZip, moveFile, fetchDocumentUsage, type DeleteFileResult, type DocumentUsage } from '../../api/files'
@@ -436,6 +437,7 @@ export function FileBrowser({ searchAction, searchField, selectedDocumentUuids, 
 
   // + Add dropdown
   const [addMenuOpen, setAddMenuOpen] = useState(false)
+  const [existingFilesDestination, setExistingFilesDestination] = useState<{ uuid: string; title: string } | null>(null)
   const addMenuRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -700,6 +702,16 @@ export function FileBrowser({ searchAction, searchField, selectedDocumentUuids, 
               <Upload className="h-4 w-4 shrink-0" style={{ width: 18 }} />
               <span>Upload Files</span>
             </button>
+            {rootFolder && <button
+              role="menuitem"
+              type="button"
+              onClick={() => {
+                const uuid = currentFolder || rootFolder
+                setExistingFilesDestination({ uuid, title: breadcrumbs.find(folder => folder.uuid === uuid)?.title || rootLabel || 'Project files' })
+                setAddMenuOpen(false)
+              }}
+              className="flex w-full items-center gap-2.5 rounded-md px-3.5 py-2.5 text-left text-sm hover:bg-black/[.04]"
+            ><FolderInput className="h-4 w-4 shrink-0" /><span>From my files</span></button>}
           </div>
         )}
 
@@ -790,7 +802,7 @@ export function FileBrowser({ searchAction, searchField, selectedDocumentUuids, 
       <div
         className="file-list-surface"
       >
-        {contentsError && !documents.length && !folders.length ? null : searchQuery.trim() && !sortedFolders.length && !sortedDocuments.length ? <p role="status" className="p-6 text-sm text-gray-600">{contentSearchState === 'loading' ? 'Searching document contents…' : contentSearchState === 'error' ? 'No matching names in this folder. Retry content search above, or change the search.' : <>No files or folders match “{searchQuery}”. Change the search or use Close search to see this folder again.</>}</p> : currentFolder && !sortedFolders.length && !sortedDocuments.length ? <p role="status" className="p-6 text-sm text-gray-600">This folder is empty. Upload files here or use Add to create a folder.</p> : <FileList
+        {contentsError && !documents.length && !folders.length ? null : searchQuery.trim() && !sortedFolders.length && !sortedDocuments.length ? <p role="status" className="p-6 text-sm text-gray-600">{contentSearchState === 'loading' ? 'Searching document contents…' : contentSearchState === 'error' ? 'No matching names in this folder. Retry content search above, or change the search.' : <>No files or folders match “{searchQuery}”. Change the search or use Close search to see this folder again.</>}</p> : currentFolder && !sortedFolders.length && !sortedDocuments.length ? <p role="status" className="p-6 text-sm text-gray-600">{rootFolder ? 'This folder is empty. Use Add → From my files to move existing files here, or upload new files.' : 'This folder is empty. Upload files here or use Add to create a folder.'}</p> : <FileList
           folders={sortedFolders}
           documents={sortedDocuments}
           onFolderClick={setCurrentFolder}
@@ -937,6 +949,7 @@ export function FileBrowser({ searchAction, searchField, selectedDocumentUuids, 
           onClose={() => setMoveFileTarget(null)}
         />
       )}
+      {existingFilesDestination && <ExistingFilesDialog destination={existingFilesDestination} onClose={() => setExistingFilesDestination(null)} />}
     </div>
   )
 }

@@ -50,7 +50,10 @@ function urgency(item: Obligation): string | null {
   return null
 }
 
-const SOURCE_ROLES: Record<string, string> = { limit: 'Limit', observed: 'Observed value' }
+const SOURCE_ROLES: Record<string, string> = {
+  limit: 'Limit', observed: 'Observed value', timing: 'Timing rule',
+  period_of_performance: 'Period of Performance', budget_period: 'Budget period',
+}
 
 // Home stays open while people work elsewhere; recheck when they come back to
 // it so an item done or added from chat or another tab doesn't stay stale.
@@ -102,6 +105,12 @@ function InboxRow({ item, onChanged, onError }: {
         <div style={{ fontSize: 'var(--workspace-font-meta)', color: item.in_conflict ? '#92400e' : '#4b5563' }}>
           {summary(item)}
         </div>
+        {item.deadline_calculation && <details style={{ fontSize: 'var(--workspace-font-meta)', color: '#4b5563' }}>
+          <summary>How this date was calculated</summary>
+          <p>{item.deadline_calculation.rule}</p>
+          <p>{item.deadline_calculation.formula}</p>
+          <p>Calendar days; anchor day excluded. No weekend or holiday adjustment.</p>
+        </details>}
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-6)', marginTop: 'var(--workspace-space-4)' }}>
           <button type="button" style={{ ...BUTTON, border: 'none', padding: 0, color: '#2563eb', textDecoration: 'underline' }}
             onClick={() => navigate({ to: '/', search: { project: item.project_uuid } as never })}>

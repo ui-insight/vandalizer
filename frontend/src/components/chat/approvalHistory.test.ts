@@ -4,6 +4,14 @@ import type { ChatMessage } from '../../types/chat'
 const preview: ChatMessage = { role: 'assistant', content: '', tool_calls: [{ tool_name: 'create_workflow', tool_call_id: 'preview', args: { name: 'Budget', confirmed: false } }], tool_results: [{ tool_name: 'create_workflow', tool_call_id: 'preview', content: { needs_confirmation: true }, quality: null }] }
 const approval: ChatMessage = { role: 'user', content: 'Yes, go ahead' }
 const executed: ChatMessage = { role: 'assistant', content: '', tool_calls: [{ tool_name: 'create_workflow', tool_call_id: 'run', args: { confirmed: true, name: 'Budget' } }], tool_results: [{ tool_name: 'create_workflow', tool_call_id: 'run', content: { workflow_id: 'wf-1' }, quality: null }] }
+const skill = { uuid: 'award', title: 'Award Review', instructions: 'When reviewing an award, add attribution.', version: 'v1' }
+const skillPreview = (uuid: string | null): ChatMessage => ({ role: 'assistant', content: '',
+  tool_calls: [{ tool_name: 'select_skill', tool_call_id: 'preview', args: { skill_uuid: uuid } }],
+  tool_results: [{ tool_name: 'select_skill', tool_call_id: 'preview', content: { needs_confirmation: true }, quality: null }],
+})
+const skillReceipt = (selected: typeof skill | null): ChatMessage => ({ role: 'assistant', content: '',
+  tool_results: [{ tool_name: 'select_skill', tool_call_id: 'changed', content: { status: 'selected', active_skill: selected }, quality: null }],
+})
 describe('historical approval evidence', () => {
   it('matches a saved page by its immutable preview ID without repeating large HTML arguments', () => {
     const id = 'a'.repeat(32)
@@ -42,6 +50,41 @@ describe('historical approval evidence', () => {
   it('uses failure evidence instead of the approval request', () => {
     const failed = { ...executed, tool_results: [{ ...executed.tool_results![0], content: { error: 'Permission denied' } }] }
     expect(approvalHistoryFor(preview, [approval, failed]).preview.label).toBe('Failed')
+  })
+  it.each([skill, null])('uses a successful Skill receipt even without the model call (%j)', selected => {
+    const result = approvalHistoryFor(skillPreview(selected?.uuid ?? null), [approval, skillReceipt(selected)]).preview
+    expect(result.label).toBe(selected ? 'Skill selected' : 'Skill removed')
+    expect(result.detail).not.toContain('nothing was created or changed')
+  })
+  it('uses persisted segments and result targets without relying on confirmed arguments', () => {
+    const receipt = skillReceipt(null)
+    // The backend coerces boolean tool parameters, but the transcript retains
+    // the model's raw arguments. The completed receipt is authoritative.
+    receipt.tool_calls = [{ tool_name: 'select_skill', tool_call_id: 'changed', args: { skill_uuid: null, confirmed: 'true' } }]
+    receipt.segments = [{ kind: 'tool_result', result: receipt.tool_results![0] }]
+    delete receipt.tool_results
+    const original = skillPreview(null)
+    original.tool_results![0].content = { needs_confirmation: true, skill_uuid: null }
+    delete original.tool_calls
+    expect(approvalHistoryFor(original, [approval, receipt]).preview.label).toBe('Skill removed')
+  })
+  it('does not infer removal from missing, incomplete, or unrelated evidence', () => {
+    const incomplete: ChatMessage = { role: 'assistant', content: 'Removed.', tool_results: [
+      { tool_name: 'select_skill', tool_call_id: 'changed', content: { status: 'selected' }, quality: null },
+    ] }
+    for (const responses of [[], [incomplete], [skillReceipt(skill)], [{ role: 'user' as const, content: 'New task' }, skillReceipt(null)]]) {
+      const record = approvalHistoryFor(skillPreview(null), [approval, ...responses]).preview
+      expect(record.label).toBe('Change not confirmed')
+      expect(record.detail).not.toContain('nothing was created or changed')
+    }
+    expect(approvalHistoryFor(skillPreview(skill.uuid), [approval, skillReceipt({ ...skill, uuid: 'other' })]).preview.label).toBe('Change not confirmed')
+  })
+  it('does not mark a failed or pending Skill change as successful', () => {
+    for (const content of [{ error: 'Save failed', status: 'selected', active_skill: null }, { needs_confirmation: true, status: 'selected', active_skill: null }]) {
+      const response = skillReceipt(null)
+      response.tool_results![0].content = content
+      expect(approvalHistoryFor(skillPreview(null), [approval, response]).preview.label).toBe('Change not confirmed')
+    }
   })
 })
 

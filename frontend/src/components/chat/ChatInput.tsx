@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useId, type KeyboardEvent, type ReactNode } from 'react'
 import { FocusTrap } from '../shared/PanelFocusTrap'
-import { Send, Square, X, Plus, FileUp, Globe, BookOpen, ChevronDown, Cpu, SquarePen } from 'lucide-react'
+import { Send, Square, X, Plus, FileUp, FolderOpen, Globe, BookOpen, ChevronDown, Cpu, SquarePen } from 'lucide-react'
 import { getModels } from '../../api/config'
 import type { ModelInfo } from '../../types/workflow'
 import { ModelEffortPicker } from '../ModelEffortPicker'
@@ -13,6 +13,7 @@ interface Props {
   onDraftChange?: (draft: string) => void
   onSend: (message: string) => void | Promise<void>
   onAttachFile?: (files: File[]) => void
+  onAddExistingFiles?: () => void
   onAttachLink?: (url: string) => void
   // Opens the knowledge base screen so the user can pick a KB to chat with.
   onAddKnowledge?: () => void
@@ -39,7 +40,7 @@ interface Props {
 const MIN_COMPOSER_TEXT_HEIGHT = 24
 
 export function ChatInput({
-  onSend, onAttachFile, onAttachLink, onAddKnowledge, disabled, sendDisabled,
+  onSend, onAttachFile, onAddExistingFiles, onAttachLink, onAddKnowledge, disabled, sendDisabled,
   isStreaming, onStop,
   selectedModel, onModelChange, onModelsLoaded, exportActions, onNewChat, hasMessages, hasDocuments,
   contextMeter, memoryControl, navigationControl, focusSignal, initialDraft = '', onDraftChange, draftInsertion,
@@ -269,6 +270,14 @@ export function ChatInput({
                   if (e.key === 'Escape') setShowAddMenu(false)
                 }}
               >
+                {onAddExistingFiles && <button
+                  role="menuitem"
+                  onClick={() => { onAddExistingFiles(); setShowAddMenu(false) }}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm text-[#1f2937] hover:bg-black/[.04]"
+                >
+                  <FolderOpen className="h-4 w-4 shrink-0" />
+                  <span>From my files<span className="block text-xs text-gray-600">Use files already in Vandalizer</span></span>
+                </button>}
                 <button
                   role="menuitem"
                   onClick={() => { fileInputRef.current?.click(); setShowAddMenu(false) }}

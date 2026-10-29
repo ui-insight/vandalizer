@@ -88,6 +88,8 @@ async def test_selection_requires_prior_turn_and_pins_exact_preview_despite_libr
          patch.object(skill_service, "authorize_skill", AsyncMock()):
         preview = await tools.select_skill(ctx, "s1", confirmed=True)
         assert preview["needs_confirmation"] and preview["skill_instructions"] == "NEW_REVIEW_GUIDANCE"
+        assert preview["approval_label"] == "Use Skill"
+        assert '"Use Skill" button' in preview["assistant_instruction"]
         assert (await tools.select_skill(ctx, "s1", confirmed=True))["needs_confirmation"]
         conv.set.assert_not_awaited()
         ctx.deps.turn_marker = 7
@@ -96,6 +98,29 @@ async def test_selection_requires_prior_turn_and_pins_exact_preview_despite_libr
     assert selected["active_skill"] == snapshot().model_dump()
     assert conv.active_skill == snapshot()
     assert conv.set.await_args.args[0]["active_skill"]["version"] == "v1"
+
+
+@pytest.mark.asyncio
+async def test_removal_preview_and_receipt_use_removal_wording_and_preserve_confirmation():
+    conv = conversation()
+    ctx = _make_context(conversation=conv)
+    preview = await tools.select_skill(ctx, None, confirmed=True)
+    assert preview["needs_confirmation"] is True
+    assert preview["skill_uuid"] is None
+    assert preview["approval_label"] == "Remove Skill"
+    assert '"Remove Skill" button' in preview["assistant_instruction"]
+    assert "Apply Skill selection" not in preview["assistant_instruction"]
+    assert preview["skill_instructions"] is None
+    assert conv.active_skill is not None
+    conv.set.assert_not_awaited()
+
+    ctx.deps.turn_marker += 2
+    result = await tools.select_skill(ctx, None, confirmed=True)
+    assert result["status"] == "selected"
+    assert result["active_skill"] is None
+    assert result["message"] == "Skill removed."
+    assert conv.active_skill is None
+    assert conv.set.await_args.args[0]["active_skill"] is None
 
 
 @pytest.mark.asyncio
@@ -143,6 +168,8 @@ async def test_model_receives_replaced_instructions_immediately_and_on_followup(
         assert "OLD_GUIDANCE" not in current
         assert ("NEW_REVIEW_GUIDANCE" in current) is bool(uuid)
         assert current.startswith("Application rules.")
+        if uuid:
+            assert "applying them only within their stated scope and conditions" in current
     assert conv.active_skill == (snapshot() if uuid else None)
 
 
@@ -213,6 +240,7 @@ def test_guidance_help_and_registry_distinguish_the_three_capabilities():
     assert "Descriptions must come from the Skill itself" in AGENTIC_CHAT_SYSTEM_PROMPT
     assert "no accessible Library Skills were found" in AGENTIC_CHAT_SYSTEM_PROMPT
     assert "Skill availability is an exception" in AGENTIC_CHAT_SYSTEM_PROMPT
+    assert "Keep internal deliberation about user intent, approval rules, and tool selection out of" in AGENTIC_CHAT_SYSTEM_PROMPT
     assert find_topics("skills", limit=1)[0]["id"] == "skills"
     names = {fn.__name__ for fn in chat_tools.TOOLS}
     assert {"list_skills", "get_skill", "select_skill"} <= names

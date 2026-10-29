@@ -110,6 +110,12 @@ A workflow built in chat starts **unverified**. It's ready to run, but fine-tune
 
 ### Working in projects
 
+To reuse files already in Vandalizer, choose **Add → From my files** in chat, search, select files, and click **Attach**. This adds them to the conversation without moving or re-uploading them.
+
+In a project's **Files** tab, choose **Add → From my files** to move existing files into the displayed folder. Review the selected files and destination, then click **Move files here**. The originals leave their current folders and become accessible to project members; no copies are uploaded. You need permission to move the source files and add to the destination. Moves across personal/team ownership boundaries are not supported.
+
+You can also ask chat to move an attached or named file into a project. It previews the files and destination and waits for approval before moving them. Creating a project alone does not move attached files.
+
 | Ask… | The agent will… |
 |---|---|
 | *"Start a project for the Smith R01."* | Create a goal-scoped workspace — folder, knowledge base, pinned tools, and chat in one place |
@@ -118,7 +124,7 @@ A workflow built in chat starts **unverified**. It's ready to run, but fine-tune
 | *"Pin the compliance extraction to this project."* | Add a quick-access reference (nothing is moved or copied) |
 | *"Mark this project submitted."* | Move it through its lifecycle: draft → active → submitted → awarded → closeout → archived |
 
-Because every file added to a project is auto-indexed, project-wide chat works immediately — **there's no knowledge base to build or maintain.**
+Every file added to a project is auto-indexed in the background. Once indexing finishes, project-wide chat can use it—**there's no knowledge base to build or maintain.**
 
 ### Building knowledge bases
 

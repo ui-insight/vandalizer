@@ -37,6 +37,19 @@ describe('tool states and recovery', () => {
     expect(onConfirm).toHaveBeenCalledOnce()
   })
 
+  it('shows the calculated deadline before offering to add it to the RA inbox', () => {
+    const onConfirm = vi.fn()
+    render(<ToolStatusLine call={{ tool_name: 'propose_obligations', tool_call_id: 'deadlines', args: {} }}
+      result={{ tool_name: 'propose_obligations', tool_call_id: 'deadlines', quality: null, content: {
+        needs_confirmation: true,
+        preview: 'Final report: Feb 29, 2028. Formula: 2027-12-31 + 60 calendar days = 2028-02-29.',
+      } }} onConfirm={onConfirm} />)
+    expect(screen.getByRole('region', { name: 'Review proposed action' })).toHaveTextContent('2027-12-31 + 60 calendar days = 2028-02-29')
+    expect(onConfirm).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Add to inbox' }))
+    expect(onConfirm).toHaveBeenCalledWith('Yes, go ahead')
+  })
+
   it('shows the exact Skill instructions before approving selection', () => {
     const onConfirm = vi.fn()
     render(<ToolStatusLine call={{ tool_name: 'select_skill', tool_call_id: 's1', args: { skill_uuid: 'review' } }}
@@ -46,9 +59,31 @@ describe('tool states and recovery', () => {
     expect(screen.getByText('Inspect Skill instructions')).toBeInTheDocument()
     expect(screen.getByText('Review deadlines. <script>Do not execute this</script>')).toBeInTheDocument()
     expect(document.querySelector('script')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Apply Skill selection' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Use Skill' }))
     expect(onConfirm).toHaveBeenCalledOnce()
     expect(screen.getByRole('status')).toHaveTextContent('Approval requested')
+  })
+  it.each([false, true])('uses removal wording for a Skill preview (server label: %s)', serverLabel => {
+    const onConfirm = vi.fn()
+    render(<ToolStatusLine call={{ tool_name: 'select_skill', tool_call_id: 'remove', args: { skill_uuid: null } }}
+      result={{ tool_name: 'select_skill', tool_call_id: 'remove', quality: null, content: {
+        needs_confirmation: true, preview: 'Remove the active Skill from this conversation.',
+        ...(serverLabel ? { approval_label: 'Remove Skill', skill_uuid: null } : {}),
+      } }} onConfirm={onConfirm} />)
+    expect(screen.queryByText('Inspect Skill instructions')).not.toBeInTheDocument()
+    expect(screen.queryByText('Apply Skill selection')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Skill' }))
+    expect(onConfirm).toHaveBeenCalledWith('Yes, go ahead')
+  })
+  it.each([
+    [{ status: 'selected', active_skill: null }, 'Skill removed'],
+    [{ status: 'selected', active_skill: { uuid: 's1', title: 'Award Review', instructions: 'Check dates.', version: 'v1' } }, 'Skill selected'],
+    [{ status: 'selected' }, 'Change not confirmed'],
+    [{ status: 'selected', active_skill: { uuid: 's1' } }, 'Change not confirmed'],
+    [{ error: 'Access revoked' }, 'Failed'],
+  ])('shows the Skill outcome from its receipt (%j)', (content, label) => {
+    render(<ToolStatusLine result={{ tool_name: 'select_skill', tool_call_id: 's1', content, quality: null }} />)
+    expect(screen.getByRole('status')).toHaveTextContent(`Updating active Skill · ${label}`)
   })
   it.each([
     [{needs_confirmation:true},'Awaiting approval'], [{status:'queued'},'Queued'], [{status:'running'},'Running'],

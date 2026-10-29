@@ -44,6 +44,8 @@ export const TOOL_META: Record<string, { label: string; category: ToolCategory }
   revise_html_artifact:  { label: 'Updating page',        category: 'write' },
   get_html_artifact:     { label: 'Reading page',         category: 'read' },
   create_project:        { label: 'Creating project',         category: 'write' },
+  list_projects:         { label: 'Finding projects',         category: 'read' },
+  move_documents_to_project: { label: 'Moving files into project', category: 'write' },
   list_project_documents:{ label: 'Listing project files',    category: 'read' },
   run_pin_on_project:    { label: 'Running pinned item',      category: 'workflow' },
   pin_to_project:        { label: 'Pinning to project',       category: 'write' },

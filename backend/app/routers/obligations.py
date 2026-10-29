@@ -62,7 +62,16 @@ async def create_obligations(body: CreateObligationsRequest, user: User = Depend
     """Add items by hand. Each is checked against the document it cites; rejected ones say why."""
     project = await _project_for(body.project_uuid, user, manage=True)
     checked = await obligation_service.propose(project, user, body.items)
-    created = [await obligation_service.save_checked(project, user, a["clean"]) for a in checked["accepted"]]
+    # This manual endpoint has no calculation-preview approval handshake.
+    # Relative schedules go through the chat tool's server-enforced gate.
+    manual = []
+    for accepted in checked["accepted"]:
+        if accepted["clean"].get("deadline_calculation"):
+            checked["rejected"].append({"title": accepted["clean"]["title"],
+                                        "reason": "Review and approve calculated deadlines in project chat before adding them."})
+        else:
+            manual.append(accepted)
+    created = [await obligation_service.save_checked(project, user, a["clean"]) for a in manual]
     return {
         "created": [obligation_service.serialize(o, user, project.title) for o in created],
         "rejected": checked["rejected"],

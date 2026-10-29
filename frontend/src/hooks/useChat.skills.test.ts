@@ -37,6 +37,8 @@ it.each([
   { error: 'Access revoked' },
   { status: 'selected' },
   { status: 'selected', active_skill: { uuid: 'broken' } },
+  { status: 'selected', active_skill: null, needs_confirmation: true },
+  { status: 'selected', active_skill: null, error: 'Save failed' },
 ])('does not change the active Skill for an unconfirmed or incomplete result (%j)', async content => {
   const { result } = renderHook(() => useChat())
   await act(async () => { await result.current.loadHistory('c1') })

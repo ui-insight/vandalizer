@@ -10,6 +10,7 @@ import { ChatScrollRegion } from './ChatScrollRegion'
 import { ChatInput } from './ChatInput'
 import { AttachmentList } from './AttachmentList'
 import { ChatSkillDialog } from './ChatSkillDialog'
+import { ExistingFilesDialog } from '../files/ExistingFilesDialog'
 import { FileProcessingCell, type ProcessingCellDoc } from './FileProcessingCell'
 import { ChatExportActions } from './ChatExportActions'
 import { TrialTopUpDialog } from '../trial/TrialTopUpDialog'
@@ -151,6 +152,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const modelPreference = useChatModelPreference()
   const { selectedModel, models: modelsList } = modelPreference
   const [showAttachKB, setShowAttachKB] = useState(false)
+  const [showExistingFiles, setShowExistingFiles] = useState(false)
   const [skillDialog, setSkillDialog] = useState<'change' | 'inspect' | null>(null)
   const [draftInsertion, setDraftInsertion] = useState<{ id: number; text: string }>()
   const [showContextDialog, setShowContextDialog] = useState(false)
@@ -816,6 +818,15 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       )}
 
       {/* Attachments bar */}
+      {showExistingFiles && <ExistingFilesDialog
+        attachedUuids={selectedDocUuids}
+        onAttach={files => {
+          setSelectedDocUuids(previous => [...new Set([...previous, ...files.map(file => file.uuid)])])
+          setSelectedDocNames(previous => ({ ...previous, ...Object.fromEntries(files.map(file => [file.uuid, file.title])) }))
+          focusChat()
+        }}
+        onClose={() => setShowExistingFiles(false)}
+      />}
       <AttachmentList
         activeSkill={activeSkill}
         skillBusy={isStreaming || isLoadingHistory || isSelectingSkill}
@@ -907,6 +918,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
             else if (!handleSend(msg)) throw new Error('Message was not sent. Check the current conversation and attachments, then try again.')
           }}
           onAttachFile={handleAttachFile}
+          onAddExistingFiles={() => setShowExistingFiles(true)}
           onAttachLink={handleAttachLink}
           onAddKnowledge={() => setShowAttachKB(true)}
           disabled={false}

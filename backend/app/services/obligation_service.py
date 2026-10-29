@@ -1,7 +1,8 @@
 """The RA inbox: obligations found in a project's documents (#999).
 
 Every obligation is checked against the document it cites before it is saved:
-its quote must be on the cited page, a deadline's date must be in its quote,
+its quote must be on the cited page, a deadline's date must be in its quote
+or calculated from a verified relative rule and period dates,
 and a limit's figures must be in their quotes. A proposal that fails is
 returned with the reason, never saved, so the inbox cannot hold a deadline
 the documents don't state.
@@ -329,8 +330,10 @@ async def check_proposal(item: dict, user: User, project: Project) -> tuple[Opti
     raw_sources = item.get("sources") or []
     if not isinstance(raw_sources, list) or not raw_sources:
         return None, "at least one source (document, page and quote) is required"
+    if len(raw_sources) > 30:
+        return None, "at most 30 source passages can be checked per obligation"
     sources: list[ObligationSource] = []
-    for raw in raw_sources[:4]:
+    for raw in raw_sources:
         src, reason = await _check_source(raw, user, project)
         if reason:
             return None, reason
@@ -342,10 +345,23 @@ async def check_proposal(item: dict, user: User, project: Project) -> tuple[Opti
         deadline_type = item.get("deadline_type") or "other"
         if deadline_type not in DEADLINE_TYPES:
             return None, f"deadline_type must be one of {', '.join(DEADLINE_TYPES)}"
-        checked, reason = check_deadline(item.get("due_at"), item.get("due_text"), quotes)
-        if reason:
-            return None, reason
-        clean.update(deadline_type=deadline_type, **checked)
+        clean["deadline_type"] = deadline_type
+        if item.get("relative_deadline") is True:
+            from app.services.relative_deadlines import calculate_deadlines
+
+            try:
+                clean["_occurrences"] = calculate_deadlines(sources)
+            except (ValueError, OverflowError) as exc:
+                return None, str(exc)
+        else:
+            from app.services.relative_deadlines import _OFFSET
+
+            if _OFFSET.search(quotes):
+                return None, "relative timing needs relative_deadline=true with timing and period source roles; the server calculates the dates"
+            checked, reason = check_deadline(item.get("due_at"), item.get("due_text"), quotes)
+            if reason:
+                return None, reason
+            clean.update(**checked)
     elif kind == "limit":
         limit_value = _as_number(item.get("limit_value"))
         observed = _as_number(item.get("observed_value"))
@@ -364,6 +380,9 @@ async def find_replaced(project_uuid: str, clean: dict) -> Optional[Obligation]:
     """The open deadline of the same type a new one would replace (an amendment)."""
     if clean.get("kind") != "deadline" or clean.get("deadline_type") == "other":
         return None
+    # Separate occurrences of a reporting schedule are not amendments.
+    if clean.get("deadline_calculation"):
+        return None
     existing = await Obligation.find(
         Obligation.project_uuid == project_uuid,
         Obligation.kind == "deadline",
@@ -371,6 +390,10 @@ async def find_replaced(project_uuid: str, clean: dict) -> Optional[Obligation]:
         Obligation.status == "open",
     ).to_list()
     for ob in existing:
+        if ob.deadline_calculation:
+            continue
+        if clean.get("deadline_type") == "report_due" and ob.title.strip().lower() != clean["title"].strip().lower():
+            continue
         if ob.due_at and clean.get("due_at") and ob.due_at.date() != clean["due_at"].date():
             return ob
     return None
@@ -385,6 +408,8 @@ async def is_duplicate(project_uuid: str, clean: dict) -> bool:
     for ob in existing:
         if clean["kind"] == "deadline" and ob.due_at and clean.get("due_at"):
             if ob.deadline_type == clean.get("deadline_type") and ob.due_at.date() == clean["due_at"].date():
+                if (ob.deadline_calculation or clean.get("deadline_calculation")) and ob.title.strip().lower() != clean["title"].strip().lower():
+                    continue
                 return True
         elif ob.title.strip().lower() == clean["title"].strip().lower():
             return True
@@ -413,17 +438,27 @@ async def save_checked(project: Project, user: User, clean: dict) -> Obligation:
 async def propose(project: Project, user: User, items: list[dict]) -> dict:
     """Check proposed obligations without saving: what would be added, replaced or rejected."""
     accepted, rejected = [], []
-    for item in (items or [])[:_MAX_ITEMS]:
+    if len(items or []) > _MAX_ITEMS:
+        return {"accepted": [], "rejected": [{"title": "Batch", "reason": f"propose at most {_MAX_ITEMS} obligations at a time"}]}
+    from app.services.relative_deadlines import MAX_OCCURRENCES
+
+    for item in items or []:
         clean, reason = await check_proposal(item, user, project)
         title = str((item or {}).get("title") or "") if isinstance(item, dict) else ""
         if reason:
             rejected.append({"title": title, "reason": reason})
             continue
-        if await is_duplicate(project.uuid, clean):
-            rejected.append({"title": clean["title"], "reason": "already in this project's inbox"})
+        occurrences = clean.pop("_occurrences", [{}])
+        if len(accepted) + len(occurrences) > MAX_OCCURRENCES:
+            rejected.append({"title": clean["title"], "reason": "too many dated occurrences in this batch; propose fewer schedules"})
             continue
-        replaced = await find_replaced(project.uuid, clean)
-        accepted.append({"clean": clean, "replaces": serialize(replaced, user) if replaced else None})
+        for occurrence in occurrences:
+            row = {**clean, **occurrence}
+            if any(a["clean"] == row for a in accepted) or await is_duplicate(project.uuid, row):
+                rejected.append({"title": row["title"], "reason": "already in this project's inbox or proposal"})
+                continue
+            replaced = await find_replaced(project.uuid, row)
+            accepted.append({"clean": row, "replaces": serialize(replaced, user) if replaced else None})
     return {"accepted": accepted, "rejected": rejected}
 
 
@@ -444,6 +479,7 @@ def serialize(ob: Obligation, user: User, project_title: str | None = None) -> d
         "deadline_type": ob.deadline_type,
         "due_at": ob.due_at.isoformat() if ob.due_at else None,
         "due_text": ob.due_text,
+        "deadline_calculation": ob.deadline_calculation.model_dump() if ob.deadline_calculation else None,
         "limit_value": ob.limit_value,
         "observed_value": ob.observed_value,
         "unit": ob.unit,

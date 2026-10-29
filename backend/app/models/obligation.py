@@ -33,6 +33,16 @@ class ObligationSource(BaseModel):
     role: str = "evidence"
 
 
+class DeadlineCalculation(BaseModel):
+    """Server-calculated calendar date, retained with its quoted evidence."""
+
+    rule: str
+    anchor_kind: str
+    anchor_date: str
+    offset_days: int
+    formula: str
+
+
 class Obligation(Document):
     uuid: str
     project_uuid: str
@@ -44,6 +54,7 @@ class Obligation(Document):
     # As written in the source ("5:00 p.m. Pacific Time"), kept so the
     # inbox never restates a time zone the document didn't give.
     due_text: Optional[str] = None
+    deadline_calculation: Optional[DeadlineCalculation] = None
     limit_value: Optional[float] = None
     observed_value: Optional[float] = None
     unit: Optional[str] = None

@@ -73,7 +73,7 @@ async def select_skill(
 
     Use when the user wants reusable guidance applied to chat. Preview first;
     confirm only after the user approves. The exact previewed instruction version
-    is pinned, applies to the rest of this response and follow-ups, and is visible
+    is pinned, remains available for matching tasks on follow-ups, and is visible
     above the composer. It does not run an extraction or workflow, grant access,
     approve other actions, or change a project's default. Only one Skill is active.
     """
@@ -98,8 +98,10 @@ async def select_skill(
     snapshot = selected.model_dump() if selected else None
     preview = {
         "title": selected.title if selected else "No active Skill",
+        "skill_uuid": skill_uuid,
+        "approval_label": "Use Skill" if selected else "Remove Skill",
         "preview": (f'Use "{selected.title}" as the only active Skill for this conversation. '
-                    "It will guide this response and follow-ups until changed or removed."
+                    "It will guide tasks within its stated scope until changed or removed."
                     if selected else "Remove the active Skill from this conversation. Continue without reusable Skill instructions."),
         "skill_instructions": selected.instructions if selected else None,
     }
@@ -112,4 +114,9 @@ async def select_skill(
     conversation.active_skill = selected
     return {"status": "selected", "active_skill": snapshot,
             "message": f'Skill selected: {selected.title}.' if selected else "Skill removed.",
-            "assistant_instruction": "Continue with the user's task using the current active Skill instructions, if any."}
+            "assistant_instruction": (
+                "Briefly acknowledge the completed Skill change. Do not ask for approval again or "
+                "narrate internal deliberation about user intent or tool selection. If the user also "
+                "requested substantive work, continue it, applying any current Skill only within "
+                "its stated scope and conditions."
+            )}

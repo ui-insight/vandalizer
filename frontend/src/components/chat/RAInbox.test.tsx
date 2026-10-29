@@ -37,6 +37,26 @@ beforeEach(() => {
 })
 
 describe('RA inbox', () => {
+  it('retains a calculated deadline formula and opens the timing and anchor evidence', async () => {
+    const timing = { ...source, quote: 'Final report is due within 60 days after the end of the Period of Performance.', role: 'timing' }
+    const period = { ...source, page: 2, quote: 'Period of Performance ends December 31, 2027.', role: 'period_of_performance' }
+    api.getInbox.mockResolvedValue({ items: [item({
+      title: 'Final report', due_at: '2028-02-29T00:00:00', due_text: null, sources: [timing, period],
+      deadline_calculation: { rule: timing.quote, anchor_kind: 'performance_period_end', anchor_date: '2027-12-31',
+        offset_days: 60, formula: '2027-12-31 + 60 calendar days = 2028-02-29' },
+    })], inbox_hidden: false })
+    render(<RAInbox />)
+    const inbox = await screen.findByRole('region', { name: 'RA inbox' })
+    expect(inbox).toHaveTextContent('Feb 29, 2028')
+    fireEvent.click(screen.getByText('How this date was calculated'))
+    expect(screen.getByText('2027-12-31 + 60 calendar days = 2028-02-29')).toBeVisible()
+    expect(screen.getByText(timing.quote)).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Open the timing rule in sponsor-amendment.pdf at page 1' }))
+    expect(viewDocument).toHaveBeenLastCalledWith('amend', 'sponsor-amendment.pdf', expect.objectContaining({ page: 1 }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open the period of performance in sponsor-amendment.pdf at page 2' }))
+    expect(viewDocument).toHaveBeenLastCalledWith('amend', 'sponsor-amendment.pdf', expect.objectContaining({ page: 2 }))
+  })
+
   it('lists what is due and needed, each with its source', async () => {
     render(<RAInbox />)
     const inbox = await screen.findByRole('region', { name: 'RA inbox' })

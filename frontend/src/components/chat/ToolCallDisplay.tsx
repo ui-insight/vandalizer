@@ -1,6 +1,7 @@
 import './tool-calls.css'
 import { getToolMeta as getMeta, TOOL_META, toolTarget, activeToolLabel } from './toolActivity'
 import { qualityPresentation } from '../../lib/qualityLabels'
+import { completedSkillSelection } from '../../lib/skillSelection'
 import { ChatPageCard } from '../artifacts/ChatPageCard'
 import type { ApprovalRecord } from './approvalHistory'
 import { certificationPayloadIssue } from '../../lib/certificationPayload'
@@ -372,6 +373,8 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
       const t = obj.title ? `"${String(obj.title).slice(0, 40)}"` : 'project'
       return { text: `Created project ${t}`, qualityHint }
     }
+    case 'move_documents_to_project':
+      return { text: typeof obj.message === 'string' ? obj.message : 'File move result', qualityHint: '' }
 
     case 'check_compliance': {
       if (obj.rules_checked === 0) return { text: 'No compliance rules defined', qualityHint: '' }
@@ -1254,6 +1257,7 @@ export function ToolStatusLine({
   const unconfirmed = !isActive && !!call && !result
 
   const needsConfirmation = !isActive && obj?.needs_confirmation === true
+  const selectedSkill = name === 'select_skill' ? completedSkillSelection(result?.content) : undefined
   // An editor showing a workflow chat just changed reloads its steps.
   const editedWorkflowId = name === 'update_workflow' && !needsConfirmation && !isError && typeof obj?.workflow_id === 'string' ? obj.workflow_id : null
   useEffect(() => {
@@ -1283,12 +1287,14 @@ export function ToolStatusLine({
   const executionLabel = needsConfirmation ? approvalHistory?.label ?? (decision === 'approved' ? 'Approval requested' : decision === 'canceled' ? 'Cancellation requested' : 'Awaiting approval')
     : canceled ? 'Canceled' : certificationIssue ? 'Result needs review' : isError ? 'Failed' : unconfirmed ? 'Completion not confirmed' : isActive ? 'Running'
     : name === 'run_workflow' && typeof obj?.session_id === 'string' ? 'Run accepted'
-    : name === 'select_skill' && obj?.status === 'selected' ? 'Completed'
+    : name === 'select_skill' ? selectedSkill === null ? 'Skill removed' : selectedSkill ? 'Skill selected' : 'Change not confirmed'
     : name === 'create_automation' && obj?.id && obj?.enabled === false ? 'Paused'
     : obj?.status === 'queued' || obj?.status === 'pending' ? 'Queued'
     : obj?.status === 'running' ? 'Running' : obj?.status === 'paused' ? 'Awaiting approval' : obj?.status && obj.status !== 'completed' ? 'Result received' : 'Completed'
 
-  const actionLabel = ({ propose_obligations: 'Add to inbox', create_project: 'Create project', select_skill: 'Apply Skill selection', create_workflow: 'Create workflow', update_workflow: 'Update workflow', create_automation: 'Create automation', create_extraction_from_document: 'Create extraction', run_workflow: 'Run workflow', run_validation: 'Run validation', approve_workflow_step: 'Approve step', complete_certification_module: 'Complete module' } as Record<string, string>)[name] ?? approveLabel(name)
+  const actionLabel = name === 'select_skill'
+    ? typeof obj?.approval_label === 'string' ? obj.approval_label : args.skill_uuid === null || obj?.skill_uuid === null ? 'Remove Skill' : 'Use Skill'
+    : ({ propose_obligations: 'Add to inbox', create_project: 'Create project', move_documents_to_project: 'Move files', create_workflow: 'Create workflow', update_workflow: 'Update workflow', create_automation: 'Create automation', create_extraction_from_document: 'Create extraction', run_workflow: 'Run workflow', run_validation: 'Run validation', approve_workflow_step: 'Approve step', complete_certification_module: 'Complete module' } as Record<string, string>)[name] ?? approveLabel(name)
   const target = args.name ?? args.title ?? obj?.default_title
   const artifact = !isActive && !needsConfirmation && !isError && obj
     ? (name === 'create_workflow' || name === 'update_workflow') && typeof obj.workflow_id === 'string' ? { label: 'Open workflow', open: () => openWorkflow(obj.workflow_id as string) }

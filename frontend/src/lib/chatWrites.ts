@@ -40,6 +40,7 @@ export function chatWriteTargets(result: ToolResultInfo): ChatWriteTarget[] {
     case 'add_url_to_kb': return has('kb_uuid') ? ['knowledgeBases'] : []
     // A project brings its own knowledge base and root folder.
     case 'create_project': return has('project_uuid') ? ['projects', 'knowledgeBases', 'documents'] : []
+    case 'move_documents_to_project': return Array.isArray(value.moved_documents) && value.moved_documents.length > 0 ? ['projects', 'knowledgeBases', 'documents'] : []
     case 'pin_to_project':
     case 'unpin_from_project':
     case 'set_project_status': return value.ok === true ? ['projects'] : []

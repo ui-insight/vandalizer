@@ -13,6 +13,16 @@ vi.mock('../../contexts/BrandingContext', () => ({
 }))
 
 describe('ChatInput', () => {
+  it('offers existing files directly in Add without opening a computer upload', () => {
+    const add = vi.fn(), upload = vi.fn(), send = vi.fn()
+    render(<ChatInput onSend={send} onAttachFile={upload} onAddExistingFiles={add} />)
+    fireEvent.click(screen.getByRole('button', { name: /Add a source/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /From my files/ }))
+    expect(add).toHaveBeenCalledOnce()
+    expect(upload).not.toHaveBeenCalled()
+    expect(send).not.toHaveBeenCalled()
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
   it('adds a prepared task once, preserves an existing draft, and waits for Send', () => {
     const send = vi.fn(), changed = vi.fn()
     const view = render(<ChatInput onSend={send} onDraftChange={changed} initialDraft="Keep my notes." />)

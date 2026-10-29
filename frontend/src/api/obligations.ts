@@ -19,6 +19,13 @@ export interface Obligation {
   deadline_type: string | null
   due_at: string | null
   due_text: string | null
+  deadline_calculation?: {
+    rule: string
+    anchor_kind: string
+    anchor_date: string
+    offset_days: number
+    formula: string
+  } | null
   limit_value: number | null
   observed_value: number | null
   unit: string | null

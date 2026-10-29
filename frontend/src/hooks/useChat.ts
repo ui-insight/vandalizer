@@ -5,6 +5,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { streamChat, getHistory, previewSkill, selectConversationSkill, stopChatTurn, type ChatHistory } from '../api/chat'
 import type { ChatActivity, SkillSnapshot } from '../types/chat'
 import { expandSnippetRefs, markUsed } from '../utils/snippetRefs'
+import { completedSkillSelection } from '../lib/skillSelection'
 import type { ChatMessage, Citation, ContextBudgetPlan, ContextMeterInfo, OversizeDocument, PlanTask, StreamChunk, StreamSegment, SuggestedModel, ToolCallInfo, ToolResultInfo } from '../types/chat'
 
 export interface ContextNotice {
@@ -392,11 +393,8 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
                 quality: chunk.quality || null,
               }
               if (res.tool_name === 'select_skill' && res.content && typeof res.content === 'object') {
-                const selected = res.content as { status?: string; active_skill?: SkillSnapshot | null }
-                const skill = selected.active_skill
-                if (selected.status === 'selected' && (skill === null || (skill &&
-                  typeof skill.uuid === 'string' && typeof skill.title === 'string' &&
-                  typeof skill.version === 'string' && typeof skill.instructions === 'string'))) {
+                const skill = completedSkillSelection(res.content)
+                if (skill !== undefined) {
                   turnSkill = skill
                   manualSkillSelection.current = true
                   setActiveSkill(skill)
