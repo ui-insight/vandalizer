@@ -171,7 +171,7 @@ def perform_extraction_task(
         # Handle fillable PDF if present
         if fillable_pdf_url:
             try:
-                from PyPDF2 import PdfReader, PdfWriter
+                from pypdf import PdfReader, PdfWriter
 
                 bindings = {}
                 result_dict = results if isinstance(results, dict) else (results[0] if isinstance(results, list) and results else {})
