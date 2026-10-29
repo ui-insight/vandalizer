@@ -2,6 +2,31 @@ import { expect, it, vi } from 'vitest'
 import { streamChat, exportChat } from './chat'
 import { rawFetch } from './client'
 vi.mock('./client', () => ({ rawFetch: vi.fn(), apiFetch: vi.fn() }))
+it('sends the current browser timezone on each turn without trusting a client date', async () => {
+  vi.mocked(rawFetch).mockImplementation(async () => new Response(''))
+  const original = Intl.DateTimeFormat().resolvedOptions()
+  const zone = vi.spyOn(Intl.DateTimeFormat.prototype, 'resolvedOptions')
+  try {
+    zone.mockReturnValue({ ...original, timeZone: 'America/Los_Angeles' })
+    await streamChat('Add today’s date to the footer', [])
+    const first = JSON.parse(vi.mocked(rawFetch).mock.lastCall![1]!.body as string)
+    expect(first.client_timezone).toBe('America/Los_Angeles')
+    expect(first).not.toHaveProperty('current_date')
+    zone.mockReturnValue({ ...original, timeZone: 'Pacific/Auckland' })
+    await streamChat('What is due this month?', [])
+    expect(JSON.parse(vi.mocked(rawFetch).mock.lastCall![1]!.body as string).client_timezone).toBe('Pacific/Auckland')
+  } finally { zone.mockRestore() }
+})
+
+it('still sends chat when browser timezone detection is unavailable', async () => {
+  vi.mocked(rawFetch).mockImplementation(async () => new Response(''))
+  const zone = vi.spyOn(Intl.DateTimeFormat.prototype, 'resolvedOptions').mockImplementation(() => { throw new Error('Unavailable') })
+  try {
+    await streamChat('What is today’s date?', [])
+    expect(JSON.parse(vi.mocked(rawFetch).mock.lastCall![1]!.body as string)).not.toHaveProperty('client_timezone')
+  } finally { zone.mockRestore() }
+})
+
 it('sends an approval receipt without resending the page HTML', async () => {
   vi.mocked(rawFetch).mockResolvedValueOnce(new Response(''))
   const previewId = 'c'.repeat(32)

@@ -157,7 +157,8 @@ class TestAnalyzeDocumentsTool:
 
         monkeypatch.setattr(chat_tools, "SmartDocument", _FakeSmartDocument)
 
-        async def fake_fan_out(*, documents, instruction, model_name, sys_config_doc):
+        async def fake_fan_out(*, documents, instruction, model_name, sys_config_doc, date_context=""):
+            assert date_context == "Today: 2026-10-29 (America/Los_Angeles)"
             return [
                 {"uuid": d["uuid"], "title": d["title"], "analysis": "ok"}
                 for d in documents
@@ -165,9 +166,9 @@ class TestAnalyzeDocumentsTool:
 
         monkeypatch.setattr(chat_subagents, "fan_out_analyses", fake_fan_out)
 
-        result = await analyze_documents(
-            _ctx(), "summarize", ["mine", "theirs", "empty", "ghost"],
-        )
+        context = _ctx()
+        context.deps.current_date_context = "Today: 2026-10-29 (America/Los_Angeles)"
+        result = await analyze_documents(context, "summarize", ["mine", "theirs", "empty", "ghost"])
         assert result["analyzed"] == 1
         assert result["results"][0]["uuid"] == "mine"
         reasons = {s["uuid"]: s["reason"] for s in result["skipped"]}

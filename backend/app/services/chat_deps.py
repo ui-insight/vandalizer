@@ -95,6 +95,8 @@ class AgenticChatDeps:
     # chat_service wraps around them; and the once-only flag for
     # approval_claims.require_learner_route.
     user_message: str = ""
+    # Shared with document analyses so all comparisons use this turn's clock.
+    current_date_context: str = ""
     learner_route_retry_used: bool = False
     # Once-only flag for approval_claims.require_course_read.
     course_entry_retry_used: bool = False

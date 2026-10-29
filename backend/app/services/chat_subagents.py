@@ -42,9 +42,10 @@ _PROMPT_OVERHEAD_TOKENS = 2_000
 SUBAGENT_SYSTEM_PROMPT = (
     "You are a focused document-analysis assistant. You receive ONE document "
     "and ONE instruction; you know nothing else about the wider conversation.\n"
-    "- Follow the instruction exactly and answer from the document text only.\n"
-    "- Ground every claim in the document. If the document does not contain "
-    "what the instruction asks for, say so plainly — never guess or fill in "
+    "- Follow the instruction exactly and answer from the document text and supplied runtime calendar context.\n"
+    "- Use the runtime calendar context for today's date and relative-date comparisons.\n"
+    "- Ground every document-specific claim in the document. If it does not contain "
+    "the required source facts, say so plainly — never guess or fill in "
     "from general knowledge.\n"
     "- Preserve exact names, figures, dates, and identifiers.\n"
     "- Be concise: a few hundred words unless the instruction demands "
@@ -62,6 +63,7 @@ async def analyze_one_document(
     instruction: str,
     model_name: str,
     sys_config_doc: dict,
+    date_context: str = "",
 ) -> dict:
     """Run one tool-less sub-analysis; never raises — errors return per-doc.
 
@@ -83,6 +85,7 @@ async def analyze_one_document(
         text, dropped = _truncate_text_to_tokens(raw_text, text_budget, model_name)
 
         prompt = (
+            (f"{date_context}\n\n" if date_context else "") +
             f"Instruction: {instruction}\n\n"
             f"--- BEGIN DOCUMENT: {doc_title} ---\n"
             f"{text}\n"
@@ -125,6 +128,7 @@ async def fan_out_analyses(
     instruction: str,
     model_name: str,
     sys_config_doc: dict,
+    date_context: str = "",
 ) -> list[dict]:
     """Analyze documents concurrently (bounded by the global semaphore).
 
@@ -140,6 +144,7 @@ async def fan_out_analyses(
             instruction=instruction,
             model_name=model_name,
             sys_config_doc=sys_config_doc,
+            date_context=date_context,
         )
         for d in documents
     ]

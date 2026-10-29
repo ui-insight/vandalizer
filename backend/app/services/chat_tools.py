@@ -6100,6 +6100,7 @@ async def analyze_documents(
         instruction=instruction,
         model_name=context.deps.model_name,
         sys_config_doc=context.deps.system_config_doc,
+        date_context=getattr(context.deps, "current_date_context", ""),
     )
     failed = [r for r in results if "error" in r]
     return {

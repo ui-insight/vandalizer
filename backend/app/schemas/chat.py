@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 class ChatRequest(BaseModel):
     message: str
+    client_timezone: Optional[str] = Field(default=None, max_length=100)
     retry: bool = False
     page_approval: Optional[str] = Field(default=None, pattern=r"^[a-f0-9]{32}$")
     # Omitted: retain the conversation's pinned Skill. Null: remove it.

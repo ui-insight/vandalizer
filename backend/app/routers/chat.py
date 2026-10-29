@@ -355,6 +355,7 @@ async def chat(
                 onboarding_context=onboarding_ctx,
                 active_skill=active_skill,
                 retry=body.retry,
+                client_timezone=body.client_timezone,
             ):
                 yield chunk
         finally:

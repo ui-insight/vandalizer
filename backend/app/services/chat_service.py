@@ -1571,6 +1571,7 @@ async def chat_stream(
     onboarding_context=None,
     active_skill=None,
     retry: bool = False,
+    client_timezone: str | None = None,
 ) -> AsyncGenerator[str, None]:
     """Async generator yielding newline-delimited JSON chunks for streaming chat."""
 
@@ -1987,7 +1988,9 @@ async def chat_stream(
     # Note: run_demo is handled via scripted demo and returns early above, so
     # it never reaches this block.
     have_context = bool(doc_segments or attachment_segments)
-    reminder_blocks: list[str] = []
+    from app.services.chat_clock import current_date_context
+    date_context = current_date_context(client_timezone)
+    reminder_blocks: list[str] = [date_context]
     kb_empty_mode = False
 
     # Mode rules — same precedence as the pre-Phase-1 per-turn prompt swap:
@@ -2477,6 +2480,7 @@ async def chat_stream(
                 e["title"] for e in kb_status_entries if not e.get("validated_at")
             ],
             user_message=message,
+            current_date_context=date_context,
             kb_snippet_ref=max(
                 (s["ref"] for s in kb_sources if isinstance(s.get("ref"), int)),
                 default=0,

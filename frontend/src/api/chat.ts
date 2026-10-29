@@ -1,6 +1,11 @@
 import { apiFetch, rawFetch } from './client'
 import type { ChatMessage, UrlAttachment, FileAttachment, PlanTask, StreamChunk, SkillSnapshot } from '../types/chat'
 
+function browserTimeZone(): string | undefined {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined }
+  catch { return undefined }
+}
+
 export interface ExportMessage {
   role: 'user' | 'assistant'
   content: string
@@ -49,6 +54,7 @@ export async function streamChat(
     signal,
     body: JSON.stringify({
       message,
+      client_timezone: browserTimeZone(),
       ...(retry ? { retry: true } : {}),
       ...(pageApproval ? { page_approval: pageApproval } : {}),
       ...(skillUuid !== undefined ? { skill_uuid: skillUuid } : {}),
