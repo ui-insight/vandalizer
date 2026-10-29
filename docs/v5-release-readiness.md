@@ -34,6 +34,27 @@ expose Chroma collection configuration or enable `trust_remote_code` for users.
 These controls reduce exposure; they do not establish that the dependency is
 patched. Re-audit before release and retain this as an unresolved security item.
 
+The follow-up review of `chromadb/chroma:0.6.3` checked both the published wheel
+and the running image. The wheel SHA-256 is
+`4851258489a3612b558488d98d09ae0fe0a28d5cad6bd1ba64b96fdc419dc0e5`.
+Its collection configuration accepts only `hnsw_configuration`; the collection
+update model accepts only name and metadata. The reviewed source contains no
+`trust_remote_code`, embedding `build_from_config`, or remote model loading
+path. A disposable server test confirms that remote embedding configuration is
+rejected and an unknown update configuration is not applied. This is evidence
+about these artifacts, not an upstream correction of the advisory's affected
+version range. The legacy RBAC provider still lacks resource-scope checks.
+
+Compose now separates Chroma from the frontend on an internal network, and
+Helm explicitly denies Chroma egress when NetworkPolicy is enabled. The local
+container check passes for backend access, denied frontend access (DNS and
+direct IP), and denied Chroma access to a listening peer on a separate network.
+Run `python3 scripts/check_chroma_isolation.py --pull` to reproduce it; CI runs
+the same check in the Chroma job. It uses the v2 routes actually used by the
+locked client. No live application volumes or published ports are involved.
+Helm lint and schema validation pass for all five chart fixtures. Actual staging
+network-policy enforcement and deployment identity still need deployed QA.
+
 ## Typing
 
 The starting mypy run reports 3,141 errors, including 2,345 missing-annotation

@@ -206,6 +206,9 @@ jobs:
       - name: Run Tier 4 (ChromaDB)
         run: make backend-test-integration-t4
 
+      - name: Verify Chroma API security and network isolation
+        run: python scripts/check_chroma_isolation.py --pull
+
   backend-test-t2:
     name: Backend Tier 2 (MongoDB)
     runs-on: ubuntu-latest
