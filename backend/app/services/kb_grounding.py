@@ -678,11 +678,14 @@ def dedupe_passages(passages: list[dict]) -> list[dict]:
     return out
 
 
-def _precise_pool(dm, kb_uuid: str, query: str, *, k: int, floor: float) -> Optional[list[dict]]:
+def _precise_pool(dm, kb_uuid: str, query: str, *, k: int, floor: float,
+                  other_within: Optional[float] = None) -> Optional[list[dict]]:
     """One (knowledge base, query) pool through precise retrieval (see
     :mod:`app.services.kb_retrieval`), or None when it cannot run here — the
     store cannot list the base, the reranker is unavailable, or it is turned
-    off — so the caller keeps the vector ranking.
+    off — so the caller keeps the vector ranking. ``other_within`` is the
+    relevance cut's window for a passage from another section than the first
+    (``kb_retrieval.keep``; chat passes ``CHAT_OTHER_SECTION_WITHIN``).
 
     The lanes, in the order their passages are handed over:
 
@@ -702,7 +705,7 @@ def _precise_pool(dm, kb_uuid: str, query: str, *, k: int, floor: float) -> Opti
     index = kr.index_for(dm, kb_uuid)
     if index is None or not kr.ready():
         return None
-    cache_key = (kb_uuid, index.revision, index.count, index.built_at, query, k, floor)
+    cache_key = (kb_uuid, index.revision, index.count, index.built_at, query, k, floor, other_within)
     hit = kr.cached(cache_key)
     if hit is not None:
         return hit
@@ -747,7 +750,8 @@ def _precise_pool(dm, kb_uuid: str, query: str, *, k: int, floor: float) -> Opti
             final.append(r)
 
     general = [c for c in kr.candidates(dm, index, kb_uuid, expanded, floor=floor) if c.get("chunk_id") not in seen]
-    for r in kr.keep(kr.rerank(index, expanded, general), anchor_section=anchor, index=index):
+    for r in kr.keep(kr.rerank(index, expanded, general), anchor_section=anchor, index=index,
+                     other_within=other_within):
         if len(final) >= k:
             break
         if r.get("chunk_id") in seen:

@@ -14,7 +14,15 @@ import pytest
 from app.services import kb_grounding as kg
 from app.services import kb_paraphrase as kp
 from app.services import kb_retrieval as kr
-from tests.test_kb_precise_retrieval import KB, _store, precise  # noqa: F401 — fixture
+from tests.test_kb_precise_retrieval import (
+    KB,
+    Store,
+    _para,
+    _pool,
+    _sectioned,
+    _store,
+    precise,  # noqa: F401 — fixture
+)
 
 # Words none of the fake corpus holds: the fake scorer gives every passage
 # -9, so precise retrieval keeps nothing.
@@ -357,3 +365,44 @@ class TestPrecisePool:
         monkeypatch.setattr(kg, "_precise_pool", lambda *a, **k: None)
         assert await kp.precise_pool(object(), KB, PLAIN, k=4, floor=0.0, model_name="m") is None
         assert agent.calls == 0
+
+
+# Two sibling sections of one source. The question's words are all in
+# § 300.1 and all but one in § 300.2, which the fake scorer puts within
+# WITHIN_TOP of § 300.1 but past OTHER_SECTION_WITHIN.
+SIBLINGS = (
+    "Part 300—Closeout\n\n"
+    "§ 300.1 Final reports.\n\n" + _para("a", 300, "deadline sponsor closeout final report invoice")
+    + "\n\n§ 300.2 Final payment.\n\n" + _para("b", 300, "deadline sponsor closeout final report") + "\n"
+)
+SIBLING_QUESTION = "deadline sponsor closeout final report invoice"
+
+
+class TestChatOtherSectionWindow:
+    @staticmethod
+    def _store():
+        return Store(_sectioned("s300", "Part 300—Closeout", SIBLINGS))
+
+    @staticmethod
+    def _sections(store, pool):
+        index = kr.index_for(store, KB)
+        return sorted({index.section_of(p.get("chunk_id")) for p in pool})
+
+    def test_workflow_grounding_keeps_the_first_passage_s_section_only(self, precise):
+        store = self._store()
+        assert self._sections(store, _pool(store, SIBLING_QUESTION)) == ["300.1"]
+
+    @pytest.mark.asyncio
+    async def test_chat_also_keeps_the_sibling_section(self, precise, agent):
+        store = self._store()
+        pool = await kp.precise_pool(store, KB, SIBLING_QUESTION, k=4, floor=0.0, model_name="m")
+        assert self._sections(store, pool) == ["300.1", "300.2"]
+        assert agent.calls == 0 and not any(r.get(kp.RESCUED) for r in pool)
+
+    @pytest.mark.asyncio
+    async def test_the_two_windows_do_not_share_a_cached_pool(self, precise, agent):
+        store = self._store()
+        assert self._sections(store, _pool(store, SIBLING_QUESTION)) == ["300.1"]
+        pool = await kp.precise_pool(store, KB, SIBLING_QUESTION, k=4, floor=0.0, model_name="m")
+        assert self._sections(store, pool) == ["300.1", "300.2"]
+        assert self._sections(store, _pool(store, SIBLING_QUESTION)) == ["300.1"]

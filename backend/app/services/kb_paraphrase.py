@@ -230,14 +230,17 @@ def mark_rescued(pool: list[dict]) -> list[dict]:
 
 async def precise_pool(dm, kb_uuid: str, query: str, *, k: int, floor: float,
                        model_name: Optional[str]) -> Optional[list[dict]]:
-    """The precise pool for ``query`` (:func:`kb_grounding._precise_pool`);
-    when it keeps nothing, the passages paraphrases of ``query`` find, marked
-    :data:`RESCUED`. Either way followed by its passages' neighbours in their
-    sections (:func:`kb_grounding.with_neighbours`). None when precise
-    retrieval cannot run here."""
-    from app.services import kb_grounding
+    """The precise pool for ``query`` (:func:`kb_grounding._precise_pool`) at
+    chat's window for passages of other sections
+    (``kb_retrieval.CHAT_OTHER_SECTION_WITHIN``); when it keeps nothing, the
+    passages paraphrases of ``query`` find, marked :data:`RESCUED`. Either way
+    followed by its passages' neighbours in their sections
+    (:func:`kb_grounding.with_neighbours`). None when precise retrieval cannot
+    run here."""
+    from app.services import kb_grounding, kb_retrieval
 
-    pool = await asyncio.to_thread(kb_grounding._precise_pool, dm, kb_uuid, query, k=k, floor=floor)
+    pool = await asyncio.to_thread(kb_grounding._precise_pool, dm, kb_uuid, query, k=k, floor=floor,
+                                   other_within=kb_retrieval.CHAT_OTHER_SECTION_WITHIN)
     if pool is None:
         return None
     rescued = False

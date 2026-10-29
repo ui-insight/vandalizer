@@ -453,20 +453,29 @@ class TestRouteAndCut:
         index = kr.build_index(KB, store.chunks, embedding_function=store.embedding_function)
         assert index.title_matrix is None and kr.route(index, "program income") is None
 
-    def test_the_cut_keeps_strong_same_section_passages_only(self):
-        index = _index()
+    @staticmethod
+    def _cut_rows(index):
         a = [i for i, k in enumerate(index.keys) if k == "200.307"]
         b = [i for i, k in enumerate(index.keys) if k == "200.308"]
         assert len(a) >= 3 and len(b) >= 2
-        rows = [
+        return [
             {"chunk_id": index.chunks[a[0]]["chunk_id"], "rerank_score": 6.0},
             {"chunk_id": index.chunks[a[1]]["chunk_id"], "rerank_score": 3.5},   # same section, within 3
             {"chunk_id": index.chunks[b[0]]["chunk_id"], "rerank_score": 4.0},   # other section, not within 1.5
             {"chunk_id": index.chunks[b[1]]["chunk_id"], "rerank_score": 5.0},   # other section, within 1.5
             {"chunk_id": index.chunks[a[2]]["chunk_id"], "rerank_score": 2.5},   # below top - 3
         ]
-        kept = [r["rerank_score"] for r in kr.keep(rows, anchor_section=None, index=index)]
+
+    def test_the_cut_keeps_strong_same_section_passages_only(self):
+        index = _index()
+        kept = [r["rerank_score"] for r in kr.keep(self._cut_rows(index), anchor_section=None, index=index)]
         assert kept == [6.0, 3.5, 5.0]
+
+    def test_chat_s_window_keeps_another_section_on_the_same_terms(self):
+        index = _index()
+        kept = [r["rerank_score"] for r in kr.keep(self._cut_rows(index), anchor_section=None, index=index,
+                                                   other_within=kr.CHAT_OTHER_SECTION_WITHIN)]
+        assert kept == [6.0, 3.5, 4.0, 5.0]
 
     def test_nothing_clears_the_cut_means_nothing_is_kept(self):
         index = _index()

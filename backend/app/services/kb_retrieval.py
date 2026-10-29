@@ -83,6 +83,17 @@ RRF_K = 60
 MIN_SCORE = -3.0
 WITHIN_TOP = 3.0
 OTHER_SECTION_WITHIN = 1.5
+# Chat keeps a passage from another section on the same terms as one from the
+# first passage's section (kb_paraphrase.precise_pool); workflow grounding
+# keeps OTHER_SECTION_WITHIN. That rule was set for a grounded task's queries,
+# written in the base's terms about one section. A chat question is asked as a
+# case and often turns on a sibling section: § 46.109 beside § 46.110,
+# 9904.403-40 beside 9904.403-50. On the KB accuracy eval (2026-10-29, the
+# question's pool on the live bases) this reached answer text the rule had cut
+# for 16 items, which took 55 of the 344 turns of the 10-28 A/B whose passages
+# lacked their answer text, for 0.4 more passages per question; it lost none,
+# and handed nothing to a question that keeps nothing.
+CHAT_OTHER_SECTION_WITHIN = WITHIN_TOP
 # The cut for a passage scored against a paraphrase of the question in the
 # base's own words (app.services.kb_paraphrase) rather than the question. A
 # short search query is what the cross-encoder was trained on, and its scores
@@ -642,8 +653,10 @@ def rerank(index: KbIndex, expanded: str, results: list[dict]) -> list[dict]:
 
 
 def keep(scored: list[dict], *, anchor_section: Optional[str], index: KbIndex, top: Optional[float] = None,
-         min_score: float = MIN_SCORE) -> list[dict]:
-    """The relevance cut over reranked results (best first)."""
+         min_score: float = MIN_SCORE, other_within: Optional[float] = None) -> list[dict]:
+    """The relevance cut over reranked results (best first). ``other_within``
+    is how far below the best a passage from another section than the anchor
+    may score (``OTHER_SECTION_WITHIN`` when None)."""
     if not scored:
         return []
     top = scored[0]["rerank_score"] if top is None else top
@@ -653,8 +666,9 @@ def keep(scored: list[dict], *, anchor_section: Optional[str], index: KbIndex, t
     # The section of the first passage handed over (a section the query named
     # or was routed to, else the best-scoring one) anchors the rest.
     anchor = anchor_section or index.section_of(kept[0].get("chunk_id"))
+    other = OTHER_SECTION_WITHIN if other_within is None else other_within
     return [r for r in kept
-            if index.section_of(r.get("chunk_id")) == anchor or r["rerank_score"] >= top - OTHER_SECTION_WITHIN]
+            if index.section_of(r.get("chunk_id")) == anchor or r["rerank_score"] >= top - other]
 
 
 _RESULTS: "OrderedDict[tuple, list[dict]]" = OrderedDict()

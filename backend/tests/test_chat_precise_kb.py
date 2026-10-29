@@ -60,9 +60,13 @@ async def _segment(message: str, mocks: dict):
 @pytest.mark.asyncio
 async def test_chat_uses_precise_retrieval_and_cites_sections(precise_on, monkeypatch):
     pool = [_section_chunk(4, 1), _section_chunk(5, 2)]
-    monkeypatch.setattr(kb_grounding, "_precise_pool", lambda dm, kb, q, k, floor: list(pool))
+    windows: list = []
+    monkeypatch.setattr(kb_grounding, "_precise_pool",
+                        lambda dm, kb, q, k, floor, other_within=None: windows.append(other_within) or list(pool))
     mocks = _patched()
     segment, sources = await _segment("What does § 200.308 say about revising a budget?", mocks)
+    # Chat's window for passages of another section, not workflow grounding's.
+    assert windows == [kb_retrieval.CHAT_OTHER_SECTION_WITHIN]
 
     assert [s["label"] for s in sources] == [f"{SOURCE} · § 200.308 · part 1", f"{SOURCE} · § 200.308 · part 2"]
     assert [s["cite_label"] for s in sources] == [s["label"] for s in sources]
@@ -78,7 +82,7 @@ async def test_chat_uses_precise_retrieval_and_cites_sections(precise_on, monkey
 
 @pytest.mark.asyncio
 async def test_a_question_the_base_cannot_answer_gets_no_snippets(precise_on, monkeypatch):
-    monkeypatch.setattr(kb_grounding, "_precise_pool", lambda dm, kb, q, k, floor: [])
+    monkeypatch.setattr(kb_grounding, "_precise_pool", lambda dm, kb, q, k, floor, other_within=None: [])
     asked = AsyncMock(return_value=[])
     monkeypatch.setattr("app.services.kb_paraphrase.paraphrases", asked)
     segment, sources = await _segment("Can grant funds buy beer for a lab party?", _patched())
@@ -89,7 +93,7 @@ async def test_a_question_the_base_cannot_answer_gets_no_snippets(precise_on, mo
 
 @pytest.mark.asyncio
 async def test_a_question_that_keeps_nothing_gets_what_its_paraphrase_finds(precise_on, monkeypatch):
-    monkeypatch.setattr(kb_grounding, "_precise_pool", lambda dm, kb, q, k, floor: [])
+    monkeypatch.setattr(kb_grounding, "_precise_pool", lambda dm, kb, q, k, floor, other_within=None: [])
     monkeypatch.setattr("app.services.kb_paraphrase.paraphrases",
                         AsyncMock(return_value=["revision of budget and program plans"]))
     found = MagicMock(return_value=[_section_chunk(4, 1)])
@@ -112,7 +116,7 @@ async def test_a_follow_up_is_searched_with_the_question_it_follows(precise_on, 
     }
     asked: list[str] = []
 
-    def pool(dm, kb, q, k, floor):
+    def pool(dm, kb, q, k, floor, other_within=None):
         asked.append(q)
         return list(pools.get(q, []))
 
@@ -148,7 +152,7 @@ async def test_a_follow_up_only_its_earlier_question_finds_is_marked(precise_on,
 
     earlier = "How long is the one-time no-cost extension we can take ourselves?"
     monkeypatch.setattr(kb_grounding, "_precise_pool",
-                        lambda dm, kb, q, k, floor: [_section_chunk(5, 1)] if q == earlier else [])
+                        lambda dm, kb, q, k, floor, other_within=None: [_section_chunk(5, 1)] if q == earlier else [])
     monkeypatch.setattr("app.services.kb_paraphrase.paraphrases", AsyncMock(return_value=[]))
     history = [
         ModelRequest(parts=[UserPromptPart(content=earlier)]),
@@ -178,7 +182,8 @@ async def test_a_follow_up_only_its_earlier_question_finds_is_marked(precise_on,
 @pytest.mark.asyncio
 async def test_each_part_of_a_compound_question_is_searched(precise_on, monkeypatch):
     message = "Can we rebudget into equipment, and who approves the extension?"
-    monkeypatch.setattr(kb_grounding, "_precise_pool", lambda dm, kb, q, k, floor: [_section_chunk(4, 1)])
+    monkeypatch.setattr(kb_grounding, "_precise_pool",
+                        lambda dm, kb, q, k, floor, other_within=None: [_section_chunk(4, 1)])
     split = AsyncMock(return_value=["rebudgeting into equipment", "approval of a no-cost extension"])
     monkeypatch.setattr("app.services.kb_paraphrase.parts", split)
     found = {"rebudgeting into equipment": [_section_chunk(4, 1)],
@@ -199,7 +204,8 @@ async def test_each_part_of_a_compound_question_is_searched(precise_on, monkeypa
 
 @pytest.mark.asyncio
 async def test_a_question_asking_one_thing_is_not_split(precise_on, monkeypatch):
-    monkeypatch.setattr(kb_grounding, "_precise_pool", lambda dm, kb, q, k, floor: [_section_chunk(4, 1)])
+    monkeypatch.setattr(kb_grounding, "_precise_pool",
+                        lambda dm, kb, q, k, floor, other_within=None: [_section_chunk(4, 1)])
     split = AsyncMock(return_value=[])
     monkeypatch.setattr("app.services.kb_paraphrase.parts", split)
     await _segment("Do we need prior approval to rebudget into equipment?", _patched())
@@ -208,7 +214,7 @@ async def test_a_question_asking_one_thing_is_not_split(precise_on, monkeypatch)
 
 @pytest.mark.asyncio
 async def test_a_multi_kb_question_asking_one_thing_is_not_split(precise_on, monkeypatch):
-    monkeypatch.setattr(kb_grounding, "_precise_pool", lambda dm, kb, q, k, floor: [])
+    monkeypatch.setattr(kb_grounding, "_precise_pool", lambda dm, kb, q, k, floor, other_within=None: [])
     monkeypatch.setattr("app.services.kb_paraphrase.paraphrases", AsyncMock(return_value=[]))
     split = AsyncMock(return_value=["rebudgeting into equipment", "approval of a no-cost extension"])
     monkeypatch.setattr("app.services.kb_paraphrase.parts", split)
@@ -228,7 +234,7 @@ async def test_a_multi_kb_question_asking_one_thing_is_not_split(precise_on, mon
 
 @pytest.mark.asyncio
 async def test_the_vector_pipeline_stands_when_precise_retrieval_cannot_run(precise_on, monkeypatch):
-    monkeypatch.setattr(kb_grounding, "_precise_pool", lambda dm, kb, q, k, floor: None)
+    monkeypatch.setattr(kb_grounding, "_precise_pool", lambda dm, kb, q, k, floor, other_within=None: None)
     vector = AsyncMock(return_value=([_section_chunk(1, 1)], RAGConfig(k=4), 0))
     mocks = _patched(**{"app.services.kb_validation_service.retrieve_kb_chunks": vector})
     _, sources = await _segment("revision of budget", mocks)
@@ -238,7 +244,8 @@ async def test_the_vector_pipeline_stands_when_precise_retrieval_cannot_run(prec
 
 @pytest.mark.asyncio
 async def test_amendment_passages_are_held_to_the_relevance_cut(precise_on, monkeypatch):
-    monkeypatch.setattr(kb_grounding, "_precise_pool", lambda dm, kb, q, k, floor: [_section_chunk(4, 1)])
+    monkeypatch.setattr(kb_grounding, "_precise_pool",
+                        lambda dm, kb, q, k, floor, other_within=None: [_section_chunk(4, 1)])
     off_topic = {"content": "Unrelated amendment text.", "metadata": {"source_name": "Supplement", "source_id": "s2"},
                  "chunk_id": "s2_chunk_0", "score": 0.1}
     cut = MagicMock(return_value=[])
@@ -269,8 +276,10 @@ def test_a_section_citation_marks_only_that_passage_used():
 async def test_the_agent_search_returns_labels_to_cite(precise_on, monkeypatch):
     from tests.test_agentic_kb_page_hedging import _kb, _make_context
 
+    windows: list = []
     monkeypatch.setattr(kb_grounding, "_precise_pool",
-                        lambda dm, kb, q, k, floor: [_section_chunk(4, 1), _section_chunk(5, 2)])
+                        lambda dm, kb, q, k, floor, other_within=None:
+                        windows.append(other_within) or [_section_chunk(4, 1), _section_chunk(5, 2)])
     ctx = _make_context()
     ctx.tool_call_id = "call-1"
     with (
@@ -289,6 +298,8 @@ async def test_the_agent_search_returns_labels_to_cite(precise_on, monkeypatch):
 
         out = await search_knowledge_base(ctx, "revising a budget", kb_uuid="kb-1")
     vector.assert_not_awaited()
+    # The agent's own search is chat too.
+    assert windows == [kb_retrieval.CHAT_OTHER_SECTION_WITHIN]
     assert [e["label"] for e in out] == [f"{SOURCE} · § 200.308 · part 1", f"{SOURCE} · § 200.308 · part 2"]
     citations = ctx.deps.citation_annotations["call-1"]
     assert [c["cite_label"] for c in citations] == [e["label"] for e in out]
