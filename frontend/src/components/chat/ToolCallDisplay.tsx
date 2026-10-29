@@ -5,6 +5,7 @@ import { ChatPageCard } from '../artifacts/ChatPageCard'
 import type { ApprovalRecord } from './approvalHistory'
 import { certificationPayloadIssue } from '../../lib/certificationPayload'
 import { useEffect, useRef, useState } from 'react'
+import { AutomationSettings } from './AutomationSettings'
 import type { ReactNode } from 'react'
 import { AlertTriangle, Check, ChevronRight, ClipboardCopy, Download, ExternalLink, FileText, Loader2, Search, BookOpen, Globe, ScanText, Hammer, Workflow } from 'lucide-react'
 import { runModelLabel } from '../../lib/runModel'
@@ -1283,6 +1284,7 @@ export function ToolStatusLine({
     : canceled ? 'Canceled' : certificationIssue ? 'Result needs review' : isError ? 'Failed' : unconfirmed ? 'Completion not confirmed' : isActive ? 'Running'
     : name === 'run_workflow' && typeof obj?.session_id === 'string' ? 'Run accepted'
     : name === 'select_skill' && obj?.status === 'selected' ? 'Completed'
+    : name === 'create_automation' && obj?.id && obj?.enabled === false ? 'Paused'
     : obj?.status === 'queued' || obj?.status === 'pending' ? 'Queued'
     : obj?.status === 'running' ? 'Running' : obj?.status === 'paused' ? 'Awaiting approval' : obj?.status && obj.status !== 'completed' ? 'Result received' : 'Completed'
 
@@ -1414,6 +1416,7 @@ export function ToolStatusLine({
         {onConfirm ? <button type="button" className="chat-action-btn" onClick={() => onConfirm(`Help me recover the failed ${name.replaceAll('_', ' ')} step. Review the existing results and explain the next action. Do not repeat completed changes without my approval.`)}>Review recovery options</button> : <p>Ask the Assistant to review this failed step. Keep completed results when deciding what to retry.</p>}
       </div>}
       {artifact && <button type="button" className="chat-action-btn" style={{ margin: "var(--workspace-space-8) 0 var(--workspace-space-8) var(--workspace-space-20)" }} onClick={artifact.open}>{artifact.label}</button>}
+      {name === 'create_automation' && !isActive && !isError && (!needsConfirmation || approvalHistory) && <AutomationSettings settings={obj?.automation_settings} />}
       {needsConfirmation && approvalHistory && <section className="agent-approval" aria-label="Earlier action decision">
         <strong>{approvalHistory.label}</strong><p>{approvalHistory.detail}</p>
         {name === 'propose_obligations' && !!obj?.obligation_review && typeof obj.obligation_review === 'object' && <ObligationReview review={obj.obligation_review as Record<string, unknown>} />}
@@ -1428,6 +1431,7 @@ export function ToolStatusLine({
           {name === 'propose_obligations' && obj?.obligation_review && typeof obj.obligation_review === 'object'
             ? <ObligationReview review={obj.obligation_review as Record<string, unknown>} />
             : <dl><dt>Action</dt><dd>{actionLabel}</dd>{typeof target === 'string' && <><dt>Name</dt><dd>{target}</dd></>}<dt>Change</dt><dd>{typeof obj?.preview === 'string' ? obj.preview : 'Review the proposed action above before approving.'}</dd></dl>}
+          {name === 'create_automation' && <AutomationSettings settings={obj?.automation_settings} />}
           {decision && <p>Check the Assistant’s next response for the outcome.</p>}
           {decisionError && <p role="alert">{decisionError}</p>}
           {!decision && !onConfirm && <p>Continue from the latest Assistant response to make a decision about this preview.</p>}

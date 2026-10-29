@@ -104,7 +104,7 @@ Cross-field rules are *evaluated* from chat but *authored* in the extraction edi
 | *"What's the status of the workflow I just ran?"* | Poll and return current step, completion %, approval gates, or final output |
 | *"Approve the review step."* | Resume a paused workflow — if you're an assigned reviewer or workflow manager |
 | *"Build a workflow that extracts the budget, checks it against policy, then drafts a summary."* | Lay out the steps, preview them, and create a real workflow on your confirm |
-| *"Run that on every file added to my Intake folder."* | Create an automation (disabled, so nothing fires before you review it) |
+| *"Run that on every PDF added to my Intake folder."* | Preview an automation with PDF-only filtering, then create it Paused after approval; enable it from Automations |
 
 A workflow built in chat starts **unverified**. It's ready to run, but fine-tune it in the visual editor and validate it before relying on it for real decisions.
 

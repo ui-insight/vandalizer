@@ -324,9 +324,12 @@ def send_workflow_notification(
     recipients = list(notification.get("recipients", []))
 
     if notification.get("notify_owner"):
-        workflow = db.workflow.find_one({"_id": result_doc.get("workflow")})
-        if workflow:
-            user = db.user.find_one({"user_id": workflow.get("user_id")})
+        owner_id = result_doc.get("automation_user_id")
+        if not owner_id:
+            workflow = db.workflow.find_one({"_id": result_doc.get("workflow")})
+            owner_id = workflow.get("user_id") if workflow else None
+        if owner_id:
+            user = db.user.find_one({"user_id": owner_id})
             if user and user.get("email") and user["email"] not in recipients:
                 recipients.append(user["email"])
 

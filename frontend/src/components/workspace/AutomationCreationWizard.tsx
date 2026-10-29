@@ -661,7 +661,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                 testId="wizard-activation"
               >
               <div style={{ paddingTop: 'var(--workspace-space-8)' }}>
-              <p style={{ marginBottom: 'var(--workspace-space-16)', lineHeight: 1.5 }}>Choose <strong>Save disabled</strong> to finish setup without running, or <strong>Create &amp; enable</strong> to activate this automation.</p>
+              <p style={{ marginBottom: 'var(--workspace-space-16)', lineHeight: 1.5 }}>Choose <strong>Save paused</strong> to finish setup without running, or <strong>Create &amp; enable</strong> to activate this automation.</p>
 
               {/* Share with team */}
               <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', cursor: 'pointer', fontSize: 'var(--workspace-font-control)', color: '#374151' }}>
@@ -802,7 +802,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
               </ActionButton>
             ) : (
               <>
-                <ActionButton variant="secondary" type="button" onClick={() => handleCreate(false)} disabled={!canAdvance() || creating} >Save disabled</ActionButton>
+                <ActionButton variant="secondary" type="button" onClick={() => handleCreate(false)} disabled={!canAdvance() || creating} >Save paused</ActionButton>
                 <ActionButton variant="primary" type="button" onClick={() => handleCreate(true)} disabled={!canAdvance() || creating} >
                   {creating && <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />}
                   Create &amp; enable

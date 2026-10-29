@@ -264,7 +264,7 @@ export function AutomationEditorPanel() {
                 width: 8, height: 8, borderRadius: '50%',
                 backgroundColor: automation.enabled ? '#22c55e' : '#9ca3af',
               }} />
-              {automation.enabled ? 'Enabled' : 'Disabled'}
+              {automation.enabled ? 'Active' : 'Paused'}
             </button>
             <details className="automation-more" onKeyDown={event => {
               if (event.key === 'Escape') { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus() }
@@ -761,7 +761,7 @@ function FolderWatchConfig({ automation, onSave }: { automation: Automation; onS
           style={{ width: 16, height: 16, accentColor: 'var(--highlight-on-light)' }}
         />
         <span style={{ fontWeight: 500 }}>Batch mode</span>
-        <span style={{ color: '#555e68', fontSize: 'var(--workspace-font-meta)' }}>wait and process files together</span>
+        <span style={{ color: '#555e68', fontSize: 'var(--workspace-font-meta)' }}>Files currently run individually; batch execution is not available yet.</span>
       </label>
     </div>
   )

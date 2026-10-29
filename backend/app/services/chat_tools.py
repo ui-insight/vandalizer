@@ -5393,6 +5393,15 @@ async def create_automation(
     cron_expression: str = "",
     description: str = "",
     confirmed: bool = False,
+    file_types: list[str] | None = None,
+    exclude_patterns: str = "",
+    batch_mode: bool = False,
+    output_folder_uuid: str = "",
+    output_format: str = "",
+    output_file_naming: str = "{workflow_name}_{date}",
+    email_recipients: list[str] | None = None,
+    notify_owner: bool = False,
+    email_condition: str = "always",
 ) -> dict:
     """Create an automation that runs a workflow or extraction automatically.
 
@@ -5401,10 +5410,10 @@ async def create_automation(
       - "schedule": fires on a cron schedule (needs cron_expression, e.g. "0 9 * * 1")
 
     The action is an EXISTING workflow or extraction (action_type + action_id);
-    chat can't author those, so find or create them first (list_workflows /
+    find or create them first (list_workflows /
     list_extraction_sets). Call with confirmed=false to preview, then
-    confirmed=true after the user approves. The automation is created DISABLED —
-    tell the user to enable it on the Automations screen once it looks right.
+    confirmed=true after the user approves, with the SAME settings. The automation
+    is created Paused; tell the user to enable it on the Automations screen.
 
     Args:
         context: The call context.
@@ -5416,10 +5425,46 @@ async def create_automation(
         cron_expression: Required for schedule — a cron expression like "0 9 * * 1".
         description: Optional description.
         confirmed: Must be true to actually create. If false, returns a preview.
+        file_types: Folder-watch extensions, e.g. ["pdf"] for PDFs only. Supports
+            pdf, doc, docx, xls, xlsx, csv, txt, md; omitted or [] means all types.
+        exclude_patterns: Folder-watch filename globs separated by commas, e.g. "draft*, temp_*".
+        batch_mode: Save the editor's folder-watch Batch mode option. The current
+            runner still processes files individually; disclose this limitation.
+        output_folder_uuid: Optional folder to save results into; resolve with list_folders.
+        output_format: text, markdown, pdf, json, or csv (extractions only).
+            Defaults to csv for extractions and text for workflows.
+        output_file_naming: Result filename pattern; supports {workflow_name},
+            {date}, {timestamp}, {document_name}. Used with output_folder_uuid.
+        email_recipients: Explicit notification email addresses requested by the user.
+        notify_owner: Send email to the automation owner; no guessed address needed.
+        email_condition: Send email always, on success, or on failure.
     """
     from app.services import access_control
+    from app.utils.file_validation import ALLOWED_EXTS
 
     user = context.deps.user
+
+    if action_type not in ("workflow", "extraction"):
+        return {"error": "action_type must be 'workflow' or 'extraction'."}
+    normalized_types = sorted({extension.strip().lower().removeprefix(".") for extension in (file_types or [])})
+    unsupported = set(normalized_types) - ALLOWED_EXTS
+    if unsupported:
+        return {"error": f"Unsupported file_types: {', '.join(sorted(unsupported))}. Use {', '.join(sorted(ALLOWED_EXTS))}."}
+    if trigger_type != "folder_watch" and (file_types is not None or exclude_patterns or batch_mode):
+        return {"error": "file_types, exclude_patterns and batch_mode apply only to folder_watch triggers."}
+    if email_condition not in ("always", "success", "failure"):
+        return {"error": "email_condition must be 'always', 'success', or 'failure'."}
+    recipients = list(dict.fromkeys(address.strip() for address in (email_recipients or [])))
+    if any(not re.fullmatch(r"[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+", address) for address in recipients):
+        return {"error": "email_recipients must contain valid individual email addresses."}
+    if email_condition != "always" and not (recipients or notify_owner):
+        return {"error": "Choose email_recipients or notify_owner for email notifications."}
+    if not output_folder_uuid and (output_format or output_file_naming != "{workflow_name}_{date}"):
+        return {"error": "Choose output_folder_uuid before configuring result files."}
+    storage_format = output_format.strip().lower() or ("csv" if action_type == "extraction" else "text")
+    formats = {"text", "markdown", "pdf", "json"} | ({"csv"} if action_type == "extraction" else set())
+    if storage_format not in formats:
+        return {"error": f"output_format for {action_type} must be one of: {', '.join(sorted(formats))}."}
 
     # Validate the trigger and build its config.
     if trigger_type not in ("folder_watch", "schedule"):
@@ -5442,7 +5487,10 @@ async def create_automation(
                     "folder uuids."
                 ),
             )
-        trigger_config = {"folder_id": folder.uuid}
+        trigger_config = {
+            "folder_id": folder.uuid, "file_types": normalized_types,
+            "exclude_patterns": exclude_patterns.strip(), "batch_mode": batch_mode,
+        }
         trigger_desc = f'when a document is added to "{folder.title}"'
     else:  # schedule
         if not (cron_expression or "").strip():
@@ -5453,8 +5501,6 @@ async def create_automation(
         trigger_desc = f"on schedule ({cron_expression.strip()})"
 
     # Validate the action target and resolve a friendly name.
-    if action_type not in ("workflow", "extraction"):
-        return {"error": "action_type must be 'workflow' or 'extraction'."}
     if action_type == "workflow":
         wf = await access_control.get_authorized_workflow(
             action_id, user, team_access=context.deps.team_access,
@@ -5468,6 +5514,46 @@ async def create_automation(
             return {"error": "Extraction not found or you don't have access to it."}
         action_name = ss.title or action_id
 
+    output_config: dict = {}
+    settings = []
+    if trigger_type == "folder_watch":
+        settings.extend([
+            {"label": "File types", "value": ", ".join(f".{ext}" for ext in normalized_types) or "All supported file types"},
+            {"label": "Exclude patterns", "value": exclude_patterns.strip() or "None"},
+            {"label": "Batch mode", "value": "On (files currently run individually)" if batch_mode else "Off"},
+        ])
+    if description:
+        settings.append({"label": "Description", "value": description})
+    if output_folder_uuid:
+        destination = await access_control.get_authorized_folder(
+            output_folder_uuid, user, contribute=True, team_access=context.deps.team_access,
+        )
+        if not destination:
+            return {"error": "Output folder not found or you don't have permission to save results there."}
+        output_config["storage"] = {
+            "enabled": True, "destination_folder": destination.uuid,
+            "format": storage_format, "file_naming": output_file_naming,
+        }
+        settings.extend([
+            {"label": "Save results to", "value": destination.title},
+            {"label": "Result format", "value": storage_format},
+            {"label": "File naming pattern", "value": output_file_naming},
+        ])
+    else:
+        settings.append({"label": "Save results to a folder", "value": "Off"})
+    if recipients or notify_owner:
+        output_config["notifications"] = [{
+            "channel": "email", "recipients": recipients,
+            "notify_owner": notify_owner, "conditions": email_condition,
+        }]
+        settings.extend([
+            {"label": "Email notification", "value": ", ".join((["Automation owner"] if notify_owner else []) + recipients)},
+            {"label": "Send email", "value": {"always": "Always", "success": "On success only", "failure": "On failure only"}[email_condition]},
+        ])
+    else:
+        settings.append({"label": "Email notification", "value": "Off"})
+    settings.append({"label": "Status", "value": "Paused"})
+
     gate = await _confirm_gate(
         context,
         tool_name="create_automation",
@@ -5477,13 +5563,18 @@ async def create_automation(
             "trigger_config": trigger_config,
             "action_type": action_type,
             "action_id": action_id,
+            "description": description,
+            "output_config": output_config,
         },
         preview={
             "action": "create_automation",
             "preview": (
                 f'Create automation "{name}": run {action_type} "{action_name}" '
-                f"{trigger_desc}. (Created disabled — you enable it after review.)"
+                f"{trigger_desc}. Will be created Paused — enable it after review."
             ),
+            "automation_settings": settings,
+            "trigger_config": trigger_config,
+            "output_config": output_config,
             "needs_confirmation": True,
         },
         confirmed=confirmed,
@@ -5504,13 +5595,17 @@ async def create_automation(
         action_id=action_id,
         team_id=team_id,
         shared_with_team=False,
+        output_config=output_config,
     )
     return {
         "id": str(auto.id),
         "name": auto.name,
         "enabled": auto.enabled,
+        "automation_settings": settings,
+        "trigger_config": trigger_config,
+        "output_config": output_config,
         "message": (
-            f'Automation "{auto.name}" created (disabled). It will run the '
+            f'Automation "{auto.name}" created (Paused). It will run the '
             f'{action_type} "{action_name}" {trigger_desc}. Enable it on the '
             "Automations screen when you're ready."
         ),

@@ -203,7 +203,7 @@ function RunNowSession({ automation, canManage, onClose, userScope }: Props) {
         <AlertTriangle style={{ width: 14, height: 14, flexShrink: 0, marginTop: 1 }} />
         <span>
           This is a real run, not a dry run: results are saved and notifications and webhooks are sent exactly as configured below.
-          {!automation.enabled && ' The automation can stay disabled — a manual run does not switch it on.'}
+          {!automation.enabled && ' The automation can stay Paused — a manual run does not switch it on.'}
         </span>
       </div>
 

@@ -65,7 +65,7 @@ describe('AutomationCreationWizard draft safety', () => {
     expect(screen.getByText('Review your automation')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Create & enable' }))
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Retry to update the same automation'))
-    fireEvent.click(screen.getByRole('button', { name: 'Save disabled' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save paused' }))
     await waitFor(() => expect(onCreate).toHaveBeenCalledWith('saved-draft'))
     expect(createAutomation).toHaveBeenCalledTimes(1)
     expect(updateAutomation).toHaveBeenLastCalledWith('saved-draft', expect.objectContaining({ enabled: false, action_id: 'wf-1' }))
@@ -173,14 +173,14 @@ describe('AutomationCreationWizard branch drafts and requirements', () => {
     fireEvent.click(screen.getByRole('radio', { name: /Run Workflow/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     fireEvent.click(screen.getByRole('checkbox', { name: /Save results to a folder/ }))
-    expect(screen.getByRole('button', { name: 'Save disabled' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Save paused' })).toBeDisabled()
     fireEvent.change(screen.getByLabelText('Destination folder'), { target: { value: 'folder-1' } })
     expect(screen.getByLabelText('Output format')).toHaveValue('text')
     fireEvent.click(screen.getByRole('checkbox', { name: /Email results when complete/ }))
     fireEvent.change(screen.getByLabelText('Email recipients'), { target: { value: 'invalid' } })
-    expect(screen.getByRole('button', { name: 'Save disabled' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Save paused' })).toBeDisabled()
     fireEvent.change(screen.getByLabelText('Email recipients'), { target: { value: 'review@example.com' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save disabled' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save paused' }))
     await waitFor(() => expect(createAutomation).toHaveBeenCalledWith(expect.objectContaining({
       trigger_type: 'api', trigger_config: undefined, action_id: 'wf-1',
       output_config: expect.objectContaining({ storage: { enabled: true, destination_folder: 'folder-1', format: 'text' } }),

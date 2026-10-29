@@ -826,6 +826,7 @@ def process_outputs(self, workflow_result_id: str) -> dict:
         })
     if automation and automation.get("output_config"):
         output_config = automation["output_config"]
+        result_doc["automation_user_id"] = automation.get("user_id")
 
     outputs = {"storage": None, "onedrive": None, "notifications": [], "webhooks": [], "chains": []}
 
@@ -1194,6 +1195,7 @@ def process_extraction_outputs(
     }
 
     result_doc = {
+        "automation_user_id": auto.get("user_id"),
         "status": run_status,
         "error": run_error,
         "trigger_type": auto.get("trigger_type", "api"),

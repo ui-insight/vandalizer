@@ -1228,6 +1228,7 @@ def _process_extraction_outputs(db, automation: dict, results: dict) -> None:
 
     # Build a result-like dict for notification/webhook handlers
     result_doc = {
+        "automation_user_id": automation.get("user_id"),
         "status": "completed",
         "trigger_type": automation.get("trigger_type", "folder_watch"),
         "final_output": {"output": results},

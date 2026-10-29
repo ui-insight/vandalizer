@@ -276,7 +276,7 @@ export function ChatMessage({
         | Record<string, unknown>
         | undefined
       if (!content || content.needs_confirmation !== true) continue
-      const key = `${seg.call.tool_name}|${String(content.preview ?? '')}`
+      const key = `${seg.call.tool_name}|${String(content.preview ?? '')}|${JSON.stringify(content.automation_settings ?? null)}`
       if (seen.has(key)) suppressed.add(seg.call.tool_call_id)
       else seen.add(key)
     }

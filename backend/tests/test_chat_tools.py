@@ -1764,7 +1764,7 @@ class TestCreateAutomation:
 
         assert result["id"] == "auto-1"
         assert result["enabled"] is False
-        assert "disabled" in result["message"].lower()
+        assert "Paused" in result["message"]
         mock_create.assert_awaited_once()
 
 

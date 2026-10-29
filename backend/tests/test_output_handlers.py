@@ -312,6 +312,21 @@ class TestSaveWorkflowAsMarkdown:
 
 
 class TestSendWorkflowNotification:
+    @pytest.mark.parametrize("workflow", [None, {"name": "Shared workflow", "user_id": "different-owner"}])
+    def test_notifies_automation_owner_for_extractions_and_shared_workflows(self, workflow):
+        mock_db = MagicMock()
+        mock_db.workflow.find_one.return_value = workflow
+        mock_db.user.find_one.return_value = {"email": "automation-owner@example.org"}
+        with patch("app.services.output_handlers.get_sync_db", return_value=mock_db), \
+             patch("app.services.output_handlers._send_email") as send:
+            from app.services.output_handlers import send_workflow_notification
+            send_workflow_notification(
+                {"automation_user_id": "automation-owner", "status": "completed"},
+                {"channel": "email", "recipients": [], "notify_owner": True},
+            )
+        mock_db.user.find_one.assert_called_once_with({"user_id": "automation-owner"})
+        assert send.call_args.args[0] == ["automation-owner@example.org"]
+
     def test_email_notification_with_owner(self):
         mock_db = MagicMock()
         mock_db.workflow.find_one.return_value = {"name": "My WF", "user_id": "user1"}
