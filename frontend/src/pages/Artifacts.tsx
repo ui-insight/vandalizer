@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, ArrowUpRight, Check, ChevronRight, Code2, Copy, Download, FileText, Globe2, Link2, LockKeyhole, MessageSquare, Share2, Trash2, Workflow } from 'lucide-react'
 import * as api from '../api/artifacts'
 import { PagesBrowser } from '../components/artifacts/PagesBrowser'
+import { PageDeleteDialog } from '../components/artifacts/PageDeleteDialog'
 import { PageBadge, PageDialog, PagePreview, pagesUrl } from '../components/artifacts/PagePrimitives'
 import { listTeams } from '../api/teams'
 import { PagePrintLink, pageViewUrl } from '../components/artifacts/PagePrintLink'
@@ -87,7 +88,7 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
   const publicUpdated = publicInfo?.updated_at ? new Date(publicInfo.updated_at) : null
   const publicUpdatedLabel = publicUpdated && !Number.isNaN(publicUpdated.getTime())
     ? publicUpdated.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC', timeZoneName: 'short' }) : null
-  const title = publicInfo?.title || revision?.title || artifact?.title || 'Page'
+  const title = publicInfo?.title || (selected === artifact?.latest_revision ? artifact?.title : revision?.title) || artifact?.title || 'Page'
   const backUrl = pagesUrl(artifact?.source?.project_uuid)
   const publicLink = artifact?.public_token ? `${window.location.origin}/a/${artifact.public_token}` : ''
   const copy = (value: string, success: string) => void action(async () => { await navigator.clipboard.writeText(value); setNotice(success) })
@@ -175,6 +176,6 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
     {requestChanges && uuid && artifact?.can_manage && <PageDialog title="Request changes" onClose={() => setRequestChanges(false)}>
       <p>Describe what you’d like to change in <strong>{title}</strong>. You’ll review the message in chat before sending it.</p>{feedback}<label className="block text-sm font-medium">What would you like to change?<textarea className="mt-2 min-h-36 w-full rounded-lg border border-slate-300 p-3 text-sm" value={changes} maxLength={8000} onChange={e => setChanges(e.target.value)} placeholder="Make the funding summary easier to scan, add a next-steps section…" autoFocus /></label><div className="page-actions"><button className="page-button page-button-primary" disabled={!changes.trim()} onClick={() => { try { sessionStorage.setItem(`pages:edit-request:${uuid}`, changes.trim()); window.location.assign(chatUrl) } catch { setError('Could not open chat. Copy your request and return to the originating chat.') } }}><MessageSquare size={16} />Continue in chat</button><button className="page-button" onClick={() => setRequestChanges(false)}>Cancel</button></div>
     </PageDialog>}
-    {confirmDelete && uuid && artifact?.can_manage && <PageDialog title="Delete this page?" busy={busy} onClose={() => setConfirmDelete(false)}><p>This deletes every saved version of <strong>{title}</strong> and removes all its public links. This cannot be undone.</p>{feedback}<div className="page-actions"><button className="page-button" disabled={busy} autoFocus onClick={() => setConfirmDelete(false)}>Keep page</button><button className="page-button page-button-danger" disabled={busy} onClick={() => void action(async () => { await api.deleteArtifact(uuid); window.location.assign(backUrl) })}>Delete permanently</button></div></PageDialog>}
+    {confirmDelete && uuid && artifact?.can_manage && <PageDeleteDialog title={title} busy={busy} feedback={feedback} onClose={() => setConfirmDelete(false)} onConfirm={() => void action(async () => { await api.deleteArtifact(uuid); window.location.assign(backUrl) })} />}
   </div></main>
 }

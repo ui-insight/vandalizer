@@ -12,7 +12,7 @@ from app.config import Settings
 from app.dependencies import get_current_user, get_settings
 from app.models.user import User
 from app.rate_limit import limiter
-from app.schemas.artifact import ChatArtifactRequest, CreateArtifactRequest, PublishArtifactRequest, ReviseArtifactRequest, ShareArtifactRequest
+from app.schemas.artifact import ChatArtifactRequest, CreateArtifactRequest, DuplicateArtifactRequest, PublishArtifactRequest, RenameArtifactRequest, ReviseArtifactRequest, ShareArtifactRequest
 from app.schemas.chat_export import ChatExportRequest
 from app.services.page_links import prepare_page_links
 from app.services import access_control, artifacts
@@ -191,8 +191,22 @@ async def private_content(uuid: str, revision: str, download: bool = False,
 
 @router.get("/{uuid}/revisions/{revision}/source")
 async def revision_source(uuid: str, revision: str, user: User = Depends(get_current_user)):
-    rev = artifacts.revision(await authorized(uuid, user, manage=True), revision)
-    return {"title": rev["title"], "html": rev["html"]}
+    doc = await authorized(uuid, user, manage=True)
+    rev = artifacts.revision(doc, revision)
+    return {"title": (doc.get("title") or rev["title"]) if revision == doc["latest_revision"] else rev["title"], "html": rev["html"]}
+
+
+@router.patch("/{uuid}")
+async def rename_artifact(uuid: str, body: RenameArtifactRequest, user: User = Depends(get_current_user)):
+    doc = await authorized(uuid, user, manage=True)
+    return artifacts.metadata(await run(artifacts.rename, doc, body.title), True)
+
+
+@router.post("/{uuid}/duplicate")
+@limiter.limit("20/minute")
+async def duplicate_artifact(request: Request, uuid: str, body: DuplicateArtifactRequest, user: User = Depends(get_current_user)):
+    doc = await authorized(uuid, user)
+    return artifacts.metadata(await run(artifacts.duplicate, doc, user.user_id, body.request_id), True)
 
 
 @router.post("/{uuid}/revisions")

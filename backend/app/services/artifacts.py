@@ -115,6 +115,32 @@ def create(db, user_id, title, html, request_id, source=None):
     return doc
 
 
+def rename(db, doc, title):
+    """Change the owner's library name without modifying immutable versions."""
+    saved = db.html_artifacts.find_one_and_update({
+        "uuid": doc["uuid"], "user_id": doc["user_id"], "deleted_at": None,
+    }, {"$set": {"title": title, "updated_at": datetime.now(timezone.utc)}}, return_document=ReturnDocument.AFTER)
+    if not saved:
+        raise HTTPException(404, "Page not found")
+    return saved
+
+
+def duplicate(db, doc, user_id, request_id):
+    """Copy the latest accessible version; never inherit sharing or provenance."""
+    key = f"duplicate:{doc['uuid']}:{request_id}"
+    uid = hashlib.sha256(f"{user_id}\0{key}".encode()).hexdigest()[:32]
+    existing = db.html_artifacts.find_one({"uuid": uid, "user_id": user_id})
+    if existing:
+        if existing.get("deleted_at"):
+            raise HTTPException(410, "The duplicate was deleted. Start a new copy.")
+        return existing
+    current = revision(doc)
+    title = f"Copy of {doc.get('title') or current['title']}"[:200]
+    return create(db, user_id, title, current["html"], key, {
+        "kind": "editor", "copied_from": doc["uuid"], "copied_revision": current["uuid"],
+    })
+
+
 def get(db, uuid):
     doc = db.html_artifacts.find_one({"uuid": uuid, "deleted_at": None})
     if not doc:
@@ -202,7 +228,7 @@ def visible_metadata_stages(user_id):
         {"$addFields": {"_visible_revision": {"$arrayElemAt": [{"$filter": {
             "input": "$revisions", "as": "revision", "cond": {"$eq": ["$$revision.uuid", selected]},
         }}, 0]}}},
-        {"$addFields": {"title": "$_visible_revision.title",
+        {"$addFields": {"title": {"$cond": [owner, {"$ifNull": ["$title", "$_visible_revision.title"]}, "$_visible_revision.title"]},
             "updated_at": {"$cond": [owner, "$updated_at", "$_visible_revision.created_at"]}}},
     ]
 
@@ -211,7 +237,7 @@ def metadata(doc, owner=False):
     if not owner:
         doc = team_view(doc)
     current = revision(doc)
-    result = {"uuid": doc["uuid"], "title": current["title"], "latest_revision": doc["latest_revision"],
+    result = {"uuid": doc["uuid"], "title": (doc.get("title") or current["title"]) if owner else current["title"], "latest_revision": doc["latest_revision"],
               "team_id": doc.get("team_id"), "can_manage": owner, "published_revision": doc.get("published_revision"),
               "team_revision": team_revision(doc),
               "revisions": [{**{k: r[k] for k in ("uuid", "title", "created_at", "warnings")},

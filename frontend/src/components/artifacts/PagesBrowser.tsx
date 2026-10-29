@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowUpRight, Download, FileText, FolderOpen, Globe2, Loader2, MessageSquare, Plus, Search, Share2, Workflow } from 'lucide-react'
+import { ArrowUpRight, FileText, FolderOpen, Loader2, MessageSquare, Plus, Search, Workflow } from 'lucide-react'
 import { artifactContentUrl, browseArtifacts, createArtifact, type ArtifactPageResult } from '../../api/artifacts'
 import { addProjectPin } from '../../api/projects'
 import { PageBadge, PagePreview } from './PagePrimitives'
-import { useRefreshOnChatWrite } from '../../lib/chatWrites'
+import { announceWorkspaceWrite, useRefreshOnChatWrite } from '../../lib/chatWrites'
+import { PageCardActions, type PageCardNotice } from './PageCardActions'
 
 const message = (e: unknown) => e instanceof Error ? e.message : 'Could not load pages. Please try again.'
 function readView(key: string) {
@@ -24,6 +25,7 @@ export function PagesBrowser({ projectUuid, canManage = false }: { projectUuid?:
   const [result, setResult] = useState<ArtifactPageResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState<PageCardNotice | null>(null)
   const [busy, setBusy] = useState(false)
   const [refresh, setRefresh] = useState(0)
   const request = useRef(crypto.randomUUID())
@@ -60,6 +62,7 @@ export function PagesBrowser({ projectUuid, canManage = false }: { projectUuid?:
     <p className="pages-library-intro">Your finished work, ready to revisit and share. Pages from chat and workflows start private.</p>
     {projectUuid && canManage && <button className="page-button mb-4" disabled={busy} onClick={() => { setAdding(!adding); setSearch(''); setQuery(''); setPage(1) }}><FolderOpen size={16} />{adding ? 'Back to project pages' : 'Add existing page'}</button>}
     <div className="pages-toolbar"><label className="pages-search">Search pages<input type="search" placeholder="Find a page…" value={search} onChange={e => setSearch(e.target.value)} /></label><label>Sort pages<select value={sort} onChange={e => { setSort(e.target.value); setPage(1) }}><option value="updated">Recently updated</option><option value="newest">Newest first</option><option value="title">Title</option></select></label></div>
+    {notice && <p role="status" className="page-notice">{notice.message}{notice.href && <> <a className="underline" href={notice.href}>Open copy</a></>}</p>}
     {error && <div role="alert" className="page-alert">{error} <button className="underline" onClick={() => setRefresh(n => n + 1)}>Retry pages</button></div>}
     {loading ? <p role="status" className="pages-loading"><Loader2 size={18} className="animate-spin" />Loading your pages…</p> : result && <>
       {!result.items.length && <div className="pages-empty">{query ? <Search size={30} /> : <FileText size={30} />}<h3>{query ? 'No pages match your search.' : 'A home for your finished work'}</h3><p>{query ? 'Try a different title, or clear the search to see all your pages.' : 'Ask the assistant to create a page, save a workflow result, or start with a blank page.'}</p>{query ? <button className="page-button" onClick={() => setSearch('')}>Clear search</button> : <button className="page-button page-button-primary" disabled={busy} onClick={newPage}><Plus size={16} />Create your first page</button>}</div>}
@@ -73,7 +76,9 @@ export function PagesBrowser({ projectUuid, canManage = false }: { projectUuid?:
           <div className="page-card-body"><a className="page-card-title" href={href}>{item.title}</a>
             <div className="page-card-meta"><PageBadge published={!!item.published_revision || !!item.publications?.length}>{item.published_revision || item.publications?.length ? 'Published' : item.team_id ? 'Team access' : 'Private'}</PageBadge><span className="text-xs text-slate-500">{item.revisions.length} version{item.revisions.length === 1 ? '' : 's'}</span></div>
             <p className="page-card-origin"><Origin size={12} />{item.source?.kind === 'workflow' ? 'From a workflow' : item.source?.kind === 'chat' ? 'From chat' : 'Created in Pages'}{item.source?.project_uuid && ' · Project page'}</p>
-            <div className="page-card-footer"><time dateTime={item.updated_at} title={validDate ? date.toLocaleString() : undefined}>{validDate ? date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Saved page'}</time><div className="flex gap-1"><a className="page-icon-button" title="Download HTML" aria-label={`Download ${item.title} as HTML`} href={`${artifactContentUrl(item.uuid, item.latest_revision)}?download=true`}><Download size={16} /></a>{item.can_manage ? <a className="page-icon-button" title="Share page" aria-label={`Share ${item.title}`} href={`${href}#share`}><Share2 size={16} /></a> : item.published_revision && <Globe2 size={16} aria-label="Published page" />}</div></div>
+            <div className="page-card-footer"><time dateTime={item.updated_at} title={validDate ? date.toLocaleString() : undefined}>{validDate ? date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Saved page'}</time><PageCardActions page={item} onError={error => { setNotice(null); setError(error) }} onChanged={(notice, refresh = true) => {
+              setError(''); setNotice(notice); if (refresh) announceWorkspaceWrite('pages', 'projects')
+            }} /></div>
             {adding && projectUuid && <button className="page-button mt-3 w-full" disabled={busy} onClick={() => void act(async () => { await addProjectPin(projectUuid, { pin_type: 'artifact', target_id: item.uuid }); setAdding(false); setPage(1); setSearch(''); setQuery(''); setRefresh(n => n + 1) })}>Add {item.title} to project</button>}
           </div>
         </li>

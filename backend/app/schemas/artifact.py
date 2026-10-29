@@ -1,6 +1,6 @@
-from typing import Optional
+from typing import Annotated, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
 from app.schemas.chat_export import ExportMessage
 
@@ -16,6 +16,14 @@ class ReviseArtifactRequest(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     html: str = Field(min_length=1, max_length=262144)
     base_revision: str = Field(min_length=1, max_length=64)
+
+
+class RenameArtifactRequest(BaseModel):
+    title: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+
+
+class DuplicateArtifactRequest(BaseModel):
+    request_id: str = Field(min_length=1, max_length=100)
 
 
 class PublishArtifactRequest(BaseModel):

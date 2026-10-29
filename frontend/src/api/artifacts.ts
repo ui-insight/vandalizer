@@ -41,3 +41,5 @@ export const publishArtifactVersion = (id: string, revision: string) => apiFetch
 export const unpublishArtifactVersion = (id: string, revision: string) => apiFetch(`${path(id)}/publication?revision=${encodeURIComponent(revision)}`, { method: 'DELETE' })
 export const shareArtifactTeam = (id: string, teamId: string | null, revision?: string) => apiFetch(`${path(id)}/team`, { method: 'PUT', body: JSON.stringify({ team_id: teamId, revision }) })
 export const deleteArtifact = (id: string) => apiFetch(path(id), { method: 'DELETE' })
+export const renameArtifact = (id: string, title: string) => apiFetch<Artifact>(path(id), { method: 'PATCH', body: JSON.stringify({ title }) })
+export const duplicateArtifact = (id: string, requestId: string) => apiFetch<Artifact>(`${path(id)}/duplicate`, { method: 'POST', body: JSON.stringify({ request_id: requestId }) })

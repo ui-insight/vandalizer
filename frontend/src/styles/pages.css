@@ -110,6 +110,14 @@
 .page-card-footer { border-top:1px solid #edf0f4; margin-top:12px; padding-top:10px; display:flex; align-items:center; justify-content:space-between; gap:8px; }
 .page-card-footer time { font-size:11px; color:#647083; }
 .page-card-footer .page-icon-button { min-height:34px; min-width:34px; border-color:transparent; }
+.page-card-menu { position:fixed; z-index:1100; width:224px; max-width:calc(100vw - 24px); max-height:calc(100dvh - 24px); overflow:auto; padding:6px; border:1px solid #dce1e7; border-radius:12px; background:white; box-shadow:0 12px 36px #10182826; color:#303b49; }
+.page-card-menu [role=menuitem] { display:flex; align-items:center; gap:10px; width:100%; min-height:40px; padding:9px 10px; border:0; border-radius:6px; background:transparent; text-align:left; text-decoration:none; font:500 13px/1.4 system-ui,sans-serif; cursor:pointer; }
+.page-card-menu [role=menuitem]:hover,.page-card-menu [role=menuitem]:focus { background:#f1f3f6; outline:2px solid transparent; }
+.page-card-menu [role=menuitem]:focus-visible { outline:2px solid var(--highlight-on-light,#806600); outline-offset:-2px; }
+.page-card-menu .page-card-menu-danger { color:#a12626; border-top:1px solid #edf0f4; margin-top:4px; border-radius:0 0 6px 6px; }
+.page-card-form { display:grid; gap:18px; }
+.page-card-form label { display:grid; gap:7px; font-size:13px; font-weight:600; }
+.page-card-form input,.page-card-form select { width:100%; min-height:44px; border:1px solid #cbd5e1; border-radius:8px; background:white; padding:8px 10px; font-size:16px; color:#202936; }
 .pages-empty { text-align:center; padding:48px 20px; border:1px dashed #cdd5df; border-radius:12px; background:white; }
 .pages-empty svg { margin:0 auto 14px; color:#8491a3; }
 .pages-empty h3 { font-size:17px; font-weight:650; margin-bottom:8px; }

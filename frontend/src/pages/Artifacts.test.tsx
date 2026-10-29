@@ -42,6 +42,16 @@ it('does not invent an update date when public metadata has an invalid timestamp
   expect(screen.queryByText(/Invalid Date/)).not.toBeInTheDocument()
 })
 
+it('shows the renamed library name for the latest version and preserves historical titles', async () => {
+  vi.mocked(api.getArtifact).mockResolvedValue({ ...item, title: 'Renamed award dashboard' })
+  render(<ArtifactPage uuid="a1" />)
+  expect(await screen.findByRole('heading', { name: 'Renamed award dashboard' })).toBeInTheDocument()
+  fireEvent.change(screen.getByLabelText('Page version'), { target: { value: 'r1' } })
+  expect(screen.getByRole('heading', { name: 'Published report' })).toBeInTheDocument()
+  fireEvent.change(screen.getByLabelText('Page version'), { target: { value: 'r2' } })
+  expect(screen.getByRole('heading', { name: 'Renamed award dashboard' })).toBeInTheDocument()
+})
+
 it('publishes exactly the selected saved revision and revokes an existing link', async () => {
   render(<ArtifactPage uuid="a1" />)
   fireEvent.click(await screen.findByRole('button', { name: 'Share' }))
