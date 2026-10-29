@@ -9,7 +9,7 @@ def extraction_generation_filter(document_uuid: str, extraction_revision: int = 
     """
     if type(extraction_revision) is not int or extraction_revision < 0:
         raise ValueError('Invalid extraction revision')
-    query = {'uuid': document_uuid, 'soft_deleted': {'$ne': True}}
+    query: dict[str, object] = {'uuid': document_uuid, 'soft_deleted': {'$ne': True}}
     if extraction_revision == 0:
         query['$or'] = [
             {'_extraction_restart_revision': {'$exists': False}},

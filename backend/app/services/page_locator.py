@@ -41,15 +41,20 @@ def with_marker_provenance(markers: Optional[list[dict]]) -> Optional[list[dict]
     Returns a new list with the flag set when the signature matches;
     otherwise the input, untouched.
     """
+    if not markers:
+        return markers
     pages = [
         m for m in (markers or [])
         if isinstance(m, dict) and m.get("kind") == "page"
     ]
     if len(pages) < 3 or any(m.get("approximate") for m in pages):
         return markers
-    offsets = [m.get("char_offset") for m in pages]
-    if not all(isinstance(o, int) and not isinstance(o, bool) for o in offsets):
-        return markers
+    offsets: list[int] = []
+    for marker in pages:
+        offset = marker.get("char_offset")
+        if not isinstance(offset, int) or isinstance(offset, bool):
+            return markers
+        offsets.append(offset)
     deltas = {b - a for a, b in zip(offsets, offsets[1:])}
     if len(deltas) != 1 or deltas == {0}:
         return markers

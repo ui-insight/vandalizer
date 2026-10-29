@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 
-def describe_catalog_usage(kind: str, item, steps: list | None = None) -> dict:
+def describe_catalog_usage(kind: str, item: object, steps: list | None = None) -> dict:
     notes: list[str] = []
     outputs: list[str] = []
     if kind == "knowledge_base":

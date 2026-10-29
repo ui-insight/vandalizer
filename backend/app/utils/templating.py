@@ -54,7 +54,7 @@ def has_placeholder(text: object) -> bool:
     return isinstance(text, str) and "{{" in text and bool(_PLACEHOLDER_RE.search(text))
 
 
-def _resolve_path(expr: str, context: dict):
+def _resolve_path(expr: str, context: dict) -> object:
     """Walk a dotted path like ``inputs.output.records.0`` through ``context``.
 
     The leading ``inputs.`` segment is optional, so ``output`` and

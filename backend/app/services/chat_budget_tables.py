@@ -9,6 +9,7 @@ import json
 import re
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
+from collections.abc import Iterator
 
 
 _YEAR = re.compile(r"\b(?:year|yr)\s*(\d+)\b", re.I)
@@ -21,7 +22,7 @@ def _plain(text: str) -> str:
     return re.sub(r"[*`_]", "", text).strip()
 
 
-def _money(value) -> Decimal | None:
+def _money(value: object) -> Decimal | None:
     if value is None or isinstance(value, bool):
         return None
     text = _plain(str(value)).replace(",", "").replace("$", "").strip()
@@ -69,7 +70,7 @@ class _Row:
     values: dict[str, Decimal | None] = field(default_factory=dict)
 
 
-def _leaves(value, path: str = ""):
+def _leaves(value: object, path: str = "") -> Iterator[tuple[str, object]]:
     """Flat fields and JSON objects with category/year in either order."""
     if isinstance(value, str) and value.strip().startswith(("{", "[")):
         try:
@@ -152,7 +153,7 @@ def reconcile_budget_tables(answer: str, tool_results: list[dict]) -> str:
     """
     candidates = _candidates(tool_results)
 
-    def reconcile(match: re.Match) -> str:
+    def reconcile(match: re.Match[str]) -> str:
         original = match.group()
         lines = [line.strip() for line in original.strip().splitlines()]
         cells = [[_plain(cell) for cell in line.strip("|").split("|")] for line in lines]
@@ -162,7 +163,7 @@ def reconcile_budget_tables(answer: str, tool_results: list[dict]) -> str:
         years = [_YEAR.fullmatch(c) for c in header[1:]]
         if not years or not all(years) or any(len(row) != len(header) for row in cells[2:]):
             return original
-        periods = [year.group(1) for year in years]
+        periods = [year.group(1) for year in years if year is not None]
         if len(set(periods)) != len(periods):
             return original
         rows = {
@@ -195,16 +196,15 @@ def reconcile_budget_tables(answer: str, tool_results: list[dict]) -> str:
         details = [row for key, row in rows.items() if key != "total" and not _subtotal(key)]
         if not details:
             return original
-        sums = {
-            p: sum((row.values[p] for row in details), Decimal(0))
-            if all(row.values[p] is not None for row in details) else None
-            for p in periods
-        }
-        differences = {
-            p: rows["total"].values[p] - sums[p]
-            if sums[p] is not None and rows["total"].values[p] is not None else None
-            for p in periods
-        }
+        differences: dict[str, Decimal | None] = {}
+        for period in periods:
+            amounts = [row.values[period] for row in details]
+            known_amounts = [amount for amount in amounts if amount is not None]
+            total = rows["total"].values[period]
+            differences[period] = (
+                total - sum(known_amounts, Decimal(0))
+                if total is not None and len(known_amounts) == len(amounts) else None
+            )
         mismatch = any(difference is None or difference != 0 for difference in differences.values())
         if not repaired and not mismatch:
             return original

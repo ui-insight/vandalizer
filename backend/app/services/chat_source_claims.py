@@ -7,6 +7,12 @@ This is a narrow check on explicit verification claims, not a content verifier.
 
 import re
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.models.chat import FileAttachment
+    from app.models.document import SmartDocument
+    from app.services.context_budget import DocumentSegment
 
 
 @dataclass(frozen=True)
@@ -47,7 +53,12 @@ def _extension(source: Source) -> str:
     return (source.extension or source.title.rsplit(".", 1)[-1]).lower().lstrip(".")
 
 
-def attachment_sources(documents, files, document_segments, attachment_segments) -> list[Source]:
+def attachment_sources(
+    documents: list["SmartDocument"],
+    files: list["FileAttachment"],
+    document_segments: list["DocumentSegment"],
+    attachment_segments: list["DocumentSegment"],
+) -> list[Source]:
     """Use the post-compaction segments, not raw text the model never received."""
     labels = {segment.label for segment in [*document_segments, *attachment_segments] if segment.text.strip()}
     return [

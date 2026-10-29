@@ -3,9 +3,12 @@
 This validates the mapping used to design a course. It does not assess a learner
 or make a draft enrollable. Delivery/rubric implementation is tracked explicitly.
 """
-from typing import Literal
+from typing import TYPE_CHECKING, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.catalog import CoursePackage
 
 
 class ContractModel(BaseModel):
@@ -60,7 +63,7 @@ class Outcome(ContractModel):
     availability_checks: tuple[AvailabilityCheck, ...] = ()
 
     @model_validator(mode='after')
-    def validate_cases(self):
+    def validate_cases(self) -> Self:
         ids = [case.id for case in self.calibration]
         if len(ids) != len(set(ids)) or not {'pass', 'fail'} <= {case.expected for case in self.calibration}:
             raise ValueError('Every outcome needs unique passing and failing calibration cases')
@@ -92,7 +95,7 @@ class OutcomeContract(ContractModel):
     modules: tuple[ModuleOutcomes, ...] = Field(min_length=1)
 
     @model_validator(mode='after')
-    def validate_identities(self):
+    def validate_identities(self) -> Self:
         modules = [module.module_id for module in self.modules]
         outcomes = [outcome for module in self.modules for outcome in module.outcomes]
         ids = [outcome.id for outcome in outcomes]
@@ -107,7 +110,7 @@ class OutcomeContract(ContractModel):
             raise ValueError('A release candidate requires authored teaching and verified assessments')
         return self
 
-    def verify_teaching_references(self, lessons: dict):
+    def verify_teaching_references(self, lessons: dict) -> None:
         """A design may reference lessons that need revision; never invent IDs."""
         if {module.module_id for module in self.modules} != set(lessons):
             raise ValueError('Outcome coverage must match the course modules exactly')
@@ -116,11 +119,11 @@ class OutcomeContract(ContractModel):
             if any(not set(outcome.lesson_ids) <= available for outcome in module.outcomes):
                 raise ValueError(f'Unknown teaching reference in {module.module_id}')
 
-    def required_outcomes(self):
+    def required_outcomes(self) -> tuple[str, ...]:
         return tuple(outcome.id for module in self.modules for outcome in module.outcomes)
 
 
-def package_outcomes(package):
+def package_outcomes(package: "CoursePackage") -> OutcomeContract | None:
     """Validate optional competency assets without assigning them to old credit."""
     if 'outcomes.json' not in package.manifest.artifacts:
         return None

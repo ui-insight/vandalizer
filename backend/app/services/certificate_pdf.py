@@ -111,7 +111,7 @@ def render_certificate_pdf(
     # Outcome-based credentials (they carry a credential promise) are titled by
     # their own course; the legacy course keeps the title it awarded.
     outcome_based = bool(credential_promise and course_title)
-    headline = course_title if outcome_based else "Vandal Workflow Architect"
+    headline = course_title if outcome_based and course_title else "Vandal Workflow Architect"
     c.setTitle(f"{headline} certificate - {name}")
     c.setAuthor("Vandalizer")
     _dejavu_charmap()  # Embed Latin fonts; do not rely on a viewer's font substitution.
@@ -206,7 +206,7 @@ def render_certificate_pdf(
         (cx + 3 * inch, credential_id),
     ):
         footer_font = _font_for(value, bold=True)
-        footer_size = 12
+        footer_size = 12.0
         while footer_size > 7 and c.stringWidth(value, footer_font, footer_size) > 2.5 * inch:
             footer_size -= 0.5
         c.setFont(footer_font, footer_size)
