@@ -38,6 +38,10 @@
 .page-dialog-body > * + * { margin-top:20px; }
 .page-dialog-body p { color:#5b6573; font-size:13px; line-height:1.65; }
 .page-share-section { border:1px solid #dfe4eb; border-radius:12px; padding:18px; }
+.page-share-summary { display:grid; gap:8px; padding:14px 16px; background:#f6f8fb; border-radius:10px; font-size:13px; }
+.page-share-summary > div { display:flex; flex-wrap:wrap; gap:4px 12px; justify-content:space-between; }
+.page-share-summary dt { color:#5b6573; }
+.page-share-summary dd { margin:0; font-weight:600; }
 .page-share-section h3 { display:flex; align-items:center; gap:8px; font-size:15px; font-weight:650; margin:0 0 8px; }
 .page-share-section .page-actions { margin-top:14px; }
 .page-share-section label,.page-editor label { display:block; font-size:12px; font-weight:600; color:#475569; margin-top:16px; }

@@ -126,8 +126,92 @@ it('distinguishes a live publication from an unpublished draft beside the title'
   expect(screen.getByRole('link', { name: 'Pages' })).toHaveAttribute('href', '/?mode=files&files=pages')
   fireEvent.change(screen.getByLabelText('Page version'), { target: { value: 'r1' } })
   fireEvent.click(screen.getByRole('button', { name: 'Share' }))
-  expect(screen.getByRole('button', { name: 'Published' })).toBeDisabled()
+  expect(screen.getByLabelText('Version to publish')).toHaveValue('r2')
+  expect(screen.getByRole('button', { name: 'Publish updates · version 2' })).toBeEnabled()
   expect(api.publishArtifact).not.toHaveBeenCalled()
+})
+
+it('publishes the latest version from Share while the page behind it previews the published version', async () => {
+  const shared = { ...item, team_id: 'team-a', team_revision: 'r1' }
+  vi.mocked(api.getArtifact).mockResolvedValue(shared)
+  render(<ArtifactPage uuid="a1" />)
+  fireEvent.change(await screen.findByLabelText('Page version'), { target: { value: 'r1' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Share' }))
+  const dialog = within(screen.getByRole('dialog', { name: 'Share page' }))
+  const summary = dialog.getByLabelText('Current audience versions')
+  expect(summary).toHaveTextContent('Your team sees:Version 1')
+  expect(summary).toHaveTextContent('Public link shows:Version 1')
+  expect(summary).toHaveTextContent('Latest saved:Version 2')
+  expect(dialog.getByText('Version 2 is newer than the published version.')).toBeVisible()
+  expect(dialog.getByLabelText('Version to publish')).toHaveValue('r2')
+  expect(dialog.getByRole('link', { name: 'Preview version 2' })).toHaveAttribute('href', '/api/pages/a1/revisions/r2/content')
+  expect(within(dialog.getByLabelText('Version shared with team')).getByRole('option', { name: 'Version 1 · shared with team' })).toBeInTheDocument()
+
+  vi.mocked(api.getArtifact).mockResolvedValue({ ...shared, published_revision: 'r2' })
+  fireEvent.click(dialog.getByRole('button', { name: 'Publish updates · version 2' }))
+  await dialog.findByText('Version 2 published. Anyone with the link can view it.')
+  expect(api.publishArtifact).toHaveBeenCalledWith('a1', 'r2')
+  expect(api.shareArtifactTeam).not.toHaveBeenCalled()
+  expect(summary).toHaveTextContent('Your team sees:Version 1')
+  expect(summary).toHaveTextContent('Public link shows:Version 2')
+  expect(dialog.queryByText(/is newer than the published version/)).not.toBeInTheDocument()
+  expect(dialog.getByRole('button', { name: 'Published' })).toBeDisabled()
+  fireEvent.click(dialog.getByRole('button', { name: 'Close Share page' }))
+  expect(screen.getByLabelText('Page version')).toHaveValue('r1')
+})
+
+it('lets the owner choose a public version independently of team access and the page preview', async () => {
+  const third = { ...item, team_id: 'team-a', team_revision: 'r1', latest_revision: 'r3',
+    revisions: [...item.revisions, { uuid: 'r3', title: 'Latest draft', created_at: '', warnings: [] }],
+  }
+  vi.mocked(api.getArtifact).mockResolvedValue(third)
+  render(<ArtifactPage uuid="a1" />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Share' }))
+  expect(screen.getByLabelText('Version to publish')).toHaveValue('r3')
+  fireEvent.change(screen.getByLabelText('Version to publish'), { target: { value: 'r1' } })
+  expect(screen.getByRole('button', { name: 'Published' })).toBeDisabled()
+  fireEvent.change(screen.getByLabelText('Version to publish'), { target: { value: 'r2' } })
+  expect(screen.getByLabelText('Version shared with team')).toHaveValue('r1')
+  expect(screen.getByRole('button', { name: 'Save access' })).toBeDisabled()
+  expect(screen.getByLabelText('Current audience versions')).toHaveTextContent('Public link shows:Version 1')
+  expect(api.publishArtifact).not.toHaveBeenCalled()
+  vi.mocked(api.getArtifact).mockResolvedValue({ ...third, published_revision: 'r2' })
+  fireEvent.click(screen.getByRole('button', { name: 'Publish updates · version 2' }))
+  await screen.findByText('Version 2 published. Anyone with the link can view it.')
+  expect(api.publishArtifact).toHaveBeenCalledWith('a1', 'r2')
+  expect(screen.getByLabelText('Version to publish')).toHaveValue('r2')
+  expect(screen.getByLabelText('Version shared with team')).toHaveValue('r1')
+  fireEvent.click(screen.getByRole('button', { name: 'Close Share page' }))
+  expect(screen.getByLabelText('Page version')).toHaveValue('r3')
+  fireEvent.click(screen.getByRole('button', { name: 'Share' }))
+  expect(screen.getByLabelText('Version to publish')).toHaveValue('r3')
+})
+
+it('retains the public selection and live audience versions when publishing fails', async () => {
+  vi.mocked(api.publishArtifact).mockRejectedValueOnce(new Error('Publication failed. Try again.'))
+  render(<ArtifactPage uuid="a1" />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Share' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Publish updates · version 2' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Publication failed. Try again.')
+  expect(screen.getByLabelText('Version to publish')).toHaveValue('r2')
+  expect(screen.getByLabelText('Current audience versions')).toHaveTextContent('Public link shows:Version 1')
+  expect(screen.getByLabelText('Current audience versions')).toHaveTextContent('Your team sees:Not shared with a team')
+  expect(screen.getByRole('button', { name: 'Publish updates · version 2' })).toBeEnabled()
+})
+
+it('defaults direct Share links to the latest saved version and identifies unpublished access', async () => {
+  window.history.replaceState(null, '', '/pages/a1#share')
+  vi.mocked(api.getArtifact).mockResolvedValue({ ...item, published_revision: null, public_token: null })
+  try {
+    render(<ArtifactPage uuid="a1" />)
+    const dialog = within(await screen.findByRole('dialog', { name: 'Share page' }))
+    expect(dialog.getByLabelText('Version to publish')).toHaveValue('r2')
+    expect(dialog.getByLabelText('Current audience versions')).toHaveTextContent('Public link shows:Not published')
+    expect(dialog.getByRole('button', { name: 'Publish version 2' })).toBeEnabled()
+    expect(api.publishArtifact).not.toHaveBeenCalled()
+  } finally {
+    window.history.replaceState(null, '', '/')
+  }
 })
 
 it('shows only the shared version to a team member without owner notices or controls', async () => {
@@ -157,10 +241,19 @@ it('lets the owner change the team version explicitly and explains the sharing b
   expect(screen.getByText(/Other versions and future drafts stay owner-only/)).toBeInTheDocument()
   expect(screen.getByText('Currently shared: version 1.')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Save access' })).toBeDisabled()
+  fireEvent.change(screen.getByLabelText('Version to publish'), { target: { value: 'r1' } })
   fireEvent.change(screen.getByLabelText('Version shared with team'), { target: { value: 'r2' } })
+  expect(screen.getByLabelText('Version to publish')).toHaveValue('r1')
+  expect(screen.getByLabelText('Current audience versions')).toHaveTextContent('Your team sees:Version 1')
   expect(api.shareArtifactTeam).not.toHaveBeenCalled()
+  vi.mocked(api.getArtifact).mockResolvedValue({ ...item, team_id: 'team-a', team_revision: 'r2' })
   fireEvent.click(screen.getByRole('button', { name: 'Save access' }))
   await waitFor(() => expect(api.shareArtifactTeam).toHaveBeenCalledWith('a1', 'team-a', 'r2'))
+  await screen.findByText('Workspace access updated.')
+  expect(screen.getByLabelText('Current audience versions')).toHaveTextContent('Your team sees:Version 2')
+  expect(screen.getByLabelText('Current audience versions')).toHaveTextContent('Public link shows:Version 1')
+  expect(screen.getByLabelText('Version to publish')).toHaveValue('r1')
+  expect(api.publishArtifact).not.toHaveBeenCalled()
 })
 
 it('defaults a new team share to the latest saved version when nothing is published', async () => {
