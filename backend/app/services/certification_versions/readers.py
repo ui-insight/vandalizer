@@ -1,4 +1,5 @@
 """Non-enrolling reads for home, feedback and background engagement."""
+from .catalog import CoursePackage
 from collections import Counter, defaultdict
 
 from pydantic import ValidationError
@@ -19,7 +20,7 @@ async def has_earned_certification(user_id: str) -> bool:
     return await CertificationProgress.find_one({'user_id': user_id, 'certified': True}) is not None
 
 
-async def existing_active_progress(user_id: str):
+async def existing_active_progress(user_id: str) -> CertificationProgress | None:
     """Never initialize an enrollment merely to evaluate a background prompt.
 
     Honor an existing selection even when the rollout flag is disabled. Falling
@@ -34,7 +35,8 @@ async def existing_active_progress(user_id: str):
         return None
     if len(rows) != 1 or rows[0].get('enrollment_id'):
         raise EnrollmentConflict('Certification history needs reconciliation before choosing a course')
-    return CertificationProgress.model_validate(rows[0])
+    progress: CertificationProgress = CertificationProgress.model_validate(rows[0])
+    return progress
 
 
 async def support_metadata_many(progresses: list[CertificationProgress]) -> dict[str, dict]:
@@ -60,18 +62,19 @@ async def support_metadata_many(progresses: list[CertificationProgress]) -> dict
     for row in selections:
         by_user_selection[row.get('user_id')].append(row)
     counts = Counter(progress.user_id for progress in progresses)
-    packages = {}
+    packages: dict[str, CoursePackage | CourseCatalogError] = {}
     policies = {}
     updates = {}
 
-    def verified_enrollment(raw):
+    def verified_enrollment(raw: dict) -> tuple[CertificationEnrollment, CoursePackage]:
         enrollment = CertificationEnrollment.model_validate(raw)
         version = enrollment.course_version
         if version not in packages:
             try:
-                packages[version] = repository.catalog.load(version)
-                policies[version] = package_progression_policy(packages[version])
-                updates[version] = optional_update_available(packages[version])
+                loaded = repository.catalog.load(version)
+                packages[version] = loaded
+                policies[version] = package_progression_policy(loaded)
+                updates[version] = optional_update_available(loaded)
             except CourseCatalogError as exc:
                 packages[version] = exc
         package = packages[version]
@@ -171,7 +174,7 @@ async def support_metadata(progress: CertificationProgress) -> dict:
     })
 
 
-async def set_support_unlock(user_id: str, unlocked: bool, enrollment_id: str | None, *, actor_user_id: str, reason: str, request_id: str):
+async def set_support_unlock(user_id: str, unlocked: bool, enrollment_id: str | None, *, actor_user_id: str, reason: str, request_id: str) -> CertificationProgress:
     """Target the reviewed row, under the same boundary as learner writes."""
     from .support_access import AccessChangeRequest, apply_access_change
     request = AccessChangeRequest(request_id=request_id, unlocked=unlocked, reason=reason)
@@ -190,15 +193,15 @@ async def set_support_unlock(user_id: str, unlocked: bool, enrollment_id: str | 
             return await apply_access_change(repository, progress, request, actor_user_id, progress_filter(progress))
     if enrollment_id or versioning_enabled():
         raise EnrollmentConflict('Load and reconcile this learner enrollment before changing prerequisites')
-    progress = await existing_active_progress(user_id)
-    if progress is None:
+    legacy_progress = await existing_active_progress(user_id)
+    if legacy_progress is None:
         raise EnrollmentConflict('Load existing progress before changing prerequisites')
     # Legacy reads have no enrolled write lease. Never replace their complete
     # document: an assessment or lesson save may have committed since this read.
     # Compare only the reviewed access/binding, then return the fresh saved row.
-    access_filter: dict = {'unlocked': True} if progress.unlocked else {
+    access_filter: dict = {'unlocked': True} if legacy_progress.unlocked else {
         '$or': [{'unlocked': False}, {'unlocked': {'$exists': False}}],
     }
-    return await apply_access_change(repository, progress, request, actor_user_id,
+    return await apply_access_change(repository, legacy_progress, request, actor_user_id,
         {'enrollment_id': None, 'course_version': None, **access_filter,
          '_certification_write_fence': {'$exists': False}})

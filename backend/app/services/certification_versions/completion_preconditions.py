@@ -20,7 +20,7 @@ class CompletionReviewRequired(EnrollmentConflict):
         self.detail = {'code': 'CERTIFICATION_COMPLETION_REVIEW_REQUIRED', 'message': str(self)}
 
 
-def check_completion_counter(progress: CertificationProgress, module_id: str, expected_attempts, *, required: bool=False) -> None:
+def check_completion_counter(progress: CertificationProgress, module_id: str, expected_attempts: object, *, required: bool=False) -> None:
     if expected_attempts is None:
         if required:
             raise CompletionReviewRequired()

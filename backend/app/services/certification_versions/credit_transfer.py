@@ -34,7 +34,7 @@ class CreditTransferRequest(ContractModel):
     consent: Literal['transfer_reviewed_module_credit_preserve_original_no_new_xp_reward']
 
 
-def verify_transfer_credit(package: CoursePackage, progress: CreditProgress, module_id: str, credit, *, depth: int=0) -> dict:
+def verify_transfer_credit(package: CoursePackage, progress: CreditProgress, module_id: str, credit: dict, *, depth: int=0) -> dict:
     """Revalidate frozen original evidence, including before credential issuance."""
     from .outcome_credit import verified_credit_snapshot
     try:
@@ -109,7 +109,7 @@ class CreditTransfer:
         return {'read_only': True, 'request': request.model_dump(mode='json'), 'state': raw['state'],
                 'result': self.journal.payload(raw, 'result') if raw['state'] in ('applied', 'rejected', 'failed') else None}
 
-    async def preview(self, user_id: str, target_id: str):
+    async def preview(self, user_id: str, target_id: str) -> dict:
         repo = self.repository
         target = await repo.current(user_id)
         if (target is None or target.uuid != target_id or target.provenance != 'explicit_upgrade'
@@ -153,7 +153,7 @@ class CreditTransfer:
                     consent='transfer_reviewed_module_credit_preserve_original_no_new_xp_reward').model_dump(mode='json')
         return result
 
-    async def apply(self, user_id: str, body):
+    async def apply(self, user_id: str, body: object) -> dict:
         from .runtime import CourseOperation, _operation
         from app.services.certification_service import complete_module
         request = CreditTransferRequest.model_validate(body)

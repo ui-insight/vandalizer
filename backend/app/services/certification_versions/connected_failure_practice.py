@@ -14,8 +14,8 @@ def is_failure_practice(plan: dict) -> bool:
     return isinstance(consent, str) and consent == PRACTICE_CONSENT
 
 
-def approval_question(public_case, consent):
-    question = next(item for item in public_case['questions'] if item['id'] == 'scope_approval')
+def approval_question(public_case: dict, consent: str) -> dict:
+    question: dict = next(item for item in public_case['questions'] if item['id'] == 'scope_approval')
     if consent != PRACTICE_CONSENT:
         return question
     practice = public_case.get('controlled_failure_practice')

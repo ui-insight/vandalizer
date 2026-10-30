@@ -6,6 +6,7 @@ workers must be settled under the source guard; independent workspace activity
 is neither transferred nor dispatched/cancelled by a course selection.
 """
 from __future__ import annotations
+from .writes import WriteLease
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -47,7 +48,7 @@ class UpgradeActivationRepository(SelectionJournal):
         self.targets = UpgradeTargetRepository(self.repository)
 
     @property
-    def records(self) -> AsyncIOMotorCollection:
+    def records(self) -> AsyncIOMotorCollection[dict]:
         return CertificationUpgradeActivation.get_motor_collection()
 
     @staticmethod
@@ -81,7 +82,7 @@ class UpgradeActivationRepository(SelectionJournal):
             raise CourseCatalogError('The original course-switch intent needs integrity reconciliation') from exc
 
     @staticmethod
-    def verify_receipt(raw, result):
+    def verify_receipt(raw: dict, result: dict) -> dict:
         # Do not recursively call decode: applied journals verify their receipt
         # here after the intent envelope has been checked.
         intent = json.loads(raw['record_json'])
@@ -101,7 +102,7 @@ class UpgradeActivationRepository(SelectionJournal):
         datetime.datetime.fromisoformat(result['selected_at'])
         return result
 
-    async def owned(self, user_id: str, request):
+    async def owned(self, user_id: str, request: UpgradeActivationRequest) -> dict | None:
         raw = await self.records.find_one({'uuid': request.request_id})
         if raw is None:
             return None
@@ -112,7 +113,7 @@ class UpgradeActivationRepository(SelectionJournal):
             raise EnrollmentConflict('This request already belongs to a different course-switch decision')
         return raw
 
-    async def clear_pending(self, raw, result) -> None:
+    async def clear_pending(self, raw: dict, result: dict) -> None:
         # A staged course is not writable or active in history. Promote only
         # after the original selection and journal have both committed; retain
         # the pending marker until promotion succeeds. Old replay does not edit
@@ -147,7 +148,7 @@ class UpgradeActivationRepository(SelectionJournal):
                     raise EnrollmentConflict('The original prepared enrollment changed during confirmation')
         await super().clear_pending(raw, result)
 
-    async def activate(self, user_id: str, body):
+    async def activate(self, user_id: str, body: object) -> dict:
         request = UpgradeActivationRequest.model_validate(body)
         existing = await self.owned(user_id, request)
         if existing:
@@ -180,12 +181,13 @@ class UpgradeActivationRepository(SelectionJournal):
                     await self.records.insert_one(seed)
                 except DuplicateKeyError:
                     pass
-                raw = await self.owned(user_id, request)
-                if raw is None:
+                confirmed = await self.owned(user_id, request)
+                if confirmed is None:
                     raise EnrollmentConflict('This preservation choice already has another switch request; resume the original request')
+                raw = confirmed
             return await self.commit(raw, lease, package)
 
-    async def commit(self, raw, lease, package: CoursePackage):
+    async def commit(self, raw: dict, lease: WriteLease, package: CoursePackage) -> dict:
         """Commit only while holding the revalidated original course boundary."""
         from .upgrade_comparison import UpgradeComparison
         intent = self.decode(raw)

@@ -62,7 +62,7 @@ class OutputHandoffRequest(ContractModel):
         return self
 
 
-def release_authorization(review) -> dict:
+def release_authorization(review: dict) -> dict:
     return {key: deepcopy(review[key]) for key in ('uuid', 'user_id', 'enrollment_id', 'module_id', 'course_version',
         'manifest_sha256', 'run_id', 'submission', 'submitted_at', 'submission_channel')}
 
@@ -120,7 +120,7 @@ class OutputPrivateHandoffRepository(LearnerDecisionJournal):
         raw = await self.records.find_one({'uuid': request_id, 'user_id': user_id, 'prompt_id': PROMPT_ID, 'module_id': 'output_delivery'})
         return self.decode(raw) if raw else None
 
-    async def submit(self, operation: CourseOperation, body, *, actor_user_id: str):
+    async def submit(self, operation: CourseOperation, body: object, *, actor_user_id: str) -> dict:
         body = OutputHandoffRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Only the authenticated learner can send to this private training inbox')
@@ -131,7 +131,7 @@ class OutputPrivateHandoffRepository(LearnerDecisionJournal):
         request = body.model_dump(mode='json')
         request_hash = encode(request)[1]
 
-        async def replay(raw):
+        async def replay(raw: dict) -> dict:
             if any(raw.get(key) != value for key, value in identity.items()) or raw.get('request_sha256') != request_hash:
                 raise EnrollmentConflict('This handoff request belongs to different files, approval or learner')
             saved = self.decode(raw)
@@ -215,7 +215,7 @@ class OutputPrivateHandoffRepository(LearnerDecisionJournal):
         await self._finish_claim(operation, saved)
         return saved
 
-    async def _finish_claim(self, operation, saved) -> None:
+    async def _finish_claim(self, operation: CourseOperation, saved: dict) -> None:
         lease = LabExecutionRepository.check_operation(operation, saved)
         await LabInputRepository._check_lease(lease)
         # First failure releases the decision lock, permitting a subsequent hold.

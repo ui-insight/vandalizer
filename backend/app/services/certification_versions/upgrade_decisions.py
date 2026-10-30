@@ -5,6 +5,9 @@ upgrade. A future activation must revalidate the frozen snapshot under its own
 write boundary. A replay returns the original choice, never renewed consent.
 """
 from __future__ import annotations
+from collections.abc import AsyncIterator
+from app.models.certification import CertificationProgress
+from .catalog import CoursePackage
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -84,7 +87,7 @@ class UpgradeDecisionRepository:
         raw = await self.records.find_one({'uuid': request_id, 'user_id': user_id})
         return self.decode(raw) if raw else None
 
-    async def accept(self, user_id: str, body):
+    async def accept(self, user_id: str, body: object) -> UpgradeDecisionRecord:
         request = UpgradeDecisionRequest.model_validate(body)
         existing = await self.records.find_one({'uuid': request.request_id})
         if existing is not None:
@@ -119,7 +122,7 @@ class UpgradeDecisionRepository:
         return self._replay(saved, user_id, request)
 
     @asynccontextmanager
-    async def hold_reviewed_choice(self, user_id: str, request_id: str, *, activation_request=None):
+    async def hold_reviewed_choice(self, user_id: str, request_id: str, *, activation_request: dict | None=None) -> AsyncIterator[tuple[UpgradeDecisionRecord, CertificationProgress, CoursePackage]]:
         """Revalidate under the source write lock; this does not switch courses.
 
         External-job reconciliation and a recoverable selection commit remain
@@ -152,7 +155,7 @@ class UpgradeDecisionRepository:
                 raise EnrollmentConflict('The offered course changed during review')
             yield original, progress, package
 
-    def _replay(self, raw, user_id: str, request):
+    def _replay(self, raw: dict, user_id: str, request: UpgradeDecisionRequest) -> UpgradeDecisionRecord:
         if raw['user_id'] != user_id:
             raise EnrollmentConflict('The request reference is unavailable')
         original = self.decode(raw)

@@ -68,7 +68,7 @@ class OutputFileReviewRequest(ContractModel):
         return self
 
 
-def embedded_execution(run):
+def embedded_execution(run: dict) -> dict:
     plan = run['plan']
     raw = {key: plan[key] for key in ('uuid', 'user_id', 'enrollment_id', 'module_id', 'course_version',
                                     'manifest_sha256', 'input_snapshot_id')}
@@ -81,7 +81,7 @@ def embedded_execution(run):
     return raw
 
 
-def validate_inspection(body, run) -> None:
+def validate_inspection(body: OutputFileReviewRequest, run: dict) -> None:
     artifacts = run['result']['generated_artifacts']
     case = run['plan']['input_snapshot']['case']
     if (run['state'] != 'completed' or body.result_sha256 != encode(run['result'])[1]
@@ -118,11 +118,13 @@ class OutputFileReviewRepository(LearnerDecisionJournal):
         except (KeyError, TypeError, ValueError, EnrollmentConflict) as exc:
             raise CourseCatalogError('The saved output inspection failed integrity verification') from exc
 
-    async def get(self, user_id: str, submission_id) -> dict | None:
+    async def get(self, user_id: str, submission_id: str | None) -> dict | None:
+        if submission_id is None:
+            return None
         raw = await self.records.find_one({'uuid': submission_id, 'user_id': user_id, 'module_id': 'output_delivery', 'prompt_id': PROMPT_ID})
         return self.decode(raw) if raw else None
 
-    async def submit(self, operation: CourseOperation, body, *, actor_user_id: str):
+    async def submit(self, operation: CourseOperation, body: object, *, actor_user_id: str) -> dict:
         body = OutputFileReviewRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Output inspection requires the authenticated learner')
@@ -133,7 +135,7 @@ class OutputFileReviewRepository(LearnerDecisionJournal):
         request = body.model_dump(mode='json')
         request_hash = encode(request)[1]
 
-        async def replay(raw):
+        async def replay(raw: dict) -> dict:
             if any(raw.get(key) != value for key, value in identity.items()) or raw.get('request_sha256') != request_hash:
                 raise EnrollmentConflict('This inspection reference belongs to different answers or another learner')
             saved = self.decode(raw)
@@ -179,7 +181,7 @@ class OutputFileReviewRepository(LearnerDecisionJournal):
         await self._link(operation, saved, replay=False)
         return saved
 
-    async def _link(self, operation, saved, *, replay) -> None:
+    async def _link(self, operation: CourseOperation, saved: dict, *, replay: bool) -> None:
         lease = LabExecutionRepository.check_operation(operation, saved)
         records = LabExecutionRepository().records
         current = await records.find_one({'uuid': saved['run_id'], 'user_id': operation.user_id})

@@ -52,7 +52,7 @@ class GovernanceFindingRequest(ContractModel):
         return self
 
 
-def embedded_execution(run):
+def embedded_execution(run: dict) -> dict:
     from .governance_preparation import GovernancePreparation
     plan = run['plan']
     raw = {key: plan[key] for key in ('uuid', 'user_id', 'enrollment_id', 'module_id', 'course_version', 'manifest_sha256', 'input_snapshot_id')}
@@ -66,7 +66,7 @@ def embedded_execution(run):
     return raw
 
 
-def validate_finding(body, run):
+def validate_finding(body: GovernanceFindingRequest, run: dict) -> dict:
     if (run['state'] != 'completed' or run['plan']['phase'] != 'original' or body.run_id != run['run_id']
             or body.result_sha256 != encode(run['result'])[1] or body.case_sha256 != run['plan']['case_sha256']):
         raise EnrollmentConflict('Inspect the exact owned original completed extraction before recording its finding')
@@ -112,11 +112,13 @@ class GovernanceFindingRepository(LearnerDecisionJournal):
         except (KeyError, TypeError, ValueError, StopIteration) as exc:
             raise CourseCatalogError('The saved Governance source finding failed integrity verification') from exc
 
-    async def get(self, user_id: str, reference: str) -> dict | None:
+    async def get(self, user_id: str, reference: str | None) -> dict | None:
+        if reference is None:
+            return None
         raw = await self.records.find_one({'uuid': reference, 'user_id': user_id, 'module_id': 'governance', 'prompt_id': PROMPT_ID})
         return self.decode(raw) if raw else None
 
-    async def submit(self, operation: CourseOperation, body, *, actor_user_id: str):
+    async def submit(self, operation: CourseOperation, body: object, *, actor_user_id: str) -> dict:
         from .governance_preparation import GovernancePreparation
         body = GovernanceFindingRequest.model_validate(body)
         if actor_user_id != operation.user_id:
@@ -128,7 +130,7 @@ class GovernanceFindingRepository(LearnerDecisionJournal):
         request = body.model_dump(mode='json')
         request_hash = encode(request)[1]
 
-        def replay(raw):
+        def replay(raw: dict) -> dict:
             if any(raw.get(k) != v for k, v in identity.items()) or raw.get('request_sha256') != request_hash:
                 raise EnrollmentConflict('This finding identity belongs to a different learner, answer or original result')
             return self.decode(raw)

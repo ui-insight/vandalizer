@@ -54,7 +54,7 @@ class SavedCourseSelectionRepository(SelectionJournal):
         self.work = TransitionRecordReconciliation(self.repository)
 
     @property
-    def records(self) -> AsyncIOMotorCollection:
+    def records(self) -> AsyncIOMotorCollection[dict]:
         return CertificationSavedCourseSelection.get_motor_collection()
 
     async def pair(self, user_id: str, activation_id: str, action: str) -> tuple[str, str]:
@@ -72,7 +72,7 @@ class SavedCourseSelectionRepository(SelectionJournal):
             raise CourseCatalogError('The original course receipt has invalid enrollment identities')
         return (upgraded, original) if action == 'return_to_original_course' else (original, upgraded)
 
-    async def collect(self, user_id: str, source_id: str, target_id: str, *, held: bool=False):
+    async def collect(self, user_id: str, source_id: str, target_id: str, *, held: bool=False) -> tuple[dict, dict]:
         repo = self.repository
         selection = await repo.selections.find_one({'user_id': user_id})
         if (not selection or selection['active_enrollment_id'] != source_id
@@ -111,7 +111,7 @@ class SavedCourseSelectionRepository(SelectionJournal):
             raise EnrollmentConflict('Finish or reconcile the current course operation before choosing a saved course')
         return state, summaries
 
-    async def preview(self, user_id: str, activation_id, action, *, _held: bool=False) -> dict:
+    async def preview(self, user_id: str, activation_id: str, action: Action, *, _held: bool=False) -> dict:
         source_id, target_id = await self.pair(user_id, activation_id, action)
         before, summaries = await self.collect(user_id, source_id, target_id, held=_held)
         after, current = await self.collect(user_id, source_id, target_id, held=_held)
@@ -156,7 +156,7 @@ class SavedCourseSelectionRepository(SelectionJournal):
             raise CourseCatalogError('The saved course-selection intent failed integrity verification') from exc
 
     @staticmethod
-    def verify_receipt(raw, result):
+    def verify_receipt(raw: dict, result: dict) -> dict:
         intent = json.loads(raw['record_json'])
         preview = intent['preview']
         expected = {'kind': 'saved_course_selection.1', 'selection_id': raw['uuid'],
@@ -174,7 +174,7 @@ class SavedCourseSelectionRepository(SelectionJournal):
         datetime.datetime.fromisoformat(result['selected_at'])
         return result
 
-    async def owned(self, user_id: str, request):
+    async def owned(self, user_id: str, request: SavedCourseSelectionRequest) -> dict | None:
         raw = await self.records.find_one({'uuid': request.request_id})
         if raw is None:
             return None
@@ -184,7 +184,7 @@ class SavedCourseSelectionRepository(SelectionJournal):
             raise EnrollmentConflict('This request already belongs to a different saved-course choice')
         return raw
 
-    async def select(self, user_id: str, body):
+    async def select(self, user_id: str, body: object) -> dict:
         request = SavedCourseSelectionRequest.model_validate(body)
         existing = await self.owned(user_id, request)
         if existing:
@@ -210,12 +210,13 @@ class SavedCourseSelectionRepository(SelectionJournal):
                     await self.records.insert_one(seed)
                 except DuplicateKeyError:
                     pass
-                raw = await self.owned(user_id, request)
-                if raw is None:
+                confirmed = await self.owned(user_id, request)
+                if confirmed is None:
                     raise EnrollmentConflict('The original saved-course selection intent could not be confirmed')
+                raw = confirmed
             return await self.commit(raw)
 
-    async def commit(self, raw):
+    async def commit(self, raw: dict) -> dict:
         intent = self.decode(raw)
         original = intent['preview']
         user_id = raw['user_id']

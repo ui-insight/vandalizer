@@ -1,5 +1,6 @@
 """Preserve a learner's interpretation and exact original/recovery inventories."""
 from __future__ import annotations
+from motor.motor_asyncio import AsyncIOMotorCollection
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -62,7 +63,7 @@ class BatchReviewRequest(ContractModel):
         return self
 
 
-def embedded_execution(run):
+def embedded_execution(run: dict) -> dict:
     plan = run['plan']
     raw = {key: plan[key] for key in ('uuid', 'user_id', 'enrollment_id', 'module_id', 'course_version', 'manifest_sha256', 'input_snapshot_id')}
     raw.update(state=run['state'], scope_decision_id=run['scope_decision_id'], scope_decision_sha256=run['scope_decision_sha256'])
@@ -74,7 +75,7 @@ def embedded_execution(run):
     return raw
 
 
-def reconcile(original, retries):
+def reconcile(original: dict, retries: list[dict]) -> dict:
     if original['state'] != 'completed' or original['plan']['phase'] != 'batch':
         raise EnrollmentConflict('Select the original complete batch inventory')
     for retry in retries:
@@ -110,11 +111,13 @@ class BatchReviewRepository(LearnerDecisionJournal):
         except (KeyError, TypeError, ValueError) as exc:
             raise CourseCatalogError('The saved batch result review failed integrity verification') from exc
 
-    async def get(self, user_id: str, submission_id) -> dict | None:
+    async def get(self, user_id: str, submission_id: str | None) -> dict | None:
+        if submission_id is None:
+            return None
         raw = await self.records.find_one({'uuid': submission_id, 'user_id': user_id, 'module_id': 'batch_processing', 'prompt_id': PROMPT_ID})
         return self.decode(raw) if raw else None
 
-    async def submit(self, operation: CourseOperation, body, *, actor_user_id: str):
+    async def submit(self, operation: CourseOperation, body: object, *, actor_user_id: str) -> dict:
         body = BatchReviewRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Batch result review requires the authenticated learner')
@@ -125,7 +128,7 @@ class BatchReviewRepository(LearnerDecisionJournal):
         request = body.model_dump(mode='json')
         request_hash = encode(request)[1]
 
-        def replay(raw):
+        def replay(raw: dict) -> dict:
             if any(raw.get(key) != value for key, value in identity.items()) or raw.get('request_sha256') != request_hash:
                 raise EnrollmentConflict('This review identity belongs to different answers or another learner')
             return self.decode(raw)
@@ -146,7 +149,7 @@ class BatchReviewRepository(LearnerDecisionJournal):
         preserved = ([previous['execution'], *previous['retry_executions']] if previous else [])
         preserved_runs = {run['run_id']: run for run in (BatchPreparation.decode(raw) for raw in preserved)}
 
-        async def owned(reference: str, digest):
+        async def owned(reference: str, digest: str) -> dict:
             run = preserved_runs.get(reference) or await BatchPreparation().get(actor_user_id, reference)
             if run is None or run['state'] != 'completed' or encode(run['result'])[1] != digest:
                 raise EnrollmentConflict('Inspect the exact complete saved batch or retry result before reviewing it')
@@ -185,5 +188,5 @@ class BatchReviewRepository(LearnerDecisionJournal):
         return saved
 
     @staticmethod
-    def records_for_runs():
+    def records_for_runs() -> AsyncIOMotorCollection[dict]:
         return BatchPreparation().records

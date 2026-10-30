@@ -1,5 +1,7 @@
 """Freeze owned extraction instructions and all three complete assigned test sources."""
 from __future__ import annotations
+from app.services.storage import StorageBackend
+from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -34,7 +36,7 @@ class BatchCaptureRequest(ContractModel):
     consent: Literal['capture_batch_extraction_and_complete_sources']
 
 
-def verify_artifact(artifact, artifact_id: str, user_id: str) -> None:
+def verify_artifact(artifact: dict, artifact_id: str, user_id: str) -> None:
     fields = artifact['fields']
     if (artifact['uuid'] != artifact_id or artifact['user_id'] != user_id or artifact['set_type'] != 'extraction'
             or len(fields) != 5 or tuple(f['title'] for f in fields) != FIELDS
@@ -44,17 +46,17 @@ def verify_artifact(artifact, artifact_id: str, user_id: str) -> None:
         raise EnrollmentConflict('Use exactly the five named extraction fields with complete source context and no attached text overrides')
 
 
-def pdf_pages(data):
+def pdf_pages(data: bytes) -> list[str]:
     if not data or len(data) > 2 * 1024 * 1024:
         raise EnrollmentConflict('An assigned batch PDF exceeds the bounded source limit')
     with fitz.open(stream=data, filetype='pdf') as pdf:
-        pages = [page.get_text() for page in pdf]
+        pages: list[str] = [pdf.load_page(i).get_text() for i in range(len(pdf))]
     if not pages or any(not page.strip() for page in pages):
         raise EnrollmentConflict('Every assigned batch page must have readable source text')
     return pages
 
 
-def review_scope(case, assigned_ids, selected) -> dict:
+def review_scope(case: BatchCase, assigned_ids: Sequence[str], selected: Sequence[str]) -> dict:
     """Accept only the assigned inputs out of the proposed batch, and record what was removed."""
     proposed = case.proposed_scope(list(assigned_ids))
     wrong = proposed[1]
@@ -100,14 +102,14 @@ class BatchInputRepository(LabInputRepository):
             raise CourseCatalogError('Saved representative batch inputs failed integrity verification') from exc
 
     @staticmethod
-    async def _read_artifact(user_id: str, artifact_id: str):
+    async def _read_artifact(user_id: str, artifact_id: str) -> dict:
         artifact = await SearchSet.find_one({'uuid': artifact_id, 'user_id': user_id})
         if artifact is None:
             raise EnrollmentConflict('Select an extraction owned by this learner')
         items = await SearchSetItem.find({'searchset': artifact_id}).sort('_id').to_list()
         if any(item.user_id not in (None, user_id) for item in items):
             raise EnrollmentConflict('The extraction contains fields owned by another learner')
-        result = artifact.model_dump(mode='json', include={
+        result: dict = artifact.model_dump(mode='json', include={
             'uuid', 'user_id', 'title', 'set_type', 'domain', 'extraction_config', 'extraction_config_override', 'cross_field_rules', 'item_order',
         })
         result['fields'] = sorted([item.model_dump(mode='json', include={
@@ -116,7 +118,7 @@ class BatchInputRepository(LabInputRepository):
         verify_artifact(result, artifact_id, user_id)
         return result
 
-    async def capture(self, operation: CourseOperation, body, *, actor_user_id: str, storage):
+    async def capture(self, operation: CourseOperation, body: object, *, actor_user_id: str, storage: StorageBackend) -> dict:
         body = BatchCaptureRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Batch capture requires the authenticated learner')
@@ -131,7 +133,7 @@ class BatchInputRepository(LabInputRepository):
         request = body.model_dump(mode='json')
         request_hash = encode(request)[1]
 
-        def replay(raw):
+        def replay(raw: dict) -> dict:
             saved = self.decode(raw)
             if any(saved[key] != value for key, value in identity.items()) or saved['request_sha256'] != request_hash:
                 raise EnrollmentConflict('This capture identity belongs to different work or another learner')

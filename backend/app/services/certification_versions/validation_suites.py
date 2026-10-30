@@ -68,13 +68,13 @@ class ValidationSuiteRequest(ContractModel):
         return self
 
 
-def embedded_input(snapshot) -> dict:
+def embedded_input(snapshot: dict) -> dict:
     serialized, digest = encode(snapshot)
     return {**{key: snapshot[key] for key in ('uuid', 'user_id', 'enrollment_id', 'module_id', 'course_version', 'manifest_sha256', 'artifact_id')},
             'record_json': serialized, 'record_sha256': digest}
 
 
-def test_cases(body, snapshot):
+def test_cases(body: ValidationSuiteRequest, snapshot: dict) -> list[dict]:
     """Full immutable suite by logical field, allowing later instruction repair.
 
     A quote's presence establishes traceability only. It does not prove that the
@@ -83,7 +83,7 @@ def test_cases(body, snapshot):
     if (snapshot['uuid'] != body.input_snapshot_id or encode(snapshot)[1] != body.input_snapshot_sha256
             or snapshot['case']['case_sha256'] != body.case_sha256):
         raise EnrollmentConflict('Save expectations against the exact original captured source and extraction')
-    by_pair = {(item.source_id, item.field): item for item in body.expectations}
+    by_pair: dict[tuple[str, str], LearnerExpectation] = {(item.source_id, item.field): item for item in body.expectations}
     cases = []
     for source in snapshot['documents']:
         entries = []
@@ -122,11 +122,13 @@ class ValidationSuiteRepository(LearnerDecisionJournal):
         except (KeyError, TypeError, ValueError, AttributeError) as exc:
             raise CourseCatalogError('The saved representative suite failed integrity verification') from exc
 
-    async def get(self, user_id: str, submission_id) -> dict | None:
+    async def get(self, user_id: str, submission_id: str | None) -> dict | None:
+        if submission_id is None:
+            return None
         raw = await self.records.find_one({'uuid': submission_id, 'user_id': user_id, 'module_id': 'validation_qa', 'prompt_id': PROMPT_ID})
         return self.decode(raw) if raw else None
 
-    async def submit(self, operation: CourseOperation, body, *, actor_user_id: str):
+    async def submit(self, operation: CourseOperation, body: object, *, actor_user_id: str) -> dict:
         body = ValidationSuiteRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Test expectations require the authenticated learner')
@@ -137,7 +139,7 @@ class ValidationSuiteRepository(LearnerDecisionJournal):
         request = body.model_dump(mode='json')
         request_hash = encode(request)[1]
 
-        def replay(raw):
+        def replay(raw: dict) -> dict:
             saved = self.decode(raw)
             if any(saved[key] != value for key, value in identity.items()) or saved['request_sha256'] != request_hash:
                 raise EnrollmentConflict('This suite identity already preserves different expectations or another learner')

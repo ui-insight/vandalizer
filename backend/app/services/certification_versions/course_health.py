@@ -10,6 +10,8 @@ spans a proposal-deadline or month-end pause in self-paced professional study,
 so one quiet month is not counted. It is reported as inactive, never as
 dropout: the records cannot say why someone stopped or whether they will return.
 """
+from collections.abc import Iterable
+from beanie import Document
 from datetime import datetime, timedelta, timezone
 
 from app.models.certification import (
@@ -46,11 +48,11 @@ class HealthUnavailable(ValueError):
     pass
 
 
-def allowed(field, values) -> dict:
+def allowed(field: str, values: Iterable[str]) -> dict:
     return {'$cond': [{'$in': [f'${field}', list(values)]}, f'${field}', 'unknown']}
 
 
-def identifier(field, pattern) -> dict:
+def identifier(field: str, pattern: str) -> dict:
     return {'$cond': [
         {'$regexMatch': {'input': {'$cond': [{'$eq': [{'$type': f'${field}'}, 'string']}, f'${field}', '']},
                          'regex': pattern}},
@@ -58,7 +60,7 @@ def identifier(field, pattern) -> dict:
     ]}
 
 
-def course_identity(*, legacy_unknown: bool=False):
+def course_identity(*, legacy_unknown: bool=False) -> dict:
     identity = {'course_version': identifier('course_version', VERSION_PATTERN),
                 'manifest_sha256': identifier('manifest_sha256', MANIFEST_PATTERN)}
     if legacy_unknown:
@@ -68,7 +70,7 @@ def course_identity(*, legacy_unknown: bool=False):
     return identity
 
 
-def pipeline(source):
+def pipeline(source: str) -> list[dict]:
     _, states = SOURCES[source]
     identity = {
         **course_identity(legacy_unknown=source == 'enrollments'),
@@ -78,15 +80,15 @@ def pipeline(source):
     return [{'$group': {'_id': identity, 'count': {'$sum': 1}}}, {'$limit': MAX_GROUPS + 1}]
 
 
-def as_date(expression) -> dict:
+def as_date(expression: object) -> dict:
     return {'$convert': {'input': expression, 'to': 'date', 'onError': None, 'onNull': None}}
 
 
-def count_if(condition) -> dict:
+def count_if(condition: object) -> dict:
     return {'$sum': {'$cond': [condition, 1, 0]}}
 
 
-def enrollment_outcomes_pipeline(cutoff):
+def enrollment_outcomes_pipeline(cutoff: datetime) -> list[dict]:
     """Started enrollments by course, using only activity timestamps."""
     active = {'$eq': ['$state', 'active']}
     return [
@@ -124,7 +126,7 @@ def enrollment_outcomes_pipeline(cutoff):
     ]
 
 
-def bridge_pipeline():
+def bridge_pipeline() -> list[dict]:
     """Learners with a historical course record who explicitly started a newer course."""
     return [
         {'$group': {
@@ -144,11 +146,11 @@ def bridge_pipeline():
     ]
 
 
-def rate(numerator, denominator):
+def rate(numerator: int, denominator: int) -> float | None:
     return round(numerator / denominator, 4) if denominator >= MIN_RATE_DENOMINATOR else None
 
 
-async def aggregate(model, stages, message):
+async def aggregate(model: type[Document], stages: list[dict], message: str) -> list[dict]:
     groups = await model.get_motor_collection().aggregate(
         stages, maxTimeMS=5000, allowDiskUse=False).to_list(length=MAX_GROUPS + 1)
     if len(groups) > MAX_GROUPS:
@@ -156,15 +158,15 @@ async def aggregate(model, stages, message):
     return groups
 
 
-def course_key(row):
+def course_key(row: dict) -> tuple[str | None, str | None]:
     return row.get('course_version'), row.get('manifest_sha256')
 
 
-def sort_key(row):
+def sort_key(row: dict) -> tuple[str, ...]:
     return tuple(str(value or '') for value in course_key(row))
 
 
-def course_titles(keys):
+def course_titles(keys: Iterable[tuple[str | None, str | None]]) -> dict[tuple[str, str], str]:
     """Plain-language titles for the exact registered packages; unknown stays None."""
     titles, catalog = {}, CourseCatalog()
     for version, manifest in keys:
@@ -179,10 +181,10 @@ def course_titles(keys):
     return titles
 
 
-async def journey_success(started, journey_start, journey_rows) -> dict:
+async def journey_success(started: datetime, journey_start: datetime, journey_rows: list[dict]) -> dict:
     courses: dict[tuple, dict] = {}
 
-    def course(identity):
+    def course(identity: dict) -> dict:
         return courses.setdefault(course_key(identity), {
             'course_version': identity.get('course_version'), 'manifest_sha256': identity.get('manifest_sha256'),
             'started': 0, 'active': 0, 'completed': 0, 'transferred': 0, 'inactive': 0, 'activity_unknown': 0,
@@ -219,7 +221,8 @@ async def journey_success(started, journey_start, journey_rows) -> dict:
     rows = sorted(courses.values(), key=sort_key)
     titles = course_titles({course_key(row) for row in [*rows, *targets]})
     for row in [*rows, *targets]:
-        row['course_title'] = titles.get(course_key(row))
+        version, manifest = course_key(row)
+        row['course_title'] = titles.get((version, manifest)) if version and manifest else None
     return {
         'inactive_after_days': INACTIVE_AFTER_DAYS,
         'min_rate_denominator': MIN_RATE_DENOMINATOR,
@@ -262,7 +265,7 @@ async def course_health() -> dict:
     }
 
 
-def release_status(rows) -> dict:
+def release_status(rows: list[dict]) -> dict:
     """This worker's release fingerprint and any enrolled course it cannot serve.
 
     Each refresh may reach a different worker; differing fingerprints mean the

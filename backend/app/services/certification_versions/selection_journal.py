@@ -1,14 +1,31 @@
 """Confirm one committed selection without repeating or replacing it."""
+from abc import ABC, abstractmethod
+from motor.motor_asyncio import AsyncIOMotorCollection
 from .attempts import AttemptRepository, encode
 from .catalog import CourseCatalogError
 from .enrollments import EnrollmentConflict, EnrollmentRepository
 
 
-class SelectionJournal:
+class SelectionJournal(ABC):
     repository: EnrollmentRepository
     receipt_id_field = 'activation_id'
 
-    async def resume_receipt(self, raw):
+    @property
+    @abstractmethod
+    def records(self) -> AsyncIOMotorCollection[dict]:
+        raise NotImplementedError
+
+    @staticmethod
+    @abstractmethod
+    def decode(raw: dict) -> dict:
+        raise NotImplementedError
+
+    @staticmethod
+    @abstractmethod
+    def verify_receipt(raw: dict, result: dict) -> dict:
+        raise NotImplementedError
+
+    async def resume_receipt(self, raw: dict) -> dict | None:
         self.decode(raw)
         if raw['state'] == 'applied':
             result = AttemptRepository.payload(raw, 'result')
@@ -19,13 +36,13 @@ class SelectionJournal:
         if result.get(self.receipt_id_field) != raw['uuid']:
             return None
         self.verify_receipt(raw, result)
-        if (selection['active_enrollment_id'] != result['target_enrollment_id']
+        if (selection is None or selection['active_enrollment_id'] != result['target_enrollment_id']
                 or selection.get('pending_transition_id') != raw['uuid']
                 or selection['revision'] != result['revision']):
             raise EnrollmentConflict('The unconfirmed selection no longer matches its original switch receipt')
         return await self.finalize(raw, result)
 
-    async def finalize(self, raw, result):
+    async def finalize(self, raw: dict, result: dict) -> dict:
         self.decode(raw)
         self.verify_receipt(raw, result)
         selected = await self.repository.selections.find_one({'user_id': raw['user_id'],
@@ -46,7 +63,7 @@ class SelectionJournal:
         await self.clear_pending(saved, result)
         return result
 
-    async def clear_pending(self, raw, result) -> None:
+    async def clear_pending(self, raw: dict, result: dict) -> None:
         # A later selection or active worker is never cleared by old replay.
         query = {'user_id': raw['user_id'],
             'active_enrollment_id': result['target_enrollment_id'], 'revision': result['revision'],

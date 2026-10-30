@@ -26,7 +26,7 @@ MEDIA_TYPES = {'pdf': 'application/pdf', 'csv': 'text/csv', 'json': 'application
     'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'zip': 'application/zip'}
 
 
-def _bytes(value):
+def _bytes(value: object) -> bytes:
     try:
         if not isinstance(value, str) or len(value) > (MAX_TOTAL_BYTES + 65536) * 4 // 3 + 8:
             raise ValueError('Unsupported encoding size')
@@ -35,7 +35,7 @@ def _bytes(value):
         raise EnrollmentConflict('Generated file encoding is invalid or too large') from exc
 
 
-def _filename(name):
+def _filename(name: object) -> str:
     if (not isinstance(name, str) or not name.strip() or len(name) > 180 or name != name.strip()
             or name in ('.', '..') or name.startswith('.') or '/' in name or '\\' in name
             or any(ord(c) < 32 or ord(c) == 127 for c in name) or PurePosixPath(name).name != name):
@@ -105,17 +105,18 @@ def inspect_file(filename: str, file_type: str, data: bytes) -> dict:
             'source_correctness_verified': False, 'visual_inspection_required': True}
 
 
-def _file_record(name, kind, data) -> dict:
+def _file_record(name: object, kind: object, data: bytes) -> dict:
     if not isinstance(kind, str) or kind not in FILE_TYPES:
         raise EnrollmentConflict('Unsupported generated file type')
     if len(data) > MAX_FILE_BYTES:
         raise EnrollmentConflict('Generated file exceeds the preserved size limit')
-    return {'filename': _filename(name), 'file_type': kind, 'sha256': hashlib.sha256(data).hexdigest(),
+    name = _filename(name)
+    return {'filename': name, 'file_type': kind, 'sha256': hashlib.sha256(data).hexdigest(),
             'size_bytes': len(data), 'data_base64': base64.b64encode(data).decode('ascii'),
             'inspection': inspect_file(name, kind, data)}
 
 
-def capture_generated_artifacts(status):
+def capture_generated_artifacts(status: object) -> dict:
     """Internal trusted engine result only; no endpoint accepts a supplied status."""
     from app.routers.workflows import _render_workflow_output, _step_output_value
     if not isinstance(status, dict) or status.get('status') != 'completed':
@@ -153,7 +154,7 @@ def capture_generated_artifacts(status):
     return result
 
 
-def verify_generated_artifacts(record):
+def verify_generated_artifacts(record: dict) -> dict:
     """Verify original bytes without regenerating a timestamped ZIP or files."""
     try:
         if (set(record) != {'schema_version', 'record_kind', 'files', 'download', 'all_required_files_parseable',
@@ -202,7 +203,7 @@ def verify_generated_artifacts(record):
         raise EnrollmentConflict('The original generated file evidence is invalid') from exc
 
 
-def verify_artifacts_for_events(artifacts, events, plan):
+def verify_artifacts_for_events(artifacts: dict, events: list[dict], plan: dict) -> dict:
     """Bind the preserved files to the actual approved renderer/export results."""
     from app.routers.workflows import _step_output_value
     verify_generated_artifacts(artifacts)

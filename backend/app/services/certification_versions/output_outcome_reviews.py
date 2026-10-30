@@ -49,14 +49,14 @@ class OutputOutcomeReviewRequest(ContractModel):
         return self
 
 
-def compact_handoff(handoff):
+def compact_handoff(handoff: dict) -> dict:
     value = deepcopy(handoff)
     artifacts = value.pop('destination_copy')
     value['destination_copy_sha256'] = encode(artifacts)[1] if artifacts is not None else None
     return value
 
 
-def restore_handoff(value, artifacts):
+def restore_handoff(value: dict, artifacts: dict) -> dict:
     value = deepcopy(value)
     reference = value.pop('destination_copy_sha256')
     if reference is not None and reference != encode(artifacts)[1]:
@@ -66,7 +66,7 @@ def restore_handoff(value, artifacts):
     return OutputPrivateHandoffRepository.decode({**value, 'record_json': serialized, 'record_sha256': digest})
 
 
-def embedded_review(review) -> dict:
+def embedded_review(review: dict) -> dict:
     serialized, digest = encode(review)
     return {**{key: review[key] for key in ('uuid', 'user_id', 'enrollment_id', 'module_id', 'course_version',
         'manifest_sha256', 'request_sha256', 'run_id', 'prompt_id')}, 'record_json': serialized, 'record_sha256': digest}
@@ -98,11 +98,13 @@ class OutputOutcomeReviewRepository(LearnerDecisionJournal):
         except (KeyError, TypeError, ValueError, EnrollmentConflict) as exc:
             raise CourseCatalogError('The saved output outcome review failed integrity verification') from exc
 
-    async def get(self, user_id: str, submission_id) -> dict | None:
+    async def get(self, user_id: str, submission_id: str | None) -> dict | None:
+        if submission_id is None:
+            return None
         raw = await self.records.find_one({'uuid': submission_id, 'user_id': user_id, 'module_id': 'output_delivery', 'prompt_id': PROMPT_ID})
         return self.decode(raw) if raw else None
 
-    async def submit(self, operation: CourseOperation, body, *, actor_user_id: str):
+    async def submit(self, operation: CourseOperation, body: object, *, actor_user_id: str) -> dict:
         body = OutputOutcomeReviewRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Output interpretation requires the authenticated learner')

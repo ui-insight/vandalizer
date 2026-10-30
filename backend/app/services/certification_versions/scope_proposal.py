@@ -22,7 +22,7 @@ class ScopeProposalCase(BaseModel):
     task: str = Field(min_length=20, max_length=3000)
     original_source_filename: str = Field(pattern=r'^[a-z0-9][a-z0-9-]*\.pdf$')
 
-    def verify_exercise(self, exercise) -> None:
+    def verify_exercise(self, exercise: object) -> None:
         """Bind the new draft instructions without changing legacy exercises."""
         if (not isinstance(exercise, dict)
                 or exercise.get('assessment_method') != 'owned_scoped_extraction'
@@ -46,7 +46,7 @@ class ProposalSelection(BaseModel):
     source_id: str = Field(min_length=1, max_length=200)
 
 
-def load_proposal_case(package: CoursePackage, module_id: str):
+def load_proposal_case(package: CoursePackage, module_id: str) -> ScopeProposalCase | None:
     from .learner_decisions import execution_requirement
     path = f'proposals/{module_id}.json'
     if path not in package.manifest.artifacts:
@@ -68,7 +68,7 @@ def load_proposal_case(package: CoursePackage, module_id: str):
         raise CourseCatalogError('The scope proposal case is invalid') from exc
 
 
-def capture_proposal(package: CoursePackage, snapshot) -> None | dict:
+def capture_proposal(package: CoursePackage, snapshot: dict) -> None | dict:
     case = load_proposal_case(package, snapshot['module_id'])
     if case is None:
         return None
@@ -87,6 +87,6 @@ def capture_proposal(package: CoursePackage, snapshot) -> None | dict:
             ]}
 
 
-def selection_matches_run(proposal, selection, snapshot):
+def selection_matches_run(proposal: dict, selection: ProposalSelection | None, snapshot: dict) -> bool:
     return (selection is not None and selection.proposal_sha256 == encode(proposal)[1]
             and [selection.source_id] == [item['document_id'] for item in snapshot['documents']])

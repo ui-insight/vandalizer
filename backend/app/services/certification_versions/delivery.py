@@ -4,6 +4,7 @@ This explicit-enrollment library supports the disabled-by-default rollout.
 Chat/API request pinning lives in runtime; server position UI wiring is separate.
 """
 from __future__ import annotations
+from app.models.certification import CertificationEnrollment
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -20,7 +21,7 @@ from .writes import progress_filter
 from .editorial_corrections import module_notices_for, notices_for
 
 
-def public_modules(package: CoursePackage):
+def public_modules(package: CoursePackage) -> list[dict]:
     """Deliver pinned teaching and recognition prompts without answer keys."""
     from .scenario_submissions import module_bank
     lessons = package.json('lessons.json')
@@ -90,7 +91,7 @@ class CourseDelivery:
     def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         self.repository = repository or EnrollmentRepository()
 
-    async def _resolve(self, user_id: str, enrollment_id: str):
+    async def _resolve(self, user_id: str, enrollment_id: str) -> tuple[CertificationEnrollment, CoursePackage, CertificationProgress]:
         enrollment = await self.repository._enrollment(user_id, enrollment_id)
         package = self.repository.catalog.load(enrollment.course_version)
         progress = await self.repository.read_progress(user_id, enrollment_id)
@@ -135,7 +136,7 @@ class CourseDelivery:
         }
 
     @staticmethod
-    async def store_position(progress: CertificationProgress, package, module_id: str, lesson_id: str, expected_revision: int) -> dict:
+    async def store_position(progress: CertificationProgress, package: CoursePackage, module_id: str, lesson_id: str, expected_revision: int) -> dict:
         """Called only inside a pinned write boundary; stale devices fail closed."""
         if progress.position_revision != expected_revision:
             raise EnrollmentConflict('Your saved place changed in another session; reload before saving it again')

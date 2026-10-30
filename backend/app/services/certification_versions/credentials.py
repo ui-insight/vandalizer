@@ -112,11 +112,11 @@ class CredentialRepository:
         raw = await self.records.find_one({'enrollment_id': enrollment_id, 'user_id': user_id})
         return self.decode(raw) if raw else None
 
-    async def list(self, user_id: str):
+    async def list(self, user_id: str) -> list[CredentialRecord]:
         rows = await self.records.find({'user_id': user_id}).to_list(None)
         return [self.decode(raw) for raw in rows]
 
-    async def _insert_snapshot(self, progress: CertificationProgress, package, learner_name: str, *, legacy: bool=False):
+    async def _insert_snapshot(self, progress: CertificationProgress, package: CoursePackage, learner_name: str, *, legacy: bool=False) -> CredentialRecord:
         """Caller holds the enrollment write boundary; no update path exists."""
         existing = await self.for_enrollment(progress.user_id, progress.enrollment_id)
         if existing:
@@ -195,7 +195,7 @@ class CredentialRepository:
             raise EnrollmentConflict('Credential identity conflicts with another record')
         return preserved
 
-    async def preserve_legacy(self, repository: EnrollmentRepository, user_id: str, enrollment_id: str, learner_name: str):
+    async def preserve_legacy(self, repository: EnrollmentRepository, user_id: str, enrollment_id: str, learner_name: str) -> CredentialRecord:
         """Explicit migration primitive; never invoked by a read or publication."""
         enrollment = await repository._enrollment(user_id, enrollment_id)
         if enrollment.provenance != 'legacy_version_unknown':

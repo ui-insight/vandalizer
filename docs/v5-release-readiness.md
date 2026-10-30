@@ -58,7 +58,7 @@ network-policy enforcement and deployment identity still need deployed QA.
 ## Typing
 
 The original mypy baseline was 3,141 errors. The dependency pass reduced it to
-3,098; the current follow-up reduces it to 1,338 across 524 source files. The
+3,098; the current follow-up reduces it to 1,142 across 524 source files. The
 models, schemas, database helpers, URL helpers and observability setup pass their
 focused type check. Workflow execution, automatic review, review persistence and
 review recovery, and the knowledge-base, admin, workflow and Home/config APIs
@@ -79,7 +79,12 @@ extraction, document, knowledge-base, passive, quality and retention task module
 now pass mypy. The generic async task runner preserves its coroutine's result
 contract, and worker MongoDB handles are explicit. Delivery records distinguish
 storage outcomes from notification/webhook lists; extraction storage accepts both
-its existing mapping and entity-list shapes.
+its existing mapping and entity-list shapes. Upgrade/credit-transfer delivery,
+selection replay journals, course health, enrollment readers, credential snapshots,
+completion journals and legacy access wrappers now pass mypy. Captured batch,
+validation and governance inputs, plus saved reviews and generated output artifact
+verification, have explicit model/storage contracts. PDF, workbook and DOCX readers
+use their actual library result types.
 
 The follow-up adds validator, database, record-reader and execution contracts,
 separates shared repository storage from incompatible submission signatures,
@@ -144,6 +149,20 @@ continue to use their existing Pydantic validation at the API boundary.
 - Catalog/verification regressions: 116 passed, two skipped. Quality, drift and
   regression reporting: 122 passed, one skipped. Task boundary checks: 44 passed;
   the subsequent worker/output/retry suite: 449 passed with network access.
+- Course upgrade, selection replay, credit transfer and course-health persistence:
+  105 passed against disposable MongoDB. Course write/access, legacy evidence,
+  completion replay/concurrency and support persistence: 122 passed. Containers
+  were removed. The subsequent certification unit suite: 1,574 passed.
+- Saved batch/validation/governance input and output-review/handoff persistence:
+  230 passed against disposable MongoDB, removed afterward.
+- Document-reader contracts: 221 passed across PDF table/unread-page/hidden-text,
+  workbook damage and format detection, and DOCX/helper checks.
+- CI at `edfb6e1a` passed every job except Python 3.11 backend tests: 8,893
+  cases passed but the sandbox-cleanup assertion failed when an unrelated thread
+  exited (the count fell from three to two). The test now checks newly surviving
+  thread identities, which also catches a leak masked by another thread's exit.
+  Eight focused checks pass on Python 3.12; all five cleanup checks and an explicit
+  background-thread-exit reproduction pass on Python 3.11. Fresh CI remains required.
 - Certification enrollment and practical delivery persistence: 518 passed
   against a disposable MongoDB container, removed after the run.
 - Chroma's disposable container check passes locally and is included in CI.

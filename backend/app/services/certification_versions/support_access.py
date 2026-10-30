@@ -1,5 +1,6 @@
 """Access-only administrator changes, recorded atomically with their effect."""
 from __future__ import annotations
+from .enrollments import EnrollmentRepository
 
 import datetime
 
@@ -19,7 +20,7 @@ class AccessChangeRequest(BaseModel):
     reason: str = Field(min_length=5, max_length=1000)
 
 
-async def apply_access_change(repository, progress: CertificationProgress, request, actor_user_id: str, access_filter):
+async def apply_access_change(repository: EnrollmentRepository, progress: CertificationProgress, request: AccessChangeRequest, actor_user_id: str, access_filter: dict) -> CertificationProgress:
     """The audit event and flag share one Mongo write; earned fields are untouched.
 
     This private journal is outside the learner progress model. Ordinary model
@@ -30,7 +31,7 @@ async def apply_access_change(repository, progress: CertificationProgress, reque
         raise EnrollmentConflict('An authenticated administrator is required for an access change')
     identity = {'_id': progress.id, 'user_id': progress.user_id}
 
-    async def replay():
+    async def replay() -> CertificationProgress | None:
         current = await repository.progress.find_one(identity)
         events = current.get(JOURNAL, []) if current else []
         if not isinstance(events, list):
@@ -43,7 +44,8 @@ async def apply_access_change(repository, progress: CertificationProgress, reque
             'enrollment_id': progress.enrollment_id, 'course_version': progress.course_version,
         }.items()):
             raise EnrollmentConflict('This access request already belongs to a different change')
-        return CertificationProgress.model_validate(current)
+        restored: CertificationProgress = CertificationProgress.model_validate(current)
+        return restored
 
     existing = await replay()
     if existing is not None:
@@ -63,14 +65,16 @@ async def apply_access_change(repository, progress: CertificationProgress, reque
         if existing is not None:
             return existing
         raise EnrollmentConflict('The reviewed access or course binding changed; refresh before changing prerequisites')
-    return CertificationProgress.model_validate(saved)
+    restored: CertificationProgress = CertificationProgress.model_validate(saved)
+    return restored
 
 
-async def access_history(repository, progress) -> dict:
+async def access_history(repository: EnrollmentRepository, progress: CertificationProgress) -> dict:
     raw = await repository.progress.find_one(
         {'_id': progress.id, 'user_id': progress.user_id}, {'user_id': 1, JOURNAL: {'$slice': -11}})
     events = raw.get(JOURNAL, []) if raw else []
-    result = {'state': 'not_recorded', 'changes': [], 'older_available': False,
+    changes: list[dict] = []
+    result = {'state': 'not_recorded', 'changes': changes, 'older_available': False,
               'historical_unlocked': progress.unlocked}
     if not isinstance(events, list):
         return {**result, 'state': 'unavailable'}
@@ -81,7 +85,7 @@ async def access_history(repository, progress) -> dict:
                     or type(event['previous_unlocked']) is not bool or event['credit_effect'] != 'none'
                     or not isinstance(event['recorded_at'], datetime.datetime)):
                 raise ValueError('Invalid access event')
-            result['changes'].append({**request.model_dump(), 'actor_user_id': event['actor_user_id'],
+            changes.append({**request.model_dump(), 'actor_user_id': event['actor_user_id'],
                                       'previous_unlocked': event['previous_unlocked'],
                                       'recorded_at': event['recorded_at'].isoformat(), 'credit_effect': 'none'})
     except (KeyError, TypeError, ValueError):
