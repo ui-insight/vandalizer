@@ -71,7 +71,7 @@ async def search_documents(
 
     if not q.strip():
         query: dict = {"$and": base_conditions} if len(base_conditions) > 1 else owner_filter
-        results = await SmartDocument.find(query).sort(-SmartDocument.created_at).limit(limit).to_list()
+        results = await SmartDocument.find(query).sort('-created_at').limit(limit).to_list()
     else:
         regex = re.compile(re.escape(q), re.IGNORECASE)
         results = await SmartDocument.find(
@@ -85,7 +85,7 @@ async def search_documents(
                     },
                 ],
             }
-        ).sort(-SmartDocument.created_at).limit(limit).to_list()
+        ).sort('-created_at').limit(limit).to_list()
 
     items = []
     for doc in results:

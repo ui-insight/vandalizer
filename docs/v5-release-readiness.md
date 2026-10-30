@@ -58,7 +58,7 @@ network-policy enforcement and deployment identity still need deployed QA.
 ## Typing
 
 The original mypy baseline was 3,141 errors. The dependency pass reduced it to
-3,098; the current follow-up reduces it to 1,767 across 524 source files. The
+3,098; the current follow-up reduces it to 1,564 across 524 source files. The
 models, schemas, database helpers, URL helpers and observability setup pass their
 focused type check. Workflow execution, automatic review, review persistence and
 review recovery, and the knowledge-base, admin, workflow and Home/config APIs
@@ -68,7 +68,13 @@ delivery also pass their checks. The six module delivery APIs, project, team,
 organization and Skill contracts are now clean, and 131 additional JSON-object
 HTTP endpoints have explicit return types. Invalid principals fail before learner storage
 is accessed; 18 regressions cover internal, HTTP and tool error handling. The full check remains
-advisory; the backlog is not clear.
+advisory; the backlog is not clear. LLM configuration, extraction, run metadata,
+knowledge ingestion, management and workflow services now pass their focused checks.
+The LLM wrappers use the current SDK model and retry contracts. Extraction's
+source fallback now accepts bare entity lists without treating them as mappings;
+OpenRouter clients send the application title header. Management config redaction
+covers the current `available_models` credentials and OCR/web-search keys without
+mutating stored configuration.
 
 The follow-up adds validator, database, record-reader and execution contracts,
 separates shared repository storage from incompatible submission signatures,
@@ -123,6 +129,13 @@ continue to use their existing Pydantic validation at the API boundary.
 - After the API contracts: 8,888 passed and 2,130 skipped in the full backend
   run. Three tests required public DNS unavailable in the sandbox; all three
   pass with network access (8,891 passing cases combined).
+- SDK and extraction contract checks: 309 and 475 passed, respectively (86
+  provider-dependent extraction cases skipped). Case/catalog/fallback checks:
+  396 passed; run metadata: 51 passed; knowledge, documents, reviews and management:
+  953 passed. The management redaction regression and API checks: 22 passed.
+- Workflow and chat-workflow regressions: 1,011 passed, including one DNS-dependent
+  test rerun with network access. CI passed at `5b1ab444`; subsequent changes
+  require a fresh CI run.
 - Certification enrollment and practical delivery persistence: 518 passed
   against a disposable MongoDB container, removed after the run.
 - Chroma's disposable container check passes locally and is included in CI.

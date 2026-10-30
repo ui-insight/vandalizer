@@ -2486,7 +2486,7 @@ async def chat_stream(
                 default=0,
             ),
         )
-        agent = create_agentic_chat_agent(
+        agent: Agent[AgenticChatDeps, str] | Agent[None, str] = create_agentic_chat_agent(
             model_name, system_config_doc=sys_config_doc,
         )
     else:

@@ -17,7 +17,7 @@ from typing import Optional
 
 from fastapi import HTTPException
 from pydantic import BaseModel
-from pydantic_ai.tools import RunContext
+from pydantic_ai.tools import RunContext, ToolFuncContext
 
 from app.models.document import SmartDocument
 from app.models.extraction_test_case import ExtractionTestCase
@@ -6921,7 +6921,7 @@ from app.services.chat_workflow_tools import get_workflow_definition, update_wor
 # Tool registry — imported by llm_service.create_agentic_chat_agent()
 # ---------------------------------------------------------------------------
 
-TOOLS = [
+TOOLS: list[ToolFuncContext[AgenticChatDeps, ...]] = [
     list_skills,
     get_skill,
     select_skill,

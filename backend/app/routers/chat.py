@@ -704,7 +704,7 @@ async def list_conversations(
     """List the user's chat conversations, most recent first."""
     conversations = await ChatConversation.find(
         ChatConversation.user_id == user.user_id,
-    ).sort(-ChatConversation.updated_at).limit(limit).to_list()
+    ).sort('-updated_at').limit(limit).to_list()
 
     return [
         {

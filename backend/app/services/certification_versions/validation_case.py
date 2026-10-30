@@ -1,5 +1,7 @@
 """Authored representative validation assignment, never observed test evidence."""
 from __future__ import annotations
+from collections.abc import Sequence
+from .outcomes import OutcomeContract
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -124,13 +126,15 @@ class ValidationCase(ContractModel):
         return self
 
     @property
-    def digest(self):
+    def digest(self) -> str:
         return encode(self.model_dump(mode='json'))[1]
 
     def public_definition(self) -> dict:
         return {**self.model_dump(mode='json', exclude={'expectations', 'review_guidance'}), 'case_sha256': self.digest}
 
-    def verify_contract(self, contract) -> None:
+    def verify_contract(self, contract: OutcomeContract | None) -> None:
+        if contract is None:
+            raise ValueError('The course outcome contract is unavailable')
         module = next((m for m in contract.modules if m.module_id == self.module_id), None)
         practical = [o for o in module.outcomes if o.method == 'structured_review'] if module else []
         if {o.id for o in practical} != set(EVIDENCE):
@@ -142,7 +146,7 @@ class ValidationCase(ContractModel):
                     or guidance[outcome.id].critical_failures != outcome.critical_failures):
                 raise ValueError('Validation guidance cannot weaken required evidence or passing conditions')
 
-    def verify_source(self, source_id: str, source_bytes, page_texts) -> None:
+    def verify_source(self, source_id: str, source_bytes: bytes, page_texts: Sequence[str]) -> None:
         source = next((s for s in self.sources if s.id == source_id), None)
         if source is None or hashlib.sha256(source_bytes).hexdigest() != source.sha256:
             raise ValueError('The assigned validation source changed')
@@ -162,7 +166,7 @@ class ValidationCase(ContractModel):
                 if anchor.page > len(page_texts) or ' '.join(anchor.quote.split()) not in ' '.join(page_texts[anchor.page - 1].split()):
                     raise ValueError('An agent-drafted expectation quotes text not on its source page')
 
-    def verify_exercise(self, exercise) -> None:
+    def verify_exercise(self, exercise: dict) -> None:
         if (exercise.get('documents') != [s.filename for s in self.sources]
                 or exercise.get('assessment_case_id') != self.id or exercise.get('validation_case_sha256') != self.digest
                 or exercise.get('assessment_method') != 'authenticated_representative_suite_repair_retest'
@@ -171,7 +175,7 @@ class ValidationCase(ContractModel):
             raise ValueError('The exercise must bind the full case without test-count credit or private answer keys')
 
 
-def load_validation_case(package: CoursePackage):
+def load_validation_case(package: CoursePackage) -> ValidationCase:
     from .catalog import CourseCatalogError
     from .outcomes import package_outcomes
     path = 'validation-cases/validation_qa.json'

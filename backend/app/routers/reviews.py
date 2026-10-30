@@ -185,7 +185,7 @@ async def list_my_reviews(
 
     approvals = (
         await ApprovalRequest.find(query)
-        .sort(-ApprovalRequest.created_at)
+        .sort('-created_at')
         .to_list()
     )
     return {"reviews": [_approval_summary(a) for a in approvals]}
@@ -218,7 +218,7 @@ async def list_team_reviews(
 
     approvals = (
         await ApprovalRequest.find(query)
-        .sort(-ApprovalRequest.created_at)
+        .sort('-created_at')
         .to_list()
     )
     return {"reviews": [_approval_summary(a) for a in approvals]}

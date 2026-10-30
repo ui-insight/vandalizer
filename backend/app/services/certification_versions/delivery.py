@@ -78,7 +78,10 @@ def public_modules(package: CoursePackage):
                 item['practicalPreparation'] = True
             if module['id'] == 'extraction_engine' and 'repair-cases/extraction_engine.json' in package.manifest.artifacts:
                 from .repair_case import load_repair_case
-                item['repairAssignment'] = load_repair_case(package, module['id']).public_definition()
+                repair = load_repair_case(package, module['id'])
+                if repair is None:
+                    raise CourseCatalogError('The declared repair assignment is unavailable')
+                item['repairAssignment'] = repair.public_definition()
         modules.append(item)
     return modules
 

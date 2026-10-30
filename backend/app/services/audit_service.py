@@ -76,5 +76,5 @@ async def query_audit_log(
 
     query = AuditLog.find(filters)
     total = await query.count()
-    entries = await query.sort(-AuditLog.timestamp).skip(skip).limit(limit).to_list()
+    entries = await query.sort('-timestamp').skip(skip).limit(limit).to_list()
     return entries, total

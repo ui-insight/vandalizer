@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+from beanie.odm.enums import SortDirection
+
 import asyncio
 import datetime
 import logging
@@ -31,7 +34,7 @@ from app.models.knowledge import (
 from app.models.user import User
 from app.models.team import Team
 from app.services import access_control, audit_service, kb_source_versions, name_conflicts
-from app.services.document_manager import get_document_manager
+from app.services.document_manager import DocumentManager, get_document_manager
 from app.utils import kb_source_currency as currency
 from app.utils.fetch_errors import describe_fetch_error
 from app.utils.url_validation import normalize_crawl_url as _normalize_crawl_url
@@ -44,7 +47,7 @@ logger = logging.getLogger(__name__)
 IN_FLIGHT_TASK_STATUSES = ("layout", "extracting", "ocr", "security", "readying")
 
 
-def _get_dm():
+def _get_dm() -> DocumentManager:
     return get_document_manager()
 
 
@@ -125,7 +128,7 @@ async def list_knowledge_bases(
     total = await KnowledgeBase.find(query).count()
     kbs = await (
         KnowledgeBase.find(query)
-        .sort([("created_at", -1), ("uuid", 1)])
+        .sort([("created_at", SortDirection.DESCENDING), ("uuid", SortDirection.ASCENDING)])
         .skip(skip)
         .limit(limit)
         .to_list()
@@ -254,7 +257,7 @@ async def get_knowledge_base(
 async def get_kb_sources(kb_uuid: str) -> list[KnowledgeBaseSource]:
     return await KnowledgeBaseSource.find(
         KnowledgeBaseSource.knowledge_base_uuid == kb_uuid,
-    ).sort(-KnowledgeBaseSource.created_at).to_list()
+    ).sort('-created_at').to_list()
 
 
 async def kb_has_sources(kb: KnowledgeBase) -> bool:
@@ -329,7 +332,7 @@ async def _remove_duplicate_url_sources() -> int:
     Returns the number of source rows deleted.
     """
     collection = KnowledgeBaseSource.get_motor_collection()
-    pipeline = [
+    pipeline: list[dict] = [
         {"$match": {"url": {"$type": "string"}}},
         {"$group": {
             "_id": {"kb": "$knowledge_base_uuid", "url": "$url"},
@@ -348,7 +351,7 @@ async def _remove_duplicate_url_sources() -> int:
         dupes = await KnowledgeBaseSource.find(
             KnowledgeBaseSource.knowledge_base_uuid == kb_uuid,
             KnowledgeBaseSource.url == group["_id"]["url"],
-        ).sort(+KnowledgeBaseSource.created_at).to_list()
+        ).sort('created_at').to_list()
         for extra in dupes[1:]:
             try:
                 dm = _get_dm()
@@ -412,7 +415,7 @@ async def _save_unless_deleted(source: KnowledgeBaseSource) -> bool:
     return True
 
 
-async def resolve_document_titles(sources) -> dict[str, str]:
+async def resolve_document_titles(sources: Iterable[KnowledgeBaseSource]) -> dict[str, str]:
     """Batch-load display titles for the given KB sources, by document uuid.
 
     Prefers the live SmartDocument title. When the document has been deleted
@@ -429,9 +432,9 @@ async def resolve_document_titles(sources) -> dict[str, str]:
     if not doc_sources:
         return {}
     titles = {
-        s.document_uuid: getattr(s, "document_title", None)
+        s.document_uuid: s.document_title
         for s in doc_sources
-        if getattr(s, "document_title", None)
+        if s.document_uuid is not None and s.document_title
     }
     try:
         docs = await SmartDocument.find(
@@ -443,7 +446,7 @@ async def resolve_document_titles(sources) -> dict[str, str]:
     return titles
 
 
-async def resolve_existing_documents(sources) -> set[str]:
+async def resolve_existing_documents(sources: Iterable[KnowledgeBaseSource]) -> set[str]:
     """The document uuids among ``sources`` whose SmartDocument still exists.
 
     Callers use it to mark a source whose document was deleted from Files; the
@@ -467,7 +470,7 @@ async def resolve_existing_documents(sources) -> set[str]:
     return {d.uuid for d in docs}
 
 
-async def resolve_document_ingestion_warnings(sources) -> dict[str, list[str]]:
+async def resolve_document_ingestion_warnings(sources: Iterable[KnowledgeBaseSource]) -> dict[str, list[str]]:
     """Per-source ingestion-warning codes, keyed by source uuid.
 
     A document source indexes ``SmartDocument.raw_text`` as it stands, and
@@ -499,7 +502,7 @@ async def resolve_document_ingestion_warnings(sources) -> dict[str, list[str]]:
     return {
         s.uuid: by_doc[s.document_uuid]
         for s in doc_sources
-        if by_doc.get(s.document_uuid)
+        if s.document_uuid is not None and by_doc.get(s.document_uuid)
     }
 
 
@@ -1430,7 +1433,7 @@ async def list_suggestions(
     query: dict = {"knowledge_base_uuid": kb_uuid}
     if status:
         query["status"] = status
-    return await KBSuggestion.find(query).sort([("created_at", -1), ("uuid", 1)]).to_list()
+    return await KBSuggestion.find(query).sort([("created_at", SortDirection.DESCENDING), ("uuid", SortDirection.ASCENDING)]).to_list()
 
 
 async def review_suggestion(
@@ -1570,7 +1573,10 @@ def _extract_links(html: str, base_url: str) -> list[str]:
     seen: set[str] = set()
     links: list[str] = []
     for a in soup.find_all("a", href=True):
-        href = a["href"].strip()
+        raw_href = a["href"]
+        if not isinstance(raw_href, str):
+            continue
+        href = raw_href.strip()
         if not href or href.startswith(("#", "mailto:", "javascript:", "tel:")):
             continue
         absolute = urljoin(base_url, href)
@@ -1747,14 +1753,16 @@ async def _crawl_from_source(
         )
         if not await _insert_source_unless_duplicate(child):
             return _CrawlVisit("known")
+        def content_gate(result: WebFetchResult) -> str | None:
+            return describe_low_value_page(
+                result.text, len(_crawlable_links(result, url)),
+                min_chars=min_content_chars,
+            )
+
         # _ingest_url_source returns the fetch result on success
         child_fetched = await _ingest_url_source(
             child, kb,
-            content_gate=lambda result, page=url: describe_low_value_page(
-                result.text,
-                len(_crawlable_links(result, page)),
-                min_chars=min_content_chars,
-            ),
+            content_gate=content_gate,
         )
         if child.status == "deleted":
             # Removed by the user while it was being ingested: not added.
@@ -1768,6 +1776,8 @@ async def _crawl_from_source(
             return _CrawlVisit("skipped", child_fetched)
         return _CrawlVisit("added", child_fetched)
 
+    if parent.url is None:
+        raise ValueError("A crawl requires a source URL")
     crawled_urls, skipped_urls, fetches = await _crawl_bfs(
         parent.url, parent_fetched, max_pages, allowed_domains, ingest_child,
     )
@@ -2215,6 +2225,8 @@ async def refresh_url_source(
     reason: str | None
     result: WebFetchResult | None = None
     try:
+        if source.url is None:
+            raise ValueError("A URL source requires a URL")
         result = await fetch_source_page(source.url)
         reason = _reject_fetched_page(result)
         if reason is None:
@@ -2353,6 +2365,8 @@ async def _ingest_url_source(
     source.status = "processing"
     await source.save()
     try:
+        if source.url is None:
+            raise ValueError("A URL source requires a URL")
         result = await fetch_source_page(source.url)
         raw_text = result.text
 
@@ -2447,7 +2461,7 @@ async def _store_url_text(
     dm = _get_dm()
     chunk_count = await asyncio.to_thread(
         dm.add_to_kb, kb.uuid, source.uuid,
-        source.url_title or source.url, raw_text,
+        source.url_title or source.url or "Web source", raw_text,
     )
     source.chunk_count = chunk_count
     source.status = "ready"

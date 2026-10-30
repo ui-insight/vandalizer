@@ -12,7 +12,9 @@ import threading
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
-from typing import List, Literal, Optional, Union
+from typing import Any, Callable, Literal, Optional, Protocol, TypeGuard, Union
+from types import GenericAlias
+from pydantic_ai.usage import RunUsage
 
 from pydantic import BaseModel, ConfigDict, Field, create_model, model_validator
 from pydantic_ai import Agent, BinaryContent, NativeOutput
@@ -29,6 +31,10 @@ from app.services.llm_service import (
     get_agent_model,
     use_native_structured_output,
 )
+
+class UsageResult(Protocol):
+    def usage(self) -> RunUsage: ...
+
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +93,7 @@ def _prompt_instructive(source_label: str) -> str:
     )
 
 
-PROMPT_VARIANTS: dict[str, "callable"] = {
+PROMPT_VARIANTS: dict[str, Callable[[str], str]] = {
     "default": _prompt_default,
     "strict": _prompt_strict,
     "instructive": _prompt_instructive,
@@ -237,7 +243,7 @@ class ExtractionEngine:
         self.skipped_doc_indices: list[int] = []
         self._usage_lock = threading.Lock()
 
-    def _record_usage(self, result) -> None:
+    def _record_usage(self, result: UsageResult) -> None:
         """Accumulate token usage from a pydantic-ai RunResult."""
         try:
             usage = result.usage()
@@ -415,7 +421,8 @@ class ExtractionEngine:
         output = result.output.replace("\\n", "").replace("```json", "").replace("```", "")
 
         if "{" in output and "}" in output:
-            return json.loads(output.strip())
+            parsed: object = json.loads(output.strip())
+            return parsed if isinstance(parsed, dict) else None
         return None
 
     # ------------------------------------------------------------------
@@ -447,14 +454,15 @@ class ExtractionEngine:
 
     def _resolve_model(self, cfg: dict, model: str | None) -> str:
         config_model = cfg.get("model", "")
-        if config_model:
+        if isinstance(config_model, str) and config_model:
             return config_model
         if model:
             return model
         # Fallback to first available model
         models = self._sys_cfg.get("available_models", [])
         if models:
-            return models[0].get("name", "")
+            name: object = models[0].get("name", "")
+            return name if isinstance(name, str) else ""
         return ""
 
     def effective_model_info(
@@ -497,7 +505,7 @@ class ExtractionEngine:
     def _get_model_config(self, model_name: str) -> dict:
         """Look up a model's config dict from available_models."""
         for m in self._sys_cfg.get("available_models", []):
-            if m.get("name") == model_name:
+            if isinstance(m, dict) and m.get("name") == model_name:
                 return m
         return {}
 
@@ -760,7 +768,7 @@ class ExtractionEngine:
     def _merge_chunk_results(self, results: list) -> list:
         if not results:
             return []
-        merged = {}
+        merged: dict = {}
         for item in results:
             if isinstance(item, dict):
                 for k, v in item.items():
@@ -785,7 +793,7 @@ class ExtractionEngine:
         with ThreadPoolExecutor(max_workers=2) as executor:
             future_1 = executor.submit(self._dispatch_extraction, content, keys, model_name, config, meta_map, capture_sources)
             future_2 = executor.submit(self._dispatch_extraction, content, keys, model_name, config, meta_map, capture_sources)
-            results: list = []
+            results: list[list] = []
             errors: list[ExtractionError] = []
             for future in (future_1, future_2):
                 try:
@@ -850,14 +858,14 @@ class ExtractionEngine:
             return {}
         if isinstance(results, dict):
             return results
-        merged = {}
+        merged: dict = {}
         for item in results:
             if isinstance(item, dict):
                 merged.update(item)
         return merged
 
     def _majority_vote(self, keys: list[str], results: list[dict]) -> dict:
-        consensus = {}
+        consensus: dict[str, object] = {}
         for key in keys:
             values = [r.get(key) for r in results]
             counter = Counter(
@@ -883,7 +891,7 @@ class ExtractionEngine:
         if isinstance(draft_entities, list):
             if len(draft_entities) == 1 and isinstance(draft_entities[0], dict):
                 return self._strip_sources(draft_entities[0]) or None
-            merged = {}
+            merged: dict = {}
             for entity in draft_entities:
                 if not isinstance(entity, dict):
                     continue
@@ -903,7 +911,7 @@ class ExtractionEngine:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _is_multimodal_content(content: ExtractionContent) -> bool:
+    def _is_multimodal_content(content: ExtractionContent) -> TypeGuard[list[BinaryContent]]:
         return isinstance(content, list) and bool(content) and isinstance(content[0], BinaryContent)
 
     def _get_domain_supplement(self) -> str:
@@ -915,7 +923,8 @@ class ExtractionEngine:
         template = get_domain_template(self._domain, admin_overrides)
         if not template:
             return ""
-        return "\n\n" + template.get("system_supplement", "")
+        supplement: object = template.get("system_supplement", "")
+        return "\n\n" + supplement if isinstance(supplement, str) else ""
 
     def _build_fields_prompt(self, keys: list[str], meta_map: dict[str, dict] | None = None) -> str:
         """Build a fields description string with enum/optional annotations and domain hints."""
@@ -955,7 +964,7 @@ class ExtractionEngine:
     def _describe_content(self, content: ExtractionContent) -> str:
         """Return a human label for the content type (for system prompts)."""
         if self._is_multimodal_content(content):
-            items = content  # type: ignore[assignment]
+            items = content
             if len(items) == 1 and items[0].media_type == "application/pdf":
                 return "attached PDF document"
             return "attached document page images"
@@ -1032,7 +1041,8 @@ class ExtractionEngine:
         capture_sources: bool = False,
     ) -> list:
         # Build dynamic Pydantic model
-        field_definitions = {}
+        # Pydantic accepts runtime annotation objects and Field definitions here.
+        field_definitions: dict[str, Any] = {}
         for key in keys:
             safe_key = "".join(c if c.isalnum() else "_" for c in key)
             if not safe_key:
@@ -1067,24 +1077,25 @@ class ExtractionEngine:
 
         # Source quotes reuse the same safe-key/alias mapping but are always
         # plain strings (a verbatim passage, even for enum fields).
+        source_field_definitions: dict[str, Any] = {
+            safe_key: (Optional[str], Field(default=None, alias=defn[1].alias))
+            for safe_key, defn in field_definitions.items()
+        }
         DynamicSources = create_model(
             "DynamicSources",
             __config__=ConfigDict(extra="allow", populate_by_name=True),
-            **{
-                safe_key: (Optional[str], Field(default=None, alias=defn[1].alias))
-                for safe_key, defn in field_definitions.items()
-            },
+            **source_field_definitions,
         )
 
-        class ExtractionModel(BaseModel):
+        class ExtractionModelBase(BaseModel):
             model_config = ConfigDict(extra="allow")
-            entities: List[DynamicEntity]
+            entities: list[BaseModel]
             if capture_sources:
-                sources: Optional[List[DynamicSources]] = None
+                sources: list[BaseModel] | None = None
 
             @model_validator(mode="before")
             @classmethod
-            def coerce_entities(cls, value):
+            def coerce_entities(cls, value: object) -> object:
                 if isinstance(value, str):
                     try:
                         value = json.loads(value)
@@ -1100,6 +1111,15 @@ class ExtractionEngine:
                         return value
                     return {"entities": [value]}
                 return value
+
+        # Runtime field classes keep the exact generated schema, while the
+        # common base describes the model interface used below.
+        extraction_fields: dict[str, Any] = {
+            "entities": (GenericAlias(list, DynamicEntity), ...),
+        }
+        if capture_sources:
+            extraction_fields["sources"] = (GenericAlias(list, DynamicSources) | type(None), None)
+        ExtractionModel = create_model("ExtractionModel", __base__=ExtractionModelBase, **extraction_fields)
 
         native_structured = use_native_structured_output(model_name, self._sys_cfg)
         structured_retries = 3
@@ -1146,8 +1166,7 @@ class ExtractionEngine:
                 model,
                 system_prompt=system_prompt,
                 output_type=output_type,
-                retries=structured_retries,
-                output_retries=structured_retries,
+                retries={"tools": structured_retries, "output": structured_retries},
             )
 
             result = agent.run_sync(prompt, model_settings=model_settings)
@@ -1200,7 +1219,7 @@ class ExtractionEngine:
         return re.sub(r"[^a-z0-9]", "", str(key).lower())
 
     @classmethod
-    def _names_every_key(cls, parsed, keys: list[str]) -> bool:
+    def _names_every_key(cls, parsed: object, keys: list[str]) -> bool:
         """Whether every requested field appears as a key somewhere in ``parsed``."""
         seen: set[str] = set()
         stack = [parsed]
@@ -1214,7 +1233,7 @@ class ExtractionEngine:
         return all(cls._fold_key(k) in seen for k in keys)
 
     @staticmethod
-    def _unwrap_entities_envelope(parsed):
+    def _unwrap_entities_envelope(parsed: object) -> tuple[object, object]:
         """Return ``(body, envelope)`` for a parsed fallback payload.
 
         Every prompt variant ends with "Return a JSON object with an
@@ -1286,19 +1305,21 @@ class ExtractionEngine:
         return entity, matched, consumed
 
     @classmethod
-    def _fallback_sources_sidecar(cls, parsed: dict, entity: dict) -> dict:
+    def _fallback_sources_sidecar(cls, parsed: object, entity: dict) -> dict:
         """Per-field quote sidecar from a fallback payload's ``_sources`` block.
 
         The block's field names drift exactly like the value keys do, so they
         are reconciled the same way — otherwise a correctly-quoted extraction
         silently loses every source and each value renders as untraced.
         """
+        if not isinstance(parsed, dict):
+            return {}
         raw = parsed.get("_sources")
         if not isinstance(raw, dict):
             raw = parsed.get("sources")
         if not isinstance(raw, dict):
             return {}
-        by_folded = {}
+        by_folded: dict[str, str] = {}
         for field, quote in raw.items():
             if isinstance(quote, str) and quote.strip():
                 by_folded.setdefault(cls._fold_key(field), quote.strip())

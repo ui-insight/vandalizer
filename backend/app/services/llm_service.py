@@ -8,11 +8,18 @@ import weakref
 from email.utils import parsedate_to_datetime
 from contextvars import ContextVar
 from dataclasses import dataclass, replace as dataclass_replace
-from typing import Iterator, Optional
+from typing import TYPE_CHECKING, Any, AsyncIterator, Iterator, Optional, SupportsInt, SupportsIndex, Sequence
+from types import TracebackType
 
 import httpx
 from contextlib import asynccontextmanager, contextmanager
 from pydantic_ai.agent import Agent
+from pydantic_ai.capabilities import ProcessHistory
+from pydantic_ai.models import Model, ModelRequestParameters, StreamedResponse
+from pydantic_ai.messages import ModelMessage, ModelResponse, ModelResponsePart
+from pydantic_ai.settings import ModelSettings
+from pydantic_ai.models.anthropic import AnthropicModelSettings
+from pydantic_ai.usage import RequestUsage
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.models.wrapper import WrapperModel
 from pydantic_ai.profiles import ModelProfile
@@ -24,6 +31,12 @@ from pydantic_ai.profiles.openai import (
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 from pydantic_ai.tools import RunContext
 
+from app.services.chat_deps import AgenticChatDeps
+
+if TYPE_CHECKING:
+    from app.models.document import SmartDocument
+    from app.services.document_manager import DocumentManager
+
 from app.services.context_budget import CUT_NOTE_PREFIX
 from app.services.page_authoring import PAGE_INTERACTION_RULES, PAGE_LANGUAGE_RULES, PAGE_SOURCE_FIDELITY_RULES
 from app.utils.encryption import decrypt_value
@@ -34,7 +47,7 @@ logger = logging.getLogger(__name__)
 # Agent caches  - prevent context leaks across requests
 # ---------------------------------------------------------------------------
 _chat_agent_cache: dict[str, Agent] = {}
-_agentic_chat_agent_cache: dict[str, Agent] = {}
+_agentic_chat_agent_cache: dict[str, Agent[AgenticChatDeps, str]] = {}
 _extraction_agent_cache: dict[str, Agent] = {}
 _rag_agent_cache: dict[str, Agent] = {}
 _prompt_agent_cache: dict[str, Agent] = {}
@@ -118,7 +131,7 @@ def _retry_after_seconds(response: httpx.Response) -> float | None:
     except ValueError:
         pass
     try:
-        when = parsedate_to_datetime(header)
+        when: datetime.datetime = parsedate_to_datetime(header)
     except (TypeError, ValueError):
         return None
     if when.tzinfo is None:
@@ -174,8 +187,8 @@ class RateLimitRetryTransport(httpx.AsyncBaseTransport):
         await self.wrapped.__aenter__()
         return self
 
-    async def __aexit__(self, *exc_info) -> None:
-        await self.wrapped.__aexit__(*exc_info)
+    async def __aexit__(self, exc_type: type[BaseException] | None = None, exc_value: BaseException | None = None, traceback: TracebackType | None = None) -> None:
+        await self.wrapped.__aexit__(exc_type, exc_value, traceback)
 
 
 def _get_loop_http_client() -> httpx.AsyncClient:
@@ -232,9 +245,9 @@ async def aclose_loop_http_client() -> None:
 
 @dataclass
 class RagDeps:
-    doc_manager: object  # DocumentManager instance
+    doc_manager: "DocumentManager"
     user_id: str
-    documents: list  # list of SmartDocument
+    documents: list["SmartDocument"]
 
 
 # ---------------------------------------------------------------------------
@@ -269,13 +282,14 @@ class InsightAIProvider(OpenRouterProvider):
             return self._endpoint
         return "https://api.openai.com/v1"
 
-    def model_profile(self, model_name: str) -> Optional[ModelProfile]:
+    @staticmethod
+    def model_profile(model_name: str) -> Optional[ModelProfile]:
         if "/" not in model_name:
             profile = openai_model_profile(model_name)
             return OpenAIModelProfile(
                 json_schema_transformer=OpenAIJsonSchemaTransformer
             ).update(profile)
-        return super().model_profile(model_name)
+        return OpenRouterProvider.model_profile(model_name)
 
 
 class OllamaProvider(OpenRouterProvider):
@@ -301,7 +315,8 @@ class OllamaProvider(OpenRouterProvider):
             return self._endpoint
         return "http://localhost:11434/v1"
 
-    def model_profile(self, model_name: str) -> Optional[ModelProfile]:
+    @staticmethod
+    def model_profile(model_name: str) -> Optional[ModelProfile]:
         profile = openai_model_profile(model_name)
         return OpenAIModelProfile(
             json_schema_transformer=OpenAIJsonSchemaTransformer
@@ -331,14 +346,15 @@ class VLLMProvider(OpenRouterProvider):
             return self._endpoint
         return "http://localhost:8000/v1"
 
-    def model_profile(self, model_name: str) -> Optional[ModelProfile]:
+    @staticmethod
+    def model_profile(model_name: str) -> Optional[ModelProfile]:
         if "/" not in model_name:
             profile = openai_model_profile(model_name)
-            base = OpenAIModelProfile(
+            base: ModelProfile | None = OpenAIModelProfile(
                 json_schema_transformer=OpenAIJsonSchemaTransformer
             ).update(profile)
         else:
-            base = super().model_profile(model_name)
+            base = OpenRouterProvider.model_profile(model_name)
         if base is None:
             return base
         # JSON-schema output is a property of the *server*, not the model
@@ -368,7 +384,7 @@ def _get_model_config_sync(model_name: str, system_config_doc: dict | None = Non
     """Get model config from a pre-fetched SystemConfig document (sync context)."""
     if system_config_doc and system_config_doc.get("available_models"):
         for model in system_config_doc["available_models"]:
-            if model.get("name") == model_name:
+            if isinstance(model, dict) and model.get("name") == model_name:
                 return model
     return None
 
@@ -377,11 +393,13 @@ def _get_model_endpoint_sync(model_name: str, system_config_doc: dict | None = N
     """Get the endpoint URL for a model (sync context)."""
     model_config = _get_model_config_sync(model_name, system_config_doc)
     if model_config:
-        endpoint = model_config.get("endpoint", "").strip()
+        configured_endpoint = model_config.get("endpoint", "")
+        endpoint = configured_endpoint.strip() if isinstance(configured_endpoint, str) else ""
         if endpoint:
             return endpoint
-    if system_config_doc and system_config_doc.get("llm_endpoint"):
-        return system_config_doc["llm_endpoint"]
+    configured_fallback = system_config_doc.get("llm_endpoint") if system_config_doc else None
+    if isinstance(configured_fallback, str) and configured_fallback:
+        return configured_fallback
     return ""
 
 
@@ -391,7 +409,8 @@ SUPPORTED_PROTOCOLS = ("openai", "ollama", "vllm", "anthropic", "openrouter", "g
 def detect_api_protocol(model_name: str, model_config: Optional[dict] = None) -> str:
     """Detect API protocol based on model name and configuration."""
     if model_config and model_config.get("api_protocol"):
-        protocol = model_config.get("api_protocol", "").strip().lower()
+        configured_protocol = model_config.get("api_protocol", "")
+        protocol = configured_protocol.strip().lower() if isinstance(configured_protocol, str) else ""
         if protocol in SUPPORTED_PROTOCOLS:
             return protocol
 
@@ -453,7 +472,7 @@ def use_native_structured_output(
     )
 
 
-def unwrap_model_base_url(model) -> Optional[str]:
+def unwrap_model_base_url(model: object) -> Optional[str]:
     """The base URL a built model will actually dial, through our wrappers.
 
     ``Model.base_url`` is a property that defaults to None on the base class,
@@ -468,13 +487,13 @@ def unwrap_model_base_url(model) -> Optional[str]:
     """
     seen = 0
     while getattr(model, "wrapped", None) is not None and seen < 10:
-        model = model.wrapped
+        model = getattr(model, "wrapped")
         seen += 1
     url = getattr(model, "base_url", None)
     return str(url) if url else None
 
 
-def _looks_like_missing_route(body) -> bool:
+def _looks_like_missing_route(body: object) -> bool:
     """Whether a 404 body is a web framework's "no such path", not an API's
     "no such model / deployment / endpoint for this model"."""
     if body is None or body == "" or body == {}:
@@ -528,8 +547,10 @@ def resolve_thinking_enabled(
     return bool(model_config.get("thinking", False)) if model_config else False
 
 
-def _positive_int(value) -> Optional[int]:
+def _positive_int(value: object) -> Optional[int]:
     """Coerce a config value to a positive int, or None if unset/invalid."""
+    if not isinstance(value, (str, bytes, bytearray, SupportsInt, SupportsIndex)):
+        return None
     try:
         n = int(value)
     except (TypeError, ValueError):
@@ -537,7 +558,7 @@ def _positive_int(value) -> Optional[int]:
     return n if n > 0 else None
 
 
-def _temperature(value) -> Optional[float]:
+def _temperature(value: object) -> Optional[float]:
     """Coerce a config value to a usable temperature, or None if unset/invalid.
 
     Deliberately *not* written as ``value or default``: ``0.0`` is falsy and is
@@ -557,7 +578,7 @@ def build_thinking_model_settings(
     agent_model: str,
     thinking_override: Optional[bool] = None,
     system_config_doc: dict | None = None,
-) -> dict:
+) -> AnthropicModelSettings:
     """Build ModelSettings that explicitly enable/disable thinking for the request.
 
     pydantic-ai's unified `thinking` setting only fires when the profile's
@@ -593,7 +614,7 @@ def build_thinking_model_settings(
         not raw_protocol and detect_api_protocol(agent_model, model_config) == "google"
     )
 
-    settings: dict = {"thinking": thinking_enabled}
+    settings: AnthropicModelSettings = {"thinking": thinking_enabled}
     extra_body: dict = {}
     if raw_protocol == "ollama":
         extra_body["think"] = thinking_enabled
@@ -667,7 +688,7 @@ def build_thinking_model_settings(
 def build_prompt_cache_model_settings(
     agent_model: str,
     system_config_doc: dict | None = None,
-) -> dict:
+) -> AnthropicModelSettings:
     """Anthropic prompt-cache settings for multi-turn chat agents.
 
     Marks the instructions, tool definitions, and latest message as cache
@@ -737,7 +758,7 @@ def is_transient_llm_error(exc: Exception) -> bool:
 def _retry_backoff_seconds(attempt: int) -> float:
     import random
 
-    return min(0.5 * (2 ** (attempt - 1)), 32.0) * (1.0 + random.random() * 0.25)
+    return float(min(0.5 * (2 ** (attempt - 1)), 32.0)) * (1.0 + random.random() * 0.25)
 
 
 class RetryingModel(WrapperModel):
@@ -749,7 +770,7 @@ class RetryingModel(WrapperModel):
     handling owns it. CancelledError passes through untouched (BaseException).
     """
 
-    async def request(self, messages, model_settings, model_request_parameters):
+    async def request(self, messages: list[ModelMessage], model_settings: ModelSettings | None, model_request_parameters: ModelRequestParameters) -> ModelResponse:
         attempt = 0
         while True:
             try:
@@ -769,8 +790,8 @@ class RetryingModel(WrapperModel):
 
     @asynccontextmanager
     async def request_stream(
-        self, messages, model_settings, model_request_parameters, run_context=None
-    ):
+        self, messages: list[ModelMessage], model_settings: ModelSettings | None, model_request_parameters: ModelRequestParameters, run_context: RunContext[Any] | None = None
+    ) -> AsyncIterator[StreamedResponse]:
         attempt = 0
         while True:
             entered = False
@@ -882,9 +903,9 @@ class MeteredModel(WrapperModel):
     # The System Config name this model was built from. ``model_name`` is the
     # provider's (a leading "anthropic/" or "openrouter/" is stripped), and
     # the config, which a run's record reports, is keyed by this one.
-    configured_model = None
+    configured_model: str | None = None
 
-    async def request(self, messages, model_settings, model_request_parameters):
+    async def request(self, messages: list[ModelMessage], model_settings: ModelSettings | None, model_request_parameters: ModelRequestParameters) -> ModelResponse:
         resp = await self.wrapped.request(messages, model_settings, model_request_parameters)
         self._record(
             messages, getattr(resp, "usage", None), getattr(resp, "parts", None),
@@ -895,8 +916,8 @@ class MeteredModel(WrapperModel):
 
     @asynccontextmanager
     async def request_stream(
-        self, messages, model_settings, model_request_parameters, run_context=None
-    ):
+        self, messages: list[ModelMessage], model_settings: ModelSettings | None, model_request_parameters: ModelRequestParameters, run_context: RunContext[Any] | None = None
+    ) -> AsyncIterator[StreamedResponse]:
         async with self.wrapped.request_stream(
             messages, model_settings, model_request_parameters, run_context
         ) as stream:
@@ -923,7 +944,7 @@ class MeteredModel(WrapperModel):
                 )
                 self._note_finish(response, model_settings)
 
-    def _note_finish(self, response, model_settings) -> None:
+    def _note_finish(self, response: ModelResponse | None, model_settings: ModelSettings | None) -> None:
         """Flag a response that stopped because it hit the output cap."""
         try:
             if getattr(response, "finish_reason", None) != "length":
@@ -934,7 +955,7 @@ class MeteredModel(WrapperModel):
             # Truncation reporting must never break an LLM call.
             pass
 
-    def _record(self, messages, usage, parts, model_settings=None, model_request_parameters=None) -> None:
+    def _record(self, messages: list[ModelMessage], usage: RequestUsage | None, parts: Sequence[ModelResponsePart] | None, model_settings: ModelSettings | None = None, model_request_parameters: ModelRequestParameters | None = None) -> None:
         from app.services.metering import (
             estimate_messages_tokens,
             estimate_parts_tokens,
@@ -963,7 +984,7 @@ def get_agent_model(
     agent_model: str,
     thinking_override: Optional[bool] = None,
     system_config_doc: dict | None = None,
-):
+) -> MeteredModel:
     """Get the appropriate model instance, wrapped for token metering.
 
     Sync  - safe for Celery workers. The returned MeteredModel is a drop-in
@@ -982,7 +1003,7 @@ def _build_agent_model(
     agent_model: str,
     thinking_override: Optional[bool] = None,
     system_config_doc: dict | None = None,
-):
+) -> Model:
     """Build the raw (unmetered) provider-specific model instance."""
     from app.config import Settings
     model_config = _get_model_config_sync(agent_model, system_config_doc)
@@ -1029,8 +1050,8 @@ def _build_agent_model(
         model_name = agent_model.split("/", 1)[1] if agent_model.startswith("google/") else agent_model
         # Per-loop httpx client for the same event-loop-safety reason as the
         # Anthropic branch above — see _get_loop_http_client.
-        provider = GoogleProvider(api_key=api_key, http_client=_get_loop_http_client())
-        return GoogleModel(model_name=model_name, provider=provider)
+        google_provider = GoogleProvider(api_key=api_key, http_client=_get_loop_http_client())
+        return GoogleModel(model_name=model_name, provider=google_provider)
 
     # OpenRouter — pydantic-ai ships a first-class provider with a fixed
     # https://openrouter.ai/api/v1 base URL. If an admin configures a custom
@@ -1047,10 +1068,11 @@ def _build_agent_model(
             # its connection pool) per call — see _get_loop_http_client above.
             client = AsyncOpenAI(
                 api_key=api_key, base_url=endpoint,
+                default_headers={"X-Title": "Vandalizer"},
                 timeout=float(Settings().workflow_llm_timeout_seconds),
                 http_client=_get_loop_http_client(),
             )
-            provider = OpenRouterProvider(openai_client=client, app_title="Vandalizer")
+            provider = OpenRouterProvider(openai_client=client)
         else:
             # Pass the per-loop httpx client so we don't fall back to the
             # cross-loop-unsafe process-wide cache — see _get_loop_http_client.
@@ -1112,7 +1134,7 @@ def create_chat_agent(
     # per pydantic-ai run_sync() call — causing silent retries on every call.
     prompt_to_use = system_prompt or DEFAULT_CHAT_SYSTEM_PROMPT
     model = get_agent_model(agent_model, thinking_override=thinking_override, system_config_doc=system_config_doc)
-    model_settings = {
+    model_settings: AnthropicModelSettings = {
         **build_thinking_model_settings(agent_model, thinking_override, system_config_doc),
         **build_prompt_cache_model_settings(agent_model, system_config_doc),
     }
@@ -1129,7 +1151,7 @@ def create_chat_agent(
     return Agent(model, instructions=prompt_to_use, model_settings=model_settings)
 
 
-async def _inject_queued_user_parts(ctx: RunContext, messages: list) -> list:
+async def _inject_queued_user_parts(ctx: RunContext[AgenticChatDeps], messages: list[ModelMessage]) -> list[ModelMessage]:
     """History processor: fold mid-run queued user messages into the outgoing
     request (uplift plan Phase 10).
 
@@ -1169,7 +1191,7 @@ def create_agentic_chat_agent(
     agent_model: str,
     thinking_override: Optional[bool] = None,
     system_config_doc: dict | None = None,
-) -> Agent:
+) -> Agent[AgenticChatDeps, str]:
     """Create or retrieve a cached agentic chat agent with tools.
 
     System prompts (including per-user workspace inventory) are passed at
@@ -1205,22 +1227,21 @@ def create_agentic_chat_agent(
             thinking_override=thinking_override,
             system_config_doc=system_config_doc,
         )
-        agent = Agent(
+        agent: Agent[AgenticChatDeps, str] = Agent(
             model,
             deps_type=AgenticChatDeps,
             model_settings=build_prompt_cache_model_settings(
                 agent_model, system_config_doc
             ) or None,
-            history_processors=[_inject_queued_user_parts],
+            capabilities=[ProcessHistory(_inject_queued_user_parts)],
         )
         for tool_fn in TOOLS:
             agent.tool(
-                tool_fn,
                 sequential=(
                     not parallel_enabled
                     or tool_fn.__name__ not in PARALLEL_SAFE_TOOLS
                 ),
-            )
+            )(tool_fn)
         # "Click the Create workflow button" with no tool call leaves the user
         # hunting for a card that never rendered, and "Running a preview of…"
         # with no tool call leaves the chat stopped; send either reply back once.
@@ -2641,11 +2662,11 @@ PROMPT_AGENT_SYSTEM_PROMPT = (
 def create_rag_agent(
     agent_model: str,
     system_config_doc: dict | None = None,
-) -> Agent:
+) -> Agent[RagDeps, str]:
     # Always build fresh (see create_chat_agent for rationale).
     model = get_agent_model(agent_model, system_config_doc=system_config_doc)
     model_settings = build_thinking_model_settings(agent_model, system_config_doc=system_config_doc)
-    agent = Agent(
+    agent: Agent[RagDeps, str] = Agent(
         model,
         deps_type=RagDeps,
         system_prompt=RAG_SYSTEM_PROMPT,
@@ -2657,7 +2678,7 @@ def create_rag_agent(
         context: RunContext[RagDeps],
         question: str,
         docs_ids: Optional[list[str]] = None,
-    ):
+    ) -> list[dict]:
         if docs_ids is None:
             docs_ids = []
 
@@ -2702,7 +2723,7 @@ def create_rag_agent(
 def create_prompt_agent(
     agent_model: str,
     system_config_doc: dict | None = None,
-) -> Agent:
+) -> Agent[None, str]:
     # Always build fresh (see create_chat_agent for rationale).
     model = get_agent_model(agent_model, system_config_doc=system_config_doc)
     model_settings = build_thinking_model_settings(agent_model, system_config_doc=system_config_doc)

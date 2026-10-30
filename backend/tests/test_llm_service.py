@@ -581,3 +581,16 @@ class TestTruncationCapture:
 
         text = describe_truncation([{"model": "qwen3", "max_tokens": None}])
         assert "output limit" in text
+
+
+@pytest.mark.asyncio
+async def test_custom_openrouter_client_retains_application_attribution():
+    """Attribution belongs on a supplied SDK client, not provider-only options."""
+    async with httpx.AsyncClient() as client:
+        with patch.object(llm_service, '_get_loop_http_client', return_value=client):
+            model = llm_service._build_agent_model('openrouter/openai/gpt-4o', system_config_doc=_cfg(
+                name='openrouter/openai/gpt-4o', api_protocol='openrouter',
+                endpoint='https://gateway.example.test/v1', api_key='test-key',
+            ))
+        assert model.client.default_headers['X-Title'] == 'Vandalizer'
+        assert str(model.client.base_url) == 'https://gateway.example.test/v1/'

@@ -4,9 +4,12 @@ This validates a draft case and its package binding. It does not enable practica
 delivery, collect learner work, grade a response or award credit.
 """
 from __future__ import annotations
+from collections.abc import Sequence
+from .outcomes import OutcomeContract
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from .learner_decisions import DecisionPrompt
     from app.services.certification_versions.catalog import CoursePackage
 
 from typing import Self
@@ -94,10 +97,12 @@ class ExtractionRepairCase(CaseModel):
         return self
 
     @property
-    def digest(self):
+    def digest(self) -> str:
         return encode(self.model_dump(mode='json'))[1]
 
-    def verify_contract(self, contract, prompts) -> None:
+    def verify_contract(self, contract: OutcomeContract | None, prompts: Sequence[DecisionPrompt]) -> None:
+        if contract is None:
+            raise ValueError('The course outcome contract is unavailable')
         module = next((module for module in contract.modules if module.module_id == self.module_id), None)
         by_prompt = {prompt.id: prompt for prompt in prompts}
         if module is None or set(self.outcome_ids) != {outcome.id for outcome in module.outcomes}:
@@ -113,7 +118,7 @@ class ExtractionRepairCase(CaseModel):
                 or set(values.required_fields) != {item.field for item in self.expectations}):
             raise ValueError('Repair decisions must authorize scope and check every revised value')
 
-    def verify_source(self, pdf_bytes, page_texts) -> None:
+    def verify_source(self, pdf_bytes: bytes, page_texts: Sequence[str]) -> None:
         """Authoring check only; text presence is not learner source verification."""
         if hashlib.sha256(pdf_bytes).hexdigest() != self.source_sha256:
             raise ValueError('Repair case source bytes changed')
@@ -127,7 +132,7 @@ class ExtractionRepairCase(CaseModel):
         """Task and deliberately flawed specimen only; no expected answers."""
         return {**self.model_dump(mode='json', exclude={'expectations'}), 'case_sha256': self.digest}
 
-    def verify_exercise(self, exercise) -> None:
+    def verify_exercise(self, exercise: dict) -> None:
         if (exercise.get('documents') != [self.source_filename]
                 or exercise.get('assessment_case_id') != self.id
                 or exercise.get('repair_case_sha256') != self.digest
@@ -137,7 +142,7 @@ class ExtractionRepairCase(CaseModel):
             raise ValueError('The exercise must describe the pinned repair task without legacy count credit or answer keys')
 
 
-def load_repair_case(package: CoursePackage, module_id: str):
+def load_repair_case(package: CoursePackage, module_id: str) -> ExtractionRepairCase | None:
     path = f'repair-cases/{module_id}.json'
     if path not in package.manifest.artifacts:
         return None
@@ -158,7 +163,7 @@ def load_repair_case(package: CoursePackage, module_id: str):
         raise CourseCatalogError('The packaged Extraction Engine repair case is invalid') from exc
 
 
-def capture_repair_case(package, snapshot) -> None | dict:
+def capture_repair_case(package: CoursePackage, snapshot: dict) -> None | dict:
     """Bind the public authored baseline to these exact inputs, not a fake run."""
     case = load_repair_case(package, snapshot['module_id'])
     if case is None:
