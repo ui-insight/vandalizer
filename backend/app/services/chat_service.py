@@ -3972,8 +3972,10 @@ async def _retrieve_kb_results(
     # base cannot answer hands over nothing rather than the nearest text. It
     # has its own section and identifier lanes, so chat's pins are not added
     # on top. A question that keeps nothing is asked again in the base's own
-    # words (kb_paraphrase). None when it cannot run here (store, reranker or
-    # setting): the tuned vector pipeline below stands.
+    # words (kb_paraphrase), and when that finds nothing either, a model may
+    # read its best candidates (kb_empty_check, behind a setting). None when
+    # it cannot run here (store, reranker or setting): the tuned vector
+    # pipeline below stands.
     from app.services import kb_grounding, kb_paraphrase, kb_retrieval
     from app.services.document_manager import get_document_manager
 

@@ -750,8 +750,8 @@ def _precise_pool(dm, kb_uuid: str, query: str, *, k: int, floor: float,
             final.append(r)
 
     general = [c for c in kr.candidates(dm, index, kb_uuid, expanded, floor=floor) if c.get("chunk_id") not in seen]
-    for r in kr.keep(kr.rerank(index, expanded, general), anchor_section=anchor, index=index,
-                     other_within=other_within):
+    ranked = kr.rerank(index, expanded, general)
+    for r in kr.keep(ranked, anchor_section=anchor, index=index, other_within=other_within):
         if len(final) >= k:
             break
         if r.get("chunk_id") in seen:
@@ -760,7 +760,42 @@ def _precise_pool(dm, kb_uuid: str, query: str, *, k: int, floor: float,
         final.append(r)
     pool = attach_lead_ins(dm, kb_uuid, final[:k])
     kr.remember(cache_key, pool)
+    if not pool and not seen:
+        # Nothing cleared the cut, and no lane set a chunk aside: these are all
+        # the hybrid candidates, scored. Kept for best_candidates, so chat's
+        # check of the best of them does not score them again.
+        kr.remember(_ranked_key(index, kb_uuid, query, floor), ranked)
     return pool
+
+
+def _ranked_key(index, kb_uuid: str, query: str, floor: float) -> tuple:
+    return (kb_uuid, index.revision, index.count, index.built_at, ("ranked", query), floor)
+
+
+def best_candidates(dm, kb_uuid: str, query: str, *, n: int, floor: float) -> Optional[list[dict]]:
+    """The ``n`` best of :func:`_precise_pool`'s hybrid candidates for ``query``
+    by cross-encoder score, with no relevance cut, best first and with their
+    lead-ins (for a pool that kept nothing: :mod:`app.services.kb_empty_check`);
+    None when precise retrieval cannot run here. The scores of a pool that kept
+    nothing for the same ``query`` and ``floor`` are reused while cached: the
+    cross-encoder over the candidates is most of the check's time when turns
+    run at once (A/B of 2026-10-29: 8.9 s of a check's 10 s at 6 concurrent)."""
+    from app.services import kb_retrieval as kr
+
+    index = kr.index_for(dm, kb_uuid)
+    if index is None or not kr.ready():
+        return None
+    cache_key = (kb_uuid, index.revision, index.count, index.built_at, ("best", query, n), floor)
+    hit = kr.cached(cache_key)
+    if hit is not None:
+        return hit
+    ranked = kr.cached(_ranked_key(index, kb_uuid, query, floor))
+    if ranked is None:
+        expanded = kr.expand(index, query)
+        ranked = kr.rerank(index, expanded, kr.candidates(dm, index, kb_uuid, expanded, floor=floor))
+    best = attach_lead_ins(dm, kb_uuid, ranked[:n])
+    kr.remember(cache_key, best)
+    return best
 
 
 def paraphrase_pool(dm, kb_uuid: str, query: str, phrases: list[str], *, k: int,

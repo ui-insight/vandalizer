@@ -224,6 +224,10 @@ class SystemConfig(Document):
     #       (chat_answer_repair). With it: "answer_repair_checker_model",
     #       "answer_repair_second_checker_model" (empty for none),
     #       "answer_repair_model", "answer_repair_second_check_seconds".
+    #   "empty_pool_check_enabled": bool (default False) — when a KB question
+    #       keeps no passage, even reworded, have a model read its best three
+    #       candidates and keep those it finds answer it (kb_empty_check).
+    #       With it: "empty_pool_check_model".
     # Missing keys mean "use the default" so deployments never need a
     # migration to pick up new phases.
     chat_config: dict = {}
