@@ -14,7 +14,7 @@ import datetime
 import hashlib
 import logging
 import random
-from typing import Any
+from typing import Any, overload
 from uuid import uuid4
 
 from app.models.kb_optimization_run import KBOptimizationRun
@@ -2068,6 +2068,14 @@ def _as_aware(dt: datetime.datetime | None) -> datetime.datetime | None:
     if dt.tzinfo is None:
         return dt.replace(tzinfo=datetime.timezone.utc)
     return dt
+
+
+@overload
+async def reap_one(run_doc: KBOptimizationRun) -> KBOptimizationRun: ...
+
+
+@overload
+async def reap_one(run_doc: None) -> None: ...
 
 
 async def reap_one(run_doc: KBOptimizationRun | None) -> KBOptimizationRun | None:

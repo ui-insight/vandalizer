@@ -26,7 +26,7 @@ class RecoveryWorkflow:
     def records(self) -> AsyncIOMotorCollection:
         return CertificationRecoveryRecord.get_motor_collection()
 
-    async def inspect(self, user_id: str, enrollment_id: str):
+    async def inspect(self, user_id: str, enrollment_id: str) -> dict:
         repo = self.repository
         enrollment = await repo._enrollment(user_id, enrollment_id)
         selection = await repo.selections.find_one({'user_id': user_id})
@@ -84,7 +84,7 @@ class RecoveryWorkflow:
         review['review_sha256'] = encode(review)[1]
         return review
 
-    async def history(self, user_id: str, enrollment_id: str):
+    async def history(self, user_id: str, enrollment_id: str) -> list[dict]:
         rows = await self.records.find({'user_id': user_id, 'enrollment_id': enrollment_id}).sort('created_at', -1).limit(10).to_list(10)
         results = []
         for row in rows:
@@ -97,7 +97,7 @@ class RecoveryWorkflow:
                 'result': AttemptRepository.payload(row, 'result') if row['state'] == 'completed' else None})
         return results
 
-    async def submit(self, actor_user_id: str, user_id: str, enrollment_id: str, *, request_id: str, review_sha256, reason):
+    async def submit(self, actor_user_id: str, user_id: str, enrollment_id: str, *, request_id: str, review_sha256: str, reason: str) -> dict:
         if not re.fullmatch(r'[a-f0-9]{32}', request_id) or not re.fullmatch(r'[a-f0-9]{64}', review_sha256):
             raise EnrollmentConflict('A valid recovery request and reviewed snapshot are required')
         if not isinstance(reason, str) or not 5 <= len(reason.strip()) <= 1000:

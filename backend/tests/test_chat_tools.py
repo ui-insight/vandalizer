@@ -303,7 +303,8 @@ class TestListKnowledgeBases:
         assert "mine" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_a_ready_kb_with_a_failed_source_says_so(self):
+    @pytest.mark.parametrize("has_timestamp", [True, False])
+    async def test_a_ready_kb_with_a_failed_source_says_so(self, has_timestamp):
         """Support ticket: chat called "Subaward Policies" "ready with 4 sources
         indexed" while its card read "3 of 4 sources ready · 1 needs attention".
         """
@@ -326,7 +327,7 @@ class TestListKnowledgeBases:
             {"name": "2 CFR 200.331", "status": "ready", "error": ""},
             {"name": "FDP Subaward Forms", "status": "error", "error": "HTTP 403 Forbidden"},
         ]
-        validated = SimpleNamespace(at=datetime.datetime(2026, 10, 2, 15, 0))
+        validated = SimpleNamespace(at=datetime.datetime(2026, 10, 2, 15, 0) if has_timestamp else None)
         with patch("app.services.knowledge_service.get_kb_manifest", AsyncMock(return_value=manifest)) as get_manifest, \
              patch("app.routers.knowledge._latest_runs_by_kb", AsyncMock(return_value={"kb-ok": validated})):
             await _add_source_health(entries)
@@ -337,7 +338,7 @@ class TestListKnowledgeBases:
             assert entry["failed_sources"] == [{"name": "FDP Subaward Forms", "reason": "HTTP 403 Forbidden"}]
             assert entry["last_validated"] is None
         assert "failed_sources" not in entries[2]
-        assert entries[2]["last_validated"] == "2026-10-02"
+        assert entries[2]["last_validated"] == ("2026-10-02" if has_timestamp else None)
 
     @pytest.mark.asyncio
     async def test_a_ready_kb_with_a_held_page_names_it(self):

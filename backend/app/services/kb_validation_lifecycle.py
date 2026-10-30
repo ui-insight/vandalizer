@@ -19,11 +19,11 @@ from app.models.validation_run import ValidationRun
 logger = logging.getLogger(__name__)
 
 
-def task_reference(receipt, *, resumed=False):
+def task_reference(receipt: KBValidationTask, *, resumed: bool = False) -> dict[str, object]:
     return {"task_id": receipt.uuid, "status": "queued", "options": receipt.options, "resumed": resumed}
 
 
-async def active_validation(kb_uuid: str, user_id: str):
+async def active_validation(kb_uuid: str, user_id: str) -> dict[str, object]:
     receipt = await KBValidationTask.find_one({"kb_uuid": kb_uuid, "user_id": user_id, "active": True})
     if receipt is None:
         recent = await KBValidationTask.find({"kb_uuid": kb_uuid, "user_id": user_id}).sort("-created_at").limit(1).to_list()
@@ -34,12 +34,12 @@ async def active_validation(kb_uuid: str, user_id: str):
     return {"task": {**outcome, "options": receipt.options}}
 
 
-async def finish_receipt(receipt, status) -> None:
+async def finish_receipt(receipt: KBValidationTask, status: str) -> None:
     if receipt.active or receipt.terminal_status != status:
         await receipt.set({"active": False, "terminal_status": status})
 
 
-async def existing_validation(kb_uuid: str, user_id: str, options: dict, request_id: str | None):
+async def existing_validation(kb_uuid: str, user_id: str, options: dict, request_id: str | None) -> dict[str, object] | None:
     if not request_id:
         return None
     try:
@@ -54,7 +54,7 @@ async def existing_validation(kb_uuid: str, user_id: str, options: dict, request
     return task_reference(prior)
 
 
-async def start_validation(kb_uuid: str, user_id: str, options: dict, request_id: str | None):
+async def start_validation(kb_uuid: str, user_id: str, options: dict, request_id: str | None) -> dict[str, object]:
     try:
         task_id = str(UUID(request_id)) if request_id else str(uuid4())
     except (ValueError, TypeError, AttributeError):
@@ -90,7 +90,7 @@ async def start_validation(kb_uuid: str, user_id: str, options: dict, request_id
     return task_reference(receipt)
 
 
-async def validation_status(kb_uuid: str, user_id: str, task_id: str):
+async def validation_status(kb_uuid: str, user_id: str, task_id: str) -> dict[str, object]:
     receipt = await KBValidationTask.find_one({"uuid": task_id, "kb_uuid": kb_uuid, "user_id": user_id})
     if receipt is None:
         raise HTTPException(404, "Validation task not found")

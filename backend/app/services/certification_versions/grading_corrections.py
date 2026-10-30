@@ -9,6 +9,7 @@ chooses which attempt to use. Grading stays automatic: no one sets a verdict.
 from pydantic import Field
 
 from .attempts import encode
+from .automatic_review import ReviewModel
 from .enrollments import EnrollmentConflict, EnrollmentRepository
 from .outcomes import ContractModel
 from .review_attempts import ReviewAttemptRepository
@@ -23,7 +24,7 @@ class GradingCorrectionRequest(ContractModel):
     reference: str = Field(min_length=3, max_length=200)
 
 
-def correction_view(saved) -> dict:
+def correction_view(saved: dict) -> dict:
     correction = saved['record'].get('grading_correction')
     result = saved['result'] or {}
     return {'attempt_id': saved['attempt_id'], 'state': saved['state'],
@@ -37,7 +38,7 @@ class GradingCorrections:
         self.repository = repository or EnrollmentRepository()
         self.attempts = ReviewAttemptRepository()
 
-    async def _graded(self, user_id: str, enrollment_id: str, attempt_id: str):
+    async def _graded(self, user_id: str, enrollment_id: str, attempt_id: str) -> dict:
         saved = await self.attempts.get(user_id, attempt_id)
         if saved is None or saved['record']['enrollment_id'] != enrollment_id:
             raise EnrollmentConflict('This saved assessment is unavailable for that enrollment')
@@ -58,19 +59,19 @@ class GradingCorrections:
                 'reviewer_implementation_sha256': saved['record']['reviewer'].get('implementation_sha256'),
                 'corrections': children}
 
-    async def submit(self, actor_user_id: str, user_id: str, enrollment_id: str, body, system_config, *, call_model=None):
-        body = GradingCorrectionRequest.model_validate(body)
-        await self._graded(user_id, enrollment_id, body.parent_attempt_id)
+    async def submit(self, actor_user_id: str, user_id: str, enrollment_id: str, body: object, system_config: dict, *, call_model: ReviewModel | None = None) -> dict:
+        request = GradingCorrectionRequest.model_validate(body)
+        await self._graded(user_id, enrollment_id, request.parent_attempt_id)
         correction = {'kind': 'supported_grading_correction', 'actor_user_id': actor_user_id,
-                      'reason': body.reason.strip(), 'reference': body.reference.strip(),
-                      'parent_result_sha256': body.parent_result_sha256}
+                      'reason': request.reason.strip(), 'reference': request.reference.strip(),
+                      'parent_result_sha256': request.parent_result_sha256}
         repository = self.repository
         async with repository.write_boundary(user_id, enrollment_id, operation='prepare_grading_correction') as progress:
             if progress.course_version is None:
                 raise EnrollmentConflict('This operation requires a bound course version')
             package = repository.catalog.load(progress.course_version)
             prepared = await self.attempts.prepare_correction(CourseOperation(user_id, package, progress, True),
-                body.parent_attempt_id, body.request_id, correction=correction, system_config=system_config)
+                request.parent_attempt_id, request.request_id, correction=correction, system_config=system_config)
         saved = await self.attempts.evaluate_saved(repository, user_id, enrollment_id, prepared['attempt_id'],
                                                    system_config, call_model=call_model)
         return correction_view(saved)

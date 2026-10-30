@@ -58,10 +58,11 @@ network-policy enforcement and deployment identity still need deployed QA.
 ## Typing
 
 The original mypy baseline was 3,141 errors. The dependency pass reduced it to
-3,098; the current follow-up reduces it to 2,693 across 524 source files. The
+3,098; the current follow-up reduces it to 2,448 across 524 source files. The
 models, schemas, database helpers, URL helpers and observability setup pass their
 focused type check. Workflow execution, automatic review, review persistence and
-review recovery now have no mypy diagnostics either. The full check remains
+review recovery, the knowledge-base API and the admin API now have no mypy
+diagnostics either. The full check remains
 advisory; the backlog is not clear.
 
 The follow-up adds validator, database, record-reader and execution contracts,
@@ -79,6 +80,12 @@ checks that the first call uses the primary model and the retry uses the fallbac
 Automatic-review completion and recovery also reject a disappeared saved receipt
 instead of returning `None` as a successful assessment. Structured review uses
 the SDK's explicit tool/output retry budgets, preserving one citation repair.
+
+API response contracts retain the previous FastAPI serialization settings.
+Knowledge-base access gates preserve optional organization ancestry; source
+version selection preserves full-record versus summary types. Admin analytics
+use explicit counter and identity-set types. Chat source-health summaries now
+handle validation records without a timestamp instead of failing the listing.
 
 ## Verification
 
@@ -98,6 +105,8 @@ the SDK's explicit tool/output retry budgets, preserving one citation repair.
   remaining public-host DNS test passed with network access. Automatic-review
   regressions: 38 passed. Review persistence, recovery, deduplication, result
   integrity and grading correction checks: 70 passed against disposable MongoDB.
+- Admin and knowledge-base contract regressions (including optimizer, chat,
+  source-history and validation-task checks): 403 passed.
 - Chroma's disposable container check passes locally and is included in CI.
   Its Compose renderer uses an empty temporary environment fixture so it
   never depends on or reads an operator's real `backend/.env`.

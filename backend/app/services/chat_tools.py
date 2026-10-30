@@ -955,7 +955,7 @@ async def _add_source_health(entries: list[dict]) -> None:
         if held.get(entry["uuid"]):
             entry["held_sources"] = held[entry["uuid"]]
         run = trust.get(entry["uuid"])
-        entry["last_validated"] = run.at.date().isoformat() if run else None
+        entry["last_validated"] = run.at.date().isoformat() if run and run.at is not None else None
 
 
 def _kb_matches(kb: KnowledgeBase, search: Optional[str]) -> bool:
