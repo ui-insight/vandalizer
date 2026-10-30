@@ -65,8 +65,8 @@ async def update_item(
     return LibraryItemResponse(**item)
 
 
-@router.post("/items/{item_id}/touch")
-async def touch_item(item_id: str, user: User = Depends(get_current_user)):
+@router.post("/items/{item_id}/touch", response_model=None)
+async def touch_item(item_id: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     """Record that a library item was just used."""
     ok = await svc.touch_item(item_id, user)
     if not ok:
@@ -150,8 +150,8 @@ async def create_folder(req: CreateFolderRequest, user: User = Depends(get_curre
     return folder
 
 
-@router.post("/folders/move-items")
-async def move_items(req: MoveItemsRequest, user: User = Depends(get_current_user)):
+@router.post("/folders/move-items", response_model=None)
+async def move_items(req: MoveItemsRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
     ok = await svc.move_items(req.item_ids, req.folder_uuid, user)
     if not ok:
         raise HTTPException(status_code=404, detail="Folder or item not found")
@@ -170,8 +170,8 @@ async def rename_folder(
     return folder
 
 
-@router.delete("/folders/{folder_uuid}")
-async def delete_folder(folder_uuid: str, user: User = Depends(get_current_user)):
+@router.delete("/folders/{folder_uuid}", response_model=None)
+async def delete_folder(folder_uuid: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     ok = await svc.delete_folder(folder_uuid, user)
     if not ok:
         raise HTTPException(status_code=404, detail="Folder not found")
@@ -216,8 +216,8 @@ async def update_library(
     return LibraryResponse(**lib)
 
 
-@router.delete("/{library_id}")
-async def delete_library(library_id: str, user: User = Depends(get_current_user)):
+@router.delete("/{library_id}", response_model=None)
+async def delete_library(library_id: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     ok = await svc.delete_library(library_id, user)
     if not ok:
         raise HTTPException(status_code=404, detail="Library not found")
@@ -273,13 +273,13 @@ async def list_items(
     return [LibraryItemResponse(**i) for i in items]
 
 
-@router.delete("/{library_id}/items/{item_id}")
+@router.delete("/{library_id}/items/{item_id}", response_model=None)
 async def remove_item(
     library_id: str,
     item_id: str,
     delete_underlying: bool = Query(False),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     try:
         ok = await svc.remove_item(
             library_id, item_id, user, delete_underlying=delete_underlying,

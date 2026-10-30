@@ -69,8 +69,8 @@ async def save_template(request: Request, body: SaveTemplate, user: User = Depen
     return page_templates.metadata(template, user.user_id)
 
 
-@router.get('/{uuid}')
-async def get_template(uuid: str, user: User = Depends(get_current_user)):
+@router.get('/{uuid}', response_model=None)
+async def get_template(uuid: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     template = await authorized(uuid, user)
     return {**page_templates.metadata(template, user.user_id), 'fields': template['fields'], 'guidance': template.get('guidance', '')}
 
@@ -84,8 +84,8 @@ async def template_content(uuid: str, user: User = Depends(get_current_user)):
         'X-Frame-Options': 'SAMEORIGIN', 'Referrer-Policy': 'no-referrer', 'X-Robots-Tag': 'noindex, nofollow'})
 
 
-@router.put('/{uuid}/team')
-async def share_template(uuid: str, body: TemplateAccess, user: User = Depends(get_current_user)):
+@router.put('/{uuid}/team', response_model=None)
+async def share_template(uuid: str, body: TemplateAccess, user: User = Depends(get_current_user)) -> dict[str, object]:
     await authorized(uuid, user, manage=True)
     if body.team_id and not access_control.can_view_team(body.team_id, await access_control.get_team_access_context(user)):
         raise HTTPException(404, 'Team not found')
@@ -93,8 +93,8 @@ async def share_template(uuid: str, body: TemplateAccess, user: User = Depends(g
     return {'ok': True}
 
 
-@router.delete('/{uuid}')
-async def delete_template(uuid: str, user: User = Depends(get_current_user)):
+@router.delete('/{uuid}', response_model=None)
+async def delete_template(uuid: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     await authorized(uuid, user, manage=True)
     await run(lambda db: db.page_templates.update_one({'uuid': uuid, 'user_id': user.user_id}, {'$set': {'deleted_at': datetime.now(timezone.utc), 'team_id': None, 'html': '', 'fields': [], 'tables': []}}))
     return {'ok': True}

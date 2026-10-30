@@ -19,8 +19,8 @@ class SubmitRatingRequest(BaseModel):
     search_set_uuid: Optional[str] = None
 
 
-@router.post("/submit_rating")
-async def submit_rating(req: SubmitRatingRequest, user: User = Depends(get_current_user)):
+@router.post("/submit_rating", response_model=None)
+async def submit_rating(req: SubmitRatingRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
     import json
     record = ExtractionQualityRecord(
         pdf_title=req.pdf_title,
@@ -96,10 +96,10 @@ class ProductFeedbackRequest(BaseModel):
     feature: Optional[str] = None
 
 
-@router.post("/product")
+@router.post("/product", response_model=None)
 async def submit_product_feedback(
     req: ProductFeedbackRequest, user: User = Depends(get_current_user)
-):
+) -> dict[str, object]:
     """Capture free-form positive / idea feedback. Deliberately does NOT create
     a support ticket, so praise never enters the triage queue or triggers the
     ticket email/Teams fan-out. It surfaces in the 'What's Working' admin feed."""
@@ -116,8 +116,8 @@ async def submit_product_feedback(
     return {"complete": True}
 
 
-@router.post("/chat")
-async def submit_chat_feedback(req: ChatFeedbackRequest, user: User = Depends(get_current_user)):
+@router.post("/chat", response_model=None)
+async def submit_chat_feedback(req: ChatFeedbackRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
     record = ChatFeedback(
         conversation_uuid=req.conversation_uuid,
         message_index=req.message_index,

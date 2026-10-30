@@ -253,7 +253,7 @@ async def copy_project_contents(
             uuid=new_doc_uuid,
             user_id=user_id,
             team_id=None,
-            folder=id_map.get(doc.folder),
+            folder=id_map.get(doc.folder) if doc.folder is not None else None,
             token_count=doc.token_count,
             num_pages=doc.num_pages,
             extraction_nonletter_ratio=doc.extraction_nonletter_ratio,
@@ -688,14 +688,15 @@ async def _resolve_pin_name(pin: ProjectPin) -> str | None:
     return None
 
 
-async def authorize_resource(pin_type, target_id, user):
+async def authorize_resource(pin_type: str, target_id: str, user: User) -> str:
     """Project references never confer access to their underlying resources."""
     if pin_type == "skill":
         from app.services.skill_service import authorize_skill
         return (await authorize_skill(target_id, user)).title
     from app.routers.artifacts import authorized
     from app.services.artifacts import revision
-    return revision(await authorized(target_id, user))["title"]
+    title: str = revision(await authorized(target_id, user))["title"]
+    return title
 
 
 async def list_pins(project: Project, user: User | None = None) -> list[dict]:
@@ -704,6 +705,7 @@ async def list_pins(project: Project, user: User | None = None) -> list[dict]:
     ).to_list()
     result = []
     for pin in pins:
+        name: str | None
         if pin.pin_type in ("skill", "artifact"):
             if user is None:
                 continue

@@ -12,7 +12,7 @@ from app.services import audit_service
 router = APIRouter()
 
 
-@router.get("/")
+@router.get("/", response_model=None)
 async def query_audit_log(
     action: Optional[str] = None,
     actor_user_id: Optional[str] = None,
@@ -24,7 +24,7 @@ async def query_audit_log(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Query audit log. Admin or staff (analytics role)."""
     if not (user.is_admin or user.is_staff):
         raise HTTPException(status_code=403, detail="Admin access required")
@@ -192,7 +192,7 @@ def _web_search_row(e) -> dict:
     }
 
 
-@router.get("/web-searches")
+@router.get("/web-searches", response_model=None)
 async def query_web_searches(
     feature: Optional[str] = None,
     status: Optional[str] = None,
@@ -203,7 +203,7 @@ async def query_web_searches(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Web searches sent to the provider, newest first, with counts by
     feature and status over the same filter. Admin or staff (analytics role)."""
     from app.models.web_search_usage import WebSearchUsage

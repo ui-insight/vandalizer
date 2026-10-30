@@ -29,11 +29,11 @@ async def update_space(
     return result
 
 
-@router.delete("/{space_uuid}")
+@router.delete("/{space_uuid}", response_model=None)
 async def delete_space(
     space_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     ok = await space_service.delete_space(space_uuid, user)
     if not ok:
         raise HTTPException(status_code=404, detail="Space not found")

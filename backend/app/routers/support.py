@@ -217,7 +217,7 @@ async def create_ticket(
     return _view(ticket, is_support)
 
 
-@router.get("/tickets")
+@router.get("/tickets", response_model=None)
 async def list_tickets(
     status: str | None = None,
     priority: str | None = None,
@@ -229,7 +229,7 @@ async def list_tickets(
     offset: int = 0,
     scope: str | None = None,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """List tickets.
 
     - Default: support users see all tickets, regular users see their own.
@@ -283,11 +283,11 @@ async def get_ticket(
     return _view(ticket, is_support)
 
 
-@router.post("/tickets/{ticket_uuid}/read")
+@router.post("/tickets/{ticket_uuid}/read", response_model=None)
 async def mark_ticket_read(
     ticket_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Mark a ticket as read by the current user."""
     ok = await support_service.mark_ticket_read(ticket_uuid, user.user_id)
     if not ok:
@@ -659,8 +659,8 @@ async def get_ticket_stats(user: User = Depends(get_current_user)):
     return await support_service.get_ticket_stats()
 
 
-@router.get("/tags")
-async def list_tags(user: User = Depends(get_current_user)):
+@router.get("/tags", response_model=None)
+async def list_tags(user: User = Depends(get_current_user)) -> dict[str, object]:
     """Return distinct tags currently in use across tickets. Support users only."""
     is_support = await _is_support_user(user)
     if not is_support:
@@ -668,8 +668,8 @@ async def list_tags(user: User = Depends(get_current_user)):
     return {"tags": await support_service.list_all_tags()}
 
 
-@router.get("/contacts")
-async def get_support_contacts(user: User = Depends(get_current_user)):
+@router.get("/contacts", response_model=None)
+async def get_support_contacts(user: User = Depends(get_current_user)) -> dict[str, object]:
     """Get list of support contacts (for admin config UI)."""
     is_support = await _is_support_user(user)
     if not is_support:

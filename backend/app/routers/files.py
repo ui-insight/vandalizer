@@ -26,8 +26,8 @@ from app.utils.content_disposition import content_disposition
 router = APIRouter()
 
 
-@router.get("/upload-policy")
-async def upload_policy(user: User = Depends(get_current_user), settings: Settings = Depends(get_settings)):
+@router.get("/upload-policy", response_model=None)
+async def upload_policy(user: User = Depends(get_current_user), settings: Settings = Depends(get_settings)) -> dict[str, object]:
     """The same deployment limits enforced by upload_document."""
     return {"extensions": sorted(ALLOWED_EXTS), "max_size_bytes": settings.max_upload_size_mb * 1024 * 1024}
 
@@ -245,13 +245,13 @@ async def usage(
     return result
 
 
-@router.delete("/{doc_uuid}")
+@router.delete("/{doc_uuid}", response_model=None)
 async def delete(
     doc_uuid: str,
     remove_from_knowledge_bases: bool = Query(False),
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-):
+) -> dict[str, object]:
     """Delete a document. Knowledge-base sources built from it keep their
     ingested copy — and keep answering — unless ``remove_from_knowledge_bases``
     is set, in which case they are removed from every KB the caller manages;
@@ -265,11 +265,11 @@ async def delete(
     return {"ok": True, "knowledge_bases_removed": removed, "knowledge_bases_kept": kept}
 
 
-@router.patch("/rename")
+@router.patch("/rename", response_model=None)
 async def rename(
     body: RenameDocumentRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     try:
         ok = await file_service.rename_document(body.uuid, body.newName, user=user)
     except ValueError as e:
@@ -279,11 +279,11 @@ async def rename(
     return {"ok": True}
 
 
-@router.patch("/move")
+@router.patch("/move", response_model=None)
 async def move(
     body: MoveFileRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     try:
         ok = await file_service.move_document(body.fileUUID, body.folderID, user=user)
     except ValueError as e:

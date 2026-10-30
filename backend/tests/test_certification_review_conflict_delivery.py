@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock
 import pytest
 from fastapi import HTTPException
 
+from app.services.certification_versions.practical_assessment import AssessmentSubmission, AssessmentRetrySubmission
 from app.services.certification_versions.review_attempts import ReviewAlreadyExists
 
 
@@ -21,8 +22,10 @@ async def test_module_review_conflict_keeps_owned_reference(monkeypatch, suffix,
     service = SimpleNamespace(request=AsyncMock(side_effect=conflict), retry=AsyncMock(side_effect=conflict))
     monkeypatch.setattr(routes, service_name, lambda: service)
     for kind in ('assess', 'retry'):
+        payload = (AssessmentRetrySubmission(request_id='b' * 32, consent='retry_saved_assessment')
+                   if kind == 'retry' else AssessmentSubmission(request_id='b' * 32, consent='assess_saved_work'))
         with pytest.raises(HTTPException) as caught:
-            await routes.action(SimpleNamespace(user_id='owner'), 'enrollment', payload=object(), reference='saved', kind=kind)
+            await routes.action(SimpleNamespace(user_id='owner'), 'enrollment', payload=payload, reference='saved', kind=kind)
         assert caught.value.status_code == 409
         assert caught.value.detail == conflict.detail
 
@@ -37,12 +40,14 @@ async def test_design_review_conflict_keeps_owned_reference(monkeypatch, kind):
     service = SimpleNamespace(request=AsyncMock(side_effect=conflict), retry=AsyncMock(side_effect=conflict))
     monkeypatch.setattr(service_module, service_name, lambda: service)
     for retry in (False, True):
+        payload = (AssessmentRetrySubmission(request_id='b' * 32, consent='retry_saved_assessment')
+                   if retry else AssessmentSubmission(request_id='b' * 32, consent='assess_saved_work'))
         with pytest.raises(HTTPException) as caught:
             if kind == 'process':
                 await routes._process_design_action(SimpleNamespace(user_id='owner'), 'enrollment',
-                    payload=object(), submission_id='saved', assessment=True, parent_id='parent' if retry else None)
+                    payload=payload, submission_id='saved', assessment=True, parent_id='parent' if retry else None)
             else:
                 await routes._workflow_design_action(SimpleNamespace(user_id='owner'), 'enrollment',
-                    payload=object(), reference='saved', action='retry' if retry else 'assess')
+                    payload=payload, reference='saved', action='retry' if retry else 'assess')
         assert caught.value.status_code == 409
         assert caught.value.detail == conflict.detail

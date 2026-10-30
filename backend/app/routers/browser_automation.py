@@ -56,8 +56,8 @@ async def _get_authorized_workflow_result(workflow_result_id: str, user: User) -
 # ---------------------------------------------------------------------------
 
 
-@router.post("/sessions")
-async def create_session(req: CreateSessionRequest, user: User = Depends(get_current_user)):
+@router.post("/sessions", response_model=None)
+async def create_session(req: CreateSessionRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
     from app.services.browser_automation import BrowserAutomationService
 
     workflow_result = await _get_authorized_workflow_result(req.workflow_result_id, user)
@@ -69,8 +69,8 @@ async def create_session(req: CreateSessionRequest, user: User = Depends(get_cur
     }
 
 
-@router.get("/sessions/{session_id}")
-async def get_session_status(session_id: str, user: User = Depends(get_current_user)):
+@router.get("/sessions/{session_id}", response_model=None)
+async def get_session_status(session_id: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     from app.services.browser_automation import BrowserAutomationService
 
     service = BrowserAutomationService.get_instance()
@@ -86,8 +86,8 @@ async def get_session_status(session_id: str, user: User = Depends(get_current_u
     }
 
 
-@router.post("/sessions/{session_id}/navigate")
-async def navigate_session(session_id: str, req: NavigateRequest, user: User = Depends(get_current_user)):
+@router.post("/sessions/{session_id}/navigate", response_model=None)
+async def navigate_session(session_id: str, req: NavigateRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
     from app.services.browser_automation import BrowserAutomationService
 
     service = BrowserAutomationService.get_instance()
@@ -101,8 +101,8 @@ async def navigate_session(session_id: str, req: NavigateRequest, user: User = D
     return {"status": "ok", "result": result}
 
 
-@router.post("/sessions/{session_id}/end")
-async def end_session(session_id: str, user: User = Depends(get_current_user)):
+@router.post("/sessions/{session_id}/end", response_model=None)
+async def end_session(session_id: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     from app.services.browser_automation import BrowserAutomationService
 
     service = BrowserAutomationService.get_instance()

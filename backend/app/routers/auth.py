@@ -224,13 +224,13 @@ async def register(
     return await _user_response(user)
 
 
-@router.post("/forgot-password")
+@router.post("/forgot-password", response_model=None)
 @limiter.limit("3/minute")
 async def forgot_password(
     request: Request,
     body: ForgotPasswordRequest,
     settings: Settings = Depends(get_settings),
-):
+) -> dict[str, object]:
     """Send a password reset (or set-password, for SSO-only users) email.
 
     Always returns success to avoid email enumeration. SSO-only users have
@@ -304,13 +304,13 @@ async def forgot_password(
     return {"ok": True}
 
 
-@router.post("/reset-password")
+@router.post("/reset-password", response_model=None)
 @limiter.limit("5/minute")
 async def reset_password(
     request: Request,
     body: ResetPasswordRequest,
     settings: Settings = Depends(get_settings),
-):
+) -> dict[str, object]:
     """Reset password using a token from the forgot-password email."""
     from app.utils.security import hash_password
 
@@ -391,8 +391,8 @@ async def magic_login(
     return response
 
 
-@router.post("/logout")
-async def logout(response: Response):
+@router.post("/logout", response_model=None)
+async def logout(response: Response) -> dict[str, object]:
     response.delete_cookie("access_token", path="/")
     response.delete_cookie("refresh_token", path="/")
     return {"ok": True}
@@ -530,14 +530,14 @@ async def delete_account_preflight(user: User = Depends(get_current_user)):
     return summary
 
 
-@router.post("/account/delete")
+@router.post("/account/delete", response_model=None)
 @limiter.limit("3/hour")
 async def delete_account(
     request: Request,
     body: DeleteAccountRequest,
     response: Response,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Permanently delete the current user's account and all data."""
     if body.confirmation != "DELETE MY ACCOUNT":
         raise HTTPException(status_code=400, detail="Confirmation text does not match.")
@@ -573,8 +573,8 @@ async def delete_account(
 _API_TOKEN_EXPIRY_DAYS = 365
 
 
-@router.post("/api-token/generate")
-async def generate_api_token(user: User = Depends(get_current_user)):
+@router.post("/api-token/generate", response_model=None)
+async def generate_api_token(user: User = Depends(get_current_user)) -> dict[str, object]:
     """Generate a new API token for the current user (expires in 365 days)."""
     try:
         from app.utils.security import hash_api_token
@@ -600,8 +600,8 @@ async def generate_api_token(user: User = Depends(get_current_user)):
         )
 
 
-@router.post("/api-token/revoke")
-async def revoke_api_token(user: User = Depends(get_current_user)):
+@router.post("/api-token/revoke", response_model=None)
+async def revoke_api_token(user: User = Depends(get_current_user)) -> dict[str, object]:
     """Revoke the current user's API token."""
     try:
         user.api_token_hash = None
@@ -618,8 +618,8 @@ async def revoke_api_token(user: User = Depends(get_current_user)):
         )
 
 
-@router.get("/api-token/status")
-async def api_token_status(user: User = Depends(get_current_user)):
+@router.get("/api-token/status", response_model=None)
+async def api_token_status(user: User = Depends(get_current_user)) -> dict[str, object]:
     """Check if the current user has an active API token."""
     try:
         now = datetime.datetime.now(datetime.timezone.utc)
@@ -697,8 +697,8 @@ def _get_saml_provider(config: SystemConfig) -> dict | None:
     return None
 
 
-@router.get("/config")
-async def auth_config():
+@router.get("/config", response_model=None)
+async def auth_config() -> dict[str, object]:
     """Public endpoint  - returns which auth methods are available."""
     config = await SystemConfig.get_config()
     providers = []

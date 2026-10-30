@@ -107,9 +107,9 @@ async def create_artifact(request: Request, body: CreateArtifactRequest, user: U
                                         {"kind": "editor", "project_uuid": body.project_uuid}), True)
 
 
-@router.post("/from-chat")
+@router.post("/from-chat", response_model=None)
 @limiter.limit("20/minute")
-async def chat_artifact(request: Request, body: ChatArtifactRequest, user: User = Depends(get_current_user)):
+async def chat_artifact(request: Request, body: ChatArtifactRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
     await authorized_project(body.project_uuid, user)
     conversation = None
     if body.conversation_uuid:
@@ -149,8 +149,8 @@ async def public_doc(token, settings):
     return doc, artifacts.revision(doc, selected)
 
 
-@router.get("/public/{token}")
-async def get_public(token: str, response: Response, settings: Settings = Depends(get_settings)):
+@router.get("/public/{token}", response_model=None)
+async def get_public(token: str, response: Response, settings: Settings = Depends(get_settings)) -> dict[str, object]:
     doc, rev = await public_doc(token, settings)
     # Mongo may return naive UTC datetimes. Never use the page's updated_at:
     # it advances when an owner saves a private draft.
@@ -175,8 +175,8 @@ async def public_content(token: str, download: bool = False, revision: str | Non
     return content_response(rev, download, version=version, view=view)
 
 
-@router.get("/{uuid}")
-async def get_artifact(uuid: str, user: User = Depends(get_current_user), settings: Settings = Depends(get_settings)):
+@router.get("/{uuid}", response_model=None)
+async def get_artifact(uuid: str, user: User = Depends(get_current_user), settings: Settings = Depends(get_settings)) -> dict[str, object]:
     doc = await authorized(uuid, user)
     return {**artifacts.metadata(doc, doc["user_id"] == user.user_id), "public_sharing_enabled": settings.artifact_public_sharing_enabled}
 
@@ -190,8 +190,8 @@ async def private_content(uuid: str, revision: str, download: bool = False,
     return content_response(rev, download, version=version, view=view)
 
 
-@router.get("/{uuid}/revisions/{revision}/source")
-async def revision_source(uuid: str, revision: str, user: User = Depends(get_current_user)):
+@router.get("/{uuid}/revisions/{revision}/source", response_model=None)
+async def revision_source(uuid: str, revision: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     doc = await authorized(uuid, user, manage=True)
     rev = artifacts.revision(doc, revision)
     return {"title": (doc.get("title") or rev["title"]) if revision == doc["latest_revision"] else rev["title"], "html": rev["html"]}
@@ -217,8 +217,8 @@ async def revise_artifact(request: Request, uuid: str, body: ReviseArtifactReque
     return artifacts.metadata(await run(artifacts.revise, doc, body.title, body.html, body.base_revision), True)
 
 
-@router.put("/{uuid}/team")
-async def share_team(uuid: str, body: ShareArtifactRequest, user: User = Depends(get_current_user)):
+@router.put("/{uuid}/team", response_model=None)
+async def share_team(uuid: str, body: ShareArtifactRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
     doc = await authorized(uuid, user, manage=True)
     if body.team_id and not access_control.can_view_team(body.team_id, await access_control.get_team_access_context(user)):
         raise HTTPException(404, "Team not found")
@@ -237,8 +237,8 @@ async def publish(uuid: str, body: PublishArtifactRequest, user: User = Depends(
     return artifacts.metadata(saved, True)
 
 
-@router.delete("/{uuid}/publication")
-async def unpublish(uuid: str, revision: str | None = Query(default=None, min_length=1, max_length=64), user: User = Depends(get_current_user)):
+@router.delete("/{uuid}/publication", response_model=None)
+async def unpublish(uuid: str, revision: str | None = Query(default=None, min_length=1, max_length=64), user: User = Depends(get_current_user)) -> dict[str, object]:
     doc = await authorized(uuid, user, manage=True)
     if revision is not None:
         await run(artifacts.unpublish_separate, doc, revision)
@@ -247,8 +247,8 @@ async def unpublish(uuid: str, revision: str | None = Query(default=None, min_le
     return {"ok": True}
 
 
-@router.delete("/{uuid}")
-async def delete_artifact(uuid: str, user: User = Depends(get_current_user)):
+@router.delete("/{uuid}", response_model=None)
+async def delete_artifact(uuid: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     from datetime import datetime, timezone
     await authorized(uuid, user, manage=True)
     await run(lambda db: db.html_artifacts.update_one({"uuid": uuid, "user_id": user.user_id}, {"$set": {

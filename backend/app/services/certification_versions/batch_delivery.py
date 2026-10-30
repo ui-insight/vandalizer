@@ -1,4 +1,10 @@
 """Owned Batch learner actions and preserved source/run history."""
+from app.models.certification import CertificationEnrollment
+from .catalog import CoursePackage
+from .batch_case import BatchCase
+from .batch_preparation import BatchPlanRequest
+from .batch_execution import BatchExecutionRequest
+from .batch_approval import BatchScopeRequest
 import base64
 
 from .source_access import owned_source
@@ -31,7 +37,7 @@ class BatchDelivery:
         self.scopes = BatchScopeRepository()
         self.reviews = BatchReviewRepository()
 
-    async def course(self, user_id: str, enrollment_id: str):
+    async def course(self, user_id: str, enrollment_id: str) -> tuple[CertificationEnrollment, CoursePackage, BatchCase]:
         enrollment = await self.repository._enrollment(user_id, enrollment_id)
         package = self.repository.catalog.load(enrollment.course_version)
         if 'batch-cases/batch_processing.json' not in package.manifest.artifacts:
@@ -39,26 +45,26 @@ class BatchDelivery:
         return enrollment, package, load_batch_case(package)
 
     @staticmethod
-    def verify(record, enrollment, case) -> None:
+    def verify(record: dict, enrollment: CertificationEnrollment, case: BatchCase) -> None:
         if (any(record[key] != value for key, value in {'user_id': enrollment.user_id,
                 'enrollment_id': enrollment.uuid, 'course_version': enrollment.course_version,
                 'manifest_sha256': enrollment.manifest_sha256, 'module_id': 'batch_processing'}.items())
                 or record.get('case', record.get('input_snapshot', {}).get('case')) != case.public_definition()):
             raise CourseCatalogError('This saved batch work differs from its original course')
 
-    async def writable(self, enrollment, enabled) -> bool:
+    async def writable(self, enrollment: CertificationEnrollment, enabled: bool) -> bool:
         selection = await self.repository.selections.find_one({'user_id': enrollment.user_id})
         return bool(enabled and enrollment.state in ('active', 'completed') and selection
                     and selection.get('active_enrollment_id') == enrollment.uuid)
 
     @staticmethod
-    def capture_view(saved):
+    def capture_view(saved: dict) -> dict:
         return {key: saved[key] for key in ('uuid', 'enrollment_id', 'module_id', 'course_version', 'manifest_sha256',
             'case', 'artifact_id', 'artifact_sha256', 'artifact', 'captured_at', 'scope_review')} | {
             'documents': [{key: value for key, value in source.items() if key != 'source_pdf_base64'} for source in saved['documents']],
             'input_snapshot_sha256': encode(saved)[1], 'execution_authorized': False, 'credit_awarded': False}
 
-    async def run_view(self, run, *, writable: bool=False) -> dict:
+    async def run_view(self, run: dict, *, writable: bool=False) -> dict:
         plan = run['plan']
         scope = run['authorization']['decision'] if run['authorization'] else None
         if scope is None and run['scope_decision_id']:
@@ -88,7 +94,7 @@ class BatchDelivery:
     def repositories(self) -> dict:
         return {'capture': self.inputs, 'run': self.runs, 'scope': self.scopes, 'review': self.reviews}
 
-    async def get(self, user_id: str, enrollment_id: str, reference: str, *, kind: str='review', delivery_enabled: bool=False):
+    async def get(self, user_id: str, enrollment_id: str, reference: str, *, kind: str='review', delivery_enabled: bool=False) -> dict:
         enrollment, _, case = await self.course(user_id, enrollment_id)
         saved = await self.repositories()[kind].get(user_id, reference)
         if saved is None:
@@ -111,7 +117,7 @@ class BatchDelivery:
     async def list(self, user_id: str, enrollment_id: str, *, delivery_enabled: bool=False) -> dict:
         enrollment, package, case = await self.course(user_id, enrollment_id)
         query = {'user_id': user_id, 'enrollment_id': enrollment_id, 'module_id': 'batch_processing'}
-        result = {'enrollment_id': enrollment_id, 'module_id': 'batch_processing', 'course_version': enrollment.course_version,
+        result: dict[str, object] = {'enrollment_id': enrollment_id, 'module_id': 'batch_processing', 'course_version': enrollment.course_version,
                   'manifest_sha256': enrollment.manifest_sha256, 'case': case.public_definition()}
         for kind, repository, selector in (
                 ('captures', self.inputs, {'record_kind': 'batch_extraction_input'}),
@@ -157,7 +163,7 @@ class BatchDelivery:
                 'assigned_sources': sources, 'proposed_scope': proposed, 'older_extractions_available': len(owned) > 50, 'can_submit': writable,
                 'read_only_reason': None if writable else 'This is preserved course history. Select an available current course before saving new work.'}
 
-    async def download(self, user_id: str, enrollment_id: str, reference: str, *, origin, source_id: str):
+    async def download(self, user_id: str, enrollment_id: str, reference: str, *, origin: str, source_id: str) -> tuple[bytes, str]:
         enrollment, _, case = await self.course(user_id, enrollment_id)
         saved = await self.repositories()[origin].get(user_id, reference)
         if saved is None:
@@ -175,7 +181,7 @@ class BatchDelivery:
             raise BatchUnavailable('This source is not a member of the original assigned inventory')
         return base64.b64decode(source['source_pdf_base64'], validate=True), source['assigned_filename']
 
-    async def save(self, user_id: str, enrollment_id: str, payload, *, action):
+    async def save(self, user_id: str, enrollment_id: str, payload: object, *, action: str) -> dict:
         current = await self.repository.current(user_id)
         if current is None or current.uuid != enrollment_id:
             raise EnrollmentConflict('Select your existing course before saving or executing batch work')
@@ -188,20 +194,25 @@ class BatchDelivery:
                 saved = await self.reviews.submit(operation, payload, actor_user_id=user_id)
                 return await self.get(user_id, enrollment_id, saved['uuid'])
             if action == 'prepare':
-                existing = await self.runs.records.find_one({'uuid': payload.request_id})
+                prepare_request = BatchPlanRequest.model_validate(payload)
+                existing = await self.runs.records.find_one({'uuid': prepare_request.request_id})
                 config = {} if existing else await practical_preparation.configured_runtime()
-                saved = await self.runs.prepare(operation, payload, config, actor_user_id=user_id)
+                saved = await self.runs.prepare(operation, prepare_request, config, actor_user_id=user_id)
             elif action == 'scope':
-                await self.scopes.submit(operation, payload, actor_user_id=user_id)
-                saved = await self.runs.get(user_id, payload.run_id)
+                scope_request = BatchScopeRequest.model_validate(payload)
+                await self.scopes.submit(operation, scope_request, actor_user_id=user_id)
+                saved = await self.runs.get(user_id, scope_request.run_id)
             elif action == 'execute':
-                existing = await self.runs.get(user_id, payload.run_id)
+                execute_request = BatchExecutionRequest.model_validate(payload)
+                existing = await self.runs.get(user_id, execute_request.run_id)
                 config = await practical_preparation.configured_runtime() if existing and existing['state'] == 'prepared' else {}
-                saved = await self.runs.execute(operation, payload, config, actor_user_id=user_id)
+                saved = await self.runs.execute(operation, execute_request, config, actor_user_id=user_id)
             elif action == 'finalize':
                 saved = await BatchRecovery().finalize(operation, payload, actor_user_id=user_id)
             else:
                 raise ValueError('Unsupported batch action')
+            if saved is None:
+                raise EnrollmentConflict('The saved execution is no longer available')
             return await self.run_view(saved, writable=True)
 
 

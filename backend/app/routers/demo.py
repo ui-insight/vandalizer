@@ -31,8 +31,8 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 
 
-@router.get("/feedback/{token}")
-async def get_feedback(token: str):
+@router.get("/feedback/{token}", response_model=None)
+async def get_feedback(token: str) -> dict[str, object]:
     """Validate a feedback token and return application info."""
     app = await demo_service.get_feedback_application(token)
     if not app:
@@ -173,13 +173,13 @@ async def in_app_topup(
     )
 
 
-@router.post("/resend-verification")
+@router.post("/resend-verification", response_model=None)
 @limiter.limit("3/minute")
 async def resend_verification(
     request: Request,
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-):
+) -> dict[str, object]:
     """Re-send the confirm-your-email link to the signed-in trial user.
 
     Always 200 with an `ok` flag: the caller is already authenticated, so
@@ -241,8 +241,8 @@ async def admin_applications(
     return await demo_service.admin_list_applications(status_filter)
 
 
-@router.post("/admin/release/{demo_uuid}")
-async def admin_release(demo_uuid: str, user: User = Depends(get_current_user)):
+@router.post("/admin/release/{demo_uuid}", response_model=None)
+async def admin_release(demo_uuid: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     """Stop metering a finished trial user so they can use AI again."""
     _require_admin(user)
     success = await demo_service.admin_release_user(demo_uuid)
@@ -253,8 +253,8 @@ async def admin_release(demo_uuid: str, user: User = Depends(get_current_user)):
     return {"ok": True}
 
 
-@router.post("/admin/promote/{demo_uuid}")
-async def admin_promote(demo_uuid: str, user: User = Depends(get_current_user)):
+@router.post("/admin/promote/{demo_uuid}", response_model=None)
+async def admin_promote(demo_uuid: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     """Promote a demo/trial user to a permanent full user (clears demo flags)."""
     _require_admin(user)
     success = await demo_service.admin_promote_user(demo_uuid)
@@ -265,8 +265,8 @@ async def admin_promote(demo_uuid: str, user: User = Depends(get_current_user)):
     return {"ok": True}
 
 
-@router.post("/admin/restart-trial/{demo_uuid}")
-async def admin_restart_trial(demo_uuid: str, user: User = Depends(get_current_user)):
+@router.post("/admin/restart-trial/{demo_uuid}", response_model=None)
+async def admin_restart_trial(demo_uuid: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     """Restart the trial for an expired demo user (reset to 14 days)."""
     _require_admin(user)
     success = await demo_service.admin_restart_trial(demo_uuid)
@@ -278,12 +278,12 @@ async def admin_restart_trial(demo_uuid: str, user: User = Depends(get_current_u
     return {"ok": True}
 
 
-@router.post("/admin/add-user")
+@router.post("/admin/add-user", response_model=None)
 async def admin_add_user(
     body: AdminAddDemoUserRequest,
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-):
+) -> dict[str, object]:
     """Directly add a user to the demo trial by name and email."""
     _require_admin(user)
     try:
@@ -298,12 +298,12 @@ async def admin_add_user(
     return {"ok": True, "uuid": app.uuid}
 
 
-@router.post("/admin/activate/{demo_uuid}")
+@router.post("/admin/activate/{demo_uuid}", response_model=None)
 async def admin_activate(
     demo_uuid: str,
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-):
+) -> dict[str, object]:
     """Manually activate a waitlisted user (skip queue)."""
     _require_admin(user)
     success = await demo_service.admin_activate_user(demo_uuid, settings)
@@ -315,12 +315,12 @@ async def admin_activate(
     return {"ok": True}
 
 
-@router.post("/admin/test-email")
+@router.post("/admin/test-email", response_model=None)
 async def admin_test_email(
     to: str = Query(..., description="Recipient email address"),
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-):
+) -> dict[str, object]:
     """Send a test email to verify SMTP deliverability."""
     _require_admin(user)
     success = await demo_service.send_test_email(to, settings)
@@ -332,11 +332,11 @@ async def admin_test_email(
     return {"ok": True, "message": f"Test email sent to {to}"}
 
 
-@router.post("/admin/bulk-resend-credentials")
+@router.post("/admin/bulk-resend-credentials", response_model=None)
 async def admin_bulk_resend_credentials(
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-):
+) -> dict[str, object]:
     """Resend fresh magic sign-in links to all active demo users who have
     never logged in. Use after fixing deliverability issues."""
     _require_admin(user)
@@ -344,12 +344,12 @@ async def admin_bulk_resend_credentials(
     return {"ok": True, **result}
 
 
-@router.post("/admin/magic-link/{demo_uuid}")
+@router.post("/admin/magic-link/{demo_uuid}", response_model=None)
 async def admin_magic_link(
     demo_uuid: str,
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-):
+) -> dict[str, object]:
     """Generate a one-time magic login link for a demo user."""
     _require_admin(user)
     url = await demo_service.generate_magic_link(demo_uuid, settings)
@@ -361,11 +361,11 @@ async def admin_magic_link(
     return {"ok": True, "url": url}
 
 
-@router.post("/admin/recapture")
+@router.post("/admin/recapture", response_model=None)
 async def admin_trigger_recapture(
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-):
+) -> dict[str, object]:
     """Enqueue recapture drips for all active demo users who haven't logged in.
 
     Use this after fixing SMTP issues to re-engage users who missed emails.

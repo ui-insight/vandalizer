@@ -1,4 +1,9 @@
 """Authenticated capstone learner actions, exact downloads and preserved read-only history."""
+from app.models.certification import CertificationEnrollment
+from .catalog import CoursePackage
+from .governance_case import GovernanceCase
+from .governance_preparation import GovernancePlanRequest
+from .governance_execution import GovernanceExecutionRequest
 import base64
 
 from .source_access import owned_source
@@ -40,7 +45,7 @@ class GovernanceDelivery:
         return {'capture': self.inputs, 'run': self.runs, 'scope': self.scopes, 'correction': self.corrections,
             'finding': self.findings, 'memo': self.memos, 'release': self.releases, 'handoff': self.handoffs, 'review': self.reviews}
 
-    async def course(self, user_id: str, enrollment_id: str):
+    async def course(self, user_id: str, enrollment_id: str) -> tuple[CertificationEnrollment, CoursePackage, GovernanceCase]:
         enrollment = await self.repository._enrollment(user_id, enrollment_id)
         package = self.repository.catalog.load(enrollment.course_version)
         if 'governance-cases/governance.json' not in package.manifest.artifacts:
@@ -48,24 +53,24 @@ class GovernanceDelivery:
         return enrollment, package, load_governance_case(package)
 
     @staticmethod
-    def verify(record, enrollment, case) -> None:
+    def verify(record: dict, enrollment: CertificationEnrollment, case: GovernanceCase) -> None:
         if (any(record[k] != v for k, v in {'user_id': enrollment.user_id, 'enrollment_id': enrollment.uuid,
                 'course_version': enrollment.course_version, 'manifest_sha256': enrollment.manifest_sha256, 'module_id': 'governance'}.items())
                 or (record['case_sha256'] != case.digest if 'case_sha256' in record else record['case'] != case.public_definition())):
             raise CourseCatalogError('The saved capstone record differs from its original course')
 
-    async def writable(self, enrollment, enabled) -> bool:
+    async def writable(self, enrollment: CertificationEnrollment, enabled: bool) -> bool:
         selection = await self.repository.selections.find_one({'user_id': enrollment.user_id})
         return bool(enabled and enrollment.state in ('active', 'completed') and selection and selection.get('active_enrollment_id') == enrollment.uuid)
 
     @staticmethod
-    def capture_view(saved):
+    def capture_view(saved: dict) -> dict:
         return {k: saved[k] for k in ('uuid', 'enrollment_id', 'module_id', 'course_version', 'manifest_sha256', 'case',
             'artifact_id', 'artifact_sha256', 'artifact', 'captured_at')} | {
             'documents': [{k: v for k, v in s.items() if k != 'source_pdf_base64'} for s in saved['documents']],
             'input_snapshot_sha256': encode(saved)[1], 'execution_authorized': False, 'credit_awarded': False}
 
-    async def run_view(self, run, *, writable: bool=False) -> dict:
+    async def run_view(self, run: dict, *, writable: bool=False) -> dict:
         plan = run['plan']
         scope = run['authorization']['decision'] if run['authorization'] else None
         if scope is None and run['scope_decision_id']:
@@ -88,7 +93,7 @@ class GovernanceDelivery:
                 and run['extraction_events'][-1]['receipt']['result']['status'] == 'completed'),
             'credit_awarded': False, 'module_completion_eligible': False}
 
-    async def record_view(self, kind, saved):
+    async def record_view(self, kind: str, saved: dict) -> dict:
         # Only explicitly shaped nested views cross HTTP. Serialized raw records
         # contain complete PDF bytes and private authored expectations.
         excluded = {'execution', 'input_snapshot', 'memo', 'release', 'handoff', 'previous_failed_receipt', 'file', 'destination_copy'}
@@ -111,7 +116,7 @@ class GovernanceDelivery:
             result['handoff'] = await self.record_view('handoff', saved['handoff'])
         return result
 
-    async def get(self, user_id: str, enrollment_id: str, reference: str, *, kind: str='review', delivery_enabled: bool=False):
+    async def get(self, user_id: str, enrollment_id: str, reference: str, *, kind: str='review', delivery_enabled: bool=False) -> dict:
         enrollment, _, case = await self.course(user_id, enrollment_id)
         saved = await self.repositories()[kind].get(user_id, reference)
         if saved is None:
@@ -126,8 +131,9 @@ class GovernanceDelivery:
     async def list(self, user_id: str, enrollment_id: str, *, delivery_enabled: bool=False) -> dict:
         enrollment, _, case = await self.course(user_id, enrollment_id)
         query = {'user_id': user_id, 'enrollment_id': enrollment_id, 'module_id': 'governance'}
-        result = {'enrollment_id': enrollment_id, 'module_id': 'governance', 'course_version': enrollment.course_version,
-            'manifest_sha256': enrollment.manifest_sha256, 'case': case.public_definition(), 'records': {}}
+        records: dict[str, dict[str, object]] = {}
+        result: dict[str, object] = {'enrollment_id': enrollment_id, 'module_id': 'governance', 'course_version': enrollment.course_version,
+            'manifest_sha256': enrollment.manifest_sha256, 'case': case.public_definition(), 'records': records}
         for kind, repository in self.repositories().items():
             selector = ({'record_kind': 'governance_extraction_input'} if kind == 'capture' else {} if kind == 'run' else
                 {'prompt_id': {'scope': 'governance_execution_approval', 'correction': 'governance_scope_correction',
@@ -144,7 +150,7 @@ class GovernanceDelivery:
                     'run_id': saved.get('run_id'), 'state': saved.get('state', saved.get('status')),
                     'phase': record.get('phase'), 'artifact_title': record.get('artifact', {}).get('title'),
                     'memo_id': record.get('submission', {}).get('memo_id'), 'previous_submission_id': record.get('submission', {}).get('previous_submission_id')})
-            result['records'][kind] = {'items': summaries, 'older_available': len(rows) > 50}
+            records[kind] = {'items': summaries, 'older_available': len(rows) > 50}
         writable = await self.writable(enrollment, delivery_enabled)
         owned = await SearchSet.find({'user_id': user_id, 'set_type': 'extraction'}).sort('-updated_at').limit(51).to_list() if writable else []
         sources = []
@@ -159,7 +165,7 @@ class GovernanceDelivery:
             'assigned_sources': sources, 'older_extractions_available': len(owned) > 50, 'can_submit': writable,
             'read_only_reason': None if writable else 'This is preserved course history. Select an available current course before saving new work.'}
 
-    async def download(self, user_id: str, enrollment_id: str, reference: str, *, origin, source_id: str | None=None):
+    async def download(self, user_id: str, enrollment_id: str, reference: str, *, origin: str, source_id: str | None=None) -> tuple[bytes, str, str]:
         enrollment, _, case = await self.course(user_id, enrollment_id)
         saved = await self.repositories()[origin].get(user_id, reference)
         if saved is None:
@@ -189,7 +195,7 @@ class GovernanceDelivery:
             raise GovernanceUnavailable('This record has no confirmed saved memo copy')
         return base64.b64decode(file['content_base64'], validate=True), file['filename'], file['content_type']
 
-    async def save(self, user_id: str, enrollment_id: str, payload, *, action):
+    async def save(self, user_id: str, enrollment_id: str, payload: object, *, action: str) -> dict:
         current = await self.repository.current(user_id)
         if current is None or current.uuid != enrollment_id:
             raise EnrollmentConflict('Select your existing course before saving or executing capstone work')
@@ -202,17 +208,21 @@ class GovernanceDelivery:
                 saved = await self.repositories()[action].submit(operation, payload, actor_user_id=user_id)
                 return await self.record_view(action, saved)
             if action == 'prepare':
-                existing = await self.runs.records.find_one({'uuid': payload.request_id})
+                prepare_request = GovernancePlanRequest.model_validate(payload)
+                existing = await self.runs.records.find_one({'uuid': prepare_request.request_id})
                 config = {} if existing else await practical_preparation.configured_runtime()
-                saved = await self.runs.prepare(operation, payload, config, actor_user_id=user_id)
+                saved = await self.runs.prepare(operation, prepare_request, config, actor_user_id=user_id)
             elif action == 'execute':
-                existing = await self.runs.get(user_id, payload.run_id)
+                execute_request = GovernanceExecutionRequest.model_validate(payload)
+                existing = await self.runs.get(user_id, execute_request.run_id)
                 config = await practical_preparation.configured_runtime() if existing and existing['state'] == 'prepared' else {}
-                saved = await self.runs.execute(operation, payload, config, actor_user_id=user_id)
+                saved = await self.runs.execute(operation, execute_request, config, actor_user_id=user_id)
             elif action == 'finalize':
                 saved = await GovernanceRecovery().finalize(operation, payload, actor_user_id=user_id)
             else:
                 raise ValueError('Unsupported capstone action')
+            if saved is None:
+                raise EnrollmentConflict('The saved execution is no longer available')
             return await self.run_view(saved, writable=True)
 
 

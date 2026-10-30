@@ -58,13 +58,15 @@ network-policy enforcement and deployment identity still need deployed QA.
 ## Typing
 
 The original mypy baseline was 3,141 errors. The dependency pass reduced it to
-3,098; the current follow-up reduces it to 2,152 across 524 source files. The
+3,098; the current follow-up reduces it to 1,767 across 524 source files. The
 models, schemas, database helpers, URL helpers and observability setup pass their
 focused type check. Workflow execution, automatic review, review persistence and
 review recovery, and the knowledge-base, admin, workflow and Home/config APIs
 now have no mypy diagnostics either. The main certification API, course-operation
 decorator, preparation/execution services, design delivery and saved-review
-delivery also pass their checks. Invalid principals fail before learner storage
+delivery also pass their checks. The six module delivery APIs, project, team,
+organization and Skill contracts are now clean, and 131 additional JSON-object
+HTTP endpoints have explicit return types. Invalid principals fail before learner storage
 is accessed; 18 regressions cover internal, HTTP and tool error handling. The full check remains
 advisory; the backlog is not clear.
 
@@ -114,6 +116,10 @@ continue to use their existing Pydantic validation at the API boundary.
 - Admin and knowledge-base contract regressions (including optimizer, chat,
   source-history and validation-task checks): 403 passed.
 - Workflow, Home, config and project-context contract regressions: 1,038 passed.
+- Certification API and module-delivery regressions: 1,574 passed, including
+  18 invalid-principal checks and preserved owned-review conflict responses.
+- Project, team, organization, Skill and exception regressions: 211 passed,
+  two skipped.
 - Chroma's disposable container check passes locally and is included in CI.
   Its Compose renderer uses an empty temporary environment fixture so it
   never depends on or reads an operator's real `backend/.env`.

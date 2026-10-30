@@ -31,8 +31,8 @@ def _require_admin(user: User) -> User:
 # ------------------------------------------------------------------
 
 
-@router.get("/pending")
-async def get_pending_prompt(user: User = Depends(get_current_user)):
+@router.get("/pending", response_model=None)
+async def get_pending_prompt(user: User = Depends(get_current_user)) -> dict[str, object]:
     """Return the next eligible feedback prompt for this demo user, or null."""
     if not user.is_demo_user:
         return {"prompt": None}
@@ -109,8 +109,8 @@ async def show_prompt(slug: str, user: User = Depends(get_current_user)):
     return result
 
 
-@router.post("/{slug}/dismiss")
-async def dismiss_prompt(slug: str, user: User = Depends(get_current_user)):
+@router.post("/{slug}/dismiss", response_model=None)
+async def dismiss_prompt(slug: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     """Dismiss a feedback prompt so it won't be shown again."""
     _require_demo_user(user)
     ok = await svc.dismiss_prompt(user, slug)

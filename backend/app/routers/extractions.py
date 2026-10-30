@@ -215,8 +215,8 @@ async def update_search_set(uuid: str, req: UpdateSearchSetRequest, user: User =
     return await _ss_response(ss)
 
 
-@router.delete("/search-sets/{uuid}")
-async def delete_search_set(uuid: str, user: User = Depends(get_current_user)):
+@router.delete("/search-sets/{uuid}", response_model=None)
+async def delete_search_set(uuid: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     ss = await _get_search_set_or_404(uuid, user, manage=True)
     ok = await svc.delete_search_set(uuid)
     if not ok:
@@ -917,8 +917,8 @@ async def update_item(item_id: str, req: UpdateSearchSetItemRequest, user: User 
     )
 
 
-@router.post("/search-sets/{uuid}/reorder-items")
-async def reorder_items(uuid: str, req: ReorderItemsRequest, user: User = Depends(get_current_user)):
+@router.post("/search-sets/{uuid}/reorder-items", response_model=None)
+async def reorder_items(uuid: str, req: ReorderItemsRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
     await _get_search_set_or_404(uuid, user, manage=True)
     ok = await svc.reorder_items(uuid, req.item_ids)
     if not ok:
@@ -926,8 +926,8 @@ async def reorder_items(uuid: str, req: ReorderItemsRequest, user: User = Depend
     return {"ok": True}
 
 
-@router.delete("/items/{item_id}")
-async def delete_item(item_id: str, user: User = Depends(get_current_user)):
+@router.delete("/items/{item_id}", response_model=None)
+async def delete_item(item_id: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     await _get_search_set_item_or_404(item_id, user)
     ok = await svc.delete_item(item_id)
     if not ok:
@@ -939,9 +939,9 @@ async def delete_item(item_id: str, user: User = Depends(get_current_user)):
 # Extraction execution
 # ---------------------------------------------------------------------------
 
-@router.post("/search-sets/{uuid}/build-from-document")
+@router.post("/search-sets/{uuid}/build-from-document", response_model=None)
 @limiter.limit("10/minute")
-async def build_from_document(request: Request, uuid: str, req: BuildFromDocumentRequest, user: User = Depends(get_current_user)):
+async def build_from_document(request: Request, uuid: str, req: BuildFromDocumentRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
     """Use AI to analyze selected documents and generate extraction fields."""
     await _get_search_set_or_404(uuid, user)
     document_uuids = await _authorize_documents(req.document_uuids, user)
@@ -957,9 +957,9 @@ async def build_from_document(request: Request, uuid: str, req: BuildFromDocumen
     return {"entities": entities}
 
 
-@router.post("/suggest-fields")
+@router.post("/suggest-fields", response_model=None)
 @limiter.limit("10/minute")
-async def suggest_fields(request: Request, req: SuggestFieldsRequest, user: User = Depends(get_current_user)):
+async def suggest_fields(request: Request, req: SuggestFieldsRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
     """AI-suggest extraction field names from documents without persisting to a SearchSet.
 
     Used by the workflow editor's manual-fields path so users can get AI suggestions
@@ -2146,10 +2146,10 @@ class StartExtractionOptimizationRequest(BaseModel):
     test_case_uuids: list[str] | None = None
 
 
-@router.post("/search-sets/{uuid}/baseline-probe")
+@router.post("/search-sets/{uuid}/baseline-probe", response_model=None)
 async def extraction_baseline_probe(
     uuid: str, request: Request, user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Cheap no-settings baseline probe for the tuning wizard.
 
     Runs extraction with empty config_override against a sample of test cases

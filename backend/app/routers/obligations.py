@@ -30,12 +30,12 @@ async def _obligation_for(obligation_uuid: str, user: User, *, manage: bool):
     return ob, project
 
 
-@router.get("")
+@router.get("", response_model=None)
 async def list_obligations(
     project_uuid: Optional[str] = None,
     include_dismissed: bool = False,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Home: open items across your projects. With ``project_uuid``: that project's items."""
     if project_uuid:
         project = await _project_for(project_uuid, user, manage=False)
@@ -57,8 +57,8 @@ class CreateObligationsRequest(BaseModel):
     items: list[dict]
 
 
-@router.post("")
-async def create_obligations(body: CreateObligationsRequest, user: User = Depends(get_current_user)):
+@router.post("", response_model=None)
+async def create_obligations(body: CreateObligationsRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
     """Add items by hand. Each is checked against the document it cites; rejected ones say why."""
     project = await _project_for(body.project_uuid, user, manage=True)
     checked = await obligation_service.propose(project, user, body.items)
@@ -108,8 +108,8 @@ class InboxSettingsRequest(BaseModel):
     inbox_hidden: bool
 
 
-@router.put("/home-settings")
-async def update_home_settings(body: InboxSettingsRequest, user: User = Depends(get_current_user)):
+@router.put("/home-settings", response_model=None)
+async def update_home_settings(body: InboxSettingsRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
     """Turn the whole RA inbox on Home off or back on, for this account."""
     user.home_inbox_hidden = body.inbox_hidden
     await user.save()

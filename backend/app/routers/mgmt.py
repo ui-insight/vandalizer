@@ -985,11 +985,11 @@ async def update_test_case(
     return _testcase_to_item(tc)
 
 
-@router.delete("/validation/test-cases/{uuid}")
+@router.delete("/validation/test-cases/{uuid}", response_model=None)
 async def delete_test_case(
     uuid: str,
     _: ApiKey = Depends(require_mgmt_scope("validation:write")),
-):
+) -> dict[str, object]:
     tc = await ExtractionTestCase.find_one(ExtractionTestCase.uuid == uuid)
     if not tc:
         raise HTTPException(status_code=404, detail="Test case not found")
@@ -997,12 +997,12 @@ async def delete_test_case(
     return {"uuid": uuid, "deleted": True}
 
 
-@router.put("/validation/extractions/{search_set_uuid}/cross-field-rules")
+@router.put("/validation/extractions/{search_set_uuid}/cross-field-rules", response_model=None)
 async def update_cross_field_rules(
     search_set_uuid: str,
     body: UpdateCrossFieldRulesBody,
     _: ApiKey = Depends(require_mgmt_scope("validation:write")),
-):
+) -> dict[str, object]:
     from app.services.cross_field_rules import normalize_rules, validate_rule_shape
 
     ss = await SearchSet.find_one(SearchSet.uuid == search_set_uuid)
@@ -1113,14 +1113,14 @@ async def run_validation(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/workflows/{workflow_id}/run")
+@router.post("/workflows/{workflow_id}/run", response_model=None)
 @limiter.limit("20/minute", key_func=mgmt_key_func)
 async def run_workflow_endpoint(
     request: Request,
     workflow_id: str,
     body: RunWorkflowBody,
     api_key: ApiKey = Depends(require_mgmt_scope("workflows:run")),
-):
+) -> dict[str, object]:
     from beanie import PydanticObjectId
 
     from app.models.activity import ActivityStatus, ActivityType
@@ -1173,13 +1173,13 @@ async def run_workflow_endpoint(
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.post("/extractions/run")
+@router.post("/extractions/run", response_model=None)
 @limiter.limit("30/minute", key_func=mgmt_key_func)
 async def run_extraction(
     request: Request,
     body: RunExtractionBody,
     api_key: ApiKey = Depends(require_mgmt_scope("extractions:run")),
-):
+) -> dict[str, object]:
     from app.models.activity import ActivityStatus, ActivityType
     from app.services import activity_service
     from app.services import search_set_service as ss_svc

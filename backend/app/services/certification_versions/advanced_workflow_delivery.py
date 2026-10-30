@@ -1,4 +1,10 @@
 """Authenticated learner delivery for explicit budget work and saved history."""
+from app.models.certification import CertificationEnrollment
+from .catalog import CoursePackage
+from .advanced_case import AdvancedNodesCase
+from .advanced_workflow_preparation import AdvancedPlanRequest
+from .advanced_workflow_execution import AdvancedExecutionRequest
+from .advanced_workflow_approval import AdvancedScopeRequest
 from app.models.workflow import Workflow
 from .source_access import owned_source
 from app.services.storage import get_storage
@@ -32,7 +38,7 @@ class AdvancedWorkflowDelivery:
         self.reviews = AdvancedReviewRepository()
         self.scopes = AdvancedScopeRepository()
 
-    async def course(self, user_id: str, enrollment_id: str):
+    async def course(self, user_id: str, enrollment_id: str) -> tuple[CertificationEnrollment, CoursePackage, AdvancedNodesCase]:
         enrollment = await self.repository._enrollment(user_id, enrollment_id)
         package = self.repository.catalog.load(enrollment.course_version)
         if 'advanced-cases/advanced_nodes.json' not in package.manifest.artifacts:
@@ -40,7 +46,7 @@ class AdvancedWorkflowDelivery:
         return enrollment, package, load_advanced_case(package)
 
     @staticmethod
-    def verify(record, enrollment, case):
+    def verify(record: dict, enrollment: CertificationEnrollment, case: AdvancedNodesCase) -> dict:
         if (any(record[key] != value for key, value in {'user_id': enrollment.user_id,
                 'enrollment_id': enrollment.uuid, 'course_version': enrollment.course_version,
                 'manifest_sha256': enrollment.manifest_sha256, 'module_id': 'advanced_nodes'}.items())
@@ -48,26 +54,26 @@ class AdvancedWorkflowDelivery:
             raise CourseCatalogError('This saved budget work does not match its original course')
         return record
 
-    async def writable(self, enrollment, delivery_enabled) -> bool:
+    async def writable(self, enrollment: CertificationEnrollment, delivery_enabled: bool) -> bool:
         selection = await self.repository.selections.find_one({'user_id': enrollment.user_id})
         return bool(delivery_enabled and enrollment.state in ('active', 'completed')
                     and selection and selection.get('active_enrollment_id') == enrollment.uuid)
 
     @staticmethod
-    def calculation_view(snapshot):
+    def calculation_view(snapshot: dict) -> dict:
         return {key: snapshot[key] for key in ('uuid', 'enrollment_id', 'module_id', 'course_version', 'manifest_sha256',
             'case', 'request', 'document', 'checks', 'captured_at', 'credit_awarded', 'module_completion_eligible')} | {
             'calculation_snapshot_sha256': encode(snapshot)[1]}
 
     @staticmethod
-    def capture_view(snapshot):
+    def capture_view(snapshot: dict) -> dict:
         return {key: snapshot[key] for key in ('uuid', 'enrollment_id', 'module_id', 'course_version', 'manifest_sha256',
             'case', 'artifact_id', 'artifact_sha256', 'artifact', 'captured_at')} | {
             'calculation': AdvancedWorkflowDelivery.calculation_view(snapshot['calculation_snapshot']),
             'method_choice': snapshot['request']['method_choice'],
             'input_snapshot_sha256': encode(snapshot)[1], 'execution_authorized': False, 'credit_awarded': False}
 
-    async def run_view(self, run, *, writable: bool=False) -> dict:
+    async def run_view(self, run: dict, *, writable: bool=False) -> dict:
         plan = run['plan']
         scope = run['authorization']['decision'] if run['authorization'] else None
         if scope is None and run['scope_decision_id']:
@@ -90,7 +96,7 @@ class AdvancedWorkflowDelivery:
                     and not any(item['receipt']['kind'] == 'task_failed' for item in run['task_events']),
                 'credit_awarded': False, 'module_completion_eligible': False}
 
-    async def get(self, user_id: str, enrollment_id: str, reference: str, *, kind: str='review', delivery_enabled: bool=False):
+    async def get(self, user_id: str, enrollment_id: str, reference: str, *, kind: str='review', delivery_enabled: bool=False) -> dict:
         enrollment, _, case = await self.course(user_id, enrollment_id)
         repositories: dict[str, RecordReader] = {'calculation': self.calculations, 'capture': self.inputs, 'run': self.runs, 'review': self.reviews, 'scope': self.scopes}
         repository = repositories[kind]
@@ -117,7 +123,7 @@ class AdvancedWorkflowDelivery:
     async def list(self, user_id: str, enrollment_id: str, *, delivery_enabled: bool=False) -> dict:
         enrollment, _, case = await self.course(user_id, enrollment_id)
         query = {'user_id': user_id, 'enrollment_id': enrollment_id, 'module_id': 'advanced_nodes'}
-        result = {'enrollment_id': enrollment_id, 'module_id': 'advanced_nodes', 'course_version': enrollment.course_version,
+        result: dict[str, object] = {'enrollment_id': enrollment_id, 'module_id': 'advanced_nodes', 'course_version': enrollment.course_version,
                   'manifest_sha256': enrollment.manifest_sha256, 'case': case.public_definition(),
                   'calculation_fields': [{'id': check.id, 'unit': check.unit, 'operation': check.operation,
                       'inputs': [{'id': amount.id, 'label': amount.label, 'source_page': amount.anchor.page}
@@ -164,7 +170,7 @@ class AdvancedWorkflowDelivery:
                 'older_workflows_available': len(owned) > 50, 'can_submit': writable,
                 'read_only_reason': None if writable else 'This is preserved course history. Select an available current course before saving new work.'}
 
-    async def save(self, user_id: str, enrollment_id: str, payload, *, action):
+    async def save(self, user_id: str, enrollment_id: str, payload: object, *, action: str) -> dict:
         current = await self.repository.current(user_id)
         if current is None or current.uuid != enrollment_id:
             raise EnrollmentConflict('Select your existing course before saving or executing budget work')
@@ -179,18 +185,21 @@ class AdvancedWorkflowDelivery:
                 return self.capture_view(saved)
             if action == 'prepare':
                 # Replaying a prepared receipt must not depend on live settings.
-                existing = await self.runs.records.find_one({'uuid': payload.request_id})
+                prepare_request = AdvancedPlanRequest.model_validate(payload)
+                existing = await self.runs.records.find_one({'uuid': prepare_request.request_id})
                 config = {} if existing else await practical_preparation.configured_runtime()
                 models = config.get('available_models') or []
                 default = config.get('default_model') or (models[0].get('name') if models else '')
-                saved = await self.runs.prepare(operation, payload, config, actor_user_id=user_id, default_model=default)
+                saved = await self.runs.prepare(operation, prepare_request, config, actor_user_id=user_id, default_model=default)
             elif action == 'scope':
-                await self.scopes.submit(operation, payload, actor_user_id=user_id)
-                saved = await self.runs.get(user_id, payload.run_id)
+                scope_request = AdvancedScopeRequest.model_validate(payload)
+                await self.scopes.submit(operation, scope_request, actor_user_id=user_id)
+                saved = await self.runs.get(user_id, scope_request.run_id)
             elif action == 'execute':
-                existing = await self.runs.get(user_id, payload.run_id)
+                execute_request = AdvancedExecutionRequest.model_validate(payload)
+                existing = await self.runs.get(user_id, execute_request.run_id)
                 config = await practical_preparation.configured_runtime() if existing and existing['state'] == 'prepared' else {}
-                saved = await self.runs.execute(operation, payload, config, actor_user_id=user_id)
+                saved = await self.runs.execute(operation, execute_request, config, actor_user_id=user_id)
             elif action == 'finalize':
                 saved = await AdvancedWorkflowRecovery().finalize(operation, payload, actor_user_id=user_id)
             elif action == 'review':
@@ -198,6 +207,8 @@ class AdvancedWorkflowDelivery:
                 return await self.get(user_id, enrollment_id, saved['uuid'])
             else:
                 raise ValueError('Unsupported budget action')
+            if saved is None:
+                raise EnrollmentConflict('The saved execution is no longer available')
             return await self.run_view(saved, writable=True)
 
 

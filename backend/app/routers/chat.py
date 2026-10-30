@@ -396,13 +396,13 @@ async def chat(
     )
 
 
-@router.post("/add-link")
+@router.post("/add-link", response_model=None)
 @limiter.limit("20/minute")
 async def add_link(
     request: Request,
     body: AddLinkRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Add a URL attachment to a chat conversation."""
     user_id = user.user_id
     activity: Optional[ActivityEvent] = None
@@ -490,14 +490,14 @@ async def add_link(
     }
 
 
-@router.post("/add-document")
+@router.post("/add-document", response_model=None)
 @limiter.limit("10/minute")
 async def add_document(
     request: Request,
     files: list[UploadFile] = File(...),
     current_activity_id: Optional[str] = Form(None),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Add file attachments to a chat conversation."""
     user_id = user.user_id
     activity: Optional[ActivityEvent] = None
@@ -637,11 +637,11 @@ async def add_document(
     }
 
 
-@router.delete("/remove-document/{attachment_id}")
+@router.delete("/remove-document/{attachment_id}", response_model=None)
 async def remove_document(
     attachment_id: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Remove a file attachment from chat."""
     from beanie import PydanticObjectId
 
@@ -667,11 +667,11 @@ async def remove_document(
     return {"success": True}
 
 
-@router.delete("/remove-link/{attachment_id}")
+@router.delete("/remove-link/{attachment_id}", response_model=None)
 async def remove_link(
     attachment_id: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Remove a URL attachment from chat."""
     from beanie import PydanticObjectId
 
@@ -847,12 +847,12 @@ async def preview_skill(skill_uuid: str, user: User = Depends(get_current_user))
     return await skill_service.snapshot_skill(skill_uuid, user)
 
 
-@router.put("/history/{conversation_uuid}/skill")
+@router.put("/history/{conversation_uuid}/skill", response_model=None)
 async def select_conversation_skill(
     conversation_uuid: str,
     body: SelectSkillRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     conversation = await ChatConversation.find_one({"uuid": conversation_uuid, "user_id": user.user_id})
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
@@ -873,11 +873,11 @@ async def select_conversation_skill(
     return {"active_skill": selected}
 
 
-@router.get("/history/{conversation_uuid}")
+@router.get("/history/{conversation_uuid}", response_model=None)
 async def get_chat_history(
     conversation_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Get chat conversation history."""
     conversation = await ChatConversation.find_one(
         ChatConversation.uuid == conversation_uuid,
@@ -930,11 +930,11 @@ async def get_chat_history(
     }
 
 
-@router.delete("/history/{conversation_uuid}")
+@router.delete("/history/{conversation_uuid}", response_model=None)
 async def delete_chat_history(
     conversation_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Delete a chat conversation and all related records."""
     conversation = await ChatConversation.find_one(
         ChatConversation.uuid == conversation_uuid,
@@ -1025,11 +1025,11 @@ async def download_chat(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/queue")
+@router.post("/queue", response_model=None)
 async def queue_message(
     body: QueueMessageRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Queue a message typed while a turn is streaming (uplift plan Phase 10).
 
     chat_stream drains the queue atomically before each model request and
@@ -1065,11 +1065,11 @@ async def queue_message(
     return {"success": True}
 
 
-@router.post("/stop")
+@router.post("/stop", response_model=None)
 async def stop_turn(
     body: StopTurnRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Mark the streaming turn as stopped by the user.
 
     The client calls this just before it aborts the stream. The abort cancels
@@ -1086,11 +1086,11 @@ async def stop_turn(
     return {"success": True}
 
 
-@router.post("/truncate")
+@router.post("/truncate", response_model=None)
 async def truncate_context(
     body: TruncateContextRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Truncate conversation context — older messages remain visible but are excluded from LLM context."""
     conversation = await ChatConversation.find_one(
         ChatConversation.uuid == body.conversation_uuid,
@@ -1119,11 +1119,11 @@ async def truncate_context(
     }
 
 
-@router.post("/compact")
+@router.post("/compact", response_model=None)
 async def compact_context(
     body: CompactContextRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Compact conversation context — summarize history with an LLM, keeping old messages visible."""
     conversation = await ChatConversation.find_one(
         ChatConversation.uuid == body.conversation_uuid,
@@ -1167,11 +1167,11 @@ async def compact_context(
     }
 
 
-@router.post("/clear-context")
+@router.post("/clear-context", response_model=None)
 async def clear_context(
     body: ClearContextRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Clear conversation context — all existing messages become display-only."""
     conversation = await ChatConversation.find_one(
         ChatConversation.uuid == body.conversation_uuid,
@@ -1211,11 +1211,11 @@ async def get_user_memory(
     return await user_memory_service.get_patterns(user.user_id, team_id)
 
 
-@router.put("/memory/paused")
+@router.put("/memory/paused", response_model=None)
 async def set_user_memory_paused(
     req: MemoryPauseRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Turn assistant memory off or on for the current team scope.
 
     While paused nothing new is recorded and the system prompt gets no
@@ -1228,10 +1228,10 @@ async def set_user_memory_paused(
     return {"paused": paused}
 
 
-@router.delete("/memory")
+@router.delete("/memory", response_model=None)
 async def clear_user_memory(
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Wipe the user's behavioral memory for the current team scope.
 
     Research admins can use this if the patterns the assistant references

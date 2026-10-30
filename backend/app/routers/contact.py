@@ -35,11 +35,11 @@ class DemoRequestContactRequest(BaseModel):
         return v
 
 
-@router.post("/request-contact", status_code=status.HTTP_202_ACCEPTED)
+@router.post("/request-contact", status_code=status.HTTP_202_ACCEPTED, response_model=None)
 async def request_contact(
     body: DemoRequestContactRequest,
     settings: Settings = Depends(get_settings),
-):
+) -> dict[str, object]:
     """Submit a landing-page demo request. Emails requester and admin notification."""
     admin_to = (
         settings.demo_request_to_email

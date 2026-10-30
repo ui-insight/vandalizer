@@ -19,11 +19,11 @@ from app.utils.content_disposition import content_disposition
 router = APIRouter()
 
 
-@router.post("/create")
+@router.post("/create", response_model=None)
 async def create(
     body: CreateFolderRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     team_id: str | None = None
     if body.folder_type == "team" and user.current_team:
         from app.models.team import Team
@@ -51,11 +51,11 @@ async def create(
     }
 
 
-@router.patch("/rename")
+@router.patch("/rename", response_model=None)
 async def rename(
     body: RenameFolderRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     ok = await folder_service.rename_folder(body.uuid, body.newName, user)
     if not ok:
         raise HTTPException(status_code=404, detail="Folder not found")
@@ -95,12 +95,12 @@ async def export(
     )
 
 
-@router.patch("/{folder_uuid}/move")
+@router.patch("/{folder_uuid}/move", response_model=None)
 async def move(
     folder_uuid: str,
     body: MoveFolderRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     try:
         folder = await folder_service.move_folder(folder_uuid, body.parent_id, user)
     except ValueError as e:
@@ -115,11 +115,11 @@ async def move(
     }
 
 
-@router.delete("/{folder_uuid}")
+@router.delete("/{folder_uuid}", response_model=None)
 async def delete(
     folder_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     try:
         ok = await folder_service.delete_folder(folder_uuid, user)
     except ValueError as e:
@@ -129,11 +129,11 @@ async def delete(
     return {"ok": True}
 
 
-@router.patch("/{folder_uuid}/convert-to-team")
+@router.patch("/{folder_uuid}/convert-to-team", response_model=None)
 async def convert_to_team(
     folder_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     try:
         folder = await folder_service.convert_to_team_folder(folder_uuid, user)
     except ValueError as e:

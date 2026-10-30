@@ -168,22 +168,22 @@ async def submit_for_verification(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/queue")
+@router.get("/queue", response_model=None)
 async def list_queue(
     status: Optional[str] = Query(None),
     limit: int = Query(50, ge=1, le=200),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     _require_examiner_access(user)
     requests = await svc.list_queue(status_filter=status, limit=limit)
     return {"requests": requests}
 
 
-@router.get("/mine")
+@router.get("/mine", response_model=None)
 async def my_requests(
     limit: int = Query(50, ge=1, le=200),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     requests = await svc.my_requests(user.user_id, limit=limit)
     return {"requests": requests}
 
@@ -250,11 +250,11 @@ async def update_item_metadata(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/upload-test-file")
+@router.post("/upload-test-file", response_model=None)
 async def upload_test_file(
     file: UploadFile = File(...),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Upload a test file for a verification submission. Returns metadata."""
     import os
     import uuid
@@ -334,11 +334,11 @@ async def unverify_item(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/collections/featured")
+@router.get("/collections/featured", response_model=None)
 async def list_featured_collections(
     kind: Optional[str] = Query(None),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """List featured collections (available to all users, not just examiners).
 
     ``kind`` restricts badge counts to one item kind, for single-kind views
@@ -362,11 +362,11 @@ async def list_featured_collections(
     return {"collections": result}
 
 
-@router.get("/collections/browse")
+@router.get("/collections/browse", response_model=None)
 async def browse_collections(
     kind: Optional[str] = Query(None),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """List collections for catalog browsing (available to all users).
 
     A collection's badge count reflects only items the caller can actually
@@ -390,8 +390,8 @@ async def browse_collections(
     return {"collections": result}
 
 
-@router.get("/collections")
-async def list_collections(user: User = Depends(get_current_user)):
+@router.get("/collections", response_model=None)
+async def list_collections(user: User = Depends(get_current_user)) -> dict[str, object]:
     _require_examiner_access(user)
     return {"collections": await svc.list_collections()}
 
@@ -424,11 +424,11 @@ async def update_collection(
     return result
 
 
-@router.delete("/collections/{collection_id}")
+@router.delete("/collections/{collection_id}", response_model=None)
 async def delete_collection(
     collection_id: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     _require_examiner_access(user)
     ok = await svc.delete_collection(collection_id)
     if not ok:
@@ -482,11 +482,11 @@ async def export_catalog(user: User = Depends(get_current_user)):
     )
 
 
-@router.post("/catalog/preview-import")
+@router.post("/catalog/preview-import", response_model=None)
 async def preview_catalog_import(
     file: UploadFile = File(...),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     _require_examiner_access(user)
 
     from app.services import export_import_service as eis
@@ -505,13 +505,13 @@ async def preview_catalog_import(
     return {"items": items}
 
 
-@router.post("/catalog/import")
+@router.post("/catalog/import", response_model=None)
 async def import_catalog_items(
     file: UploadFile = File(...),
     selected_indices: str = Form(...),
     space: Optional[str] = Form(None),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     _require_examiner_access(user)
 
     from app.services import export_import_service as eis
@@ -549,21 +549,21 @@ async def import_catalog_items(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/examiners")
+@router.get("/examiners", response_model=None)
 async def list_examiners(
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     if not user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
     examiners = await svc.list_examiners()
     return {"examiners": examiners}
 
 
-@router.get("/examiners/search")
+@router.get("/examiners/search", response_model=None)
 async def search_users_for_examiner(
     q: str = Query(..., min_length=1),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     if not user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
     users = await svc.search_users(q)
@@ -589,14 +589,14 @@ async def set_examiner(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/try/{item_kind}/{item_id}")
+@router.post("/try/{item_kind}/{item_id}", response_model=None)
 @limiter.limit("10/minute")
 async def try_verified_item(
     request: Request,
     item_kind: str,
     item_id: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Run a trial extraction using a verified search set against user's own document.
 
     Lets users 'try before adopting' from the verified catalog.

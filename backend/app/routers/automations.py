@@ -354,8 +354,8 @@ async def list_automations(user: User = Depends(get_current_user)):
     ]
 
 
-@router.get("/active")
-async def get_active_automations(user: User = Depends(get_current_user)):
+@router.get("/active", response_model=None)
+async def get_active_automations(user: User = Depends(get_current_user)) -> dict[str, object]:
     """Return IDs of automations whose linked workflows/extractions/tasks are currently running,
     plus recently completed automations (within the last 30 seconds) for toast notifications."""
     import datetime
@@ -590,8 +590,8 @@ async def update_automation(automation_id: str, req: UpdateAutomationRequest, us
     return await _to_response(auto, can_manage=True)
 
 
-@router.delete("/{automation_id}")
-async def delete_automation(automation_id: str, user: User = Depends(get_current_user)):
+@router.delete("/{automation_id}", response_model=None)
+async def delete_automation(automation_id: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     auto, _ = await _load_authorized_automation(automation_id, user, manage=True)
     await auto.delete()
     await audit_service.log_event(

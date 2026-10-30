@@ -41,13 +41,13 @@ async def list_documents(
     return await document_service.list_contents(user=user, folder=folder, team_uuid=team_uuid)
 
 
-@router.get("/search")
+@router.get("/search", response_model=None)
 async def search_documents(
     q: str = Query(default="", min_length=0),
     limit: int = Query(default=20, ge=1, le=100),
     folder: str | None = Query(default=None),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Search documents by title or content text. Returns recent docs when q is empty.
 
     When `folder` is provided, results are restricted to that folder value.
@@ -146,11 +146,11 @@ class TitlesRequest(BaseModel):
 _MAX_TITLE_LOOKUPS = 100
 
 
-@router.post("/titles")
+@router.post("/titles", response_model=None)
 async def resolve_titles(
     body: TitlesRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Titles for the documents and folders the caller can view.
 
     Opening a chat setup link re-attaches the sender's documents and folders
@@ -196,13 +196,13 @@ def _extraction_is_stale(doc: SmartDocument) -> bool:
     return extraction_is_stale(doc.updated_at, doc.created_at)
 
 
-@router.post("/{doc_uuid}/retry-extraction")
+@router.post("/{doc_uuid}/retry-extraction", response_model=None)
 @limiter.limit("30/minute")
 async def retry_extraction(
     request: Request,
     doc_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Re-run text extraction (and downstream ingestion) for a document.
 
     Useful when the original extraction silently produced no text — for example
@@ -264,12 +264,12 @@ class ReclassifyRequest(BaseModel):
     reason: Optional[str] = None
 
 
-@router.patch("/{doc_uuid}/classify")
+@router.patch("/{doc_uuid}/classify", response_model=None)
 async def reclassify_document(
     doc_uuid: str,
     body: ReclassifyRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Manually reclassify a document."""
     valid_levels = {"unrestricted", "internal", "ferpa", "cui", "itar"}
     if body.classification not in valid_levels:
@@ -310,12 +310,12 @@ async def reclassify_document(
 # Retention
 # ---------------------------------------------------------------------------
 
-@router.post("/{doc_uuid}/retention-hold")
+@router.post("/{doc_uuid}/retention-hold", response_model=None)
 async def set_retention_hold(
     doc_uuid: str,
     request: Request,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Place a legal hold on a document. Admin only."""
     if not user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
@@ -346,11 +346,11 @@ async def set_retention_hold(
     return {"detail": "Retention hold applied", "retention_hold": True}
 
 
-@router.delete("/{doc_uuid}/retention-hold")
+@router.delete("/{doc_uuid}/retention-hold", response_model=None)
 async def remove_retention_hold(
     doc_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Remove a legal hold from a document. Admin only."""
     if not user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
