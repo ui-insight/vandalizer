@@ -120,6 +120,11 @@ continue to use their existing Pydantic validation at the API boundary.
   18 invalid-principal checks and preserved owned-review conflict responses.
 - Project, team, organization, Skill and exception regressions: 211 passed,
   two skipped.
+- After the API contracts: 8,888 passed and 2,130 skipped in the full backend
+  run. Three tests required public DNS unavailable in the sandbox; all three
+  pass with network access (8,891 passing cases combined).
+- Certification enrollment and practical delivery persistence: 518 passed
+  against a disposable MongoDB container, removed after the run.
 - Chroma's disposable container check passes locally and is included in CI.
   Its Compose renderer uses an empty temporary environment fixture so it
   never depends on or reads an operator's real `backend/.env`.
