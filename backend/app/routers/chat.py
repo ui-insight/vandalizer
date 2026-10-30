@@ -1,4 +1,5 @@
 """Chat API routes."""
+from collections.abc import AsyncGenerator
 
 import io
 import logging
@@ -69,14 +70,14 @@ async def _get_authorized_activity(activity_id: str, user: User) -> ActivityEven
     return activity
 
 
-@router.post("")
+@router.post("", response_model=None)
 @limiter.limit("30/minute")
 async def chat(
     request: Request,
     body: ChatRequest,
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-):
+) -> StreamingResponse:
     """Streaming chat endpoint. Returns newline-delimited JSON chunks."""
     user_id = user.user_id
     message = body.message
@@ -243,7 +244,7 @@ async def chat(
         onboarding_ctx = await provision_onboarding_sample(user)
 
     team_id = str(user.current_team) if user.current_team else None
-    if not activity_id or len(str(activity_id).strip()) < 10:
+    if activity is None:
         # New conversation
         conversation = ChatConversation(
             title=message.strip(),
@@ -330,7 +331,7 @@ async def chat(
             ChatRole.USER, message, source_documents=source_documents or None,
         )
 
-    async def generate():
+    async def generate() -> AsyncGenerator[str, None]:
         try:
             if page_preview is not None:
                 from app.services.chat_page_approval import stream_save
@@ -433,7 +434,7 @@ async def add_link(
             ChatConversation.user_id == user_id,
         )
 
-    if not conversation or not activity:
+    if not conversation or not activity or activity.id is None:
         raise HTTPException(status_code=500, detail="Failed to create conversation")
 
     # Fetch URL content — uses trafilatura for main-content extraction and
@@ -470,6 +471,8 @@ async def add_link(
         url=body.link, title=title, content=content, user_id=user_id
     )
     await url_attachment.insert()
+    if url_attachment.id is None:
+        raise HTTPException(status_code=503, detail="The link attachment save could not be confirmed")
 
     conversation.url_attachments.append(url_attachment.id)
     conversation.updated_at = datetime.now()
@@ -528,7 +531,7 @@ async def add_document(
             ChatConversation.user_id == user_id,
         )
 
-    if not conversation or not activity:
+    if not conversation or not activity or activity.id is None:
         raise HTTPException(status_code=500, detail="Failed to create conversation")
 
     uploaded_attachments = []
@@ -587,6 +590,8 @@ async def add_document(
                 user_id=user_id,
             )
             await file_attachment.insert()
+            if file_attachment.id is None:
+                raise HTTPException(status_code=503, detail="The file attachment save could not be confirmed")
 
             conversation.file_attachments.append(file_attachment.id)
             await conversation.add_message(
@@ -623,6 +628,8 @@ async def add_document(
                 user_id=user_id,
             )
             await file_attachment.insert()
+            if file_attachment.id is None:
+                raise HTTPException(status_code=503, detail="The file attachment save could not be confirmed")
             conversation.file_attachments.append(file_attachment.id)
 
     conversation.updated_at = datetime.now()
@@ -696,11 +703,11 @@ async def remove_link(
     return {"success": True}
 
 
-@router.get("/conversations")
+@router.get("/conversations", response_model=None)
 async def list_conversations(
     limit: int = 50,
     user: User = Depends(get_current_user),
-):
+) -> list[dict]:
     """List the user's chat conversations, most recent first."""
     conversations = await ChatConversation.find(
         ChatConversation.user_id == user.user_id,
@@ -842,8 +849,8 @@ async def _restore_scope(
     }
 
 
-@router.get("/skills/{skill_uuid}")
-async def preview_skill(skill_uuid: str, user: User = Depends(get_current_user)):
+@router.get("/skills/{skill_uuid}", response_model=None)
+async def preview_skill(skill_uuid: str, user: User = Depends(get_current_user)) -> SkillSnapshot:
     return await skill_service.snapshot_skill(skill_uuid, user)
 
 
@@ -972,13 +979,13 @@ async def delete_chat_history(
     return {"success": True, "message": "Conversation deleted successfully"}
 
 
-@router.post("/export")
+@router.post("/export", response_model=None)
 @limiter.limit("10/minute")
 async def export_chat(
     request: Request,
     body: ChatExportRequest,
     user: User = Depends(get_current_user),
-):
+) -> StreamingResponse:
     """Download the supplied visible transcript; does not publish or fetch content."""
     try:
         data = await anyio.to_thread.run_sync(render_chat_export, body)
@@ -994,11 +1001,11 @@ async def export_chat(
     )
 
 
-@router.post("/download")
+@router.post("/download", response_model=None)
 async def download_chat(
     body: ChatDownloadRequest,
     user: User = Depends(get_current_user),
-):
+) -> StreamingResponse:
     """Export chat content as TXT or CSV."""
     fmt = body.format.lower()
     content = body.content
@@ -1196,10 +1203,10 @@ async def clear_context(
     }
 
 
-@router.get("/memory")
+@router.get("/memory", response_model=None)
 async def get_user_memory(
     user: User = Depends(get_current_user),
-):
+) -> dict:
     """Return what the assistant remembers about this user's habits.
 
     Shows the same items that feed the "Your patterns" block in the

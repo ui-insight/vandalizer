@@ -16,6 +16,9 @@ import logging
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
+    from app.models.knowledge import KnowledgeBase
+    from app.models.search_set import SearchSet
+    from app.models.workflow import Workflow
     from app.models.extraction_optimization_run import ExtractionOptimizationRun
     from app.models.kb_optimization_run import KBOptimizationRun
     from app.models.workflow_optimization_run import WorkflowOptimizationRun
@@ -42,7 +45,7 @@ class OptimizationActionError(Exception):
 # ---------------------------------------------------------------------------
 
 async def start_kb_optimization(
-    kb,
+    kb: KnowledgeBase,
     user_id: str,
     token_budget: int,
     include_indexing_track: bool = False,
@@ -98,7 +101,7 @@ async def start_kb_optimization(
 
 
 async def start_extraction_optimization(
-    search_set,
+    search_set: SearchSet,
     user_id: str,
     token_budget: int,
     apply_on_finish: bool = False,
@@ -231,7 +234,7 @@ async def start_workflow_optimization(
 # Apply
 # ---------------------------------------------------------------------------
 
-def _require_applyable(run) -> None:
+def _require_applyable(run: KBOptimizationRun | ExtractionOptimizationRun | WorkflowOptimizationRun) -> dict:
     if run.status != "completed":
         raise OptimizationActionError(
             "not_completed",
@@ -239,9 +242,10 @@ def _require_applyable(run) -> None:
         )
     if not run.best_config:
         raise OptimizationActionError("no_best_config", "Run has no best_config to apply")
+    return run.best_config
 
 
-def _require_not_tied(run, force: bool, subject: str) -> None:
+def _require_not_tied(run: KBOptimizationRun | ExtractionOptimizationRun | WorkflowOptimizationRun, force: bool, subject: str) -> None:
     """Refuse to apply a config that's statistically tied with the baseline.
 
     A tie (within judge noise) means the data doesn't justify a config change.
@@ -260,9 +264,9 @@ def _require_not_tied(run, force: bool, subject: str) -> None:
         )
 
 
-async def apply_kb_optimization(kb, run: KBOptimizationRun, user_id: str, force: bool = False) -> dict:
+async def apply_kb_optimization(kb: KnowledgeBase, run: KBOptimizationRun, user_id: str, force: bool = False) -> dict:
     """Apply a completed optimization's best config to the KB's rag_config_override."""
-    _require_applyable(run)
+    best_config = _require_applyable(run)
     _require_not_tied(run, force, "KB")
     if getattr(run, "winner", None) == "current" and not run.tied_with_baseline and not force:
         raise OptimizationActionError(
@@ -276,7 +280,7 @@ async def apply_kb_optimization(kb, run: KBOptimizationRun, user_id: str, force:
     run.previous_override = dict(kb.rag_config_override) if kb.rag_config_override else None
     run.applied_at = now
     run.reverted_at = None
-    kb.rag_config_override = dict(run.best_config)
+    kb.rag_config_override = dict(best_config)
     kb.rag_config_override_set_at = now
     kb.rag_config_override_run_uuid = run.uuid
     await kb.save()
@@ -310,7 +314,7 @@ async def apply_kb_optimization(kb, run: KBOptimizationRun, user_id: str, force:
 
 
 async def apply_extraction_optimization(
-    search_set,
+    search_set: SearchSet,
     run: ExtractionOptimizationRun,
     user_id: str,
     min_cf_pass_rate: Optional[float] = None,
@@ -322,7 +326,7 @@ async def apply_extraction_optimization(
     pass rate falls below it, raises ``OptimizationActionError`` with code
     ``cross_field_below_threshold``. Resubmit with ``force=True`` to apply anyway.
     """
-    _require_applyable(run)
+    best_config = _require_applyable(run)
 
     # The same condition the optimizer refuses to auto-apply on. A judge
     # outage during the baseline-default trial withholds the baseline, and
@@ -377,7 +381,7 @@ async def apply_extraction_optimization(
 
     # Persist previous override on the run so revert can restore it.
     run.previous_override = search_set.extraction_config_override
-    search_set.extraction_config_override = dict(run.best_config)
+    search_set.extraction_config_override = dict(best_config)
     search_set.extraction_config_override_set_at = datetime.datetime.now(tz=datetime.timezone.utc)
     await search_set.save()
     await run.save()
@@ -425,7 +429,7 @@ async def apply_extraction_optimization(
 
 
 async def apply_workflow_optimization(
-    wf,
+    wf: Workflow,
     run: WorkflowOptimizationRun,
     user_id: str,
     step_ids: Optional[list[str]] = None,
@@ -436,10 +440,10 @@ async def apply_workflow_optimization(
     ``step_ids`` promotes only those step overrides (Phase 3 per-step apply);
     None applies all winning step overrides.
     """
-    _require_applyable(run)
+    best_config = _require_applyable(run)
     _require_not_tied(run, force, "workflow")
 
-    winning_overrides: dict = (run.best_config or {}).get("step_overrides") or {}
+    winning_overrides: dict = best_config.get("step_overrides") or {}
     if step_ids is not None:
         # Validate: every requested step_id must exist in the winning config.
         unknown = [s for s in step_ids if s not in winning_overrides]

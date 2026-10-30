@@ -1,4 +1,9 @@
 """Service layer for the Vandal Workflow Architect certification system."""
+from collections.abc import Iterable
+from typing import TypedDict
+from app.config import Settings
+from app.models.user import User
+
 
 import base64
 import datetime
@@ -20,6 +25,11 @@ from app.services.certification_versions.catalog import CATALOG_ROOT as _CATALOG
 from app.services.certification_versions.rubrics import legacy_20261002 as _legacy
 
 log = logging.getLogger(__name__)
+
+
+class AssessmentOptions(TypedDict, total=False):
+    assessment_selection: dict[str, str]
+
 
 # ---------------------------------------------------------------------------
 # Exercises data (loaded once from certification-data/exercises.json)
@@ -46,7 +56,11 @@ def _require_unversioned_reader() -> None:
 def _load_exercises() -> dict:
     operation = current_operation()
     if operation:
-        return operation.package.json('exercises.json')
+        content = operation.package.json('exercises.json')
+        if not isinstance(content, dict):
+            from .certification_versions.catalog import CourseCatalogError
+            raise CourseCatalogError('Course exercises must contain an object')
+        return content
     _require_unversioned_reader()
     global _EXERCISES
     if _EXERCISES:
@@ -78,7 +92,11 @@ _LESSONS: dict = {}
 def _load_lessons() -> dict:
     operation = current_operation()
     if operation:
-        return operation.package.json('lessons.json')
+        content = operation.package.json('lessons.json')
+        if not isinstance(content, dict):
+            from .certification_versions.catalog import CourseCatalogError
+            raise CourseCatalogError('Course lessons must contain an object')
+        return content
     _require_unversioned_reader()
     global _LESSONS
     if _LESSONS:
@@ -127,14 +145,14 @@ def _compute_level(xp: int) -> str:
     return level
 
 
-def course_levels():
+def course_levels() -> list[tuple[str, int]]:
     operation = current_operation()
     if operation:
         from app.services.certification_versions.grading import load_rubric
         rubric = load_rubric(operation.package)
         if 'outcomes.json' in operation.package.manifest.artifacts:
             return [(item['name'], item['xp']) for item in operation.package.json('course-structure.json')['levels']]
-        return rubric.LEVELS
+        return list(rubric.LEVELS)
     return LEVELS
 
 
@@ -322,7 +340,9 @@ def lesson_check_for_learner(lesson: dict | None) -> dict | None:
     check = (lesson or {}).get("knowledge_check")
     if not isinstance(check, dict):
         return None
-    options = check.get("options") if isinstance(check.get("options"), list) else []
+    options = check.get("options")
+    if not isinstance(options, list):
+        options = []
     return {"question": check.get("question", ""),
             "options": [o.get("text", "") if isinstance(o, dict) else "" for o in options]}
 
@@ -372,7 +392,7 @@ async def answer_lesson_check(user_id: str, module_id: str, lesson_id: str, choi
     }
 
 
-def lesson_checks_required(prog) -> dict[str, bool]:
+def lesson_checks_required(prog: CertificationProgress) -> dict[str, bool]:
     """Per module, whether its lessons must be passed in order before the
     exercise: not for admin-unlocked learners or modules already under way."""
     if getattr(prog, "unlocked", False):
@@ -522,7 +542,7 @@ CERT_FOLDER_TITLE = "Certification Lab"
 
 
 @course_operation(write=True)
-async def provision_module_documents(user, module_id: str, settings, *, enrollment_id: str | None = None) -> dict:
+async def provision_module_documents(user: User, module_id: str, settings: Settings, *, enrollment_id: str | None = None) -> dict:
     """Provision sample documents for a certification module.
 
     Creates a Certification Lab folder in the user's workspace if needed,
@@ -685,7 +705,7 @@ async def validate_module(user_id: str, module_id: str, *, enrollment_id: str | 
     operation = current_operation()
     if operation:
         from app.services.certification_versions.grading import grade
-        selected = {'assessment_selection': assessment_selection} if assessment_selection is not None else {}
+        selected: AssessmentOptions = {'assessment_selection': assessment_selection} if assessment_selection is not None else {}
         return {**course_identity(), **await grade(operation.package, operation.progress, module_id, **selected)}
     if assessment_selection is not None:
         from .certification_versions.enrollments import EnrollmentConflict
@@ -783,7 +803,8 @@ async def complete_module(user_id: str, module_id: str, *, enrollment_id: str | 
         else:
             try:
                 selected = journal.assessment_selection(attempt)
-                validation = await validate_module(user_id, module_id, **({'assessment_selection': selected} if selected is not None else {}))
+                options: AssessmentOptions = {'assessment_selection': selected} if selected is not None else {}
+                validation = await validate_module(user_id, module_id, **options)
             except Exception:
                 await journal.finish(attempt, {'error': 'Assessment could not finish; submit a new request to try again', 'attempt_id': attempt['uuid']}, failed=True)
                 raise
@@ -869,7 +890,7 @@ async def complete_module(user_id: str, module_id: str, *, enrollment_id: str | 
             from app.models.user import User
             from .certification_versions.credentials import CredentialRepository
             learner = await User.find_one(User.user_id == user_id)
-            name = (learner.name or learner.email) if learner else user_id
+            name = (learner.name or learner.email or user_id) if learner else user_id
             # Freeze the payload in the same progress save as graduation. A
             # retry finishes this original issuance before awarding anything.
             prog.pending_credential = CredentialRepository.prepare(prog, operation.package, name).model_dump(mode='json')
@@ -915,7 +936,7 @@ async def complete_module(user_id: str, module_id: str, *, enrollment_id: str | 
     return result
 
 
-async def _finish_pending_credential(progress) -> None:
+async def _finish_pending_credential(progress: CertificationProgress) -> None:
     from app.models.certification import CertificationEnrollment
     from .certification_versions.credentials import CredentialRepository, parse_credential_snapshot
     from .certification_versions.enrollments import EnrollmentConflict
@@ -957,7 +978,7 @@ async def _resolve_extraction_field_names(task_data: dict) -> list[str]:
     names: list[str] = []
     seen: set[str] = set()
 
-    def _add(values) -> None:
+    def _add(values: Iterable[object]) -> None:
         for raw in values:
             if not raw:
                 continue

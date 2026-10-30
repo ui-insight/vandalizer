@@ -5,6 +5,11 @@ receives ``RunContext[AgenticChatDeps]`` for user-scoped authorization.
 
 Tools are exported as the ``TOOLS`` list for bulk registration.
 """
+from collections.abc import Awaitable, Callable
+from typing import cast, Concatenate, NotRequired, ParamSpec, Protocol, TypedDict
+from app.models.approval import ApprovalRequest
+from app.models.project import Project
+from app.models.user import User
 
 import asyncio
 import datetime
@@ -43,6 +48,28 @@ from app.services.page_locator import annotate_chunk_pages, cited_pages, format_
 logger = logging.getLogger(__name__)
 
 MAX_RESULTS = 20
+
+P = ParamSpec('P')
+
+
+class ExtractionSetListing(TypedDict):
+    uuid: str
+    title: str
+    verified: bool
+    field_count: int
+    domain: str | None
+    quality_score: NotRequired[float]
+    quality_tier: NotRequired[str | None]
+
+
+class WorkflowProjectOptions(TypedDict, total=False):
+    project_context: dict
+
+
+class CompletionService(Protocol):
+    def course_module_titles(self) -> dict[str, str]: ...
+    def course_identity(self) -> dict: ...
+    def validate_module(self, user_id: str, module_id: str) -> Awaitable[dict]: ...
 
 
 def _resolve_doc_uuids(
@@ -101,7 +128,7 @@ def _score_to_tier(score: float | None) -> str | None:
 
 async def _extraction_set_staleness(
     ss: "SearchSet",
-    latest_run,
+    latest_run: ValidationRun | None,
     current_keys: Optional[set[str]] = None,
 ) -> tuple[bool, list[str]]:
     """Whether *ss* has drifted from the config its latest validation measured.
@@ -528,7 +555,7 @@ async def search_documents(
         if pattern:
             title_regex = {"title": {"$regex": pattern, "$options": "i"}}
             if search_content:
-                text_filter = {
+                text_filter: dict = {
                     "$or": [
                         title_regex,
                         {"raw_text": {"$regex": pattern, "$options": "i"}},
@@ -898,7 +925,7 @@ async def search_knowledge_base(
 KB_GROUPS = ("mine", "team", "verified", "project")
 
 
-def _kb_entry(kb: KnowledgeBase, group: str, **extra) -> dict:
+def _kb_entry(kb: KnowledgeBase, group: str, **extra: object) -> dict:
     return {
         "uuid": kb.uuid,
         "title": kb.title,
@@ -1073,7 +1100,7 @@ async def list_knowledge_bases(
 async def list_extraction_sets(
     context: RunContext[AgenticChatDeps],
     search: Optional[str] = None,
-) -> list[dict]:
+) -> list[ExtractionSetListing]:
     """List extraction templates available to the user.
 
     Args:
@@ -1113,10 +1140,10 @@ async def list_extraction_sets(
             if run.score is not None and run.item_id not in scores:
                 scores[run.item_id] = run.score
 
-    results = []
+    results: list[ExtractionSetListing] = []
     for ss in sets:
         field_count = len(ss.item_order) if ss.item_order else 0
-        entry = {
+        entry: ExtractionSetListing = {
             "uuid": ss.uuid,
             "title": ss.title,
             "verified": ss.verified or False,
@@ -1398,18 +1425,18 @@ async def get_app_help(
         return text.replace("Vandalizer", org)
 
     primary = matches[0]
-    topic = {
+    matched_topic = {
         "id": primary["id"],
         "title": _brand(primary["title"]),
         "body": _brand(primary["body"]),
     }
     if primary.get("requires"):
-        topic["requires"] = primary["requires"]
+        matched_topic["requires"] = primary["requires"]
     user = context.deps.user
     team_role = _team_role(context.deps.team_id, context.deps.team_access)
     result = {
         "matched": True,
-        "topic": topic,
+        "topic": matched_topic,
         # The steps in a topic can be gated by role. This is who is asking, so
         # the answer can say "ask your admin" instead of describing controls
         # the user will never see.
@@ -1594,7 +1621,7 @@ async def fetch_url(
             "sheet": None,
             "chunk_id": None,
             "score": None,
-            "content_preview": page["text"][:240],
+            "content_preview": text[:_FETCH_URL_MAX_CHARS][:240],
             "source_reference": None,
             "url": page["url"],
         }]
@@ -1957,7 +1984,7 @@ async def run_extraction(
 
 async def _execute_extraction(
     context: RunContext[AgenticChatDeps],
-    ss,
+    ss: SearchSet,
     document_uuids: list[str],
 ) -> dict:
     """Run an already-authorized extraction set against documents.
@@ -2431,8 +2458,8 @@ _RULE_FIELD_LISTS = {
 
 def _untraced_rule_inputs(rule: dict, data: dict, entity_sources: dict) -> list[str]:
     """Fields a rule read whose non-empty value has no verified source quote."""
-    fields = [rule.get(k) for k in _RULE_FIELD_KEYS.get(rule.get("type"), ())]
-    list_key = _RULE_FIELD_LISTS.get(rule.get("type"))
+    fields = [rule.get(k) for k in _RULE_FIELD_KEYS.get(str(rule.get("type") or ""), ())]
+    list_key = _RULE_FIELD_LISTS.get(str(rule.get("type") or ""))
     if list_key:
         fields += list(rule.get(list_key) or [])
     lowered_data = {str(k).lower(): v for k, v in data.items()}
@@ -2636,7 +2663,7 @@ async def _resolve_requested_model(model: Optional[str]) -> tuple[Optional[str],
     when nothing was named, and ``(None, error)`` for a name that isn't
     configured, so the tool fails before it spends a call.
     """
-    if not (model or "").strip():
+    if model is None or not model.strip():
         return None, None
     from app.models.system_config import SystemConfig
     sys_cfg = await SystemConfig.get_config()
@@ -2650,7 +2677,7 @@ async def _resolve_requested_model(model: Optional[str]) -> tuple[Optional[str],
         None,
     )
     if not match:
-        names = [m.get("name") for m in available if m.get("name")]
+        names = [name for m in available if isinstance(name := m.get("name"), str) and name]
         return None, _err(
             f"Model '{model}' is not configured on this deployment.",
             hint=f"Configured models: {', '.join(names) or 'none'}. Retry with one of these names.",
@@ -2658,7 +2685,7 @@ async def _resolve_requested_model(model: Optional[str]) -> tuple[Optional[str],
     return match.get("name"), None
 
 
-def _workflow_run_model(context: RunContext[AgenticChatDeps], wf, requested: Optional[str]) -> tuple[Optional[str], str]:
+def _workflow_run_model(context: RunContext[AgenticChatDeps], wf: Workflow, requested: Optional[str]) -> tuple[Optional[str], str]:
     """The model a chat-started run uses, and where that choice came from.
 
     A model the user named wins; then the model set on the workflow (the
@@ -2829,7 +2856,7 @@ def _source_conversation_id(context: RunContext[AgenticChatDeps]) -> Optional[st
 
 async def _execute_workflow(
     context: RunContext[AgenticChatDeps],
-    wf,
+    wf: Workflow,
     document_uuids: list[str],
     model: Optional[str] = None,
     project_context: dict | None = None,
@@ -2876,6 +2903,7 @@ async def _execute_workflow(
         logger.exception("Failed to create chat-tagged activity for workflow %s", workflow_id)
 
     run_model, _ = _workflow_run_model(context, wf, model)
+    project_options: WorkflowProjectOptions = {"project_context": project_context} if project_context else {}
     try:
         session_id = await workflow_service.run_workflow(
             workflow_id=workflow_id,
@@ -2885,7 +2913,7 @@ async def _execute_workflow(
             user=context.deps.user,
             activity_id=activity_id,
             force_model=bool(model),
-            **({"project_context": project_context} if project_context else {}),
+            **project_options,
         )
     except ValueError as e:
         return {"error": str(e)}
@@ -2922,7 +2950,7 @@ async def _execute_workflow(
     }
 
 
-async def _workflow_quality_sidecar(workflow_id: str, user) -> Optional[dict]:
+async def _workflow_quality_sidecar(workflow_id: str, user: User) -> Optional[dict]:
     """Quality sidecar for a completed workflow run, from the workflow's own
     latest ValidationRun — QUALITY_SIGNALS_EXPLAINED.md promises signals on
     workflow results. Same contract as run_extraction's sidecar: the streaming
@@ -3108,7 +3136,7 @@ _AWAITING_APPROVAL_STATUSES = ("pending_approval", "paused")
 
 async def _find_pending_approval(
     context: RunContext[AgenticChatDeps], approval_request_id: str, session_id: str,
-):
+) -> tuple[ApprovalRequest | None, dict | None]:
     """The ApprovalRequest to decide, by its id or by the waiting run's session.
 
     Returns ``(approval, None)`` or ``(None, error_dict)``. The user never sees
@@ -3158,7 +3186,7 @@ async def _find_pending_approval(
     return approval, None
 
 
-async def _can_decide_approval(approval, user) -> bool:
+async def _can_decide_approval(approval: ApprovalRequest, user: User) -> bool:
     """Whether *user* may approve/reject *approval*.
 
     Mirrors ``routers/reviews.py::_can_decide_approval``: an assigned reviewer,
@@ -3201,8 +3229,8 @@ async def approve_workflow_step(
     from app.models.approval import STATUS_APPROVED, STATUS_PENDING
 
     approval, error = await _find_pending_approval(context, approval_request_id, session_id)
-    if error:
-        return error
+    if approval is None:
+        return error or {"error": "The approval request is unavailable."}
     approval_request_id = approval.uuid
     if approval.status != STATUS_PENDING:
         return {
@@ -3294,8 +3322,8 @@ async def reject_workflow_step(
     from app.models.approval import STATUS_PENDING, STATUS_REJECTED
 
     approval, error = await _find_pending_approval(context, approval_request_id, session_id)
-    if error:
-        return error
+    if approval is None:
+        return error or {"error": "The approval request is unavailable."}
     approval_request_id = approval.uuid
     if approval.status != STATUS_PENDING:
         return {
@@ -3502,7 +3530,7 @@ async def propose_test_case(
 
     model = context.deps.model_name or None
 
-    def _run():
+    def _run() -> list[dict]:
         # The settings an editor run uses (see run_recorded_extraction), so a
         # drafted test case expects the values the validated set produces.
         engine = ExtractionEngine(system_config_doc=sys_cfg)
@@ -4069,12 +4097,14 @@ _OPTIMIZE_KIND_ALIASES = {
 }
 
 
-async def _get_optimizable_item(context: RunContext[AgenticChatDeps], item_kind: str, item_uuid: str):
+async def _get_optimizable_item(context: RunContext[AgenticChatDeps], item_kind: str, item_uuid: str | None) -> tuple[KnowledgeBase | SearchSet | Workflow | None, str | None, dict | None]:
     """Resolve + manage-level authorize the parent item of an optimization.
 
     Returns (item, title, error_dict_or_None). Manage level = owner or same
     team — verified-only visibility is NOT enough to retune someone's config.
     """
+    if not item_uuid:
+        return None, None, {"error": "The optimization run has no original item identity."}
     user_id = context.deps.user_id
     team_id = context.deps.team_id
 
@@ -4264,8 +4294,8 @@ async def start_optimization(
         return {"error": f"Unknown item_kind '{item_kind}'."}
 
     item, title, err = await _get_optimizable_item(context, kind, item_uuid)
-    if err:
-        return err
+    if item is None:
+        return err or {"error": "The optimization item is unavailable."}
 
     duration = {
         "knowledge_base": "10–20 minutes",
@@ -4407,11 +4437,11 @@ async def apply_optimization(
     user_id = context.deps.user_id
     try:
         if kind == "knowledge_base":
-            outcome = await apply_kb_optimization(item, run, user_id)
+            outcome = await apply_kb_optimization(cast(KnowledgeBase, item), run, user_id)
         elif kind == "search_set":
-            outcome = await apply_extraction_optimization(item, run, user_id)
+            outcome = await apply_extraction_optimization(cast(SearchSet, item), run, user_id)
         else:
-            outcome = await apply_workflow_optimization(item, run, user_id)
+            outcome = await apply_workflow_optimization(cast(Workflow, item), run, user_id)
     except OptimizationActionError as e:
         return {"error": e.message, "code": e.code, **e.detail}
 
@@ -4489,7 +4519,7 @@ _MAX_SAVE_SOURCES = 50
 MAX_SAVE_CHARS = 1_000_000
 
 
-async def _checked_save_sources(sources: list[dict], context) -> list[dict]:
+async def _checked_save_sources(sources: list[dict], context: RunContext[AgenticChatDeps]) -> list[dict]:
     """Sources for a saved file, each quote checked against its document (#1008).
 
     A quote is only marked found when it appears in the named document's text,
@@ -4509,7 +4539,7 @@ async def _checked_save_sources(sources: list[dict], context) -> list[dict]:
                 doc.user_id == context.deps.user_id
                 or (context.deps.team_id and doc.team_id == context.deps.team_id)
             )
-            texts[doc_uuid] = (doc.raw_text or "") if readable else None
+            texts[doc_uuid] = (doc.raw_text or "") if readable and doc is not None else None
         page = src.get("page")
         rows.append({
             "item": str(src.get("item") or ""),
@@ -4622,8 +4652,8 @@ def _render_saved_file(ext: str, title: str, content: str, source_rows: list[dic
         src_sheet.append(SOURCE_HEADERS)
         for cell in src_sheet[1]:
             cell.font = Font(bold=True)
-        for r in source_rows:
-            src_sheet.append([r["item"], r["document"], r["page"], r["quote"], r["status"]])
+        for source_row in source_rows:
+            src_sheet.append([source_row["item"], source_row["document"], source_row["page"], source_row["quote"], source_row["status"]])
     out = io.BytesIO()
     wb.save(out)
     return out.getvalue()
@@ -4832,7 +4862,7 @@ async def save_to_folder(
 # ---------------------------------------------------------------------------
 
 
-async def _resolve_active_project(context: RunContext[AgenticChatDeps]):
+async def _resolve_active_project(context: RunContext[AgenticChatDeps]) -> Project | None:
     """The authorized active project, or None when no project is open.
 
     Resolves ``deps.active_project_uuid`` (set when the user chats inside a
@@ -4976,7 +5006,8 @@ async def run_pin_on_project(
         wf = await Workflow.get(target_id)
         if not wf:
             return {"error": "The pinned workflow no longer exists."}
-        result = await _execute_workflow(context, wf, doc_uuids, **({"project_context": project_context} if project_context else {}))
+        project_options: WorkflowProjectOptions = {"project_context": project_context} if project_context else {}
+        result = await _execute_workflow(context, wf, doc_uuids, **project_options)
         if len(doc_uuids) > 10 and "error" not in result:
             result["note"] = (
                 "Ran on the first 10 of "
@@ -6403,6 +6434,8 @@ async def get_certification_module(
         from app.services.certification_versions.outcomes import package_outcomes
         from app.services.certification_versions.grading import selected_outcome_completion_available
         contract = package_outcomes(operation.package)
+        if contract is None:
+            raise ValueError("The course outcome contract is unavailable")
         required = next(module for module in contract.modules if module.module_id == module_id)
         assessment_mode = "selected_saved_outcomes"
         assessment_keys, assessment_questions = [], []
@@ -6414,6 +6447,8 @@ async def get_certification_module(
             # The real case count, so the agent does not infer one from the outcome list.
             scenario_cases = len(module_bank(operation.package, module_id).questions)
             if data.get("scenario_attempt_id"):
+                if operation.progress.enrollment_id is None:
+                    raise ValueError("Saved assessments require an enrollment identity")
                 saved_assessment = await _saved_scenario_summary(context.deps.user_id, operation.progress.enrollment_id,
                                                                  module_id, data["scenario_attempt_id"])
     return {
@@ -6460,16 +6495,16 @@ async def get_certification_module(
     }
 
 
-def lessons_first(action: str):
+def lessons_first(action: str) -> Callable[[Callable[Concatenate[RunContext[AgenticChatDeps], str, P], Awaitable[dict]]], Callable[Concatenate[RunContext[AgenticChatDeps], str, P], Awaitable[dict]]]:
     """Refuse a course step until the module's lessons are read (guided course).
 
     Applied inside the course operation, so it reads the pinned enrollment.
     """
     import functools
 
-    def decorate(function):
+    def decorate(function: Callable[Concatenate[RunContext[AgenticChatDeps], str, P], Awaitable[dict]]) -> Callable[Concatenate[RunContext[AgenticChatDeps], str, P], Awaitable[dict]]:
         @functools.wraps(function)
-        async def wrapped(context, module_id, *args, **kwargs):
+        async def wrapped(context: RunContext[AgenticChatDeps], module_id: str, *args: P.args, **kwargs: P.kwargs) -> dict:
             from app.services import certification_service as cert_svc
 
             gate = await cert_svc.lesson_gate(context.deps.user_id, module_id)
@@ -6702,7 +6737,7 @@ async def check_certification_module(
     }
 
 
-async def _completion_approval(context, cert_svc, module_id: str, enrollment_id: str | None, confirmed: bool) -> dict | None:
+async def _completion_approval(context: RunContext[AgenticChatDeps], cert_svc: CompletionService, module_id: str, enrollment_id: str | None, confirmed: bool) -> dict | None:
     """complete_certification_module's check and approval card; None once approved."""
     # Completing awards credit, and it ran with no approval: answering Module
     # 3's reflection questions, a learner watched chat try to complete the

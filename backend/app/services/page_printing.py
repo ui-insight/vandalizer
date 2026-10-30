@@ -53,13 +53,21 @@ def render_page(revision: dict, version: int, view: str = "content") -> tuple[st
     # Saved Pages already have a canonical head/body; tolerate old fragments.
     if not soup.html:
         wrapper = BeautifulSoup("<!doctype html><html><head></head><body></body></html>", "html.parser")
+        wrapper_body = wrapper.body
+        assert wrapper_body is not None
         for node in list(soup.contents):
-            wrapper.body.append(node.extract())
+            wrapper_body.append(node.extract())
         soup = wrapper
-    if not soup.head:
-        soup.html.insert(0, soup.new_tag("head"))
-    if not soup.body:
-        soup.html.append(soup.new_tag("body"))
+    root = soup.html
+    assert root is not None
+    head = soup.head
+    if head is None:
+        head = soup.new_tag("head")
+        root.insert(0, head)
+    body = soup.body
+    if body is None:
+        body = soup.new_tag("body")
+        root.append(body)
     for element in soup.select("#vandalizer-print-style, #vandalizer-print-footer, #vandalizer-print-controls, #vandalizer-print-script"):
         element.decompose()
     saved = revision.get("created_at")
@@ -70,13 +78,13 @@ def render_page(revision: dict, version: int, view: str = "content") -> tuple[st
     else:
         date = "Date unavailable"
     footer_text = f'{revision["title"]} · Version {version} · Saved {date}'
-    soup.head.append(soup.new_tag("meta", id="vandalizer-print-footer", attrs={"name": "page-version", "content": footer_text}))
+    head.append(soup.new_tag("meta", id="vandalizer-print-footer", attrs={"name": "page-version", "content": footer_text}))
     # A margin box reserves space on every sheet instead of overlaying content.
     # Hex-escape all text, including quotes and </style>, for the CSS context.
     footer_css = '"' + ''.join(f'\\{ord(char):x} ' for char in footer_text) + '"'
     style = soup.new_tag("style", id="vandalizer-print-style")
     style.string = PRINT_STYLE.replace("__PAGE_FOOTER__", footer_css)
-    soup.head.append(style)
+    head.append(style)
 
     csp = CONTENT_CSP
     if view in {"full", "print"}:
@@ -86,14 +94,14 @@ def render_page(revision: dict, version: int, view: str = "content") -> tuple[st
         button = soup.new_tag("button", id="vandalizer-print-button", type="button")
         button.string = "Print / Save as PDF"
         controls.append(button)
-        soup.body.insert(0, controls)
+        body.insert(0, controls)
         script = soup.new_tag("script", id="vandalizer-print-script", nonce=nonce)
         script.string = PRINT_SCRIPT + (AUTO_PRINT_SCRIPT if view == "print" else "")
-        soup.body.append(script)
+        body.append(script)
     # The meta policy must agree with the response header. It cannot loosen
     # that header, but the old script-src 'none' would block our print button.
     for meta in soup.find_all("meta"):
         if str(meta.get("http-equiv", "")).lower() == "content-security-policy":
             meta.decompose()
-    soup.head.insert(0, soup.new_tag("meta", attrs={"http-equiv": "Content-Security-Policy", "content": csp}))
+    head.insert(0, soup.new_tag("meta", attrs={"http-equiv": "Content-Security-Policy", "content": csp}))
     return str(soup), csp

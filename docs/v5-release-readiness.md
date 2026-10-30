@@ -24,7 +24,11 @@ The corresponding advisories are
 and [RBAC scope enforcement](https://github.com/advisories/GHSA-xph7-9rjv-w5fr).
 [Upstream tracking](https://github.com/chroma-core/chroma/issues/7909) also
 reports no patched release; upgrading to the current 1.x line does not clear
-the findings and requires a separate server/API migration.
+the findings and requires a separate server/API migration. Rechecked on
+2026-10-29: all three advisories still have `first_patched_version: null`,
+[1.5.9 remains the latest upstream release](https://github.com/chroma-core/chroma/releases/tag/1.5.9),
+and [the relevant remediation PR](https://github.com/chroma-core/chroma/pull/7602)
+remains open and unmerged.
 
 Chroma must stay behind the application boundary: Compose production does not
 publish its port, the development override binds it to `127.0.0.1`, and Helm
@@ -58,7 +62,7 @@ network-policy enforcement and deployment identity still need deployed QA.
 ## Typing
 
 The original mypy baseline was 3,141 errors. The dependency pass reduced it to
-3,098; the current follow-up reduces it to 824 across 524 source files. The
+3,098; the current follow-up reduces it to 498 across 524 source files. The
 models, schemas, database helpers, URL helpers and observability setup pass their
 focused type check. Workflow execution, automatic review, review persistence and
 review recovery, and the knowledge-base, admin, workflow and Home/config APIs
@@ -173,7 +177,10 @@ continue to use their existing Pydantic validation at the API boundary.
   at `29be876b`; that run failed only a credit-transfer persistence test because
   three routes still passed bound methods to the new lazy dispatch helper. Those
   routes now pass factories, with route-level coverage for preview, apply, saved
-  reads and disabled-rollout construction. Fresh CI remains required.
+  reads and disabled-rollout construction. The complete CI run at `ed47b294`
+  passed, including both Python versions, all four persistence shards, Chroma,
+  Helm, frontend, release checks and Docker. Mypy and dependency audit remain
+  advisory, so their green status does not close those backlogs.
 - Execution, governance, transition, recovery and legacy preservation persistence:
   221 passed against disposable MongoDB. A final run with stable implementation
   fingerprints passed all 107 execution/credit-transfer checks, including the
@@ -185,6 +192,17 @@ continue to use their existing Pydantic validation at the API boundary.
   (four optional cases skipped); the nine-query feedback concurrency test passed.
   Every changed application file is checked
   against the full mypy output before committing, rather than only its original errors.
+- The next contract batch types chat streaming/tools, KB judging and optimizers,
+  authentication/support/trial APIs, Page templates/exports, notifications and
+  selection confirmation. KB/judge tests passed 752 cases; optimizer tests 244;
+  auth/browser tests 349 (three skipped); support/trial/template tests 163;
+  Page/export tests 105; certification/obligation tests 1,661; and notification/
+  print tests 98. The final combined chat, approval, cross-field validation,
+  template and trial suite passed 897 cases. Missing judge scores remain unmeasured; malformed extension
+  responses are rejected; an unconfirmed template save can retry its stable ID.
+- Selection confirmation, saved-course switching, completion concurrency and
+  credential completion passed 100 persistence cases against disposable MongoDB.
+  The container was removed afterward.
 - Certification enrollment and practical delivery persistence: 518 passed
   against a disposable MongoDB container, removed after the run.
 - Chroma's disposable container check passes locally and is included in CI.

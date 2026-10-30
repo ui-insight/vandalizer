@@ -19,6 +19,7 @@ from enum import Enum
 from pathlib import Path
 
 import redis
+from fastapi import WebSocket
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +80,7 @@ class BrowserAutomationService:
 
     def __init__(self) -> None:
         self.sessions: dict[str, BrowserAutomationSession] = {}
-        self.websocket_connections: dict[str, object] = {}  # user_id -> WebSocket
+        self.websocket_connections: dict[str, WebSocket] = {}  # user_id -> WebSocket
         self._redis: redis.Redis | None = None
         self._current_model: str | None = None
 
@@ -230,7 +231,7 @@ class BrowserAutomationService:
             "url_matches": self._assert_url_matches,
             "value_equals": self._assert_value_equals,
         }
-        handler = handlers.get(assertion_type)
+        handler = handlers.get(assertion_type) if isinstance(assertion_type, str) else None
         if not handler:
             raise ValueError(f"Unknown assertion type: {assertion_type}")
 
@@ -310,7 +311,9 @@ class BrowserAutomationService:
             if response.output:
                 json_match = re.search(r"\{.*\}", response.output, re.DOTALL)
                 if json_match:
-                    return json.loads(json_match.group(0))
+                    parsed = json.loads(json_match.group(0))
+                    if isinstance(parsed, dict):
+                        return parsed
             return {"found": False, "answer": None}
         except Exception as e:
             logger.error("LLM extraction failed: %s", e)
@@ -340,7 +343,9 @@ class BrowserAutomationService:
                 response = agent.run_sync(user_prompt)
             json_match = re.search(r"\[.*\]", response.output, re.DOTALL)
             if json_match:
-                return json.loads(json_match.group(0))
+                parsed = json.loads(json_match.group(0))
+                if isinstance(parsed, list):
+                    return parsed
             return []
         except Exception as e:
             logger.error("Extract by example failed: %s", e)
@@ -433,10 +438,10 @@ class BrowserAutomationService:
             raise ValueError(f"Session {session_id} not found")
         return self.send_command(session, "get_page_state", {})
 
-    def record_audit_event(self, session_id: str, event_type: str, details: dict):
+    def record_audit_event(self, session_id: str, event_type: str, details: dict) -> dict | None:
         session = self.get_session(session_id)
         if not session:
-            return
+            return None
 
         screenshot_url = None
         if event_type in ("action_success", "action_failure", "step_failure"):
@@ -508,7 +513,7 @@ class BrowserAutomationService:
     # WebSocket / extension communication
     # ------------------------------------------------------------------
 
-    def register_websocket(self, user_id: str, ws) -> None:
+    def register_websocket(self, user_id: str, ws: WebSocket) -> None:
         self.websocket_connections[user_id] = ws
         logger.info("Registered WebSocket for user %s", user_id)
 
@@ -538,7 +543,7 @@ class BrowserAutomationService:
             logger.error("Redis publish failed: %s", e)
             return False
 
-    def send_command(self, session: BrowserAutomationSession | str, command_name: str, payload: dict, timeout_ms: int = 30000, wait_for_response: bool = True) -> dict | None:
+    def send_command(self, session: BrowserAutomationSession | str | None, command_name: str, payload: dict, timeout_ms: int = 30000, wait_for_response: bool = True) -> dict | None:
         """Send command to extension and optionally wait for response via Redis."""
         if isinstance(session, str):
             session = self.get_session(session)
@@ -578,11 +583,18 @@ class BrowserAutomationService:
         while elapsed < timeout_seconds:
             response_json = self.redis_client.get(response_key)
             if response_json:
+                if not isinstance(response_json, (str, bytes, bytearray)):
+                    raise ValueError("Invalid extension response encoding")
                 self.redis_client.delete(response_key)
                 response = json.loads(response_json)
+                if not isinstance(response, dict):
+                    raise ValueError("Invalid extension response: expected an object")
                 if response.get("status") == "error":
                     raise Exception(f"Extension error: {response.get('message')}")
-                return response.get("data")
+                data = response.get("data")
+                if data is not None and not isinstance(data, dict):
+                    raise ValueError("Invalid extension response data: expected an object")
+                return data
             time.sleep(poll_interval)
             elapsed += poll_interval
 

@@ -4,6 +4,13 @@ Shared by the workflow download endpoint and the save-to-folder / passive
 storage paths so every export surface produces the same branded Word
 documents. python-docx itself is imported lazily inside the render functions.
 """
+from __future__ import annotations
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from docx.document import Document as DocxDocument
+    from docx.table import Table, _Cell
+    from docx.text.paragraph import Paragraph
+
 
 import io
 import json
@@ -15,7 +22,7 @@ _INLINE_CODE = re.compile(r"`(.+?)`")
 _MD_LINK = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
 
 
-def _add_runs_with_formatting(paragraph, text: str) -> None:
+def _add_runs_with_formatting(paragraph: Paragraph, text: str) -> None:
     """Add runs to a docx paragraph, parsing inline **bold**, *italic*, `code`, [link](url)."""
     # Drop markdown link syntax — keep the visible text only (URLs in LLM output
     # are often hallucinated and useless in a Word doc).
@@ -76,7 +83,7 @@ _DOCX_TABLE_BORDER = "E5E7EB"        # light-gray grid
 _DOCX_HEADING_HEX = "191919"         # charcoal headings (override Word's blue)
 
 
-def _shade_docx_cell(cell, fill_hex: str) -> None:
+def _shade_docx_cell(cell: _Cell, fill_hex: str) -> None:
     """Set a table cell's background fill (python-docx has no high-level API)."""
     from docx.oxml import OxmlElement
     from docx.oxml.ns import qn
@@ -88,7 +95,7 @@ def _shade_docx_cell(cell, fill_hex: str) -> None:
     cell._tc.get_or_add_tcPr().append(shd)
 
 
-def _set_docx_table_borders(table, color_hex: str) -> None:
+def _set_docx_table_borders(table: Table, color_hex: str) -> None:
     """Apply a thin single-line grid border (color_hex) to every table edge."""
     from docx.oxml import OxmlElement
     from docx.oxml.ns import qn
@@ -104,7 +111,7 @@ def _set_docx_table_borders(table, color_hex: str) -> None:
     table._tbl.tblPr.append(borders)
 
 
-def _add_docx_hr(doc) -> None:
+def _add_docx_hr(doc: DocxDocument) -> None:
     """Render a markdown horizontal rule as an empty paragraph with a thin,
     light-gray bottom border (Word has no native ``<hr>``)."""
     from docx.oxml import OxmlElement
@@ -122,7 +129,7 @@ def _add_docx_hr(doc) -> None:
     p_pr.append(borders)
 
 
-def _apply_docx_table_theme(table) -> None:
+def _apply_docx_table_theme(table: Table) -> None:
     """Apply the Vandalizer gold table theme to a Word table.
 
     Gold (#eab308) header row with bold black text, faint gold zebra striping on
@@ -145,7 +152,7 @@ def _apply_docx_table_theme(table) -> None:
                 _shade_docx_cell(cell, _DOCX_TABLE_STRIPE_FILL)
 
 
-def _add_markdown_table_to_docx(doc, headers: list[str], rows: list[list[str]]) -> None:
+def _add_markdown_table_to_docx(doc: DocxDocument, headers: list[str], rows: list[list[str]]) -> None:
     """Render parsed markdown-table cells as a real Word table.
 
     Uses the shared gold table theme (see ``_apply_docx_table_theme``), with
@@ -169,7 +176,7 @@ def _add_markdown_table_to_docx(doc, headers: list[str], rows: list[list[str]]) 
     _apply_docx_table_theme(table)
 
 
-def markdown_to_docx(text: str):
+def markdown_to_docx(text: str) -> DocxDocument:
     """Render a markdown-ish string into a python-docx Document.
 
     Handles ATX headings, unordered/ordered lists, GitHub-flavored tables,
@@ -253,7 +260,7 @@ def markdown_to_docx(text: str):
     return doc
 
 
-def data_to_docx_bytes(data) -> bytes:
+def data_to_docx_bytes(data: object) -> bytes:
     """Serialize workflow output (str/dict/list) to a .docx byte payload."""
     from docx import Document
     from docx.shared import Inches, Pt

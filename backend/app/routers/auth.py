@@ -102,14 +102,14 @@ _LOGIN_ERROR_MESSAGES = {
 }
 
 
-@router.post("/login")
+@router.post("/login", response_model=None)
 @limiter.limit("5/minute")
 async def login(
     request: Request,
     body: LoginRequest,
     response: Response,
     settings: Settings = Depends(get_settings),
-):
+) -> dict:
     user, reason = await auth_service.authenticate_with_reason(
         body.user_id, body.password
     )
@@ -152,14 +152,14 @@ async def login(
     return result
 
 
-@router.post("/register")
+@router.post("/register", response_model=None)
 @limiter.limit("3/minute")
 async def register(
     request: Request,
     body: RegisterRequest,
     response: Response,
     settings: Settings = Depends(get_settings),
-):
+) -> UserResponse:
     try:
         user = await auth_service.register(
             body.user_id or body.email, body.email, body.password, body.name
@@ -354,11 +354,11 @@ async def reset_password(
     return {"ok": True}
 
 
-@router.get("/magic-login")
+@router.get("/magic-login", response_model=None)
 async def magic_login(
     token: str = Query(...),
     settings: Settings = Depends(get_settings),
-):
+) -> RedirectResponse:
     """Consume a one-time magic login token and redirect to the app."""
     r = aioredis.from_url(f"redis://{settings.redis_host}:6379")
     try:
@@ -398,24 +398,24 @@ async def logout(response: Response) -> dict[str, object]:
     return {"ok": True}
 
 
-@router.get("/me")
-async def me(user: User = Depends(get_current_user)):
+@router.get("/me", response_model=None)
+async def me(user: User = Depends(get_current_user)) -> UserResponse:
     return await _user_response(user)
 
 
-@router.put("/profile")
+@router.put("/profile", response_model=None)
 @limiter.limit("10/minute")
 async def update_profile(
     request: Request,
     body: UpdateProfileRequest,
     settings: Settings = Depends(get_settings),
     user: User = Depends(get_current_user),
-):
+) -> UserResponse:
     if body.name is not None:
         user.name = body.name
 
     email_changed = body.email is not None and body.email != user.email
-    if email_changed:
+    if email_changed and body.email is not None:
         # SSO-linked accounts' email is owned by the identity provider — every
         # SSO login syncs it back from the IdP, so a local edit would silently
         # revert. That includes hybrid accounts (SSO + local password), which is
@@ -499,17 +499,17 @@ def _email_prefs_response(prefs: dict | None) -> dict:
     }
 
 
-@router.get("/email-preferences")
-async def get_email_preferences(user: User = Depends(get_current_user)):
+@router.get("/email-preferences", response_model=None)
+async def get_email_preferences(user: User = Depends(get_current_user)) -> dict:
     """Get the current user's email notification preferences."""
     return _email_prefs_response(user.email_preferences)
 
 
-@router.put("/email-preferences")
+@router.put("/email-preferences", response_model=None)
 async def update_email_preferences(
     body: dict,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     """Update email notification preferences."""
     prefs = user.email_preferences or {}
     for key in ("onboarding", "nudges", "announcements"):
@@ -520,8 +520,8 @@ async def update_email_preferences(
     return _email_prefs_response(prefs)
 
 
-@router.post("/account/delete/preflight")
-async def delete_account_preflight(user: User = Depends(get_current_user)):
+@router.post("/account/delete/preflight", response_model=None)
+async def delete_account_preflight(user: User = Depends(get_current_user)) -> dict:
     """Pre-flight check: returns data counts and blocking conditions."""
     from app.services.account_deletion_service import get_deletion_summary
 
@@ -641,14 +641,14 @@ async def api_token_status(user: User = Depends(get_current_user)) -> dict[str, 
         )
 
 
-@router.post("/refresh")
+@router.post("/refresh", response_model=None)
 @limiter.limit("10/minute")
 async def refresh(
     request: Request,
     response: Response,
     refresh_token: str | None = Cookie(default=None),
     settings: Settings = Depends(get_settings),
-):
+) -> UserResponse:
     if not refresh_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="No refresh token"
@@ -753,8 +753,8 @@ _AZURE_TOKEN = "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
 _GRAPH_ME = "https://graph.microsoft.com/v1.0/me"
 
 
-@router.get("/oauth/azure")
-async def oauth_azure_login(settings: Settings = Depends(get_settings)):
+@router.get("/oauth/azure", response_model=None)
+async def oauth_azure_login(settings: Settings = Depends(get_settings)) -> RedirectResponse:
     """Redirect the browser to Azure AD for authentication."""
     config = await SystemConfig.get_config()
     azure = _get_azure_provider(config)
@@ -785,14 +785,14 @@ async def oauth_azure_login(settings: Settings = Depends(get_settings)):
     return RedirectResponse(f"{url}?{urllib.parse.urlencode(params)}")
 
 
-@router.get("/oauth/azure/callback")
+@router.get("/oauth/azure/callback", response_model=None)
 async def oauth_azure_callback(
     request: Request,
     code: str | None = Query(default=None),
     error: str | None = Query(default=None),
     state: str | None = Query(default=None),
     settings: Settings = Depends(get_settings),
-):
+) -> RedirectResponse:
     """Azure AD redirects here after the user authenticates."""
     landing = f"{settings.frontend_url}/landing"
 
@@ -876,8 +876,8 @@ async def oauth_azure_callback(
 # SAML SSO
 # ---------------------------------------------------------------------------
 
-@router.get("/saml/login")
-async def saml_login(request: Request, settings: Settings = Depends(get_settings)):
+@router.get("/saml/login", response_model=None)
+async def saml_login(request: Request, settings: Settings = Depends(get_settings)) -> RedirectResponse:
     """Initiate SAML login — redirects to IdP."""
     config = await SystemConfig.get_config()
     saml_provider = None
@@ -894,8 +894,8 @@ async def saml_login(request: Request, settings: Settings = Depends(get_settings
     return RedirectResponse(redirect_url)
 
 
-@router.post("/saml/acs")
-async def saml_acs(request: Request, settings: Settings = Depends(get_settings)):
+@router.post("/saml/acs", response_model=None)
+async def saml_acs(request: Request, settings: Settings = Depends(get_settings)) -> RedirectResponse:
     """SAML Assertion Consumer Service — receives IdP response."""
     config = await SystemConfig.get_config()
     saml_provider = None
@@ -962,8 +962,8 @@ async def saml_acs(request: Request, settings: Settings = Depends(get_settings))
     return response
 
 
-@router.get("/saml/metadata")
-async def saml_metadata(request: Request):
+@router.get("/saml/metadata", response_model=None)
+async def saml_metadata(request: Request) -> Response:
     """Return SP metadata XML for IdP configuration."""
     config = await SystemConfig.get_config()
     saml_provider = None

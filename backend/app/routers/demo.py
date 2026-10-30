@@ -47,7 +47,7 @@ async def get_feedback(token: str) -> dict[str, object]:
 
 
 @router.post("/resend-credentials/{uuid}", response_model=ResendCredentialsResponse)
-async def resend_credentials(uuid: str, settings: Settings = Depends(get_settings)):
+async def resend_credentials(uuid: str, settings: Settings = Depends(get_settings)) -> ResendCredentialsResponse:
     """Resend a fresh sign-in link, or steer the user to the right next step.
 
     Always 200: the status field tells the frontend whether the link was sent,
@@ -65,14 +65,14 @@ async def resend_credentials(uuid: str, settings: Settings = Depends(get_setting
     return ResendCredentialsResponse(
         ok=status_value == "sent",
         status=status_value or "not_found",
-        message=messages.get(status_value, messages["not_found"]),
+        message=messages.get(status_value or "not_found", messages["not_found"]),
         email=result.get("email"),
         feedback_token=result.get("feedback_token"),
     )
 
 
 @router.post("/feedback/{token}", response_model=PostExperienceResponseSchema)
-async def submit_feedback(token: str, body: PostExperienceRequest):
+async def submit_feedback(token: str, body: PostExperienceRequest) -> PostExperienceResponseSchema:
     """Submit post-experience questionnaire."""
     success = await demo_service.submit_post_questionnaire(token, body.responses)
     if not success:
@@ -85,7 +85,7 @@ async def submit_feedback(token: str, body: PostExperienceRequest):
 
 
 @router.get("/trial-end/{token}", response_model=TrialEndInfoResponse)
-async def trial_end_info(token: str):
+async def trial_end_info(token: str) -> TrialEndInfoResponse:
     """Return the data the trial-end screen needs (engagement + token balance)."""
     info = await demo_service.get_trial_end_info(token)
     if not info:
@@ -102,7 +102,7 @@ async def extend_trial(
     token: str,
     body: TrialExtensionRequest,
     settings: Settings = Depends(get_settings),
-):
+) -> TrialExtensionResponse:
     """Self-serve token top-up from the trial-end screen.
 
     Unauthenticated on purpose — the emailed token is the credential — so the
@@ -124,7 +124,7 @@ async def extend_trial(
 
 
 @router.get("/trial-usage", response_model=TrialUsageResponse)
-async def trial_usage(user: User = Depends(get_current_user)):
+async def trial_usage(user: User = Depends(get_current_user)) -> TrialUsageResponse:
     """The signed-in user's trial token balance.
 
     ``enabled`` is False for anyone who isn't a metered trial user — the caller
@@ -144,7 +144,7 @@ _IN_APP_TOPUP_REFUSALS = {
 
 
 @router.get("/top-up", response_model=InAppTopUpInfoResponse)
-async def in_app_topup_info(user: User = Depends(get_current_user)):
+async def in_app_topup_info(user: User = Depends(get_current_user)) -> InAppTopUpInfoResponse:
     """Whether the signed-in trial user can top up in the app, and what it asks."""
     return InAppTopUpInfoResponse(**await demo_service.get_in_app_topup_info(user))
 
@@ -156,14 +156,14 @@ async def in_app_topup(
     body: TrialExtensionRequest,
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-):
+) -> TrialExtensionResponse:
     """In-app token top-up for the signed-in trial user: the same grant and
     feedback as the emailed link, with the session as the credential."""
     result = await demo_service.topup_signed_in_trial(user, body.notes, settings)
     if not result.get("ok"):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=_IN_APP_TOPUP_REFUSALS.get(result.get("reason"), "This account can't be topped up right now."),
+            detail=_IN_APP_TOPUP_REFUSALS.get(result.get("reason") or "", "This account can't be topped up right now."),
         )
     return TrialExtensionResponse(
         ok=True,
@@ -217,25 +217,25 @@ def _require_admin(user: User) -> None:
 
 
 @router.get("/admin/stats", response_model=DemoAdminStatsResponse)
-async def admin_stats(user: User = Depends(get_current_user)):
+async def admin_stats(user: User = Depends(get_current_user)) -> DemoAdminStatsResponse:
     """Get trial program statistics."""
     _require_admin(user)
     stats = await demo_service.admin_get_stats()
     return DemoAdminStatsResponse(**stats)
 
 
-@router.get("/admin/responses")
-async def admin_responses(user: User = Depends(get_current_user)):
+@router.get("/admin/responses", response_model=None)
+async def admin_responses(user: User = Depends(get_current_user)) -> list[dict]:
     """List all post-experience responses with applicant info."""
     _require_admin(user)
     return await demo_service.admin_list_post_responses()
 
 
-@router.get("/admin/applications")
+@router.get("/admin/applications", response_model=None)
 async def admin_applications(
     status_filter: str | None = Query(default=None, alias="status"),
     user: User = Depends(get_current_user),
-):
+) -> list[dict]:
     """List all trial accounts."""
     _require_admin(user)
     return await demo_service.admin_list_applications(status_filter)

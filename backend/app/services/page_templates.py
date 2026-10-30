@@ -4,6 +4,10 @@ The original HTML/text never enters template storage. Only a conservative
 layout vocabulary and neutral fields survive conversion. New values must be
 quoted from the newly authorized file; the model cannot submit replacement HTML.
 """
+from pymongo.database import Database
+from app.models.document import SmartDocument
+from app.schemas.page_template import SaveTemplate, TemplateValue, TemplateTable
+
 from copy import deepcopy
 import hashlib
 import json
@@ -43,7 +47,7 @@ PROPERTIES = set(('color background background-color border-color border-top-col
                   'flex-wrap align-items justify-content list-style-type opacity outline outline-offset scroll-margin-top').split())
 
 
-def _css_value(value) -> bool:
+def _css_value(value: str) -> bool:
     # No strings, URLs, escapes, custom properties, data attributes, or generated content.
     if not re.fullmatch(r'[\w\s#.,()%+/-]+', value, re.ASCII):
         return False
@@ -51,7 +55,7 @@ def _css_value(value) -> bool:
     return all(word.lower() in KEYWORDS | {'rgb', 'rgba', 'hsl', 'hsla', 'calc'} for word in re.findall(r'[a-zA-Z_][\w-]*', scrubbed))
 
 
-def _declarations(text, *, bar=False):
+def _declarations(text: str, *, bar: bool=False) -> str:
     result = []
     for item in text.split(';'):
         prop, _, value = item.partition(':')
@@ -66,19 +70,20 @@ def _declarations(text, *, bar=False):
     return ';'.join(result)
 
 
-def design(html):
+def design(html: str) -> dict:
     cleaned, _ = artifacts.clean_html(html, 'Template')
     soup = BeautifulSoup(cleaned, 'html.parser')
     for node in soup.select('img, title'):
         # Raster charts and contact metadata can encode source data.
         node.decompose()
-    classes, ids = {}, {}
+    classes: dict[str, str] = {}
+    ids: dict[str, str] = {}
     for tag in soup.find_all(True):
-        for cls in tag.get('class', []):
+        for cls in tag.get_attribute_list('class'):
             classes.setdefault(cls, f'tc{len(classes)+1}')
         if tag.get('id'):
-            ids.setdefault(tag['id'], f'ts{len(ids)+1}')
-    def stylesheet(css):
+            ids.setdefault(str(tag['id']), f'ts{len(ids)+1}')
+    def stylesheet(css: str) -> str:
         rules = []
         css = re.sub(r'/\*.*?\*/', '', css, flags=re.S)
         offset = 0
@@ -102,7 +107,9 @@ def design(html):
             if not re.fullmatch(r'[\w\s.#,:*>+~-]+', selector, re.ASCII):
                 continue
             is_chart = bool(re.search(r'bar|progress|fill', selector, re.I))
-            selector = re.sub(r'([.#])([\w-]+)', lambda m: m[1] + (classes if m[1] == '.' else ids).get(m[2], 'unused'), selector)
+            def rename_selector(match: re.Match[str]) -> str:
+                return match[1] + (classes if match[1] == '.' else ids).get(match[2], 'unused')
+            selector = re.sub(r'([.#])([\w-]+)', rename_selector, selector)
             words = re.findall(r'(?<![.#\w-])([a-zA-Z][\w-]*)', selector)
             if any(word not in artifacts.ALLOWED_TAGS | {'hover', 'focus', 'focus-visible', 'first-child', 'last-child', 'root'} for word in words):
                 continue
@@ -113,10 +120,18 @@ def design(html):
 
     for style in soup.find_all('style'):
         style.string = stylesheet(style.get_text())
+    body = soup.body
+    if body is None:
+        raise HTTPException(422, 'Template must contain a document body.')
     # Preserve a guidance box's position and theme, but never its old factual text.
-    guidance_box = next((tag for tag in soup.body.find_all(True) if
-        re.search(r'guidance', ' '.join(tag.get('class', [])), re.I) or
-        (tag.name == 'aside' and tag.find(['h2', 'h3']) and tag.find(['h2', 'h3']).get_text(strip=True).casefold() == 'guidance')), None)
+    guidance_box = None
+    for candidate in body.find_all(True):
+        heading = candidate.find(['h2', 'h3'])
+        if re.search(r'guidance', ' '.join(candidate.get_attribute_list('class')), re.I) or (
+            candidate.name == 'aside' and heading is not None and heading.get_text(strip=True).casefold() == 'guidance'
+        ):
+            guidance_box = candidate
+            break
     if guidance_box:
         guidance_box.clear()
         heading = soup.new_tag('h2')
@@ -124,21 +139,22 @@ def design(html):
         content = soup.new_tag('p')
         content.string = '{{template_guidance}}'
         guidance_box.extend([heading, content])
-    fields = []
-    for tag in [soup.body, *soup.body.find_all(True)]:
-        original_class = ' '.join(tag.get('class', []))
+    fields: list[dict] = []
+    for tag in [body, *body.find_all(True)]:
+        original_class = ' '.join(tag.get_attribute_list('class'))
         bar = bool(re.search(r'bar|progress|fill', original_class, re.I))
-        attrs = {}
+        attrs: dict = {}
         if tag.get('class'):
             attrs['class'] = [classes[c] for c in tag['class']]
         if tag.get('id'):
-            attrs['id'] = ids[tag['id']]
+            attrs['id'] = ids[str(tag['id'])]
         if tag.get('style'):
-            attrs['style'] = _declarations(tag['style'], bar=bar)
-        if tag.name == 'a' and tag.get('href', '').startswith('#') and tag['href'][1:] in ids:
-            attrs['href'] = '#' + ids[tag['href'][1:]]
+            attrs['style'] = _declarations(str(tag['style']), bar=bar)
+        href = tag.get('href')
+        if tag.name == 'a' and isinstance(href, str) and href.startswith('#') and href[1:] in ids:
+            attrs['href'] = '#' + ids[href[1:]]
         for attr in ('colspan', 'rowspan'):
-            if str(tag.get(attr, '')).isdigit() and int(tag[attr]) <= 100:
+            if str(tag.get(attr, '')).isdigit() and int(str(tag[attr])) <= 100:
                 attrs[attr] = tag[attr]
         tag.attrs = attrs
         for text in list(tag.children):
@@ -160,7 +176,8 @@ def design(html):
             hint = LABELS.get(previous.get_text(' ', strip=True).casefold(), '') if previous else ''
             cell = tag if tag.name == 'td' else tag.find_parent('td')
             if cell:
-                headers = cell.find_parent('table').select('thead th')
+                parent_table = cell.find_parent('table')
+                headers = parent_table.select('thead th') if parent_table is not None else []
                 column = len(cell.find_previous_siblings(['td', 'th']))
                 if column < len(headers):
                     hint = LABELS.get(headers[column].get_text(' ', strip=True).casefold(), '')
@@ -177,7 +194,7 @@ def design(html):
     for style in soup.find_all('style'):
         style.extract()
     shell = styles + str(soup.body)
-    tables = []
+    tables: list[dict] = []
     shell_soup = BeautifulSoup(shell, 'html.parser')
     for table in shell_soup.find_all('table'):
         rows = [row for row in table.find_all('tr') if row.find('td') and row.find_parent('table') is table]
@@ -189,12 +206,12 @@ def design(html):
         table_id = f'table_{len(tables)+1}'
         table['data-template-table'] = table_id
         field_ids = re.findall(r'\{\{(field_\d+)\}\}', ''.join(str(row) for row in rows))
-        headers = [cell.get_text(' ', strip=True) for cell in table.select('thead th')]
-        tables.append({'id': table_id, 'columns': columns, 'headers': headers, 'field_ids': field_ids})
+        header_labels = [cell.get_text(' ', strip=True) for cell in table.select('thead th')]
+        tables.append({'id': table_id, 'columns': columns, 'headers': header_labels, 'field_ids': field_ids})
     return {'html': str(shell_soup), 'fields': fields, 'tables': tables}
 
 
-def prepare(db, user_id, html):
+def prepare(db: Database[dict], user_id: str, html: str) -> dict:
     draft = design(html)
     key = hashlib.sha256((user_id + json.dumps(draft, sort_keys=True)).encode()).hexdigest()[:32]
     db.page_template_drafts.find_one_and_update({'_id': key}, {'$setOnInsert': {
@@ -203,7 +220,7 @@ def prepare(db, user_id, html):
     return {'draft_id': key, **draft, 'preview_html': render(draft, {})[0]}
 
 
-def save(db, user_id, owner_name, body):
+def save(db: Database[dict], user_id: str, owner_name: str, body: SaveTemplate) -> dict:
     draft = db.page_template_drafts.find_one({'_id': body.draft_id, 'user_id': user_id})
     if not draft:
         raise HTTPException(404, 'Template preview not found. Prepare it again.')
@@ -217,31 +234,33 @@ def save(db, user_id, owner_name, body):
         'name': body.name.strip(), 'description': body.description.strip(), 'guidance': body.guidance.strip(),
         'html': draft['html'], 'fields': fields, 'tables': draft.get('tables', []), 'deleted_at': None, 'created_at': datetime.now(timezone.utc),
     }}, upsert=True, return_document=ReturnDocument.AFTER)
+    if doc is None:
+        raise HTTPException(503, 'Template save was not confirmed. Retry the same request.')
     if doc.get('deleted_at'):
         raise HTTPException(409, 'This template was deleted. Choose a new name to save a new template.')
     return doc
 
 
-def get(db, uuid):
+def get(db: Database[dict], uuid: str) -> dict:
     doc = db.page_templates.find_one({'uuid': uuid, 'deleted_at': None})
     if not doc:
         raise HTTPException(404, 'Template not found')
     return doc
 
 
-def metadata(doc, user_id):
+def metadata(doc: dict, user_id: str) -> dict:
     return {key: doc.get(key) for key in ('uuid', 'name', 'description', 'owner_name', 'team_id', 'created_at')} | {
         'can_manage': doc['user_id'] == user_id,
     }
 
 
-def render(template, values, table_values=None):
+def render(template: dict, values: dict[str, str], table_values: dict[str, list[list[str | None]]] | None=None) -> tuple[str, int]:
     soup = BeautifulSoup(template['html'], 'html.parser')
     table_values = table_values or {}
     filled = 0
     filled_cells = set()
     for table in soup.select('[data-template-table]'):
-        table_id = table.attrs.pop('data-template-table')
+        table_id = str(table.attrs.pop('data-template-table'))
         if table_id not in table_values:
             continue
         old_rows = [row for row in table.find_all('tr') if row.find('td') and row.find_parent('table') is table]
@@ -249,6 +268,8 @@ def render(template, values, table_values=None):
             continue
         prototype = max(old_rows, key=lambda row: len(row.find_all(['td', 'th'], recursive=False)))
         parent = prototype.parent
+        if parent is None:
+            continue
         for values_row in table_values[table_id]:
             row = deepcopy(prototype)
             for cell, value in zip(row.find_all(['td', 'th'], recursive=False), values_row):
@@ -262,12 +283,13 @@ def render(template, values, table_values=None):
             row.decompose()
     has_guidance = '{{template_guidance}}' in template['html']
     for text in list(soup.find_all(string=True)):
-        if text.parent.name == 'style' or id(text.parent) in filled_cells:
+        if text.parent is None or text.parent.name == 'style' or id(text.parent) in filled_cells:
             continue
-        def substitute(match):
+        def substitute(match: re.Match[str]) -> str:
             nonlocal filled
             if match[1] == 'template_guidance':
-                return template.get('guidance') or 'Reusable guidance'
+                guidance = template.get('guidance')
+                return guidance if isinstance(guidance, str) and guidance else 'Reusable guidance'
             value = values.get(match[1])
             if value is not None:
                 filled += 1
@@ -281,9 +303,9 @@ def render(template, values, table_values=None):
             numeric[key] = float(re.sub(r'[^\d.]', '', value))
     maximum = max(numeric.values(), default=0)
     for bar in soup.select('[data-template-bar]'):
-        key = bar.attrs.pop('data-template-bar')
+        key = str(bar.attrs.pop('data-template-bar'))
         width = 100 * numeric.get(key, 0) / maximum if maximum else 0
-        bar['style'] = re.sub(r'(?:width|height):[^;]*;?', '', bar.get('style', '')) + (f';width:{width:.3f}%;overflow:visible' if key in numeric else ';width:auto;background:none;border:1px dashed gray')
+        bar['style'] = re.sub(r'(?:width|height):[^;]*;?', '', str(bar.get('style', ''))) + (f';width:{width:.3f}%;overflow:visible' if key in numeric else ';width:auto;background:none;border:1px dashed gray')
     if template.get('guidance') and not has_guidance:
         guidance = soup.new_tag('aside')
         title = soup.new_tag('h2')
@@ -297,12 +319,12 @@ def render(template, values, table_values=None):
     return html, filled
 
 
-def fill(template, document, supplied, supplied_tables=None):
+def fill(template: dict, document: SmartDocument, supplied: list[TemplateValue], supplied_tables: list[TemplateTable] | None=None) -> tuple[str, dict]:
     text = ' '.join((document.raw_text or '').split())
     if document.processing or getattr(document, 'soft_deleted', False) or not text:
         raise HTTPException(422, 'Choose a processed file with readable text.')
     ids = {field['id'] for field in template['fields']}
-    def checked(value, quote):
+    def checked(value: str, quote: str) -> str:
         value, quote = ' '.join(value.split()), ' '.join(quote.split())
         numeric = re.fullmatch(r'[-+]?[$€£]?\s*\d[\d,.]*%?', value)
         boundary = (r'(?<![\w.,+\-$€£])', r'(?!\w|[.,]\d|%)') if numeric else (r'(?<!\w)', r'(?!\w)')
@@ -310,7 +332,7 @@ def fill(template, document, supplied, supplied_tables=None):
             raise HTTPException(422, 'A supplied value is not supported by its quote in the selected file. Omit unavailable values.')
         return value
     tables = {table['id']: table for table in template.get('tables', [])}
-    table_values = {}
+    table_values: dict[str, list[list[str | None]]] = {}
     for supplied_table in supplied_tables or []:
         if supplied_table.table_id not in tables or supplied_table.table_id in table_values:
             raise HTTPException(422, 'Use each template table once, with its exact identifier.')

@@ -1,10 +1,15 @@
 """Deterministic exports. No model calls, external fetches, storage or publication."""
+from docx.text.paragraph import Paragraph
+from openpyxl.worksheet.worksheet import Worksheet
+from app.schemas.chat_export import ExportMessage
+
 
 import io
 import re
 from html import escape
 
 from bs4 import BeautifulSoup, NavigableString, Tag
+from bs4.element import PageElement
 from docx import Document
 from docx.shared import Inches, Pt
 from markdown_it import MarkdownIt
@@ -20,20 +25,22 @@ MIME_TYPES = {
 }
 
 
-def _message_html(message):
+def _message_html(message: ExportMessage) -> str:
     # Raw HTML is displayed as text. Images never cause external requests.
     md = MarkdownIt("commonmark", {"html": False}).enable("table")
-    md.renderer.rules["image"] = lambda tokens, idx, *_: escape(tokens[idx].content)
+    md.add_render_rule("image", lambda renderer, tokens, idx, options, env: escape(tokens[idx].content))
     body = md.render(message.content)
     tools = "".join(f'<p class="tool">{escape(t)}</p>' for t in message.tools)
     evidence = f'<pre class="evidence">{escape(message.evidence)}</pre>' if message.evidence else ""
     return f'<section><h2>{message.role.title()}</h2>{body}{tools}{evidence}</section>'
 
 
-def _inline(paragraph, node, bold=False, italic=False) -> None:
+def _inline(paragraph: Paragraph, node: PageElement, bold: bool=False, italic: bool=False) -> None:
     if isinstance(node, NavigableString):
         run = paragraph.add_run(str(node))
         run.bold, run.italic = bold, italic
+        return
+    if not isinstance(node, Tag):
         return
     if node.name == "br":
         paragraph.add_run().add_break()
@@ -45,7 +52,7 @@ def _inline(paragraph, node, bold=False, italic=False) -> None:
         paragraph.add_run(f' ({node["href"]})')
 
 
-def _docx(soup):
+def _docx(soup: BeautifulSoup) -> bytes:
     doc = Document()
     section = doc.sections[0]
     section.top_margin = section.bottom_margin = Inches(0.7)
@@ -53,7 +60,7 @@ def _docx(soup):
     doc.styles["Normal"].font.size = Pt(11)
     doc.add_heading("Chat export", 0)
 
-    def blocks(parent) -> None:
+    def blocks(parent: Tag) -> None:
         for node in parent.children:
             if not isinstance(node, Tag):
                 continue
@@ -93,7 +100,7 @@ def _docx(soup):
     return out.getvalue()
 
 
-def _cell(sheet, row, column, value, numeric=False) -> None:
+def _cell(sheet: Worksheet, row: int, column: int, value: str, numeric: bool=False) -> None:
     # Force strings to literal cells: formulas and Excel error tokens remain text.
     cell = sheet.cell(row, column)
     cell.value = value
@@ -104,9 +111,11 @@ def _cell(sheet, row, column, value, numeric=False) -> None:
     cell.alignment = Alignment(vertical="top", wrap_text=True)
 
 
-def _xlsx(body, soup):
+def _xlsx(body: ChatExportRequest, soup: BeautifulSoup) -> bytes:
     wb = Workbook()
     transcript = wb.active
+    if not isinstance(transcript, Worksheet):
+        raise RuntimeError("A new workbook must contain a worksheet")
     transcript.title = "Conversation"
     transcript.append(["Message", "Role", "Part", "Content", "Tool summaries", "Source references and warnings"])
     for index, message in enumerate(body.messages, 1):
@@ -120,7 +129,10 @@ def _xlsx(body, soup):
                 _cell(transcript, row, col, pieces[part] if part < len(pieces) else "")
     for index, table in enumerate(soup.select("table"), 1):
         sheet = wb.create_sheet(f"Table {index}")
-        message_index = len(list(table.find_parent("section").find_previous_siblings("section"))) + 1
+        section = table.find_parent("section")
+        if section is None:
+            raise ValueError("Export table must belong to a message")
+        message_index = len(list(section.find_previous_siblings("section"))) + 1
         sheet.append([f"From message {message_index}; source references are on the Conversation sheet."])
         for row_index, row in enumerate(table.select("tr"), 2):
             for col, source in enumerate(row.find_all(["th", "td"], recursive=False), 1):

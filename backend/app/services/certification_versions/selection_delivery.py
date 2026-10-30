@@ -30,14 +30,14 @@ class SelectionDelivery:
     def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         self.repository = repository or EnrollmentRepository()
 
-    def journal(self, kind):
+    def journal(self, kind: object) -> UpgradeActivationRepository | SavedCourseSelectionRepository:
         if kind == 'optional_upgrade_selection.1':
             return UpgradeActivationRepository(self.repository)
         if kind == 'saved_course_selection.1':
             return SavedCourseSelectionRepository(self.repository)
         raise CourseCatalogError('The saved course switch has an unknown receipt type')
 
-    async def original(self, user_id: str, kind, request_id: str):
+    async def original(self, user_id: str, kind: object, request_id: str) -> tuple[UpgradeActivationRepository | SavedCourseSelectionRepository, dict]:
         journal = self.journal(kind)
         raw = await journal.records.find_one({'uuid': request_id, 'user_id': user_id})
         if raw is None:
@@ -46,7 +46,7 @@ class SelectionDelivery:
         return journal, raw
 
     @staticmethod
-    def verify(journal, raw, receipt):
+    def verify(journal: UpgradeActivationRepository | SavedCourseSelectionRepository, raw: dict, receipt: object) -> dict:
         if not isinstance(receipt, dict):
             raise CourseCatalogError('The saved course switch receipt is malformed')
         try:
@@ -55,7 +55,7 @@ class SelectionDelivery:
             raise CourseCatalogError('The saved course switch receipt failed integrity verification') from exc
 
     @staticmethod
-    def matches_selection(selection, receipt, request_id: str) -> None:
+    def matches_selection(selection: dict, receipt: dict, request_id: str) -> None:
         if (selection.get('pending_transition_id') != request_id
                 or selection.get('active_enrollment_id') != receipt.get('target_enrollment_id')
                 or selection.get('revision') != receipt.get('revision')
@@ -63,7 +63,7 @@ class SelectionDelivery:
             raise EnrollmentConflict('The selected course no longer matches this unconfirmed switch')
 
     @staticmethod
-    def summary(receipt, request_id: str) -> dict:
+    def summary(receipt: dict, request_id: str) -> dict:
         # Allowlist: no original answers, grading payloads or learner identity.
         return {'request_id': request_id, **{key: receipt[key] for key in (
             'kind', 'receipt_sha256', 'source_enrollment_id', 'target_enrollment_id',
@@ -71,9 +71,9 @@ class SelectionDelivery:
             'action': receipt.get('action', 'activate_optional_upgrade'),
             'credit_transferred': False, 'histories_preserved': True}
 
-    async def status(self, user_id: str):
+    async def status(self, user_id: str) -> dict:
         selection = await self.repository.selections.find_one({'user_id': user_id})
-        result = {'read_only': True, 'current_enrollment_id': (selection or {}).get('active_enrollment_id'),
+        result: dict = {'read_only': True, 'current_enrollment_id': (selection or {}).get('active_enrollment_id'),
                   'pending': None}
         if not selection or not selection.get('pending_transition_id'):
             if selection and selection.get('in_flight_writes'):
@@ -97,7 +97,7 @@ class SelectionDelivery:
         result['pending'] = self.summary(receipt, request_id)
         return result
 
-    async def confirm(self, user_id: str, body) -> dict:
+    async def confirm(self, user_id: str, body: object) -> dict:
         request = SelectionConfirmation.model_validate(body)
         journal, raw = await self.original(user_id, request.kind, request.request_id)
         if raw['state'] == 'applied':

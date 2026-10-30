@@ -29,6 +29,7 @@ import asyncio
 import datetime
 import hashlib
 import logging
+import math
 import random
 from typing import Any
 
@@ -306,6 +307,8 @@ async def run_optimization(
         from app.services.workflow_service import _measure_no_workflow_baseline, get_workflow
 
         wf_data = await get_workflow(workflow_id)
+        if wf_data is None:
+            raise OptimizationInputError(f"Workflow not found: {workflow_id}")
 
         # No-workflow baseline (single-shot prompt against the source text).
         # Best-effort — `_measure_no_workflow_baseline` returns None when the
@@ -761,7 +764,7 @@ async def _resolve_test_inputs(
     return out
 
 
-async def _load_result_for_test_input(test_input: dict):
+async def _load_result_for_test_input(test_input: dict) -> WorkflowResult | None:
     """Fetch the original WorkflowResult so baseline_no_workflow can re-use
     its ``steps_output`` to pull the source document text. Returns None when
     the result has been deleted since the expected_output was saved."""
@@ -1495,10 +1498,10 @@ def _compute_workflow_variance(samples: list[tuple[dict, dict]]) -> float | None
         return None
     mean = sum(deltas) / len(deltas)
     variance = sum((d - mean) ** 2 for d in deltas) / (len(deltas) - 1)
-    return round(variance ** 0.5, 4)
+    return round(math.sqrt(variance), 4)
 
 
-def _serialize_for_judge(final_output) -> str | None:
+def _serialize_for_judge(final_output: object) -> str | None:
     """Same serialization as workflow_service._serialize_output, kept inline so
     the optimizer doesn't depend on a private helper."""
     import base64 as _b64

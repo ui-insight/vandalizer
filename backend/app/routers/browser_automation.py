@@ -125,7 +125,7 @@ async def end_session(session_id: str, user: User = Depends(get_current_user)) -
 async def browser_automation_ws(
     websocket: WebSocket,
     access_token: str | None = Cookie(default=None),
-):
+) -> None:
     """WebSocket endpoint for Chrome extension communication.
 
     Authentication is validated during the handshake via the access_token
@@ -161,7 +161,7 @@ async def browser_automation_ws(
     from app.services.browser_automation import BrowserAutomationService
 
     service = BrowserAutomationService.get_instance()
-    user_id: str | None = ws_user.user_id
+    user_id = ws_user.user_id
 
     # Background task for forwarding Redis -> WebSocket
     forward_task: asyncio.Task | None = None
@@ -180,7 +180,7 @@ async def browser_automation_ws(
         with contextlib.suppress(asyncio.CancelledError):
             await task
 
-    async def _forward_redis_to_ws(uid: str):
+    async def _forward_redis_to_ws(uid: str) -> None:
         """Subscribe to Redis channel and forward messages to WebSocket."""
         import redis.asyncio as aioredis
         import os

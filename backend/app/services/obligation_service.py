@@ -212,10 +212,10 @@ def check_deadline(
             return None, "due_text must describe the same verified time and time zone as due_at"
     # Store only the verified time/zone. The date is already in due_at; keeping
     # the model's full "due June 30, 2026" phrase repeats it in every inbox/card.
-    text = stated_time["text"] if stated_time is not None else None
+    verified_time = stated_time["text"] if stated_time is not None else None
     if not has_time:
         due = datetime.datetime.combine(due.date(), datetime.time())
-    return {"due_at": due, "due_text": text or None}, None
+    return {"due_at": due, "due_text": verified_time or None}, None
 
 
 def _parse_due(value: Any) -> Optional[datetime.datetime]:
@@ -335,8 +335,8 @@ async def check_proposal(item: dict, user: User, project: Project) -> tuple[Opti
     sources: list[ObligationSource] = []
     for raw in raw_sources:
         src, reason = await _check_source(raw, user, project)
-        if reason:
-            return None, reason
+        if src is None or reason:
+            return None, reason or "source could not be verified"
         sources.append(src)
     quotes = " ".join(s.quote for s in sources)
     clean: dict[str, Any] = {"kind": kind, "title": title[:200], "sources": sources}
@@ -359,8 +359,8 @@ async def check_proposal(item: dict, user: User, project: Project) -> tuple[Opti
             if _OFFSET.search(quotes):
                 return None, "relative timing needs relative_deadline=true with timing and period source roles; the server calculates the dates"
             checked, reason = check_deadline(item.get("due_at"), item.get("due_text"), quotes)
-            if reason:
-                return None, reason
+            if checked is None or reason:
+                return None, reason or "deadline could not be verified"
             clean.update(**checked)
     elif kind == "limit":
         limit_value = _as_number(item.get("limit_value"))
@@ -437,7 +437,8 @@ async def save_checked(project: Project, user: User, clean: dict) -> Obligation:
 
 async def propose(project: Project, user: User, items: list[dict]) -> dict:
     """Check proposed obligations without saving: what would be added, replaced or rejected."""
-    accepted, rejected = [], []
+    accepted: list[dict] = []
+    rejected: list[dict] = []
     if len(items or []) > _MAX_ITEMS:
         return {"accepted": [], "rejected": [{"title": "Batch", "reason": f"propose at most {_MAX_ITEMS} obligations at a time"}]}
     from app.services.relative_deadlines import MAX_OCCURRENCES
@@ -445,8 +446,8 @@ async def propose(project: Project, user: User, items: list[dict]) -> dict:
     for item in items or []:
         clean, reason = await check_proposal(item, user, project)
         title = str((item or {}).get("title") or "") if isinstance(item, dict) else ""
-        if reason:
-            rejected.append({"title": title, "reason": reason})
+        if clean is None or reason:
+            rejected.append({"title": title, "reason": reason or "obligation could not be verified"})
             continue
         occurrences = clean.pop("_occurrences", [{}])
         if len(accepted) + len(occurrences) > MAX_OCCURRENCES:
@@ -462,7 +463,7 @@ async def propose(project: Project, user: User, items: list[dict]) -> dict:
     return {"accepted": accepted, "rejected": rejected}
 
 
-def _sort_key(ob: Obligation):
+def _sort_key(ob: Obligation) -> tuple[int, datetime.datetime, datetime.datetime]:
     far = datetime.datetime.max.replace(tzinfo=datetime.timezone.utc)
     due = ob.due_at.replace(tzinfo=ob.due_at.tzinfo or datetime.timezone.utc) if ob.due_at else far
     rank = 0 if ob.kind == "deadline" else 1 if ob.in_conflict else 2

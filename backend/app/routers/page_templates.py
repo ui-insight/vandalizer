@@ -1,4 +1,7 @@
 """First-class private/team design templates. No publication or source access grants."""
+from typing import Callable, Concatenate, ParamSpec, TypeVar
+from pymongo.database import Database
+
 import functools
 import re
 from datetime import datetime, timezone
@@ -15,14 +18,17 @@ from app.services import access_control, artifacts, page_templates
 from app.services.page_links import prepare_page_links
 from app.tasks import get_sync_db
 
+P = ParamSpec("P")
+ResultT = TypeVar("ResultT")
+
 router = APIRouter()
 
 
-async def run(fn, *args):
-    return await anyio.to_thread.run_sync(functools.partial(fn, get_sync_db(), *args))
+async def run(fn: Callable[Concatenate[Database[dict], P], ResultT], *args: P.args, **kwargs: P.kwargs) -> ResultT:
+    return await anyio.to_thread.run_sync(functools.partial(fn, get_sync_db(), *args, **kwargs))
 
 
-async def authorized(uuid, user, manage=False):
+async def authorized(uuid: str, user: User, manage: bool=False) -> dict:
     template = await run(page_templates.get, uuid)
     if template['user_id'] == user.user_id:
         return template
@@ -31,25 +37,25 @@ async def authorized(uuid, user, manage=False):
     raise HTTPException(404, 'Template not found')
 
 
-async def browse(user, search='', page=1):
+async def browse(user: User, search: str='', page: int=1) -> dict:
     access = await access_control.get_team_access_context(user)
-    query = {'deleted_at': None, '$or': [{'user_id': user.user_id}, {'team_id': {'$in': list(access.team_uuids | access.team_object_ids)}}]}
+    query: dict = {'deleted_at': None, '$or': [{'user_id': user.user_id}, {'team_id': {'$in': list(access.team_uuids | access.team_object_ids)}}]}
     if search.strip():
         query['name'] = {'$regex': re.escape(search.strip()), '$options': 'i'}
-    def load(db):
+    def load(db: Database[dict]) -> dict:
         items = list(db.page_templates.find(query).sort([('created_at', -1), ('uuid', 1)]).skip((page - 1) * 20).limit(20))
         return {'items': [page_templates.metadata(item, user.user_id) for item in items], 'total': db.page_templates.count_documents(query), 'page': page, 'page_size': 20}
     return await run(load)
 
 
-@router.get('')
-async def list_templates(search: str = Query(default='', max_length=200), page: int = Query(default=1, ge=1, le=100000), user: User = Depends(get_current_user)):
+@router.get('', response_model=None)
+async def list_templates(search: str = Query(default='', max_length=200), page: int = Query(default=1, ge=1, le=100000), user: User = Depends(get_current_user)) -> dict:
     return await browse(user, search, page)
 
 
-@router.post('/prepare')
+@router.post('/prepare', response_model=None)
 @limiter.limit('20/minute')
-async def prepare_template(request: Request, body: TemplateSource, user: User = Depends(get_current_user)):
+async def prepare_template(request: Request, body: TemplateSource, user: User = Depends(get_current_user)) -> dict:
     if body.artifact_uuid:
         from app.routers.artifacts import authorized as authorize_page
         page = await authorize_page(body.artifact_uuid, user)
@@ -62,9 +68,9 @@ async def prepare_template(request: Request, body: TemplateSource, user: User = 
     return await run(page_templates.prepare, user.user_id, html)
 
 
-@router.post('')
+@router.post('', response_model=None)
 @limiter.limit('20/minute')
-async def save_template(request: Request, body: SaveTemplate, user: User = Depends(get_current_user)):
+async def save_template(request: Request, body: SaveTemplate, user: User = Depends(get_current_user)) -> dict:
     template = await run(page_templates.save, user.user_id, user.name or 'Workspace member', body)
     return page_templates.metadata(template, user.user_id)
 
@@ -75,8 +81,8 @@ async def get_template(uuid: str, user: User = Depends(get_current_user)) -> dic
     return {**page_templates.metadata(template, user.user_id), 'fields': template['fields'], 'guidance': template.get('guidance', '')}
 
 
-@router.get('/{uuid}/content')
-async def template_content(uuid: str, user: User = Depends(get_current_user)):
+@router.get('/{uuid}/content', response_model=None)
+async def template_content(uuid: str, user: User = Depends(get_current_user)) -> HTMLResponse:
     template = await authorized(uuid, user)
     html, _ = page_templates.render(template, {})
     html, csp = prepare_page_links(html, artifacts.CONTENT_CSP)
