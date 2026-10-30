@@ -9,7 +9,7 @@ class PracticalHistory:
         self.repository = repository or EnrollmentRepository()
         self.decisions = LearnerDecisionRepository()
 
-    async def operation(self, user_id: str, enrollment_id: str, delivery_enabled):
+    async def operation(self, user_id: str, enrollment_id: str, delivery_enabled: bool) -> tuple[CourseOperation, str | None]:
         enrollment = await self.repository._enrollment(user_id, enrollment_id)
         package = self.repository.catalog.load(enrollment.course_version)
         progress = await self.repository.read_progress(user_id, enrollment_id)

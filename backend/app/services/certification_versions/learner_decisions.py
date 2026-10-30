@@ -59,7 +59,7 @@ class DecisionPrompt(BaseModel):
         return self
 
     @property
-    def digest(self):
+    def digest(self) -> str:
         return encode(self.model_dump(mode='json'))[1]
 
 
@@ -97,7 +97,7 @@ class DecisionSubmission(BaseModel):
         return self
 
 
-def load_prompt(package: CoursePackage, module_id: str, prompt_id: str):
+def load_prompt(package: CoursePackage, module_id: str, prompt_id: str) -> DecisionPrompt:
     path = f'decisions/{module_id}.json'
     if path not in package.manifest.artifacts:
         raise EnrollmentConflict('This course has no practical decision prompts for this module')
@@ -150,7 +150,7 @@ class LearnerDecisionJournal:
         except (TypeError, ValueError, KeyError) as exc:
             raise CourseCatalogError('The saved learner decision failed integrity verification') from exc
 
-    async def get(self, user_id: str, decision_id) -> dict | None:
+    async def get(self, user_id: str, decision_id: str | None) -> dict | None:
         raw = await self.records.find_one({'uuid': decision_id, 'user_id': user_id})
         return self.decode(raw) if raw else None
 
@@ -162,7 +162,7 @@ class LearnerDecisionJournal:
                 'course_version': operation.package.manifest.release_id,
                 'manifest_sha256': operation.package.manifest_sha256, 'module_id': module_id}
 
-    async def runs(self, operation, module_id: str) -> dict:
+    async def runs(self, operation: CourseOperation, module_id: str) -> dict:
         query = self.read_identity(operation, module_id)
         records = await CertificationLabExecution.get_motor_collection().find(query,
             {'uuid': 1, 'state': 1}).sort('_id', -1).limit(51).to_list(None)
@@ -195,7 +195,7 @@ class LearnerDecisionJournal:
                 'latest_decision': self.decode(latest) if latest else None}
 
 
-    async def _link_scope(self, operation, record, *, replay) -> None:
+    async def _link_scope(self, operation: CourseOperation, record: dict, *, replay: bool) -> None:
         if record['prompt'].get('execution_choice') is None:
             return
         lease = LabExecutionRepository.check_operation(operation, record)
@@ -219,12 +219,12 @@ class LearnerDecisionJournal:
             if latest is None:
                 raise EnrollmentConflict('The run or scope decision changed before this choice was linked')
 
-    async def authorize(self, operation: CourseOperation, run):
+    async def authorize(self, operation: CourseOperation, run: dict) -> dict | None:
         """Read the currently linked consent, never an arbitrary passing answer."""
         LabExecutionRepository.check_operation(operation, run['plan'])
         return await self.inspect_authorization(operation.user_id, operation.progress.enrollment_id, operation.package, run)
 
-    async def inspect_authorization(self, user_id: str, enrollment_id: str | None, package: CoursePackage, run) -> None | dict:
+    async def inspect_authorization(self, user_id: str, enrollment_id: str | None, package: CoursePackage, run: dict) -> None | dict:
         """Validate linked consent without acquiring a write lease or dispatching."""
         identity = {'user_id': user_id, 'enrollment_id': enrollment_id,
                     'course_version': package.manifest.release_id, 'manifest_sha256': package.manifest_sha256}
@@ -268,7 +268,7 @@ class LearnerDecisionJournal:
 
 
 class LearnerDecisionRepository(LearnerDecisionJournal):
-    async def submit(self, operation: CourseOperation, module_id: str, prompt_id: str, submission, *, actor_user_id: str):
+    async def submit(self, operation: CourseOperation, module_id: str, prompt_id: str, submission: object, *, actor_user_id: str) -> dict:
         submission = DecisionSubmission.model_validate(submission)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Only the authenticated learner can submit this decision')

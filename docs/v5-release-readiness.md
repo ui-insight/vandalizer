@@ -58,11 +58,14 @@ network-policy enforcement and deployment identity still need deployed QA.
 ## Typing
 
 The original mypy baseline was 3,141 errors. The dependency pass reduced it to
-3,098; the current follow-up reduces it to 2,302 across 524 source files. The
+3,098; the current follow-up reduces it to 2,152 across 524 source files. The
 models, schemas, database helpers, URL helpers and observability setup pass their
 focused type check. Workflow execution, automatic review, review persistence and
 review recovery, and the knowledge-base, admin, workflow and Home/config APIs
-now have no mypy diagnostics either. The full check remains
+now have no mypy diagnostics either. The main certification API, course-operation
+decorator, preparation/execution services, design delivery and saved-review
+delivery also pass their checks. Invalid principals fail before learner storage
+is accessed; 18 regressions cover internal, HTTP and tool error handling. The full check remains
 advisory; the backlog is not clear.
 
 The follow-up adds validator, database, record-reader and execution contracts,

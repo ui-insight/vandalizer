@@ -1,4 +1,7 @@
 """Owned capture, approval and history; automatic assessment is explicit."""
+from app.models.certification import CertificationEnrollment
+from .catalog import CoursePackage
+from .workflow_design_case import WorkflowDesignCase
 from app.models.workflow import Workflow
 from .attempts import encode
 from .catalog import CourseCatalogError
@@ -20,7 +23,7 @@ class WorkflowDesignDelivery:
         self.inputs = WorkflowDesignInputRepository()
         self.records = WorkflowDesignSubmissionRepository()
 
-    async def course(self, user_id: str, enrollment_id: str):
+    async def course(self, user_id: str, enrollment_id: str) -> tuple[CertificationEnrollment, CoursePackage, WorkflowDesignCase]:
         enrollment = await self.repository._enrollment(user_id, enrollment_id)
         package = self.repository.catalog.load(enrollment.course_version)
         if 'design-cases/workflow_design.json' not in package.manifest.artifacts:
@@ -28,7 +31,7 @@ class WorkflowDesignDelivery:
         return enrollment, package, load_workflow_design_case(package)
 
     @staticmethod
-    def verify(saved, enrollment, case, *, capture: bool=False):
+    def verify(saved: dict, enrollment: CertificationEnrollment, case: WorkflowDesignCase, *, capture: bool=False) -> dict:
         snapshot = saved if capture else saved['input_snapshot']
         if (any(saved[key] != value for key, value in {'user_id': enrollment.user_id,
                 'enrollment_id': enrollment.uuid, 'course_version': enrollment.course_version,
@@ -37,7 +40,7 @@ class WorkflowDesignDelivery:
             raise CourseCatalogError('The saved workflow design does not match its original course')
         return saved
 
-    async def get(self, user_id: str, enrollment_id: str, submission_id, *, capture: bool=False):
+    async def get(self, user_id: str, enrollment_id: str, submission_id: str, *, capture: bool=False) -> dict:
         enrollment, _, case = await self.course(user_id, enrollment_id)
         saved = await (self.inputs if capture else self.records).get(user_id, submission_id)
         if saved is None:
@@ -72,7 +75,7 @@ class WorkflowDesignDelivery:
                 'process_choices': process_choices, 'older_process_choices_available': older_processes,
                 'can_submit': writable, 'read_only_reason': None if writable else 'This is preserved course history. Select an available current course before saving new work.'}
 
-    async def save(self, user_id: str, enrollment_id: str, payload, *, capture: bool=False):
+    async def save(self, user_id: str, enrollment_id: str, payload: object, *, capture: bool=False) -> dict:
         current = await self.repository.current(user_id)
         if current is None or current.uuid != enrollment_id:
             raise EnrollmentConflict('Select your existing course before saving Workflow Design work')

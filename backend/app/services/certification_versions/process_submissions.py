@@ -75,11 +75,11 @@ class ProcessSubmissionRepository:
         except (ValueError, TypeError, KeyError) as exc:
             raise CourseCatalogError('The saved process design failed integrity verification') from exc
 
-    async def get(self, user_id: str, submission_id) -> dict | None:
+    async def get(self, user_id: str, submission_id: str) -> dict | None:
         raw = await self.records.find_one({'user_id': user_id, 'uuid': submission_id})
         return self.decode(raw) if raw else None
 
-    async def submit(self, operation: CourseOperation, body, *, actor_user_id: str):
+    async def submit(self, operation: CourseOperation, body: object, *, actor_user_id: str) -> dict:
         submission = ProcessSubmission.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Process design requires the authenticated learner')

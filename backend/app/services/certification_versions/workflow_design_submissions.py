@@ -76,11 +76,11 @@ class WorkflowDesignSubmissionRepository:
         except (KeyError, TypeError, ValueError) as exc:
             raise CourseCatalogError('The saved workflow approval failed integrity verification') from exc
 
-    async def get(self, user_id: str, submission_id) -> dict | None:
+    async def get(self, user_id: str, submission_id: str) -> dict | None:
         raw = await self.records.find_one({'uuid': submission_id, 'user_id': user_id})
         return self.decode(raw) if raw else None
 
-    async def submit(self, operation: CourseOperation, body, *, actor_user_id: str):
+    async def submit(self, operation: CourseOperation, body: object, *, actor_user_id: str) -> dict:
         body = WorkflowDesignSubmission.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Workflow Design approval requires the authenticated learner')
@@ -93,7 +93,7 @@ class WorkflowDesignSubmissionRepository:
             raise EnrollmentConflict('Approve the original assigned design case')
         request_hash = encode({**identity, 'submission': body.model_dump(mode='json')})[1]
 
-        def replay(raw):
+        def replay(raw: dict) -> dict:
             if any(raw.get(key) != value for key, value in identity.items()) or raw.get('request_sha256') != request_hash:
                 raise EnrollmentConflict('This approval reference already belongs to different work')
             return self.decode(raw)

@@ -33,14 +33,15 @@ class PreparationSubmission(BaseModel):
     artifact_id: str = Field(min_length=1, max_length=200, pattern=r'^\S+$')
 
 
-async def configured_runtime():
+async def configured_runtime() -> dict:
     # Preparation must not create or repair global application settings.
-    config = await SystemConfig.find_one()
+    config: SystemConfig | None = await SystemConfig.find_one()
     if config is None:
         raise CourseCatalogError('Assessed execution settings are unavailable; your saved work is preserved')
     # Runtime fingerprints require JSON data. Database identity and edit
     # attribution are not execution settings and must not invalidate a plan.
-    return config.model_dump(mode='json', exclude={'id', 'updated_at', 'updated_by'})
+    runtime: dict = config.model_dump(mode='json', exclude={'id', 'updated_at', 'updated_by'})
+    return runtime
 
 
 class PracticalPreparation:
@@ -64,7 +65,7 @@ class PracticalPreparation:
                 raise PreparationUnavailable('This course does not offer preparation for this practical module')
 
     @staticmethod
-    def public(snapshot, run) -> dict:
+    def public(snapshot: dict, run: dict | None) -> dict:
         if run and (run['plan']['input_snapshot_id'] != snapshot['uuid']
                 or run['plan']['input_snapshot_sha256'] != encode(snapshot)[1]
                 or any(run['plan'][key] != snapshot[key] for key in
@@ -90,7 +91,7 @@ class PracticalPreparation:
             'can_execute': False, 'credit_awarded': False, 'module_completion_eligible': False,
         }
 
-    async def get(self, user_id: str, enrollment_id: str, request_id: str):
+    async def get(self, user_id: str, enrollment_id: str, request_id: str) -> dict:
         snapshot = await self.inputs.get(user_id, request_id)
         if snapshot is None or snapshot.get('record_kind') is not None:
             raise PreparationUnavailable('This saved preparation is unavailable')
@@ -100,7 +101,7 @@ class PracticalPreparation:
             raise EnrollmentConflict('This preparation belongs to a different course')
         return self.public(snapshot, await self.runs.get(user_id, request_id))
 
-    async def prepare(self, user_id: str, enrollment_id: str, module_id: str, submission):
+    async def prepare(self, user_id: str, enrollment_id: str, module_id: str, submission: PreparationSubmission) -> dict:
         repo = self.repository
         source = await repo.current(user_id)
         if source is None or source.uuid != enrollment_id:

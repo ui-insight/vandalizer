@@ -5,6 +5,7 @@ versioned together. Authenticated submission, saved-map handoff and assessment
 are separate delivery work; validating this case awards nothing.
 """
 from __future__ import annotations
+from .outcomes import OutcomeContract
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -99,13 +100,15 @@ class ProcessMappingCase(ContractModel):
         return self
 
     @property
-    def digest(self):
+    def digest(self) -> str:
         return encode(self.model_dump(mode='json'))[1]
 
     def public_definition(self) -> dict:
         return {**self.model_dump(mode='json', exclude={'review_guidance'}), 'case_sha256': self.digest}
 
-    def verify_contract(self, contract) -> None:
+    def verify_contract(self, contract: OutcomeContract | None) -> None:
+        if contract is None:
+            raise ValueError('The course outcome contract is unavailable')
         module = next((module for module in contract.modules if module.module_id == self.module_id), None)
         if module is None or {outcome.id for outcome in module.outcomes} != OUTCOMES:
             raise ValueError('Process case must cover the exact declared module outcomes')
@@ -116,7 +119,7 @@ class ProcessMappingCase(ContractModel):
                     or review.critical_failures != outcome.critical_failures):
                 raise ValueError('Case review guidance cannot silently change the outcome rubric')
 
-    def verify_exercise(self, exercise) -> None:
+    def verify_exercise(self, exercise: dict) -> None:
         if (exercise.get('documents') != [] or exercise.get('expected_fields') != []
                 or exercise.get('expected_values') != {} or exercise.get('star_criteria') != {}
                 or exercise.get('assessment_case_id') != self.id or exercise.get('process_case_sha256') != self.digest
@@ -124,7 +127,7 @@ class ProcessMappingCase(ContractModel):
             raise ValueError('The process exercise must bind the case without document, field-count or legacy reflection credit')
 
 
-def load_process_case(package: CoursePackage, module_id: str='process_mapping'):
+def load_process_case(package: CoursePackage, module_id: str='process_mapping') -> ProcessMappingCase:
     from .catalog import CourseCatalogError
     from .outcomes import package_outcomes
     path = f'process-cases/{module_id}.json'

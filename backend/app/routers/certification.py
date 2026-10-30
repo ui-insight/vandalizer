@@ -1,5 +1,5 @@
 """Vandal Workflow Architect certification endpoints."""
-from typing import Self
+from typing import Self, TypedDict, NotRequired
 
 import datetime
 from typing import Annotated, Literal
@@ -71,6 +71,12 @@ class ScenarioSubmissionPayload(BaseModel):
     answers: dict[str, str]
 
 
+class CompletionOptions(TypedDict):
+    require_attempt_counter: bool
+    expected_attempts: NotRequired[int]
+    assessment_selection: NotRequired[dict]
+
+
 class OutcomeCompletionPayload(BaseModel):
     model_config = ConfigDict(extra='forbid')
     consent: Literal['complete_selected_saved_outcomes']
@@ -95,7 +101,7 @@ router.include_router(upgrades_router)
 router.include_router(journey_router)
 
 
-async def _upgrade_comparison(user, enrollment_id, target_version=None):
+async def _upgrade_comparison(user: User, enrollment_id: str, target_version: str | None=None) -> dict:
     from app.services.certification_versions.runtime import versioning_enabled
     from app.services.certification_versions.enrollments import EnrollmentConflict
     from app.services.certification_versions.upgrade_comparison import UpgradeComparison, UpgradeUnavailable
@@ -114,17 +120,17 @@ async def _upgrade_comparison(user, enrollment_id, target_version=None):
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
-@router.get('/upgrade-options')
-async def get_upgrade_options(enrollment_id: str, user: User = Depends(get_current_user)):
+@router.get('/upgrade-options', response_model=None)
+async def get_upgrade_options(enrollment_id: str, user: User = Depends(get_current_user)) -> dict:
     return await _upgrade_comparison(user, enrollment_id)
 
 
-@router.get('/upgrade-preview')
-async def get_upgrade_preview(enrollment_id: str, target_version: str, user: User = Depends(get_current_user)):
+@router.get('/upgrade-preview', response_model=None)
+async def get_upgrade_preview(enrollment_id: str, target_version: str, user: User = Depends(get_current_user)) -> dict:
     return await _upgrade_comparison(user, enrollment_id, target_version)
 
 
-def _credential_response(record: CredentialRecord):
+def _credential_response(record: CredentialRecord) -> Response:
     pdf = render_certificate_pdf(
         name=record.learner_name, level=record.level,
         certified_at=datetime.datetime.fromisoformat(record.certified_at) if record.certified_at else None,
@@ -138,8 +144,8 @@ def _credential_response(record: CredentialRecord):
     })
 
 
-@router.get('/credentials')
-async def list_credentials(user: User = Depends(get_current_user)):
+@router.get('/credentials', response_model=None)
+async def list_credentials(user: User = Depends(get_current_user)) -> dict:
     """Read preserved credentials without consulting today's course or progress."""
     try:
         records = await CredentialRepository().list(user.user_id)
@@ -151,12 +157,12 @@ async def list_credentials(user: User = Depends(get_current_user)):
         'course_version': record.course_version, 'certified_at': record.certified_at,
         'provenance': record.provenance,
         **({'credential_scope': record.credential_scope.model_dump(mode='json')}
-           if getattr(record, 'credential_scope', None) is not None else {}),
+           if isinstance(record, CompetencyCredentialSnapshot) else {}),
     } for record in records]}
 
 
-@router.get('/credentials/{credential_id}/certificate')
-async def download_preserved_certificate(credential_id: str, user: User = Depends(get_current_user)):
+@router.get('/credentials/{credential_id}/certificate', response_model=None)
+async def download_preserved_certificate(credential_id: str, user: User = Depends(get_current_user)) -> Response:
     try:
         record = await CredentialRepository().get(user.user_id, credential_id)
     except CourseCatalogError as exc:
@@ -166,24 +172,24 @@ async def download_preserved_certificate(credential_id: str, user: User = Depend
     return _credential_response(record)
 
 
-@router.put('/position')
+@router.put('/position', response_model=None)
 @course_operation(write=True, http=True)
-async def save_lesson_position(payload: LessonPositionPayload, user: User = Depends(get_current_user), enrollment_id: str | None = None):
+async def save_lesson_position(payload: LessonPositionPayload, user: User = Depends(get_current_user), enrollment_id: str | None = None) -> dict:
     return await svc.save_learning_position(user.user_id, payload.module_id, payload.lesson_id, payload.expected_revision)
 
 
-@router.post('/lessons/read')
+@router.post('/lessons/read', response_model=None)
 @course_operation(http=True)
-async def mark_lesson_read(payload: LessonReadPayload, user: User = Depends(get_current_user), enrollment_id: str | None = None):
+async def mark_lesson_read(payload: LessonReadPayload, user: User = Depends(get_current_user), enrollment_id: str | None = None) -> dict:
     """A lesson opened in the panel or the chat lesson card, so chat knows.
     It counts as read only when the lesson has no knowledge check."""
     read = await svc.record_lessons_opened(user.user_id, payload.module_id, [payload.lesson_id])
     return {"module_id": payload.module_id, "lesson_ids_read": read, **svc.lesson_reading(payload.module_id, read)}
 
 
-@router.post('/lessons/check')
+@router.post('/lessons/check', response_model=None)
 @course_operation(http=True)
-async def answer_lesson_check(payload: LessonCheckPayload, user: User = Depends(get_current_user), enrollment_id: str | None = None):
+async def answer_lesson_check(payload: LessonCheckPayload, user: User = Depends(get_current_user), enrollment_id: str | None = None) -> dict:
     """Grade a lesson's knowledge check; a correct answer records the lesson as read."""
     result = await svc.answer_lesson_check(user.user_id, payload.module_id, payload.lesson_id, payload.choice)
     if "error" in result:
@@ -191,21 +197,21 @@ async def answer_lesson_check(payload: LessonCheckPayload, user: User = Depends(
     return result
 
 
-@router.get("/progress")
+@router.get("/progress", response_model=None)
 @course_operation(http=True)
-async def get_progress(user: User = Depends(get_current_user)):
+async def get_progress(user: User = Depends(get_current_user)) -> dict:
     return await svc.get_progress_dict(user.user_id)
 
 
-@router.get('/course')
+@router.get('/course', response_model=None)
 @course_operation(http=True)
-async def get_course(user: User = Depends(get_current_user), enrollment_id: str | None = None):
+async def get_course(user: User = Depends(get_current_user), enrollment_id: str | None = None) -> dict:
     return await svc.get_course_definition(user.user_id)
 
 
-@router.get("/certificate")
+@router.get("/certificate", response_model=None)
 @course_operation(http=True)
-async def download_certificate(user: User = Depends(get_current_user), enrollment_id: str | None = None):
+async def download_certificate(user: User = Depends(get_current_user), enrollment_id: str | None = None) -> Response:
     """Return the caller's certificate as a printable PDF, once certified."""
     prog = await svc.get_progress(user.user_id)
     if current_operation():
@@ -230,19 +236,19 @@ async def download_certificate(user: User = Depends(get_current_user), enrollmen
     )
 
 
-@router.post("/modules/{module_id}/validate")
+@router.post("/modules/{module_id}/validate", response_model=None)
 @course_operation(http=True)
-async def validate_module(module_id: str, user: User = Depends(get_current_user), enrollment_id: str | None = None):
+async def validate_module(module_id: str, user: User = Depends(get_current_user), enrollment_id: str | None = None) -> dict:
     await _require_lessons_read(user.user_id, module_id, "Checking the module")
     result = await svc.validate_module(user.user_id, module_id)
     return result
 
 
-@router.post("/modules/{module_id}/complete")
+@router.post("/modules/{module_id}/complete", response_model=None)
 @course_operation(write=True, http=True)
-async def complete_module(module_id: str, user: User = Depends(get_current_user), enrollment_id: str | None = None, request_id: str | None = None, payload: OutcomeCompletionPayload | None = None, expected_attempts: Annotated[int | None, Query(ge=0)] = None):
+async def complete_module(module_id: str, user: User = Depends(get_current_user), enrollment_id: str | None = None, request_id: str | None = None, payload: OutcomeCompletionPayload | None = None, expected_attempts: Annotated[int | None, Query(ge=0)] = None) -> dict:
     await _require_lessons_read(user.user_id, module_id, "Completing the module")
-    selected = {'require_attempt_counter': True}
+    selected: CompletionOptions = {'require_attempt_counter': True}
     if expected_attempts is not None:
         selected['expected_attempts'] = expected_attempts
     if payload is not None:
@@ -257,34 +263,34 @@ async def complete_module(module_id: str, user: User = Depends(get_current_user)
     return result
 
 
-@router.post("/modules/{module_id}/assessment")
+@router.post("/modules/{module_id}/assessment", response_model=None)
 @course_operation(write=True, http=True)
 async def submit_assessment(
     module_id: str,
     payload: AssessmentPayload,
     user: User = Depends(get_current_user),
     enrollment_id: str | None = None,
-):
+) -> dict:
     """Store self-assessment answers for a module."""
     result = await svc.store_assessment(user.user_id, module_id, payload.answers)
     return result
 
 
-@router.get('/modules/{module_id}/lab-status')
+@router.get('/modules/{module_id}/lab-status', response_model=None)
 @course_operation(http=True)
-async def get_lab_status(module_id: str, user: User = Depends(get_current_user), enrollment_id: str | None = None):
+async def get_lab_status(module_id: str, user: User = Depends(get_current_user), enrollment_id: str | None = None) -> dict:
     from app.services.certification_versions.lab_status import read_lab_status
     return await read_lab_status(user, module_id)
 
 
-@router.post("/modules/{module_id}/provision")
+@router.post("/modules/{module_id}/provision", response_model=None)
 @course_operation(write=True, http=True)
 async def provision_module(
     module_id: str,
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
     enrollment_id: str | None = None,
-):
+) -> dict:
     """Provision sample documents for a certification module into the user's workspace."""
     await _require_lessons_read(user.user_id, module_id, "Setting up the lab")
     result = await svc.provision_module_documents(user, module_id, settings)
@@ -293,9 +299,9 @@ async def provision_module(
     return result
 
 
-@router.get("/modules/{module_id}/exercise")
+@router.get("/modules/{module_id}/exercise", response_model=None)
 @course_operation(http=True)
-async def get_exercise(module_id: str, user: User = Depends(get_current_user), enrollment_id: str | None = None):
+async def get_exercise(module_id: str, user: User = Depends(get_current_user), enrollment_id: str | None = None) -> dict:
     """Return the exercise definition for a certification module."""
     exercise = svc.get_exercise(module_id)
     if not exercise:
@@ -303,23 +309,23 @@ async def get_exercise(module_id: str, user: User = Depends(get_current_user), e
     return exercise
 
 
-@router.post('/modules/ai_literacy/chat-practice-check')
+@router.post('/modules/ai_literacy/chat-practice-check', response_model=None)
 @course_operation(http=True)
-async def check_chat_practice(payload: ChatPracticeCheck, user: User = Depends(get_current_user), enrollment_id: str | None = None):
+async def check_chat_practice(payload: ChatPracticeCheck, user: User = Depends(get_current_user), enrollment_id: str | None = None) -> dict:
     """Check the Module 0 scoped chat practice against the packaged document; saves nothing."""
     from app.services.certification_versions.batch_inputs import pdf_pages
     from app.services.certification_versions.chat_practice import ChatPractice, check_practice
     operation = current_operation()
     raw = operation.package.json('exercises.json').get('ai_literacy', {}).get('chat_practice') if operation else None
-    if not raw:
+    if operation is None or not raw:
         raise HTTPException(status_code=404, detail='This course does not offer the scoped chat practice')
     practice = ChatPractice.model_validate(raw)
     return check_practice(practice, pdf_pages(operation.package.read('documents/' + practice.document)), payload)
 
 
-@router.get('/modules/{module_id}/scenarios')
+@router.get('/modules/{module_id}/scenarios', response_model=None)
 @course_operation(http=True)
-async def get_scenario_assessment(module_id: str, user: User = Depends(get_current_user), enrollment_id: str | None = None):
+async def get_scenario_assessment(module_id: str, user: User = Depends(get_current_user), enrollment_id: str | None = None) -> dict:
     from app.services.certification_versions.scenario_submissions import module_bank
     operation = current_operation()
     if operation is None:
@@ -327,10 +333,10 @@ async def get_scenario_assessment(module_id: str, user: User = Depends(get_curre
     return module_bank(operation.package, module_id).public_definition()
 
 
-@router.post('/modules/{module_id}/scenarios')
+@router.post('/modules/{module_id}/scenarios', response_model=None)
 @course_operation(write=True, http=True)
 async def submit_scenario_assessment(module_id: str, payload: ScenarioSubmissionPayload,
-        user: User = Depends(get_current_user), enrollment_id: str | None = None):
+        user: User = Depends(get_current_user), enrollment_id: str | None = None) -> dict:
     from app.services.certification_versions.scenario_submissions import ScenarioSubmissionRepository
     operation = current_operation()
     if operation is None:
@@ -340,8 +346,8 @@ async def submit_scenario_assessment(module_id: str, payload: ScenarioSubmission
     )
 
 
-@router.get('/scenario-attempts/{attempt_id}')
-async def get_scenario_submission(attempt_id: str, user: User = Depends(get_current_user)):
+@router.get('/scenario-attempts/{attempt_id}', response_model=None)
+async def get_scenario_submission(attempt_id: str, user: User = Depends(get_current_user)) -> dict:
     from app.services.certification_versions.scenario_submissions import ScenarioSubmissionRepository
     try:
         record = await ScenarioSubmissionRepository().status(user.user_id, attempt_id)
@@ -352,10 +358,10 @@ async def get_scenario_submission(attempt_id: str, user: User = Depends(get_curr
     return record
 
 
-@router.get('/modules/{module_id}/decisions/{prompt_id}')
+@router.get('/modules/{module_id}/decisions/{prompt_id}', response_model=None)
 @course_operation(http=True)
 async def get_practical_decision_prompt(module_id: str, prompt_id: str,
-        user: User = Depends(get_current_user), enrollment_id: str | None = None):
+        user: User = Depends(get_current_user), enrollment_id: str | None = None) -> dict:
     operation = current_operation()
     if operation is None:
         raise HTTPException(status_code=404, detail='This course does not offer practical decision capture')
@@ -363,10 +369,10 @@ async def get_practical_decision_prompt(module_id: str, prompt_id: str,
     return {**prompt.model_dump(mode='json'), 'prompt_sha256': prompt.digest}
 
 
-@router.post('/modules/{module_id}/decisions/{prompt_id}')
+@router.post('/modules/{module_id}/decisions/{prompt_id}', response_model=None)
 @course_operation(write=True, http=True)
 async def submit_practical_decision(module_id: str, prompt_id: str, payload: DecisionSubmission,
-        user: User = Depends(get_current_user), enrollment_id: str | None = None):
+        user: User = Depends(get_current_user), enrollment_id: str | None = None) -> dict:
     operation = current_operation()
     if operation is None:
         raise HTTPException(status_code=404, detail='This course does not offer practical decision capture')
@@ -376,8 +382,8 @@ async def submit_practical_decision(module_id: str, prompt_id: str, payload: Dec
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-@router.get('/learner-decisions/{decision_id}')
-async def get_practical_decision(decision_id: str, user: User = Depends(get_current_user)):
+@router.get('/learner-decisions/{decision_id}', response_model=None)
+async def get_practical_decision(decision_id: str, user: User = Depends(get_current_user)) -> dict:
     try:
         record = await LearnerDecisionRepository().get(user.user_id, decision_id)
     except CourseCatalogError as exc:
@@ -387,7 +393,7 @@ async def get_practical_decision(decision_id: str, user: User = Depends(get_curr
     return record
 
 
-async def _course_history(user, enrollment_id=None):
+async def _course_history(user: User, enrollment_id: str | None=None) -> dict:
     from app.services.certification_versions.enrollments import EnrollmentConflict
     from app.services.certification_versions.course_history import CourseHistory
     try:
@@ -399,17 +405,17 @@ async def _course_history(user, enrollment_id=None):
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
-@router.get('/practical-history')
-async def get_practical_history_courses(user: User = Depends(get_current_user)):
+@router.get('/practical-history', response_model=None)
+async def get_practical_history_courses(user: User = Depends(get_current_user)) -> dict:
     return await _course_history(user)
 
 
-@router.get('/practical-history/{enrollment_id}')
-async def get_practical_history_course(enrollment_id: str, user: User = Depends(get_current_user)):
+@router.get('/practical-history/{enrollment_id}', response_model=None)
+async def get_practical_history_course(enrollment_id: str, user: User = Depends(get_current_user)) -> dict:
     return await _course_history(user, enrollment_id)
 
 
-async def _scenario_history(user, enrollment_id, module_id, attempt_id=None):
+async def _scenario_history(user: User, enrollment_id: str, module_id: str, attempt_id: str | None=None) -> dict:
     from app.services.certification_versions.enrollments import EnrollmentConflict
     from app.services.certification_versions.scenario_history import ScenarioHistory
     try:
@@ -424,17 +430,17 @@ async def _scenario_history(user, enrollment_id, module_id, attempt_id=None):
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
-@router.get('/practical-history/{enrollment_id}/modules/{module_id}/scenarios')
-async def get_scenario_history(enrollment_id: str, module_id: str, user: User = Depends(get_current_user)):
+@router.get('/practical-history/{enrollment_id}/modules/{module_id}/scenarios', response_model=None)
+async def get_scenario_history(enrollment_id: str, module_id: str, user: User = Depends(get_current_user)) -> dict:
     return await _scenario_history(user, enrollment_id, module_id)
 
 
-@router.get('/practical-history/{enrollment_id}/modules/{module_id}/scenarios/{attempt_id}')
-async def get_scenario_history_attempt(enrollment_id: str, module_id: str, attempt_id: str, user: User = Depends(get_current_user)):
+@router.get('/practical-history/{enrollment_id}/modules/{module_id}/scenarios/{attempt_id}', response_model=None)
+async def get_scenario_history_attempt(enrollment_id: str, module_id: str, attempt_id: str, user: User = Depends(get_current_user)) -> dict:
     return await _scenario_history(user, enrollment_id, module_id, attempt_id)
 
 
-async def _practical_history(user, enrollment_id, module_id, *, prompt_id=None, run_id=None):
+async def _practical_history(user: User, enrollment_id: str, module_id: str, *, prompt_id: str | None=None, run_id: str | None=None) -> dict:
     from app.services.certification_versions.runtime import versioning_enabled
     from app.services.certification_versions.enrollments import EnrollmentConflict
     from app.services.certification_versions.practical_history import PracticalHistory
@@ -442,6 +448,8 @@ async def _practical_history(user, enrollment_id, module_id, *, prompt_id=None, 
         history = PracticalHistory()
         if run_id is None:
             return await history.runs(user.user_id, enrollment_id, module_id, delivery_enabled=versioning_enabled())
+        if prompt_id is None:
+            raise HTTPException(status_code=422, detail='A practical decision prompt is required')
         return await history.context(user.user_id, enrollment_id, module_id, prompt_id, run_id, delivery_enabled=versioning_enabled())
     except EnrollmentConflict as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
@@ -449,12 +457,12 @@ async def _practical_history(user, enrollment_id, module_id, *, prompt_id=None, 
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
-@router.get('/modules/{module_id}/practical-runs')
-async def get_practical_runs(module_id: str, enrollment_id: str, user: User = Depends(get_current_user)):
+@router.get('/modules/{module_id}/practical-runs', response_model=None)
+async def get_practical_runs(module_id: str, enrollment_id: str, user: User = Depends(get_current_user)) -> dict:
     return await _practical_history(user, enrollment_id, module_id)
 
 
-async def _practical_preparation(user, enrollment_id, *, module_id=None, payload=None, request_id=None):
+async def _practical_preparation(user: User, enrollment_id: str, *, module_id: str | None=None, payload: PreparationSubmission | None=None, request_id: str | None=None) -> dict:
     from app.services.certification_versions import runtime
     from app.services.certification_versions.enrollments import EnrollmentConflict
     from app.services.certification_versions.practical_preparation import PracticalPreparation, PreparationUnavailable, PreparationRejected
@@ -463,7 +471,11 @@ async def _practical_preparation(user, enrollment_id, *, module_id=None, payload
     try:
         service = PracticalPreparation()
         if payload is None:
+            if request_id is None:
+                raise HTTPException(status_code=422, detail='A preparation request ID is required')
             return await service.get(user.user_id, enrollment_id, request_id)
+        if module_id is None:
+            raise HTTPException(status_code=422, detail='A preparation module is required')
         return await service.prepare(user.user_id, enrollment_id, module_id, payload)
     except PreparationUnavailable as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -475,18 +487,18 @@ async def _practical_preparation(user, enrollment_id, *, module_id=None, payload
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
-@router.post('/modules/{module_id}/practical-runs')
+@router.post('/modules/{module_id}/practical-runs', response_model=None)
 async def prepare_practical_run(module_id: str, payload: PreparationSubmission, enrollment_id: str,
-        user: User = Depends(get_current_user)):
+        user: User = Depends(get_current_user)) -> dict:
     return await _practical_preparation(user, enrollment_id, module_id=module_id, payload=payload)
 
 
-@router.get('/practical-preparations/{request_id}')
-async def get_practical_preparation(request_id: str, enrollment_id: str, user: User = Depends(get_current_user)):
+@router.get('/practical-preparations/{request_id}', response_model=None)
+async def get_practical_preparation(request_id: str, enrollment_id: str, user: User = Depends(get_current_user)) -> dict:
     return await _practical_preparation(user, enrollment_id, request_id=request_id)
 
 
-async def _practical_execution(user, enrollment_id, run_id, payload=None):
+async def _practical_execution(user: User, enrollment_id: str, run_id: str, payload: ExecutionSubmission | None=None) -> dict:
     from app.services.certification_versions.runtime import versioning_enabled
     from app.services.certification_versions.enrollments import EnrollmentConflict
     from app.services.certification_versions.practical_execution import PracticalExecution, ExecutionUnavailable
@@ -507,24 +519,24 @@ async def _practical_execution(user, enrollment_id, run_id, payload=None):
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
-@router.get('/practical-runs/{run_id}/execution')
-async def get_practical_execution(run_id: str, enrollment_id: str, user: User = Depends(get_current_user)):
+@router.get('/practical-runs/{run_id}/execution', response_model=None)
+async def get_practical_execution(run_id: str, enrollment_id: str, user: User = Depends(get_current_user)) -> dict:
     return await _practical_execution(user, enrollment_id, run_id)
 
 
-@router.post('/practical-runs/{run_id}/execution')
+@router.post('/practical-runs/{run_id}/execution', response_model=None)
 async def execute_practical_run(run_id: str, payload: ExecutionSubmission, enrollment_id: str,
-        user: User = Depends(get_current_user)):
+        user: User = Depends(get_current_user)) -> dict:
     return await _practical_execution(user, enrollment_id, run_id, payload)
 
 
-@router.get('/modules/{module_id}/decisions/{prompt_id}/runs/{run_id}')
+@router.get('/modules/{module_id}/decisions/{prompt_id}/runs/{run_id}', response_model=None)
 async def get_practical_decision_context(module_id: str, prompt_id: str, run_id: str, enrollment_id: str,
-        user: User = Depends(get_current_user)):
+        user: User = Depends(get_current_user)) -> dict:
     return await _practical_history(user, enrollment_id, module_id, prompt_id=prompt_id, run_id=run_id)
 
 
-async def _saved_review_delivery(user, enrollment_id, *, module_id=None, attempt_id=None):
+async def _saved_review_delivery(user: User, enrollment_id: str, *, module_id: str | None=None, attempt_id: str | None=None) -> dict:
     from app.services.certification_versions.enrollments import EnrollmentConflict
     from app.services.certification_versions.review_delivery import ReviewDelivery, SavedReviewUnavailable
     # Like preserved credentials and decision receipts, owned history remains
@@ -533,6 +545,8 @@ async def _saved_review_delivery(user, enrollment_id, *, module_id=None, attempt
         delivery = ReviewDelivery()
         if attempt_id is not None:
             return await delivery.get(user.user_id, enrollment_id, attempt_id)
+        if module_id is None:
+            raise HTTPException(status_code=422, detail='A module is required to list assessments')
         return await delivery.list(user.user_id, enrollment_id, module_id)
     except SavedReviewUnavailable as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -542,20 +556,20 @@ async def _saved_review_delivery(user, enrollment_id, *, module_id=None, attempt
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
-@router.get('/modules/{module_id}/automatic-reviews')
-async def list_saved_automatic_reviews(module_id: str, enrollment_id: str, user: User = Depends(get_current_user)):
+@router.get('/modules/{module_id}/automatic-reviews', response_model=None)
+async def list_saved_automatic_reviews(module_id: str, enrollment_id: str, user: User = Depends(get_current_user)) -> dict:
     return await _saved_review_delivery(user, enrollment_id, module_id=module_id)
 
 
-@router.get('/automatic-reviews/{attempt_id}')
-async def get_saved_automatic_review(attempt_id: str, enrollment_id: str, user: User = Depends(get_current_user)):
+@router.get('/automatic-reviews/{attempt_id}', response_model=None)
+async def get_saved_automatic_review(attempt_id: str, enrollment_id: str, user: User = Depends(get_current_user)) -> dict:
     return await _saved_review_delivery(user, enrollment_id, attempt_id=attempt_id)
 
 
-@router.get('/modules/{module_id}/readiness')
+@router.get('/modules/{module_id}/readiness', response_model=None)
 async def preview_module_readiness(module_id: str, enrollment_id: str,
         review_attempt_id: str | None = None, scenario_attempt_id: str | None = None,
-        user: User = Depends(get_current_user)):
+        user: User = Depends(get_current_user)) -> dict:
     """Combine explicitly selected owned receipts; never grade or award credit."""
     from app.services.certification_versions.enrollments import EnrollmentConflict
     from app.services.certification_versions.module_readiness import ModuleReadiness
@@ -571,7 +585,7 @@ async def preview_module_readiness(module_id: str, enrollment_id: str,
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
-async def _request_automatic_assessment(user, enrollment_id, payload, *, run_id=None, parent_id=None):
+async def _request_automatic_assessment(user: User, enrollment_id: str, payload: AssessmentSubmission | AssessmentRetrySubmission, *, run_id: str | None=None, parent_id: str | None=None) -> dict:
     from app.services.certification_versions.runtime import versioning_enabled
     from app.services.certification_versions.enrollments import EnrollmentConflict
     from app.services.certification_versions.practical_assessment import PracticalAssessment
@@ -584,6 +598,8 @@ async def _request_automatic_assessment(user, enrollment_id, payload, *, run_id=
         service = PracticalAssessment()
         if parent_id is not None:
             return await service.retry(user.user_id, enrollment_id, parent_id, payload)
+        if run_id is None:
+            raise HTTPException(status_code=422, detail='A saved run is required for assessment')
         return await service.request(user.user_id, enrollment_id, run_id, payload)
     except (ExecutionUnavailable, PreparationUnavailable, SavedReviewUnavailable) as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -593,20 +609,20 @@ async def _request_automatic_assessment(user, enrollment_id, payload, *, run_id=
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
-@router.post('/practical-runs/{run_id}/automatic-reviews')
+@router.post('/practical-runs/{run_id}/automatic-reviews', response_model=None)
 async def request_automatic_assessment(run_id: str, payload: AssessmentSubmission, enrollment_id: str,
-        user: User = Depends(get_current_user)):
+        user: User = Depends(get_current_user)) -> dict:
     return await _request_automatic_assessment(user, enrollment_id, payload, run_id=run_id)
 
 
-@router.post('/automatic-reviews/{attempt_id}/retry')
+@router.post('/automatic-reviews/{attempt_id}/retry', response_model=None)
 async def retry_automatic_assessment(attempt_id: str, payload: AssessmentRetrySubmission, enrollment_id: str,
-        user: User = Depends(get_current_user)):
+        user: User = Depends(get_current_user)) -> dict:
     return await _request_automatic_assessment(user, enrollment_id, payload, parent_id=attempt_id)
 
 
 
-async def _process_design_action(user, enrollment_id, *, payload=None, submission_id=None, assessment=False, parent_id=None):
+async def _process_design_action(user: User, enrollment_id: str, *, payload: ProcessSubmission | AssessmentSubmission | AssessmentRetrySubmission | None=None, submission_id: str | None=None, assessment: bool=False, parent_id: str | None=None) -> dict:
     from app.services.certification_versions import runtime
     from app.services.certification_versions.enrollments import EnrollmentConflict
     from app.services.certification_versions.process_delivery import ProcessDelivery, ProcessAssessment, ProcessDesignUnavailable
@@ -615,16 +631,20 @@ async def _process_design_action(user, enrollment_id, *, payload=None, submissio
         raise HTTPException(status_code=404, detail='Process-design assessment is not available')
     try:
         if assessment:
+            if not isinstance(payload, (AssessmentSubmission, AssessmentRetrySubmission)):
+                raise HTTPException(status_code=422, detail='An assessment request is required')
             service = ProcessAssessment()
             if parent_id is not None:
                 return await service.retry(user.user_id, enrollment_id, parent_id, payload)
+            if submission_id is None:
+                raise HTTPException(status_code=422, detail='A saved design is required for assessment')
             return await service.request(user.user_id, enrollment_id, submission_id, payload)
-        service = ProcessDelivery()
+        delivery = ProcessDelivery()
         if payload is not None:
-            return await service.save(user.user_id, enrollment_id, payload)
+            return await delivery.save(user.user_id, enrollment_id, payload)
         if submission_id is not None:
-            return await service.get(user.user_id, enrollment_id, submission_id)
-        return await service.list(user.user_id, enrollment_id, delivery_enabled=runtime.versioning_enabled())
+            return await delivery.get(user.user_id, enrollment_id, submission_id)
+        return await delivery.list(user.user_id, enrollment_id, delivery_enabled=runtime.versioning_enabled())
     except (ProcessDesignUnavailable, SavedReviewUnavailable) as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except EnrollmentConflict as exc:
@@ -633,34 +653,34 @@ async def _process_design_action(user, enrollment_id, *, payload=None, submissio
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
-@router.get('/modules/process_mapping/process-designs')
-async def list_process_designs(enrollment_id: str, user: User = Depends(get_current_user)):
+@router.get('/modules/process_mapping/process-designs', response_model=None)
+async def list_process_designs(enrollment_id: str, user: User = Depends(get_current_user)) -> dict:
     return await _process_design_action(user, enrollment_id)
 
 
-@router.post('/modules/process_mapping/process-designs')
-async def save_process_design(payload: ProcessSubmission, enrollment_id: str, user: User = Depends(get_current_user)):
+@router.post('/modules/process_mapping/process-designs', response_model=None)
+async def save_process_design(payload: ProcessSubmission, enrollment_id: str, user: User = Depends(get_current_user)) -> dict:
     return await _process_design_action(user, enrollment_id, payload=payload)
 
 
-@router.get('/process-designs/{submission_id}')
-async def get_process_design(submission_id: str, enrollment_id: str, user: User = Depends(get_current_user)):
+@router.get('/process-designs/{submission_id}', response_model=None)
+async def get_process_design(submission_id: str, enrollment_id: str, user: User = Depends(get_current_user)) -> dict:
     return await _process_design_action(user, enrollment_id, submission_id=submission_id)
 
 
-@router.post('/process-designs/{submission_id}/automatic-reviews')
+@router.post('/process-designs/{submission_id}/automatic-reviews', response_model=None)
 async def assess_process_design(submission_id: str, payload: AssessmentSubmission, enrollment_id: str,
-        user: User = Depends(get_current_user)):
+        user: User = Depends(get_current_user)) -> dict:
     return await _process_design_action(user, enrollment_id, payload=payload, submission_id=submission_id, assessment=True)
 
 
-@router.post('/process-automatic-reviews/{attempt_id}/retry')
+@router.post('/process-automatic-reviews/{attempt_id}/retry', response_model=None)
 async def retry_process_assessment(attempt_id: str, payload: AssessmentRetrySubmission, enrollment_id: str,
-        user: User = Depends(get_current_user)):
+        user: User = Depends(get_current_user)) -> dict:
     return await _process_design_action(user, enrollment_id, payload=payload, parent_id=attempt_id, assessment=True)
 
 
-async def _workflow_design_action(user, enrollment_id, *, payload=None, reference=None, action='list'):
+async def _workflow_design_action(user: User, enrollment_id: str, *, payload: DesignCaptureRequest | WorkflowDesignSubmission | AssessmentSubmission | AssessmentRetrySubmission | None=None, reference: str | None=None, action: Literal['list', 'capture', 'approve', 'assess', 'retry']='list') -> dict:
     from app.services.certification_versions import runtime
     from app.services.certification_versions.enrollments import EnrollmentConflict
     from app.services.certification_versions.workflow_design_delivery import WorkflowDesignDelivery, WorkflowDesignAssessment, WorkflowDesignUnavailable
@@ -669,15 +689,17 @@ async def _workflow_design_action(user, enrollment_id, *, payload=None, referenc
         raise HTTPException(status_code=404, detail='Workflow Design assessment is not available')
     try:
         if action in ('assess', 'retry'):
+            if reference is None or not isinstance(payload, (AssessmentSubmission, AssessmentRetrySubmission)):
+                raise HTTPException(status_code=422, detail='A saved design and assessment request are required')
             service = WorkflowDesignAssessment()
             method = service.request if action == 'assess' else service.retry
             return await method(user.user_id, enrollment_id, reference, payload)
-        service = WorkflowDesignDelivery()
+        delivery = WorkflowDesignDelivery()
         if payload is not None:
-            return await service.save(user.user_id, enrollment_id, payload, capture=action == 'capture')
+            return await delivery.save(user.user_id, enrollment_id, payload, capture=action == 'capture')
         if reference is not None:
-            return await service.get(user.user_id, enrollment_id, reference, capture=action == 'capture')
-        return await service.list(user.user_id, enrollment_id, delivery_enabled=runtime.versioning_enabled())
+            return await delivery.get(user.user_id, enrollment_id, reference, capture=action == 'capture')
+        return await delivery.list(user.user_id, enrollment_id, delivery_enabled=runtime.versioning_enabled())
     except (WorkflowDesignUnavailable, SavedReviewUnavailable) as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except EnrollmentConflict as exc:
@@ -686,45 +708,45 @@ async def _workflow_design_action(user, enrollment_id, *, payload=None, referenc
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
-@router.get('/modules/workflow_design/designs')
-async def list_workflow_designs(enrollment_id: str, user: User = Depends(get_current_user)):
+@router.get('/modules/workflow_design/designs', response_model=None)
+async def list_workflow_designs(enrollment_id: str, user: User = Depends(get_current_user)) -> dict:
     return await _workflow_design_action(user, enrollment_id)
 
 
-@router.post('/modules/workflow_design/design-captures')
-async def capture_workflow_design(payload: DesignCaptureRequest, enrollment_id: str, user: User = Depends(get_current_user)):
+@router.post('/modules/workflow_design/design-captures', response_model=None)
+async def capture_workflow_design(payload: DesignCaptureRequest, enrollment_id: str, user: User = Depends(get_current_user)) -> dict:
     return await _workflow_design_action(user, enrollment_id, payload=payload, action='capture')
 
 
-@router.get('/workflow-design-captures/{snapshot_id}')
-async def get_workflow_design_capture(snapshot_id: str, enrollment_id: str, user: User = Depends(get_current_user)):
+@router.get('/workflow-design-captures/{snapshot_id}', response_model=None)
+async def get_workflow_design_capture(snapshot_id: str, enrollment_id: str, user: User = Depends(get_current_user)) -> dict:
     return await _workflow_design_action(user, enrollment_id, reference=snapshot_id, action='capture')
 
 
-@router.post('/modules/workflow_design/designs')
-async def approve_workflow_design(payload: WorkflowDesignSubmission, enrollment_id: str, user: User = Depends(get_current_user)):
+@router.post('/modules/workflow_design/designs', response_model=None)
+async def approve_workflow_design(payload: WorkflowDesignSubmission, enrollment_id: str, user: User = Depends(get_current_user)) -> dict:
     return await _workflow_design_action(user, enrollment_id, payload=payload, action='approve')
 
 
-@router.get('/workflow-designs/{submission_id}')
-async def get_workflow_design(submission_id: str, enrollment_id: str, user: User = Depends(get_current_user)):
+@router.get('/workflow-designs/{submission_id}', response_model=None)
+async def get_workflow_design(submission_id: str, enrollment_id: str, user: User = Depends(get_current_user)) -> dict:
     return await _workflow_design_action(user, enrollment_id, reference=submission_id)
 
 
-@router.post('/workflow-designs/{submission_id}/automatic-reviews')
+@router.post('/workflow-designs/{submission_id}/automatic-reviews', response_model=None)
 async def assess_workflow_design(submission_id: str, payload: AssessmentSubmission, enrollment_id: str,
-        user: User = Depends(get_current_user)):
+        user: User = Depends(get_current_user)) -> dict:
     return await _workflow_design_action(user, enrollment_id, payload=payload, reference=submission_id, action='assess')
 
 
-@router.post('/workflow-design-automatic-reviews/{attempt_id}/retry')
+@router.post('/workflow-design-automatic-reviews/{attempt_id}/retry', response_model=None)
 async def retry_workflow_design_assessment(attempt_id: str, payload: AssessmentRetrySubmission, enrollment_id: str,
-        user: User = Depends(get_current_user)):
+        user: User = Depends(get_current_user)) -> dict:
     return await _workflow_design_action(user, enrollment_id, payload=payload, reference=attempt_id, action='retry')
 
 
-@router.get("/levels")
-async def get_levels():
+@router.get("/levels", response_model=None)
+async def get_levels() -> dict:
     """Return the level definitions and XP thresholds."""
     return {
         "levels": [{"name": name, "xp_threshold": xp} for name, xp in svc.LEVELS],

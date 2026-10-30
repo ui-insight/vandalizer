@@ -28,7 +28,7 @@ from .scenario_assessment import ScenarioBank
 from .writes import require_lease, save_progress
 
 
-def module_bank(package: CoursePackage, module_id: str):
+def module_bank(package: CoursePackage, module_id: str) -> ScenarioBank:
     if module_id not in {module.id for module in package.manifest.modules}:
         raise EnrollmentConflict('This module is not part of the selected course')
     path = f'assessments/{module_id}.json'
@@ -47,7 +47,7 @@ def module_bank(package: CoursePackage, module_id: str):
         raise CourseCatalogError('The scenario bank does not match this course’s outcome contract') from exc
 
 
-def answers_digest(record):
+def answers_digest(record: dict) -> str:
     """Exact deterministic assessment inputs, excluding a browser request UUID."""
     return encode({key: record[key] for key in (
         'user_id', 'enrollment_id', 'module_id', 'course_version', 'manifest_sha256',
@@ -107,7 +107,7 @@ class ScenarioSubmissionRepository:
                 state = 'superseded'
         return {**record, 'progress_link': state, 'read_only': True}
 
-    async def matching_answers(self, identity, digest):
+    async def matching_answers(self, identity: dict, digest: str) -> dict | None:
         scope = {key: value for key, value in identity.items() if key != 'uuid'}
         # Historical receipts remain immutable; inspect their original inputs
         # without backfilling an index or regrading their saved result.
@@ -118,7 +118,7 @@ class ScenarioSubmissionRepository:
                 return record
         return None
 
-    async def submit(self, operation: CourseOperation, module_id: str, request_id: str, bank_sha256, answers, *, actor_user_id: str) -> dict:
+    async def submit(self, operation: CourseOperation, module_id: str, request_id: str, bank_sha256: str, answers: dict[str, str], *, actor_user_id: str) -> dict:
         progress, package = operation.progress, operation.package
         if not operation.writable or actor_user_id != operation.user_id or not re.fullmatch(r'[a-f0-9]{32}', request_id):
             raise EnrollmentConflict('Scenario submission requires the authenticated learner and a writable course operation')
@@ -135,6 +135,7 @@ class ScenarioSubmissionRepository:
         request_sha256 = encode({**identity, 'bank_sha256': bank_sha256, 'answers': answers})[1]
         digest = answers_digest({**identity, 'bank_sha256': bank_sha256, 'answers': answers,
                                  'submission_channel': 'authenticated_learner_request'})
+        record: dict | None
         existing = await self.records.find_one({'uuid': request_id})
         if existing is not None:
             if any(existing.get(key) != value for key, value in identity.items()) or existing.get('request_sha256') != request_sha256:
@@ -142,7 +143,7 @@ class ScenarioSubmissionRepository:
             record = self.decode(existing)
         else:
             record = await self.matching_answers(identity, digest)
-        if existing is None and record is None:
+        if record is None:
             try:
                 result = bank.grade(answers, expected_sha256=bank_sha256)
             except ValueError as exc:

@@ -1,4 +1,5 @@
 """Explicit learner execution of an owned plan with its exact saved approval."""
+from .catalog import CoursePackage
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -23,7 +24,7 @@ class ExecutionSubmission(BaseModel):
     scope_decision_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
     consent: Literal['execute_saved_inputs']
 
-    def expected_approval(self):
+    def expected_approval(self) -> dict:
         return self.model_dump(exclude={'consent'})
 
 
@@ -32,7 +33,7 @@ class PracticalExecution:
         self.repository = repository or EnrollmentRepository()
         self.runs = LabExecutionRepository()
 
-    async def owned(self, user_id: str, enrollment_id: str, run_id: str):
+    async def owned(self, user_id: str, enrollment_id: str, run_id: str) -> tuple[dict, CoursePackage]:
         run = await self.runs.get(user_id, run_id)
         if run is None:
             raise ExecutionUnavailable('This saved practical run is unavailable')
@@ -46,7 +47,7 @@ class PracticalExecution:
         return run, package
 
     @staticmethod
-    def public(run, *, can_execute: bool=False, blocked_reason=None) -> dict:
+    def public(run: dict, *, can_execute: bool=False, blocked_reason: str | None=None) -> dict:
         result = run.get('result') or {}
         return {
             **{key: run['plan'][key] for key in ('enrollment_id', 'module_id', 'course_version', 'manifest_sha256', 'input_snapshot_id')},
@@ -58,7 +59,7 @@ class PracticalExecution:
             'credit_awarded': False, 'module_completion_eligible': False,
         }
 
-    async def get(self, user_id: str, enrollment_id: str, run_id: str, *, delivery_enabled: bool=False):
+    async def get(self, user_id: str, enrollment_id: str, run_id: str, *, delivery_enabled: bool=False) -> dict:
         run, package = await self.owned(user_id, enrollment_id, run_id)
         if run['state'] != 'prepared':
             return self.public(run)
@@ -80,7 +81,7 @@ class PracticalExecution:
             return self.public(run, blocked_reason='Execution settings are unavailable. Your saved work is preserved.')
         return self.public(run, can_execute=True)
 
-    async def execute(self, user_id: str, enrollment_id: str, run_id: str, submission):
+    async def execute(self, user_id: str, enrollment_id: str, run_id: str, submission: ExecutionSubmission) -> dict:
         source = await self.repository.current(user_id)
         if source is None or source.uuid != enrollment_id:
             raise EnrollmentConflict('Select your existing course before executing an assessed run')

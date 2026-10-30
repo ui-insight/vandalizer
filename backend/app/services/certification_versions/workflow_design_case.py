@@ -5,6 +5,8 @@ from its owned immutable submission, and a design from a saved workspace
 workflow. Prose supplied by the client is not a substitute for either record.
 """
 from __future__ import annotations
+from .outcomes import OutcomeContract
+from .process_case import ProcessMappingCase
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -80,19 +82,21 @@ class WorkflowDesignCase(ContractModel):
         return self
 
     @property
-    def digest(self):
+    def digest(self) -> str:
         return encode(self.model_dump(mode='json'))[1]
 
     def public_definition(self) -> dict:
         return {**self.model_dump(mode='json', exclude={'review_guidance'}), 'case_sha256': self.digest}
 
-    def verify_process_case(self, process) -> None:
+    def verify_process_case(self, process: ProcessMappingCase) -> None:
         if (self.source_process_case_id != process.id or self.source_process_case_sha256 != process.digest
                 or self.assigned_inputs != process.assigned_inputs or self.intended_output != process.intended_output
                 or self.exclusions != process.exclusions):
             raise ValueError('Workflow Design must preserve its exact source process case and scope')
 
-    def verify_contract(self, contract) -> None:
+    def verify_contract(self, contract: OutcomeContract | None) -> None:
+        if contract is None:
+            raise ValueError('The course outcome contract is unavailable')
         module = next((module for module in contract.modules if module.module_id == self.module_id), None)
         if module is None or {outcome.id for outcome in module.outcomes} != OUTCOMES:
             raise ValueError('Workflow Design must cover the exact declared outcomes')
@@ -107,7 +111,7 @@ class WorkflowDesignCase(ContractModel):
                     or set(outcome.evidence) != evidence[outcome.id.split('.')[1]]):
                 raise ValueError('Design guidance cannot weaken the rubric or replace artifact evidence with prose')
 
-    def verify_exercise(self, exercise) -> None:
+    def verify_exercise(self, exercise: dict) -> None:
         if (exercise.get('documents') != [] or exercise.get('expected_fields') != []
                 or exercise.get('expected_values') != {} or exercise.get('star_criteria') != {}
                 or exercise.get('assessment_case_id') != self.id or exercise.get('design_case_sha256') != self.digest
@@ -115,7 +119,7 @@ class WorkflowDesignCase(ContractModel):
             raise ValueError('The design exercise must bind its case without reflection or step-count credit')
 
 
-def load_workflow_design_case(package: CoursePackage):
+def load_workflow_design_case(package: CoursePackage) -> WorkflowDesignCase:
     from .catalog import CourseCatalogError
     from .outcomes import package_outcomes
     from .process_case import load_process_case

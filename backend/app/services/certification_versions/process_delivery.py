@@ -1,4 +1,6 @@
 """Owned design saving/history and explicit assessment; no automatic execution."""
+from .process_case import ProcessMappingCase
+from .practical_assessment import AssessmentSubmission, AssessmentRetrySubmission
 from typing import Protocol
 from app.models.certification import CertificationEnrollment
 from .catalog import CourseCatalogError, CoursePackage
@@ -20,7 +22,7 @@ class ProcessDelivery:
         self.repository = repository or EnrollmentRepository()
         self.records = ProcessSubmissionRepository()
 
-    async def course(self, user_id: str, enrollment_id: str):
+    async def course(self, user_id: str, enrollment_id: str) -> tuple[CertificationEnrollment, CoursePackage, ProcessMappingCase]:
         enrollment = await self.repository._enrollment(user_id, enrollment_id)
         package = self.repository.catalog.load(enrollment.course_version)
         if 'process-cases/process_mapping.json' not in package.manifest.artifacts:
@@ -28,14 +30,14 @@ class ProcessDelivery:
         return enrollment, package, load_process_case(package)
 
     @staticmethod
-    def verify(record, enrollment, case):
+    def verify(record: dict, enrollment: CertificationEnrollment, case: ProcessMappingCase) -> dict:
         if (record['user_id'] != enrollment.user_id or record['enrollment_id'] != enrollment.uuid
                 or record['course_version'] != enrollment.course_version or record['manifest_sha256'] != enrollment.manifest_sha256
                 or record['module_id'] != 'process_mapping' or record['case'] != case.public_definition()):
             raise CourseCatalogError('The saved design does not match its original course requirements')
         return record
 
-    async def get(self, user_id: str, enrollment_id: str, submission_id):
+    async def get(self, user_id: str, enrollment_id: str, submission_id: str) -> dict:
         enrollment, _, case = await self.course(user_id, enrollment_id)
         saved = await self.records.get(user_id, submission_id)
         if saved is None:
@@ -59,7 +61,7 @@ class ProcessDelivery:
                 'case': case.public_definition(), 'submissions': submissions, 'older_submissions_available': len(rows) > 50,
                 'can_submit': writable, 'read_only_reason': None if writable else 'This is preserved course history. Select an available current course before saving new work.'}
 
-    async def save(self, user_id: str, enrollment_id: str, payload):
+    async def save(self, user_id: str, enrollment_id: str, payload: object) -> dict:
         current = await self.repository.current(user_id)
         if current is None or current.uuid != enrollment_id:
             raise EnrollmentConflict('Select your existing course before saving a process design')
@@ -87,7 +89,7 @@ class ProcessAssessment(PracticalAssessment):
     def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         super().__init__(repository or EnrollmentRepository())
 
-    async def existing(self, user_id: str, enrollment_id: str, submission_id, request_id: str, parent_id=None):
+    async def existing(self, user_id: str, enrollment_id: str, submission_id: str, request_id: str, parent_id: str | None=None) -> dict | None:
         raw = await self.reviews.records.find_one({'uuid': request_id})
         if raw is None:
             return None
@@ -101,7 +103,7 @@ class ProcessAssessment(PracticalAssessment):
             raise EnrollmentConflict('This assessment reference belongs to different saved work')
         return saved
 
-    async def request(self, user_id: str, enrollment_id: str, submission_id, payload):
+    async def request(self, user_id: str, enrollment_id: str, submission_id: str, payload: AssessmentSubmission | AssessmentRetrySubmission) -> dict:
         await self.selected(user_id, enrollment_id)
         saved = await self.existing(user_id, enrollment_id, submission_id, payload.request_id)
         if saved is not None:
@@ -116,7 +118,7 @@ class ProcessAssessment(PracticalAssessment):
                 submission_id, payload.request_id, actor_user_id=user_id, model_name=model, system_config=config)
         return await self.finish(user_id, enrollment_id, saved, config)
 
-    async def retry(self, user_id: str, enrollment_id: str, parent_id, payload):
+    async def retry(self, user_id: str, enrollment_id: str, parent_id: str, payload: AssessmentSubmission | AssessmentRetrySubmission) -> dict:
         await self.selected(user_id, enrollment_id)
         parent = await ReviewDelivery(self.repository).get(user_id, enrollment_id, parent_id)
         if parent['module_id'] != self.module_id or parent['assessment_kind'] != self.assessment_kind:

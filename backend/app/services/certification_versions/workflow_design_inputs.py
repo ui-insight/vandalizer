@@ -105,7 +105,7 @@ class WorkflowDesignInputJournal(LabInputRepository):
                 'referenced_extraction_sets': extraction_sets}
 
     @staticmethod
-    async def _read_extraction(user_id: str, reference: str):
+    async def _read_extraction(user_id: str, reference: str) -> dict:
         matches = await SearchSet.find({'uuid': reference, 'user_id': user_id, 'set_type': 'extraction'}).limit(2).to_list()
         if len(matches) != 1:
             raise EnrollmentConflict('Every referenced extraction template must be owned by this learner')
@@ -117,7 +117,7 @@ class WorkflowDesignInputJournal(LabInputRepository):
         names = [item.searchphrase.strip().casefold() for item in fields]
         if not fields or not all(names) or len(names) != len(set(names)):
             raise EnrollmentConflict('A referenced extraction template has missing or ambiguous field definitions')
-        state = artifact.model_dump(mode='json', include={
+        state: dict = artifact.model_dump(mode='json', include={
             'uuid', 'title', 'set_type', 'domain', 'extraction_config', 'extraction_config_override', 'cross_field_rules', 'item_order',
         })
         state['fields'] = [item.model_dump(mode='json', include={
@@ -127,7 +127,7 @@ class WorkflowDesignInputJournal(LabInputRepository):
 
 
 class WorkflowDesignInputRepository(WorkflowDesignInputJournal):
-    async def capture(self, operation: CourseOperation, body, *, actor_user_id: str):
+    async def capture(self, operation: CourseOperation, body: object, *, actor_user_id: str) -> dict:
         body = DesignCaptureRequest.model_validate(body)
         progress, package = operation.progress, operation.package
         if (not operation.writable or actor_user_id != operation.user_id or progress.user_id != operation.user_id
@@ -145,7 +145,7 @@ class WorkflowDesignInputRepository(WorkflowDesignInputJournal):
                     'module_id': 'workflow_design', 'course_version': package.manifest.release_id,
                     'manifest_sha256': package.manifest_sha256, 'artifact_id': body.workflow_id}
 
-        def replay(raw):
+        def replay(raw: dict) -> dict:
             saved = self.decode(raw)
             if any(saved[key] != value for key, value in identity.items()) or saved['request_sha256'] != request_hash:
                 raise EnrollmentConflict('This capture reference already belongs to another design request')
@@ -156,6 +156,8 @@ class WorkflowDesignInputRepository(WorkflowDesignInputJournal):
         if existing is not None:
             return replay(existing)
         if body.handoff == 'owned_saved_process_submission':
+            if body.process_submission_id is None:
+                raise EnrollmentConflict('Select the original owned process submission')
             original = await ProcessSubmissionRepository().get(operation.user_id, body.process_submission_id)
             if (original is None or any(original[key] != identity[key] for key in
                     ('user_id', 'enrollment_id', 'course_version', 'manifest_sha256'))
@@ -170,7 +172,7 @@ class WorkflowDesignInputRepository(WorkflowDesignInputJournal):
         artifact = await self._read_artifact(operation.user_id, body.workflow_id)
         if await self._read_artifact(operation.user_id, body.workflow_id) != artifact:
             raise EnrollmentConflict('The workflow changed during capture; inspect the current revision')
-        payload = {**identity, 'schema_version': 1, 'record_kind': 'saved_workflow_design',
+        payload: dict = {**identity, 'schema_version': 1, 'record_kind': 'saved_workflow_design',
                    'rubric_id': package.manifest.rubric_id, 'exercise_sha256': package.manifest.artifacts['exercises.json'],
                    'request': request, 'request_sha256': request_hash, 'case': case.public_definition(), 'handoff': handoff,
                    'artifact': artifact, 'artifact_sha256': encode(artifact)[1],
