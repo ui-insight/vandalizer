@@ -26,7 +26,7 @@ REQUIREMENT_KEYS = ('id', 'statement', 'method', 'evidence', 'passing_conditions
 REQUIREMENTS_SHA256 = '98998a3d3cee237eea5be427ef0383e80fed74ed5bca6a33a8e152cceecb0c59'
 
 
-async def assemble_batch_review(operation: CourseOperation, submission_id, *, actor_user_id: str) -> dict:
+async def assemble_batch_review(operation: CourseOperation, submission_id: str, *, actor_user_id: str) -> dict:
     if actor_user_id != operation.user_id:
         raise EnrollmentConflict('Batch assessment requires the authenticated learner')
     saved = await BatchReviewRepository().get(actor_user_id, submission_id)
@@ -56,13 +56,13 @@ async def assemble_batch_review(operation: CourseOperation, submission_id, *, ac
             raise EvidenceAssemblyUnavailable('Missing or uncomparable output values are unavailable evidence; inspect the saved item before assessment')
     evidence = []
 
-    def add(kind, identity, payload) -> None:
+    def add(kind: str, identity: str, payload: object) -> None:
         try:
             evidence.append(ReviewEvidence(id=identity, kind=kind, text=encode(payload)[0]).model_dump(mode='json'))
         except ValidationError as exc:
             raise EvidenceAssemblyUnavailable('Batch evidence exceeds review limits; no content was truncated') from exc
 
-    def chunks(kind, identity, text, metadata) -> None:
+    def chunks(kind: str, identity: str, text: str, metadata: dict) -> None:
         for offset in range(0, max(1, len(text)), 6000):
             add(kind, f'{identity}:{offset}', {**metadata, 'text_offset': offset, 'text_length': len(text), 'text': text[offset:offset + 6000]})
 

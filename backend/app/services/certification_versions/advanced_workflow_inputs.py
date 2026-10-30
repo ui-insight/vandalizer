@@ -73,7 +73,7 @@ class AdvancedWorkflowInputRepository(WorkflowDesignInputJournal):
         except (KeyError, TypeError, ValueError, AttributeError) as exc:
             raise CourseCatalogError('Saved budget workflow evidence failed integrity verification') from exc
 
-    async def capture(self, operation: CourseOperation, body, *, actor_user_id: str):
+    async def capture(self, operation: CourseOperation, body: object, *, actor_user_id: str) -> dict:
         body = AdvancedWorkflowCapture.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Budget workflow capture requires the authenticated learner')
@@ -88,7 +88,7 @@ class AdvancedWorkflowInputRepository(WorkflowDesignInputJournal):
         request = body.model_dump(mode='json')
         request_hash = encode(request)[1]
 
-        def replay(raw):
+        def replay(raw: dict) -> dict:
             saved = self.decode(raw)
             if any(saved[key] != value for key, value in identity.items()) or saved['request_sha256'] != request_hash:
                 raise EnrollmentConflict('This capture request belongs to another workflow or method decision')
@@ -109,7 +109,7 @@ class AdvancedWorkflowInputRepository(WorkflowDesignInputJournal):
         artifact = await self._read_artifact(actor_user_id, body.workflow_id)
         if await self._read_artifact(actor_user_id, body.workflow_id) != artifact:
             raise EnrollmentConflict('The workflow changed during capture; inspect its current revision')
-        saved = {**identity, 'schema_version': 1, 'record_kind': 'advanced_workflow_input',
+        saved: dict = {**identity, 'schema_version': 1, 'record_kind': 'advanced_workflow_input',
                  'rubric_id': package.manifest.rubric_id, 'exercise_sha256': package.manifest.artifacts['exercises.json'],
                  'request': request, 'request_sha256': request_hash, 'case': case.public_definition(),
                  'artifact': artifact, 'artifact_sha256': encode(artifact)[1], 'calculation_snapshot': calculation,

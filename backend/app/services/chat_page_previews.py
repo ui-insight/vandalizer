@@ -1,4 +1,5 @@
 """Immutable chat page proposals: approval saves bytes, not a regenerated prompt."""
+from pymongo.database import Database
 import hashlib
 import json
 from datetime import datetime, timezone
@@ -9,22 +10,26 @@ from pymongo import ReturnDocument
 from app.services import artifacts
 
 
-def prepare(db, user_id, conversation_uuid, title, html, artifact_uuid, base_revision, source):
+def prepare(db: Database[dict], user_id: str, conversation_uuid: str, title: str, html: str, artifact_uuid: str | None, base_revision: str | None, source: dict) -> dict:
     prepared, warnings = artifacts.clean_html(html, title)
     # Equivalent sanitized HTML reuses the original proposal and its warnings.
-    identity = [user_id, conversation_uuid, artifact_uuid, base_revision, title, prepared]
+    identity: list[object] = [user_id, conversation_uuid, artifact_uuid, base_revision, title, prepared]
     if source.get('template_uuid'):
         identity.append([source['template_uuid'], source.get('template_check')])
     preview_id = hashlib.sha256(json.dumps(identity, ensure_ascii=False).encode()).hexdigest()[:32]
-    return db.chat_page_previews.find_one_and_update({"_id": preview_id}, {"$setOnInsert": {
+    preview = db.chat_page_previews.find_one_and_update({"_id": preview_id}, {"$setOnInsert": {
         "user_id": user_id, "conversation_uuid": conversation_uuid,
         "title": title, "html": html, "prepared_html": prepared, "warnings": warnings,
         "artifact_uuid": artifact_uuid, "base_revision": base_revision,
         "source": source, "created_at": datetime.now(timezone.utc),
     }}, upsert=True, return_document=ReturnDocument.AFTER)
 
+    if preview is None:
+        raise HTTPException(503, "The page preview save could not be confirmed. Retry preparing this preview.")
+    return preview
 
-def get(db, user_id, conversation_uuid, preview_id):
+
+def get(db: Database[dict], user_id: str, conversation_uuid: str, preview_id: str) -> dict:
     preview = db.chat_page_previews.find_one({
         "_id": preview_id, "user_id": user_id, "conversation_uuid": conversation_uuid,
     })
@@ -33,7 +38,7 @@ def get(db, user_id, conversation_uuid, preview_id):
     return preview
 
 
-def save(db, user_id, conversation_uuid, preview_id):
+def save(db: Database[dict], user_id: str, conversation_uuid: str, preview_id: str) -> dict:
     preview = get(db, user_id, conversation_uuid, preview_id)
     title, html = preview["title"], preview["html"]
     target, base = preview["artifact_uuid"], preview["base_revision"]

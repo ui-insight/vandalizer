@@ -13,14 +13,14 @@ from .validation_inputs import ValidationInputRepository
 from .validation_suites import ValidationSuiteRepository, embedded_input
 
 
-def implementation_digest():
+def implementation_digest() -> str:
     folder = Path(__file__).parent
     paths = sorted(folder.glob('validation_*.py')) + [folder / 'connected_workflow_approval.py']
     return encode({'extraction': extraction_implementation_digest(),
         'files': {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in paths}})[1]
 
 
-def case_plans(snapshot):
+def case_plans(snapshot: dict) -> list[dict]:
     return [{'source_id': s['source_id'], 'document_id': s['document_id'], 'source_sha256': s['source_sha256'],
              'source_text_sha256': encode(s['pages'])[1], 'doc_texts': ['\n\n'.join(s['pages'])],
              'field_keys': [f['searchphrase'].strip() for f in snapshot['artifact']['fields']],
@@ -28,7 +28,7 @@ def case_plans(snapshot):
                                 for f in snapshot['artifact']['fields']]} for s in snapshot['documents']]
 
 
-def validate_suite_binding(snapshot, suite, case, *, original_run=None):
+def validate_suite_binding(snapshot: dict, suite: dict, case: ValidationCase, *, original_run: dict | None=None) -> tuple[str, list[str], str]:
     """`original_run` must already be decoded by the trusted run repository."""
     snapshot = ValidationInputRepository.decode(embedded_input(snapshot))
     serialized, digest = encode(suite)
@@ -66,7 +66,7 @@ def validate_suite_binding(snapshot, suite, case, *, original_run=None):
     return phase, changed, digest
 
 
-def validation_plan(snapshot, suite, case, system_config, *, original_run=None) -> dict:
+def validation_plan(snapshot: dict, suite: dict, case: ValidationCase, system_config: dict, *, original_run: dict | None=None) -> dict:
     phase, changed, digest = validate_suite_binding(snapshot, suite, case, original_run=original_run)
     # Reuse production extraction configuration resolution only. The validation
     # record remains a distinct kind and cannot enter the generic lab executor.

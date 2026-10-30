@@ -332,3 +332,11 @@ def test_the_sync_wrapper_records_through_the_sync_path(patch_httpx, ledger):
     result = web_search_service.web_search_sync("q", {"web_search_provider": "tavily"})
     assert result["results"] == []
     assert len(ledger) == 1 and ledger[0]["status"] == "ok"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('payload', [None, [], 'unexpected', 7])
+async def test_non_object_provider_response_is_rejected(patch_httpx, payload):
+    patch_httpx(payload)
+    with pytest.raises(ValueError, match='non-object response'):
+        await web_search_service._send('GET', 'https://search.example.test')

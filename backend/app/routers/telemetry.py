@@ -173,7 +173,7 @@ async def telemetry_analytics(user: User = Depends(get_current_user)) -> dict:
         for r in rows
         if r.organization
     ]
-    named.sort(key=lambda d: d["last_seen"], reverse=True)
+    named.sort(key=lambda d: str(d["last_seen"]), reverse=True)
 
     return {
         "total_instances": total,

@@ -18,8 +18,8 @@ class ModuleReadiness:
     def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         self.repository = repository or EnrollmentRepository()
 
-    async def preview(self, user_id: str, enrollment_id: str, module_id: str, *, review_attempt_id=None,
-                      scenario_attempt_id=None) -> dict:
+    async def preview(self, user_id: str, enrollment_id: str, module_id: str, *, review_attempt_id: str | None=None,
+                      scenario_attempt_id: str | None=None) -> dict:
         enrollment = await self.repository._enrollment(user_id, enrollment_id)
         package = self.repository.catalog.load(enrollment.course_version)
         if package.manifest_sha256 != enrollment.manifest_sha256:

@@ -230,7 +230,10 @@ class TransitionRecordReconciliation:
             from .review_result_integrity import validate_saved_review_result
             if raw['state'] not in ('prepared', 'evaluated', 'unavailable'):
                 raise EnrollmentConflict('Resolve the original automatic review before changing courses')
-            validate_saved_review_result(ReviewAttemptRepository.decode(raw), package_outcomes(package))
+            contract = package_outcomes(package)
+            if contract is None:
+                raise CourseCatalogError('The original automatic review has no outcome contract')
+            validate_saved_review_result(ReviewAttemptRepository.decode(raw), contract)
         elif kind == 'scenarios':
             from .scenario_history import ScenarioHistory, module_bank
             ScenarioHistory.receipt(raw, enrollment, module_bank(package, raw['module_id']))

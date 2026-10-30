@@ -55,7 +55,7 @@ async def query_audit_log(
     limit: int = 50,
 ) -> tuple[list[AuditLog], int]:
     """Query audit log with filters. Returns (entries, total_count)."""
-    filters = {}
+    filters: dict = {}
     if action:
         filters["action"] = action
     if actor_user_id:

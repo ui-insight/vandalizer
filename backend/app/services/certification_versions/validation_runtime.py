@@ -1,4 +1,5 @@
 """Run each complete assigned source through the real extraction engine once."""
+from collections.abc import Callable
 from copy import deepcopy
 
 from .attempts import encode
@@ -8,7 +9,7 @@ from .validation_checks import check_repair, check_suite
 from .validation_plan import validation_plan
 
 
-def complete_result(plan, results) -> dict:
+def complete_result(plan: dict, results: list[dict]) -> dict:
     from .validation_preparation import ValidationPreparation
     case = ValidationCase.model_validate(plan['input_snapshot']['authored_case'])
     checks = check_suite(case, plan['input_snapshot'], plan['suite']['test_cases'], results)
@@ -21,7 +22,7 @@ def complete_result(plan, results) -> dict:
             'credit_awarded': False, 'module_completion_eligible': False}
 
 
-def execute_approved_suite(run, system_config, *, checkpoint, should_stop):
+def execute_approved_suite(run: dict, system_config: dict, *, checkpoint: Callable[[dict, str], dict], should_stop: Callable[[], bool]) -> dict:
     from app.services.extraction_engine import ExtractionEngine
     from .validation_approval import ValidationScopeRepository
     from .validation_preparation import SCOPE_QUESTION, ValidationPreparation
@@ -47,12 +48,12 @@ def execute_approved_suite(run, system_config, *, checkpoint, should_stop):
         raise EnrollmentConflict('The approved suite, inputs, runtime or implementation changed')
     events, results = [], []
 
-    def emit(value):
+    def emit(value: dict) -> dict:
         if should_stop():
             raise EnrollmentConflict('Stopped validation work cannot append another case')
         event = {**value, 'run_id': run['run_id'], 'plan_sha256': run['plan_sha256'],
                  'authorization_sha256': encode(authorization)[1], 'credit_awarded': False}
-        receipt = {'receipt': event, 'receipt_sha256': encode(event)[1]}
+        receipt: dict = {'receipt': event, 'receipt_sha256': encode(event)[1]}
         if checkpoint(deepcopy(event), receipt['receipt_sha256']) != receipt:
             raise EnrollmentConflict('The case checkpoint was not durably acknowledged')
         events.append(receipt)

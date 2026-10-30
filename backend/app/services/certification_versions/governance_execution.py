@@ -1,5 +1,6 @@
 """Claim an explicitly approved capstone extraction once and preserve its durable case prefix."""
 from __future__ import annotations
+from .writes import WriteLease
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -36,7 +37,7 @@ class GovernanceExecutionRequest(ContractModel):
 
 
 class GovernanceExecution(GovernancePreparation):
-    async def execute(self, operation: CourseOperation, body, system_config_doc, *, actor_user_id: str):
+    async def execute(self, operation: CourseOperation, body: object, system_config_doc: dict, *, actor_user_id: str) -> dict | None:
         body = GovernanceExecutionRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Only the authenticated learner can execute the approved capstone extraction')
@@ -72,7 +73,7 @@ class GovernanceExecution(GovernancePreparation):
         stop, loop = threading.Event(), asyncio.get_running_loop()
         checkpoints = GovernanceCheckpoints()
 
-        def checkpoint(event, event_hash):
+        def checkpoint(event: dict, event_hash: str) -> dict:
             if stop.is_set():
                 raise EnrollmentConflict('A stopped worker cannot append another case')
             future = asyncio.run_coroutine_threadsafe(checkpoints.append(operation, run, event, event_hash), loop)
@@ -106,7 +107,7 @@ class GovernanceExecution(GovernancePreparation):
         await self._finish(run, lease, result, started_at)
         return await self.get(actor_user_id, body.run_id)
 
-    async def _finish(self, run, lease, result, started_at) -> None:
+    async def _finish(self, run: dict, lease: WriteLease, result: dict, started_at: str) -> None:
         fenced = await self.records.update_one({'uuid': run['run_id'], 'plan_sha256': run['plan_sha256'],
             'state': 'executing', 'worker_id': lease.write_id, 'authorization_sha256': encode(run['authorization'])[1]},
             {'$set': {'checkpoint_closed': True}})

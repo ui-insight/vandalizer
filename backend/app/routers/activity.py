@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-async def _team_ids_for_user(user) -> list[str]:
+async def _team_ids_for_user(user: User) -> list[str]:
     """Collect all team identifiers (UUID and ObjectId forms) for the user."""
     ctx = await access_control.get_team_access_context(user)
     return list(ctx.team_uuids | ctx.team_object_ids)

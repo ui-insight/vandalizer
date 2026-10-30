@@ -1,4 +1,6 @@
 """Run authored synthetic review cases; never infer release readiness from a pass."""
+from .outcomes import OutcomeContract
+from .automatic_review import ReviewModel
 from typing import Self
 from typing import Literal
 
@@ -30,7 +32,7 @@ class ReviewCalibrationSuite(ContractModel):
             raise ValueError('Calibration case identities must be unique')
         return self
 
-    def verify_contract(self, contract) -> None:
+    def verify_contract(self, contract: OutcomeContract) -> None:
         module = next((module for module in contract.modules if module.module_id == self.module_id), None)
         required = {outcome.id for outcome in module.outcomes if outcome.method == 'structured_review'} if module else set()
         if not required or contract.rubric_id != self.rubric_id:
@@ -44,7 +46,7 @@ class ReviewCalibrationSuite(ContractModel):
             raise ValueError('Automatic-only grading needs an unclear-evidence calibration case')
 
 
-def measure_calibration_case(case, result) -> dict:
+def measure_calibration_case(case: ReviewCalibrationCase, result: dict) -> dict:
     """Measure a returned verdict without confusing technical failure with performance."""
     actual = {item['outcome_id']: item['verdict'] for item in result['outcomes']}
     unavailable = result['status'] == 'grading_unavailable'
@@ -58,7 +60,7 @@ def measure_calibration_case(case, result) -> dict:
             'grading_unavailable': unavailable, 'review_result': result}
 
 
-async def run_review_calibration(contract, suite, *, model_name, system_config, call_model=None) -> dict:
+async def run_review_calibration(contract: OutcomeContract, suite: ReviewCalibrationSuite, *, model_name: str, system_config: dict, call_model: ReviewModel | None=None) -> dict:
     suite.verify_contract(contract)
     rows = []
     for case in suite.cases:

@@ -23,7 +23,7 @@ from .outcomes import require_package_outcomes
 from .practical_evidence import EvidenceAssemblyUnavailable
 
 
-async def assemble_budget_review(operation: CourseOperation, submission_id, *, actor_user_id: str) -> dict:
+async def assemble_budget_review(operation: CourseOperation, submission_id: str, *, actor_user_id: str) -> dict:
     if actor_user_id != operation.user_id:
         raise EnrollmentConflict('Budget assessment requires the authenticated learner')
     saved = await AdvancedReviewRepository().get(actor_user_id, submission_id)
@@ -43,7 +43,7 @@ async def assemble_budget_review(operation: CourseOperation, submission_id, *, a
         raise CourseCatalogError('The budget evidence does not bind the original assignment and rubric')
     evidence = []
 
-    def add(kind, identity, payload) -> None:
+    def add(kind: str, identity: str, payload: object) -> None:
         try:
             evidence.append(ReviewEvidence(id=identity, kind=kind, text=encode(payload)[0]).model_dump(mode='json'))
         except ValidationError as exc:

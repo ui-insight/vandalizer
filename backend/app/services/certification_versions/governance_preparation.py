@@ -196,5 +196,5 @@ class GovernancePreparation(LabExecutionJournal):
         await LabInputRepository._check_lease(lease)
         return await self.get(actor_user_id, body.request_id)
 
-    async def execute(self, *args: Any, **kwargs: Any) -> dict:
+    async def execute(self, *args: Any, **kwargs: Any) -> dict | None:
         raise EnrollmentConflict('Capstone execution requires the separately approved durable executor')

@@ -1,5 +1,6 @@
 """Persist an output plan for separate explicit scope approval, without dispatch."""
 from __future__ import annotations
+from typing import Any
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -98,7 +99,7 @@ class OutputWorkflowPreparation(LabExecutionJournal):
         except (KeyError, TypeError, ValueError, EnrollmentConflict) as exc:
             raise CourseCatalogError('The saved output workflow plan failed integrity verification') from exc
 
-    async def prepare(self, operation: CourseOperation, body, system_config_doc, *, actor_user_id: str, default_model):
+    async def prepare(self, operation: CourseOperation, body: object, system_config_doc: dict, *, actor_user_id: str, default_model: str) -> dict | None:
         body = OutputPlanRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Only the authenticated learner can prepare this output plan')
@@ -109,7 +110,7 @@ class OutputWorkflowPreparation(LabExecutionJournal):
         request = body.model_dump(mode='json')
         request_hash = encode(request)[1]
 
-        def replay(raw):
+        def replay(raw: dict) -> dict:
             saved = self.decode(raw)
             if any(saved['plan'][key] != value for key, value in identity.items()) or saved['plan']['request_sha256'] != request_hash:
                 raise EnrollmentConflict('This plan reference belongs to different saved evidence')
@@ -145,5 +146,5 @@ class OutputWorkflowPreparation(LabExecutionJournal):
         await LabInputRepository._check_lease(lease)
         return await self.get(actor_user_id, body.request_id)
 
-    async def execute(self, *args, **kwargs) -> dict:
+    async def execute(self, *args: Any, **kwargs: Any) -> dict | None:
         raise EnrollmentConflict('Output dispatch requires its approved generation executor')

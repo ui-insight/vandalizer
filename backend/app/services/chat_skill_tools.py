@@ -1,4 +1,5 @@
 """Discover and explicitly select reusable Library instructions in chat."""
+from collections.abc import Callable
 
 from fastapi import HTTPException
 from pydantic_ai import RunContext
@@ -8,7 +9,7 @@ from app.services import skill_service
 from app.services.chat_deps import AgenticChatDeps
 
 
-def conversation_instructions(base: str):
+def conversation_instructions(base: str) -> Callable[[RunContext[AgenticChatDeps]], str]:
     """Resolve the pin on every model request, including after a selection tool."""
     def instructions(context: RunContext[AgenticChatDeps]) -> str:
         conversation = context.deps.conversation

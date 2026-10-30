@@ -34,7 +34,7 @@ def duplicate_project_task(
 ) -> dict:
     """Deep-copy a project's folders + files + KB ingestion in the background."""
 
-    async def _run():
+    async def _run() -> dict:
         from app.config import Settings
         from app.database import init_db
         from app.services import project_service

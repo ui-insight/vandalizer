@@ -68,7 +68,7 @@ class ConnectedScopeRepository(LearnerDecisionJournal):
         except (KeyError, TypeError, ValueError) as exc:
             raise CourseCatalogError('The saved connected-workflow scope decision failed integrity verification') from exc
 
-    async def submit(self, operation: CourseOperation, body, *, actor_user_id: str):
+    async def submit(self, operation: CourseOperation, body: object, *, actor_user_id: str) -> dict:
         body = self.request_model.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Only the authenticated learner can approve the saved revision')
@@ -81,7 +81,7 @@ class ConnectedScopeRepository(LearnerDecisionJournal):
         request = body.model_dump(mode='json')
         request_hash = encode(request)[1]
 
-        async def replay(raw):
+        async def replay(raw: dict) -> dict:
             record = self.decode(raw)
             if any(record[key] != value for key, value in identity.items()) or record['request_sha256'] != request_hash:
                 raise EnrollmentConflict('This scope reference belongs to different answers or another learner')
@@ -120,7 +120,7 @@ class ConnectedScopeRepository(LearnerDecisionJournal):
         await self._link_scope(operation, record, replay=False)
         return record
 
-    async def authorize(self, operation, run) -> dict:
+    async def authorize(self, operation: CourseOperation, run: dict) -> dict:
         """Validate currently linked consent; this method never dispatches."""
         LabExecutionRepository.check_operation(operation, run['plan'])
         record = await self.get(operation.user_id, run.get('scope_decision_id'))

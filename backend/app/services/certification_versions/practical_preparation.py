@@ -138,6 +138,6 @@ class PracticalPreparation:
                 if await self.inputs.records.find_one({'uuid': submission.request_id}) is not None:
                     raise
                 raise PreparationRejected(str(exc)) from exc
-            run = await self.runs.prepare(operation, snapshot['uuid'], submission.request_id,
+            prepared_run = await self.runs.prepare(operation, snapshot['uuid'], submission.request_id,
                                           await configured_runtime())
-            return self.public(snapshot, run)
+            return self.public(snapshot, prepared_run)

@@ -212,7 +212,7 @@ async def _summarize(
         result = await agent.run(
             "Summarize the following conversation transcript:\n\n" + transcript
         )
-    return result.output if hasattr(result, "output") else str(result.data)
+    return result.output
 
 
 async def compact_conversation(
@@ -233,7 +233,7 @@ async def compact_conversation(
     """
     msgs = await ChatMessage.find({"_id": {"$in": conversation.messages}}).to_list()
     order = {mid: i for i, mid in enumerate(conversation.messages)}
-    msgs.sort(key=lambda m: order.get(m.id, 0))
+    msgs.sort(key=lambda m: order.get(m.id, 0) if m.id is not None else 0)
 
     start = (
         conversation.context_cutoff_index

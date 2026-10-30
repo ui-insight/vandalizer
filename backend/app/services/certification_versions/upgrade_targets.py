@@ -5,6 +5,7 @@ activate it. A later selection commit must reacquire/revalidate the original
 choice and reconcile saved operations. Existing target work is never reset.
 """
 from __future__ import annotations
+from .upgrade_decisions import UpgradeDecisionRecord
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -23,12 +24,12 @@ from .upgrade_decisions import UpgradeDecisionRepository
 from .writes import require_lease
 
 
-def target_identity(request_id: str):
+def target_identity(request_id: str) -> tuple[str, str]:
     enrollment_id = uuid5(NAMESPACE_URL, 'vandalizer:certification:upgrade-target:' + request_id).hex
     return enrollment_id, enrollment_id[:24]
 
 
-def initial_level(package: CoursePackage):
+def initial_level(package: CoursePackage) -> str:
     levels = package.json('course-structure.json').get('levels')
     if (not isinstance(levels, list) or not levels
             or any(not isinstance(level, dict) or not isinstance(level.get('name'), str) or not level['name'].strip()
@@ -38,7 +39,8 @@ def initial_level(package: CoursePackage):
             or len({level['name'] for level in levels}) != len(levels)
             or any(left['xp'] >= right['xp'] for left, right in zip(levels, levels[1:]))):
         raise EnrollmentConflict('The target needs valid pinned zero-XP progression before preparation')
-    return levels[0]['name']
+    name: str = levels[0]['name']
+    return name
 
 
 class UpgradeTargetRepository:
@@ -46,11 +48,11 @@ class UpgradeTargetRepository:
         self.repository = repository or EnrollmentRepository()
         self.decisions = UpgradeDecisionRepository(self.repository)
 
-    async def prepare(self, user_id: str, request_id: str):
+    async def prepare(self, user_id: str, request_id: str) -> dict:
         async with self.decisions.hold_reviewed_choice(user_id, request_id) as (decision, source_progress, package):
             return await self.stage(decision, source_progress, package)
 
-    async def stage(self, decision, source_progress, package: CoursePackage) -> dict:
+    async def stage(self, decision: UpgradeDecisionRecord, source_progress: CertificationProgress, package: CoursePackage) -> dict:
         """Internal helper for a future commit holding the same reviewed guard."""
         user_id, source_id = decision.user_id, decision.request.source_enrollment_id
         lease = require_lease(user_id, source_id)

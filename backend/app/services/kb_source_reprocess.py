@@ -124,6 +124,7 @@ async def _reprocess_document_source(
     if extracting:
         return "waiting"
     if needs_read:
+        assert authorized_doc is not None  # Edit access was checked before saving source state.
         from app.services.extraction_restarts import ExtractionRestartConflict
         try:
             await document_service.restart_extraction(authorized_doc, user.user_id)

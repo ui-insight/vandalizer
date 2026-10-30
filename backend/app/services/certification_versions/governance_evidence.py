@@ -23,7 +23,7 @@ from .outcomes import require_package_outcomes
 from .practical_evidence import EvidenceAssemblyUnavailable
 
 
-async def assemble_governance_review(operation: CourseOperation, submission_id, *, actor_user_id: str) -> dict:
+async def assemble_governance_review(operation: CourseOperation, submission_id: str, *, actor_user_id: str) -> dict:
     if actor_user_id != operation.user_id:
         raise EnrollmentConflict('Governance assessment requires the authenticated learner')
     saved = await GovernanceReviewRepository().get(actor_user_id, submission_id)
@@ -46,13 +46,13 @@ async def assemble_governance_review(operation: CourseOperation, submission_id, 
         raise EvidenceAssemblyUnavailable('Missing or uncomparable values are unavailable evidence, not learner failure')
     evidence = []
 
-    def add(kind, identity, payload) -> None:
+    def add(kind: str, identity: str, payload: object) -> None:
         try:
             evidence.append(ReviewEvidence(id=identity, kind=kind, text=encode(payload)[0]).model_dump(mode='json'))
         except ValidationError as exc:
             raise EvidenceAssemblyUnavailable('Complete capstone evidence exceeds review limits; nothing was truncated') from exc
 
-    def chunks(kind, identity, text, metadata) -> None:
+    def chunks(kind: str, identity: str, text: str, metadata: dict) -> None:
         for offset in range(0, max(1, len(text)), 6000):
             add(kind, f'{identity}:{offset}', {**metadata, 'text_offset': offset, 'text_length': len(text), 'text': text[offset:offset + 6000]})
 

@@ -4,6 +4,7 @@ Supports one source review, or two independent source reviews in a parallel
 step, followed by one internal memo. This is an executor capability boundary,
 not a node-count grading rule. No provider, database or arbitrary code runs.
 """
+from .advanced_case import AdvancedNodesCase
 from copy import deepcopy
 import hashlib
 from pathlib import Path
@@ -18,7 +19,7 @@ from .enrollments import EnrollmentConflict
 from .lab_execution import runtime_digest
 
 
-def implementation_digest():
+def implementation_digest() -> str:
     folder = Path(__file__).parent
     paths = [Path(__file__), folder / 'advanced_workflow_inputs.py', folder / 'advanced_calculation_records.py',
              folder / 'advanced_calculations.py', folder / 'advanced_case.py', folder / 'connected_workflow_plan.py',
@@ -30,14 +31,14 @@ def implementation_digest():
     return encode({str(path.relative_to(folder.parent)): hashlib.sha256(path.read_bytes()).hexdigest() for path in paths})[1]
 
 
-def calculation_context(snapshot) -> dict:
+def calculation_context(snapshot: dict) -> dict:
     """Only submitted arithmetic and checked facts, never the private answer key."""
     return {'kind': 'saved_learner_calculation_evidence', 'snapshot_id': snapshot['uuid'],
             'snapshot_sha256': encode(snapshot)[1], 'source_sha256': snapshot['document']['source_sha256'],
             'records': snapshot['request']['records'], 'checks': snapshot['checks']}
 
 
-def advanced_workflow_plan(snapshot, case, system_config, *, default_model) -> dict:
+def advanced_workflow_plan(snapshot: dict, case: AdvancedNodesCase, system_config: dict, *, default_model: str) -> dict:
     from app.services.workflow_engine import apply_step_input_config, _resolve_input_sources, build_step_output_keys
 
     try:

@@ -239,8 +239,8 @@ async def my_review_count(user: User = Depends(get_current_user)) -> dict[str, o
 # ---------------------------------------------------------------------------
 
 
-@router.get("/{approval_uuid}")
-async def get_review(approval_uuid: str, user: User = Depends(get_current_user)):
+@router.get("/{approval_uuid}", response_model=None)
+async def get_review(approval_uuid: str, user: User = Depends(get_current_user)) -> dict:
     approval = await ApprovalRequest.find_one(ApprovalRequest.uuid == approval_uuid)
     if not approval:
         raise HTTPException(status_code=404, detail="Review not found")

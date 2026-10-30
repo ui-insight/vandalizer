@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 @celery.task(name="tasks.document.classify", bind=True, retry_backoff=True, max_retries=2, default_retry_delay=30)
-def classify_document_task(self: Task, document_uuid: str, extraction_revision: int = 0):
+def classify_document_task(self: Task, document_uuid: str, extraction_revision: int = 0) -> None:
     """Auto-classify a document after text extraction.
 
     Auto-classification is best-effort enrichment: a model failure must not
@@ -42,6 +42,7 @@ def classify_document_task(self: Task, document_uuid: str, extraction_revision: 
 
     from app.exceptions import TrialSpendBlockedError
 
+    transient_errors: tuple[type[BaseException], ...] = (ModelAPIError, *TRANSIENT_EXCEPTIONS)
     try:
         run_task_async(_classify(document_uuid, extraction_revision))
     except TrialSpendBlockedError as blocked:
@@ -56,7 +57,7 @@ def classify_document_task(self: Task, document_uuid: str, extraction_revision: 
             "(likely misconfigured model/API key); leaving unclassified: %s",
             document_uuid, getattr(exc, "status_code", "?"), exc,
         )
-    except (ModelAPIError, *TRANSIENT_EXCEPTIONS) as exc:
+    except transient_errors as exc:
         if self.request.retries < self.max_retries:
             raise self.retry(exc=exc)
         logger.warning(
@@ -66,7 +67,7 @@ def classify_document_task(self: Task, document_uuid: str, extraction_revision: 
         )
 
 
-async def _classify(document_uuid: str, extraction_revision: int = 0):
+async def _classify(document_uuid: str, extraction_revision: int = 0) -> None:
     from app.database import init_db
     from app.config import Settings
 

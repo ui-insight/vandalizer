@@ -1,4 +1,5 @@
 """Source-grounded checks over trusted complete capstone extraction receipts."""
+from .governance_case import GovernanceCase
 import datetime
 import re
 
@@ -9,13 +10,13 @@ from .governance_case import FIELDS
 from .governance_inputs import GovernanceInputRepository
 
 
-def embedded_input(snapshot) -> dict:
+def embedded_input(snapshot: dict) -> dict:
     payload, digest = encode(snapshot)
     return {**{key: snapshot[key] for key in ('uuid', 'user_id', 'enrollment_id', 'module_id', 'course_version', 'manifest_sha256', 'artifact_id')},
             'record_json': payload, 'record_sha256': digest}
 
 
-def canonical(value, comparison):
+def canonical(value: object, comparison: str) -> tuple[str, str | None]:
     if comparison != 'iso_date':
         return canonical_field(value, comparison)
     if not isinstance(value, str) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}', value.strip()):
@@ -26,7 +27,7 @@ def canonical(value, comparison):
         return ('unrecognized', None)
 
 
-def check_result(case, snapshot, result, *, run_id: str, phase) -> dict:
+def check_result(case: GovernanceCase, snapshot: dict, result: dict, *, run_id: str, phase: str) -> dict:
     snapshot = GovernanceInputRepository.decode(embedded_input(snapshot))
     if (snapshot['case'] != case.public_definition() or phase not in ('original', 'repair')
             or result.get('run_id') != run_id or result.get('phase') != phase
@@ -40,7 +41,7 @@ def check_result(case, snapshot, result, *, run_id: str, phase) -> dict:
         raise CourseCatalogError('A completed extraction cannot hide a failure reason')
     entities = result.get('entities')
     complete = result['status'] == 'completed' and isinstance(entities, list) and len(entities) == 1 and isinstance(entities[0], dict)
-    output = entities[0] if complete else {}
+    output = entities[0] if complete and isinstance(entities, list) else {}
     fields = snapshot['artifact']['fields']
     if tuple(f['title'] for f in fields) != FIELDS:
         raise CourseCatalogError('The capstone source check requires every original field')
@@ -61,7 +62,7 @@ def check_result(case, snapshot, result, *, run_id: str, phase) -> dict:
         'credit_awarded': False, 'module_completion_eligible': False}
 
 
-def compare_repair(case, original, repaired) -> dict:
+def compare_repair(case: GovernanceCase, original: dict, repaired: dict) -> dict:
     """Caller first decodes owned durable runs; this grants no dispatch authority."""
     before, after = original['plan']['input_snapshot'], repaired['plan']['input_snapshot']
     if (original['state'] != 'completed' or repaired['state'] != 'completed' or original['run_id'] == repaired['run_id']

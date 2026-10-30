@@ -5,6 +5,8 @@ persist each checkpoint before returning. This module provides no HTTP dispatch
 or retry. Callback failure stops the chain; completed provider work is never
 silently replayed here.
 """
+from collections.abc import Callable
+from .output_case import OutputDeliveryCase
 from copy import deepcopy
 
 from .attempts import encode
@@ -15,7 +17,7 @@ from .enrollments import EnrollmentConflict
 MAX_STAGE_BYTES = 4 * 1024 * 1024
 
 
-def execute_approved_generation(run, case, system_config, *, checkpoint, should_stop) -> dict:
+def execute_approved_generation(run: dict, case: OutputDeliveryCase, system_config: dict, *, checkpoint: Callable[[dict, str], dict], should_stop: Callable[[], bool]) -> dict:
     from app.services import workflow_engine
 
     try:

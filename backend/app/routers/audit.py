@@ -1,4 +1,6 @@
 """Audit log query endpoints."""
+from fastapi.responses import StreamingResponse
+from app.models.web_search_usage import WebSearchUsage
 
 import datetime
 from typing import Optional
@@ -78,7 +80,7 @@ async def query_audit_log(
     }
 
 
-@router.get("/export")
+@router.get("/export", response_model=None)
 async def export_audit_log(
     action: Optional[str] = None,
     actor_user_id: Optional[str] = None,
@@ -86,7 +88,7 @@ async def export_audit_log(
     start_time: Optional[str] = None,
     end_time: Optional[str] = None,
     user: User = Depends(get_current_user),
-):
+) -> StreamingResponse:
     """Export audit log as CSV. Admin or staff (analytics role).
 
     Pass ``actor_user_id`` to scope the export to a single user's trail (used by
@@ -176,7 +178,7 @@ def _web_search_filter(
     return query
 
 
-def _web_search_row(e) -> dict:
+def _web_search_row(e: WebSearchUsage) -> dict:
     return {
         "id": str(e.id),
         "timestamp": e.timestamp.isoformat() if e.timestamp else None,
@@ -230,7 +232,7 @@ async def query_web_searches(
     }
 
 
-@router.get("/web-searches/export")
+@router.get("/web-searches/export", response_model=None)
 async def export_web_searches(
     feature: Optional[str] = None,
     status: Optional[str] = None,
@@ -239,7 +241,7 @@ async def export_web_searches(
     start_time: Optional[str] = None,
     end_time: Optional[str] = None,
     user: User = Depends(get_current_user),
-):
+) -> StreamingResponse:
     """Web searches as CSV (up to 10,000, newest first). Admin or staff."""
     import csv
     import io

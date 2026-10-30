@@ -25,6 +25,7 @@ Two deliberate limits:
   Tagged PDFs and accessibility duplicates repeat visible text invisibly;
   removing those occurrences would delete the visible copy too.
 """
+from pymupdf import Page
 
 import logging
 import re
@@ -63,7 +64,7 @@ def _normalize(text: str) -> str:
     return " ".join((text or "").split())
 
 
-def _page_backdrops(page, blocks: list[dict]) -> list:
+def _page_backdrops(page: Page, blocks: list[dict]) -> list:
     """Rects that give white text something to show up against.
 
     White is only a hiding trick when the page behind the text is also

@@ -107,7 +107,7 @@ async def apply_classification(
     classification changes the document. Saving the whole original model here
     would restore stale text and processing state (and could resurrect a delete).
     """
-    expected = {
+    expected: dict = {
         '_id': document.id, 'uuid': document.uuid,
         'user_id': document.user_id, 'team_id': document.team_id, 'folder': document.folder,
         'soft_deleted': {'$ne': True},

@@ -8,13 +8,13 @@ class CourseHistory:
     def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         self.repository = repository or EnrollmentRepository()
 
-    async def selection(self, user_id: str):
+    async def selection(self, user_id: str) -> dict | None:
         return await self.repository.selections.find_one({'user_id': user_id},
             {'_id': 0, 'active_enrollment_id': 1, 'revision': 1, 'pending_transition_id': 1})
 
     @staticmethod
-    def selection_status(enrollment_id: str, state, selection):
-        if (selection or {}).get('active_enrollment_id') == enrollment_id:
+    def selection_status(enrollment_id: str, state: str, selection: dict | None) -> str:
+        if selection is not None and selection.get('active_enrollment_id') == enrollment_id:
             return 'confirmation_pending' if selection.get('pending_transition_id') else 'current'
         return 'prepared' if state == 'prepared' else 'retained'
 

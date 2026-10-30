@@ -25,7 +25,7 @@ from .repair_case import capture_repair_case, load_repair_case, repair_reference
 MODULE = 'extraction_engine'
 
 
-def verify_decision(operation: CourseOperation, run, record, prompt_id: str, state) -> None:
+def verify_decision(operation: CourseOperation, run: dict, record: dict, prompt_id: str, state: str) -> None:
     LabExecutionRepository.check_operation(operation, record)
     prompt = load_prompt(operation.package, MODULE, prompt_id)
     try:
@@ -92,7 +92,7 @@ async def assemble_extraction(operation: CourseOperation, run_id: str, *, actor_
             raise CourseCatalogError('The saved repair source checks are incomplete or unbound')
     evidence = []
 
-    def add(kind, identity, payload) -> None:
+    def add(kind: str, identity: str, payload: object) -> None:
         try:
             evidence.append(ReviewEvidence(id=identity, kind=kind, text=encode(payload)[0]).model_dump(mode='json'))
         except ValidationError as exc:

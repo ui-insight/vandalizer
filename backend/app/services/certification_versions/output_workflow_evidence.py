@@ -24,7 +24,7 @@ from .output_workflow_preparation import OutputWorkflowPreparation
 from .practical_evidence import EvidenceAssemblyUnavailable
 
 
-async def assemble_output_review(operation: CourseOperation, submission_id, *, actor_user_id: str) -> dict:
+async def assemble_output_review(operation: CourseOperation, submission_id: str, *, actor_user_id: str) -> dict:
     if actor_user_id != operation.user_id:
         raise EnrollmentConflict('Output assessment requires the authenticated learner')
     saved = await OutputOutcomeReviewRepository().get(actor_user_id, submission_id)
@@ -43,7 +43,7 @@ async def assemble_output_review(operation: CourseOperation, submission_id, *, a
             or snapshot['rubric_id'] != contract.rubric_id):
         raise CourseCatalogError('Output evidence does not bind the original assignment and rubric')
     evidence = []
-    def add(kind, identity, payload) -> None:
+    def add(kind: str, identity: str, payload: object) -> None:
         try:
             evidence.append(ReviewEvidence(id=identity, kind=kind, text=encode(payload)[0]).model_dump(mode='json'))
         except ValidationError as exc:

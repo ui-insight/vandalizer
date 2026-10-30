@@ -1,4 +1,6 @@
 """Owned recognition receipts, read without regrading or moving progress."""
+from app.models.certification import CertificationEnrollment
+from .scenario_assessment import ScenarioBank
 from .catalog import CourseCatalogError
 from .enrollments import EnrollmentRepository
 from .scenario_submissions import ScenarioSubmissionRepository, module_bank
@@ -9,13 +11,13 @@ class ScenarioHistory:
         self.repository = repository or EnrollmentRepository()
         self.submissions = ScenarioSubmissionRepository()
 
-    async def resolve(self, user_id: str, enrollment_id: str, module_id: str):
+    async def resolve(self, user_id: str, enrollment_id: str, module_id: str) -> tuple[CertificationEnrollment, ScenarioBank]:
         enrollment = await self.repository._enrollment(user_id, enrollment_id)
         package = self.repository.catalog.load(enrollment.course_version)
         return enrollment, module_bank(package, module_id)
 
     @staticmethod
-    def receipt(raw, enrollment, bank):
+    def receipt(raw: dict, enrollment: CertificationEnrollment, bank: ScenarioBank) -> dict:
         try:
             return ScenarioHistory._receipt(raw, enrollment, bank)
         except (KeyError, TypeError, AttributeError, ValueError) as exc:
@@ -24,7 +26,7 @@ class ScenarioHistory:
             raise CourseCatalogError('The saved scenario feedback is inconsistent; the original result needs reconciliation') from exc
 
     @staticmethod
-    def _receipt(raw, enrollment, bank):
+    def _receipt(raw: dict, enrollment: CertificationEnrollment, bank: ScenarioBank) -> dict:
         record = ScenarioSubmissionRepository.decode(raw)
         if (record['user_id'] != enrollment.user_id
                 or record.get('submission_channel') != 'authenticated_learner_request'
@@ -43,7 +45,7 @@ class ScenarioHistory:
         return record
 
     @staticmethod
-    def validate_feedback(record, bank) -> None:
+    def validate_feedback(record: dict, bank: ScenarioBank) -> None:
         """Validate the receipt's own summaries without running the grader.
 
         Historical verdicts are retained. This does not re-decide whether a

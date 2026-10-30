@@ -95,7 +95,7 @@ class PracticalEvidenceRepository:
 
         evidence = []
 
-        def add(kind, identity, payload) -> None:
+        def add(kind: str, identity: str, payload: object) -> None:
             try:
                 evidence.append(ReviewEvidence(id=identity, kind=kind, text=encode(payload)[0]).model_dump(mode='json'))
             except ValidationError as exc:
@@ -151,7 +151,7 @@ class PracticalEvidenceRepository:
                     'value_decision_sha256': encode(values)[1] if values else None}}
 
     @staticmethod
-    def _check_decision(operation: CourseOperation, run, decision, prompt_id: str, state) -> None:
+    def _check_decision(operation: CourseOperation, run: dict, decision: dict, prompt_id: str, state: str) -> None:
         LabExecutionRepository.check_operation(operation, decision)
         prompt = load_prompt(operation.package, 'foundations', prompt_id)
         try:

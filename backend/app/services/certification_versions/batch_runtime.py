@@ -1,4 +1,5 @@
 """Bounded real extraction per assigned item with a disclosed training gate."""
+from collections.abc import Callable
 from copy import deepcopy
 import datetime
 import time
@@ -10,7 +11,7 @@ from .batch_plan import batch_plan
 from .enrollments import EnrollmentConflict
 
 
-def complete_result(plan, results) -> dict:
+def complete_result(plan: dict, results: list[dict]) -> dict:
     case = BatchCase.model_validate(plan['input_snapshot']['authored_case'])
     checks = check_inventory(case, plan['input_snapshot'], results, batch_id=plan['batch_id'],
         run_id=plan['uuid'], attempt_kind=plan['phase'], source_ids=plan['source_ids'])
@@ -18,7 +19,7 @@ def complete_result(plan, results) -> dict:
             'credit_awarded': False, 'module_completion_eligible': False}
 
 
-def execute_approved_batch(run, system_config, *, checkpoint, should_stop):
+def execute_approved_batch(run: dict, system_config: dict, *, checkpoint: Callable[[dict, str], dict], should_stop: Callable[[], bool]) -> dict:
     from app.services.extraction_engine import ExtractionEngine
     from .batch_approval import BatchScopeRepository
     from .batch_preparation import BatchPreparation, scope_question
@@ -51,12 +52,12 @@ def execute_approved_batch(run, system_config, *, checkpoint, should_stop):
         raise EnrollmentConflict('The approved inputs, model settings or implementation changed')
     events, results = [], []
 
-    def emit(value):
+    def emit(value: dict) -> dict:
         if should_stop():
             raise EnrollmentConflict('Stopped batch work cannot append another item')
         event = {**value, 'run_id': run['run_id'], 'plan_sha256': run['plan_sha256'],
                  'authorization_sha256': encode(authorization)[1], 'credit_awarded': False}
-        receipt = {'receipt': event, 'receipt_sha256': encode(event)[1]}
+        receipt: dict = {'receipt': event, 'receipt_sha256': encode(event)[1]}
         if checkpoint(deepcopy(event), receipt['receipt_sha256']) != receipt:
             raise EnrollmentConflict('The original item checkpoint was not durably acknowledged')
         events.append(receipt)

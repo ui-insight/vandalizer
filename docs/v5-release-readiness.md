@@ -62,7 +62,7 @@ network-policy enforcement and deployment identity still need deployed QA.
 ## Typing
 
 The original mypy baseline was 3,141 errors. The dependency pass reduced it to
-3,098; the current follow-up reduces it to 300 across 524 source files. The
+3,098; the completed follow-up passes all 524 source files with zero errors. The
 models, schemas, database helpers, URL helpers and observability setup pass their
 focused type check. Workflow execution, automatic review, review persistence and
 review recovery, and the knowledge-base, admin, workflow and Home/config APIs
@@ -71,8 +71,7 @@ decorator, preparation/execution services, design delivery and saved-review
 delivery also pass their checks. The six module delivery APIs, project, team,
 organization and Skill contracts are now clean, and 131 additional JSON-object
 HTTP endpoints have explicit return types. Invalid principals fail before learner storage
-is accessed; 18 regressions cover internal, HTTP and tool error handling. The full check remains
-advisory; the backlog is not clear. LLM configuration, extraction, run metadata,
+is accessed; 18 regressions cover internal, HTTP and tool error handling. The complete type check is now a blocking CI gate. LLM configuration, extraction, run metadata,
 knowledge ingestion, management and workflow services now pass their focused checks.
 The LLM wrappers use the current SDK model and retry contracts. Extraction's
 source fallback now accepts bare entity lists without treating them as mappings;
@@ -104,6 +103,15 @@ records explicitly at enrollment, recovery and execution boundaries. Previously
 unchecked bodies exposed additional issues, which were corrected rather than
 suppressed. Frozen legacy rubric artifacts are unchanged. No global checks have
 been disabled and no blanket error suppression added.
+
+Run `make backend-typecheck` (or `backend/.venv/bin/python scripts/check_backend_types.py`).
+The published legacy rubric cannot accept even annotation edits because existing
+enrollments bind its exact hash. The checker supplies three missing annotations
+and two explicit JSON-object casts through mypy's temporary shadow-file support.
+It verifies the original SHA-256 and compares executable syntax trees before
+checking every original function body. Nothing is excluded or suppressed; the
+archived runtime bytes remain unchanged. Running bare `mypy app` without that
+annotation overlay still reports the five archival typing diagnostics.
 
 The workflow pass found a real retry defect: updating the fallback model in task
 configuration did not update the cached model used by several concrete nodes.
@@ -210,6 +218,17 @@ continue to use their existing Pydantic validation at the API boundary.
   upgrade and completion passed 728 persistence tests against disposable MongoDB.
   Graph subscription creation now includes its required expiration, and create/
   renew timestamps use a single UTC suffix; five regressions cover both paths.
+- Final application/course/catalog contracts: the broad unit suite passed 8,897
+  cases initially (101 optional cases skipped). Thirteen failures exposed missing
+  `classification` on legacy support records; the original fallback is restored.
+  Those cases and three sandbox-DNS failures passed in the 170-test focused rerun
+  with network access: 8,913 distinct passing cases combined. Five additional
+  regressions cover retrying an unconfirmed preview save and rejecting non-object
+  search responses (33 focused cases passed). The complete type
+  check, release preservation, Ruff, Bandit and endpoint-map checks pass.
+- The final execution/checkpoint, source-calculation, scope, scenario and
+  transition-history batch passed 142 persistence tests against disposable
+  MongoDB. The container was removed after the run.
 - Certification enrollment and practical delivery persistence: 518 passed
   against a disposable MongoDB container, removed after the run.
 - Chroma's disposable container check passes locally and is included in CI.
@@ -259,7 +278,8 @@ Before release:
 
 - [ ] Resolve or explicitly assess the remaining Chroma security findings.
 - [ ] Complete deployment certification QA and preserve its evidence.
-- [ ] Review current CI and the advisory typing backlog.
+- [x] Clear the typing backlog and enforce it in CI.
+- [ ] Review CI for the final commit.
 - [ ] Review release notes and set the release date only when publishing.
 - [ ] Obtain a separate instruction to merge/release v5; the current instruction
   is to keep it unmerged. Retain the PR's squash-merge recommendation to avoid

@@ -187,6 +187,7 @@ class BatchDelivery:
             raise EnrollmentConflict('Select your existing course before saving or executing batch work')
         _, package, _ = await self.course(user_id, enrollment_id)
         async with self.repository.write_boundary(user_id, enrollment_id, operation='batch_' + action) as progress:
+            saved: dict | None
             operation = CourseOperation(user_id, package, progress, True)
             if action == 'capture':
                 return self.capture_view(await self.inputs.capture(operation, payload, actor_user_id=user_id, storage=get_storage()))

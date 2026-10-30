@@ -12,17 +12,17 @@ class UpdateSpaceRequest(BaseModel):
     title: str
 
 
-@router.get("/")
-async def list_spaces(user: User = Depends(get_current_user)):
+@router.get("/", response_model=None)
+async def list_spaces(user: User = Depends(get_current_user)) -> list[dict]:
     return await space_service.list_spaces(user)
 
 
-@router.patch("/{space_uuid}")
+@router.patch("/{space_uuid}", response_model=None)
 async def update_space(
     space_uuid: str,
     body: UpdateSpaceRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     result = await space_service.update_space(space_uuid, body.title, user)
     if result is None:
         raise HTTPException(status_code=404, detail="Space not found")

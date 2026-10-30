@@ -62,12 +62,12 @@ async def rename(
     return {"ok": True}
 
 
-@router.get("/{folder_uuid}/export")
+@router.get("/{folder_uuid}/export", response_model=None)
 async def export(
     folder_uuid: str,
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-):
+) -> StreamingResponse:
     """Stream a zip of every document in the folder subtree, preserving structure."""
     manifest = await folder_service.collect_export_entries(folder_uuid, user)
     if manifest is None:
@@ -148,10 +148,10 @@ async def convert_to_team(
     }
 
 
-@router.get("/all")
+@router.get("/all", response_model=None)
 async def list_all_folders(
     user: User = Depends(get_current_user),
-):
+) -> list[dict]:
     """Return all folders for the current user, including subfolders."""
     from app.services.access_control import get_team_access_context
 
@@ -190,11 +190,11 @@ async def list_all_folders(
     ]
 
 
-@router.get("/breadcrumbs/{folder_uuid}")
+@router.get("/breadcrumbs/{folder_uuid}", response_model=None)
 async def breadcrumbs(
     folder_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> list[dict]:
     crumbs = await folder_service.get_breadcrumbs(folder_uuid, user)
     if crumbs is None:
         raise HTTPException(status_code=404, detail="Folder not found")

@@ -1,4 +1,5 @@
 """Append-only task receipts with parallel starts and a complete-result barrier."""
+from .runtime import CourseOperation
 from copy import deepcopy
 import hashlib
 import json
@@ -13,7 +14,7 @@ from .stage_inputs import saved_history, stage_inputs
 MAX_CHECKPOINT_BYTES = 4 * 1024 * 1024
 
 
-def review_output(previous, plan):
+def review_output(previous: list[dict], plan: dict) -> dict:
     """Reconstruct the real engine's bounded Prompt-step aggregation in task order."""
     completed = {item['receipt']['task_index']: item['receipt']['result'] for item in previous
                  if item['receipt']['kind'] == 'task_completed' and item['receipt']['stage_index'] == 0}
@@ -33,7 +34,7 @@ def review_output(previous, plan):
     return combined
 
 
-def validate_event(event, previous, run) -> None:
+def validate_event(event: dict, previous: list[dict], run: dict) -> None:
     from app.services.workflow_engine import _build_combined_context
     plan = run['plan']
     stage_index, task_index = event['stage_index'], event['task_index']
@@ -89,7 +90,7 @@ def validate_event(event, previous, run) -> None:
                 raise ValueError('Completed task receipt must preserve a usable result and the actual instructions')
 
 
-def decode_checkpoints(raw, run):
+def decode_checkpoints(raw: dict, run: dict) -> list[dict]:
     try:
         serialized = raw.get('task_events_json')
         if serialized is None:
@@ -102,7 +103,7 @@ def decode_checkpoints(raw, run):
         expected_count = 2 * sum(len(stage['tasks']) for stage in run['plan']['stage_plans'])
         if not isinstance(events, list) or len(events) != raw['task_event_count'] or len(events) > expected_count:
             raise ValueError('Task event count mismatch')
-        previous = []
+        previous: list[dict] = []
         for item in events:
             if set(item) != {'receipt', 'receipt_sha256'} or encode(item['receipt'])[1] != item['receipt_sha256']:
                 raise ValueError('Task receipt hash changed')
@@ -119,7 +120,7 @@ def decode_checkpoints(raw, run):
 
 
 class AdvancedWorkflowCheckpoints:
-    async def append(self, operation, run, event, digest):
+    async def append(self, operation: CourseOperation, run: dict, event: dict, digest: str) -> dict:
         lease = LabExecutionRepository.check_operation(operation, run['plan'])
         records = LabExecutionRepository().records
         raw = await records.find_one({'uuid': run['run_id'], 'user_id': operation.user_id})

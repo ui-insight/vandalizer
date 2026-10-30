@@ -1,4 +1,5 @@
 """Execution completeness for the assigned NIH repair, separate from quality."""
+from .outcomes import OutcomeContract
 import hashlib
 from pathlib import Path
 
@@ -11,7 +12,7 @@ REQUIREMENT_KEYS = ('id', 'statement', 'method', 'evidence', 'passing_conditions
 REQUIREMENTS_SHA256 = '3feca5f5a0ba883c3f0aec3b5896eb6f88d5250525fee9d76c10137a0e7fd7db'
 
 
-def check_extraction_execution(contract, run, snapshot) -> dict:
+def check_extraction_execution(contract: OutcomeContract, run: dict, snapshot: dict) -> dict:
     """Consume collector-verified owned records; never decide value accuracy."""
     module = next((item for item in contract.modules if item.module_id == 'extraction_engine'), None)
     required = [item for item in module.outcomes if item.method == 'deterministic'] if module else []

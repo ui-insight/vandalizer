@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any
+from typing import Any, TypeVar
 from urllib.parse import urlsplit
 
 from pydantic import BaseModel, Field
@@ -102,7 +102,10 @@ async def is_available() -> bool:
         return False
 
 
-async def _agent(output_type: type[BaseModel], system_prompt: str, sys_config_doc: dict) -> Agent:
+OutputModel = TypeVar('OutputModel', bound=BaseModel)
+
+
+async def _agent(output_type: type[OutputModel], system_prompt: str, sys_config_doc: dict) -> Agent[None, OutputModel]:
     from app.services.config_service import get_default_model_name
     from app.services.llm_service import get_agent_model
 

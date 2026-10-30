@@ -8,6 +8,7 @@ Handles:
 """
 
 from __future__ import annotations
+from pymongo.database import Database
 
 import datetime
 import logging
@@ -111,7 +112,7 @@ async def resolve_assignees(
     return [workflow.user_id] if workflow.user_id else []
 
 
-def resolve_assignees_sync(db, role: str, workflow_doc: dict, explicit_user_ids: list[str]) -> list[str]:
+def resolve_assignees_sync(db: Database[dict], role: str, workflow_doc: dict, explicit_user_ids: list[str]) -> list[str]:
     """Sync variant for use inside Celery tasks (pymongo handle).
 
     Mirrors `resolve_assignees` but uses sync pymongo so the Celery worker
@@ -137,8 +138,8 @@ def resolve_assignees_sync(db, role: str, workflow_doc: dict, explicit_user_ids:
             return [user_id] if user_id else []
         memberships = list(db.team_membership.find({"team": team_oid}))
         admins = [m.get("user_id") for m in memberships if m.get("role") in ("owner", "admin")]
-        admins = [a for a in admins if a]
-        return admins or ([user_id] if user_id else [])
+        assignee_ids = [a for a in admins if isinstance(a, str) and a]
+        return assignee_ids or ([user_id] if user_id else [])
 
     logger.warning("Unknown assignee_role %r — defaulting to workflow owner", role)
     return [user_id] if user_id else []
@@ -149,7 +150,7 @@ def resolve_assignees_sync(db, role: str, workflow_doc: dict, explicit_user_ids:
 # ---------------------------------------------------------------------------
 
 
-def detect_artifact_kind(value) -> str:
+def detect_artifact_kind(value: object) -> str:
     """Best-effort guess at the renderer to use on the review screen.
 
     The output of the previous step can be almost anything. We try to identify
@@ -280,7 +281,7 @@ async def expire_overdue_approvals() -> dict:
     overdue = await ApprovalRequest.find(
         ApprovalRequest.status == STATUS_PENDING,
         ApprovalRequest.expires_at != None,  # noqa: E711
-        ApprovalRequest.expires_at < now,
+        {"expires_at": {"$lt": now}},
     ).to_list()
 
     counts = {"approved": 0, "rejected": 0, "escalated": 0, "expired": 0, "skipped": 0}

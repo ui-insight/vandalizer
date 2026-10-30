@@ -176,6 +176,7 @@ class AdvancedWorkflowDelivery:
             raise EnrollmentConflict('Select your existing course before saving or executing budget work')
         _, package, _ = await self.course(user_id, enrollment_id)
         async with self.repository.write_boundary(user_id, enrollment_id, operation='budget_' + action) as progress:
+            saved: dict | None
             operation = CourseOperation(user_id, package, progress, True)
             if action == 'calculation':
                 saved = await self.calculations.submit(operation, payload, actor_user_id=user_id, storage=get_storage())
@@ -204,6 +205,8 @@ class AdvancedWorkflowDelivery:
                 saved = await AdvancedWorkflowRecovery().finalize(operation, payload, actor_user_id=user_id)
             elif action == 'review':
                 saved = await self.reviews.submit(operation, payload, actor_user_id=user_id)
+                if saved is None:
+                    raise EnrollmentConflict('The saved review is no longer available')
                 return await self.get(user_id, enrollment_id, saved['uuid'])
             else:
                 raise ValueError('Unsupported budget action')

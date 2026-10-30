@@ -190,6 +190,8 @@ async def convert_to_team_folder(folder_uuid: str, user: User) -> SmartFolder:
 
     # Refresh and return
     folder = await SmartFolder.find_one(SmartFolder.uuid == folder_uuid)
+    if folder is None:
+        raise ValueError("The folder is no longer available after the ownership change.")
     return folder
 
 
@@ -319,6 +321,8 @@ async def convert_to_personal_folder(
     )
 
     folder = await SmartFolder.find_one(SmartFolder.uuid == folder_uuid)
+    if folder is None:
+        raise ValueError("The folder is no longer available after the ownership change.")
     return folder
 
 

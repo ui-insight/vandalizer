@@ -5,6 +5,8 @@ persist each checkpoint before returning. This module provides no HTTP dispatch
 or retry. Callback failure stops the chain; completed provider work is never
 silently replayed here.
 """
+from collections.abc import Callable
+from .multi_step_case import MultiStepCase
 from copy import deepcopy
 
 from .attempts import encode
@@ -17,7 +19,7 @@ from .stage_inputs import history_entry, stage_inputs
 MAX_STAGE_BYTES = 8 * 1024 * 1024
 
 
-def execute_approved_chain(run, case, system_config, *, checkpoint, should_stop) -> dict:
+def execute_approved_chain(run: dict, case: MultiStepCase, system_config: dict, *, checkpoint: Callable[[dict, str], dict], should_stop: Callable[[], bool]) -> dict:
     from app.services import workflow_engine
 
     try:

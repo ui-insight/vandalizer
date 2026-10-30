@@ -1,4 +1,5 @@
 """Execute one approved six-field interpretation of both complete source records."""
+from collections.abc import Callable
 from copy import deepcopy
 
 from .attempts import encode
@@ -8,7 +9,7 @@ from .governance_checks import check_result
 from .governance_plan import governance_plan
 
 
-def complete_result(plan, extraction) -> dict:
+def complete_result(plan: dict, extraction: dict) -> dict:
     checks = check_result(GovernanceCase.model_validate(plan['input_snapshot']['authored_case']),
         plan['input_snapshot'], extraction, run_id=plan['uuid'], phase=plan['phase'])
     repair_checks = None
@@ -22,7 +23,7 @@ def complete_result(plan, extraction) -> dict:
         'credit_awarded': False, 'module_completion_eligible': False}
 
 
-def execute_approved_capstone(run, system_config, *, checkpoint, should_stop):
+def execute_approved_capstone(run: dict, system_config: dict, *, checkpoint: Callable[[dict, str], dict], should_stop: Callable[[], bool]) -> dict:
     from app.services.extraction_engine import ExtractionEngine
     from .governance_preparation import validate_authorization
     plan = run['plan']
@@ -35,12 +36,12 @@ def execute_approved_capstone(run, system_config, *, checkpoint, should_stop):
     if any(plan[key] != value for key, value in current.items()):
         raise EnrollmentConflict('The approved capstone source, revision, model or implementation changed')
 
-    def emit(value):
+    def emit(value: dict) -> dict:
         if should_stop():
             raise EnrollmentConflict('Stopped work cannot append execution evidence')
         event = {**value, 'extraction_index': 0, 'run_id': run['run_id'], 'plan_sha256': run['plan_sha256'],
             'authorization_sha256': encode(run['authorization'])[1], 'credit_awarded': False}
-        receipt = {'receipt': event, 'receipt_sha256': encode(event)[1]}
+        receipt: dict = {'receipt': event, 'receipt_sha256': encode(event)[1]}
         if checkpoint(deepcopy(event), receipt['receipt_sha256']) != receipt:
             raise EnrollmentConflict('The complete extraction input or output was not durably acknowledged')
         return receipt

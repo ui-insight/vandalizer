@@ -1,4 +1,6 @@
 """Check one real connected execution and bind an owned repair comparison."""
+from typing import Protocol
+from .outcomes import OutcomeContract
 import hashlib
 from pathlib import Path
 
@@ -7,13 +9,23 @@ from .catalog import CourseCatalogError
 from .connected_workflow_checkpoints import decode_checkpoints
 from .stage_inputs import reads_previous_stage
 
+class ConnectedCaseEvidence(Protocol):
+    @property
+    def digest(self) -> str: ...
+    @property
+    def source_filename(self) -> str: ...
+    @property
+    def source_sha256(self) -> str: ...
+    def public_definition(self) -> dict: ...
+
+
 OUTCOME_ID = 'multi_step.connected_execution'
 REQUIREMENT_KEYS = ('id', 'statement', 'method', 'evidence', 'passing_conditions', 'critical_failures')
 REQUIREMENTS_SHA256 = '84e13cc7c18b6141dfd511fa3d920a7251e592218a1de874e358e6cea86d39cf'
 IDENTITY_KEYS = ('user_id', 'enrollment_id', 'module_id', 'course_version', 'manifest_sha256')
 
 
-def verified_chain(case, run):
+def verified_chain(case: ConnectedCaseEvidence, run: dict) -> tuple[dict, list[dict]]:
     """Caller loads owned records; independently reject mixed receipt chains."""
     try:
         plan, result, authorization = run['plan'], run['result'], run['authorization']
@@ -67,7 +79,7 @@ def verified_chain(case, run):
         raise CourseCatalogError(f'The connected execution evidence does not bind one complete approved chain{reason}') from exc
 
 
-def check_connected_execution(contract, case, run) -> dict:
+def check_connected_execution(contract: OutcomeContract, case: ConnectedCaseEvidence, run: dict) -> dict:
     module = next((item for item in contract.modules if item.module_id == 'multi_step'), None)
     required = [item for item in module.outcomes if item.method == 'deterministic'] if module else []
     if (len(required) != 1 or required[0].id != OUTCOME_ID
@@ -94,7 +106,7 @@ def check_connected_execution(contract, case, run) -> dict:
             'credit_awarded': False, 'module_completion_eligible': False}
 
 
-def compare_connected_runs(case, original, corrected) -> dict:
+def compare_connected_runs(case: ConnectedCaseEvidence, original: dict, corrected: dict) -> dict:
     before, _ = verified_chain(case, original)
     after, _ = verified_chain(case, corrected)
     if (original['run_id'] == corrected['run_id'] or before['uuid'] == after['uuid']

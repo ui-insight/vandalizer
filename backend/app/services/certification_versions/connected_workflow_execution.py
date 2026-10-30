@@ -1,5 +1,6 @@
 """Claim one approved internal run and retain its bounded stage evidence."""
 from __future__ import annotations
+from .writes import WriteLease
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -38,7 +39,7 @@ class ConnectedExecutionRequest(ContractModel):
 
 
 class ConnectedWorkflowExecution(ConnectedWorkflowPreparation):
-    async def execute(self, operation: CourseOperation, body, system_config_doc, *, actor_user_id: str):
+    async def execute(self, operation: CourseOperation, body: object, system_config_doc: dict, *, actor_user_id: str) -> dict | None:
         body = ConnectedExecutionRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Only the authenticated learner can dispatch this approved run')
@@ -77,7 +78,7 @@ class ConnectedWorkflowExecution(ConnectedWorkflowPreparation):
         loop = asyncio.get_running_loop()
         checkpoints = ConnectedWorkflowCheckpoints()
 
-        def checkpoint(event, digest):
+        def checkpoint(event: dict, digest: str) -> dict:
             # The worker waits for durable acknowledgement. The event loop stays
             # available for writes and cancellation while providers run in threads.
             if stop.is_set():
@@ -122,7 +123,7 @@ class ConnectedWorkflowExecution(ConnectedWorkflowPreparation):
         await self._finish_connected(run, lease, result, started_at)
         return await self.get(operation.user_id, body.run_id)
 
-    async def _finish_connected(self, run, lease, result, started_at) -> None:
+    async def _finish_connected(self, run: dict, lease: WriteLease, result: dict, started_at: str) -> None:
         raw = await self.records.find_one({'uuid': run['run_id'], 'user_id': run['plan']['user_id']})
         if raw is None or raw.get('authorization_sha256') != encode(run['authorization'])[1]:
             raise EnrollmentConflict('The connected run disappeared before its terminal receipt was saved')

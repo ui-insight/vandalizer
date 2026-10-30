@@ -5,6 +5,7 @@ rubric alone is insufficient: original, enrollment-bound assessed credit must
 also validate. Legacy participation remains earned in its original course.
 """
 from __future__ import annotations
+from .outcomes import OutcomeContract
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -77,7 +78,7 @@ class EquivalenceReview(ContractModel):
         return self
 
 
-def equivalence_review(source, target, contract):
+def equivalence_review(source: CoursePackage, target: CoursePackage, contract: OutcomeContract) -> EquivalenceReview | None:
     """The authored review for this exact source, or None; never grants credit."""
     if 'legacy-equivalence-review.json' not in target.manifest.artifacts:
         return None
@@ -90,7 +91,7 @@ def equivalence_review(source, target, contract):
     return review
 
 
-def assessment_basis(package: CoursePackage):
+def assessment_basis(package: CoursePackage) -> str | None:
     """Conservative compatibility boundary; only presentation may differ.
 
 Unknown assets are included by default. New exercises, judge configuration,
@@ -118,7 +119,7 @@ The mapping itself is excluded to avoid a circular package digest.
         'assets': {name: digest for name, digest in manifest.artifacts.items() if name not in presentation}})[1]
 
 
-def equivalence_plan(source, target, progress: CreditProgress, *, _verified_snapshots=None):
+def equivalence_plan(source: CoursePackage, target: CoursePackage, progress: CreditProgress, *, _verified_snapshots: dict[str, dict] | None=None) -> dict:
     """Inspect trusted repository progress without changing either enrollment."""
     if progress.course_version != source.manifest.release_id or not progress.enrollment_id:
         raise CourseCatalogError('Equivalence requires the original pinned enrollment')
@@ -158,7 +159,7 @@ def equivalence_plan(source, target, progress: CreditProgress, *, _verified_snap
             rule = rules.get(outcome.id)
             determination = determinations.get(outcome.id)
             eligible = rule is not None and snapshot is not None
-            row = {'outcome_id': outcome.id, 'module_id': module.module_id,
+            row: dict = {'outcome_id': outcome.id, 'module_id': module.module_id,
                    'statement': outcome.statement,
                    'status': 'eligible_for_transfer' if eligible else 'requires_assessment',
                    'reason': rule.reason if rule is not None and eligible else (

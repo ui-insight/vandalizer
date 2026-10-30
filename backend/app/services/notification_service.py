@@ -1,4 +1,7 @@
 """Notification service for verification, support, and failure events."""
+from pymongo.database import Database
+from pymongo.results import UpdateResult
+from typing import cast
 
 import datetime
 import logging
@@ -126,7 +129,7 @@ async def create_notification(
 
 
 def create_notification_sync(
-    db,
+    db: Database[dict],
     user_id: str,
     kind: str,
     title: str,
@@ -238,7 +241,7 @@ async def mark_read_for_item(user_id: str, item_kind: str, item_id: str) -> int:
         Notification.item_id == item_id,
         Notification.read == False,  # noqa: E712
     ).update_many({"$set": {"read": True}})
-    return result.modified_count if result else 0
+    return cast(UpdateResult, result).modified_count if result else 0
 
 
 async def mark_all_read(user_id: str) -> int:
@@ -246,7 +249,7 @@ async def mark_all_read(user_id: str) -> int:
         Notification.user_id == user_id,
         Notification.read == False,  # noqa: E712
     ).update_many({"$set": {"read": True}})
-    return result.modified_count if result else 0
+    return cast(UpdateResult, result).modified_count if result else 0
 
 
 def _to_dict(n: Notification) -> dict:

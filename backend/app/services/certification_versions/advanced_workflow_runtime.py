@@ -3,6 +3,9 @@
 The caller must first claim a durable run and persist every checkpoint before
 acknowledging it. This internal worker exposes no dispatch or replay endpoint.
 """
+from app.services.workflow_engine import Node
+from collections.abc import Callable
+from .advanced_case import AdvancedNodesCase
 from copy import deepcopy
 from threading import Lock
 
@@ -14,7 +17,7 @@ from .enrollments import EnrollmentConflict
 MAX_EVENT_BYTES = 8 * 1024 * 1024
 
 
-def execute_approved_budget(run, case, system_config, *, checkpoint, should_stop) -> dict:
+def execute_approved_budget(run: dict, case: AdvancedNodesCase, system_config: dict, *, checkpoint: Callable[[dict, str], dict], should_stop: Callable[[], bool]) -> dict:
     from app.services import workflow_engine
 
     try:
@@ -48,7 +51,7 @@ def execute_approved_budget(run, case, system_config, *, checkpoint, should_stop
     lock = Lock()
     events: list[dict] = []
 
-    def emit(event):
+    def emit(event: dict) -> str:
         # Parallel tasks share one ordered durable log. Completion means the
         # sink acknowledged the record, not merely that a model returned text.
         with lock:
@@ -71,8 +74,8 @@ def execute_approved_budget(run, case, system_config, *, checkpoint, should_stop
         original = node.process_task
         task_indices = {id(task): offset for offset, task in enumerate(node.tasks)}
 
-        def process_task(task, *, stage_index=index, stage_plan=deepcopy(stage), task_index_by_id=task_indices,
-                         process_original=original):
+        def process_task(task: Node, *, stage_index: int=index, stage_plan: dict=deepcopy(stage), task_index_by_id: dict[int, int]=task_indices,
+                         process_original: Callable[[Node], dict]=original) -> dict:
             offset = task_index_by_id[id(task)]
             spec = stage_plan['tasks'][offset]
             if should_stop():

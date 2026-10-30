@@ -1,4 +1,7 @@
 """Stable, owner-scoped snapshots of the visible chat transcript."""
+from pymongo.database import Database
+from app.schemas.artifact import ChatArtifactRequest
+from app.schemas.chat_export import ExportMessage
 import hashlib
 import json
 
@@ -9,7 +12,7 @@ from app.services import artifacts
 from app.services.chat_export import render_chat_export
 
 
-def page_title(messages, conversation_title=None, requested_title=None):
+def page_title(messages: list[ExportMessage], conversation_title: str | None=None, requested_title: str | None=None) -> str:
     generic = {'chat transcript', 'new chat', 'new conversation', 'untitled', 'attachments added', 'document attached', 'link attached'}
     candidates = [requested_title, conversation_title]
     candidates.extend(message.content for message in messages if message.role == 'user')
@@ -21,7 +24,7 @@ def page_title(messages, conversation_title=None, requested_title=None):
     return 'Saved conversation'
 
 
-def save(db, user_id, body, conversation_title=None):
+def save(db: Database[dict], user_id: str, body: ChatArtifactRequest, conversation_title: str | None=None) -> tuple[dict, bool]:
     # Validate the same content/size bounds as downloads, before any lookup.
     transcript = ChatExportRequest(format='html', messages=body.messages)
     content = json.dumps([message.model_dump() for message in transcript.messages],

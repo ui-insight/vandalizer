@@ -34,6 +34,7 @@ around it batch the lookups for a listing page.
 """
 
 from __future__ import annotations
+from app.models.kb_optimization_run import KBOptimizationRun
 
 import datetime
 import hashlib
@@ -111,8 +112,8 @@ def compute_optimization_status(
     rag_config_override: Optional[dict],
     override_set_at: Optional[datetime.datetime],
     override_run_uuid: Optional[str],
-    applied_run,
-    latest_completed_run,
+    applied_run: KBOptimizationRun | None,
+    latest_completed_run: KBOptimizationRun | None,
     sources: list[SourceStamp],
     queries: list[QueryStamp],
 ) -> Optional[OptimizationStatus]:
@@ -125,12 +126,11 @@ def compute_optimization_status(
     Both are read for ``uuid``, ``started_at``, ``completed_at``,
     ``best_config``, ``tied_with_baseline`` and ``test_query_snapshot`` only.
     """
-    has_override = isinstance(rag_config_override, dict) and bool(rag_config_override)
     latest = latest_completed_run
     last_run_at = _utc(getattr(latest, "completed_at", None)) if latest else None
     last_run_uuid = getattr(latest, "uuid", None) if latest else None
 
-    if not has_override:
+    if not rag_config_override:
         # A run tied with the current settings still records a best_config
         # (the simplest of the tied trials), but apply was suppressed because
         # nothing beat what chat already uses. Support ticket: "Subaward

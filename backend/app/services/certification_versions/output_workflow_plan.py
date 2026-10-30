@@ -4,6 +4,7 @@ Four sequential stages implement the supported rendering path: source review,
 PDF renderer, source-to-record formatter and CSV export. This is a supported
 executor shape, never a node-count grading criterion or release authority.
 """
+from .output_case import OutputDeliveryCase
 from copy import deepcopy
 import hashlib
 from pathlib import Path
@@ -21,7 +22,7 @@ OUTPUT_KEYS = {'DocumentRenderer': TASK_INPUT_KEYS | {'format', 'filename', 'tit
                'DataExport': TASK_INPUT_KEYS | {'format', 'filename'}}
 
 
-def implementation_digest():
+def implementation_digest() -> str:
     folder = Path(__file__).parent
     paths = [Path(__file__), folder / 'output_workflow_inputs.py', folder / 'output_case.py',
              folder / 'output_artifacts.py', folder / 'connected_workflow_plan.py',
@@ -34,7 +35,7 @@ def implementation_digest():
     return encode({str(path.relative_to(folder.parents[1])): hashlib.sha256(path.read_bytes()).hexdigest() for path in paths})[1]
 
 
-def output_workflow_plan(snapshot, case, system_config, *, default_model) -> dict:
+def output_workflow_plan(snapshot: dict, case: OutputDeliveryCase, system_config: dict, *, default_model: str) -> dict:
     from app.services.workflow_engine import apply_step_input_config, _resolve_input_sources, build_step_output_keys
     try:
         serialized, digest = encode(snapshot)

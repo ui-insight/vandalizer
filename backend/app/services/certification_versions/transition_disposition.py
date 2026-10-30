@@ -20,7 +20,7 @@ GROUPS = (
 )
 
 
-def preservation_plan(preview, *, module_titles):
+def preservation_plan(preview: dict, *, module_titles: dict[str, str]) -> dict:
     entries = []
     for kind, reference_key, label in GROUPS:
         for record in preview[kind]:

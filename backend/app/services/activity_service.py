@@ -91,7 +91,7 @@ async def activity_finish(
     return ev
 
 
-async def activity_update(activity_id: PydanticObjectId, **kwargs) -> Optional[ActivityEvent]:
+async def activity_update(activity_id: PydanticObjectId, **kwargs: object) -> Optional[ActivityEvent]:
     ev = await ActivityEvent.get(activity_id)
     if not ev:
         return None

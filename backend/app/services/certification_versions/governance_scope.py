@@ -72,11 +72,11 @@ class GovernanceScopeCorrection(LearnerDecisionJournal):
         except (KeyError, TypeError, ValueError, StopIteration) as exc:
             raise CourseCatalogError('The saved Governance scope correction failed integrity verification') from exc
 
-    async def get(self, user_id: str, reference: str) -> dict | None:
+    async def get(self, user_id: str, reference: str | None) -> dict | None:
         raw = await self.records.find_one({'uuid': reference, 'user_id': user_id, 'module_id': 'governance', 'prompt_id': PROMPT_ID})
         return self.decode(raw) if raw else None
 
-    async def submit(self, operation: CourseOperation, body, *, actor_user_id: str):
+    async def submit(self, operation: CourseOperation, body: object, *, actor_user_id: str) -> dict:
         body = GovernanceScopeCorrectionRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Only the authenticated learner can record the capstone scope correction')
@@ -91,7 +91,7 @@ class GovernanceScopeCorrection(LearnerDecisionJournal):
         request = body.model_dump(mode='json')
         request_hash = encode(request)[1]
 
-        def replay(raw):
+        def replay(raw: dict) -> dict:
             if any(raw.get(key) != value for key, value in identity.items()) or raw.get('request_sha256') != request_hash:
                 raise EnrollmentConflict('This correction identity belongs to different learner decisions or sources')
             return self.decode(raw)

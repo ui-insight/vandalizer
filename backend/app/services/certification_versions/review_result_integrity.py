@@ -4,20 +4,21 @@ Record digests establish which bytes were saved. They do not establish that a
 producer returned a complete, consistent assessment. This check never invokes a
 judge, changes a receipt, awards credit or creates a staff-review task.
 """
+from .outcomes import OutcomeContract
 from .attempts import encode
 from .automatic_review import AutomaticReviewPolicy, OutcomeDecision, review_packet, validate_decisions
 from .catalog import CourseCatalogError
 from .review_attempts import ReviewAttemptRepository
 
 
-def validate_saved_review_result(saved, contract) -> None:
+def validate_saved_review_result(saved: dict, contract: OutcomeContract) -> None:
     try:
         _validate(saved, contract)
     except (KeyError, TypeError, AttributeError, ValueError) as exc:
         raise CourseCatalogError('The saved assessment result needs reconciliation before it can be displayed') from exc
 
 
-def _validate(saved, contract) -> None:
+def _validate(saved: dict, contract: OutcomeContract) -> None:
     if saved['result'] is None:
         if saved['state'] not in ('prepared', 'evaluating'):
             raise ValueError('A terminal review needs its original result')

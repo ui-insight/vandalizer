@@ -1,4 +1,5 @@
 """Plan a bounded internal chain from frozen inputs without executing it."""
+from .multi_step_case import MultiStepCase
 from copy import deepcopy
 import hashlib
 from pathlib import Path
@@ -18,7 +19,7 @@ TASK_KEYS = {
 }
 
 
-def implementation_digest():
+def implementation_digest() -> str:
     services = Path(__file__).resolve().parents[1]
     paths = [Path(__file__), services / 'workflow_engine.py', services / 'workflow_prompt_variants.py',
              Path(__file__).with_name('connected_workflow_inputs.py'), Path(__file__).with_name('multi_step_case.py'),
@@ -30,7 +31,7 @@ def implementation_digest():
                    'files': {str(path.relative_to(services.parent)): hashlib.sha256(path.read_bytes()).hexdigest() for path in paths}})[1]
 
 
-def checked_sources(data) -> None:
+def checked_sources(data: dict) -> None:
     if set(data) - (TASK_INPUT_KEYS | TASK_KEYS['Extraction'] | TASK_KEYS['Prompt'] | TASK_KEYS['Formatter']):
         raise EnrollmentConflict('This workflow has settings the bounded executor does not support yet')
     if 'input_sources' in data and (not isinstance(data['input_sources'], list)
@@ -43,7 +44,7 @@ def checked_sources(data) -> None:
         raise EnrollmentConflict('Task input override must be an explicit boolean')
 
 
-def connected_workflow_plan(snapshot, case, system_config, *, default_model) -> dict:
+def connected_workflow_plan(snapshot: dict, case: MultiStepCase, system_config: dict, *, default_model: str) -> dict:
     """Support the assigned three-role chain, using product input precedence.
 
     No live artifact/source lookup occurs. Unsupported integrations, linked

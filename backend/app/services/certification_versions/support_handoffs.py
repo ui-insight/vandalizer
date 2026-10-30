@@ -1,5 +1,6 @@
 """Expose terminal private training handoffs without files, memos or dispatch."""
 from __future__ import annotations
+from app.models.certification import CertificationEnrollment
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -16,7 +17,7 @@ STEPS = {
 }
 
 
-async def support_handoffs(enrollment, package: CoursePackage):
+async def support_handoffs(enrollment: CertificationEnrollment, package: CoursePackage) -> dict:
     from .support_operations import reference
     identity = {'user_id': enrollment.user_id, 'enrollment_id': enrollment.uuid}
     journals = {PROMPT_ID: OutputPrivateHandoffRepository, GovernanceHandoffRepository.prompt_id: GovernanceHandoffRepository}

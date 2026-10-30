@@ -96,4 +96,6 @@ class PracticalExecution:
         async with self.repository.write_boundary(user_id, enrollment_id, operation='execute_practical_run') as progress:
             result = await self.runs.execute(CourseOperation(user_id, package, progress, True), run_id,
                 await preparation.configured_runtime(), expected_approval=expected)
+            if result is None:
+                raise EnrollmentConflict('The execution receipt is no longer available; inspect the saved run before retrying')
             return self.public(result)

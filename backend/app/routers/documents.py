@@ -15,12 +15,12 @@ from app.services.extraction_staleness import EXTRACTION_STALE_AFTER, extraction
 router = APIRouter()
 
 
-@router.get("/list")
+@router.get("/list", response_model=None)
 async def list_documents(
     folder: str | None = None,
     team_uuid: str | None = None,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     # Use provided team_uuid, or fall back to user's current team
     if not team_uuid and user.current_team:
         team = await Team.get(user.current_team)
@@ -125,11 +125,11 @@ async def search_documents(
     return {"items": items, "total": len(items)}
 
 
-@router.get("/poll_status")
+@router.get("/poll_status", response_model=None)
 async def poll_status(
     docid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     result = await document_service.poll_status(docid, user)
     if result is None:
         raise HTTPException(status_code=404, detail="Document not found")

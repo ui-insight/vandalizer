@@ -1,4 +1,5 @@
 """Pinned deterministic Foundations execution check; no model or credit award."""
+from .outcomes import OutcomeContract
 import hashlib
 from pathlib import Path
 
@@ -12,7 +13,7 @@ REQUIREMENT_KEYS = ('id', 'statement', 'method', 'evidence', 'passing_conditions
 REQUIREMENTS_SHA256 = 'e62671b002ebce6c3e4b163e5659b613063c4a0947210169fe1e3ec2b906bc45'
 
 
-def check_foundations_execution(contract, run, snapshot) -> dict:
+def check_foundations_execution(contract: OutcomeContract, run: dict, snapshot: dict) -> dict:
     """Caller supplies owned, integrity-verified records from the collector."""
     module = next((item for item in contract.modules if item.module_id == 'foundations'), None)
     required = [item for item in module.outcomes if item.method == 'deterministic'] if module else []

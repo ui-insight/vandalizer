@@ -1,4 +1,5 @@
 """Local release authoring. These operations never read or change learners."""
+from collections.abc import Iterator
 from contextlib import contextmanager
 import datetime
 import fcntl
@@ -13,7 +14,7 @@ from .grading import load_rubric
 
 
 @contextmanager
-def authoring_lock(root: Path):
+def authoring_lock(root: Path) -> Iterator[None]:
     root.mkdir(parents=True, exist_ok=True)
     # Lock a stable inode; replacing registry.json must not invalidate the lock.
     with (root / '.authoring.lock').open('a') as handle:
@@ -36,7 +37,7 @@ def write_registry(root: Path, registry: dict) -> None:
 
 
 def publish(catalog: CourseCatalog, release_id: str, *, expected_digest: str,
-            impact_report=None, source_catalog=None, inventory=None, qa_staging=None):
+            impact_report: object=None, source_catalog: CourseCatalog | None=None, inventory: object=None, qa_staging: dict | None=None) -> dict:
     """Publish exactly a reviewed draft; do not choose any enrollment default.
 
     ``qa_staging`` ({'reason', 'actor'}) publishes a marked QA package to a
@@ -107,7 +108,7 @@ def retire(catalog: CourseCatalog, release_id: str) -> None:
         write_registry(catalog.root, registry)
 
 
-def choose_default(catalog: CourseCatalog, release_id: str, *, legacy_continuation: bool = False, reviews_root=None) -> None:
+def choose_default(catalog: CourseCatalog, release_id: str, *, legacy_continuation: bool = False, reviews_root: Path | None=None) -> None:
     """Set initialization policy only; existing selections are never updated."""
     with authoring_lock(catalog.root):
         package = catalog.load(release_id, new_enrollment=not legacy_continuation)

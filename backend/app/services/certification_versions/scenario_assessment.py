@@ -3,6 +3,7 @@
 No XP or certification is awarded here. A delivery integration must persist an
 explicit learner submission against the pinned bank before using this result.
 """
+from .outcomes import OutcomeContract
 from typing import Self
 from typing import Literal
 
@@ -54,10 +55,10 @@ class ScenarioBank(ContractModel):
         return self
 
     @property
-    def digest(self):
+    def digest(self) -> str:
         return encode(self.model_dump(mode='json'))[1]
 
-    def verify_contract(self, contract) -> None:
+    def verify_contract(self, contract: OutcomeContract) -> None:
         module = next((module for module in contract.modules if module.module_id == self.module_id), None)
         required = {outcome.id for outcome in module.outcomes if outcome.method == 'scenario_choice'} if module else set()
         if self.rubric_id != contract.rubric_id or set(self.outcome_ids) != required:

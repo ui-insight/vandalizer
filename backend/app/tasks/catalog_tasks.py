@@ -6,6 +6,8 @@ UI can poll it, and notifies admins on completion or failure.
 """
 
 from __future__ import annotations
+from collections.abc import Coroutine
+from typing import Any, TypeVar
 
 from typing import TYPE_CHECKING
 
@@ -20,9 +22,10 @@ from app.celery_app import celery
 from app.tasks import run_task_async
 
 logger = logging.getLogger(__name__)
+T = TypeVar('T')
 
 
-def _run_async(coro):
+def _run_async(coro: Coroutine[Any, Any, T]) -> T:
     """Run an async coroutine from sync Celery task context, releasing the
     loop's pooled LLM HTTP client on teardown (see ``run_task_async``)."""
     return run_task_async(coro)
@@ -33,13 +36,13 @@ def _now_iso() -> str:
 
 
 @celery.task(bind=True, name="tasks.catalog.upgrade")
-def upgrade_catalog_task(self: Task, target_version: str, prune: bool, user_id: str):
+def upgrade_catalog_task(self: Task, target_version: str, prune: bool, user_id: str) -> dict:
     """Apply the bundled catalog: seed (add/refresh) then optionally retire
     items dropped from the catalog. State is mirrored to
     SystemConfig.catalog_upgrade throughout for the admin UI to poll."""
     started = _now_iso()
 
-    async def _run():
+    async def _run() -> dict:
         from app.config import Settings
         from app.database import init_db
         from app.models.system_config import SystemConfig

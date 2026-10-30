@@ -302,7 +302,7 @@ class _Redirected(Exception):
     """The endpoint answered with a redirect, which is never followed."""
 
 
-async def _send(method: str, url: str, **kwargs) -> dict:
+async def _send(method: str, url: str, *, json: dict | None = None, params: dict | None = None, headers: dict[str, str] | None = None) -> dict:
     """One provider request, without following redirects.
 
     The endpoint is checked against the SSRF policy before the request; a
@@ -310,7 +310,7 @@ async def _send(method: str, url: str, **kwargs) -> dict:
     answer directly, so a redirect names the address to configure instead.
     """
     async with httpx.AsyncClient(timeout=_TIMEOUT_S, follow_redirects=False) as client:
-        resp = await client.request(method, url, **kwargs)
+        resp = await client.request(method, url, json=json, params=params, headers=headers)
     if resp.is_redirect:
         location = resp.headers.get("location") or "another address"
         raise _Redirected(
@@ -318,7 +318,10 @@ async def _send(method: str, url: str, **kwargs) -> dict:
             "Set the endpoint to that address in System Config."
         )
     resp.raise_for_status()
-    return resp.json()
+    data = resp.json()
+    if not isinstance(data, dict):
+        raise ValueError("Web search provider returned a non-object response")
+    return data
 
 
 async def _search_tavily(endpoint: str, api_key: str, query: str, n: int) -> dict:

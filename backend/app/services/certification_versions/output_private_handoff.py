@@ -116,7 +116,7 @@ class OutputPrivateHandoffRepository(LearnerDecisionJournal):
         except (KeyError, TypeError, ValueError, EnrollmentConflict) as exc:
             raise CourseCatalogError('The private training handoff failed integrity verification') from exc
 
-    async def get(self, user_id: str, request_id: str) -> dict | None:
+    async def get(self, user_id: str, request_id: str | None) -> dict | None:
         raw = await self.records.find_one({'uuid': request_id, 'user_id': user_id, 'prompt_id': PROMPT_ID, 'module_id': 'output_delivery'})
         return self.decode(raw) if raw else None
 

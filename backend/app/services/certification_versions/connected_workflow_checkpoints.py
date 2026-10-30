@@ -1,4 +1,5 @@
 """Append-only stage evidence within the existing owned execution record."""
+from .runtime import CourseOperation
 from copy import deepcopy
 import hashlib
 import json
@@ -16,7 +17,7 @@ from .stage_inputs import saved_history, stage_inputs
 MAX_CHECKPOINT_BYTES = 4 * 1024 * 1024
 
 
-def validate_event(event, previous, run) -> None:
+def validate_event(event: dict, previous: list[dict], run: dict) -> None:
     from app.services.workflow_engine import _build_combined_context, _build_extraction_inputs
     sequence = len(previous)
     if sequence >= 6:
@@ -62,7 +63,7 @@ def validate_event(event, previous, run) -> None:
         raise ValueError('The controlled rehearsal cannot dispatch reasoning or invent its result')
 
 
-def decode_checkpoints(raw, run):
+def decode_checkpoints(raw: dict, run: dict) -> list[dict]:
     try:
         if raw.get('stage_events_json') is None:
             if (raw.get('stage_events_sha256') is not None or raw.get('stage_event_count', 0) != 0
@@ -75,7 +76,7 @@ def decode_checkpoints(raw, run):
         events = json.loads(serialized)
         if not isinstance(events, list) or len(events) != raw['stage_event_count'] or len(events) > 6:
             raise ValueError('Checkpoint count mismatch')
-        previous = []
+        previous: list[dict] = []
         for item in events:
             if set(item) != {'receipt', 'receipt_sha256'} or encode(item['receipt'])[1] != item['receipt_sha256']:
                 raise ValueError('Stage receipt digest mismatch')
@@ -91,7 +92,7 @@ def decode_checkpoints(raw, run):
 
 
 class ConnectedWorkflowCheckpoints:
-    async def append(self, operation, run, event, digest):
+    async def append(self, operation: CourseOperation, run: dict, event: dict, digest: str) -> dict:
         lease = LabExecutionRepository.check_operation(operation, run['plan'])
         records = LabExecutionRepository().records
         raw = await records.find_one({'uuid': run['run_id'], 'user_id': operation.user_id})
