@@ -20,6 +20,10 @@ any duplicates from before that index existed so it can be built at startup.
 """
 
 from __future__ import annotations
+from motor.motor_asyncio import AsyncIOMotorCollection
+from app.models.kb_test_query import KBTestQuery
+from app.models.knowledge import KnowledgeBase
+
 
 import datetime
 import logging
@@ -58,7 +62,7 @@ def kb_id_prefix(title: Optional[str], uuid: str = "") -> str:
     first four characters of the KB uuid, so the prefix is never empty and
     two such KBs still get distinct IDs.
     """
-    words = re.findall(r"[A-Za-z0-9]+", title) if isinstance(title, str) else []
+    words: list[str] = re.findall(r"[A-Za-z0-9]+", title) if isinstance(title, str) else []
     significant = [w for w in words if w.lower() not in _PREFIX_STOPWORDS] or words
     # "2 CFR 200" should read as CFR, not 2C2: numerals only count when the
     # title has nothing else.
@@ -133,7 +137,7 @@ class AutoQueryIdAllocator:
 
 async def reserve_and_write(
     allocator: AutoQueryIdAllocator,
-    row,
+    row: KBTestQuery,
     kb_uuid: str,
     *,
     write: Callable[[], Awaitable[object]],
@@ -149,7 +153,8 @@ async def reserve_and_write(
     one of them failing. Returns the ID that was written.
     """
     for _ in range(_MAX_ID_COLLISION_RETRIES):
-        row.external_id = await allocator.reserve(kb_uuid, exclude_uuid=exclude_uuid)
+        reserved_id = await allocator.reserve(kb_uuid, exclude_uuid=exclude_uuid)
+        row.external_id = reserved_id
         try:
             await write()
         except DuplicateKeyError:
@@ -159,7 +164,7 @@ async def reserve_and_write(
                 row.external_id, kb_uuid,
             )
             continue
-        return row.external_id
+        return reserved_id
     raise RuntimeError(
         f"Could not find a free auto query ID on KB {kb_uuid} after "
         f"{_MAX_ID_COLLISION_RETRIES} collisions"
@@ -185,7 +190,7 @@ def auto_query_notes(
     return f"Auto-generated {when}{origin} ({coverage} coverage{model})."
 
 
-async def backfill_auto_query_ids(kb) -> int:
+async def backfill_auto_query_ids(kb: KnowledgeBase) -> int:
     """Give IDs to a KB's auto-generated queries that predate this scheme.
 
     Runs on the write paths only — before a generation allocates its batch,
@@ -230,7 +235,7 @@ def _dedupe_sort_key(row: dict) -> tuple:
     )
 
 
-async def dedupe_test_query_external_ids(collection) -> int:
+async def dedupe_test_query_external_ids(collection: AsyncIOMotorCollection) -> int:
     """Clear ``external_id`` on all but the oldest row of each duplicated
     ``(knowledge_base_uuid, external_id)`` pair.
 
@@ -243,7 +248,7 @@ async def dedupe_test_query_external_ids(collection) -> int:
     ``collection`` is the raw Motor collection, because this runs before the
     ODM is initialised. Returns the number of rows whose ID was cleared.
     """
-    pipeline = [
+    pipeline: list[dict] = [
         {"$match": {"external_id": {"$type": "string"}}},
         {"$group": {
             "_id": {"kb": "$knowledge_base_uuid", "external_id": "$external_id"},

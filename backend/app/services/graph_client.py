@@ -63,6 +63,12 @@ def _get_valid_token(user_id: str) -> str | None:
     return os.environ.get("GRAPH_ACCESS_TOKEN")
 
 
+def _subscription_timestamp(value: datetime.datetime) -> str:
+    # MongoDB may return UTC datetimes without tzinfo; always emit one UTC zone.
+    aware = value if value.tzinfo is not None else value.replace(tzinfo=datetime.timezone.utc)
+    return aware.astimezone(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
+
+
 class GraphClient:
     """Per-user Microsoft Graph API wrapper."""
 
@@ -265,7 +271,7 @@ class GraphClient:
             "changeType": change_type,
             "notificationUrl": notification_url,
             "resource": resource,
-            "expirationDateTime": expiration.isoformat() + "Z",
+            "expirationDateTime": _subscription_timestamp(expiration),
         }
         if client_state:
             payload["clientState"] = client_state
@@ -273,7 +279,7 @@ class GraphClient:
 
     def renew_subscription(self, subscription_id: str, expiration: datetime.datetime) -> dict[str, Any]:
         return self._patch(f"/subscriptions/{subscription_id}", {
-            "expirationDateTime": expiration.isoformat() + "Z",
+            "expirationDateTime": _subscription_timestamp(expiration),
         })
 
     def delete_subscription(self, subscription_id: str) -> None:

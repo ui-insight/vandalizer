@@ -1,5 +1,7 @@
 """Skill-compatible artifact tools using the existing prior-turn approval gate."""
 import functools
+from typing import Callable, Concatenate, ParamSpec, TypeVar
+from pymongo.database import Database
 import hashlib
 
 import anyio
@@ -22,11 +24,15 @@ RENDERING_NOTE = (
 )
 
 
-async def _call(fn, *args):
-    return await anyio.to_thread.run_sync(functools.partial(fn, get_sync_db(), *args))
+P = ParamSpec("P")
+ResultT = TypeVar("ResultT")
 
 
-def _source(context):
+async def _call(fn: Callable[Concatenate[Database[dict], P], ResultT], *args: P.args, **kwargs: P.kwargs) -> ResultT:
+    return await anyio.to_thread.run_sync(functools.partial(fn, get_sync_db(), *args, **kwargs))
+
+
+def _source(context: RunContext[AgenticChatDeps]) -> dict:
     conversation = context.deps.conversation
     skill = getattr(conversation, "active_skill", None)
     return {"kind": "chat", "conversation_uuid": getattr(conversation, "uuid", None),
@@ -117,8 +123,11 @@ async def revise_html_artifact(context: RunContext[AgenticChatDeps], artifact_uu
     return await _save(context, title, html, confirmed, artifact_uuid, base_revision)
 
 
-async def _save(context, title, html, confirmed, artifact_uuid=None, base_revision=None, template_source=None):
+async def _save(context: RunContext[AgenticChatDeps], title: str, html: str, confirmed: bool, artifact_uuid: str | None=None, base_revision: str | None=None, template_source: dict | None=None) -> dict:
     from app.services.chat_tools import _confirm_gate
+    conversation = context.deps.conversation
+    if conversation is None:
+        return {"error": "Start a chat conversation before saving a Page."}
     try:
         if len(title) > 200:
             return {"error": "Use a title of at most 200 characters."}
@@ -131,7 +140,7 @@ async def _save(context, title, html, confirmed, artifact_uuid=None, base_revisi
                 return {"error": "Page changed. Read the latest revision before proposing an edit."}
         name = "revise_html_artifact" if artifact_uuid else "create_html_artifact"
         snapshot = await _call(chat_page_previews.prepare, context.deps.user_id,
-            context.deps.conversation.uuid, title, html, artifact_uuid, base_revision, {**_source(context), **(template_source or {})})
+            conversation.uuid, title, html, artifact_uuid, base_revision, {**_source(context), **(template_source or {})})
         digest = hashlib.sha256((title + snapshot["prepared_html"]).encode()).hexdigest()
         gate = await _confirm_gate(context, tool_name=name,
             key={"artifact": artifact_uuid, "base": base_revision, "sha256": digest}, confirmed=confirmed,
@@ -144,7 +153,7 @@ async def _save(context, title, html, confirmed, artifact_uuid=None, base_revisi
         if gate is not None:
             return gate
         saved = await _call(chat_page_previews.save, context.deps.user_id,
-            context.deps.conversation.uuid, snapshot["_id"])
+            conversation.uuid, snapshot["_id"])
         return {**saved, "rendering_note": RENDERING_NOTE,
                 "source_fidelity_note": PAGE_SOURCE_FIDELITY_RULES, "language_note": PAGE_LANGUAGE_RULES}
     except HTTPException as exc:

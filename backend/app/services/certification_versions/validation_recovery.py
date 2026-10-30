@@ -1,4 +1,6 @@
 """Explicitly finalize a complete saved suite without repeating provider work."""
+from .runtime import CourseOperation
+
 import datetime
 from typing import Literal
 
@@ -21,7 +23,7 @@ class ValidationFinalizationRequest(ContractModel):
 
 
 class ValidationRecovery(ValidationPreparation):
-    async def finalize(self, operation, body, *, actor_user_id: str):
+    async def finalize(self, operation: CourseOperation, body: object, *, actor_user_id: str) -> dict | None:
         body = ValidationFinalizationRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Only the authenticated learner can finalize this saved suite')

@@ -37,7 +37,7 @@ async def get_default_model_name() -> str:
     for m in models:
         if isinstance(m, dict):
             name = m.get("name", "")
-            if name:
+            if isinstance(name, str) and name:
                 return name
     return ""
 
@@ -67,9 +67,10 @@ async def get_llm_model_names() -> set[str]:
     """Return set of configured model names."""
     models = await get_llm_models()
     return {
-        m.get("name")
+        name
         for m in models
-        if isinstance(m, dict) and m.get("name")
+        if isinstance(m, dict)
+        if isinstance(name := m.get("name"), str) and name
     }
 
 
@@ -94,7 +95,9 @@ async def resolve_model_name(model_name: str | None) -> str:
     if model_name:
         model = await get_llm_model_by_name(model_name)
         if model:
-            return model.get("name", model_name)
+            name = model.get("name", model_name)
+            if isinstance(name, str):
+                return name
     return await get_default_model_name()
 
 
@@ -164,7 +167,7 @@ async def get_user_model_name(user_id: str | None) -> str:
 async def reconcile_user_model_config(
     user_id: str,
     create_if_missing: bool = False,
-):
+) -> tuple[UserModelConfig | None, list[dict], str]:
     """Reconcile a user's model config with system models.
 
     Returns (user_config_or_none, configured_models, resolved_model_name).

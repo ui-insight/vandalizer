@@ -90,9 +90,9 @@ async def list_intakes(user: User = Depends(get_current_user)) -> dict[str, obje
     return {"intakes": [_intake_to_dict(i) for i in intakes]}
 
 
-@router.post("/intakes")
+@router.post("/intakes", response_model=None)
 @limiter.limit("30/minute")
-async def create_intake(request: Request, req: CreateIntakeRequest, user: User = Depends(get_current_user)):
+async def create_intake(request: Request, req: CreateIntakeRequest, user: User = Depends(get_current_user)) -> dict:
     from beanie import PydanticObjectId
 
     if req.default_workflow:
@@ -115,14 +115,14 @@ async def create_intake(request: Request, req: CreateIntakeRequest, user: User =
     return _intake_to_dict(intake)
 
 
-@router.patch("/intakes/{intake_uuid}")
+@router.patch("/intakes/{intake_uuid}", response_model=None)
 @limiter.limit("30/minute")
 async def update_intake(
     request: Request,
     intake_uuid: str,
     req: UpdateIntakeRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     intake = await _get_owned_intake(intake_uuid, user)
     if not intake:
         raise HTTPException(status_code=404, detail="Intake not found")
@@ -174,17 +174,17 @@ async def list_work_items(
     return {"items": [_work_item_to_dict(i) for i in items]}
 
 
-@router.get("/workitems/{item_uuid}")
-async def get_work_item(item_uuid: str, user: User = Depends(get_current_user)):
+@router.get("/workitems/{item_uuid}", response_model=None)
+async def get_work_item(item_uuid: str, user: User = Depends(get_current_user)) -> dict:
     item = await _get_owned_work_item(item_uuid, user)
     if not item:
         raise HTTPException(status_code=404, detail="Work item not found")
     return _work_item_to_dict(item)
 
 
-@router.post("/workitems/{item_uuid}/approve")
+@router.post("/workitems/{item_uuid}/approve", response_model=None)
 @limiter.limit("30/minute")
-async def approve_work_item(request: Request, item_uuid: str, user: User = Depends(get_current_user)):
+async def approve_work_item(request: Request, item_uuid: str, user: User = Depends(get_current_user)) -> dict:
     item = await _get_owned_work_item(item_uuid, user)
     if not item:
         raise HTTPException(status_code=404, detail="Work item not found")
@@ -243,6 +243,7 @@ async def create_graph_subscription(
         resource=resource,
         change_type=change_type,
         notification_url=notification_url,
+        expiration=datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=2),
         client_state=client_state,
     )
 

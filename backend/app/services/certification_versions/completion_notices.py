@@ -5,6 +5,10 @@ automatic send attempt; an uncertain attempt is retained, never blindly
 resent. The durable in-app notice and credential remain available regardless.
 """
 from __future__ import annotations
+from app.config import Settings
+from app.models.user import User
+from .credentials import CredentialRecord
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -28,7 +32,7 @@ from .credentials import CredentialRepository
 from .enrollments import EnrollmentConflict
 
 
-def notice_record(credential) -> dict:
+def notice_record(credential: CredentialRecord) -> dict:
     if (credential.provenance != 'versioned_course_completion' or not credential.certified_at
             or not credential.course_version or not credential.module_ids):
         raise EnrollmentConflict('Historical credential preservation is not a new completion announcement')
@@ -46,7 +50,7 @@ def notice_record(credential) -> dict:
             'link': '/certification'}
 
 
-def render_email(record, frontend_url):
+def render_email(record: dict, frontend_url: str) -> tuple[str, str]:
     from app.services.email_service import _BASE_STYLE, _prefs_footer
     url = urlsplit(frontend_url)
     if url.scheme not in ('http', 'https') or not url.netloc or url.username or url.password:
@@ -89,7 +93,7 @@ class CompletionNoticeRepository:
         except (KeyError, TypeError, ValueError) as exc:
             raise CourseCatalogError('The preserved completion notice failed integrity verification') from exc
 
-    async def prepare(self, user_id: str, enrollment_id: str):
+    async def prepare(self, user_id: str, enrollment_id: str) -> dict:
         credential = await CredentialRepository().for_enrollment(user_id, enrollment_id)
         if credential is None:
             raise EnrollmentConflict('Preserve the earned credential before announcing completion')
@@ -101,12 +105,12 @@ class CompletionNoticeRepository:
             await self.records.insert_one(seed)
         except DuplicateKeyError:
             pass
-        saved = await self.records.find_one({'uuid': credential.credential_id, 'user_id': user_id})
+        saved: dict | None = await self.records.find_one({'uuid': credential.credential_id, 'user_id': user_id})
         if saved is None or self.decode(saved) != record:
             raise CourseCatalogError('Completion notice differs from the original issued credential')
         return saved
 
-    async def notify(self, raw):
+    async def notify(self, raw: dict) -> dict | None:
         record = self.decode(raw)
         if raw.get('notification_created') is True:
             return None
@@ -122,7 +126,7 @@ class CompletionNoticeRepository:
             await collection.update_one({'_id': ObjectId(identity[:24])}, {'$setOnInsert': row}, upsert=True)
         except DuplicateKeyError:
             pass
-        saved = await collection.find_one({'_id': ObjectId(identity[:24])})
+        saved: dict | None = await collection.find_one({'_id': ObjectId(identity[:24])})
         if saved is None or any(saved.get(key) != row[key] for key in
                                ('uuid', 'user_id', 'kind', 'title', 'body', 'link', 'item_kind', 'item_id', 'item_name')):
             raise CourseCatalogError('The original completion notification could not be confirmed')
@@ -130,7 +134,7 @@ class CompletionNoticeRepository:
             'record_sha256': raw['record_sha256']}, {'$set': {'notification_created': True}})
         return saved
 
-    async def email(self, raw, user, settings):
+    async def email(self, raw: dict, user: User, settings: Settings) -> bool:
         from app.services.email_service import send_email
         record = self.decode(raw)
         if user.user_id != record['user_id']:

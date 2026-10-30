@@ -4,6 +4,8 @@ No provider is invoked and no prior terminal receipt is overwritten. Incomplete
 or uncertain runs require a separate recovery design, not a guessed success or
 automatic replay of their completed stages.
 """
+from .runtime import CourseOperation
+
 import datetime
 from typing import Literal
 
@@ -27,7 +29,7 @@ class ConnectedFinalizationRequest(ContractModel):
 
 
 class ConnectedWorkflowRecovery(ConnectedWorkflowPreparation):
-    async def finalize(self, operation, body, *, actor_user_id: str):
+    async def finalize(self, operation: CourseOperation, body: object, *, actor_user_id: str) -> dict | None:
         from app.services.workflow_engine import WorkflowEngine
         body = ConnectedFinalizationRequest.model_validate(body)
         if actor_user_id != operation.user_id:

@@ -4,6 +4,10 @@ Until assessed-outcome equivalence and external-job reconciliation exist, this
 is an internal preparation view, not a learner activation API. Draft target
 requirements may be inspected without making that draft enrollable.
 """
+from app.models.certification import CertificationEnrollment
+from .catalog import CoursePackage
+from .credentials import CredentialRecord
+
 from copy import deepcopy
 
 from bson import ObjectId, json_util
@@ -32,12 +36,12 @@ RECOVERY_SUMMARY_FIELDS = {'uuid': 1, 'state': 1, 'request_sha256': 1, 'review_s
 REVIEW_SUMMARY_FIELDS = {'uuid': 1, 'module_id': 1, 'state': 1, 'record_sha256': 1,
                          'result_sha256': 1, 'worker_id': 1}
 
-def fingerprint(value):
+def fingerprint(value: object) -> str:
     # Canonical BSON encoding retains ObjectIds/dates and the write fence.
     return encode({'bson': json_util.dumps(value, sort_keys=True)})[1]
 
 
-def without_owned_write(selection, progress, user_id: str, enrollment_id: str):
+def without_owned_write(selection: dict | None, progress: dict | None, user_id: str, enrollment_id: str) -> tuple[dict, dict]:
     """Remove only this caller's verified guard when comparing reviewed work."""
     from .writes import require_lease
     lease = require_lease(user_id, enrollment_id)
@@ -58,7 +62,7 @@ def without_owned_write(selection, progress, user_id: str, enrollment_id: str):
     return selection, progress
 
 
-def decision_basis(state, source, target, credential):
+def decision_basis(state: dict, source: CertificationEnrollment, target: CoursePackage, credential: CredentialRecord | None) -> str:
     """Guard rotation alone is not changed work; actual data/revisions are."""
     state = deepcopy(state)
     state['selection'].pop('active_write', None)
@@ -72,7 +76,7 @@ class TransitionPreview:
     def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         self.repository = repository or EnrollmentRepository()
 
-    async def inspect(self, user_id: str, source_id: str, target_version: str, *, _held_write: bool=False):
+    async def inspect(self, user_id: str, source_id: str, target_version: str, *, _held_write: bool=False) -> dict:
         repo = self.repository
         selection = await repo.selections.find_one({'user_id': user_id})
         if not selection or selection['active_enrollment_id'] != source_id:

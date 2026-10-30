@@ -1,5 +1,6 @@
 """Persist exact bounded batch plans for separate learner approval."""
 from __future__ import annotations
+from typing import Any
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -54,7 +55,7 @@ class BatchPlanRequest(ContractModel):
         return self
 
 
-def scope_question(case, phase) -> dict:
+def scope_question(case: BatchCase, phase: str) -> dict:
     key = {'pilot': 'pilot_choice', 'batch': 'scale_choice', 'retry': 'recovery_choice'}[phase]
     question = next(q for q in case.questions if q.id == key)
     return {'id': 'batch_scope_approval', 'phase': 'before_execution', 'batch_phase': phase,
@@ -137,7 +138,7 @@ class BatchPreparation(LabExecutionJournal):
         except (KeyError, TypeError, ValueError, AttributeError) as exc:
             raise CourseCatalogError('The saved bounded batch plan failed integrity verification') from exc
 
-    async def prepare(self, operation: CourseOperation, body, system_config_doc, *, actor_user_id: str):
+    async def prepare(self, operation: CourseOperation, body: object, system_config_doc: dict, *, actor_user_id: str) -> dict | None:
         body = BatchPlanRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Only the authenticated learner can prepare this bounded action')
@@ -148,7 +149,7 @@ class BatchPreparation(LabExecutionJournal):
         request = body.model_dump(mode='json')
         request_hash = encode(request)[1]
 
-        def replay(raw):
+        def replay(raw: dict) -> dict:
             saved = self.decode(raw)
             if any(saved['plan'][key] != value for key, value in identity.items()) or saved['plan']['request_sha256'] != request_hash:
                 raise EnrollmentConflict('This plan request belongs to different original work or another learner')
@@ -199,5 +200,5 @@ class BatchPreparation(LabExecutionJournal):
         await LabInputRepository._check_lease(lease)
         return await self.get(actor_user_id, body.request_id)
 
-    async def execute(self, *args, **kwargs) -> dict:
+    async def execute(self, *args: Any, **kwargs: Any) -> dict | None:
         raise EnrollmentConflict('Batch dispatch requires the separately approved durable item executor')

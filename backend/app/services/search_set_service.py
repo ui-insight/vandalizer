@@ -54,7 +54,7 @@ async def create_search_set(
     from app.services import library_service
 
     await library_service.ensure_bookmark(
-        ss.id, LibraryItemKind.SEARCH_SET, user_id, team_id=team_id,
+        library_service._persisted_id(ss), LibraryItemKind.SEARCH_SET, user_id, team_id=team_id,
     )
     return ss
 
@@ -130,7 +130,7 @@ def effective_extraction_config(ss: SearchSet | dict | None) -> dict:
         base = ss.extraction_config
     if isinstance(override, dict) and override:
         return override
-    return base or {}
+    return base if isinstance(base, dict) else {}
 
 
 async def get_search_set_item(item_id: str) -> SearchSetItem | None:
@@ -211,7 +211,7 @@ async def clone_search_set(search_set_uuid: str, user_id: str) -> SearchSet | No
     from app.services import library_service
 
     await library_service.ensure_bookmark(
-        clone.id, LibraryItemKind.SEARCH_SET, user_id, team_id=original.team_id,
+        library_service._persisted_id(clone), LibraryItemKind.SEARCH_SET, user_id, team_id=original.team_id,
     )
 
     return clone

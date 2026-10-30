@@ -1,4 +1,7 @@
 """Document Manager  - ChromaDB-backed document ingestion and semantic search for RAG."""
+from chromadb.api.types import Metadata, Where
+from chromadb.types import InclusionExclusionOperator, LiteralValue
+
 
 import hashlib
 import logging
@@ -337,7 +340,7 @@ class DocumentManager:
 
         ids = []
         documents = []
-        metadatas = []
+        metadatas: list[Metadata] = []
         for i, (chunk, offset) in enumerate(text_splits):
             ids.append(f"{document_id}_chunk_{i}")
             documents.append(chunk)
@@ -377,7 +380,7 @@ class DocumentManager:
             return self._FALLBACK_MAX_ADD_BATCH
         return reported if reported >= 1 else self._FALLBACK_MAX_ADD_BATCH
 
-    def _add_in_batches(self, collection, ids, documents, metadatas) -> None:
+    def _add_in_batches(self, collection: chromadb.Collection, ids: list[str], documents: list[str], metadatas: list[Metadata]) -> None:
         """``collection.add`` split to respect ChromaDB's per-call maximum."""
         size = self._max_add_batch()
         for start in range(0, len(ids), size):
@@ -397,10 +400,12 @@ class DocumentManager:
     ) -> list[dict[str, Any]]:
         collection = self.get_user_collection(user_id)
 
-        where_filter = None
+        where_filter: Where | None = None
         if filter_docs:
-            clean_ids = [doc.split(".")[0] for doc in filter_docs]
-            where_filter = {"document_id": {"$in": clean_ids}}
+            inclusion: dict[InclusionExclusionOperator, list[LiteralValue]] = {
+                "$in": [doc.split(".")[0] for doc in filter_docs],
+            }
+            where_filter = {"document_id": inclusion}
 
         results = collection.query(
             query_texts=[query],
@@ -409,12 +414,14 @@ class DocumentManager:
         )
 
         output = []
-        if results and results.get("documents"):
+        documents = results.get("documents") if results else None
+        if documents:
             ids_list = (results.get("ids") or [[]])[0]
             dists_list = (results.get("distances") or [[]])[0]
-            for i, doc in enumerate(results["documents"][0]):
+            metadatas = results.get("metadatas")
+            for i, doc in enumerate(documents[0]):
                 metadata = (
-                    results["metadatas"][0][i] if results.get("metadatas") else {}
+                    metadatas[0][i] if metadatas else {}
                 )
                 output.append({
                     "content": doc,
@@ -503,7 +510,7 @@ class DocumentManager:
 
         ids = []
         documents = []
-        metadatas = []
+        metadatas: list[Metadata] = []
         for i, (chunk, offset) in enumerate(text_splits):
             ids.append(f"{id_prefix or source_id}_chunk_{i}")
             documents.append(chunk)
@@ -546,11 +553,13 @@ class DocumentManager:
         results = collection.query(query_texts=[query], n_results=k, where=where)
 
         output = []
-        if results and results.get("documents"):
+        documents = results.get("documents") if results else None
+        if documents:
             ids_list = (results.get("ids") or [[]])[0]
             dists_list = (results.get("distances") or [[]])[0]
-            for i, doc in enumerate(results["documents"][0]):
-                metadata = results["metadatas"][0][i] if results.get("metadatas") else {}
+            metadatas = results.get("metadatas")
+            for i, doc in enumerate(documents[0]):
+                metadata = metadatas[0][i] if metadatas else {}
                 dist = dists_list[i] if i < len(dists_list) else None
                 # Chroma returns squared-L2 distances and the default embedding
                 # function yields unit vectors, so d = 2(1 - cos); map back to
@@ -704,7 +713,7 @@ class DocumentManager:
         metadatas = existing.get("metadatas") or []
         if not ids:
             return
-        updated: list[dict] = []
+        updated: list[Metadata] = []
         for meta in metadatas:
             m = dict(meta or {})
             m["source_name"] = new_name

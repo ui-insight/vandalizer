@@ -53,7 +53,7 @@ class ConnectedRecoveryDecisionRequest(ContractModel):
         return self
 
 
-def recovery_checks(run, body) -> dict:
+def recovery_checks(run: dict, body: ConnectedRecoveryDecisionRequest) -> dict:
     if (not is_failure_practice(run['plan']) or run['state'] != 'failed'
             or not run['result'] or run['result'].get('reason') != STOP_MARKER
             or len(run['stage_events']) != 4
@@ -101,12 +101,12 @@ class ConnectedRecoveryDecisionRepository(LearnerDecisionJournal):
         except (KeyError, TypeError, ValueError, EnrollmentConflict) as exc:
             raise CourseCatalogError('The saved stopped-run recovery choices failed integrity verification') from exc
 
-    async def get(self, user_id: str, submission_id) -> dict | None:
+    async def get(self, user_id: str, submission_id: str | None) -> dict | None:
         raw = await self.records.find_one({'uuid': submission_id, 'user_id': user_id,
                                           'module_id': 'multi_step', 'prompt_id': PROMPT_ID})
         return self.decode(raw) if raw else None
 
-    async def submit(self, operation: CourseOperation, body, *, actor_user_id: str):
+    async def submit(self, operation: CourseOperation, body: object, *, actor_user_id: str) -> dict | None:
         body = ConnectedRecoveryDecisionRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Only the authenticated learner can record recovery choices')
@@ -117,7 +117,7 @@ class ConnectedRecoveryDecisionRepository(LearnerDecisionJournal):
         request = body.model_dump(mode='json')
         request_hash = encode(request)[1]
 
-        def replay(raw):
+        def replay(raw: dict) -> dict:
             if any(raw.get(key) != value for key, value in identity.items()) or raw['request_sha256'] != request_hash:
                 raise EnrollmentConflict('This recovery reference already belongs to different work or answers')
             return self.decode(raw)

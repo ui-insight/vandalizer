@@ -1,4 +1,6 @@
 """Durable, ordered per-item starts and results before a successor can run."""
+from .runtime import CourseOperation
+
 from copy import deepcopy
 import hashlib
 import json
@@ -12,7 +14,7 @@ from .lab_inputs import LabInputRepository
 MAX_CHECKPOINT_BYTES = 2 * 1024 * 1024
 
 
-def validate_event(event, previous, run) -> None:
+def validate_event(event: dict, previous: list[dict], run: dict) -> None:
     sequence = len(previous)
     if sequence >= len(run['plan']['item_plans']) * 2:
         raise ValueError('The batch action already contains every required checkpoint')
@@ -44,7 +46,7 @@ def validate_event(event, previous, run) -> None:
                    batch_id=plan['batch_id'], run_id=run['run_id'], attempt_kind=plan['phase'])
 
 
-def decode_checkpoints(raw, run):
+def decode_checkpoints(raw: dict, run: dict) -> list[dict]:
     try:
         if raw.get('item_events_json') is None:
             if raw.get('item_events_sha256') is not None or raw.get('item_event_count', 0) != 0 or run['state'] == 'completed':
@@ -56,7 +58,7 @@ def decode_checkpoints(raw, run):
         events = json.loads(serialized)
         if not isinstance(events, list) or len(events) != raw['item_event_count'] or len(events) > len(run['plan']['item_plans']) * 2:
             raise ValueError('The item checkpoint count changed')
-        previous = []
+        previous: list[dict] = []
         for item in events:
             if set(item) != {'receipt', 'receipt_sha256'} or encode(item['receipt'])[1] != item['receipt_sha256']:
                 raise ValueError('An individual item checkpoint changed')
@@ -72,7 +74,7 @@ def decode_checkpoints(raw, run):
 
 
 class BatchCheckpoints:
-    async def append(self, operation, run, event, digest):
+    async def append(self, operation: CourseOperation, run: dict, event: dict, digest: str) -> dict:
         lease = LabExecutionRepository.check_operation(operation, run['plan'])
         records = LabExecutionRepository().records
         raw = await records.find_one({'uuid': run['run_id'], 'user_id': operation.user_id})

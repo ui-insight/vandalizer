@@ -70,14 +70,14 @@ def _parse_range_header(header: str, total: int) -> tuple[int, int] | None:
     return start, end
 
 
-@router.post("/upload")
+@router.post("/upload", response_model=None)
 @limiter.limit("30/minute")
 async def upload(
     request: Request,
     body: UploadRequest,
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-):
+) -> dict:
     try:
         result = await file_service.upload_document(
             blob=body.contentAsBase64String,
@@ -117,12 +117,12 @@ def _resolve_media_type(extension: str, title: str) -> str:
     return media_type or "application/octet-stream"
 
 
-@router.head("/download")
+@router.head("/download", response_model=None)
 async def download_head(
     docid: str,
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-):
+) -> Response:
     result = await file_service.download_document(docid, settings, user=user)
     if not result:
         raise HTTPException(status_code=404, detail="File not found")
@@ -138,14 +138,14 @@ async def download_head(
     )
 
 
-@router.get("/download")
+@router.get("/download", response_model=None)
 async def download(
     docid: str,
     inline: bool = Query(False, description="Serve with inline disposition for in-browser viewers."),
     range_header: str | None = Header(None, alias="Range"),
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-):
+) -> Response:
     result = await file_service.download_document(docid, settings, user=user)
     if not result:
         raise HTTPException(status_code=404, detail="File not found")
@@ -183,12 +183,12 @@ async def download(
     )
 
 
-@router.post("/download-bulk")
+@router.post("/download-bulk", response_model=None)
 async def download_bulk(
     doc_ids: list[str] = Body(..., embed=True),
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-):
+) -> StreamingResponse:
     """Download multiple files as a single zip archive."""
     if not doc_ids:
         raise HTTPException(status_code=400, detail="No document IDs provided")
@@ -210,12 +210,12 @@ async def download_bulk(
     )
 
 
-@router.get("/{doc_uuid}/sheet-json")
+@router.get("/{doc_uuid}/sheet-json", response_model=None)
 async def sheet_json(
     doc_uuid: str,
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-):
+) -> dict:
     """Return evaluated rows for an .xlsx file so the viewer can render
     formula results instead of blank cells when Excel didn't cache them.
     """
@@ -232,11 +232,11 @@ async def sheet_json(
     return result
 
 
-@router.get("/{doc_uuid}/usage")
+@router.get("/{doc_uuid}/usage", response_model=None)
 async def usage(
     doc_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     """Where this document is used: knowledge bases, extractions, workflows,
     and its folder path. Read it before deleting."""
     result = await document_usage_service.document_usage(doc_uuid, user=user)

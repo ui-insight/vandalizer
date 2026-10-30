@@ -32,7 +32,7 @@ class CompletionRecovery:
         self.repository = repository
         self.journal = AttemptRepository()
 
-    async def recover_worker(self, user_id: str, enrollment_id: str, *, expected_write_id, expected_revision, reason):
+    async def recover_worker(self, user_id: str, enrollment_id: str, *, expected_write_id: str, expected_revision: int, reason: object) -> dict:
         """Revoke one reviewed completion worker, then reconcile its journal.
 
         Failures retain the recovery marker. Repeat with the same write ID to
@@ -48,6 +48,8 @@ class CompletionRecovery:
         if selection is None:
             raise EnrollmentConflict('The reviewed course selection changed')
         previous = selection.get('last_completion_recovery')
+        if previous is not None and not isinstance(previous, dict):
+            raise CourseCatalogError('Original recovery receipt is malformed')
         if previous and previous.get('write_id') == expected_write_id:
             return previous
         marker = selection.get('active_write') or {}
@@ -129,7 +131,7 @@ class CompletionRecovery:
         finally:
             lease_context.reset(token)
 
-    async def reconcile_attempt(self, user_id: str, enrollment_id: str, *, attempt_id: str, reason, expected_revision=None, recovery_request_id=None):
+    async def reconcile_attempt(self, user_id: str, enrollment_id: str, *, attempt_id: str, reason: object, expected_revision: int | None=None, recovery_request_id: str | None=None) -> dict:
         """Explicit reconciliation when normal cleanup already released a lock."""
         if not isinstance(reason, str) or not reason.strip():
             raise EnrollmentConflict('Record a reason for explicit assessment recovery')
@@ -148,7 +150,7 @@ class CompletionRecovery:
             return await self._reconcile(progress, package, attempt_id, reason.strip(),
                 expected_owners=[record.get('write_id'), require_lease(user_id, enrollment_id).write_id])
 
-    async def _reconcile(self, progress: CertificationProgress, package: CoursePackage, attempt_id: str, reason, expected_owners=None) -> dict:
+    async def _reconcile(self, progress: CertificationProgress, package: CoursePackage, attempt_id: str, reason: str, expected_owners: list[str | None] | None=None) -> dict:
         lease = require_lease(progress.user_id, progress.enrollment_id)
         record = await self.journal.records.find_one({'uuid': attempt_id})
         if record is None or (record.get('user_id'), record.get('enrollment_id'), record.get('course_version'), record.get('manifest_sha256')) != (

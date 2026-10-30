@@ -55,12 +55,15 @@ def prepare_page_embed(html: str, csp: str) -> tuple[str, str]:
     nonce = secrets.token_urlsafe(24)
     csp = re.sub(r'\bsandbox\b', 'sandbox allow-scripts', csp, count=1)
     csp = csp.replace("script-src 'none'", f"script-src 'nonce-{nonce}'")
+    head, body = soup.head, soup.body
+    if head is None or body is None:
+        raise ValueError('Saved Page is missing its document structure')
     style = soup.new_tag('style', id='vandalizer-embed-style')
     style.string = EMBED_STYLE
-    soup.head.append(style)
+    head.append(style)
     script = soup.new_tag('script', id='vandalizer-embed-script', nonce=nonce)
     script.string = EMBED_SCRIPT
-    soup.body.append(script)
+    body.append(script)
     for meta in soup.find_all('meta'):
         if str(meta.get('http-equiv', '')).lower() == 'content-security-policy':
             meta['content'] = csp

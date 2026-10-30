@@ -24,6 +24,8 @@ Provider-specific request building and response parsing live here so
 is provider-independent: config lookup, retries, and graceful degradation to
 PyMuPDF.
 """
+import httpx
+
 
 import json
 import logging
@@ -82,7 +84,7 @@ def build_probe_pdf() -> bytes:
     doc = pymupdf.open()
     try:
         doc.new_page().insert_text((72, 72), PROBE_PAGE_TEXT, fontsize=14)
-        return doc.tobytes()
+        return bytes(doc.tobytes())
     finally:
         doc.close()
 
@@ -378,7 +380,7 @@ def _leading_content(text: str) -> str:
     return head[:200].lower()
 
 
-def _reject_non_text_body(resp) -> None:
+def _reject_non_text_body(resp: httpx.Response) -> None:
     """Raise unless a ``raw``-provider 200 actually looks like extracted text.
 
     Permanent, not retryable: a wrapper that answers 200 with an error page is
@@ -509,7 +511,7 @@ def parse_raw_response(body: str) -> str:
     return layout_json_to_text(body)
 
 
-def _post_pdf(client, url: str, headers: dict, pdf_path: str, field: str, data=None):
+def _post_pdf(client: httpx.Client, url: str, headers: dict, pdf_path: str, field: str, data: dict | None=None) -> httpx.Response:
     """POST the PDF as multipart, returning the httpx response.
 
     The file handle is opened per attempt so a retry re-reads from the start.
@@ -524,7 +526,7 @@ def _post_pdf(client, url: str, headers: dict, pdf_path: str, field: str, data=N
 
 
 def _await_docling_task(
-    client,
+    client: httpx.Client,
     convert_url: str,
     headers: dict,
     task_id: str,
@@ -569,7 +571,7 @@ def _await_docling_task(
 
 
 def convert(
-    client,
+    client: httpx.Client,
     *,
     pdf_path: str,
     endpoint: str,

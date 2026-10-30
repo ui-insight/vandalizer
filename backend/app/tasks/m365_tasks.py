@@ -34,7 +34,7 @@ def _get_db() -> Database[dict]:
     return get_sync_db()
 
 
-def _audit(db, action: str, **kwargs) -> None:
+def _audit(db: Database[dict], action: str, **kwargs: object) -> None:
     """Write an immutable audit entry."""
     db.m365_audit_entry.insert_one({
         "uuid": uuid4().hex,
@@ -71,7 +71,7 @@ def _attachment_rejection(filename: str, content_bytes: bytes) -> str | None:
 
 
 def _save_attachment_as_document(
-    db,
+    db: Database[dict],
     content_bytes: bytes,
     filename: str,
     user_id: str,
@@ -430,6 +430,8 @@ def triage_work_item(self: Task, work_item_id: str) -> dict:
     from app.services.passive_triggers import create_m365_trigger
     # Reload to get updated fields
     work_item = db.work_items.find_one({"_id": work_item["_id"]})
+    if work_item is None:
+        return {"error": "Work item disappeared before workflow dispatch"}
     event = create_m365_trigger(workflow, work_item)
 
     db.work_items.update_one(
@@ -443,7 +445,7 @@ def triage_work_item(self: Task, work_item_id: str) -> dict:
     return {"status": "dispatched", "workflow": workflow.get("name"), "trigger_event": event["uuid"]}
 
 
-def _match_workflow(db, work_item: dict, intake: dict):
+def _match_workflow(db: Database[dict], work_item: dict, intake: dict) -> dict | None:
     """Match a work item to a workflow using triage rules or the default."""
     if intake.get("triage_enabled") and intake.get("triage_rules"):
         category = (work_item.get("triage_category") or "").lower()

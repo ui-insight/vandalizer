@@ -1,5 +1,6 @@
 """Persist exact diagnostic plans; preparation does not execute the capstone."""
 from __future__ import annotations
+from typing import Any
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -44,7 +45,7 @@ def scope_question(phase: str='original') -> dict:
         'prompt': 'Inspect the saved learner scope correction, both complete fictional sources, exact six-field revision and resolved model. Approve or hold only this bounded ' + detail + ' Model usage may be incurred; this does not authorize any handoff, external effect, recurring action or earned credit.'}
 
 
-def validate_authorization(saved) -> None:
+def validate_authorization(saved: dict) -> None:
     from .governance_approval import GovernanceApprovalRepository
     plan, authorization = saved['plan'], saved['authorization']
     if authorization is None:
@@ -133,7 +134,7 @@ class GovernancePreparation(LabExecutionJournal):
         except (KeyError, TypeError, ValueError, AttributeError) as exc:
             raise CourseCatalogError('The saved Governance plan failed integrity verification') from exc
 
-    async def prepare(self, operation: CourseOperation, body, system_config_doc, *, actor_user_id: str):
+    async def prepare(self, operation: CourseOperation, body: object, system_config_doc: dict, *, actor_user_id: str) -> dict | None:
         body = GovernancePlanRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Only the authenticated learner can prepare the bounded capstone')
@@ -144,7 +145,7 @@ class GovernancePreparation(LabExecutionJournal):
         request = body.model_dump(mode='json')
         request_hash = encode(request)[1]
 
-        def replay(raw):
+        def replay(raw: dict) -> dict:
             saved = self.decode(raw)
             if any(saved['plan'][key] != value for key, value in identity.items()) or saved['plan']['request_sha256'] != request_hash:
                 raise EnrollmentConflict('This plan identity belongs to different capstone work or another learner')
@@ -195,5 +196,5 @@ class GovernancePreparation(LabExecutionJournal):
         await LabInputRepository._check_lease(lease)
         return await self.get(actor_user_id, body.request_id)
 
-    async def execute(self, *args, **kwargs) -> dict:
+    async def execute(self, *args: Any, **kwargs: Any) -> dict:
         raise EnrollmentConflict('Capstone execution requires the separately approved durable executor')

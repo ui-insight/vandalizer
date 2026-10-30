@@ -12,6 +12,11 @@ themselves so SPA pages produce usable content everywhere.
 """
 
 from __future__ import annotations
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from lxml.html import HtmlElement
+    from playwright.async_api import Route
+
 
 import asyncio
 import logging
@@ -115,7 +120,7 @@ def _extract_title(html: str, fallback_url: str) -> str:
     return urlparse(fallback_url).netloc
 
 
-def _trafilatura_text(html) -> str:
+def _trafilatura_text(html: str | HtmlElement) -> str:
     text = trafilatura.extract(
         html,
         include_links=False,
@@ -137,7 +142,7 @@ _HIDDEN_XPATH = (
 )
 
 
-def _without_hidden_elements(html: str):
+def _without_hidden_elements(html: str) -> HtmlElement | None:
     """*html* parsed with its never-displayed elements removed, or None if it has none."""
     try:
         from trafilatura.utils import load_html
@@ -318,7 +323,7 @@ async def _render_with_browser(url: str, timeout_seconds: int) -> Optional[str]:
                 # navigation and abort blocked ones. Subresources are left
                 # alone — their bodies never reach us, and per-request blocking
                 # DNS lookups would stall rendering.
-                async def _guard(route) -> None:
+                async def _guard(route: Route) -> None:
                     req = route.request
                     if req.resource_type == "document":
                         try:
@@ -445,7 +450,7 @@ async def fetch_url(
         )
         rendered = await _render_with_browser(url, settings.web_fetcher_timeout_seconds)
         rendered_text = _extract_main_text(rendered) if rendered else ""
-        if len(rendered_text) < settings.web_fetcher_min_chars:
+        if rendered is None or len(rendered_text) < settings.web_fetcher_min_chars:
             raise blocked_error
         raw_html, html_truncated = _cap(rendered, settings.web_fetcher_max_html_chars)
         used_browser = True

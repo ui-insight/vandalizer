@@ -1,4 +1,7 @@
 """User engagement service — onboarding drip + inactivity nudges + v5 launch funnel."""
+from typing import overload
+from beanie import PydanticObjectId
+
 
 import datetime
 import logging
@@ -50,6 +53,14 @@ NUDGE_COOLDOWN_DAYS = 30  # don't nudge the same person more than once a month
 
 # Drip schedule: days after first login to send each step
 _DRIP_SCHEDULE_DAYS = [0, 3, 7, 14]
+
+
+@overload
+def _as_aware_utc(dt: datetime.datetime) -> datetime.datetime: ...
+
+
+@overload
+def _as_aware_utc(dt: None) -> None: ...
 
 
 def _as_aware_utc(dt: datetime.datetime | None) -> datetime.datetime | None:
@@ -104,7 +115,7 @@ async def process_onboarding_drips(settings: Settings | None = None) -> int:
     # Find users with a pending drip (includes demo/trial users)
     users = await User.find(
         User.onboarding_drip_step < len(_DRIP_MODULES),
-        User.onboarding_drip_next_at <= now,
+        {"onboarding_drip_next_at": {"$lte": now}},
     ).to_list()
 
     for user in users:
@@ -189,7 +200,7 @@ async def process_inactivity_nudges(settings: Settings | None = None) -> int:
     nudge_cutoff = now - datetime.timedelta(days=NUDGE_COOLDOWN_DAYS)
     users = await User.find(
         User.last_login_at != None,  # noqa: E711
-        User.last_login_at <= threshold,
+        {"last_login_at": {"$lte": threshold}},
         User.is_demo_user != True,  # noqa: E712
     ).to_list()
 
@@ -244,7 +255,7 @@ async def _get_new_catalog_items_since(
 
     approved = await VerificationRequest.find(
         VerificationRequest.status == "approved",
-        VerificationRequest.reviewed_at >= since,
+        {"reviewed_at": {"$gte": since}},
     ).sort("-reviewed_at").limit(10).to_list()
 
     items = []
@@ -266,7 +277,7 @@ async def _get_new_catalog_items_since(
     return items
 
 
-async def _get_item_name(item_kind: str, item_id) -> str | None:
+async def _get_item_name(item_kind: str, item_id: PydanticObjectId | str) -> str | None:
     """Resolve a human-readable name for a catalog item."""
     from beanie import PydanticObjectId
     from app.models.workflow import Workflow
@@ -370,7 +381,7 @@ async def process_agentic_chat_drip(settings: Settings | None = None) -> int:
 
     users = await User.find(
         User.agentic_drip_step < _AGENTIC_DRIP_TOTAL_STEPS,
-        User.agentic_drip_next_at <= now,
+        {"agentic_drip_next_at": {"$lte": now}},
     ).to_list()
 
     for user in users:

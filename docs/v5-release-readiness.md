@@ -62,7 +62,7 @@ network-policy enforcement and deployment identity still need deployed QA.
 ## Typing
 
 The original mypy baseline was 3,141 errors. The dependency pass reduced it to
-3,098; the current follow-up reduces it to 498 across 524 source files. The
+3,098; the current follow-up reduces it to 300 across 524 source files. The
 models, schemas, database helpers, URL helpers and observability setup pass their
 focused type check. Workflow execution, automatic review, review persistence and
 review recovery, and the knowledge-base, admin, workflow and Home/config APIs
@@ -203,6 +203,13 @@ continue to use their existing Pydantic validation at the API boundary.
 - Selection confirmation, saved-course switching, completion concurrency and
   credential completion passed 100 persistence cases against disposable MongoDB.
   The container was removed afterward.
+- CI for `f7babc62` passed every main-workflow job, including all persistence
+  shards and Docker. The subsequent contract batch passed 395 OCR/context/access,
+  111 import/validation, 206 engagement/file, 86 Graph/query, 1,711 course/rendering
+  and 252 fetch/tuning checks. Course preparation, execution, recovery, support,
+  upgrade and completion passed 728 persistence tests against disposable MongoDB.
+  Graph subscription creation now includes its required expiration, and create/
+  renew timestamps use a single UTC suffix; five regressions cover both paths.
 - Certification enrollment and practical delivery persistence: 518 passed
   against a disposable MongoDB container, removed after the run.
 - Chroma's disposable container check passes locally and is included in CI.

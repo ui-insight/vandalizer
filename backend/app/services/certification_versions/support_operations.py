@@ -1,5 +1,9 @@
 """Bounded, read-only operation summaries with no source text or provider errors."""
 from __future__ import annotations
+from motor.motor_asyncio import AsyncIOMotorCollection
+from app.models.certification import CertificationEnrollment
+from .lab_execution import LabExecutionJournal
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -30,13 +34,13 @@ RUN_STEPS = {
 }
 
 
-def reference(value):
+def reference(value: object) -> str:
     if not isinstance(value, str) or not re.fullmatch(r'[a-f0-9]{32}', value):
         raise CourseCatalogError('Original operation reference needs reconciliation')
     return value
 
 
-def run_decoder(module_id: str):
+def run_decoder(module_id: str) -> type[LabExecutionJournal] | None:
     # Each workflow owns additional evidence checks beyond the common envelope.
     from .advanced_workflow_preparation import AdvancedWorkflowPreparation
     from .batch_preparation import BatchPreparation
@@ -52,7 +56,7 @@ def run_decoder(module_id: str):
     }.get(module_id)
 
 
-async def bounded_records(collection, identity, pending_states):
+async def bounded_records(collection: AsyncIOMotorCollection, identity: dict, pending_states: list[str]) -> tuple[list[dict], bool, bool]:
     # Show pending requests even when newer completed work fills the recent list.
     pending = await collection.find({**identity, 'state': {'$in': pending_states}}, {'_id': 1}).sort('_id', -1).limit(6).to_list(6)
     recent = await collection.find(identity, {'_id': 1}).sort('_id', -1).limit(6).to_list(6)
@@ -64,7 +68,7 @@ async def bounded_records(collection, identity, pending_states):
     return rows, len(pending) > 5, len(recent) > 5
 
 
-async def support_operations(enrollment, package: CoursePackage):
+async def support_operations(enrollment: CertificationEnrollment, package: CoursePackage) -> dict:
     identity = {'user_id': enrollment.user_id, 'enrollment_id': enrollment.uuid}
     modules = {module.id: module for module in package.manifest.modules}
     contract = package_outcomes(package)

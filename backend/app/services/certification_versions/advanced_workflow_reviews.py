@@ -44,7 +44,7 @@ class AdvancedReviewRequest(ContractModel):
         return self
 
 
-def embedded_execution(run):
+def embedded_execution(run: dict) -> dict:
     plan = run['plan']
     raw = {key: plan[key] for key in ('uuid', 'user_id', 'enrollment_id', 'module_id', 'course_version',
                                     'manifest_sha256', 'input_snapshot_id')}
@@ -79,11 +79,11 @@ class AdvancedReviewRepository(LearnerDecisionJournal):
         except (KeyError, TypeError, ValueError) as exc:
             raise CourseCatalogError('The saved budget result review failed integrity verification') from exc
 
-    async def get(self, user_id: str, submission_id) -> dict | None:
+    async def get(self, user_id: str, submission_id: str | None) -> dict | None:
         raw = await self.records.find_one({'uuid': submission_id, 'user_id': user_id, 'module_id': 'advanced_nodes', 'prompt_id': PROMPT_ID})
         return self.decode(raw) if raw else None
 
-    async def submit(self, operation: CourseOperation, body, *, actor_user_id: str):
+    async def submit(self, operation: CourseOperation, body: object, *, actor_user_id: str) -> dict | None:
         body = AdvancedReviewRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Budget result review requires the authenticated learner')
@@ -94,7 +94,7 @@ class AdvancedReviewRepository(LearnerDecisionJournal):
         request = body.model_dump(mode='json')
         request_hash = encode(request)[1]
 
-        def replay(raw):
+        def replay(raw: dict) -> dict:
             if any(raw.get(key) != value for key, value in identity.items()) or raw.get('request_sha256') != request_hash:
                 raise EnrollmentConflict('This review reference belongs to different answers or another learner')
             return self.decode(raw)

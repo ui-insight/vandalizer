@@ -45,14 +45,14 @@ def summarize_kb_run(run: KBOptimizationRun) -> dict:
     }
 
 
-def _held_out_headline(run) -> Optional[float]:
+def _held_out_headline(run: KBOptimizationRun | ExtractionOptimizationRun | WorkflowOptimizationRun) -> Optional[float]:
     """The run's headline score when it was measured on held-out cases.
 
     Runs from before ``holdout_optimized_score`` existed are recognised as the
     KB comparison card recognises them: a headline that differs from the
     training score can only be the held-out re-score.
     """
-    held_out = getattr(run, "holdout_optimized_score", None)
+    held_out = run.holdout_optimized_score
     if held_out is not None:
         return held_out
     train = getattr(run, "optimized_score_train", None)
@@ -66,7 +66,7 @@ def _held_out_headline(run) -> Optional[float]:
     return None
 
 
-def _reported_baseline(run) -> Optional[float]:
+def _reported_baseline(run: KBOptimizationRun | ExtractionOptimizationRun | WorkflowOptimizationRun) -> Optional[float]:
     """Current settings' score, on the same cases as the run's headline."""
     return reported_baseline_score(
         holdout_optimized_score=_held_out_headline(run),
@@ -229,17 +229,18 @@ async def latest_optimization_summary(item_kind: str, item_id: str) -> Optional[
     return with_percent_scores(summarize(run)) if run else None
 
 
-async def get_run_by_uuid(surface: str, run_uuid: str):
+async def get_run_by_uuid(surface: str, run_uuid: str) -> KBOptimizationRun | ExtractionOptimizationRun | WorkflowOptimizationRun | None:
     """Fetch a run document by its surface name ('kb'/'extraction'/'workflow')."""
-    surface_to_kind = {"kb": "knowledge_base", "extraction": "search_set", "workflow": "workflow"}
-    entry = _KIND_TO_MODEL.get(surface_to_kind.get(surface, ""))
-    if not entry:
-        return None
-    model, _, _ = entry
-    return await model.find_one(model.uuid == run_uuid)
+    if surface == "kb":
+        return await KBOptimizationRun.find_one(KBOptimizationRun.uuid == run_uuid)
+    if surface == "extraction":
+        return await ExtractionOptimizationRun.find_one(ExtractionOptimizationRun.uuid == run_uuid)
+    if surface == "workflow":
+        return await WorkflowOptimizationRun.find_one(WorkflowOptimizationRun.uuid == run_uuid)
+    return None
 
 
-def summarize_run(run) -> Optional[dict]:
+def summarize_run(run: object) -> Optional[dict]:
     """Summarize any of the three run document types."""
     if isinstance(run, KBOptimizationRun):
         return with_percent_scores(summarize_kb_run(run))

@@ -1,5 +1,7 @@
 """Read-only support metadata without reflection text, source data or grading."""
 from __future__ import annotations
+from collections.abc import Iterable
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -24,7 +26,7 @@ STATES = {
 }
 
 
-def recorded_time(value):
+def recorded_time(value: object) -> str | None:
     if isinstance(value, datetime.datetime):
         return value.isoformat()
     if isinstance(value, str):
@@ -35,7 +37,7 @@ def recorded_time(value):
     return None
 
 
-def progress_modules(progress: CertificationProgress, module_ids):
+def progress_modules(progress: CertificationProgress, module_ids: Iterable[str]) -> dict:
     """The admin detail needs earned-state fields, never arbitrary module blobs."""
     result: dict = {}
     for module_id in module_ids:
@@ -52,7 +54,7 @@ def progress_modules(progress: CertificationProgress, module_ids):
     return result
 
 
-def completion_validation(journal, row):
+def completion_validation(journal: AttemptRepository, row: dict) -> dict | None:
     """Receipt state alone cannot establish an intact recorded completion."""
     state = row['state']
     validation = None
@@ -65,12 +67,12 @@ def completion_validation(journal, row):
         if result.get('attempt_id') != row['uuid']:
             raise CourseCatalogError('Original completion result identity changed')
         if state == 'applied':
-            if (result.get('error') or validation['passed'] is not True
+            if (result.get('error') or validation is None or validation['passed'] is not True
                     or result.get('validation') != validation
                     or any(result.get(key) != row[key] for key in ('module_id', 'enrollment_id', 'course_version', 'manifest_sha256'))):
                 raise CourseCatalogError('Original awarded result changed')
         elif state == 'rejected':
-            if not isinstance(result.get('error'), str) or not result['error'] or validation['passed'] is not False or result.get('validation') != validation:
+            if not isinstance(result.get('error'), str) or not result['error'] or validation is None or validation['passed'] is not False or result.get('validation') != validation:
                 raise CourseCatalogError('Original rejected result changed')
         elif result.get('failure_kind') != 'execution' or not isinstance(result.get('error'), str) or not result['error']:
             raise CourseCatalogError('Original technical failure changed')
@@ -79,7 +81,7 @@ def completion_validation(journal, row):
     return validation
 
 
-async def support_snapshot(progress: CertificationProgress, metadata, *, repository=None):
+async def support_snapshot(progress: CertificationProgress, metadata: dict, *, repository: EnrollmentRepository | None=None) -> dict:
     result: dict = {
         'observed_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
         'read_only': True, 'last_saved_lesson': None,
@@ -109,7 +111,8 @@ async def support_snapshot(progress: CertificationProgress, metadata, *, reposit
     position = progress.learning_position
     if position:
         lessons = package.json('lessons.json')
-        module = modules.get(position.get('module_id')) if isinstance(position.get('module_id'), str) else None
+        module_id = position.get('module_id')
+        module = modules.get(module_id) if isinstance(module_id, str) else None
         lesson = next((item for item in lessons[module.id]['lessons']
                        if item['id'] == position.get('lesson_id')), None) if module else None
         if (module is not None and lesson and type(position.get('revision')) is int and lesson['revision'] == position.get('revision')

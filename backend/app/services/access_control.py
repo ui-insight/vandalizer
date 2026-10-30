@@ -97,6 +97,8 @@ async def get_team_access_context(user: User) -> TeamAccessContext:
     roles_by_uuid: dict[str, str] = {}
     roles_by_object_id: dict[str, str] = {}
     for team in teams:
+        if team.id is None:
+            continue
         role = role_by_team_id.get(team.id)
         if role:
             roles_by_uuid[team.uuid] = role
@@ -467,7 +469,7 @@ async def has_library_backed_object_access(
 
 async def has_open_verification_review_access(
     item_kind: str,
-    object_id: "PydanticObjectId | str",
+    object_id: "PydanticObjectId | str | None",
     user: User,
 ) -> bool:
     """View access for examiners while an item's verification request is open.
@@ -481,7 +483,7 @@ async def has_open_verification_review_access(
     This closes the gap for exactly as long as the review is open, and grants
     view only — reviewers need to read and test-run a submission, never edit it.
     """
-    if not (user.is_examiner or user.is_admin):
+    if object_id is None or not (user.is_examiner or user.is_admin):
         return False
 
     try:

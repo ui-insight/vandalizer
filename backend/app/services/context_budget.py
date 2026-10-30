@@ -8,6 +8,11 @@ and to Sentry.
 """
 
 from __future__ import annotations
+from typing import TYPE_CHECKING, Callable
+if TYPE_CHECKING:
+    from tokenizers import Tokenizer
+    from tiktoken import Encoding
+
 
 import logging
 import math
@@ -143,7 +148,7 @@ def _warn_estimated_once(model_name: str) -> None:
 
 
 @lru_cache(maxsize=32)
-def _load_tokenizer(path: str):
+def _load_tokenizer(path: str) -> Tokenizer | None:
     """Load a `tokenizer.json` from disk, or return None if it is unusable.
 
     Cached: a real vocabulary is several megabytes and takes milliseconds to
@@ -224,7 +229,7 @@ def _find_vocabulary(model_name: str, cache_root: str) -> Optional[str]:
     return None
 
 
-def resolve_exact_tokenizer(model_name: str, model_config: Optional[dict] = None):
+def resolve_exact_tokenizer(model_name: str, model_config: Optional[dict] = None) -> Tokenizer | None:
     """This model's real tokenizer, or None when we do not have it.
 
     None is an ordinary outcome, not an error: hosted models (Claude, and any
@@ -252,7 +257,7 @@ def resolve_exact_tokenizer(model_name: str, model_config: Optional[dict] = None
 
 
 @lru_cache(maxsize=8)
-def _get_encoder(encoding_name: str):
+def _get_encoder(encoding_name: str) -> Encoding | None:
     try:
         import tiktoken
 
@@ -398,7 +403,7 @@ def _configured_margin(
     if isinstance(raw, bool):
         raw = None  # bool is an int subclass; never a meaningful margin
     try:
-        value = float(raw) if raw not in (None, "") else 0.0
+        value = float(raw) if raw is not None and raw != "" else 0.0
     except (TypeError, ValueError):
         value = 0.0
     if value >= 1.0:
@@ -590,7 +595,7 @@ def resolve_context_window(
     if model_config:
         raw = model_config.get("context_window")
         try:
-            value = int(raw) if raw not in (None, "") else 0
+            value = int(raw) if raw is not None and raw != "" else 0
         except (TypeError, ValueError):
             value = 0
         if value > 0:
@@ -737,7 +742,7 @@ def resolve_response_reserve(
     return _default_response_reserve(context_window)
 
 
-def _split_head_tail(ids, budget: int, decode) -> Optional[tuple[str, str]]:
+def _split_head_tail(ids: list[int], budget: int, decode: Callable[[list[int]], str]) -> Optional[tuple[str, str]]:
     """Take ``budget`` tokens from ``ids`` as a 75/25 head and tail.
 
     Returns None when ``budget`` already covers the whole list. That is not a

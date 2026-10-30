@@ -21,6 +21,12 @@ Pure string/offset logic apart from that last function; no LLM access.
 """
 
 from __future__ import annotations
+from types import ModuleType
+from typing import TYPE_CHECKING
+from pymongo.database import Database
+if TYPE_CHECKING:
+    import fitz
+
 
 import base64
 import json
@@ -109,7 +115,7 @@ _FORM_FREEFORM_UNFILLED_RE = re.compile(
 )
 
 
-def form_value_is_missing(value) -> bool:
+def form_value_is_missing(value: object) -> bool:
     """True for null, blank, and prose that says there is no value."""
     if value is None:
         return True
@@ -310,13 +316,13 @@ def describe_fill_report(report: list[dict], *, missing_token: str | None) -> li
 # ---------------------------------------------------------------------------
 
 
-def _open_pdf(pdf_bytes: bytes):
+def _open_pdf(pdf_bytes: bytes) -> tuple[ModuleType, fitz.Document]:
     import fitz  # PyMuPDF
 
     return fitz, fitz.open(stream=pdf_bytes, filetype="pdf")
 
 
-def _label_near_widget(page, rect) -> str:
+def _label_near_widget(page: fitz.Page, rect: fitz.Rect) -> str:
     """Text printed just left of / above a widget — the human label for it."""
     import fitz
 
@@ -500,7 +506,7 @@ def document_meta(doc: dict) -> dict:
     }
 
 
-def load_form_filler_assets(db, task_data: dict, *, upload_dir: str) -> None:
+def load_form_filler_assets(db: Database[dict], task_data: dict, *, upload_dir: str) -> None:
     """Attach the template PDF to a Form Filler task's data, in place.
 
     Sets ``template_pdf_b64`` and ``template_document_title`` when

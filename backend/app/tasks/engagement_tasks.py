@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
     retry_backoff=True,
     max_retries=2,
 )
-def process_onboarding_drips(self: Task):
+def process_onboarding_drips(self: Task) -> dict[str, int]:
     """Send due onboarding drip emails."""
     from app.services.engagement_service import process_onboarding_drips as _run
     from app.database import init_db
@@ -46,7 +46,7 @@ def process_onboarding_drips(self: Task):
     retry_backoff=True,
     max_retries=2,
 )
-def process_inactivity_nudges(self: Task):
+def process_inactivity_nudges(self: Task) -> dict[str, int]:
     """Send inactivity nudge emails to users who haven't logged in recently."""
     from app.services.engagement_service import process_inactivity_nudges as _run
     from app.database import init_db
@@ -68,7 +68,7 @@ def process_inactivity_nudges(self: Task):
     retry_backoff=True,
     max_retries=2,
 )
-def process_v5_launch_announcement(self: Task, batch_size: int = 200):
+def process_v5_launch_announcement(self: Task, batch_size: int = 200) -> dict[str, int]:
     """Send the v5.0 launch announcement to eligible existing users.
 
     Idempotent — each user receives the email at most once. Safe to schedule
@@ -94,7 +94,7 @@ def process_v5_launch_announcement(self: Task, batch_size: int = 200):
     retry_backoff=True,
     max_retries=2,
 )
-def process_agentic_chat_drip(self: Task):
+def process_agentic_chat_drip(self: Task) -> dict[str, int]:
     """Send due agentic-chat tutorial drip emails (5-step sequence)."""
     from app.services.engagement_service import process_agentic_chat_drip as _run
     from app.database import init_db
@@ -116,7 +116,7 @@ def process_agentic_chat_drip(self: Task):
     retry_backoff=True,
     max_retries=2,
 )
-def process_powerup_milestones(self: Task):
+def process_powerup_milestones(self: Task) -> dict[str, int]:
     """Send the power-user upsell to users who've crossed the workflow threshold."""
     from app.services.engagement_service import process_powerup_milestones as _run
     from app.database import init_db

@@ -1,4 +1,6 @@
 """Extraction auto-tuning service — find optimal settings for a search set."""
+from collections.abc import AsyncIterator
+
 
 import asyncio
 import logging
@@ -185,7 +187,7 @@ async def _run_single_config(
         if not source_text:
             continue
 
-        async def _single_run():
+        async def _single_run() -> dict:
             engine = ExtractionEngine(system_config_doc=sys_config_doc)
             result = await asyncio.to_thread(
                 engine.extract,
@@ -272,12 +274,12 @@ async def _run_single_config(
                 score = float(verdict["score"])
                 judge_scores[key] = score
                 tc_uuid, field_name, run_idx = key
-                tc = tc_lookup.get(tc_uuid)
+                judged_case = tc_lookup.get(tc_uuid)
                 run_result = run_lookup.get((tc_uuid, run_idx), {})
-                if tc is not None:
+                if judged_case is not None:
                     judge_samples.append({
                         "field_name": field_name,
-                        "expected": str(tc.expected_values.get(field_name, "") or ""),
+                        "expected": str(judged_case.expected_values.get(field_name, "") or ""),
                         "actual": str(run_result.get(field_name, "") or ""),
                         "score": score,
                         # ``deterministic`` items have σ=0 by construction;
@@ -368,14 +370,14 @@ async def _run_single_config(
     # Materialize the per-field breakdown for downstream recommendations
     field_breakdown: list[dict] = []
     for field_name in keys:
-        agg = field_aggregates.get(field_name)
-        if not agg or agg["samples"] == 0:
+        field_totals = field_aggregates.get(field_name)
+        if not field_totals or field_totals["samples"] == 0:
             continue
         field_breakdown.append({
             "field": field_name,
-            "accuracy": round(agg["accuracy_sum"] / agg["samples"], 4),
-            "consistency": round(agg["consistency_sum"] / agg["samples"], 4),
-            "samples": agg["samples"],
+            "accuracy": round(field_totals["accuracy_sum"] / field_totals["samples"], 4),
+            "consistency": round(field_totals["consistency_sum"] / field_totals["samples"], 4),
+            "samples": field_totals["samples"],
         })
 
     # Cross-field evaluation. Runs the configured rules against every
@@ -443,7 +445,7 @@ async def find_best_settings_stream(
     user_id: str,
     num_runs: int = 2,
     max_candidates: int = 8,
-):
+) -> AsyncIterator[dict]:
     """Async generator that yields SSE events as each config is tested.
 
     Events:
