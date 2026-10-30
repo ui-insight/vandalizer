@@ -4,6 +4,15 @@ Ported from Flask app/utilities/activity_description.py.
 Uses pymongo (sync) for DB access.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from celery import Task
+
+from pymongo.database import Database
+
 import datetime
 import logging
 import re
@@ -131,7 +140,7 @@ def _resolve_stale_threshold_minutes(db) -> int:
     return STALE_ACTIVITY_THRESHOLD_MINUTES_DEFAULT
 
 
-def _get_db():
+def _get_db() -> Database[dict]:
     """Get sync pymongo database handle (shared per-process client)."""
     from app.tasks import get_sync_db
 
@@ -147,7 +156,7 @@ def _get_db():
     default_retry_delay=5,
 )
 def generate_activity_description_task(
-    self,
+    self: Task,
     activity_id: str,
     activity_type: str,
     document_uuids: list[str],
@@ -418,7 +427,7 @@ def _workflow_rail_rows_without_live_run(db, rail_rows: list[dict], cutoff) -> l
 
 
 @celery_app.task(bind=True, name="tasks.activity.reap_stale_running")
-def reap_stale_running_task(self) -> None:
+def reap_stale_running_task(self: Task) -> None:
     """Mark activity events stuck in running/queued as failed.
 
     Catches orphans from crashed workers, dropped chat streams, and Celery soft
@@ -607,7 +616,7 @@ NEVER_STARTED_WORKFLOW_RUN_AGE_SECONDS = 86400
 
 
 @celery_app.task(bind=True, name="tasks.activity.reap_stale_workflow_runs")
-def reap_stale_workflow_runs_task(self) -> None:
+def reap_stale_workflow_runs_task(self: Task) -> None:
     """Mark WorkflowResult rows abandoned by a dead worker as failed.
 
     Three sweeps:

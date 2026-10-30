@@ -58,7 +58,7 @@ network-policy enforcement and deployment identity still need deployed QA.
 ## Typing
 
 The original mypy baseline was 3,141 errors. The dependency pass reduced it to
-3,098; the current follow-up reduces it to 1,564 across 524 source files. The
+3,098; the current follow-up reduces it to 1,338 across 524 source files. The
 models, schemas, database helpers, URL helpers and observability setup pass their
 focused type check. Workflow execution, automatic review, review persistence and
 review recovery, and the knowledge-base, admin, workflow and Home/config APIs
@@ -74,7 +74,12 @@ The LLM wrappers use the current SDK model and retry contracts. Extraction's
 source fallback now accepts bare entity lists without treating them as mappings;
 OpenRouter clients send the application title header. Management config redaction
 covers the current `available_models` credentials and OCR/web-search keys without
-mutating stored configuration.
+mutating stored configuration. Catalog entries, quality reporting and the workflow,
+extraction, document, knowledge-base, passive, quality and retention task modules
+now pass mypy. The generic async task runner preserves its coroutine's result
+contract, and worker MongoDB handles are explicit. Delivery records distinguish
+storage outcomes from notification/webhook lists; extraction storage accepts both
+its existing mapping and entity-list shapes.
 
 The follow-up adds validator, database, record-reader and execution contracts,
 separates shared repository storage from incompatible submission signatures,
@@ -136,6 +141,9 @@ continue to use their existing Pydantic validation at the API boundary.
 - Workflow and chat-workflow regressions: 1,011 passed, including one DNS-dependent
   test rerun with network access. CI passed at `5b1ab444`; subsequent changes
   require a fresh CI run.
+- Catalog/verification regressions: 116 passed, two skipped. Quality, drift and
+  regression reporting: 122 passed, one skipped. Task boundary checks: 44 passed;
+  the subsequent worker/output/retry suite: 449 passed with network access.
 - Certification enrollment and practical delivery persistence: 518 passed
   against a disposable MongoDB container, removed after the run.
 - Chroma's disposable container check passes locally and is included in CI.

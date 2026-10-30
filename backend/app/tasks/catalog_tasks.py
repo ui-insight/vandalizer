@@ -5,6 +5,14 @@ bundled seed files, records progress on the SystemConfig singleton so the admin
 UI can poll it, and notifies admins on completion or failure.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from celery import Task
+
+
 import datetime
 import logging
 
@@ -25,7 +33,7 @@ def _now_iso() -> str:
 
 
 @celery.task(bind=True, name="tasks.catalog.upgrade")
-def upgrade_catalog_task(self, target_version: str, prune: bool, user_id: str):
+def upgrade_catalog_task(self: Task, target_version: str, prune: bool, user_id: str):
     """Apply the bundled catalog: seed (add/refresh) then optionally retire
     items dropped from the catalog. State is mirrored to
     SystemConfig.catalog_upgrade throughout for the admin UI to poll."""

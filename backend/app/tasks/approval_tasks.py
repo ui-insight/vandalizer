@@ -1,5 +1,13 @@
 """Approval lifecycle Celery tasks (timeout sweeper)."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from celery import Task
+
+
 import logging
 
 from app.celery_app import celery
@@ -22,7 +30,7 @@ def _run_async(coro):
     max_retries=2,
     default_retry_delay=10,
 )
-def expire_overdue_approvals_task(self):
+def expire_overdue_approvals_task(self: Task):
     """Find overdue pending approvals and apply their configured timeout_action.
 
     Scheduled via Celery beat (see celery_app.py beat_schedule).

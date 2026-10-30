@@ -1,5 +1,13 @@
 """Celery periodic tasks for the demo waitlist system."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from celery import Task
+
+
 import logging
 
 from app.celery_app import celery_app
@@ -50,7 +58,7 @@ async def _init_and_enqueue_recapture_all():
     max_retries=2,
     default_retry_delay=30,
 )
-def sweep_trial_budgets(self):
+def sweep_trial_budgets(self: Task):
     """Advance the trial token lifecycle: running-low warnings, then exhaustion."""
     return _run_async(_init_and_sweep_budgets())
 
@@ -63,7 +71,7 @@ def sweep_trial_budgets(self):
     max_retries=2,
     default_retry_delay=30,
 )
-def process_demo_recapture(self):
+def process_demo_recapture(self: Task):
     """Send recapture drip emails to activated users who haven't logged in."""
     count = _run_async(_init_and_process_recapture())
     return {"recapture_sent": count}
@@ -77,7 +85,7 @@ def process_demo_recapture(self):
     max_retries=2,
     default_retry_delay=30,
 )
-def enqueue_recapture_all(self):
+def enqueue_recapture_all(self: Task):
     """Admin-triggered: enqueue recapture drips for all eligible active demo users."""
     count = _run_async(_init_and_enqueue_recapture_all())
     return {"enqueued": count}

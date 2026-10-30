@@ -4,6 +4,15 @@ Ported from Flask app/utilities/upload_manager.py.
 Uses pymongo (sync) for DB access.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from celery import Task
+
+from pymongo.database import Database
+
 import datetime
 import logging
 import os
@@ -22,7 +31,7 @@ BUDGET_SKIPPED_FEEDBACK = (
 )
 
 
-def _get_db():
+def _get_db() -> Database[dict]:
     """Get sync pymongo database handle (shared per-process client)."""
     from app.tasks import get_sync_db
 
@@ -101,7 +110,7 @@ def _get_secure_agent():
     rate_limit="1/s",
 )
 def validate_chunk(
-    self,
+    self: Task,
     document_path: str,
     compliance: str,
     chunk_text: str,
@@ -189,7 +198,7 @@ def validate_chunk(
     rate_limit="1/s",
 )
 def summarize_results(
-    self,
+    self: Task,
     results: list,
     document_uuid: str,
     background: bool = False,
@@ -299,7 +308,7 @@ def summarize_results(
     rate_limit="1/s",
 )
 def perform_document_validation(
-    self,
+    self: Task,
     document_uuid: str,
     document_path: str,
     document_text: str = None,

@@ -6,6 +6,14 @@ Uses pymongo (sync) for DB access.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from celery import Task
+
+from pymongo.database import Database
+from typing import NotRequired, TypedDict
+
 import logging
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
@@ -16,10 +24,22 @@ from app.exceptions import TrialSpendBlockedError
 from app.celery_app import celery_app
 from app.tasks import TRANSIENT_EXCEPTIONS, get_sync_db
 
+class _ExtractionDelivery(TypedDict):
+    storage: dict[str, str] | None
+    notifications: list[dict[str, object]]
+    webhooks: list[dict[str, object]]
+
+
+class _WorkflowDelivery(_ExtractionDelivery):
+    onedrive: dict[str, str] | None
+    chains: list[dict[str, str]]
+    artifact: NotRequired[object]
+
+
 logger = logging.getLogger(__name__)
 
 
-def _find_automation(db, automation_id: str | None) -> dict | None:
+def _find_automation(db: Database[dict], automation_id: str | None) -> dict | None:
     """Look up an automation by its stringified ObjectId, tolerating junk ids."""
     if not automation_id:
         return None
@@ -42,7 +62,7 @@ def _find_automation(db, automation_id: str | None) -> dict | None:
     max_retries=3,
     default_retry_delay=10,
 )
-def process_pending_triggers(self) -> dict:
+def process_pending_triggers(self: Task) -> dict:
     """Evaluate pending WorkflowTriggerEvents and dispatch execution.
 
     Runs every minute via Celery Beat.
@@ -231,7 +251,7 @@ def process_pending_triggers(self) -> dict:
     max_retries=3,
     default_retry_delay=10,
 )
-def process_scheduled_automations(self) -> dict:
+def process_scheduled_automations(self: Task) -> dict:
     """Evaluate schedule-based automations and create trigger events when due.
 
     Runs every minute via Celery Beat. A schedule is due when the first slot
@@ -417,7 +437,7 @@ def process_scheduled_automations(self) -> dict:
     bind=True,
     name="tasks.passive.execute_workflow_passive",
 )
-def execute_workflow_passive(self, trigger_event_id: str) -> dict:
+def execute_workflow_passive(self: Task, trigger_event_id: str) -> dict:
     """Execute a workflow for a passive trigger event."""
     from app.services.workflow_engine import build_workflow_engine
 
@@ -773,7 +793,7 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
     max_retries=3,
     default_retry_delay=10,
 )
-def process_outputs(self, workflow_result_id: str) -> dict:
+def process_outputs(self: Task, workflow_result_id: str) -> dict:
     """Process output configuration after a workflow run finishes.
 
     Dispatched for failed runs too, so a user who configured "notify me on
@@ -828,7 +848,7 @@ def process_outputs(self, workflow_result_id: str) -> dict:
         output_config = automation["output_config"]
         result_doc["automation_user_id"] = automation.get("user_id")
 
-    outputs = {"storage": None, "onedrive": None, "notifications": [], "webhooks": [], "chains": []}
+    outputs: _WorkflowDelivery = {"storage": None, "onedrive": None, "notifications": [], "webhooks": [], "chains": []}
 
     # Failed runs get notifications and webhooks (both carry the status) but no
     # deliverables — see the docstring.
@@ -1014,7 +1034,7 @@ def process_outputs(self, workflow_result_id: str) -> dict:
         if temp_uuids:
             db.smart_document.delete_many({"uuid": {"$in": temp_uuids}})
 
-    return outputs
+    return dict(outputs)
 
 
 # ---------------------------------------------------------------------------
@@ -1031,13 +1051,13 @@ def process_outputs(self, workflow_result_id: str) -> dict:
     default_retry_delay=10,
 )
 def process_extraction_outputs(
-    self,
+    self: Task,
     automation_id: str,
     search_set_uuid: str,
     document_uuids: list[str],
     user_id: str,
     *,
-    results: dict | None = None,
+    results: dict | list[dict] | None = None,
     extraction_event_id: str | None = None,
 ) -> dict:
     """Run extraction and/or process output_config for an automation.
@@ -1202,7 +1222,7 @@ def process_extraction_outputs(
         "final_output": {"output": results},
     }
 
-    outputs = {"storage": None, "notifications": [], "webhooks": []}
+    outputs: _ExtractionDelivery = {"storage": None, "notifications": [], "webhooks": []}
 
     # Storage — nothing worth writing when every document errored.
     storage_cfg = output_config.get("storage", {})
@@ -1305,7 +1325,7 @@ CALLBACK_RETRY_DELAYS = [10, 30, 90, 270, 810]
     default_retry_delay=10,
 )
 def deliver_callback(
-    self,
+    self: Task,
     trigger_event_id: str,
     callback_url: str,
     payload: dict,
@@ -1367,7 +1387,7 @@ def deliver_callback(
     max_retries=3,
     default_retry_delay=10,
 )
-def cleanup_old_trigger_events(self) -> dict:
+def cleanup_old_trigger_events(self: Task) -> dict:
     """Delete completed/failed/skipped trigger events older than 30 days."""
     db = get_sync_db()
     cutoff = datetime.now(timezone.utc) - timedelta(days=30)

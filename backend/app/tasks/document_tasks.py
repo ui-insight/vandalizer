@@ -4,11 +4,20 @@ Ported from Flask app/utilities/document_manager.py.
 Uses pymongo (sync) for DB access — same pattern as workflow_tasks.py.
 """
 
+from __future__ import annotations
+
+from pymongo.database import Database
+
 import datetime
 import logging
 import os
 import uuid
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from celery import Task
+    from app.services.document_manager import DocumentManager
 
 from app.celery_app import celery_app
 from app.services.document_readers import DocumentReadError, UnreadableFileError
@@ -20,14 +29,14 @@ from app.utils import kb_source_currency as currency
 logger = logging.getLogger(__name__)
 
 
-def _find_project_for_folder(db, folder_uuid: str | None) -> dict | None:
+def _find_project_for_folder(db: Database[dict], folder_uuid: str | None) -> dict | None:
     """Walk a folder's ancestry and return the Project that owns its root, if any."""
     if not folder_uuid or folder_uuid == "0":
         return None
 
     # Collect the folder plus every ancestor up to the root.
     ancestors: list[str] = []
-    cursor = folder_uuid
+    cursor: str | None = folder_uuid
     seen: set[str] = set()
     while cursor and cursor != "0" and cursor not in seen:
         seen.add(cursor)
@@ -62,7 +71,7 @@ class ProjectKbDeleteFailed(ProjectKbRefreshFailed):
     """
 
 
-def _ingest_into_project_kb(db, dm, doc: dict, text: str) -> bool:
+def _ingest_into_project_kb(db: Database[dict], dm: DocumentManager, doc: dict, text: str) -> bool:
     """Best-effort: add a freshly-ingested document to its Project's implicit KB.
 
     Walks the document's folder ancestry to find the owning project, then mirrors
@@ -105,7 +114,7 @@ def _ingest_into_project_kb(db, dm, doc: dict, text: str) -> bool:
         return False
 
 
-def _add_document_chunks_to_kb(dm, kb_uuid: str, doc: dict, text: str) -> int:
+def _add_document_chunks_to_kb(dm: DocumentManager, kb_uuid: str, doc: dict, text: str) -> int:
     """The one place that calls ``dm.add_to_kb`` for a project-KB document.
 
     Both the insert branch and the refresh branch of ``_mirror_into_project_kb``
@@ -120,7 +129,7 @@ def _add_document_chunks_to_kb(dm, kb_uuid: str, doc: dict, text: str) -> int:
     )
 
 
-def _mirror_into_project_kb(db, dm, doc: dict, project: dict, text: str) -> None:
+def _mirror_into_project_kb(db: Database[dict], dm: DocumentManager, doc: dict, project: dict, text: str) -> None:
     kb_uuid = project["kb_uuid"]
     doc_uuid = doc["uuid"]
     existing = db.knowledge_base_sources.find_one(
@@ -285,7 +294,7 @@ def _mirror_into_project_kb(db, dm, doc: dict, project: dict, text: str) -> None
     )
 
 
-def _remove_from_project_kb(db, dm, doc: dict, project: dict) -> None:
+def _remove_from_project_kb(db: Database[dict], dm: DocumentManager, doc: dict, project: dict) -> None:
     """Best-effort: drop a document's chunks from a Project's implicit KB.
 
     Used when a document is moved out of (or to a different) project so the old
@@ -319,7 +328,7 @@ def _remove_from_project_kb(db, dm, doc: dict, project: dict) -> None:
 
 
 @celery_app.task(bind=True, name="tasks.document.sync_project_kb")
-def sync_project_kb_on_move(self, document_uuid: str, old_folder_uuid: str | None) -> str:
+def sync_project_kb_on_move(self: Task, document_uuid: str, old_folder_uuid: str | None) -> str:
     """Re-sync a document's project-KB membership after it is moved between folders.
 
     Moving a file into a project's folder tree must add it to that project's
@@ -370,7 +379,7 @@ def sync_project_kb_on_move(self, document_uuid: str, old_folder_uuid: str | Non
 
 
 @celery_app.task(bind=True, name="tasks.document.sync_project_kb_folder")
-def sync_project_kb_on_folder_move(self, folder_uuid: str, old_parent_id: str | None) -> int:
+def sync_project_kb_on_folder_move(self: Task, folder_uuid: str, old_parent_id: str | None) -> int:
     """Re-sync project-KB membership for every document under a moved folder.
 
     Moving a folder subtree into/out of a project changes the owning project for
@@ -432,7 +441,7 @@ def sync_project_kb_on_folder_move(self, folder_uuid: str, old_parent_id: str | 
     return synced
 
 
-def _notify_document_processing_failed(db, document_uuid: str, message: str) -> None:
+def _notify_document_processing_failed(db: Database[dict], document_uuid: str, message: str) -> None:
     """Tell the uploader their document never became readable.
 
     Both callers swallow the exception and return "" rather than re-raising, so
@@ -447,7 +456,7 @@ def _notify_document_processing_failed(db, document_uuid: str, message: str) -> 
     notify_document_failed(db, doc=doc, error=message)
 
 
-def _is_last_extraction_attempt(task) -> bool:
+def _is_last_extraction_attempt(task: Task) -> bool:
     """True when an OCR outage raised now would not be retried. Never raises:
     unsure means not final, which keeps today's retry-then-fail behavior."""
     try:
@@ -475,7 +484,7 @@ def _is_last_extraction_attempt(task) -> bool:
     default_retry_delay=5,
 )
 def perform_extraction_and_update(
-    self, document_uuid: str, extension: str,
+    self: Task, document_uuid: str, extension: str,
     force_ocr: bool = False, ocr_required: bool = False,
     extraction_revision: int = 0,
 ) -> str:
@@ -563,12 +572,15 @@ def perform_extraction_and_update(
             # On the last attempt an OCR outage no longer has a retry to wait
             # for: a PDF sent to OCR only for pages the local reading can't
             # see is stored with those pages named, rather than failed (#955).
+            def on_stage(stage: str) -> None:
+                advance_task_status(db, document_uuid, stage, extraction_revision)
+
             final_attempt = _is_last_extraction_attempt(self)
             raw_text, text_markers = extract_text_with_markers(
                 str(absolute_path), extension, report=ocr_report,
                 force_ocr=force_ocr, ocr_required=ocr_required,
                 local_on_ocr_outage=final_attempt,
-                on_stage=lambda stage: advance_task_status(db, document_uuid, stage, extraction_revision),
+                on_stage=on_stage,
             )
             if ocr_report.get("ocr_unavailable_local_fallback"):
                 logger.warning(
@@ -852,7 +864,7 @@ def perform_extraction_and_update(
         return ""
 
 
-def advance_task_status(db, document_uuid: str, status: str, extraction_revision: int = 0) -> bool:
+def advance_task_status(db: Database[dict], document_uuid: str, status: str, extraction_revision: int = 0) -> bool:
     """Move a document to ``status`` unless extraction already marked it failed.
 
     Applies to *every* post-extraction status write, not just the terminal
@@ -885,12 +897,12 @@ def advance_task_status(db, document_uuid: str, status: str, extraction_revision
     return bool(result.matched_count)
 
 
-def mark_complete_unless_errored(db, document_uuid: str, extraction_revision: int = 0) -> bool:
+def mark_complete_unless_errored(db: Database[dict], document_uuid: str, extraction_revision: int = 0) -> bool:
     """Advance a document to "complete" unless extraction already failed."""
     return advance_task_status(db, document_uuid, "complete", extraction_revision)
 
 
-def _record_ingestion_result(db, document_uuid: str, fields: dict, extraction_revision: int = 0) -> bool:
+def _record_ingestion_result(db: Database[dict], document_uuid: str, fields: dict, extraction_revision: int = 0) -> bool:
     """Persist ingestion bookkeeping, then advance the status if it's allowed.
 
     Within the same generation, record chunk counts even if extraction failed;
@@ -912,7 +924,7 @@ def _record_ingestion_result(db, document_uuid: str, fields: dict, extraction_re
     max_retries=3,
     default_retry_delay=5,
 )
-def update_document_fields(self, document_uuid: str, extraction_revision: int = 0) -> None:
+def update_document_fields(self: Task, document_uuid: str, extraction_revision: int = 0) -> None:
     """Mark document extraction as complete, then check folder watch automations.
 
     Skips the complete status if extraction already flagged the doc as errored —
@@ -953,7 +965,7 @@ def update_document_fields(self, document_uuid: str, extraction_revision: int = 
         logger.error("Error checking folder watch automations for %s: %s", document_uuid, e)
 
 
-def _resume_pending_kb_sources(db, document_uuid: str, extraction_failed: bool) -> None:
+def _resume_pending_kb_sources(db: Database[dict], document_uuid: str, extraction_failed: bool) -> None:
     """Settle KB document-sources that were waiting on this document's extraction.
 
     A KB source added before its document finished extracting is parked in
@@ -998,7 +1010,7 @@ def _resume_pending_kb_sources(db, document_uuid: str, extraction_failed: bool) 
         )
 
 
-def _check_folder_watch_automations(db, document_uuid: str) -> None:
+def _check_folder_watch_automations(db: Database[dict], document_uuid: str) -> None:
     """Check if any folder watch automations match this document's folder."""
     from bson import ObjectId
 
@@ -1125,7 +1137,7 @@ def _check_folder_watch_automations(db, document_uuid: str) -> None:
             logger.info("Skipping automation %s: unsupported action_type '%s'", auto.get("name"), action_type)
 
 
-def _run_automation_extraction(db, automation: dict, search_set_uuid: str, doc: dict) -> None:
+def _run_automation_extraction(db: Database[dict], automation: dict, search_set_uuid: str, doc: dict) -> None:
     """Run an extraction search set against a document (sync, for Celery workers)."""
     from datetime import datetime, timezone
 
@@ -1212,7 +1224,7 @@ def _run_automation_extraction(db, automation: dict, search_set_uuid: str, doc: 
         )
 
 
-def _process_extraction_outputs(db, automation: dict, results: dict) -> None:
+def _process_extraction_outputs(db: Database[dict], automation: dict, results: dict | list[dict]) -> None:
     """Process output_config for an extraction automation."""
 
     from app.services.output_handlers import (
@@ -1296,7 +1308,7 @@ def _process_extraction_outputs(db, automation: dict, results: dict) -> None:
     max_retries=3,
     default_retry_delay=5,
 )
-def cleanup_document(self, document_uuid: str, extraction_revision: int = 0) -> None:
+def cleanup_document(self: Task, document_uuid: str, extraction_revision: int = 0) -> None:
     """Error handler — mark document as errored with details.
 
     If the extraction task already wrote a specific error_message before raising,
@@ -1335,7 +1347,7 @@ def cleanup_document(self, document_uuid: str, extraction_revision: int = 0) -> 
     max_retries=3,
     default_retry_delay=5,
 )
-def perform_semantic_ingestion(self, raw_text: str, document_uuid: str, user_id: str, extraction_revision: int = 0) -> str:
+def perform_semantic_ingestion(self: Task, raw_text: str, document_uuid: str, user_id: str, extraction_revision: int = 0) -> str:
     """Chunk text and embed into ChromaDB for RAG search.
 
     Writes back ``chromadb_ready`` / ``chunk_count`` / ``ingest_error`` so the
@@ -1451,7 +1463,7 @@ _EXTRACTION_ABANDONED_MESSAGE = (
 
 
 @celery_app.task(bind=True, name="tasks.document.reap_stuck")
-def reap_stuck_documents(self) -> None:
+def reap_stuck_documents(self: Task) -> None:
     """Self-heal documents whose task_status is stuck in an in-progress stage.
 
     Two failure modes, two sweeps:
@@ -1500,7 +1512,7 @@ def reap_stuck_documents(self) -> None:
     _reap_abandoned_validations(db)
 
 
-def _reap_abandoned_extractions(db) -> int:
+def _reap_abandoned_extractions(db: Database[dict]) -> int:
     """Sweep 2 of reap_stuck_documents: fail locks whose worker is dead.
 
     Returns the number of documents flipped to error.
@@ -1592,7 +1604,7 @@ def _reap_abandoned_extractions(db) -> int:
     return reaped
 
 
-def _reap_abandoned_validations(db) -> int:
+def _reap_abandoned_validations(db: Database[dict]) -> int:
     """Fail a lost validation chord after extraction has settled, retaining text.
 
     Each current chunk and summary renews the heartbeat. A reaped generation

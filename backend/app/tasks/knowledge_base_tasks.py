@@ -4,6 +4,15 @@ Ported from Flask app/utilities/knowledge_base_tasks.py.
 Uses pymongo (sync) for DB access.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from celery import Task
+
+from pymongo.database import Database
+
 import datetime
 import logging
 
@@ -17,14 +26,14 @@ from app.utils.fetch_errors import describe_empty_fetch, describe_fetch_error
 logger = logging.getLogger(__name__)
 
 
-def _get_db():
+def _get_db() -> Database[dict]:
     """Get sync pymongo database handle (shared per-process client)."""
     from app.tasks import get_sync_db
 
     return get_sync_db()
 
 
-def _recalculate_kb(db, kb_uuid: str) -> None:
+def _recalculate_kb(db: Database[dict], kb_uuid: str) -> None:
     """Recalculate KB aggregate stats from its sources."""
     sources = list(db.knowledge_base_sources.find({"knowledge_base_uuid": kb_uuid}))
 
@@ -85,7 +94,7 @@ def _source_label(source: dict, doc: dict | None = None) -> str:
     max_retries=3,
     default_retry_delay=10,
 )
-def kb_ingest_document(self, source_uuid: str, retrieved: bool = True) -> None:
+def kb_ingest_document(self: Task, source_uuid: str, retrieved: bool = True) -> None:
     """Fetch a SmartDocument's raw_text, chunk and embed into the KB collection.
 
     ``retrieved=False`` is a Reprocess that re-indexes the document's stored
@@ -264,7 +273,7 @@ def kb_ingest_document(self, source_uuid: str, retrieved: bool = True) -> None:
     max_retries=3,
     default_retry_delay=10,
 )
-def kb_reingest(self, kb_uuid: str) -> None:
+def kb_reingest(self: Task, kb_uuid: str) -> None:
     """Re-chunk and re-embed every source in a KB from stored text.
 
     Used after chunking improvements (e.g. table-aware splitting) so existing
@@ -394,7 +403,7 @@ def kb_reingest(self, kb_uuid: str) -> None:
     max_retries=3,
     default_retry_delay=10,
 )
-def kb_ingest_url(self, source_uuid: str) -> None:
+def kb_ingest_url(self: Task, source_uuid: str) -> None:
     """Fetch URL content, chunk and embed into the KB collection."""
     from app.services.document_manager import get_document_manager
 
@@ -411,7 +420,7 @@ def kb_ingest_url(self, source_uuid: str) -> None:
         {"$set": {"status": "processing"}},
     )
 
-    def _bell(error) -> None:
+    def _bell(error: str | BaseException) -> None:
         from app.services.failure_notifications import notify_kb_source_failed
 
         notify_kb_source_failed(

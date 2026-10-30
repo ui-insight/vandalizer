@@ -493,7 +493,7 @@ def save_results_to_onedrive_channel(
 
 
 def save_extraction_results_to_folder(
-    extraction_results: dict,
+    extraction_results: dict | list[dict],
     automation: dict,
     storage_config: dict,
 ) -> str:

@@ -1,5 +1,13 @@
 """Celery tasks for document classification."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from celery import Task
+
+
 import logging
 
 from app.celery_app import celery
@@ -9,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 @celery.task(name="tasks.document.classify", bind=True, retry_backoff=True, max_retries=2, default_retry_delay=30)
-def classify_document_task(self, document_uuid: str, extraction_revision: int = 0):
+def classify_document_task(self: Task, document_uuid: str, extraction_revision: int = 0):
     """Auto-classify a document after text extraction.
 
     Auto-classification is best-effort enrichment: a model failure must not

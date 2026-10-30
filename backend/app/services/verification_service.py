@@ -1,5 +1,9 @@
 """Verification queue service  - submit, review, approve, reject."""
 
+from __future__ import annotations
+
+from typing import NotRequired, TypedDict
+
 import copy
 import datetime
 import logging
@@ -21,13 +25,48 @@ from app.models.workflow import Workflow, WorkflowStep
 from app.models.search_set import SearchSet
 from app.schemas.user import AuthorRef
 from app.services.user_lookup import resolve_author, resolve_authors
-from app.services.catalog_usage import describe_catalog_usage
+from app.services.catalog_usage import CatalogUsage, describe_catalog_usage
 
 logger = logging.getLogger(__name__)
 
 
 # Claim lock duration — after this, lock is considered abandoned (Phase C)
 CLAIM_TTL_MINUTES = 30
+
+
+class _CatalogEntry(TypedDict):
+    id: str
+    item_id: str
+    kind: str
+    name: str
+    tags: list[str]
+    verified: bool
+    created_at: str | None
+    display_name: str | None
+    description: str | None
+    markdown: str | None
+    organization_ids: list[str]
+    quality_score: float | None
+    quality_tier: str | None
+    quality_asserted: bool
+    quality_grade: str | None
+    last_validated_at: str | None
+    validation_run_count: int
+    test_case_count: int
+    consistency: float | None
+    adoption_count: int
+    starter: bool
+    regression_pending_review: bool
+    submitted_by: dict[str, object] | None
+    created_by: dict[str, object] | None
+    credit: dict[str, str | None] | None
+    usage: NotRequired[CatalogUsage]
+    set_type: NotRequired[str]
+    total_sources: NotRequired[int]
+    total_chunks: NotRequired[int]
+    sources_ready: NotRequired[int]
+    kb_status: NotRequired[str]
+    source_uuid: NotRequired[str]
 
 
 def _merge_baseline(
@@ -125,7 +164,7 @@ async def submit_for_verification(
             obj = None
         if not obj:
             obj = await KnowledgeBase.find_one(KnowledgeBase.uuid == item_id)
-        if not obj:
+        if not obj or obj.id is None:
             raise ValueError("Item not found")
         obj_id = obj.id
     elif item_kind == "search_set":
@@ -135,13 +174,13 @@ async def submit_for_verification(
             obj = await SearchSet.get(obj_id)
         except Exception:
             obj = await SearchSet.find_one(SearchSet.uuid == item_id)
-        if not obj:
+        if not obj or obj.id is None:
             raise ValueError("Item not found")
         obj_id = obj.id
     else:
         obj_id = PydanticObjectId(item_id)
         obj = await Workflow.get(obj_id)
-        if not obj:
+        if not obj or obj.id is None:
             raise ValueError("Item not found")
 
     # Check for existing pending request (returned items can be resubmitted)
@@ -513,7 +552,7 @@ async def check_auto_approve(request_uuid: str) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def catalog_row_is_openable(item, underlying) -> bool:
+def catalog_row_is_openable(item: LibraryItem, underlying: Workflow | SearchSet | KnowledgeBase | None) -> bool:
     """Whether a verified-library row can actually be opened or adopted.
 
     The library item and the underlying Workflow/SearchSet/KnowledgeBase each
@@ -539,7 +578,7 @@ _TIER_ORDER = {"excellent": 0, "good": 1, "fair": 2}
 LEGACY_TIERS = {"gold": "excellent", "silver": "good", "bronze": "fair"}
 
 
-def matches_quality_filter(tier, score, regression_pending, requested):
+def matches_quality_filter(tier: str | None, score: float | None, regression_pending: bool, requested: str | None) -> bool:
     """Presentation groups use stored configured tiers, never new score thresholds."""
     if not requested:
         return True
@@ -561,8 +600,8 @@ def normalize_tier(tier: str | None) -> str | None:
 
 
 def adoption_counts(
-    library_rows: list,
-    kb_refs: list,
+    library_rows: list[LibraryItem],
+    kb_refs: list[KnowledgeBaseReference],
     kb_uuid_to_id: dict[str, str],
     creator_map: dict[tuple[str, str], str] | None = None,
 ) -> dict[tuple[str, str], int]:
@@ -587,7 +626,9 @@ def adoption_counts(
             adopters.setdefault((LibraryItemKind.KNOWLEDGE_BASE.value, kb_id), set()).add(ref.user_id)
     creators = creator_map or {}
     for key, users in adopters.items():
-        users.discard(creators.get(key))
+        creator = creators.get(key)
+        if creator is not None:
+            users.discard(creator)
         users.discard("system")
     return {key: len(users) for key, users in adopters.items()}
 
@@ -599,13 +640,11 @@ _MEASURED_FIELDS = (
 )
 
 
-def _aware_dt(value):
-    if value is None:
-        return None
+def _aware_dt(value: datetime.datetime) -> datetime.datetime:
     return value if value.tzinfo else value.replace(tzinfo=datetime.timezone.utc)
 
 
-def with_measured_quality(meta, measured):
+def with_measured_quality(meta: VerifiedItemMetadata | None, measured: VerifiedItemMetadata | None) -> VerifiedItemMetadata | None:
     """The catalog row, carrying the newer validation result when there is one.
 
     Extraction and KB validation runs are recorded under the item's uuid, so
@@ -626,7 +665,7 @@ def with_measured_quality(meta, measured):
     return merged
 
 
-def _quality_sort_key(entry: dict) -> tuple:
+def _quality_sort_key(entry: _CatalogEntry) -> tuple[int, int, float]:
     """Sort key for ``sort=quality``: best tier first, and within a tier a
     measured score outranks a hand-asserted tier (score None) — a catalog
     author typing "excellent" must never rank above a run that earned it."""
@@ -780,7 +819,7 @@ async def list_verified_items(
 
     # --- Build result entries (applying search and org filters) ---
     search_lower = search.lower() if search else None
-    results = []
+    results: list[_CatalogEntry] = []
     for item in items:
         item_id_str = str(item.item_id)
         name = name_map.get(item_id_str, "Unknown")
@@ -837,10 +876,10 @@ async def list_verified_items(
 
         submitter_id = submitter_user_map.get((item.kind.value, item_id_str))
         submitter_ref = author_map.get(submitter_id) if submitter_id else None
-        creator_id = creator_map.get((item.kind.value, item_id_str))
-        creator_ref = author_map.get(creator_id) if creator_id else None
+        entry_creator_id = creator_map.get((item.kind.value, item_id_str))
+        creator_ref = author_map.get(entry_creator_id) if entry_creator_id else None
 
-        entry = {
+        entry: _CatalogEntry = {
             "id": str(item.id),
             "item_id": item_id_str,
             "kind": item.kind.value,
@@ -884,39 +923,39 @@ async def list_verified_items(
         # Describe the published configuration, never submission-only examples,
         # credentials, destination URLs, or names of private fixed documents.
         if item.kind == LibraryItemKind.WORKFLOW:
-            wf = workflow_map.get(item_id_str)
-            if wf:
-                steps = [workflow_steps[str(s)] for s in wf.steps if str(s) in workflow_steps]
-                entry["usage"] = describe_catalog_usage("workflow", wf, steps)
-                if len(steps) != len(wf.steps):
+            entry_wf = workflow_map.get(item_id_str)
+            if entry_wf:
+                steps = [workflow_steps[str(s)] for s in entry_wf.steps if str(s) in workflow_steps]
+                entry["usage"] = describe_catalog_usage("workflow", entry_wf, steps)
+                if len(steps) != len(entry_wf.steps):
                     entry["usage"]["output"] = "Output details are incomplete. Open the workflow to review its setup."
                     entry["usage"]["output_names"] = []
                     entry["usage"]["notes"].append("Some configured steps could not be loaded.")
         elif item.kind == LibraryItemKind.SEARCH_SET:
-            ss = ss_map.get(item_id_str)
-            if ss:
-                entry["set_type"] = ss.set_type
-                entry["usage"] = describe_catalog_usage("search_set", ss)
+            entry_ss = ss_map.get(item_id_str)
+            if entry_ss:
+                entry["set_type"] = entry_ss.set_type
+                entry["usage"] = describe_catalog_usage("search_set", entry_ss)
         elif item.kind == LibraryItemKind.KNOWLEDGE_BASE:
-            kb = kb_map.get(item_id_str)
-            if kb:
-                entry["usage"] = describe_catalog_usage("knowledge_base", kb)
+            entry_kb = kb_map.get(item_id_str)
+            if entry_kb:
+                entry["usage"] = describe_catalog_usage("knowledge_base", entry_kb)
 
         # KB-specific metrics (from batch)
         if item.kind == LibraryItemKind.KNOWLEDGE_BASE:
-            kb = kb_map.get(item_id_str)
-            if kb:
-                entry["total_sources"] = kb.total_sources
-                entry["total_chunks"] = kb.total_chunks
-                entry["sources_ready"] = kb.sources_ready
-                entry["kb_status"] = kb.status
-                entry["source_uuid"] = kb.uuid
+            entry_kb = kb_map.get(item_id_str)
+            if entry_kb:
+                entry["total_sources"] = entry_kb.total_sources
+                entry["total_chunks"] = entry_kb.total_chunks
+                entry["sources_ready"] = entry_kb.sources_ready
+                entry["kb_status"] = entry_kb.status
+                entry["source_uuid"] = entry_kb.uuid
 
         # Search set UUID (for navigation)
         if item.kind == LibraryItemKind.SEARCH_SET:
-            ss = ss_map.get(item_id_str)
-            if ss:
-                entry["source_uuid"] = ss.uuid
+            entry_ss = ss_map.get(item_id_str)
+            if entry_ss:
+                entry["source_uuid"] = entry_ss.uuid
 
         # Workflow: use MongoDB _id as source_uuid (workspace routes by _id)
         if item.kind == LibraryItemKind.WORKFLOW:
@@ -1632,6 +1671,8 @@ async def _mark_kb_verified(item_id: PydanticObjectId) -> None:
             created_at=now,
         )
         await new_item.insert()
+        if new_item.id is None:
+            raise RuntimeError("Inserted library item has no identity")
         verified_lib.items.append(new_item.id)
         verified_lib.updated_at = now
         await verified_lib.save()
@@ -1729,6 +1770,8 @@ async def _mark_item_verified(item_id: PydanticObjectId, item_kind: str) -> None
             created_at=now,
         )
         await new_item.insert()
+        if new_item.id is None:
+            raise RuntimeError("Inserted library item has no identity")
         verified_lib.items.append(new_item.id)
         verified_lib.updated_at = now
         await verified_lib.save()

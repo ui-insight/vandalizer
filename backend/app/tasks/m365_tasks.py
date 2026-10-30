@@ -7,6 +7,13 @@ Uses pymongo (sync) for DB access.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from celery import Task
+
+from pymongo.database import Database
+
 import base64
 import io
 import logging
@@ -21,7 +28,7 @@ from app.tasks import TRANSIENT_EXCEPTIONS
 logger = logging.getLogger(__name__)
 
 
-def _get_db():
+def _get_db() -> Database[dict]:
     from app.tasks import get_sync_db
 
     return get_sync_db()
@@ -133,7 +140,7 @@ def _trigger_text_extraction(doc: dict) -> None:
     default_retry_delay=10,
 )
 def ingest_email_message(
-    self,
+    self: Task,
     user_id: str,
     message_resource: str,
     intake_config_id: str,
@@ -251,7 +258,7 @@ def ingest_email_message(
     default_retry_delay=10,
 )
 def ingest_drive_item(
-    self,
+    self: Task,
     user_id: str,
     item_resource: str,
     intake_config_id: str,
@@ -357,7 +364,7 @@ def ingest_drive_item(
     max_retries=3,
     default_retry_delay=10,
 )
-def triage_work_item(self, work_item_id: str) -> dict:
+def triage_work_item(self: Task, work_item_id: str) -> dict:
     """Classify a work item and route it to the right workflow."""
     from bson import ObjectId
 
@@ -469,7 +476,7 @@ def _match_workflow(db, work_item: dict, intake: dict):
     max_retries=3,
     default_retry_delay=10,
 )
-def renew_graph_subscriptions(self) -> dict:
+def renew_graph_subscriptions(self: Task) -> dict:
     """Renew Graph subscriptions expiring within 24 hours."""
     from app.services.graph_client import GraphClient
 
@@ -507,7 +514,7 @@ def renew_graph_subscriptions(self) -> dict:
     max_retries=3,
     default_retry_delay=10,
 )
-def send_daily_digest(self) -> dict:
+def send_daily_digest(self: Task) -> dict:
     """Send daily summary to Teams channels."""
     from app.services.graph_client import GraphClient
     from app.services.teams_cards import build_daily_digest_card
