@@ -23,6 +23,7 @@ from app.models.user_config import UserModelConfig
 from app.models.workflow import Workflow, WorkflowResult
 from app.schemas.config import (
     ActiveAlertItem,
+    HomeDocument,
     ModelInfo,
     OnboardingStatusResponse,
     RecentActivityItem,
@@ -50,8 +51,8 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 
 
-@router.get("/version")
-async def get_version(settings: Settings = Depends(get_settings)):
+@router.get("/version", response_model=None)
+async def get_version(settings: Settings = Depends(get_settings)) -> dict[str, object]:
     """Public  - the build and environment this instance is running, for the UI
     version footer. Lets users tell deployments apart (different envs deploy at
     different times). `deployment_label` falls back to `environment` when unset.
@@ -76,7 +77,7 @@ def _model_context_window(model: dict) -> int:
 
 
 @router.get("/models", response_model=list[ModelInfo])
-async def get_models(user: User = Depends(get_current_user)):
+async def get_models(user: User = Depends(get_current_user)) -> list[ModelInfo]:
     models = await get_llm_models()
     return [
         ModelInfo(
@@ -98,7 +99,7 @@ async def get_models(user: User = Depends(get_current_user)):
 
 
 @router.get("/user", response_model=UserConfigResponse)
-async def get_user_config(user: User = Depends(get_current_user)):
+async def get_user_config(user: User = Depends(get_current_user)) -> UserConfigResponse:
     user_config, models, _ = await reconcile_user_model_config(
         user.user_id, create_if_missing=True
     )
@@ -132,7 +133,7 @@ async def get_user_config(user: User = Depends(get_current_user)):
 
 
 @router.put("/user", response_model=UserConfigResponse)
-async def update_user_config(req: UpdateUserConfigRequest, user: User = Depends(get_current_user)):
+async def update_user_config(req: UpdateUserConfigRequest, user: User = Depends(get_current_user)) -> UserConfigResponse:
     user_config, models, _ = await reconcile_user_model_config(
         user.user_id, create_if_missing=True
     )
@@ -207,7 +208,7 @@ def _validate_image_data_url(value: str, field: str) -> str:
 
 
 @router.get("/theme", response_model=ThemeConfigResponse)
-async def get_theme():
+async def get_theme() -> ThemeConfigResponse:
     """Public endpoint  - returns brand theme so the landing page can render it."""
     config = await SystemConfig.get_config()
     return ThemeConfigResponse(
@@ -222,7 +223,7 @@ async def get_theme():
 
 
 @router.put("/theme", response_model=ThemeConfigResponse)
-async def update_theme(req: UpdateThemeConfigRequest, user: User = Depends(get_current_user)):
+async def update_theme(req: UpdateThemeConfigRequest, user: User = Depends(get_current_user)) -> ThemeConfigResponse:
     if not user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
     config = await SystemConfig.get_config()
@@ -259,11 +260,11 @@ async def update_theme(req: UpdateThemeConfigRequest, user: User = Depends(get_c
 # ---------------------------------------------------------------------------
 
 
-@router.get("/features")
+@router.get("/features", response_model=None)
 async def get_features(
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-):
+) -> dict[str, object]:
     """Return feature flags for the current deployment."""
     from app.services import web_search_service
 
@@ -503,7 +504,9 @@ async def _activity_project_titles(events: list, user: User) -> dict[str, str]:
     from app.services import project_service
 
     titles: dict[str, str] = {}
-    for project_uuid in {getattr(ev, "project_uuid", None) for ev in events} - {None, ""}:
+    for project_uuid in {getattr(ev, "project_uuid", None) for ev in events}:
+        if not isinstance(project_uuid, str) or not project_uuid:
+            continue
         try:
             project = await project_service.get_authorized_project(project_uuid, user)
         except Exception:
@@ -515,55 +518,34 @@ async def _activity_project_titles(events: list, user: User) -> dict[str, str]:
 
 
 @router.get("/onboarding-status", response_model=OnboardingStatusResponse)
-async def get_onboarding_status(user: User = Depends(get_current_user)):
+async def get_onboarding_status(user: User = Depends(get_current_user)) -> OnboardingStatusResponse:
     uid = user.user_id
 
+    # These groups keep every read concurrent while preserving each result type.
     (
-        doc_count,
-        onboarding_doc_count,
-        workflows,
-        search_sets,
-        library_items,
-        membership_count,
-        automations,
-        knowledge_bases,
-        doc_chat_count,
-        conversation_count,
-        is_certified,
-        recent_activities,
-        extraction_run_count,
+        (doc_count, onboarding_doc_count, workflows, search_sets, library_items),
+        (membership_count, automations, knowledge_bases, doc_chat_count, conversation_count),
+        (is_certified, recent_activities, extraction_run_count),
     ) = await asyncio.gather(
-        SmartDocument.find(SmartDocument.user_id == uid).count(),
-        SmartDocument.find(
-            SmartDocument.user_id == uid,
-            SmartDocument.is_onboarding_sample == True,  # noqa: E712
-        ).count(),
-        Workflow.find(Workflow.user_id == uid).to_list(),
-        SearchSet.find(SearchSet.user_id == uid).to_list(),
-        LibraryItem.find(LibraryItem.added_by_user_id == uid).to_list(),
-        TeamMembership.find(TeamMembership.user_id == uid).count(),
-        Automation.find(Automation.user_id == uid).to_list(),
-        KnowledgeBase.find(KnowledgeBase.user_id == uid).to_list(),
-        # Conversations with at least one file or URL attachment + messages
-        ChatConversation.find({
-            "user_id": uid,
-            "messages": {"$ne": []},
-            "$or": [
-                {"file_attachments": {"$ne": []}},
-                {"url_attachments": {"$ne": []}},
-            ],
-        }).count(),
-        # Any conversations at all
-        ChatConversation.find(ChatConversation.user_id == uid).count(),
-        has_earned_certification(uid),
-        # Recent activities for workspace briefing + "continue where you left off" pill
-        ActivityEvent.find(
-            {"user_id": uid, "status": {"$in": ["completed", "failed", "running", "queued"]}}
-        ).sort("-last_updated_at").limit(3).to_list(),
-        # Completed extraction runs — drives maturity stage progression
-        ActivityEvent.find(
-            {"user_id": uid, "type": "search_set_run", "status": "completed"}
-        ).count(),
+        asyncio.gather(
+            SmartDocument.find(SmartDocument.user_id == uid).count(),
+            SmartDocument.find(SmartDocument.user_id == uid, SmartDocument.is_onboarding_sample == True).count(),  # noqa: E712
+            Workflow.find(Workflow.user_id == uid).to_list(),
+            SearchSet.find(SearchSet.user_id == uid).to_list(),
+            LibraryItem.find(LibraryItem.added_by_user_id == uid).to_list(),
+        ),
+        asyncio.gather(
+            TeamMembership.find(TeamMembership.user_id == uid).count(),
+            Automation.find(Automation.user_id == uid).to_list(),
+            KnowledgeBase.find(KnowledgeBase.user_id == uid).to_list(),
+            ChatConversation.find({'user_id': uid, 'messages': {'$ne': []}, '$or': [{'file_attachments': {'$ne': []}}, {'url_attachments': {'$ne': []}}]}).count(),
+            ChatConversation.find(ChatConversation.user_id == uid).count(),
+        ),
+        asyncio.gather(
+            has_earned_certification(uid),
+            ActivityEvent.find({'user_id': uid, 'status': {'$in': ['completed', 'failed', 'running', 'queued']}}).sort('-last_updated_at').limit(3).to_list(),
+            ActivityEvent.find({'user_id': uid, 'type': 'search_set_run', 'status': 'completed'}).count(),
+        ),
     )
 
     # Notices only for owned tools. Workflow ObjectIds and extraction UUIDs
@@ -684,7 +666,7 @@ async def get_onboarding_status(user: User = Depends(get_current_user)):
         has_only_onboarding_docs=(doc_count > 0 and doc_count == onboarding_doc_count),
         top_extraction_set_name=search_sets[0].title if search_sets else None,
         top_workflow_name=workflows[0].name if workflows else None,
-        recent_documents=[{"uuid": d.uuid, "title": d.title or "Untitled document"} for d in recent_documents],
+        recent_documents=[HomeDocument(uuid=d.uuid, title=d.title or "Untitled document") for d in recent_documents],
         recent_activity=recent_activity_items,
         active_alerts=alert_items,
         maturity_stage=maturity_stage,
@@ -694,8 +676,8 @@ async def get_onboarding_status(user: User = Depends(get_current_user)):
     )
 
 
-@router.post("/first-session-complete", status_code=204)
-async def mark_first_session_complete(user: User = Depends(get_current_user)):
+@router.post("/first-session-complete", status_code=204, response_model=None)
+async def mark_first_session_complete(user: User = Depends(get_current_user)) -> None:
     """Mark the first-session onboarding as completed so it won't show again."""
     if not user.first_session_completed:
         user.first_session_completed = True
@@ -726,8 +708,8 @@ def _as_aware_utc(dt: datetime.datetime | None) -> datetime.datetime | None:
 _DATETIME_MIN_UTC = datetime.datetime.min.replace(tzinfo=datetime.timezone.utc)
 
 
-@router.get("/automation-stats")
-async def get_automation_stats(user: User = Depends(get_current_user)):
+@router.get("/automation-stats", response_model=None)
+async def get_automation_stats(user: User = Depends(get_current_user)) -> dict[str, object]:
     visible_workflows = await workflow_service.list_workflows(
         user=user,
         skip=0,
@@ -793,8 +775,8 @@ async def get_automation_stats(user: User = Depends(get_current_user)):
     }
 
 
-@router.get("/home-alerts/{uuid}/evidence")
-async def home_alert_evidence(uuid: str, user: User = Depends(get_current_user)):
+@router.get("/home-alerts/{uuid}/evidence", response_model=None)
+async def home_alert_evidence(uuid: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     from app.services.home_alerts import owned_alert
     from app.services.quality_service import get_quality_history
     alert = await owned_alert(uuid, user)
@@ -809,7 +791,7 @@ async def review_home_alert(
     uuid: str,
     body: "ReviewAlertRequest",
     user: User = Depends(get_current_user),
-):
+) -> ActiveAlertItem:
     from app.services.home_alerts import owned_alert, alert_item
     alert = await owned_alert(uuid, user)
     alert.review_state = body.state if body.state != "acknowledged" else "in_review"

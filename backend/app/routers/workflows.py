@@ -1,5 +1,8 @@
 """Workflow API routes."""
 
+from collections.abc import AsyncIterator
+from typing import TypedDict
+
 import asyncio
 import base64
 import csv
@@ -22,6 +25,7 @@ from app.utils.timestamps import utc_iso
 from app.dependencies import get_api_key_user, get_current_user, get_current_user_or_api_key
 from app.exceptions import TrialSpendBlockedError
 from app.models.user import User
+from app.models.workflow_optimization_run import WorkflowOptimizationRun
 from app.services.extraction_dispatch import record_extraction_dispatch
 from app.services import access_control
 from app.services.access_control import get_authorized_search_set, get_authorized_workflow
@@ -57,6 +61,11 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+
+class _WorkflowContextOptions(TypedDict, total=False):
+    project_context: dict
+
+
 # Formats offered by both result-export surfaces (Download and Save to folder).
 # Keep in sync with the frontend menus in WorkflowEditorPanel/RunHistoryTab/
 # SaveWorkflowOutputDialog and the dispatch in output_handlers.save_results_to_folder.
@@ -90,14 +99,14 @@ async def _workflow_response_from_dict(wf: dict) -> WorkflowResponse:
     return WorkflowResponse(**{**wf, "created_by": created_by})
 
 
-def _csv_cell(value) -> str:
+def _csv_cell(value: object) -> str:
     """Format a value for a CSV cell, serializing complex types as JSON."""
     if isinstance(value, (dict, list)):
         return json.dumps(value, default=str)
     return str(value)
 
 
-def _parse_structured_string(text: str):
+def _parse_structured_string(text: str) -> object:
     """Best-effort extraction of structured data from a free-form string output.
 
     Tries, in order: fenced JSON blocks, raw JSON, and GitHub-flavored markdown
@@ -171,7 +180,7 @@ async def _authorize_documents(document_uuids: list[str], user: User) -> list[st
 # ---------------------------------------------------------------------------
 
 @router.post("", response_model=WorkflowResponse)
-async def create_workflow(req: CreateWorkflowRequest, user: User = Depends(get_current_user)):
+async def create_workflow(req: CreateWorkflowRequest, user: User = Depends(get_current_user)) -> WorkflowResponse:
     team_id = str(user.current_team) if user.current_team else None
     try:
         wf = await svc.create_workflow(req.name, user.user_id, req.description, team_id=team_id)
@@ -193,7 +202,7 @@ async def list_workflows(
     scope: str | None = Query(default=None),
     search: str | None = Query(default=None),
     user: User = Depends(get_current_user),
-):
+) -> WorkflowPageResponse:
     """One page of the caller's visible workflows, newest first.
 
     ``search`` filters server-side across the whole result set, not just the
@@ -235,7 +244,7 @@ async def get_workflow_status(
     session_id: str,
     share_token: str | None = Query(default=None),
     user: User = Depends(get_current_user_or_api_key),
-):
+) -> WorkflowStatusResponse:
     """Poll a workflow run by session id.
 
     Accepts a session cookie (the UI) or an ``x-api-key`` header — the run
@@ -254,25 +263,25 @@ async def get_batch_status(
     batch_id: str,
     share_token: str | None = Query(default=None),
     user: User = Depends(get_current_user),
-):
+) -> dict:
     status = await svc.get_batch_status(batch_id, user=user, share_token=share_token)
     if not status:
         raise HTTPException(status_code=404, detail="Batch not found")
     return status
 
 
-@router.get("/status/stream")
+@router.get("/status/stream", response_model=None)
 async def stream_workflow_status(
     session_id: str,
     share_token: str | None = Query(default=None),
     user: User = Depends(get_current_user_or_api_key),
-):
+) -> StreamingResponse:
     """SSE endpoint that streams workflow status updates until completion."""
     initial_status = await svc.get_workflow_status(session_id, user=user, share_token=share_token)
     if not initial_status:
         raise HTTPException(status_code=404, detail="Workflow result not found")
 
-    async def event_generator():
+    async def event_generator() -> AsyncIterator[str]:
         last_json = ""
         not_found_retries = 0
         while True:
@@ -308,12 +317,12 @@ async def stream_workflow_status(
     )
 
 
-@router.get("/steps/test/{task_id}")
-async def poll_step_test(task_id: str, user: User = Depends(get_current_user)):
+@router.get("/steps/test/{task_id}", response_model=None)
+async def poll_step_test(task_id: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     return svc.get_test_status(task_id)
 
 
-def _step_output_value(step_payload):
+def _step_output_value(step_payload: object) -> object:
     """Extract the displayable value from a stored step output payload.
 
     Each entry in WorkflowResult.steps_output is the full node return dict
@@ -324,7 +333,7 @@ def _step_output_value(step_payload):
     return step_payload.get("formatted_output") or step_payload.get("output")
 
 
-def _zip_member_for_step(step_name: str, value):
+def _zip_member_for_step(step_name: str, value: object) -> tuple[str, bytes]:
     """Return (filename, bytes) for one step's output, for inclusion in a multi-output zip."""
     safe_name = re.sub(r"[^A-Za-z0-9_\-]+", "_", step_name).strip("_") or "step"
 
@@ -406,7 +415,7 @@ def _download_zone(tz: str | None) -> ZoneInfo | None:
         return None
 
 
-def _run_stamp(start_time, zone: ZoneInfo | None) -> str | None:
+def _run_stamp(start_time: object, zone: ZoneInfo | None) -> str | None:
     """``2026-09-02 02-30 PM`` in ``zone``, or ``… UTC`` without one.
 
     Colons are not allowed in Windows file names, hence the dash in the time.
@@ -612,14 +621,14 @@ def _render_workflow_output(status: dict, format: str, parse_structured: bool) -
     return json_bytes, "application/json", "json", None
 
 
-@router.get("/download")
+@router.get("/download", response_model=None)
 async def download_results(
     session_id: str,
     format: str = "json",
     parse_structured: bool = False,
     tz: str | None = Query(default=None, description="IANA time zone for the run time in the file name"),
     user: User = Depends(get_current_user),
-):
+) -> StreamingResponse:
     """Download workflow results in specified format.
 
     If the workflow has multiple steps marked as deliverables (is_output), the
@@ -643,7 +652,7 @@ async def download_results(
     )
 
 
-@router.get("/batch-download")
+@router.get("/batch-download", response_model=None)
 async def download_batch_results(
     batch_id: str,
     format: str = "json",
@@ -651,7 +660,7 @@ async def download_batch_results(
     share_token: str | None = Query(default=None),
     tz: str | None = Query(default=None, description="IANA time zone for run times in member names"),
     user: User = Depends(get_current_user),
-):
+) -> StreamingResponse:
     """Bundle every completed run in a batch into a single ZIP.
 
     One member per completed run, each formatted like the single-session
@@ -682,7 +691,7 @@ async def download_batch_results(
 
     zone = _download_zone(tz)
 
-    def _build_zip():
+    def _build_zip() -> "tempfile.SpooledTemporaryFile[bytes]":
         """Render and compress every run.
 
         Off the event loop: rendering to pdf/docx is CPU-bound, and doing it
@@ -727,12 +736,12 @@ class SaveOutputToFolderRequest(BaseModel):
     file_name: str | None = None
 
 
-@router.post("/sessions/{session_id}/save-to-folder")
+@router.post("/sessions/{session_id}/save-to-folder", response_model=None)
 async def save_session_output_to_folder(
     session_id: str,
     req: SaveOutputToFolderRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Save a workflow run's output as a SmartDocument in the chosen SmartFolder.
 
     Writes the rendered output to disk (PDF/Markdown/CSV/JSON/text) and inserts
@@ -782,8 +791,8 @@ async def save_session_output_to_folder(
     return {"ok": True, "folder_uuid": req.folder_uuid, "file_path": file_path}
 
 
-@router.get("/{workflow_id}/export")
-async def export_workflow(workflow_id: str, user: User = Depends(get_current_user)):
+@router.get("/{workflow_id}/export", response_model=None)
+async def export_workflow(workflow_id: str, user: User = Depends(get_current_user)) -> StreamingResponse:
     """Download workflow definition as a shareable JSON file."""
     wf = await get_authorized_workflow(workflow_id, user)
     if not wf:
@@ -810,11 +819,11 @@ async def export_workflow(workflow_id: str, user: User = Depends(get_current_use
     )
 
 
-@router.post("/import")
+@router.post("/import", response_model=None)
 async def import_workflow(
     file: UploadFile = File(...),
     user: User = Depends(get_current_user),
-):
+) -> WorkflowResponse:
     """Import a workflow from an exported JSON file."""
     from app.services import export_import_service as eis
 
@@ -838,7 +847,7 @@ async def import_into_workflow(
     workflow_id: str,
     file: UploadFile = File(...),
     user: User = Depends(get_current_user),
-):
+) -> WorkflowResponse:
     """Replace the contents of an existing workflow with imported JSON data.
 
     The workflow's id, name, and description are preserved; steps, tasks,
@@ -870,7 +879,7 @@ async def get_workflow(
     workflow_id: str,
     share_token: str | None = Query(default=None),
     user: User = Depends(get_current_user),
-):
+) -> WorkflowResponse:
     wf = await svc.get_workflow(workflow_id, user=user, share_token=share_token)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
@@ -882,8 +891,8 @@ async def get_workflow(
     return await _workflow_response_from_dict(wf)
 
 
-@router.post("/{workflow_id}/share-token")
-async def mint_workflow_share_token(workflow_id: str, user: User = Depends(get_current_user)):
+@router.post("/{workflow_id}/share-token", response_model=None)
+async def mint_workflow_share_token(workflow_id: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     """Mint (or return existing) view-only share token for a workflow.
 
     Manager-level access required: owners and team owner/admin can issue
@@ -902,7 +911,7 @@ async def mint_workflow_share_token(workflow_id: str, user: User = Depends(get_c
 
 
 @router.patch("/{workflow_id}", response_model=WorkflowResponse)
-async def update_workflow(workflow_id: str, req: UpdateWorkflowRequest, user: User = Depends(get_current_user)):
+async def update_workflow(workflow_id: str, req: UpdateWorkflowRequest, user: User = Depends(get_current_user)) -> WorkflowResponse:
     try:
         wf = await svc.update_workflow(
             workflow_id, user=user, name=req.name, description=req.description,
@@ -926,8 +935,8 @@ async def update_workflow(workflow_id: str, req: UpdateWorkflowRequest, user: Us
     )
 
 
-@router.delete("/{workflow_id}")
-async def delete_workflow(workflow_id: str, user: User = Depends(get_current_user)):
+@router.delete("/{workflow_id}", response_model=None)
+async def delete_workflow(workflow_id: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     ok = await svc.delete_workflow(workflow_id, user=user)
     if not ok:
         raise HTTPException(status_code=404, detail="Workflow not found")
@@ -939,7 +948,7 @@ async def duplicate_workflow(
     workflow_id: str,
     share_token: str | None = Query(default=None),
     user: User = Depends(get_current_user),
-):
+) -> WorkflowResponse:
     team_id = str(user.current_team) if user.current_team else None
     wf = await svc.duplicate_workflow(
         workflow_id,
@@ -954,7 +963,7 @@ async def duplicate_workflow(
 
 
 @router.delete("/{workflow_id}/team", response_model=WorkflowResponse)
-async def remove_workflow_from_team(workflow_id: str, user: User = Depends(get_current_user)):
+async def remove_workflow_from_team(workflow_id: str, user: User = Depends(get_current_user)) -> WorkflowResponse:
     """Remove a workflow from its team library without deleting it.
 
     The workflow stays owned by its creator (``user_id``) and disappears from
@@ -986,16 +995,16 @@ async def remove_workflow_from_team(workflow_id: str, user: User = Depends(get_c
 # Steps
 # ---------------------------------------------------------------------------
 
-@router.post("/{workflow_id}/steps")
-async def add_step(workflow_id: str, req: AddStepRequest, user: User = Depends(get_current_user)):
+@router.post("/{workflow_id}/steps", response_model=None)
+async def add_step(workflow_id: str, req: AddStepRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
     step = await svc.add_step(workflow_id, req.name, user=user, data=req.data, is_output=req.is_output)
     if not step:
         raise HTTPException(status_code=404, detail="Workflow not found")
     return step
 
 
-@router.patch("/steps/{step_id}")
-async def update_step(step_id: str, req: UpdateStepRequest, user: User = Depends(get_current_user)):
+@router.patch("/steps/{step_id}", response_model=None)
+async def update_step(step_id: str, req: UpdateStepRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
     step = await svc.update_step(step_id, user=user, name=req.name, data=req.data, is_output=req.is_output)
     if not step:
         raise HTTPException(status_code=404, detail="Step not found")
@@ -1007,8 +1016,8 @@ async def update_step(step_id: str, req: UpdateStepRequest, user: User = Depends
     return step
 
 
-@router.delete("/steps/{step_id}")
-async def delete_step(step_id: str, user: User = Depends(get_current_user)):
+@router.delete("/steps/{step_id}", response_model=None)
+async def delete_step(step_id: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     ok = await svc.delete_step(step_id, user=user)
     if not ok:
         raise HTTPException(status_code=404, detail="Step not found")
@@ -1019,8 +1028,8 @@ async def delete_step(step_id: str, user: User = Depends(get_current_user)):
 # Tasks
 # ---------------------------------------------------------------------------
 
-@router.post("/steps/{step_id}/tasks")
-async def add_task(step_id: str, req: AddTaskRequest, user: User = Depends(get_current_user)):
+@router.post("/steps/{step_id}/tasks", response_model=None)
+async def add_task(step_id: str, req: AddTaskRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
     task = await svc.add_task(step_id, req.name, user=user, data=req.data)
     if not task:
         status_code, detail = await _diagnose_step_mutation_failure(step_id, user)
@@ -1041,7 +1050,7 @@ async def _diagnose_step_mutation_failure(step_id: str, user: User) -> tuple[int
         step = await WorkflowStep.get(PydanticObjectId(step_id))
     except Exception:
         return 404, "Step not found"
-    if not step:
+    if not step or step.id is None:
         return 404, "Step not found"
     parent = await svc._get_workflow_for_step(step.id)
     if not parent:
@@ -1065,7 +1074,7 @@ async def _diagnose_task_mutation_failure(task_id: str, user: User) -> tuple[int
         task = await WorkflowStepTask.get(PydanticObjectId(task_id))
     except Exception:
         return 404, "Task not found"
-    if not task:
+    if not task or task.id is None:
         return 404, "Task not found"
     parent = await svc._get_workflow_for_task(task.id)
     if not parent:
@@ -1076,8 +1085,8 @@ async def _diagnose_task_mutation_failure(task_id: str, user: User) -> tuple[int
     return 500, "Failed to update task"
 
 
-@router.patch("/tasks/{task_id}")
-async def update_task(task_id: str, req: UpdateTaskRequest, user: User = Depends(get_current_user)):
+@router.patch("/tasks/{task_id}", response_model=None)
+async def update_task(task_id: str, req: UpdateTaskRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
     task = await svc.update_task(task_id, user=user, name=req.name, data=req.data)
     if not task:
         status_code, detail = await _diagnose_task_mutation_failure(task_id, user)
@@ -1090,8 +1099,8 @@ async def update_task(task_id: str, req: UpdateTaskRequest, user: User = Depends
     return task
 
 
-@router.delete("/tasks/{task_id}")
-async def delete_task(task_id: str, user: User = Depends(get_current_user)):
+@router.delete("/tasks/{task_id}", response_model=None)
+async def delete_task(task_id: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     ok = await svc.delete_task(task_id, user=user)
     if not ok:
         status_code, detail = await _diagnose_task_mutation_failure(task_id, user)
@@ -1103,9 +1112,9 @@ async def delete_task(task_id: str, user: User = Depends(get_current_user)):
 # Execution
 # ---------------------------------------------------------------------------
 
-@router.post("/{workflow_id}/run")
+@router.post("/{workflow_id}/run", response_model=None)
 @limiter.limit("20/minute")
-async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowRequest, user: User = Depends(get_current_user)):
+async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
     from app.models.activity import ActivityType
     from app.services import activity_service
     from beanie import PydanticObjectId
@@ -1127,7 +1136,7 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
     if req.project_context_uuid:
         from app.services.project_context import snapshot_project_context
         project_context = await snapshot_project_context(req.project_context_uuid, user)
-    context_options = {"project_context": project_context} if project_context else {}
+    context_options: _WorkflowContextOptions = {"project_context": project_context} if project_context else {}
     document_uuids = await _authorize_documents(req.document_uuids, user)
     if req.folder_uuids:
         from app.services import folder_service
@@ -1156,6 +1165,8 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
         steps_total=num_steps,
         document_uuids=document_uuids,
     )
+    if activity.id is None:
+        raise RuntimeError("Workflow activity was not persisted")
 
     try:
         if req.batch_mode and len(document_uuids) > 1:
@@ -1184,12 +1195,12 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.post("/sessions/{session_id}/cancel")
+@router.post("/sessions/{session_id}/cancel", response_model=None)
 async def cancel_workflow_run(
     session_id: str,
     share_token: str | None = Query(default=None),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Stop an in-flight workflow run (single-run sessions)."""
     result = await svc.cancel_workflow(session_id, user, share_token=share_token)
     if result is None:
@@ -1197,12 +1208,12 @@ async def cancel_workflow_run(
     return result
 
 
-@router.post("/batches/{batch_id}/cancel")
+@router.post("/batches/{batch_id}/cancel", response_model=None)
 async def cancel_batch_run(
     batch_id: str,
     share_token: str | None = Query(default=None),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Stop every in-flight run in a batch (per-document runs)."""
     result = await svc.cancel_batch(batch_id, user, share_token=share_token)
     if result is None:
@@ -1210,9 +1221,9 @@ async def cancel_batch_run(
     return result
 
 
-@router.post("/steps/test")
+@router.post("/steps/test", response_model=None)
 @limiter.limit("20/minute")
-async def test_step(request: Request, req: TestStepRequest, user: User = Depends(get_current_user)):
+async def test_step(request: Request, req: TestStepRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
     document_uuids = await _authorize_documents(req.document_uuids, user)
     if req.task_name == "Extraction":
         search_set_uuid = (req.task_data or {}).get("search_set_uuid")
@@ -1235,18 +1246,18 @@ async def test_step(request: Request, req: TestStepRequest, user: User = Depends
     return {"task_id": task_id}
 
 
-@router.post("/{workflow_id}/reorder-steps")
-async def reorder_steps(workflow_id: str, req: ReorderStepsRequest, user: User = Depends(get_current_user)):
+@router.post("/{workflow_id}/reorder-steps", response_model=None)
+async def reorder_steps(workflow_id: str, req: ReorderStepsRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
     ok = await svc.reorder_steps(workflow_id, req.step_ids, user=user)
     if not ok:
         raise HTTPException(status_code=400, detail="Invalid step IDs or workflow not found")
     return {"ok": True}
 
 
-@router.get("/{workflow_id}/history")
+@router.get("/{workflow_id}/history", response_model=None)
 async def get_workflow_history(
     workflow_id: str, limit: int = 50, user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """List the current user's past runs of this workflow."""
     wf = await get_authorized_workflow(workflow_id, user)
     if not wf:
@@ -1275,10 +1286,10 @@ async def get_workflow_history(
             used = [m for m in (r.models_used or []) if m]
             recorded[r.session_id] = used or ([r.model] if r.model else [])
 
-    def models_of(ev) -> dict:
+    def models_of(ev: ActivityEvent) -> dict:
         fields = run_model_fields(ev.model_usage)
         if not fields["models"]:
-            fields["models"] = recorded.get(ev.workflow_session_id, [])
+            fields["models"] = recorded.get(ev.workflow_session_id or "", [])
         return fields
 
     return {
@@ -1314,8 +1325,8 @@ class SaveWorkflowVersionRequest(BaseModel):
     note: str = ""
 
 
-@router.get("/{workflow_id}/versions")
-async def list_workflow_versions(workflow_id: str, user: User = Depends(get_current_user)):
+@router.get("/{workflow_id}/versions", response_model=None)
+async def list_workflow_versions(workflow_id: str, user: User = Depends(get_current_user)) -> dict:
     """The workflow's version history, newest first."""
     from app.services import workflow_versions
 
@@ -1332,10 +1343,10 @@ async def list_workflow_versions(workflow_id: str, user: User = Depends(get_curr
     return history
 
 
-@router.post("/{workflow_id}/versions")
+@router.post("/{workflow_id}/versions", response_model=None)
 async def save_workflow_version(
     workflow_id: str, body: SaveWorkflowVersionRequest, user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Save the workflow as it stands now as a version, with an optional note."""
     from app.services import workflow_versions
 
@@ -1354,10 +1365,10 @@ async def save_workflow_version(
     return {"id": str(version.id), "number": version.number}
 
 
-@router.post("/{workflow_id}/versions/{version_id}/restore")
+@router.post("/{workflow_id}/versions/{version_id}/restore", response_model=None)
 async def restore_workflow_version(
     workflow_id: str, version_id: str, user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Make an earlier version current again. Recorded as a new version."""
     from app.models.workflow import WorkflowVersion
     from app.services import workflow_versions
@@ -1375,10 +1386,10 @@ async def restore_workflow_version(
     return {"id": str(restored.id), "number": restored.number, "restored_from": version.number, "name_note": name_note}
 
 
-@router.get("/{workflow_id}/quality-history")
+@router.get("/{workflow_id}/quality-history", response_model=None)
 async def get_workflow_quality_history(
     workflow_id: str, limit: int = 50, user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     wf = await get_authorized_workflow(workflow_id, user)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
@@ -1386,10 +1397,10 @@ async def get_workflow_quality_history(
     return {"runs": await get_quality_history("workflow", workflow_id, limit)}
 
 
-@router.get("/{workflow_id}/quality")
+@router.get("/{workflow_id}/quality", response_model=None)
 async def get_workflow_quality(
     workflow_id: str, user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Phase 3 unified quality endpoint — mirrors ``/api/knowledge/{uuid}/quality``.
 
     Returns ``{history, contract}`` so the shared QualityTimeline component
@@ -1404,10 +1415,10 @@ async def get_workflow_quality(
     return {"history": history, "contract": contract}
 
 
-@router.get("/{workflow_id}/quality-sparkline")
+@router.get("/{workflow_id}/quality-sparkline", response_model=None)
 async def get_workflow_quality_sparkline(
     workflow_id: str, limit: int = 10, user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Return compact score history for sparkline visualization."""
     wf = await get_authorized_workflow(workflow_id, user)
     if not wf:
@@ -1418,12 +1429,12 @@ async def get_workflow_quality_sparkline(
     return {"scores": scores}
 
 
-@router.post("/{workflow_id}/improvement-suggestions")
+@router.post("/{workflow_id}/improvement-suggestions", response_model=None)
 @limiter.limit("5/minute")
 async def get_workflow_suggestions(
     request: Request,
     workflow_id: str, user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Use LLM to suggest improvements based on the latest validation run."""
     wf = await get_authorized_workflow(workflow_id, user)
     if not wf:
@@ -1448,13 +1459,13 @@ class ImprovePromptRequest(BaseModel):
     sample_input: str | None = None
 
 
-@router.post("/improve-prompt")
+@router.post("/improve-prompt", response_model=None)
 @limiter.limit("10/minute")
 async def improve_prompt_endpoint(
     request: Request,
     body: ImprovePromptRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """LLM-suggested rewrite of a Prompt task's prompt, with rationale."""
     if not body.prompt.strip():
         raise HTTPException(status_code=400, detail="Prompt is required")
@@ -1476,10 +1487,10 @@ async def improve_prompt_endpoint(
         raise HTTPException(status_code=502, detail=f"Failed to generate suggestion: {exc}")
 
 
-@router.get("/{workflow_id}/quality-status")
+@router.get("/{workflow_id}/quality-status", response_model=None)
 async def get_workflow_quality_status(
     workflow_id: str, user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Return quality status for Quality Pulse card (mirrors extraction quality-status)."""
     import hashlib
     import datetime as _dt
@@ -1515,8 +1526,8 @@ async def get_workflow_quality_status(
         }
 
     measured_meta = meta is not None and meta.quality_score is not None
-    score = meta.quality_score if measured_meta else latest.get("score") if latest else None
-    if measured_meta:
+    score = meta.quality_score if meta is not None and measured_meta else latest.get("score") if latest else None
+    if meta is not None and measured_meta:
         tier = meta.quality_tier
     else:
         # A saved run can precede catalog metadata. Interpret it with the same
@@ -1532,7 +1543,8 @@ async def get_workflow_quality_status(
     config_changed = False
     if latest:
         last_config = latest.get("extraction_config", {})
-        current_steps = [{"name": s.get("name", ""), "tasks": s.get("tasks", [])} for s in (wf.get("steps_expanded", []) if isinstance(wf, dict) else [])]
+        current_steps = [{"name": s.get("name", ""), "tasks": s.get("tasks", [])} for s in (dict(wf).get("steps_expanded", []) if isinstance(wf, dict) else [])]
+        current_config: object
         if not current_steps:
             # Fallback: hash validation_plan + step IDs
             current_config = {"validation_plan": wf.validation_plan if hasattr(wf, "validation_plan") else [], "steps": [str(s) for s in (wf.steps if hasattr(wf, "steps") else [])]}
@@ -1578,7 +1590,7 @@ async def get_workflow_quality_status(
 
 
 @router.get("/{workflow_id}/validation-plan", response_model=ValidationPlanResponse)
-async def get_validation_plan(workflow_id: str, user: User = Depends(get_current_user)):
+async def get_validation_plan(workflow_id: str, user: User = Depends(get_current_user)) -> ValidationPlanResponse:
     try:
         plan_info = await svc.get_validation_plan(workflow_id, user=user)
         return ValidationPlanResponse(**plan_info)
@@ -1589,32 +1601,32 @@ async def get_validation_plan(workflow_id: str, user: User = Depends(get_current
 @router.put("/{workflow_id}/validation-plan", response_model=ValidationPlanResponse)
 async def update_validation_plan(
     workflow_id: str, req: UpdateValidationPlanRequest, user: User = Depends(get_current_user),
-):
+) -> ValidationPlanResponse:
     try:
         checks = await svc.update_validation_plan(workflow_id, [c.model_dump() for c in req.checks], user=user)
-        return ValidationPlanResponse(checks=checks)
+        return ValidationPlanResponse.model_validate({"checks": checks})
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.post("/{workflow_id}/validation-plan/generate", response_model=ValidationPlanResponse)
 @limiter.limit("5/minute")
-async def generate_validation_plan(request: Request, workflow_id: str, user: User = Depends(get_current_user)):
+async def generate_validation_plan(request: Request, workflow_id: str, user: User = Depends(get_current_user)) -> ValidationPlanResponse:
     try:
         checks = await svc.generate_validation_plan(workflow_id, user=user)
-        return ValidationPlanResponse(checks=checks)
+        return ValidationPlanResponse.model_validate({"checks": checks})
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/{workflow_id}/validation-report")
+@router.get("/{workflow_id}/validation-report", response_model=None)
 async def download_validation_report(
     workflow_id: str,
     format: str = Query("md"),
     user: User = Depends(get_current_user),
-):
+) -> Response:
     """Download the latest validation run as a report file (Markdown or JSON)."""
     fmt = (format or "md").lower()
     if fmt not in ("md", "json"):
@@ -1633,15 +1645,15 @@ async def download_validation_report(
 
 
 @router.get("/{workflow_id}/validation-inputs", response_model=ValidationInputsResponse)
-async def get_validation_inputs(workflow_id: str, user: User = Depends(get_current_user)):
+async def get_validation_inputs(workflow_id: str, user: User = Depends(get_current_user)) -> ValidationInputsResponse:
     try:
         inputs = await svc.get_validation_inputs(workflow_id, user=user)
-        doc_uuids = [inp.get("document_uuid") for inp in inputs if inp.get("document_uuid")]
+        doc_uuids = [doc_uuid for inp in inputs if isinstance(doc_uuid := inp.get("document_uuid"), str) and doc_uuid]
         exists_map = await _check_validation_input_documents_exist(doc_uuids)
         for inp in inputs:
             if inp.get("document_uuid"):
                 inp["document_exists"] = exists_map.get(inp["document_uuid"], False)
-        return ValidationInputsResponse(inputs=inputs)
+        return ValidationInputsResponse.model_validate({"inputs": inputs})
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -1649,18 +1661,18 @@ async def get_validation_inputs(workflow_id: str, user: User = Depends(get_curre
 @router.put("/{workflow_id}/validation-inputs", response_model=ValidationInputsResponse)
 async def update_validation_inputs(
     workflow_id: str, req: UpdateValidationInputsRequest, user: User = Depends(get_current_user),
-):
+) -> ValidationInputsResponse:
     try:
         inputs = await svc.update_validation_inputs(workflow_id, [i.model_dump() for i in req.inputs], user=user)
-        return ValidationInputsResponse(inputs=inputs)
+        return ValidationInputsResponse.model_validate({"inputs": inputs})
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.post("/{workflow_id}/create-temp-documents")
+@router.post("/{workflow_id}/create-temp-documents", response_model=None)
 async def create_temp_documents(
     workflow_id: str, req: CreateTempDocumentsRequest, user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     wf = await get_authorized_workflow(workflow_id, user)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
@@ -1669,7 +1681,7 @@ async def create_temp_documents(
 
 
 @router.post("/{workflow_id}/validate", response_model=ValidateWorkflowResponse)
-async def validate_workflow(workflow_id: str, user: User = Depends(get_current_user)):
+async def validate_workflow(workflow_id: str, user: User = Depends(get_current_user)) -> ValidateWorkflowResponse:
     try:
         result = await svc.validate_workflow(workflow_id, user=user)
         return ValidateWorkflowResponse(**result)
@@ -1677,8 +1689,8 @@ async def validate_workflow(workflow_id: str, user: User = Depends(get_current_u
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/{workflow_id}/save-expected-output")
-async def save_expected_output(workflow_id: str, request: Request, user: User = Depends(get_current_user)):
+@router.post("/{workflow_id}/save-expected-output", response_model=None)
+async def save_expected_output(workflow_id: str, request: Request, user: User = Depends(get_current_user)) -> dict[str, object]:
     """Mark a completed workflow execution as expected output for validation."""
     body = await request.json()
     session_id = body.get("session_id")
@@ -1692,8 +1704,8 @@ async def save_expected_output(workflow_id: str, request: Request, user: User = 
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/{workflow_id}/expected-outputs")
-async def get_expected_outputs(workflow_id: str, user: User = Depends(get_current_user)):
+@router.get("/{workflow_id}/expected-outputs", response_model=None)
+async def get_expected_outputs(workflow_id: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     """List stored expected outputs for a workflow."""
     try:
         outputs = await svc.get_expected_outputs(workflow_id, user)
@@ -1702,10 +1714,10 @@ async def get_expected_outputs(workflow_id: str, user: User = Depends(get_curren
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.delete("/{workflow_id}/expected-outputs/{expected_id}")
+@router.delete("/{workflow_id}/expected-outputs/{expected_id}", response_model=None)
 async def delete_expected_output(
     workflow_id: str, expected_id: str, user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Remove a stored expected output."""
     ok = await svc.delete_expected_output(workflow_id, expected_id, user)
     if not ok:
@@ -1729,14 +1741,14 @@ class TestCaseAcceptRequest(BaseModel):
     label_overrides: dict[str, str] | None = None
 
 
-@router.post("/{workflow_id}/test-cases/propose")
+@router.post("/{workflow_id}/test-cases/propose", response_model=None)
 @limiter.limit("10/minute")
 async def propose_test_cases(
     request: Request,
     workflow_id: str,
     body: TestCaseProposeRequest | None = None,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Scan recent runs and return scored candidate test cases for review."""
     from app.services import workflow_test_case_generator as tcg
 
@@ -1747,13 +1759,13 @@ async def propose_test_cases(
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.post("/{workflow_id}/test-cases/synthesize")
+@router.post("/{workflow_id}/test-cases/synthesize", response_model=None)
 @limiter.limit("5/minute")
 async def synthesize_test_case(
     request: Request,
     workflow_id: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Synthesize a candidate input document for a workflow with no history."""
     from app.services import workflow_test_case_generator as tcg
 
@@ -1763,12 +1775,12 @@ async def synthesize_test_case(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/{workflow_id}/test-cases/accept")
+@router.post("/{workflow_id}/test-cases/accept", response_model=None)
 async def accept_test_cases(
     workflow_id: str,
     body: TestCaseAcceptRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Persist accepted proposals as expected_output entries."""
     from app.services import workflow_test_case_generator as tcg
 
@@ -1790,14 +1802,14 @@ async def accept_test_cases(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/run-integrated")
+@router.post("/run-integrated", response_model=None)
 @limiter.limit("10/minute")
 async def run_workflow_integrated(
     request: Request,
     workflow_id: str = Form(...),
     files: list[UploadFile] = File(default=[]),
     user: User = Depends(get_api_key_user),
-):
+) -> dict[str, object]:
     """Run a workflow via external API with file uploads."""
     import uuid as _uuid
     from pathlib import Path
@@ -1854,6 +1866,8 @@ async def run_workflow_integrated(
         user_id=user.user_id,
         workflow=PydanticObjectId(workflow_id),
     )
+    if activity.id is None:
+        raise RuntimeError("Workflow activity was not persisted")
 
     try:
         # The activity id ties the run's token and model usage to its
@@ -1886,7 +1900,7 @@ async def run_workflow_integrated(
 # ---------------------------------------------------------------------------
 
 
-def _iso_utc(dt):
+def _iso_utc(dt: datetime.datetime | None) -> str | None:
     """ISO-8601 string with an explicit UTC offset.
 
     Datetimes read back from Mongo are naive (the Motor client isn't tz_aware),
@@ -1903,7 +1917,7 @@ def _iso_utc(dt):
     return dt.astimezone(_dt.timezone.utc).isoformat()
 
 
-def _elapsed_seconds(started_at, completed_at):
+def _elapsed_seconds(started_at: datetime.datetime | None, completed_at: datetime.datetime | None) -> int | None:
     """Server-authoritative elapsed seconds for the live run timer.
 
     Computed on the server so the readout can't be corrupted by client/server
@@ -1924,7 +1938,7 @@ def _elapsed_seconds(started_at, completed_at):
     return max(0, int((end - start).total_seconds()))
 
 
-def _serialize_workflow_optimization_run(run) -> dict:
+def _serialize_workflow_optimization_run(run: WorkflowOptimizationRun) -> dict:
     return {
         "uuid": run.uuid,
         "workflow_id": run.workflow_id,
@@ -1962,7 +1976,7 @@ def _serialize_workflow_optimization_run(run) -> dict:
     }
 
 
-def _summarise_workflow_optimization_run(run) -> dict:
+def _summarise_workflow_optimization_run(run: WorkflowOptimizationRun) -> dict:
     return {
         "uuid": run.uuid,
         "workflow_id": run.workflow_id,
@@ -1982,11 +1996,11 @@ def _summarise_workflow_optimization_run(run) -> dict:
     }
 
 
-@router.post("/{workflow_id}/optimize")
+@router.post("/{workflow_id}/optimize", response_model=None)
 @limiter.limit("5/minute")
 async def start_workflow_optimization(
     workflow_id: str, request: Request, user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Kick off a Workflow Autovalidate optimization run.
 
     Body (all optional):
@@ -2103,10 +2117,10 @@ async def start_workflow_optimization(
     return {"run_uuid": run.uuid, "status": "queued"}
 
 
-@router.get("/{workflow_id}/optimize/active")
+@router.get("/{workflow_id}/optimize/active", response_model=None)
 async def get_active_workflow_optimization(
     workflow_id: str, user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     wf = await get_authorized_workflow(workflow_id, user)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
@@ -2125,13 +2139,13 @@ async def get_active_workflow_optimization(
     return {"run": _serialize_workflow_optimization_run(run) if run else None}
 
 
-@router.get("/{workflow_id}/optimize")
+@router.get("/{workflow_id}/optimize", response_model=None)
 async def list_workflow_optimization_history(
     workflow_id: str,
     limit: int = Query(20, ge=1, le=100),
     skip: int = Query(0, ge=0),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """List past optimization runs for this workflow, newest first."""
     wf = await get_authorized_workflow(workflow_id, user)
     if not wf:
@@ -2152,10 +2166,10 @@ async def list_workflow_optimization_history(
     }
 
 
-@router.get("/{workflow_id}/optimize/{run_uuid}")
+@router.get("/{workflow_id}/optimize/{run_uuid}", response_model=None)
 async def get_workflow_optimization(
     workflow_id: str, run_uuid: str, user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Full state of one optimization run (UI polls this while status=running)."""
     wf = await get_authorized_workflow(workflow_id, user)
     if not wf:
@@ -2173,10 +2187,10 @@ async def get_workflow_optimization(
     return _serialize_workflow_optimization_run(run)
 
 
-@router.post("/{workflow_id}/optimize/{run_uuid}/cancel")
+@router.post("/{workflow_id}/optimize/{run_uuid}/cancel", response_model=None)
 async def cancel_workflow_optimization(
     workflow_id: str, run_uuid: str, user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Request cancellation. The worker checks this flag between trials."""
     wf = await get_authorized_workflow(workflow_id, user, validate=True)
     if not wf:
@@ -2213,13 +2227,13 @@ class ApplyWorkflowOptimizationRequest(BaseModel):
     force: bool = False
 
 
-@router.post("/{workflow_id}/optimize/{run_uuid}/apply")
+@router.post("/{workflow_id}/optimize/{run_uuid}/apply", response_model=None)
 async def apply_workflow_optimization(
     workflow_id: str,
     run_uuid: str,
     req: ApplyWorkflowOptimizationRequest | None = None,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Apply a completed run's best config to ``Workflow.config_override``.
 
     Optional body: ``{"step_ids": ["step-uuid-1", "step-uuid-2"]}`` to
@@ -2257,10 +2271,10 @@ async def apply_workflow_optimization(
         raise HTTPException(status_code=400, detail=e.message)
 
 
-@router.post("/{workflow_id}/optimize/{run_uuid}/revert")
+@router.post("/{workflow_id}/optimize/{run_uuid}/revert", response_model=None)
 async def revert_workflow_optimization(
     workflow_id: str, run_uuid: str, user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Restore the config_override that was in effect before this run applied."""
     import datetime as _dt
     from app.models.workflow import Workflow

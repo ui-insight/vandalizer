@@ -58,11 +58,11 @@ network-policy enforcement and deployment identity still need deployed QA.
 ## Typing
 
 The original mypy baseline was 3,141 errors. The dependency pass reduced it to
-3,098; the current follow-up reduces it to 2,448 across 524 source files. The
+3,098; the current follow-up reduces it to 2,302 across 524 source files. The
 models, schemas, database helpers, URL helpers and observability setup pass their
 focused type check. Workflow execution, automatic review, review persistence and
-review recovery, the knowledge-base API and the admin API now have no mypy
-diagnostics either. The full check remains
+review recovery, and the knowledge-base, admin, workflow and Home/config APIs
+now have no mypy diagnostics either. The full check remains
 advisory; the backlog is not clear.
 
 The follow-up adds validator, database, record-reader and execution contracts,
@@ -86,6 +86,9 @@ Knowledge-base access gates preserve optional organization ancestry; source
 version selection preserves full-record versus summary types. Admin analytics
 use explicit counter and identity-set types. Chat source-health summaries now
 handle validation records without a timestamp instead of failing the listing.
+Home reads remain concurrent in typed gather groups. Workflow dispatch verifies
+that its activity was persisted before starting work; validation plans and inputs
+continue to use their existing Pydantic validation at the API boundary.
 
 ## Verification
 
@@ -107,6 +110,7 @@ handle validation records without a timestamp instead of failing the listing.
   integrity and grading correction checks: 70 passed against disposable MongoDB.
 - Admin and knowledge-base contract regressions (including optimizer, chat,
   source-history and validation-task checks): 403 passed.
+- Workflow, Home, config and project-context contract regressions: 1,038 passed.
 - Chroma's disposable container check passes locally and is included in CI.
   Its Compose renderer uses an empty temporary environment fixture so it
   never depends on or reads an operator's real `backend/.env`.

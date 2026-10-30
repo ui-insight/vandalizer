@@ -23,6 +23,8 @@ expect. Step removal and retry-policy trials are deferred to a later phase.
 
 from __future__ import annotations
 
+from typing import overload
+
 import asyncio
 import datetime
 import hashlib
@@ -151,6 +153,14 @@ def _revoke_task(run_doc: WorkflowOptimizationRun) -> None:
             "Could not revoke Celery task %s for workflow optimization run %s",
             task_id, run_doc.uuid, exc_info=True,
         )
+
+
+@overload
+async def reap_one(run_doc: WorkflowOptimizationRun) -> WorkflowOptimizationRun: ...
+
+
+@overload
+async def reap_one(run_doc: None) -> None: ...
 
 
 async def reap_one(run_doc: WorkflowOptimizationRun | None) -> WorkflowOptimizationRun | None:
@@ -920,8 +930,8 @@ def _build_candidates(
 
     # 3. Uniform-model trials — every LLM step uses model X
     for m in swap_models[:3]:
-        overrides = {s["name"]: {"model": m, "prompt_variant": "default"} for s in llm_steps}
-        _add(f"uniform-{_model_short(m)}", overrides)
+        uniform_overrides = {s["name"]: {"model": m, "prompt_variant": "default"} for s in llm_steps}
+        _add(f"uniform-{_model_short(m)}", uniform_overrides)
 
     # 4. Random samples (per-step independent draws) to fill quota.
     #
