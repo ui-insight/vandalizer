@@ -423,7 +423,7 @@ class TestAdminListEndpointLimits:
         activity_find = MagicMock()
         activity_find.to_list = AsyncMock(return_value=events)
         users_find = MagicMock()
-        users_find.limit.return_value.to_list = AsyncMock(return_value=users)
+        users_find.to_list = AsyncMock(return_value=users)
 
         with (
             patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
@@ -460,7 +460,7 @@ class TestAdminListEndpointLimits:
         activity_find = MagicMock()
         activity_find.to_list = AsyncMock(return_value=events)
         users_find = MagicMock()
-        users_find.limit.return_value.to_list = AsyncMock(return_value=users)
+        users_find.to_list = AsyncMock(return_value=users)
 
         with (
             patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
@@ -978,6 +978,51 @@ class TestOcrProviderConfig:
         assert cfg.ocr_timeout_seconds == 120
 
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("quality", [
+        {"quality_tiers": {"excellent": {"min_score": 150}}},
+        {"quality_tiers": {"excellent": {"min_score": -1}}},
+        {"quality_tiers": {"excellent": {"min_score": None}}},
+        {"quality_tiers": {"excellent": {"min_score": "90"}}},
+        {"quality_tiers": {"excellent": {"min_score": True}}},
+        {"quality_tiers": {"good": {"min_score": 95}}},
+        {"quality_tiers": {"good": {"min_score": 90}}},
+        {"quality_tiers": {"fair": {"min_score": 75}}},
+        {"quality_tiers": []},
+        {"verification_gates": {"min_extraction_accuracy": 1.01}},
+        {"verification_gates": {"min_extraction_consistency": -0.1}},
+        {"verification_gates": {"min_workflow_grade": "Z"}},
+    ])
+    async def test_invalid_quality_never_mutates_config(self, client, quality):
+        cfg = self._config_stub()
+        resp = await self._put(client, {"quality_config": quality, "ocr_endpoint": "https://new.example.test"}, cfg)
+        assert resp.status_code == 422
+        assert cfg.quality_config == {}
+        assert cfg.ocr_endpoint == ""
+        cfg.save.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_valid_quality_preserves_extension_settings(self, client):
+        cfg = self._config_stub()
+        quality = {
+            "verification_gates": {"min_extraction_accuracy": 0, "min_extraction_consistency": 1},
+            "quality_tiers": {"excellent": {"min_score": 100}, "good": {"min_score": 50.5}, "fair": {"min_score": 0}},
+            "monitoring": {"stale_threshold_days": 42},
+        }
+        resp = await self._put(client, {"quality_config": quality}, cfg)
+        assert resp.status_code == 200
+        assert cfg.quality_config == quality
+        cfg.save.assert_called_once()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("value", [0, 101, 1.5, True, None])
+    async def test_invalid_extraction_chunk_size_rejected(self, client, value):
+        cfg = self._config_stub()
+        resp = await self._put(client, {"extraction_config": {"chunking": {"max_keys_per_chunk": value}}}, cfg)
+        assert resp.status_code == 422
+        cfg.save.assert_not_called()
+
+
 class TestUpdateAuthMethods:
     """PUT /api/admin/config/auth/methods must never persist an empty list —
     that disables every login path with no recovery except direct DB access.
@@ -1111,6 +1156,9 @@ def _get_config_cfg(available_models: list[dict], oauth_providers: list[dict] | 
         auth_methods=["password"],
         ocr_endpoint="",
         ocr_api_key="",
+        web_search_endpoint="",
+        web_search_api_key="",
+        web_search_provider="",
         ocr_provider="raw",
         ocr_options={},
         ocr_async=False,
@@ -1769,3 +1817,73 @@ class TestModelIdentityUniqueness:
             {"name": "gpt-oss", "tag": "fast"},
         )
         assert resp.status_code == 404
+
+
+class TestWebSearchAdmin:
+    """Web search settings: only providers the service can call are saved, and
+    the Test button tests the form's values and fails when nothing comes back."""
+
+    def _config_stub(self, **overrides):
+        base = dict(
+            extraction_config={}, quality_config={}, compliance_config={},
+            retention_config={}, ocr_endpoint="", ocr_api_key="", ocr_provider="raw",
+            ocr_options={}, ocr_async=False, ocr_timeout_seconds=120,
+            llm_endpoint="", default_team_id=None, support_contacts=[],
+            web_search_provider="", web_search_endpoint="", web_search_api_key="enc-saved",
+            updated_at=None, updated_by=None, save=AsyncMock(),
+        )
+        base.update(overrides)
+        cfg = SimpleNamespace(**base)
+        cfg.model_dump = lambda: {k: v for k, v in vars(cfg).items() if k not in ("save", "model_dump")}
+        return cfg
+
+    async def _call(self, client, method, path, body, cfg, search=None):
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.SystemConfig") as MockCfg,
+            patch("app.routers.admin._audit", new_callable=AsyncMock),
+            patch("app.routers.admin.clear_agent_caches"),
+            patch("app.services.web_search_service.web_search", search or AsyncMock()),
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockCfg.get_config = AsyncMock(return_value=cfg)
+            return await getattr(client, method)(path, json=body, cookies=cookies, headers=headers)
+
+    @pytest.mark.asyncio
+    async def test_a_provider_the_service_cannot_call_is_rejected(self, client):
+        cfg = self._config_stub(web_search_provider="tavily")
+        resp = await self._call(client, "put", "/api/admin/config", {"web_search_provider": "serper"}, cfg)
+        assert resp.status_code == 400
+        assert "serper" in resp.json()["detail"]
+        assert cfg.web_search_provider == "tavily"
+
+    @pytest.mark.asyncio
+    async def test_a_known_provider_is_saved_normalized(self, client):
+        cfg = self._config_stub()
+        resp = await self._call(client, "put", "/api/admin/config", {"web_search_provider": " SearXNG "}, cfg)
+        assert resp.status_code == 200
+        assert cfg.web_search_provider == "searxng"
+
+    @pytest.mark.asyncio
+    async def test_the_test_button_uses_the_forms_values(self, client):
+        search = AsyncMock(return_value={"results": [{"url": "https://ex.org"}]})
+        resp = await self._call(client, "post", "/api/admin/config/test-web-search", {
+            "web_search_provider": "searxng", "web_search_endpoint": "https://searx.campus.edu",
+            "web_search_api_key": "***",
+        }, self._config_stub(web_search_provider="tavily"), search)
+        assert resp.status_code == 200 and resp.json()["result_count"] == 1
+        tested = search.call_args.kwargs["sys_config_doc"]
+        assert tested["web_search_provider"] == "searxng"
+        assert tested["web_search_endpoint"] == "https://searx.campus.edu"
+        assert tested["web_search_api_key"] == "enc-saved"  # "***" keeps the saved key
+
+    @pytest.mark.asyncio
+    async def test_no_results_fails_the_test(self, client):
+        search = AsyncMock(return_value={"results": []})
+        resp = await self._call(client, "post", "/api/admin/config/test-web-search",
+                                {"web_search_provider": "tavily"}, self._config_stub(), search)
+        assert resp.status_code == 502
+        assert "no results" in resp.json()["detail"]

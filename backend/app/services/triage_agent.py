@@ -14,7 +14,7 @@ from app.services.llm_service import get_agent_model
 
 logger = logging.getLogger(__name__)
 
-_triage_agent_cache: dict[str, Agent] = {}
+_triage_agent_cache: dict[str, Agent[None, TriageResult]] = {}
 
 
 class TriageResult(BaseModel):
@@ -84,7 +84,7 @@ SUGGESTED ACTION:
 Be conservative: when uncertain, flag for review rather than processing automatically."""
 
 
-def create_triage_agent(model_name: str) -> Agent:
+def create_triage_agent(model_name: str) -> Agent[None, TriageResult]:
     """Create or retrieve a cached triage agent."""
     cache_key = f"triage_{model_name}"
     if cache_key not in _triage_agent_cache:
@@ -127,7 +127,7 @@ def triage_work_item_sync(
     agent = create_triage_agent(model_name)
 
     # Build context from work item fields
-    attachment_names = []
+    attachment_names: list[str] = []
     attachment_text_preview = ""
     # Note: attachments are ObjectIds in the next schema; text preview
     # would require loading SmartDocuments. For now, use what's available.

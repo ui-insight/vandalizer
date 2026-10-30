@@ -114,12 +114,16 @@ async def get_org_tree(root_uuid: Optional[str] = None) -> list[dict]:
         User.organization_id != None  # noqa: E711
     ).to_list()
     for u in users_with_org:
+        if u.organization_id is None:
+            continue
         user_counts[u.organization_id] = user_counts.get(u.organization_id, 0) + 1
 
     teams_with_org = await Team.find(
         Team.organization_id != None  # noqa: E711
     ).to_list()
     for t in teams_with_org:
+        if t.organization_id is None:
+            continue
         team_counts[t.organization_id] = team_counts.get(t.organization_id, 0) + 1
 
     def _build(org: Organization) -> dict:

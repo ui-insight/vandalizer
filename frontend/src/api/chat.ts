@@ -1,5 +1,33 @@
 import { apiFetch, rawFetch } from './client'
-import type { ChatMessage, UrlAttachment, FileAttachment, StreamChunk } from '../types/chat'
+import type { ChatMessage, UrlAttachment, FileAttachment, PlanTask, StreamChunk, SkillSnapshot } from '../types/chat'
+
+function browserTimeZone(): string | undefined {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined }
+  catch { return undefined }
+}
+
+export interface ExportMessage {
+  role: 'user' | 'assistant'
+  content: string
+  tools: string[]
+  evidence: string
+}
+
+export async function exportChat(format: 'html' | 'docx' | 'xlsx', messages: ExportMessage[]): Promise<Blob> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 60_000)
+  try {
+    const res = await rawFetch('/api/chat/export', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ format, messages }), signal: controller.signal,
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => null)
+      throw new Error(typeof body?.detail === 'string' ? body.detail : 'Could not export this chat. Try fewer messages or another format.')
+    }
+    return await res.blob()
+  } finally { clearTimeout(timer) }
+}
 
 export async function streamChat(
   message: string,
@@ -11,13 +39,26 @@ export async function streamChat(
   includeOnboardingContext?: boolean,
   folderUuids?: string[],
   isFirstSession?: boolean,
+  runDemo?: boolean,
+  signal?: AbortSignal,
   projectUuid?: string,
+  onStarted?: (identity: { conversationUuid: string; activityId: string }) => void,
+  skillUuid?: string | null,
+  skillVersion?: string,
+  retry = false,
+  pageApproval?: string,
 ): Promise<{ conversationUuid: string; activityId: string }> {
   const res = await rawFetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    signal,
     body: JSON.stringify({
       message,
+      client_timezone: browserTimeZone(),
+      ...(retry ? { retry: true } : {}),
+      ...(pageApproval ? { page_approval: pageApproval } : {}),
+      ...(skillUuid !== undefined ? { skill_uuid: skillUuid } : {}),
+      ...(skillVersion ? { skill_version: skillVersion } : {}),
       document_uuids: documentUuids,
       activity_id: activityId || null,
       // Several knowledge bases can be attached to one turn; retrieval fans
@@ -27,6 +68,7 @@ export async function streamChat(
       ...(includeOnboardingContext ? { include_onboarding_context: true } : {}),
       ...(folderUuids?.length ? { folder_uuids: folderUuids } : {}),
       ...(isFirstSession ? { is_first_session: true } : {}),
+      ...(runDemo ? { run_demo: true } : {}),
       ...(projectUuid ? { project_uuid: projectUuid } : {}),
     }),
   })
@@ -38,6 +80,8 @@ export async function streamChat(
 
   const conversationUuid = res.headers.get('X-Conversation-UUID') || ''
   const returnedActivityId = res.headers.get('X-Activity-ID') || ''
+  // Queueing and Stop need the accepted conversation identity before the body ends.
+  if (conversationUuid && returnedActivityId) onStarted?.({ conversationUuid, activityId: returnedActivityId })
 
   const reader = res.body?.getReader()
   if (!reader) throw new Error('No response stream')
@@ -45,23 +89,47 @@ export async function streamChat(
   const decoder = new TextDecoder()
   let buffer = ''
 
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
+  // Watchdog: if the server goes silent for this long mid-stream, stop waiting
+  // and surface a recoverable error instead of an indefinite "Thinking…" spinner.
+  const IDLE_TIMEOUT_MS = 90_000
 
-    buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split('\n')
-    buffer = lines.pop() || ''
-
-    for (const line of lines) {
-      if (!line.trim()) continue
+  try {
+    while (true) {
+      let timer: ReturnType<typeof setTimeout> | undefined
+      const idle = new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error('The response stalled. Check your connection and try again.')),
+          IDLE_TIMEOUT_MS,
+        )
+      })
+      let result: ReadableStreamReadResult<Uint8Array>
       try {
-        const chunk: StreamChunk = JSON.parse(line)
-        onChunk?.(chunk)
-      } catch {
-        // skip malformed lines
+        result = await Promise.race([reader.read(), idle])
+      } finally {
+        clearTimeout(timer)
+      }
+
+      const { done, value } = result
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+
+      for (const line of lines) {
+        if (!line.trim()) continue
+        try {
+          const chunk: StreamChunk = JSON.parse(line)
+          onChunk?.(chunk)
+        } catch {
+          // skip malformed lines
+        }
       }
     }
+  } catch (e) {
+    // Release the underlying connection before propagating (timeout or abort).
+    reader.cancel().catch(() => {})
+    throw e
   }
 
   // Process remaining buffer
@@ -155,6 +223,7 @@ export interface ChatHistoryScope {
 }
 
 export interface ChatHistory {
+  active_skill?: SkillSnapshot | null
   messages: ChatMessage[]
   url_attachments: UrlAttachment[]
   file_attachments: FileAttachment[]
@@ -164,15 +233,46 @@ export interface ChatHistory {
   // The conversation's activity, which a follow-up must send to continue it.
   activity_id?: string | null
   scope?: ChatHistoryScope
+  active_plan?: PlanTask[] | null
 }
 
 export function getHistory(conversationUuid: string) {
   return apiFetch<ChatHistory>(`/api/chat/history/${conversationUuid}`)
 }
 
+export function previewSkill(skillUuid: string) {
+  return apiFetch<SkillSnapshot>(`/api/chat/skills/${encodeURIComponent(skillUuid)}`)
+}
+
+export function selectConversationSkill(conversationUuid: string, skillUuid: string | null) {
+  return apiFetch<{ active_skill: SkillSnapshot | null }>(`/api/chat/history/${encodeURIComponent(conversationUuid)}/skill`, {
+    method: 'PUT',
+    body: JSON.stringify({ skill_uuid: skillUuid }),
+  })
+}
+
 export function deleteHistory(conversationUuid: string) {
   return apiFetch<{ success: boolean }>(`/api/chat/history/${conversationUuid}`, {
     method: 'DELETE',
+  })
+}
+
+/** Queue a message typed while a turn is streaming (uplift plan Phase 10).
+ * The backend folds it into the running turn at its next drain point, or
+ * into the next turn if the stream ends first. */
+export function queueChatMessage(conversationUuid: string, message: string) {
+  return apiFetch<{ success: boolean }>('/api/chat/queue', {
+    method: 'POST',
+    body: JSON.stringify({ conversation_uuid: conversationUuid, message }),
+  })
+}
+
+/** Record that the user pressed Stop, so the server saves the turn as stopped
+ * (activity canceled) instead of as a dropped connection. */
+export function stopChatTurn(conversationUuid: string) {
+  return apiFetch<{ success: boolean }>('/api/chat/stop', {
+    method: 'POST',
+    body: JSON.stringify({ conversation_uuid: conversationUuid }),
   })
 }
 
@@ -207,4 +307,35 @@ export function clearContext(conversationUuid: string) {
       body: JSON.stringify({ conversation_uuid: conversationUuid }),
     },
   )
+}
+
+export interface MemoryItem {
+  title: string
+  count: number
+  last_used: string
+}
+
+export interface UserMemoryResponse {
+  extractions: MemoryItem[]
+  workflows: MemoryItem[]
+  kbs: MemoryItem[]
+  /** Memory is turned off for this team: nothing recorded, nothing in the prompt. */
+  paused?: boolean
+}
+
+export function getUserMemory() {
+  return apiFetch<UserMemoryResponse>('/api/chat/memory')
+}
+
+export function setUserMemoryPaused(paused: boolean) {
+  return apiFetch<{ paused: boolean }>('/api/chat/memory/paused', {
+    method: 'PUT',
+    body: JSON.stringify({ paused }),
+  })
+}
+
+export function clearUserMemory() {
+  return apiFetch<{ success: boolean; removed: boolean }>('/api/chat/memory', {
+    method: 'DELETE',
+  })
 }

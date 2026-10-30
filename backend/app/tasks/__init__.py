@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeVar
 
 if TYPE_CHECKING:
     from collections.abc import Coroutine
 
     from pymongo.database import Database
+
+T = TypeVar("T")
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +106,7 @@ def llm_retry_countdown(retries: int) -> int:
     a gateway restart and still finishes well inside the stale-run reaper's
     30 minutes.
     """
-    return 30 * (2 ** max(retries, 0))
+    return 30 * (1 << max(retries, 0))
 
 
 def _cancel_leftover_tasks(loop: asyncio.AbstractEventLoop) -> None:
@@ -134,7 +136,7 @@ def _cancel_leftover_tasks(loop: asyncio.AbstractEventLoop) -> None:
         logger.warning("Failed to cancel leftover tasks after task: %s", e)
 
 
-def run_task_async(coro: "Coroutine[Any, Any, Any]") -> Any:
+def run_task_async(coro: "Coroutine[Any, Any, T]") -> T:
     """Run an async coroutine to completion in a fresh event loop for a Celery
     task, then release the loop's pooled LLM HTTP client before tearing the
     loop down.

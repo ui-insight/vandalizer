@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { X, FileText, ExternalLink, FolderOpen, BookOpen, Link2, Share2 } from 'lucide-react'
-import type { FileAttachment, UrlAttachment } from '../../types/chat'
+import { X, FileText, ExternalLink, FolderOpen, BookOpen, Link2, Loader2, Check, Share2, Sparkles } from 'lucide-react'
+import type { FileAttachment, UrlAttachment, SkillSnapshot } from '../../types/chat'
 import type { AttachedKB } from '../../contexts/WorkspaceContext'
 
 // Documents, folders and knowledge bases all answer the same question — what is
@@ -9,9 +9,9 @@ import type { AttachedKB } from '../../contexts/WorkspaceContext'
 // deploy-customizable, so a second semantic colour wouldn't survive theming,
 // and colour alone is invisible to a colourblind reader either way.
 
-const CHIP = 'flex items-center gap-1.5 rounded-full px-3 py-1 text-xs text-gray-700 shadow-sm border'
-const TAG = 'shrink-0 text-[10px] font-semibold uppercase tracking-wide opacity-70'
-const ICON_BTN = 'ml-1 text-gray-500 hover:text-red-500'
+const CHIP = 'flex max-w-full min-w-0 flex-wrap items-center gap-1.5 rounded-xl px-3 py-1 text-xs text-gray-700 shadow-sm border'
+const TAG = 'shrink-0 text-xs font-semibold uppercase tracking-wide'
+const ICON_BTN = 'ml-1 shrink-0 rounded p-1 text-gray-600 hover:text-red-700'
 
 // Knowledge bases (capped at three) and folders set the conversation's scope, so
 // they always render. Documents are unbounded — a heavy library selection would
@@ -19,45 +19,68 @@ const ICON_BTN = 'ml-1 text-gray-500 hover:text-red-500'
 const DOCS_SHOWN_COLLAPSED = 6
 
 interface Props {
+  activeSkill?: SkillSnapshot | null
+  skillBusy?: boolean
+  onChangeSkill?: () => void
+  onRemoveSkill?: () => void
+  onInspectSkill?: () => void
   fileAttachments?: FileAttachment[]
   urlAttachments?: UrlAttachment[]
   selectedDocUuids?: string[]
   selectedDocNames?: Record<string, string>
+  /** uuid → true while a selected doc is still extracting text (OCR/indexing). */
+  processingByUuid?: Record<string, boolean>
+  documentErrors?: Record<string, string>
   selectedFolderUuids?: string[]
   selectedFolderNames?: Record<string, string>
   knowledgeBases?: AttachedKB[]
+  knowledgeHealth?: Record<string, string>
   onRemoveFile?: (id: string) => void
   onRemoveUrl?: (id: string) => void
   onDeselectDoc?: (uuid: string) => void
   onDeselectFolder?: (uuid: string) => void
   onDetachKB?: (uuid: string) => void
   onShareKB?: (kb: AttachedKB) => void
-  /** Copy a link that opens a chat with these knowledge bases, documents and folders attached. */
+  /** Copy a link that opens a chat with these sources and Skill. */
   onShareSetup?: () => void
 }
 
 export function AttachmentList({
-  fileAttachments, urlAttachments, selectedDocUuids, selectedDocNames,
-  selectedFolderUuids, selectedFolderNames, knowledgeBases,
+  activeSkill, skillBusy, onChangeSkill, onRemoveSkill, onInspectSkill,
+  fileAttachments, urlAttachments, selectedDocUuids, selectedDocNames, processingByUuid, documentErrors,
+  selectedFolderUuids, selectedFolderNames, knowledgeBases, knowledgeHealth,
   onRemoveFile, onRemoveUrl, onDeselectDoc, onDeselectFolder, onDetachKB, onShareKB, onShareSetup,
 }: Props) {
   const [expanded, setExpanded] = useState(false)
 
   // Scope chips: bounded, always visible.
   const scopeChips = [
+    ...(activeSkill ? [
+      <div key="active-skill" className={`${CHIP} border-gray-300 bg-white`}>
+        <Sparkles className="h-3 w-3 shrink-0" />
+        <span className={TAG}>Skill</span>
+        <span className="max-w-full break-words font-semibold">{activeSkill.title}</span>
+        {onChangeSkill && <button type="button" disabled={skillBusy} onClick={onChangeSkill} className="rounded px-1 underline disabled:opacity-50">Change Skill</button>}
+        {onRemoveSkill && <button type="button" disabled={skillBusy} onClick={onRemoveSkill} className="rounded px-1 underline hover:text-red-700 disabled:opacity-50">Remove Skill</button>}
+        {onInspectSkill && <button type="button" onClick={onInspectSkill} className="rounded px-1 underline">Inspect instructions</button>}
+      </div>,
+    ] : []),
     ...(knowledgeBases ?? []).map(kb => (
       <div
         key={`kb-${kb.uuid}`}
         className={`${CHIP} font-semibold`}
         style={{
           backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 16%, white)',
-          borderColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 45%, #e5e7eb)',
-          color: 'var(--highlight-on-light, #806600)',
+          borderColor: "color-mix(in srgb, var(--highlight-color, #eab308) 45%, var(--workspace-border))",
+          color: '#424a55',
         }}
       >
         <BookOpen className="h-3 w-3 shrink-0" />
         <span className={TAG}>KB</span>
-        <span className="max-w-[120px] truncate">{kb.title}</span>
+        <span className="break-words">{kb.title}</span>
+        <span className="text-xs font-normal">
+          {knowledgeHealth?.[kb.uuid] ?? 'Source status unavailable'}
+        </span>
         {onShareKB && (
           <button
             type="button"
@@ -87,7 +110,7 @@ export function AttachmentList({
         <div key={`folder-${uuid}`} className={`${CHIP} border-gray-200 bg-white`}>
           <FolderOpen className="h-3 w-3 shrink-0 text-gray-500" />
           <span className={TAG}>Folder</span>
-          <span className="max-w-[120px] truncate">{name}</span>
+          <span className="max-w-full break-words">{name}</span>
           {onDeselectFolder && (
             <button
               type="button"
@@ -108,17 +131,23 @@ export function AttachmentList({
     // File browser selections
     ...(selectedDocUuids ?? []).map(uuid => {
       const name = selectedDocNames?.[uuid] || 'Document'
+      const processing = processingByUuid?.[uuid]
       return (
         <div
           key={`doc-${uuid}`}
           className={CHIP}
           style={{
             backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 8%, white)',
-            borderColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 30%, #e5e7eb)',
+            borderColor: "color-mix(in srgb, var(--highlight-color, #eab308) 30%, var(--workspace-border))",
           }}
         >
-          <FileText className="h-3 w-3 shrink-0" style={{ color: 'var(--highlight-color, #eab308)' }} />
-          <span className="max-w-[120px] truncate">{name}</span>
+          {processing
+            ? <Loader2 className="h-3 w-3 shrink-0 animate-spin" style={{ color: 'var(--highlight-color, #eab308)' }} />
+            : <FileText className="h-3 w-3 shrink-0" style={{ color: 'var(--highlight-color, #eab308)' }} />}
+          <span className="max-w-full break-words">{name}</span>
+          {documentErrors?.[uuid] ? <span className="text-xs text-red-700" title={documentErrors[uuid]}>Processing failed · open Files to retry</span> : processing
+            ? <span className="text-xs italic text-gray-500">processing…</span>
+            : processingByUuid && <span className="inline-flex items-center gap-1 text-xs text-green-700"><Check className="h-3 w-3 shrink-0" />Ready</span>}
           {onDeselectDoc && (
             <button
               type="button"
@@ -136,7 +165,7 @@ export function AttachmentList({
     ...(fileAttachments ?? []).map(att => (
       <div key={att.id} className={`${CHIP} border-gray-200 bg-white`}>
         <FileText className="h-3 w-3 shrink-0 text-gray-500" />
-        <span className="max-w-[120px] truncate">{att.filename}</span>
+        <span className="max-w-full break-words">{att.filename}</span>
         {onRemoveFile && (
           <button
             type="button"
@@ -159,7 +188,7 @@ export function AttachmentList({
           className="flex items-center gap-1.5 text-gray-700 hover:text-gray-900"
         >
           <ExternalLink className="h-3 w-3 shrink-0 text-gray-500" />
-          <span className="max-w-[120px] truncate">{att.title || att.url}</span>
+          <span className="max-w-full break-words">{att.title || att.url}</span>
         </a>
         {onRemoveUrl && (
           <button
@@ -180,7 +209,7 @@ export function AttachmentList({
   const hidden = expanded ? 0 : Math.max(0, docChips.length - DOCS_SHOWN_COLLAPSED)
 
   return (
-    <div className="flex flex-wrap gap-2 border-b border-gray-200 bg-gray-50 px-4 py-2">
+    <div role="region" aria-label="Conversation sources" tabIndex={0} className="chat-attachment-list flex flex-wrap gap-2 border-b border-gray-200 bg-gray-50 px-4 py-2">
       {scopeChips}
       {hidden ? docChips.slice(0, DOCS_SHOWN_COLLAPSED) : docChips}
       {hidden > 0 && (
@@ -205,7 +234,7 @@ export function AttachmentList({
         <button
           type="button"
           onClick={onShareSetup}
-          title="Copy a link that opens a new chat with these knowledge bases, documents and folders attached"
+          title="Copy a link that opens a new chat with these sources and Skill"
           className={`${CHIP} ml-auto border-gray-300 bg-white font-semibold hover:bg-gray-100`}
         >
           <Share2 className="h-3 w-3 shrink-0" />

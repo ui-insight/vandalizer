@@ -1,5 +1,8 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import type { DocumentReadiness } from '../utils/documentReadiness'
+import { validPanelSplit } from '../utils/workspaceLayout'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode, type Dispatch, type SetStateAction } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
+import type { VerificationSession } from '../api/verificationSessions'
 import { useTeams } from '../hooks/useTeams'
 import { useToast } from './ToastContext'
 import { parseIdList } from '../lib/shareLink'
@@ -8,6 +11,17 @@ import type { CrossFieldRunReport, ExtractionSourceMap, DocumentWarning } from '
 type RightTab = 'assistant' | 'library'
 export type WorkspaceMode = 'chat' | 'files' | 'automations' | 'knowledge' | 'projects'
 
+export interface VerificationCompletion {
+  sessionId: string
+  extractionSetUuid: string
+  documentTitle: string
+  testCaseUuid: string | null
+  outcome: 'finalized' | 'cancelled'
+  approvedCount: number
+  correctedCount: number
+  skippedCount: number
+}
+
 // Cross-panel "open this document" request; `highlight` optionally carries
 // terms + page to apply once the viewer opens (extraction source tracking),
 // instead of the default highlight-clearing behavior.
@@ -15,6 +29,7 @@ export interface ViewDocumentRequest {
   uuid: string
   title: string
   highlight?: { terms: string[]; page: number | null; pageApproximate?: boolean }
+  preserveChatScope?: boolean
 }
 
 export interface PendingExtractionResults {
@@ -70,6 +85,9 @@ const NavigationContext = createContext<NavigationContextValue | null>(null)
 
 export interface PendingChatMessage {
   message: string
+  draftOnly?: boolean
+  skillUuid?: string
+  skillSelectionOnly?: boolean
   documentUuids?: string[]
   folderUuids?: string[]
 }
@@ -92,7 +110,7 @@ interface ChatStateContextValue {
   pendingChatMessage: PendingChatMessage | null
   sendChatMessage: (
     message: string,
-    options?: { documentUuids?: string[]; folderUuids?: string[] },
+    options?: { documentUuids?: string[]; folderUuids?: string[]; skillUuid?: string; skillSelectionOnly?: boolean; draftOnly?: boolean },
   ) => void
   clearPendingChatMessage: () => void
   // Knowledge bases attached to the chat. Several can be attached at once;
@@ -133,6 +151,8 @@ interface ChatStateContextValue {
   // Subset of selectedDocUuids that are still being processed by the upload
   // pipeline. Populated by the file browser so the chat banner can avoid
   // claiming "ready for analysis" while OCR/indexing is still running.
+  documentReadiness: Record<string, DocumentReadiness>
+  updateDocumentReadiness: (docs: DocumentReadiness[]) => void
   selectedDocsProcessing: Array<{ uuid: string; title: string; status: string | null }>
   setSelectedDocsProcessing: (docs: Array<{ uuid: string; title: string; status: string | null }>) => void
 }
@@ -145,17 +165,22 @@ const ChatStateContext = createContext<ChatStateContextValue | null>(null)
 
 interface UIStateContextValue {
   selectedDocUuids: string[]
-  setSelectedDocUuids: (uuids: string[]) => void
+  setSelectedDocUuids: React.Dispatch<React.SetStateAction<string[]>>
   selectedDocNames: Record<string, string>
-  setSelectedDocNames: (names: Record<string, string>) => void
+  setSelectedDocNames: Dispatch<SetStateAction<Record<string, string>>>
   selectedFolderUuids: string[]
   setSelectedFolderUuids: (uuids: string[]) => void
   selectedFolderNames: Record<string, string>
-  setSelectedFolderNames: (names: Record<string, string>) => void
+  setSelectedFolderNames: Dispatch<SetStateAction<Record<string, string>>>
   railDocked: boolean
   toggleRailDocked: () => void
   panelSplit: number
   setPanelSplit: (pct: number, skipPersist?: boolean) => void
+  // Chat split view — shows the file browser beside the chat (chat mode
+  // normally collapses the left panel to zero width). Persisted so a user
+  // working through e.g. the certification program keeps their layout.
+  chatSplitOpen: boolean
+  setChatSplitOpen: (open: boolean) => void
   highlightTerms: string[]
   // Page hint for the current highlight terms (1-based, from extraction
   // source tracking) — lets the viewer jump to the right page even when the
@@ -172,8 +197,12 @@ interface UIStateContextValue {
   activitySignal: number
   bumpActivitySignal: () => void
   viewDocumentRequest: ViewDocumentRequest | null
-  viewDocument: (uuid: string, title: string, highlight?: ViewDocumentRequest['highlight']) => void
+  viewDocument: (uuid: string, title: string, highlight?: ViewDocumentRequest['highlight'], options?: { preserveChatScope?: boolean }) => void
   clearViewDocumentRequest: () => void
+  verificationSession: VerificationSession | null
+  setVerificationSession: (s: VerificationSession | null) => void
+  verificationCompletion: VerificationCompletion | null
+  setVerificationCompletion: (c: VerificationCompletion | null) => void
   // The document the file viewer currently holds (null when it is showing the
   // browser instead). Panels that link into the viewer read this to tell
   // "open it" from "it is already open" — see the chat citation menu.
@@ -191,7 +220,7 @@ function getStoredBool(key: string, fallback: boolean): boolean {
   try {
     const v = localStorage.getItem(key)
     if (v === null) return fallback
-    return v === 'true'
+    return v === 'true' ? true : v === 'false' ? false : fallback
   } catch {
     return fallback
   }
@@ -211,8 +240,8 @@ function getStoredNumber(key: string, fallback: number): number {
   try {
     const v = localStorage.getItem(key)
     if (v === null) return fallback
-    const n = parseFloat(v)
-    return isNaN(n) ? fallback : n
+    const n = v.trim() ? Number(v) : NaN
+    return Number.isFinite(n) ? n : fallback
   } catch {
     return fallback
   }
@@ -322,12 +351,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate({ from: '/' })
   const { toast } = useToast()
   const search = useSearch({ from: '/' })
-  const { currentTeam } = useTeams()
+  const { currentTeam, loading: teamsLoading } = useTeams()
 
   // ── URL-derived state ───────────────────────────────────────────────────
-  const workspaceMode: WorkspaceMode =
-    search.mode ??
-    getStoredString('workspace:mode', 'chat', ['chat', 'files', 'automations', 'knowledge', 'projects'])
+  // An old history entry without a mode keeps its original fallback; a later
+  // section choice must not rewrite what browser Back means.
+  const [initialWorkspaceMode] = useState<WorkspaceMode>(() => getStoredString('workspace:mode', 'chat', ['chat', 'files', 'automations', 'knowledge', 'projects']))
+  const workspaceMode: WorkspaceMode = search.mode ?? initialWorkspaceMode
 
   const openWorkflowId: string | null = search.workflow ?? null
   const openWorkflowShareToken: string | null = search.workflow_share_token ?? null
@@ -340,8 +370,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [selectedDocNames, setSelectedDocNames] = useState<Record<string, string>>({})
   const [selectedFolderUuids, setSelectedFolderUuids] = useState<string[]>([])
   const [selectedFolderNames, setSelectedFolderNames] = useState<Record<string, string>>({})
-  const [railDocked, setRailDocked] = useState(() => getStoredBool('workspace:railDocked', false))
-  const [panelSplit, _setPanelSplit] = useState(() => getStoredNumber('workspace:panelSplit', 60))
+  const [railDocked, setRailDocked] = useState(() => getStoredBool('workspace:railDocked', true))
+  const [panelSplit, _setPanelSplit] = useState(() => validPanelSplit(getStoredNumber('workspace:panelSplit', 60)))
+  const [chatSplitOpen, _setChatSplitOpen] = useState(() => getStoredBool('workspace:chatSplit', false))
   const [loadConversationId, setLoadConversationId] = useState<string | null>(null)
   const [currentConversationUuid, setCurrentConversationUuid] = useState<string | null>(null)
   const [newChatSignal, setNewChatSignal] = useState(0)
@@ -362,6 +393,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [])
   const [activitySignal, setActivitySignal] = useState(0)
   const [processingDoc, setProcessingDoc] = useState<{ title: string; status: string | null } | null>(null)
+  const [documentReadiness, setDocumentReadiness] = useState<Record<string, DocumentReadiness>>({})
+  const updateDocumentReadiness = useCallback((docs: DocumentReadiness[]) => {
+    setDocumentReadiness(previous => {
+      const changed = docs.filter(doc => previous[doc.uuid]?.title !== doc.title || previous[doc.uuid]?.message !== doc.message)
+      if (!changed.length) return previous
+      return { ...previous, ...Object.fromEntries(changed.map(doc => [doc.uuid, doc])) }
+    })
+  }, [])
   const [selectedDocsProcessing, _setSelectedDocsProcessing] = useState<Array<{ uuid: string; title: string; status: string | null }>>([])
   // Wrap the setter so consumers passing a fresh array each render don't
   // trigger needless re-renders of every chat consumer when the contents
@@ -382,23 +421,29 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const kbsHydratedRef = useRef(false)
   const activeKBUuid = activeKBs[0]?.uuid ?? null
   const activeKBTitle = activeKBs[0]?.title ?? null
+  // Invalidates asynchronous scope reads after another navigation or team change.
+  const projectScopeVersion = useRef(0)
   const [activeProjectUuid, setActiveProjectUuid] = useState<string | null>(null)
+  const activeProjectUuidRef = useRef(activeProjectUuid)
+  activeProjectUuidRef.current = activeProjectUuid
   const [activeProjectTitle, setActiveProjectTitle] = useState<string | null>(null)
   const [activeProjectRootFolder, setActiveProjectRootFolder] = useState<string | null>(null)
   const [activeProjectTeamId, setActiveProjectTeamId] = useState<string | null>(null)
   const [activeProjectRole, setActiveProjectRole] = useState<string | null>(null)
   const [viewDocumentRequest, setViewDocumentRequest] = useState<ViewDocumentRequest | null>(null)
+  const [verificationSession, setVerificationSession] = useState<VerificationSession | null>(null)
+  const [verificationCompletion, setVerificationCompletion] = useState<VerificationCompletion | null>(null)
   const [openDocumentUuid, setOpenDocumentUuid] = useState<string | null>(null)
   const pendingExtractionResultsRef = useRef<PendingExtractionResults | null>(null)
-  const pendingWorkflowSessionRef = useRef<string | null>(null)
+  const pendingWorkflowSessionRef = useRef<string | null>(search.run ?? null)
   const [workflowOpenSignal, setWorkflowOpenSignal] = useState(0)
   const [extractionOpenSignal, setExtractionOpenSignal] = useState(0)
 
   const updateSearch = useCallback(
-    (updater: (prev: WorkspaceSearchState) => WorkspaceSearchState) => {
+    (updater: (prev: WorkspaceSearchState) => WorkspaceSearchState, replace = true) => {
       navigate({
         search: (prev) => updater({ ...emptyWorkspaceSearch(), ...prev }),
-        replace: true,
+        replace,
       })
     },
     [navigate],
@@ -407,12 +452,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   // ── Navigation callbacks ────────────────────────────────────────────────
 
   const setWorkspaceMode = useCallback((mode: WorkspaceMode) => {
-    localStorage.setItem('workspace:mode', mode)
-    updateSearch((prev) => ({ ...prev, mode: mode === 'chat' ? undefined : mode }))
+    setStoredRaw('workspace:mode', mode)
+    updateSearch((prev) => ({ ...prev, mode }), false)
   }, [updateSearch])
 
   const setActiveRightTab = useCallback((tab: RightTab) => {
-    updateSearch((prev) => ({ ...prev, tab: tab === 'assistant' ? undefined : tab }))
+    updateSearch((prev) => ({ ...prev, tab: tab === 'assistant' ? undefined : tab }), false)
   }, [updateSearch])
 
   const openWorkflow = useCallback((id: string, sessionId?: string) => {
@@ -424,7 +469,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       workflow_share_token: undefined,
       extraction: undefined,
       automation: undefined,
-    }))
+    }), false)
   }, [updateSearch])
 
   const closeWorkflow = useCallback(() => {
@@ -443,7 +488,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       ? { values: initialResults, sources: initialSources, crossFieldSets: initialCrossFieldSets, documentWarnings: initialDocumentWarnings }
       : null
     setExtractionOpenSignal(prev => prev + 1)
-    updateSearch((prev) => ({ ...prev, extraction: uuid, workflow: undefined, automation: undefined }))
+    updateSearch((prev) => ({ ...prev, extraction: uuid, workflow: undefined, automation: undefined }), false)
   }, [updateSearch])
 
   const consumeExtractionResults = useCallback((): PendingExtractionResults | null => {
@@ -457,19 +502,39 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [updateSearch])
 
   const openAutomation = useCallback((id: string) => {
-    updateSearch((prev) => ({ ...prev, automation: id, workflow: undefined, extraction: undefined }))
+    updateSearch((prev) => ({ ...prev, automation: id, workflow: undefined, extraction: undefined }), false)
   }, [updateSearch])
 
   const closeAutomation = useCallback(() => {
     updateSearch((prev) => ({ ...prev, automation: undefined }))
   }, [updateSearch])
 
+  // Selected documents/folders live at the workspace level (not inside
+  // ChatPanel), so remounting the chat on "New chat" does NOT clear them.
+  // Every fresh-chat entry point must drop them explicitly, or a document
+  // attached to the previous chat stays attached in the new one.
+  const clearChatAttachments = useCallback(() => {
+    setSelectedDocUuids([])
+    setSelectedDocNames({})
+    setSelectedFolderUuids([])
+    setSelectedFolderNames({})
+    setProcessingDoc(null)
+    setSelectedDocsProcessing([])
+  }, [setSelectedDocsProcessing])
+
   const resetToHome = useCallback(() => {
-    updateSearch(() => emptyWorkspaceSearch())
-    localStorage.setItem('workspace:mode', 'chat')
+    projectScopeVersion.current += 1
+    updateSearch(() => ({ ...emptyWorkspaceSearch(), mode: 'chat' }))
+    setStoredRaw('workspace:mode', 'chat')
+    clearChatAttachments()
     setNewChatSignal(prev => prev + 1)
     setLoadConversationId(null)
     setPendingChatMessage(null)
+    setViewDocumentRequest(null)
+    setVerificationSession(null)
+    setVerificationCompletion(null)
+    setProcessingDoc(null)
+    setSelectedDocsProcessing([])
     setHighlightTerms([])
     setStoredRaw(KB_STORAGE_KEY, null)
     setActiveKBs([])
@@ -479,14 +544,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setActiveProjectRootFolder(null)
     setActiveProjectTeamId(null)
     setActiveProjectRole(null)
-  }, [updateSearch, setHighlightTerms])
+  }, [updateSearch, clearChatAttachments, setHighlightTerms, setSelectedDocsProcessing])
 
   // ── Chat callbacks ──────────────────────────────────────────────────────
 
   const triggerNewChat = useCallback(() => {
+    clearChatAttachments()
     setNewChatSignal(prev => prev + 1)
     updateSearch((prev) => ({ ...prev, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined }))
-  }, [updateSearch])
+  }, [updateSearch, clearChatAttachments])
 
   const focusChat = useCallback(() => {
     // Clear any right-panel overlay so the chat is visible, but keep the
@@ -497,11 +563,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const sendChatMessage = useCallback((
     message: string,
-    options?: { documentUuids?: string[]; folderUuids?: string[] },
+    options?: { documentUuids?: string[]; folderUuids?: string[]; skillUuid?: string; skillSelectionOnly?: boolean; draftOnly?: boolean },
   ) => {
     updateSearch((prev) => ({ ...prev, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined }))
     setPendingChatMessage({
       message,
+      skillUuid: options?.skillUuid,
+      skillSelectionOnly: options?.skillSelectionOnly,
+      draftOnly: options?.draftOnly,
       documentUuids: options?.documentUuids,
       folderUuids: options?.folderUuids,
     })
@@ -514,10 +583,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const activateKB = useCallback((uuid: string, title: string) => {
     setStoredRaw(KB_STORAGE_KEY, storedKBValue([{ uuid, title }]))
     setActiveKBs([{ uuid, title }])
+    clearChatAttachments()
     setNewChatSignal(prev => prev + 1)
-    localStorage.setItem('workspace:mode', 'chat')
-    updateSearch((prev) => ({ ...prev, mode: undefined, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined }))
-  }, [updateSearch])
+    setStoredRaw('workspace:mode', 'chat')
+    updateSearch((prev) => ({ ...prev, mode: 'chat', workflow: undefined, extraction: undefined, automation: undefined, tab: undefined }))
+  }, [updateSearch, clearChatAttachments])
 
   const attachKBs = useCallback((kbs: AttachedKB[]) => {
     setActiveKBs(prev => mergeAttachedKBs(prev, kbs))
@@ -537,6 +607,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const activateProject = useCallback((uuid: string, title: string) => {
+    projectScopeVersion.current += 1
+    setActiveProjectRootFolder(null)
+    setActiveProjectTeamId(null)
+    setActiveProjectRole(null)
     // Persist the scope so a reload re-enters the project (see rehydrate effect).
     // We store only the uuid — title/role/root are re-fetched on rehydrate so a
     // renamed or re-shared project never shows stale chrome.
@@ -546,25 +620,24 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     // Entering a project starts a fresh, project-scoped chat.
     setStoredRaw(KB_STORAGE_KEY, null)
     setActiveKBs([])
+    clearChatAttachments()
     setNewChatSignal(prev => prev + 1)
-    localStorage.setItem('workspace:mode', 'chat')
-    updateSearch((prev) => ({ ...prev, mode: undefined, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined }))
-  }, [updateSearch])
+    setStoredRaw('workspace:mode', 'chat')
+    updateSearch((prev) => ({ ...prev, mode: 'chat', workflow: undefined, extraction: undefined, automation: undefined, tab: undefined }))
+  }, [updateSearch, clearChatAttachments])
 
   const deactivateProject = useCallback(() => {
-    setStoredRaw(PROJECT_STORAGE_KEY, null)
-    setActiveProjectUuid(null)
-    setActiveProjectTitle(null)
-    setActiveProjectRootFolder(null)
-    setActiveProjectTeamId(null)
-    setActiveProjectRole(null)
-  }, [])
+    if (activeProjectUuid || search.project || getStoredRaw(PROJECT_STORAGE_KEY)) resetToHome()
+    else projectScopeVersion.current += 1
+  }, [activeProjectUuid, search.project, resetToHome])
 
   const refreshActiveProject = useCallback(() => {
-    if (!activeProjectUuid) return
+    if (!activeProjectUuid || activeProjectUuidRef.current !== activeProjectUuid) return
+    const version = projectScopeVersion.current
     import('../api/projects').then(({ getProject }) => {
       getProject(activeProjectUuid)
         .then((project) => {
+          if (projectScopeVersion.current !== version) return
           setActiveProjectTitle(project.title)
           setActiveProjectRootFolder(project.root_folder_uuid)
           setActiveProjectTeamId(project.team_id ?? null)
@@ -588,7 +661,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     const clearParams = (openChat: boolean) => navigate({
       search: (prev) => ({
         ...emptyWorkspaceSearch(), ...prev, kb: undefined, docs: undefined, folders: undefined,
-        ...(openChat ? { mode: undefined, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined } : {}),
+        ...(openChat ? { mode: 'chat', workflow: undefined, extraction: undefined, automation: undefined, tab: undefined } : {}),
       }),
       replace: true,
     })
@@ -617,7 +690,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setSelectedDocNames(Object.fromEntries(titles.documents.map(d => [d.uuid, d.title])))
       setSelectedFolderUuids(titles.folders.map(f => f.uuid))
       setSelectedFolderNames(Object.fromEntries(titles.folders.map(f => [f.uuid, f.title])))
-      localStorage.setItem('workspace:mode', 'chat')
+      setStoredRaw('workspace:mode', 'chat')
       if (attached < requested) {
         const missing = requested - attached
         toast(
@@ -637,9 +710,18 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const projectParam = search.project
     if (!projectParam) return
+    const version = ++projectScopeVersion.current
+    let cancelled = false
+    const isCurrent = () => !cancelled && projectScopeVersion.current === version
+    const failed = () => {
+      if (!isCurrent()) return
+      resetToHome()
+      toast('Could not open this project. It may be unavailable or no longer shared with you. Open Projects to retry.', 'error')
+    }
     import('../api/projects').then(({ getProject }) => {
       getProject(projectParam)
         .then((project) => {
+          if (!isCurrent()) return
           setStoredRaw(PROJECT_STORAGE_KEY, projectParam)
           setActiveProjectUuid(projectParam)
           setActiveProjectTitle(project.title)
@@ -648,17 +730,24 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           setActiveProjectRole(project.role)
           setStoredRaw(KB_STORAGE_KEY, null)
           setActiveKBs([])
+          clearChatAttachments()
+          setLoadConversationId(null)
+          setPendingChatMessage(null)
+          setViewDocumentRequest(null)
+          setVerificationSession(null)
+          setVerificationCompletion(null)
+          setHighlightTerms([])
           setNewChatSignal(prev => prev + 1)
           // Land in whatever mode was requested (e.g. ?project=X&mode=files),
           // defaulting to chat. Viewers (shared-in PIs) are chat-only.
           const requestedMode = project.role === 'viewer' ? 'chat' : (search.mode ?? 'chat')
-          localStorage.setItem('workspace:mode', requestedMode)
+          setStoredRaw('workspace:mode', requestedMode)
           navigate({
             // Preserve any editor param so a pinned tool (e.g. ?project=X&workflow=Y)
             // opens inside the scoped project rather than being wiped.
             search: () => ({
               ...emptyWorkspaceSearch(),
-              mode: requestedMode === 'chat' ? undefined : requestedMode,
+              mode: requestedMode,
               workflow: project.role === 'viewer' ? undefined : search.workflow,
               extraction: project.role === 'viewer' ? undefined : search.extraction,
               automation: project.role === 'viewer' ? undefined : search.automation,
@@ -667,19 +756,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
             replace: true,
           })
         })
-        .catch(() => {
-          navigate({
-            search: (prev) => ({ ...emptyWorkspaceSearch(), ...prev, project: undefined }),
-            replace: true,
-          })
-        })
-    }).catch(() => {
-      navigate({
-        search: (prev) => ({ ...emptyWorkspaceSearch(), ...prev, project: undefined }),
-        replace: true,
-      })
-    })
-  }, [search.project, search.mode, navigate])
+        .catch(failed)
+    }).catch(failed)
+    return () => { cancelled = true }
+  }, [search.project, search.mode, search.workflow, search.extraction, search.automation, navigate, clearChatAttachments, resetToHome, setHighlightTerms, toast])
 
   // Rehydrate the active project/KB scope on a fresh load (e.g. browser reload).
   // Scope lives in ephemeral React state, so without this a refresh would drop
@@ -706,17 +786,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
     if (deepLink) return
 
+    const version = projectScopeVersion.current
     if (storedProject) {
       import('../api/projects').then(({ getProject }) => {
         getProject(storedProject)
           .then((project) => {
+            if (projectScopeVersion.current !== version) return
             setActiveProjectUuid(storedProject)
             setActiveProjectTitle(project.title)
             setActiveProjectRootFolder(project.root_folder_uuid)
             setActiveProjectTeamId(project.team_id ?? null)
             setActiveProjectRole(project.role)
           })
-          .catch(() => { setStoredRaw(PROJECT_STORAGE_KEY, null) })
+          .catch(() => { if (projectScopeVersion.current === version) setStoredRaw(PROJECT_STORAGE_KEY, null) })
       }).catch(() => {})
       return
     }
@@ -728,6 +810,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         // rest of the attachment survives.
         Promise.allSettled(storedKBUuids.map(uuid => getKnowledgeBase(uuid)))
           .then(results => {
+            if (projectScopeVersion.current !== version) return
             const restored: AttachedKB[] = []
             results.forEach((res, i) => {
               if (res.status === 'fulfilled') {
@@ -760,6 +843,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   // never leave the user pointed at a project they can no longer access.
   const prevTeamUuidRef = useRef<string | null | undefined>(undefined)
   useEffect(() => {
+    if (teamsLoading) return
     const teamUuid = currentTeam?.uuid ?? null
     if (prevTeamUuidRef.current === undefined) {
       // First resolution of the current team — establish the baseline, don't
@@ -769,15 +853,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
     if (prevTeamUuidRef.current === teamUuid) return
     prevTeamUuidRef.current = teamUuid
-    setStoredRaw(PROJECT_STORAGE_KEY, null)
-    setActiveProjectUuid(null)
-    setActiveProjectTitle(null)
-    setActiveProjectRootFolder(null)
-    setActiveProjectTeamId(null)
-    setActiveProjectRole(null)
-    setStoredRaw(KB_STORAGE_KEY, null)
-    setActiveKBs([])
-  }, [currentTeam?.uuid])
+    resetToHome()
+  }, [currentTeam?.uuid, teamsLoading, resetToHome])
 
   // ── UI callbacks ────────────────────────────────────────────────────────
 
@@ -788,26 +865,48 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const toggleRailDocked = useCallback(() => {
     setRailDocked(prev => {
       const next = !prev
-      localStorage.setItem('workspace:railDocked', String(next))
+      setStoredRaw('workspace:railDocked', String(next))
       return next
     })
   }, [])
 
   const setPanelSplit = useCallback((pct: number, skipPersist?: boolean) => {
-    const clamped = Math.min(80, Math.max(20, pct))
+    const clamped = validPanelSplit(pct)
     _setPanelSplit(clamped)
     if (!skipPersist) {
-      localStorage.setItem('workspace:panelSplit', String(clamped))
+      setStoredRaw('workspace:panelSplit', String(clamped))
     }
   }, [])
 
-  const viewDocument = useCallback((uuid: string, title: string, highlight?: ViewDocumentRequest['highlight']) => {
-    setViewDocumentRequest({ uuid, title, highlight })
+  const setChatSplitOpen = useCallback((open: boolean) => {
+    _setChatSplitOpen(open)
+    try { setStoredRaw('workspace:chatSplit', String(open)) } catch {}
+  }, [])
+
+  const viewDocument = useCallback((uuid: string, title: string, highlight?: ViewDocumentRequest['highlight'], options?: { preserveChatScope?: boolean }) => {
+    setViewDocumentRequest({ uuid, title, highlight, preserveChatScope: options?.preserveChatScope })
   }, [])
 
   const clearViewDocumentRequest = useCallback(() => {
     setViewDocumentRequest(null)
   }, [])
+
+  // Source links and project Skill links are navigation only; they never send a prompt.
+  const handledResourceLink = useRef('')
+  useEffect(() => {
+    if (search.project && activeProjectUuid !== search.project) return
+    const identity = `${search.project ?? ''}:${search.conversation ?? ''}:${search.skill ?? ''}:${search.editPage ?? ''}`
+    if ((!search.conversation && !search.skill && !search.editPage) || handledResourceLink.current === identity) return
+    handledResourceLink.current = identity
+    if (search.conversation) setLoadConversationId(search.conversation)
+    if (search.skill) sendChatMessage('', { skillUuid: search.skill, skillSelectionOnly: true })
+    if (search.editPage) {
+      let request = ''
+      try { request = sessionStorage.getItem(`pages:edit-request:${search.editPage}`) || ''; sessionStorage.removeItem(`pages:edit-request:${search.editPage}`) } catch { /* A draft can still be prepared without stored details. */ }
+      sendChatMessage(`Update this page: ${window.location.origin}/pages/${search.editPage}\n\n${request.slice(0, 8000)}\n\nShow me the proposed update before saving.`, { draftOnly: true })
+    }
+    updateSearch(prev => ({ ...prev, mode: 'chat', tab: undefined, conversation: undefined, skill: undefined, editPage: undefined }))
+  }, [search.project, search.conversation, search.skill, search.editPage, activeProjectUuid, sendChatMessage, updateSearch])
 
   // ── Memoized context values ─────────────────────────────────────────────
 
@@ -843,6 +942,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     activeProjectUuid, activeProjectTitle, activeProjectRootFolder, activeProjectTeamId, activeProjectRole, activateProject, deactivateProject, refreshActiveProject,
     processingDoc, setProcessingDoc,
     selectedDocsProcessing, setSelectedDocsProcessing,
+    documentReadiness, updateDocumentReadiness,
   }), [
     loadConversationId, currentConversationUuid,
     newChatSignal, triggerNewChat,
@@ -852,6 +952,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     activeProjectUuid, activeProjectTitle, activeProjectRootFolder, activeProjectTeamId, activeProjectRole, activateProject, deactivateProject, refreshActiveProject,
     processingDoc,
     selectedDocsProcessing, setSelectedDocsProcessing,
+    documentReadiness, updateDocumentReadiness,
   ])
 
   const uiValue = useMemo<UIStateContextValue>(() => ({
@@ -861,17 +962,22 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     selectedFolderNames, setSelectedFolderNames,
     railDocked, toggleRailDocked,
     panelSplit, setPanelSplit,
+    chatSplitOpen, setChatSplitOpen,
     highlightTerms, highlightPage, highlightPageApproximate, setHighlightTerms,
     activitySignal, bumpActivitySignal,
     viewDocumentRequest, viewDocument, clearViewDocumentRequest,
+    verificationSession, setVerificationSession,
+    verificationCompletion, setVerificationCompletion,
     openDocumentUuid, setOpenDocumentUuid,
   }), [
     selectedDocUuids, selectedDocNames, selectedFolderUuids, selectedFolderNames,
     railDocked, toggleRailDocked,
     panelSplit, setPanelSplit,
+    chatSplitOpen, setChatSplitOpen,
     highlightTerms, highlightPage, highlightPageApproximate, setHighlightTerms,
     activitySignal, bumpActivitySignal,
     viewDocumentRequest, viewDocument, clearViewDocumentRequest,
+    verificationSession, verificationCompletion,
     openDocumentUuid,
   ])
 

@@ -55,7 +55,7 @@ async def query_audit_log(
     limit: int = 50,
 ) -> tuple[list[AuditLog], int]:
     """Query audit log with filters. Returns (entries, total_count)."""
-    filters = {}
+    filters: dict = {}
     if action:
         filters["action"] = action
     if actor_user_id:
@@ -76,5 +76,5 @@ async def query_audit_log(
 
     query = AuditLog.find(filters)
     total = await query.count()
-    entries = await query.sort(-AuditLog.timestamp).skip(skip).limit(limit).to_list()
+    entries = await query.sort('-timestamp').skip(skip).limit(limit).to_list()
     return entries, total

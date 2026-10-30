@@ -15,12 +15,12 @@ from app.services.extraction_staleness import EXTRACTION_STALE_AFTER, extraction
 router = APIRouter()
 
 
-@router.get("/list")
+@router.get("/list", response_model=None)
 async def list_documents(
     folder: str | None = None,
     team_uuid: str | None = None,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     # Use provided team_uuid, or fall back to user's current team
     if not team_uuid and user.current_team:
         team = await Team.get(user.current_team)
@@ -41,13 +41,13 @@ async def list_documents(
     return await document_service.list_contents(user=user, folder=folder, team_uuid=team_uuid)
 
 
-@router.get("/search")
+@router.get("/search", response_model=None)
 async def search_documents(
     q: str = Query(default="", min_length=0),
     limit: int = Query(default=20, ge=1, le=100),
     folder: str | None = Query(default=None),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Search documents by title or content text. Returns recent docs when q is empty.
 
     When `folder` is provided, results are restricted to that folder value.
@@ -71,7 +71,7 @@ async def search_documents(
 
     if not q.strip():
         query: dict = {"$and": base_conditions} if len(base_conditions) > 1 else owner_filter
-        results = await SmartDocument.find(query).sort(-SmartDocument.created_at).limit(limit).to_list()
+        results = await SmartDocument.find(query).sort('-created_at').limit(limit).to_list()
     else:
         regex = re.compile(re.escape(q), re.IGNORECASE)
         results = await SmartDocument.find(
@@ -85,7 +85,7 @@ async def search_documents(
                     },
                 ],
             }
-        ).sort(-SmartDocument.created_at).limit(limit).to_list()
+        ).sort('-created_at').limit(limit).to_list()
 
     items = []
     for doc in results:
@@ -125,11 +125,11 @@ async def search_documents(
     return {"items": items, "total": len(items)}
 
 
-@router.get("/poll_status")
+@router.get("/poll_status", response_model=None)
 async def poll_status(
     docid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     result = await document_service.poll_status(docid, user)
     if result is None:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -146,11 +146,11 @@ class TitlesRequest(BaseModel):
 _MAX_TITLE_LOOKUPS = 100
 
 
-@router.post("/titles")
+@router.post("/titles", response_model=None)
 async def resolve_titles(
     body: TitlesRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Titles for the documents and folders the caller can view.
 
     Opening a chat setup link re-attaches the sender's documents and folders
@@ -196,13 +196,13 @@ def _extraction_is_stale(doc: SmartDocument) -> bool:
     return extraction_is_stale(doc.updated_at, doc.created_at)
 
 
-@router.post("/{doc_uuid}/retry-extraction")
+@router.post("/{doc_uuid}/retry-extraction", response_model=None)
 @limiter.limit("30/minute")
 async def retry_extraction(
     request: Request,
     doc_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Re-run text extraction (and downstream ingestion) for a document.
 
     Useful when the original extraction silently produced no text — for example
@@ -229,7 +229,11 @@ async def retry_extraction(
             detail="Extraction is already in progress for this document",
         )
 
-    restart = await document_service.restart_extraction(doc, user.user_id)
+    from app.services.extraction_restarts import ExtractionRestartConflict
+    try:
+        restart = await document_service.restart_extraction(doc, user.user_id)
+    except ExtractionRestartConflict as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
     task_id = restart["task_id"]
     force_ocr = restart["force_ocr"]
     ocr_required = restart["ocr_required"]
@@ -260,12 +264,12 @@ class ReclassifyRequest(BaseModel):
     reason: Optional[str] = None
 
 
-@router.patch("/{doc_uuid}/classify")
+@router.patch("/{doc_uuid}/classify", response_model=None)
 async def reclassify_document(
     doc_uuid: str,
     body: ReclassifyRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Manually reclassify a document."""
     valid_levels = {"unrestricted", "internal", "ferpa", "cui", "itar"}
     if body.classification not in valid_levels:
@@ -280,7 +284,9 @@ async def reclassify_document(
     old_classification = doc.classification
 
     from app.services.classification_service import apply_classification
-    await apply_classification(doc, body.classification, confidence=1.0, classified_by=user.user_id)
+    applied = await apply_classification(doc, body.classification, confidence=1.0, classified_by=user.user_id)
+    if applied is None:
+        raise HTTPException(status_code=409, detail="Document changed or is no longer available. Refresh before classifying it.")
 
     await audit_service.log_event(
         action="document.classify",
@@ -304,12 +310,12 @@ async def reclassify_document(
 # Retention
 # ---------------------------------------------------------------------------
 
-@router.post("/{doc_uuid}/retention-hold")
+@router.post("/{doc_uuid}/retention-hold", response_model=None)
 async def set_retention_hold(
     doc_uuid: str,
     request: Request,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Place a legal hold on a document. Admin only."""
     if not user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
@@ -340,11 +346,11 @@ async def set_retention_hold(
     return {"detail": "Retention hold applied", "retention_hold": True}
 
 
-@router.delete("/{doc_uuid}/retention-hold")
+@router.delete("/{doc_uuid}/retention-hold", response_model=None)
 async def remove_retention_hold(
     doc_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Remove a legal hold from a document. Admin only."""
     if not user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")

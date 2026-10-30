@@ -1,18 +1,26 @@
+import { Microsoft365IntakeGuide } from './Microsoft365IntakeGuide'
+import './automation-workspace.css'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { X, Pencil, Trash2, FolderOpen, Globe, Copy, Check, ChevronRight, HelpCircle, Play, CalendarClock } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { getAutomation, updateAutomation, deleteAutomation } from '../../api/automations'
 import { apiFetch } from '../../api/client'
+import { useAutomationSave } from '../../hooks/useAutomationSave'
+import { useAuth } from '../../hooks/useAuth'
 import { useWorkflows } from '../../hooks/useWorkflows'
 import { useSearchSets } from '../../hooks/useExtractions'
 import { useConfirm } from '../shared/useConfirm'
 import { useToast } from '../../contexts/ToastContext'
 import { ItemPickerModal } from './ItemPickerModal'
 import { AutomationsExplainer } from './AutomationsExplainer'
+import { AutomationSummary } from './AutomationSummary'
+import { useAutomationFolderNames } from '../../hooks/useAutomationFolderNames'
+import { AutomationRunHistory } from './AutomationRunHistory'
 import { AutomationRunNowPanel } from './AutomationRunNowPanel'
 import { ScheduleConfigFields } from './ScheduleConfigFields'
 import { CollapsibleSection } from '../shared/CollapsibleSection'
-import { defaultScheduleConfig, describeSchedule, formatRunTime, isScheduleComplete, scheduleConfigPayload, toScheduleConfig } from '../../utils/schedule'
+import { defaultScheduleConfig, describeSchedule, isScheduleComplete, scheduleConfigPayload, toScheduleConfig } from '../../utils/schedule'
+import { formatLocalTimestamp } from '../../utils/time'
 import type { Automation, TriggerType, ActionType } from '../../types/automation'
 import { SUPPORTED_EXTENSIONS } from '../../utils/fileTypes'
 
@@ -25,12 +33,13 @@ const TRIGGER_OPTIONS: { value: TriggerType; label: string; icon: typeof FolderO
 const ACTION_OPTIONS: { value: ActionType; label: string; description: string; enabled: boolean }[] = [
   { value: 'workflow', label: 'Run Workflow', description: 'Execute a workflow on triggered documents', enabled: true },
   { value: 'extraction', label: 'Run Extraction', description: 'Run an extraction template', enabled: true },
-  { value: 'task', label: 'Run Task', description: 'Execute a standalone task', enabled: true },
 ]
 
 export function AutomationEditorPanel() {
   const { openAutomationId, closeAutomation } = useWorkspace()
+  const { user } = useAuth()
   const { workflows } = useWorkflows()
+  const folderNames = useAutomationFolderNames()
   const { searchSets } = useSearchSets()
   const confirm = useConfirm()
   const { toast } = useToast()
@@ -41,18 +50,29 @@ export function AutomationEditorPanel() {
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleValue, setTitleValue] = useState('')
   const titleInputRef = useRef<HTMLInputElement>(null)
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const titleSaving = useRef(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const autosave = useAutomationSave(openAutomationId, setAutomation, user?.user_id)
+  const { revision, applyLoaded } = autosave
+  const busySaving = autosave.state === 'pending' || autosave.state === 'saving'
+  const closeAfterSave = async () => {
+    if (await autosave.flush()) closeAutomation()
+  }
 
   const refresh = useCallback(async () => {
     if (!openAutomationId) return
     setLoading(true)
+    setLoadError(null)
+    const startedAt = revision()
     try {
       const auto = await getAutomation(openAutomationId)
-      setAutomation(auto)
+      setAutomation(applyLoaded(auto, startedAt))
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : 'Could not load automation.')
     } finally {
       setLoading(false)
     }
-  }, [openAutomationId])
+  }, [openAutomationId, revision, applyLoaded])
 
   useEffect(() => { refresh() }, [refresh])
 
@@ -65,37 +85,30 @@ export function AutomationEditorPanel() {
 
   const canManage = automation?.can_manage ?? true
   const [runNowOpen, setRunNowOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const runNowRegion = useRef<HTMLDivElement>(null)
+  const prepareRun = () => {
+    setRunNowOpen(true)
+    requestAnimationFrame(() => { runNowRegion.current?.scrollIntoView({ block: 'start' }); runNowRegion.current?.focus() })
+  }
 
-  const save = useCallback(async (updates: Parameters<typeof updateAutomation>[1]) => {
-    if (!openAutomationId) return
-    if (automation && !automation.can_manage) return
-    try {
-      const updated = await updateAutomation(openAutomationId, updates)
-      setAutomation(updated)
-      window.dispatchEvent(new Event('automations-updated'))
-    } catch (err) {
-      // A rejected save used to leave the panel showing the old value with no
-      // explanation, reading as "the click did nothing".
-      toast(err instanceof Error ? err.message : 'Failed to save automation', 'error')
-    }
-  }, [openAutomationId, automation, toast])
+  const save = async (updates: Parameters<typeof updateAutomation>[1]) => {
+    if (!openAutomationId || !canManage) return false
+    return autosave.save(updates)
+  }
 
-  const debouncedSave = useCallback((updates: Parameters<typeof updateAutomation>[1]) => {
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
-    saveTimeoutRef.current = setTimeout(() => save(updates), 500)
-  }, [save])
-
-  useEffect(() => {
-    return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current) }
-  }, [])
+  const debouncedSave = (updates: Parameters<typeof updateAutomation>[1]) => {
+    if (!canManage) return
+    setAutomation(current => current ? { ...current, ...updates } as Automation : current)
+    void autosave.save(updates, true)
+  }
 
   const handleTitleSave = async () => {
-    if (!titleValue.trim()) {
-      setEditingTitle(false)
-      return
-    }
-    await save({ name: titleValue.trim() })
-    setEditingTitle(false)
+    if (!titleValue.trim() || titleSaving.current) return
+    titleSaving.current = true
+    try {
+      if (titleValue.trim() === automation?.name || await save({ name: titleValue.trim() })) setEditingTitle(false)
+    } finally { titleSaving.current = false }
   }
 
   const handleDelete = async () => {
@@ -111,8 +124,12 @@ export function AutomationEditorPanel() {
       destructive: true,
     })
     if (!ok) return
-    await deleteAutomation(openAutomationId)
-    closeAutomation()
+    try {
+      await deleteAutomation(openAutomationId)
+      closeAutomation()
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Could not delete automation.', 'error')
+    }
   }
 
   const handleToggleEnabled = async () => {
@@ -148,77 +165,82 @@ export function AutomationEditorPanel() {
 
   if (loading) {
     return (
-      <div className="flex h-full flex-col" style={{ backgroundColor: '#fff' }}>
-        <EditorHeader title="Loading..." onClose={closeAutomation} />
-        <div style={{ padding: 40, textAlign: 'center', color: '#888', fontSize: 13 }}>Loading automation...</div>
+      <div className="automation-surface automation-editor flex h-full flex-col" style={{ backgroundColor: '#fff' }}>
+        <EditorHeader title="Loading..." onClose={closeAfterSave} />
+        <div style={{ padding: 40, textAlign: 'center', color: '#888', fontSize: 'var(--workspace-font-control)' }}>Loading automation...</div>
       </div>
     )
   }
 
   if (!automation) {
     return (
-      <div className="flex h-full flex-col" style={{ backgroundColor: '#fff' }}>
-        <EditorHeader title="Automation" onClose={closeAutomation} />
-        <div style={{ padding: 40, textAlign: 'center', color: '#d93025', fontSize: 13 }}>Automation not found.</div>
+      <div className="automation-surface automation-editor flex h-full flex-col" style={{ backgroundColor: '#fff' }}>
+        <EditorHeader title="Automation" onClose={closeAfterSave} />
+        <div style={{ padding: 40, textAlign: 'center', color: '#d93025', fontSize: 'var(--workspace-font-control)' }}>{loadError || 'Automation not found.'}<button type="button" onClick={refresh} style={{ display: 'block', margin: "var(--workspace-space-12) auto" }}>Retry loading</button></div>
       </div>
     )
   }
 
   return (
-    <div className="flex h-full flex-col" style={{ backgroundColor: '#fff', position: 'relative' }}>
+    <div className="automation-surface automation-editor flex h-full flex-col" style={{ backgroundColor: 'var(--workspace-surface)', position: 'relative' }}>
       {/* Header */}
-      <div style={{ padding: '16px 24px', borderBottom: '1px solid #e5e7eb', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="automation-editor-header" style={{ padding: "var(--workspace-space-16) var(--workspace-space-24)", width: '100%', maxWidth: 1040, margin: '0 auto', borderBottom: "1px solid var(--workspace-border)", flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--workspace-space-12)' }}>
           {editingTitle ? (
+            <div style={{ display: 'flex', flex: '1 1 240px', minWidth: 0, gap: 'var(--workspace-space-8)', flexWrap: 'wrap' }}>
             <input
               ref={titleInputRef}
               aria-label="Automation name"
               value={titleValue}
               onChange={e => setTitleValue(e.target.value)}
-              onBlur={handleTitleSave}
+              disabled={busySaving}
               onKeyDown={e => {
-                if (e.key === 'Enter') handleTitleSave()
-                if (e.key === 'Escape') setEditingTitle(false)
+                if (e.nativeEvent.isComposing) return
+                if (e.key === 'Enter') { e.preventDefault(); void handleTitleSave() }
+                if (e.key === 'Escape' && !busySaving) setEditingTitle(false)
               }}
               style={{
-                fontSize: 18, fontWeight: 600, color: '#202124', border: '1px solid #d1d5db',
-                borderRadius: 4, padding: '2px 8px', fontFamily: 'inherit',
-                flex: 1, marginRight: 8,
+                fontSize: 'var(--workspace-font-section-title)', fontWeight: 600, color: '#202124', border: "1px solid var(--workspace-border)",
+                borderRadius: 'var(--workspace-radius-small)', padding: "var(--workspace-space-2) var(--workspace-space-8)", fontFamily: 'inherit',
+                flex: '1 1 160px', minWidth: 0,
               }}
             />
+            <button type="button" disabled={busySaving || !titleValue.trim()} onClick={() => { void handleTitleSave() }}>Save name</button>
+            <button type="button" disabled={busySaving} onClick={() => setEditingTitle(false)}>Cancel rename</button>
+            </div>
           ) : (
-            <div
-              style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: canManage ? 'pointer' : 'default', flex: 1 }}
+            <button type="button" className="automation-editor-title" title={automation.name} aria-label="Rename automation" disabled={!canManage}
+              style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', cursor: canManage ? 'pointer' : 'default', flex: '1 1 100%', minWidth: 0, overflowWrap: 'anywhere', background: 'transparent', border: 0, padding: 0, textAlign: 'left', fontFamily: 'inherit' }}
               onClick={() => {
                 if (!canManage) return
                 setTitleValue(automation.name)
                 setEditingTitle(true)
               }}
             >
-              <span style={{ fontSize: 18, fontWeight: 600, color: '#202124', letterSpacing: '-0.01em' }}>
+              <span style={{ fontSize: 'var(--workspace-font-section-title)', fontWeight: 600, color: '#202124', letterSpacing: '-0.01em' }}>
                 {automation.name}
               </span>
               {canManage && <Pencil style={{ width: 14, height: 14, color: '#9ca3af' }} />}
-            </div>
+            </button>
           )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <div className="automation-editor-actions" style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', flexWrap: 'wrap', flexShrink: 1, maxWidth: '100%' }}>
             {/* Run now — a real one-off run through the automation's pipeline */}
             <button
               onClick={() => setRunNowOpen(o => !o)}
-              disabled={!canManage || !automation.action_id}
+              disabled={!canManage || !automation.action_id || autosave.state !== 'saved'}
               aria-pressed={runNowOpen}
-              title={!automation.action_id
+              title={autosave.state !== 'saved' ? 'Save changes before running this automation' : !automation.action_id
                 ? 'Choose an action first'
                 : canManage ? 'Run this automation once, now, with its configured outputs'
                 : 'Only the creator or a team owner/admin can run this'}
               style={{
-                display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px',
-                fontSize: 12, fontWeight: 700, fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', padding: "var(--workspace-space-4) var(--workspace-space-12)",
+                fontSize: 'var(--workspace-font-meta)', fontWeight: 700, fontFamily: 'inherit',
                 color: 'var(--highlight-text-color, #000)',
                 backgroundColor: 'var(--highlight-color, #eab308)',
                 border: '1px solid transparent',
-                borderRadius: 16, cursor: canManage && automation.action_id ? 'pointer' : 'not-allowed',
-                opacity: canManage && automation.action_id ? 1 : 0.6,
+                borderRadius: 16, cursor: canManage && automation.action_id && autosave.state === 'saved' ? 'pointer' : 'not-allowed',
+                opacity: canManage && automation.action_id && autosave.state === 'saved' ? 1 : 0.6,
               }}
             >
               <Play style={{ width: 12, height: 12 }} />
@@ -227,12 +249,12 @@ export function AutomationEditorPanel() {
             {/* Enabled toggle */}
             <button
               onClick={handleToggleEnabled}
-              disabled={!canManage}
+              disabled={!canManage || busySaving}
               title={canManage ? undefined : 'Only the creator or a team owner/admin can change this'}
               style={{
-                display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px',
-                fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                color: automation.enabled ? '#15803d' : '#6b7280',
+                display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', padding: "var(--workspace-space-4) var(--workspace-space-12)",
+                fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+                color: automation.enabled ? '#15803d' : '#555e68',
                 backgroundColor: automation.enabled ? '#dcfce7' : '#f3f4f6',
                 border: '1px solid ' + (automation.enabled ? '#bbf7d0' : '#e5e7eb'),
                 borderRadius: 16, cursor: canManage ? 'pointer' : 'not-allowed',
@@ -243,17 +265,22 @@ export function AutomationEditorPanel() {
                 width: 8, height: 8, borderRadius: '50%',
                 backgroundColor: automation.enabled ? '#22c55e' : '#9ca3af',
               }} />
-              {automation.enabled ? 'Enabled' : 'Disabled'}
+              {automation.enabled ? 'Active' : 'Paused'}
             </button>
+            <details className="automation-more" onKeyDown={event => {
+              if (event.key === 'Escape') { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus() }
+            }}>
+              <summary aria-label="More automation actions">More</summary>
+              <div className="automation-more-controls">
             {/* Visible to team toggle */}
             <button
               onClick={handleToggleShared}
-              disabled={!canManage}
+              disabled={!canManage || busySaving}
               title={canManage ? undefined : 'Only the creator or a team owner/admin can change this'}
               style={{
-                display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px',
-                fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                color: automation.shared_with_team ? 'rgb(0, 128, 128)' : '#6b7280',
+                display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', padding: "var(--workspace-space-4) var(--workspace-space-12)",
+                fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+                color: automation.shared_with_team ? '#0f6363' : '#555e68',
                 backgroundColor: automation.shared_with_team ? 'rgba(0, 128, 128, 0.1)' : '#f3f4f6',
                 border: '1px solid ' + (automation.shared_with_team ? 'rgba(0, 128, 128, 0.3)' : '#e5e7eb'),
                 borderRadius: 16, cursor: canManage ? 'pointer' : 'not-allowed',
@@ -266,16 +293,19 @@ export function AutomationEditorPanel() {
             {canManage && (
               <button
                 onClick={handleDelete}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 4, color: '#d93025', display: 'flex' }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', borderRadius: 'var(--workspace-radius-small)', color: '#d93025', display: 'flex' }}
                 title="Delete automation"
               >
-                <Trash2 style={{ width: 16, height: 16 }} />
+                <Trash2 aria-hidden="true" style={{ width: 16, height: 16 }} /><span>Delete automation</span>
               </button>
             )}
+              </div>
+            </details>
             {/* Close */}
             <button
-              onClick={closeAutomation}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 4, color: '#5f6368', display: 'flex' }}
+              className="automation-editor-close" aria-label="Close automation"
+              onClick={closeAfterSave}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', borderRadius: 'var(--workspace-radius-small)', color: '#5f6368', display: 'flex' }}
             >
               <X style={{ width: 20, height: 20 }} />
             </button>
@@ -283,76 +313,82 @@ export function AutomationEditorPanel() {
         </div>
       </div>
 
+      <div className="automation-save-state" role={autosave.state === 'error' ? 'alert' : 'status'} aria-live="polite" style={{ padding: "var(--workspace-space-12) var(--workspace-space-24)", maxWidth: 1040, width: '100%', margin: '0 auto', fontSize: 'var(--workspace-font-meta)', color: autosave.state === 'error' ? '#b91c1c' : '#555e68', borderBottom: "1px solid var(--workspace-border)" }}>
+        {autosave.state === 'saved' ? 'All changes saved automatically' : autosave.state === 'pending' ? 'Unsaved changes · saving shortly…' : autosave.state === 'saving' ? 'Saving changes…' : `Changes not saved. ${autosave.error}`}
+        {autosave.state === 'error' && <><span> Your edits are kept in this tab until you reload.</span><button type="button" disabled={!canManage} onClick={() => { void autosave.flush() }} style={{ marginLeft: 'var(--workspace-space-12)', padding: "var(--workspace-space-4) var(--workspace-space-12)", border: '1px solid #b91c1c', borderRadius: 'var(--workspace-radius-small)', background: 'white', color: '#b91c1c', cursor: 'pointer' }}>Retry save</button></>}
+      </div>
       {/* Body */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '24px', minHeight: 0 }}>
+      <div className="automation-editor-body" style={{ flex: 1, overflowY: 'auto', padding: "var(--workspace-space-24)", minHeight: 0, width: '100%', maxWidth: 1040, margin: '0 auto' }}>
         {!canManage && (
           <div style={{
-            padding: '10px 14px', marginBottom: 16, borderRadius: 6,
+            padding: "var(--workspace-space-12) var(--workspace-space-16)", marginBottom: 'var(--workspace-space-16)', borderRadius: 'var(--workspace-radius-small)',
             backgroundColor: '#fef3c7', border: '1px solid #fde68a',
-            color: '#92400e', fontSize: 12, lineHeight: 1.45,
+            color: '#92400e', fontSize: 'var(--workspace-font-meta)', lineHeight: 1.45,
           }}>
             <strong>View only.</strong> This automation was shared with your team by another member.
             Only the creator or a team owner/admin can change or delete it.
           </div>
         )}
         {/* Description */}
-        <input
-          type="text"
+        <textarea
+          rows={2}
           aria-label="Automation description"
-          defaultValue={automation.description || ''}
+          value={automation.description || ''}
           disabled={!canManage}
-          onBlur={e => {
-            const v = e.target.value.trim()
-            if (v !== (automation.description || '')) debouncedSave({ description: v || undefined })
-          }}
+          onChange={e => debouncedSave({ description: e.target.value })}
           placeholder="Add a description..."
           style={{
-            width: '100%', padding: '6px 0', fontSize: 13, color: '#6b7280',
+            width: '100%', padding: "var(--workspace-space-6) 0", fontSize: 'var(--workspace-font-control)', color: '#555e68',
             border: 'none', borderBottom: '1px solid transparent',
-            fontFamily: 'inherit', backgroundColor: 'transparent', marginBottom: 20,
-            boxSizing: 'border-box',
+            fontFamily: 'inherit', backgroundColor: 'transparent', marginBottom: 'var(--workspace-space-20)',
+            boxSizing: 'border-box', resize: 'vertical', lineHeight: 1.5,
           }}
           onFocus={e => (e.currentTarget.style.borderBottomColor = '#d1d5db')}
           onMouseLeave={e => { if (document.activeElement !== e.currentTarget) e.currentTarget.style.borderBottomColor = 'transparent' }}
         />
 
-        {runNowOpen && (
-
-          <AutomationRunNowPanel automation={automation} canManage={canManage} onClose={() => setRunNowOpen(false)} />
-
-        )}
+        <AutomationSummary automation={automation} names={folderNames} actionName={automation.action_type === 'extraction' ? searchSets.find(item => item.uuid === automation.action_id || item.id === automation.action_id)?.title : workflows.find(item => item.id === automation.action_id)?.name} />
+        {folderNames.error && <div className="automation-folder-error" role="status">Folder names are unavailable. <button type="button" onClick={() => void folderNames.refresh()}>Retry folder names</button></div>}
+        <div ref={runNowRegion} tabIndex={-1} hidden={!runNowOpen}>
+          <AutomationRunNowPanel automation={automation} userScope={user?.user_id} canManage={canManage && autosave.state === 'saved'} onClose={() => setRunNowOpen(false)} />
+        </div>
 
         {/* Sections fold so a long configuration can be worked one part at a time. */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-12)' }}>
+        <CollapsibleSection title="Run history" summary="Recorded status and results" open={historyOpen} onToggle={setHistoryOpen}>
+          <AutomationRunHistory automationId={automation.id} open={historyOpen} canRun={canManage && autosave.state === 'saved'} onPrepareRun={prepareRun} />
+        </CollapsibleSection>
         {/* Section A — Trigger */}
         <CollapsibleSection title="Trigger" summary={triggerSummary(automation)} testId="automation-trigger-section">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '8px 0 16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-8)', margin: "var(--workspace-space-8) 0 var(--workspace-space-16)" }}>
+          {automation.trigger_type === 'm365_intake' && <div className="automation-integration-current"><strong>Microsoft 365 intake</strong><span>Managed separately</span></div>}
           {TRIGGER_OPTIONS.map(opt => {
             const Icon = opt.icon
             const selected = automation.trigger_type === opt.value
             return (
               <button
                 key={opt.value}
+                type="button" aria-pressed={selected}
                 onClick={() => handleTriggerTypeChange(opt.value)}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '12px 16px',
-                  backgroundColor: selected ? '#eff6ff' : '#fff',
-                  border: selected ? '2px solid #3b82f6' : '1px solid #e5e7eb',
-                  borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit',
+                  display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)',
+                  padding: "var(--workspace-space-12) var(--workspace-space-16)",
+                  backgroundColor: selected ? 'var(--workspace-selected)' : '#fff',
+                  border: selected ? '2px solid var(--highlight-on-light)' : '1px solid #e5e7eb',
+                  borderRadius: 'var(--workspace-radius-medium)', cursor: 'pointer', fontFamily: 'inherit',
                   textAlign: 'left', width: '100%',
                 }}
               >
                 <div style={{
-                  width: 36, height: 36, borderRadius: 8,
+                  width: 36, height: 36, borderRadius: 'var(--workspace-radius-medium)',
                   backgroundColor: selected ? '#dbeafe' : '#f3f4f6',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                 }}>
-                  <Icon style={{ width: 18, height: 18, color: selected ? '#2563eb' : '#6b7280' }} />
+                  <Icon style={{ width: 18, height: 18, color: selected ? '#2563eb' : '#555e68' }} />
                 </div>
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#202124' }}>{opt.label}</div>
-                  <div style={{ fontSize: 12, color: '#6b7280' }}>{opt.description}</div>
+                  <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124' }}>{opt.label}</div>
+                  <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#555e68' }}>{opt.description}</div>
                 </div>
               </button>
             )
@@ -369,20 +405,21 @@ export function AutomationEditorPanel() {
 
         {/* Section B — Action */}
         <CollapsibleSection title="Action" summary={automation.action_name || 'Nothing selected yet'} testId="automation-action-section">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '8px 0 16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-8)', margin: "var(--workspace-space-8) 0 var(--workspace-space-16)" }}>
           {ACTION_OPTIONS.map(opt => {
-            const selected = automation.action_type === opt.value
+            const selected = automation.action_type === opt.value || (automation.action_type === 'task' && opt.value === 'workflow')
             return (
               <button
                 key={opt.value}
+                type="button" aria-pressed={selected}
                 onClick={() => opt.enabled && handleActionTypeChange(opt.value)}
                 disabled={!opt.enabled}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '12px 16px',
-                  backgroundColor: selected && opt.enabled ? '#eff6ff' : '#fff',
-                  border: selected && opt.enabled ? '2px solid #3b82f6' : '1px solid #e5e7eb',
-                  borderRadius: 8, fontFamily: 'inherit',
+                  display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)',
+                  padding: "var(--workspace-space-12) var(--workspace-space-16)",
+                  backgroundColor: selected && opt.enabled ? 'var(--workspace-selected)' : '#fff',
+                  border: selected && opt.enabled ? '2px solid var(--highlight-on-light)' : '1px solid #e5e7eb',
+                  borderRadius: 'var(--workspace-radius-medium)', fontFamily: 'inherit',
                   textAlign: 'left', width: '100%',
                   cursor: opt.enabled ? 'pointer' : 'default',
                   opacity: opt.enabled ? 1 : 0.5,
@@ -395,13 +432,13 @@ export function AutomationEditorPanel() {
                   backgroundColor: '#fff', flexShrink: 0,
                 }} />
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#202124' }}>{opt.label}</div>
-                  <div style={{ fontSize: 12, color: '#6b7280' }}>{opt.description}</div>
+                  <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124' }}>{opt.label}</div>
+                  <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#555e68' }}>{opt.description}</div>
                 </div>
                 {!opt.enabled && (
                   <span style={{
-                    fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
-                    backgroundColor: '#f3f4f6', color: '#6b7280', textTransform: 'uppercase',
+                    fontSize: 'var(--workspace-font-meta)', fontWeight: 700, padding: "var(--workspace-space-2) var(--workspace-space-8)", borderRadius: 'var(--workspace-radius-large)',
+                    backgroundColor: '#f3f4f6', color: '#555e68', textTransform: 'uppercase',
                   }}>
                     Coming Soon
                   </span>
@@ -414,7 +451,7 @@ export function AutomationEditorPanel() {
         {/* Action selector */}
         {(automation.action_type === 'workflow' || automation.action_type === 'extraction' || automation.action_type === 'task') && (() => {
           const actionKind = automation.action_type === 'extraction' ? 'extraction' : 'workflow'
-          const kindLabel = automation.action_type === 'extraction' ? 'Extraction' : automation.action_type === 'task' ? 'Workflow Task' : 'Workflow'
+          const kindLabel = automation.action_type === 'extraction' ? 'Extraction' : 'Workflow'
           // Resolve current action name from API response, falling back to local lookup
           let currentName = automation.action_name || ''
           if (!currentName && automation.action_id) {
@@ -427,18 +464,18 @@ export function AutomationEditorPanel() {
             }
           }
           return (
-            <div style={{ marginTop: 16, padding: '16px', backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>
+            <div style={{ marginTop: 'var(--workspace-space-16)', padding: "var(--workspace-space-16)", backgroundColor: '#f9fafb', borderRadius: 'var(--workspace-radius-medium)', border: "1px solid var(--workspace-border)" }}>
+              <label style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151', display: 'block', marginBottom: 'var(--workspace-space-8)' }}>
                 Select {kindLabel}
               </label>
               <button
                 onClick={() => setShowActionPicker(true)}
                 style={{
-                  width: '100%', padding: '10px 14px', fontSize: 13,
-                  border: '1.5px solid #d1d5db', borderRadius: 8, fontFamily: 'inherit',
-                  backgroundColor: '#fff', color: currentName ? '#111827' : '#6b7280',
+                  width: '100%', padding: "var(--workspace-space-12) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)',
+                  border: "1.5px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)', fontFamily: 'inherit',
+                  backgroundColor: '#fff', color: currentName ? '#111827' : '#555e68',
                   cursor: 'pointer', textAlign: 'left',
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--workspace-space-12)',
                 }}
               >
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -464,8 +501,8 @@ export function AutomationEditorPanel() {
         </CollapsibleSection>
 
         {/* Section C — Post-Action Output */}
-        <CollapsibleSection title="Post-Action Output" summary={outputSummary(automation)} testId="automation-output-section">
-        <div style={{ paddingTop: 8 }}>
+        <CollapsibleSection title="Results & delivery" summary={outputSummary(automation)} testId="automation-output-section">
+        <div style={{ paddingTop: 'var(--workspace-space-8)' }}>
         <OutputStorageCard automation={automation} onSave={debouncedSave} />
         <OutputNotificationCard automation={automation} onSave={debouncedSave} />
         </div>
@@ -473,15 +510,15 @@ export function AutomationEditorPanel() {
         </div>
 
         {/* "What are automations?" pill */}
-        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 24, marginBottom: 4 }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 'var(--workspace-space-24)', marginBottom: 'var(--workspace-space-4)' }}>
           <button
             onClick={() => setShowExplainer(true)}
             style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '6px 14px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
-              color: '#6b7280',
+              display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+              padding: "var(--workspace-space-6) var(--workspace-space-16)", fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
+              color: '#555e68',
               backgroundColor: '#f9fafb',
-              border: '1px solid #e5e7eb',
+              border: "1px solid var(--workspace-border)",
               borderRadius: 999, cursor: 'pointer',
               transition: 'all 0.15s',
             }}
@@ -492,7 +529,7 @@ export function AutomationEditorPanel() {
             }}
             onMouseLeave={e => {
               e.currentTarget.style.backgroundColor = '#f9fafb'
-              e.currentTarget.style.color = '#6b7280'
+              e.currentTarget.style.color = '#555e68'
               e.currentTarget.style.borderColor = '#e5e7eb'
             }}
           >
@@ -510,13 +547,14 @@ export function AutomationEditorPanel() {
 function EditorHeader({ title, onClose }: { title: string; onClose: () => void }) {
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '16px 24px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#fff', flexShrink: 0,
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--workspace-space-12)',
+      padding: "var(--workspace-space-16) var(--workspace-space-24)", borderBottom: "1px solid var(--workspace-border)", backgroundColor: '#fff', flexShrink: 0,
     }}>
-      <div style={{ fontSize: 18, fontWeight: 600, color: '#202124', letterSpacing: '-0.01em' }}>{title}</div>
+      <div style={{ fontSize: 'var(--workspace-font-section-title)', fontWeight: 600, color: '#202124', letterSpacing: '-0.01em' }}>{title}</div>
       <button
+        aria-label="Close automation"
         onClick={onClose}
-        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 4, color: '#5f6368', display: 'flex' }}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', borderRadius: 'var(--workspace-radius-small)', color: '#5f6368', display: 'flex' }}
       >
         <X style={{ width: 20, height: 20 }} />
       </button>
@@ -526,6 +564,7 @@ function EditorHeader({ title, onClose }: { title: string; onClose: () => void }
 
 /** One line for the folded Trigger section. */
 function triggerSummary(automation: Automation): string {
+  if (automation.trigger_type === 'm365_intake') return 'Microsoft 365 · managed separately'
   const label = TRIGGER_OPTIONS.find(o => o.value === automation.trigger_type)?.label ?? automation.trigger_type
   if (automation.trigger_type === 'schedule') {
     return `${label} · ${describeSchedule(toScheduleConfig(automation.trigger_config))}`
@@ -552,6 +591,7 @@ function TriggerConfigCard({ automation, onSave }: { automation: Automation; onS
   if (automation.trigger_type === 'schedule') {
     return <ScheduleConfig automation={automation} onSave={onSave} />
   }
+  if (automation.trigger_type === 'm365_intake') return <Microsoft365IntakeGuide existing />
   return null
 }
 
@@ -574,7 +614,7 @@ function ScheduleConfig({ automation, onSave }: { automation: Automation; onSave
   }
 
   return (
-    <div style={{ padding: 16, backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
+    <div style={{ padding: 'var(--workspace-space-16)', backgroundColor: '#f9fafb', borderRadius: 'var(--workspace-radius-medium)', border: "1px solid var(--workspace-border)" }}>
       <ScheduleConfigFields
         value={config}
         onChange={handleChange}
@@ -582,13 +622,13 @@ function ScheduleConfig({ automation, onSave }: { automation: Automation; onSave
         foldersLoading={foldersLoading}
         disabled={!automation.can_manage}
       />
-      <div style={{ marginTop: 10, fontSize: 12, color: '#6b7280', display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <div style={{ marginTop: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: '#555e68', display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-2)' }}>
         {!isScheduleComplete(config) && (
           <span style={{ color: '#b45309' }}>Choose a folder or documents; until then the schedule runs nothing.</span>
         )}
         {!automation.enabled && <span>Paused: it will not run until the automation is enabled.</span>}
         <span>
-          {automation.last_run_at ? `Last ran ${formatRunTime(automation.last_run_at, config.timezone)}` : 'Has not run yet'}
+          {automation.last_run_at ? `Last ran ${formatLocalTimestamp(automation.last_run_at)}` : 'Has not run yet'}
         </span>
       </div>
     </div>
@@ -640,8 +680,8 @@ function FolderWatchConfig({ automation, onSave }: { automation: Automation; onS
   }
 
   return (
-    <div style={{ padding: '16px', marginBottom: 32, backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
-      <label htmlFor="automation-watch-folder" style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>
+    <div style={{ padding: "var(--workspace-space-16)", marginBottom: 'var(--workspace-space-32)', backgroundColor: '#f9fafb', borderRadius: 'var(--workspace-radius-medium)', border: "1px solid var(--workspace-border)" }}>
+      <label htmlFor="automation-watch-folder" style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151', display: 'block', marginBottom: 'var(--workspace-space-8)' }}>
         Watch Folder
       </label>
       <select
@@ -649,9 +689,9 @@ function FolderWatchConfig({ automation, onSave }: { automation: Automation; onS
         value={watchedFolder}
         onChange={e => onSave({ trigger_config: { ...config, folder_id: e.target.value || undefined } })}
         style={{
-          width: '100%', padding: '8px 12px', fontSize: 13,
-          border: '1px solid #d1d5db', borderRadius: 6, fontFamily: 'inherit',
-          backgroundColor: '#fff', color: '#202124', marginBottom: 16,
+          width: '100%', padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-control)',
+          border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', fontFamily: 'inherit',
+          backgroundColor: '#fff', color: '#202124', marginBottom: 'var(--workspace-space-16)',
         }}
       >
         <option value="">Select a folder to watch</option>
@@ -660,10 +700,10 @@ function FolderWatchConfig({ automation, onSave }: { automation: Automation; onS
         ))}
       </select>
 
-      <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>
+      <label style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151', display: 'block', marginBottom: 'var(--workspace-space-8)' }}>
         File Types
       </label>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-6)', marginBottom: 'var(--workspace-space-16)' }}>
         {FILE_TYPE_OPTIONS.map(type => {
           const selected = fileTypes.includes(type)
           const stale = !SUPPORTED_EXTENSIONS.includes(type)
@@ -675,10 +715,10 @@ function FolderWatchConfig({ automation, onSave }: { automation: Automation; onS
                 ? `.${type} files can't be uploaded, so this filter never matches — click to remove it`
                 : undefined}
               style={{
-                padding: '4px 12px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
+                padding: "var(--workspace-space-4) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
                 borderRadius: 14, cursor: 'pointer',
                 backgroundColor: stale ? '#fef2f2' : selected ? '#dbeafe' : '#f3f4f6',
-                color: stale ? '#b3261e' : selected ? '#1d4ed8' : '#6b7280',
+                color: stale ? '#b3261e' : selected ? '#1d4ed8' : '#555e68',
                 border: stale
                   ? '1px solid #fecaca'
                   : selected ? '1px solid #93c5fd' : '1px solid #e5e7eb',
@@ -691,14 +731,14 @@ function FolderWatchConfig({ automation, onSave }: { automation: Automation; onS
         })}
       </div>
       {staleTypes.length > 0 && (
-        <p style={{ fontSize: 12, color: '#b3261e', margin: '-8px 0 16px' }}>
+        <p style={{ fontSize: 'var(--workspace-font-meta)', color: '#b3261e', margin: '-8px 0 16px' }}>
           {staleTypes.map(t => `.${t}`).join(', ')} can't be uploaded, so
           {staleTypes.length > 1 ? ' those filters ' : ' that filter '}
           never matches a file. Click to remove.
         </p>
       )}
 
-      <label htmlFor="automation-exclude-patterns" style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>
+      <label htmlFor="automation-exclude-patterns" style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151', display: 'block', marginBottom: 'var(--workspace-space-8)' }}>
         Exclude Patterns
       </label>
       <input
@@ -708,21 +748,21 @@ function FolderWatchConfig({ automation, onSave }: { automation: Automation; onS
         defaultValue={excludePatterns}
         onBlur={e => onSave({ trigger_config: { ...config, exclude_patterns: e.target.value } })}
         style={{
-          width: '100%', padding: '8px 12px', fontSize: 13, border: '1px solid #d1d5db',
-          borderRadius: 6, fontFamily: 'inherit', marginBottom: 16,
+          width: '100%', padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-control)', border: "1px solid var(--workspace-border)",
+          borderRadius: 'var(--workspace-radius-small)', fontFamily: 'inherit', marginBottom: 'var(--workspace-space-16)',
           boxSizing: 'border-box',
         }}
       />
 
-      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#374151' }}>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', cursor: 'pointer', fontSize: 'var(--workspace-font-control)', color: '#374151' }}>
         <input
           type="checkbox"
           checked={batchMode}
           onChange={e => onSave({ trigger_config: { ...config, batch_mode: e.target.checked } })}
-          style={{ width: 16, height: 16, accentColor: '#3b82f6' }}
+          style={{ width: 16, height: 16, accentColor: 'var(--highlight-on-light)' }}
         />
         <span style={{ fontWeight: 500 }}>Batch mode</span>
-        <span style={{ color: '#6b7280', fontSize: 12 }}>wait and process files together</span>
+        <span style={{ color: '#555e68', fontSize: 'var(--workspace-font-meta)' }}>Files currently run individually; batch execution is not available yet.</span>
       </label>
     </div>
   )
@@ -812,40 +852,40 @@ curl "${baseUrl}/api/workflows/status?session_id=SESSION_ID_FROM_RESPONSE" \\
 }`
 
   const codeBlockStyle: React.CSSProperties = {
-    padding: '14px 16px', backgroundColor: '#1a1a2e', borderRadius: 6, fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-    fontSize: 12, color: '#e2e8f0', whiteSpace: 'pre', overflowX: 'auto', lineHeight: 1.6, position: 'relative',
+    padding: "var(--workspace-space-16) var(--workspace-space-16)", backgroundColor: '#1a1a2e', borderRadius: 'var(--workspace-radius-small)', fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+    fontSize: 'var(--workspace-font-meta)', color: '#e2e8f0', whiteSpace: 'pre', overflowX: 'auto', lineHeight: 1.6, position: 'relative',
   }
 
   const tabStyle = (active: boolean): React.CSSProperties => ({
-    padding: '4px 12px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
-    borderRadius: 4, cursor: 'pointer', border: 'none',
-    backgroundColor: active ? '#3b82f6' : '#e5e7eb',
-    color: active ? '#fff' : '#6b7280',
+    padding: "var(--workspace-space-6) var(--workspace-space-12)", minHeight: 'var(--workspace-control-height)', fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
+    borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer', border: 'none',
+    backgroundColor: active ? 'var(--color-panel-dark)' : '#e5e7eb',
+    color: active ? '#fff' : '#555e68',
   })
 
   return (
-    <div style={{ padding: '16px', marginBottom: 32, backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
+    <div style={{ padding: "var(--workspace-space-16)", marginBottom: 'var(--workspace-space-32)', backgroundColor: '#f9fafb', borderRadius: 'var(--workspace-radius-medium)', border: "1px solid var(--workspace-border)" }}>
       {/* Header with language toggle */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <label style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--workspace-space-12)', marginBottom: 'var(--workspace-space-16)' }}>
+        <label style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151' }}>
           API Integration
         </label>
-        <div style={{ display: 'flex', gap: 4 }}>
-          <button onClick={() => setLang('python')} style={tabStyle(lang === 'python')}>Python</button>
-          <button onClick={() => setLang('curl')} style={tabStyle(lang === 'curl')}>cURL</button>
+        <div style={{ display: 'flex', gap: 'var(--workspace-space-4)' }}>
+          <button type="button" aria-pressed={lang === 'python'} onClick={() => setLang('python')} style={tabStyle(lang === 'python')}>Python</button>
+          <button type="button" aria-pressed={lang === 'curl'} onClick={() => setLang('curl')} style={tabStyle(lang === 'curl')}>cURL</button>
         </div>
       </div>
 
-      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#555e68', marginBottom: 'var(--workspace-space-12)' }}>
         Requires an API key. Generate one from <strong>My Account</strong> in the top-right menu.
       </div>
 
       {/* Endpoint */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+      <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#555e68', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--workspace-space-6)' }}>
           Endpoint
         </div>
-        <div style={{ ...codeBlockStyle, whiteSpace: 'nowrap' }}>
+        <div role="region" aria-label="API endpoint" tabIndex={0} style={{ ...codeBlockStyle, whiteSpace: 'nowrap' }}>
           <span style={{ color: '#22d3ee' }}>POST</span>{' '}{endpoint}
         </div>
       </div>
@@ -881,11 +921,11 @@ curl "${baseUrl}/api/workflows/status?session_id=SESSION_ID_FROM_RESPONSE" \\
       />
 
       {/* Response example */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+      <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#555e68', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--workspace-space-6)' }}>
           Response
         </div>
-        <div style={codeBlockStyle}>
+        <div role="region" aria-label="API response example" tabIndex={0} style={codeBlockStyle}>
           {responseExample}
         </div>
       </div>
@@ -910,25 +950,27 @@ function CodeBlock({ title, code, id, copied, onCopy, style }: {
   onCopy: (text: string, id: string) => void; style: React.CSSProperties;
 }) {
   return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+    <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--workspace-space-12)', marginBottom: 'var(--workspace-space-6)' }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#555e68', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           {title}
         </div>
         <button
+          type="button"
+          aria-label={`${copied === id ? 'Copied' : 'Copy'} ${title} example`}
           onClick={() => onCopy(code, id)}
           style={{
-            display: 'flex', alignItems: 'center', gap: 4, padding: '2px 8px', fontSize: 11,
-            fontWeight: 500, fontFamily: 'inherit', borderRadius: 4, cursor: 'pointer',
-            border: '1px solid #e5e7eb', backgroundColor: '#fff',
-            color: copied === id ? '#16a34a' : '#6b7280',
+            display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)', padding: "var(--workspace-space-2) var(--workspace-space-8)", fontSize: 'var(--workspace-font-meta)',
+            fontWeight: 500, fontFamily: 'inherit', borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
+            border: "1px solid var(--workspace-border)", backgroundColor: '#fff',
+            color: copied === id ? '#166534' : '#555e68',
           }}
         >
           {copied === id ? <Check style={{ width: 12, height: 12 }} /> : <Copy style={{ width: 12, height: 12 }} />}
           {copied === id ? 'Copied' : 'Copy'}
         </button>
       </div>
-      <div style={style}>{code}</div>
+      <div role="region" aria-label={`${title} example`} tabIndex={0} style={style}>{code}</div>
     </div>
   )
 }
@@ -956,21 +998,21 @@ function OutputStorageCard({ automation, onSave }: { automation: Automation; onS
   }
 
   return (
-    <div style={{ padding: 16, marginBottom: 16, backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
-      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: enabled ? 12 : 0 }}>
+    <div style={{ padding: 'var(--workspace-space-16)', marginBottom: 'var(--workspace-space-16)', backgroundColor: '#f9fafb', borderRadius: 'var(--workspace-radius-medium)', border: "1px solid var(--workspace-border)" }}>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', cursor: 'pointer', marginBottom: enabled ? 12 : 0 }}>
         <input
           type="checkbox"
           checked={enabled}
           onChange={e => updateStorage({ enabled: e.target.checked })}
-          style={{ width: 16, height: 16, accentColor: '#3b82f6' }}
+          style={{ width: 16, height: 16, accentColor: 'var(--highlight-on-light)' }}
         />
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>Save results to a folder</span>
+        <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151' }}>Save results to a folder</span>
       </label>
 
       {enabled && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 24 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-12)', paddingLeft: 'var(--workspace-space-24)' }}>
           <div>
-            <label htmlFor="automation-storage-destination-folder" style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
+            <label htmlFor="automation-storage-destination-folder" style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#555e68', display: 'block', marginBottom: 'var(--workspace-space-4)' }}>
               Destination Folder
             </label>
             <select
@@ -978,8 +1020,8 @@ function OutputStorageCard({ automation, onSave }: { automation: Automation; onS
               value={destinationFolder}
               onChange={e => updateStorage({ destination_folder: e.target.value })}
               style={{
-                width: '100%', padding: '8px 12px', fontSize: 13,
-                border: '1px solid #d1d5db', borderRadius: 6, fontFamily: 'inherit',
+                width: '100%', padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-control)',
+                border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', fontFamily: 'inherit',
                 backgroundColor: '#fff', color: '#202124',
               }}
             >
@@ -991,7 +1033,7 @@ function OutputStorageCard({ automation, onSave }: { automation: Automation; onS
           </div>
 
           <div>
-            <label htmlFor="automation-storage-format" style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
+            <label htmlFor="automation-storage-format" style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#555e68', display: 'block', marginBottom: 'var(--workspace-space-4)' }}>
               Format
             </label>
             <select
@@ -999,8 +1041,8 @@ function OutputStorageCard({ automation, onSave }: { automation: Automation; onS
               value={format}
               onChange={e => updateStorage({ format: e.target.value })}
               style={{
-                width: '100%', padding: '8px 12px', fontSize: 13,
-                border: '1px solid #d1d5db', borderRadius: 6, fontFamily: 'inherit',
+                width: '100%', padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-control)',
+                border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', fontFamily: 'inherit',
                 backgroundColor: '#fff', color: '#202124',
               }}
             >
@@ -1024,7 +1066,7 @@ function OutputStorageCard({ automation, onSave }: { automation: Automation; onS
           </div>
 
           <div>
-            <label htmlFor="automation-storage-file-naming" style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
+            <label htmlFor="automation-storage-file-naming" style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#555e68', display: 'block', marginBottom: 'var(--workspace-space-4)' }}>
               File Naming Pattern
             </label>
             <input
@@ -1034,11 +1076,11 @@ function OutputStorageCard({ automation, onSave }: { automation: Automation; onS
               onBlur={e => updateStorage({ file_naming: e.target.value })}
               placeholder="{workflow_name}_{date}"
               style={{
-                width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
-                border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box',
+                width: '100%', padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-control)', fontFamily: 'inherit',
+                border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', boxSizing: 'border-box',
               }}
             />
-            <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#555e68', marginTop: 'var(--workspace-space-4)' }}>
               Variables: {'{workflow_name}'}, {'{date}'}, {'{timestamp}'}, {'{document_name}'}
             </div>
           </div>
@@ -1054,7 +1096,7 @@ function OutputNotificationCard({ automation, onSave }: { automation: Automation
   const notif = notifications[0] || {}
   const enabled = notifications.length > 0 && notif.channel === 'email'
   const recipients = ((notif.recipients || []) as string[]).join(', ')
-  const notifyOwner = (notif.notify_owner as boolean) ?? true
+  const notifyOwner = (notif.notify_owner as boolean) ?? false
   const conditions = (notif.conditions as string) || 'always'
 
   const updateNotification = (patch: Record<string, unknown> & { recipients_str?: string }) => {
@@ -1082,21 +1124,21 @@ function OutputNotificationCard({ automation, onSave }: { automation: Automation
   }
 
   return (
-    <div style={{ padding: 16, marginBottom: 16, backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
-      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: enabled ? 12 : 0 }}>
+    <div style={{ padding: 'var(--workspace-space-16)', marginBottom: 'var(--workspace-space-16)', backgroundColor: '#f9fafb', borderRadius: 'var(--workspace-radius-medium)', border: "1px solid var(--workspace-border)" }}>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', cursor: 'pointer', marginBottom: enabled ? 12 : 0 }}>
         <input
           type="checkbox"
           checked={enabled}
           onChange={e => handleToggle(e.target.checked)}
-          style={{ width: 16, height: 16, accentColor: '#3b82f6' }}
+          style={{ width: 16, height: 16, accentColor: 'var(--highlight-on-light)' }}
         />
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>Send email notification</span>
+        <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151' }}>Send email notification</span>
       </label>
 
       {enabled && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 24 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-12)', paddingLeft: 'var(--workspace-space-24)' }}>
           <div>
-            <label htmlFor="automation-notif-recipients" style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
+            <label htmlFor="automation-notif-recipients" style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#555e68', display: 'block', marginBottom: 'var(--workspace-space-4)' }}>
               Recipients
             </label>
             <input
@@ -1106,24 +1148,24 @@ function OutputNotificationCard({ automation, onSave }: { automation: Automation
               onBlur={e => updateNotification({ recipients_str: e.target.value })}
               placeholder="email@example.com, another@example.com"
               style={{
-                width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
-                border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box',
+                width: '100%', padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-control)', fontFamily: 'inherit',
+                border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', boxSizing: 'border-box',
               }}
             />
           </div>
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', cursor: 'pointer' }}>
             <input
               type="checkbox"
               checked={notifyOwner}
               onChange={e => updateNotification({ notify_owner: e.target.checked })}
-              style={{ width: 14, height: 14, accentColor: '#3b82f6' }}
+              style={{ width: 14, height: 14, accentColor: 'var(--highlight-on-light)' }}
             />
-            <span style={{ fontSize: 13, color: '#374151' }}>Notify automation owner</span>
+            <span style={{ fontSize: 'var(--workspace-font-control)', color: '#374151' }}>Notify automation owner</span>
           </label>
 
           <div>
-            <label htmlFor="automation-notif-conditions" style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
+            <label htmlFor="automation-notif-conditions" style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#555e68', display: 'block', marginBottom: 'var(--workspace-space-4)' }}>
               Send when
             </label>
             <select
@@ -1131,8 +1173,8 @@ function OutputNotificationCard({ automation, onSave }: { automation: Automation
               value={conditions}
               onChange={e => updateNotification({ conditions: e.target.value })}
               style={{
-                width: '100%', padding: '8px 12px', fontSize: 13,
-                border: '1px solid #d1d5db', borderRadius: 6, fontFamily: 'inherit',
+                width: '100%', padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-control)',
+                border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', fontFamily: 'inherit',
                 backgroundColor: '#fff', color: '#202124',
               }}
             >

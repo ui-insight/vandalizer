@@ -1,5 +1,7 @@
 export class ApiError extends Error {
   status: number
+  code?: string
+  existingReviewId?: string
   // Set on 403 DEMO_EXPIRED responses so callers can route an expired trial
   // user straight to the renewal screen.
   feedbackToken?: string | null
@@ -219,9 +221,15 @@ export async function apiFetch<T>(
     if (Array.isArray(message)) {
       message = message.map((e: { msg?: string }) => e.msg || String(e)).join('; ')
     } else if (typeof message !== 'string') {
-      message = String(message)
+      message = typeof message.message === 'string' ? message.message : String(message)
     }
-    throw new ApiError(res.status, message)
+    const error = new ApiError(res.status, message)
+    if (body.detail && typeof body.detail.code === 'string') error.code = body.detail.code
+    if (res.status === 409 && error.code === 'CERTIFICATION_REVIEW_EXISTS'
+      && typeof body.detail.attempt_id === 'string' && /^[a-f0-9]{32}$/.test(body.detail.attempt_id)) {
+      error.existingReviewId = body.detail.attempt_id
+    }
+    throw error
   }
 
   return res.json()

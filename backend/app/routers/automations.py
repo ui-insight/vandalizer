@@ -1,4 +1,6 @@
 """Automation API routes."""
+from collections.abc import Awaitable, Callable, Sequence
+from app.schemas.automations import RunNowDocument
 
 import asyncio
 import datetime
@@ -12,6 +14,7 @@ from bson import ObjectId
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from starlette.responses import JSONResponse
 
+from app.utils.timestamps import utc_iso
 from app.dependencies import get_api_key_user, get_current_user
 from app.models.automation import Automation
 from app.models.document import SmartDocument
@@ -20,6 +23,7 @@ from app.models.user import User
 from app.models.workflow import WorkflowResult
 from app.rate_limit import limiter
 from app.schemas.automations import (
+    AutomationHistoryResponse,
     RunNowRequest,
     RunNowResponse,
     AutomationResponse,
@@ -29,10 +33,11 @@ from app.schemas.automations import (
     TriggerEventStatusResponse,
     UpdateAutomationRequest,
 )
+from app.services.extraction_dispatch import record_extraction_dispatch
 from app.services import access_control, audit_service
 from app.services.access_control import get_authorized_search_set, get_authorized_workflow
 from app.services import automation_service as svc
-from app.services import automation_run_now
+from app.services import automation_history, automation_run_now, automation_launch
 from app.services import automation_schedule
 
 logger = logging.getLogger(__name__)
@@ -112,7 +117,7 @@ async def _prepare_schedule_config(trigger_config: dict | None, user: User) -> d
     return cfg
 
 
-def _schedule_times(auto) -> tuple[str | None, str | None]:
+def _schedule_times(auto: Automation) -> tuple[str | None, str | None]:
     """``(next_run_at, last_run_at)`` as ISO strings for a schedule automation."""
     if auto.trigger_type != "schedule" or not (auto.trigger_config or {}).get("cron_expression"):
         return None, None
@@ -124,8 +129,8 @@ def _schedule_times(auto) -> tuple[str | None, str | None]:
         base = automation_schedule.last_run_base(auto, now)
         next_run = automation_schedule.next_runs(auto.trigger_config, base)[0]
     except Exception:
-        return None, last.isoformat() if last else None
-    return next_run.isoformat(), last.isoformat() if last else None
+        return None, utc_iso(last)
+    return utc_iso(next_run), utc_iso(last)
 
 
 async def _resolve_action_name(action_type: str | None, action_id: str | None) -> str | None:
@@ -152,7 +157,7 @@ async def _resolve_action_name(action_type: str | None, action_id: str | None) -
     return None
 
 
-async def _resolve_action_names_bulk(automations: list) -> dict[str, str]:
+async def _resolve_action_names_bulk(automations: list[Automation]) -> dict[str, str]:
     """Resolve linked workflow/extraction names for many automations in bulk.
 
     Returns a map keyed by ``action_id`` so callers avoid the N+1 of looking
@@ -208,16 +213,41 @@ async def _resolve_action_names_bulk(automations: list) -> dict[str, str]:
     return names
 
 
-_UNRESOLVED = object()
+class _UnresolvedActionName:
+    pass
+
+
+_UNRESOLVED = _UnresolvedActionName()
+
+
+async def _latest_run_summaries(automations: Sequence[Automation]) -> dict:
+    """Resolve the latest event per authorized automation in two bounded queries."""
+    ids = [str(auto.id) for auto in automations]
+    if not ids:
+        return {}
+    summaries: dict[str, dict] = {}
+    for model, key in ((WorkflowTriggerEvent, "trigger_context.automation_id"),
+                       (ExtractionTriggerEvent, "automation_id")):
+        pipeline = [
+            {"$match": {key: {"$in": ids}}},
+            {"$sort": {"created_at": -1, "_id": -1}},
+            {"$group": {"_id": "$" + key, "status": {"$first": "$status"},
+                        "created_at": {"$first": "$created_at"}}},
+        ]
+        for row in await model.aggregate(pipeline).to_list():
+            previous = summaries.get(row["_id"])
+            if previous is None or row["created_at"] > previous["created_at"]:
+                summaries[row["_id"]] = row
+    return summaries
 
 
 async def _to_response(
-    auto, *, can_manage: bool = True, action_name=_UNRESOLVED
+    auto: Automation, *, can_manage: bool = True, action_name: str | None | _UnresolvedActionName=_UNRESOLVED, last_event: dict | None=None
 ) -> AutomationResponse:
     # When action_name is left unresolved, look it up individually. Callers that
     # have already batch-resolved names (e.g. list_automations) pass the value
     # in — including None for a deleted target — to avoid a per-row N+1.
-    if action_name is _UNRESOLVED:
+    if isinstance(action_name, _UnresolvedActionName):
         action_name = await _resolve_action_name(auto.action_type, auto.action_id)
     next_run_at, last_run_at = _schedule_times(auto)
     return AutomationResponse(
@@ -234,11 +264,13 @@ async def _to_response(
         team_id=auto.team_id,
         shared_with_team=auto.shared_with_team,
         output_config=auto.output_config,
-        created_at=auto.created_at.isoformat(),
-        updated_at=auto.updated_at.isoformat(),
+        created_at=utc_iso(auto.created_at),
+        updated_at=utc_iso(auto.updated_at),
         can_manage=can_manage,
         next_run_at=next_run_at,
         last_run_at=last_run_at,
+        last_event_status=last_event["status"] if last_event else None,
+        last_event_at=utc_iso(last_event["created_at"]) if last_event else None,
     )
 
 
@@ -274,7 +306,7 @@ async def _load_authorized_automation(
 
 
 @router.post("/schedule/preview", response_model=SchedulePreviewResponse)
-async def preview_schedule(req: SchedulePreviewRequest, user: User = Depends(get_current_user)):
+async def preview_schedule(req: SchedulePreviewRequest, user: User = Depends(get_current_user)) -> SchedulePreviewResponse:
     """The next three run times for a schedule pick, before it is saved — the
     same computation the scheduler uses, so the wizard shows what will happen."""
     try:
@@ -292,7 +324,7 @@ async def preview_schedule(req: SchedulePreviewRequest, user: User = Depends(get
 
 
 @router.post("", response_model=AutomationResponse)
-async def create_automation(req: CreateAutomationRequest, user: User = Depends(get_current_user)):
+async def create_automation(req: CreateAutomationRequest, user: User = Depends(get_current_user)) -> AutomationResponse:
     await _validate_action_target(req.action_type, req.action_id, user)
     trigger_config = req.trigger_config
     if req.trigger_type == "schedule":
@@ -309,25 +341,27 @@ async def create_automation(req: CreateAutomationRequest, user: User = Depends(g
 
 
 @router.get("", response_model=list[AutomationResponse])
-async def list_automations(user: User = Depends(get_current_user)):
+async def list_automations(user: User = Depends(get_current_user)) -> list[AutomationResponse]:
     team_id = str(user.current_team) if user.current_team else None
     automations = await svc.list_automations(
         user_id=user.user_id, team_id=team_id,
     )
     team_access = await access_control.get_team_access_context(user)
     action_names = await _resolve_action_names_bulk(automations)
+    last_events = await _latest_run_summaries(automations)
     return [
         await _to_response(
             a,
             can_manage=access_control.can_manage_automation(a, user, team_access),
             action_name=action_names.get(a.action_id) if a.action_id else None,
+            last_event=last_events.get(str(a.id)),
         )  # action_name is always supplied here, so no per-row fallback fires
         for a in automations
     ]
 
 
-@router.get("/active")
-async def get_active_automations(user: User = Depends(get_current_user)):
+@router.get("/active", response_model=None)
+async def get_active_automations(user: User = Depends(get_current_user)) -> dict[str, object]:
     """Return IDs of automations whose linked workflows/extractions/tasks are currently running,
     plus recently completed automations (within the last 30 seconds) for toast notifications."""
     import datetime
@@ -422,7 +456,7 @@ async def get_active_automations(user: User = Depends(get_current_user)):
 # ---------------------------------------------------------------------------
 
 
-async def _trigger_event_status(trigger_event_id: str, *, may_view):
+async def _trigger_event_status(trigger_event_id: str, *, may_view: Callable[[str | None, str | None], Awaitable[bool]]) -> TriggerEventStatusResponse | JSONResponse:
     """Status + output of a trigger event, for the API-key route and the
     editor's cookie-auth route alike. ``may_view(automation_id | None,
     event_user_id | None)`` decides whether the caller may see the event;
@@ -446,9 +480,9 @@ async def _trigger_event_status(trigger_event_id: str, *, may_view):
             trigger_event_id=trigger_event_id,
             status=wf_event.status,
             action_type="workflow",
-            created_at=wf_event.created_at.isoformat() if wf_event.created_at else None,
-            started_at=wf_event.started_at.isoformat() if wf_event.started_at else None,
-            completed_at=wf_event.completed_at.isoformat() if wf_event.completed_at else None,
+            created_at=utc_iso(wf_event.created_at),
+            started_at=utc_iso(wf_event.started_at),
+            completed_at=utc_iso(wf_event.completed_at),
             output=output,
             error=wf_event.error,
         )
@@ -467,9 +501,9 @@ async def _trigger_event_status(trigger_event_id: str, *, may_view):
             trigger_event_id=trigger_event_id,
             status=ext_event.status,
             action_type="extraction",
-            created_at=ext_event.created_at.isoformat() if ext_event.created_at else None,
-            started_at=ext_event.started_at.isoformat() if ext_event.started_at else None,
-            completed_at=ext_event.completed_at.isoformat() if ext_event.completed_at else None,
+            created_at=utc_iso(ext_event.created_at),
+            started_at=utc_iso(ext_event.started_at),
+            completed_at=utc_iso(ext_event.completed_at),
             output=ext_event.result,
             error=ext_event.error,
         )
@@ -489,13 +523,13 @@ async def get_trigger_event_status(
     request: Request,
     trigger_event_id: str,
     user: User = Depends(get_api_key_user),
-):
+) -> TriggerEventStatusResponse | JSONResponse:
     """Poll the status and output of a triggered automation run.
 
     Works for both workflow and extraction trigger events.
     Returns output data once the run has completed.
     """
-    async def _owner_only(automation_id, event_user_id):
+    async def _owner_only(automation_id: str | None, event_user_id: str | None) -> bool:
         if event_user_id is not None:
             return event_user_id == user.user_id
         if not automation_id:
@@ -515,14 +549,14 @@ async def get_trigger_event_status(
 
 
 @router.get("/{automation_id}", response_model=AutomationResponse)
-async def get_automation(automation_id: str, user: User = Depends(get_current_user)):
+async def get_automation(automation_id: str, user: User = Depends(get_current_user)) -> AutomationResponse:
     auto, team_access = await _load_authorized_automation(automation_id, user)
     can_manage = access_control.can_manage_automation(auto, user, team_access)
     return await _to_response(auto, can_manage=can_manage)
 
 
 @router.patch("/{automation_id}", response_model=AutomationResponse)
-async def update_automation(automation_id: str, req: UpdateAutomationRequest, user: User = Depends(get_current_user)):
+async def update_automation(automation_id: str, req: UpdateAutomationRequest, user: User = Depends(get_current_user)) -> AutomationResponse:
     current, _ = await _load_authorized_automation(automation_id, user, manage=True)
 
     # Switching to an action type that names a different kind of resource
@@ -562,8 +596,8 @@ async def update_automation(automation_id: str, req: UpdateAutomationRequest, us
     return await _to_response(auto, can_manage=True)
 
 
-@router.delete("/{automation_id}")
-async def delete_automation(automation_id: str, user: User = Depends(get_current_user)):
+@router.delete("/{automation_id}", response_model=None)
+async def delete_automation(automation_id: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     auto, _ = await _load_authorized_automation(automation_id, user, manage=True)
     await auto.delete()
     await audit_service.log_event(
@@ -590,7 +624,7 @@ async def run_automation_now(
     automation_id: str,
     body: RunNowRequest | None = None,
     user: User = Depends(get_current_user),
-):
+) -> RunNowResponse:
     """Run an automation once, immediately, the way its trigger would.
 
     A real run: the documents go through the passive pipeline and every
@@ -600,10 +634,15 @@ async def run_automation_now(
     it can be tested before it is switched on. Manage rights required.
     """
     auto, _team_access = await _load_authorized_automation(automation_id, user, manage=True)
+    chosen = [u.strip() for u in (body.document_uuids if body else None) or [] if u and u.strip()]
+    request_id = body.request_id if body else None
+    if request_id:
+        recovered = await automation_launch.recover(automation_id, user.user_id, request_id, chosen)
+        if recovered:
+            return recovered
     if not auto.action_id:
         raise HTTPException(status_code=400, detail="This automation has no action target selected yet.")
 
-    chosen = [u.strip() for u in (body.document_uuids if body else None) or [] if u and u.strip()]
     if chosen:
         chosen = await _authorize_existing_documents(chosen, user)
     selection = await automation_run_now.select_run_now_documents(auto, chosen_uuids=chosen)
@@ -611,13 +650,31 @@ async def run_automation_now(
         raise HTTPException(status_code=400, detail=selection["reason"] or "No documents to run with.")
 
     doc_uuids = [d["uuid"] for d in selection["documents"]]
-    result = await _dispatch_action(
-        auto, user, doc_uuids, None, False, 30, None,
-        trigger_type="manual",
-        extra_context={"manual_run": True, "run_by_user_id": user.user_id},
-    )
+    receipt = None
+    if request_id:
+        receipt, recovered = await automation_launch.reserve(
+            automation_id, user.user_id, request_id, chosen, selection, auto.action_type,
+        )
+        if recovered:
+            return recovered
+    try:
+        result = await _dispatch_action(
+            auto, user, doc_uuids, None, False, 30, None,
+            trigger_type="manual",
+            extra_context={"manual_run": True, "run_by_user_id": user.user_id,
+                           **({"launch_request_id": request_id} if request_id else {})},
+        )
+    except Exception:
+        if receipt is None:
+            raise
+        logger.exception("Manual automation launch outcome uncertain: %s", request_id)
+        raise HTTPException(status_code=503, detail="Launch outcome is not confirmed. Reconnect using the same request; do not start another run.")
     if isinstance(result, JSONResponse):  # pragma: no cover - wait=False never returns one
         raise HTTPException(status_code=500, detail="Unexpected dispatch response")
+
+    if receipt:
+        receipt.response = automation_launch.response_for(receipt, result["trigger_event_id"]).model_dump()
+        await receipt.save()
 
     await audit_service.log_event(
         action="automation.run_now",
@@ -630,10 +687,26 @@ async def run_automation_now(
         status="queued",
         trigger_event_id=result["trigger_event_id"],
         action_type=auto.action_type,
-        documents=[{"uuid": d["uuid"], "title": d["title"]} for d in selection["documents"]],
+        documents=[RunNowDocument(uuid=d["uuid"], title=d["title"]) for d in selection["documents"]],
         document_source=selection["source"],
         documents_matched=selection["matched"],
     )
+
+
+@router.get("/{automation_id}/runs", response_model=AutomationHistoryResponse)
+@limiter.limit("120/minute")
+async def get_automation_history(
+    request: Request,
+    automation_id: str,
+    limit: int = Query(20, ge=1, le=100),
+    before: datetime.datetime | None = None,
+    before_id: str | None = Query(None, pattern=r"^[0-9a-fA-F]{24}$"),
+    user: User = Depends(get_current_user),
+) -> dict:
+    auto, _team_access = await _load_authorized_automation(automation_id, user)
+    if (before is None) != (before_id is None):
+        raise HTTPException(status_code=400, detail="Both history cursor fields are required")
+    return await automation_history.list_runs(str(auto.id), limit, before, before_id)
 
 
 @router.get("/{automation_id}/runs/{trigger_event_id}", response_model=TriggerEventStatusResponse)
@@ -643,18 +716,18 @@ async def get_automation_run_status(
     automation_id: str,
     trigger_event_id: str,
     user: User = Depends(get_current_user),
-):
+) -> TriggerEventStatusResponse | JSONResponse:
     """Cookie-auth twin of ``GET /runs/{id}`` for the editor: anyone who can
     see the automation can watch its run."""
     auto, _team_access = await _load_authorized_automation(automation_id, user)
 
-    async def _same_automation(event_automation_id, _event_user_id):
+    async def _same_automation(event_automation_id: str | None, _event_user_id: str | None) -> bool:
         return str(event_automation_id or "") == str(auto.id)
 
     return await _trigger_event_status(trigger_event_id, may_view=_same_automation)
 
 
-@router.post("/{automation_id}/trigger")
+@router.post("/{automation_id}/trigger", response_model=None)
 @limiter.limit("20/minute")
 async def trigger_automation(
     request: Request,
@@ -666,7 +739,7 @@ async def trigger_automation(
     wait: bool = Query(False),
     timeout: int = Query(30, ge=5, le=120),
     user: User = Depends(get_api_key_user),
-):
+) -> dict | JSONResponse:
     """Trigger an automation via API. Accepts file uploads, existing document UUIDs, and/or plain text.
 
     Requires ``x-api-key`` header. The automation must be enabled and have an action configured.
@@ -743,6 +816,7 @@ async def trigger_automation(
             doc = SmartDocument(
                 title=upload.filename,
                 processing=True,
+                validating=True,
                 valid=True,
                 raw_text="",
                 downloadpath=str(relative_path),
@@ -759,8 +833,7 @@ async def trigger_automation(
                 document_uuid=uid, extension=ext, document_path=str(file_path),
                 user_id=user.user_id,
             )
-            doc.task_id = task_id
-            await doc.save()
+            await record_extraction_dispatch(doc, task_id)
             all_doc_uuids.append(uid)
     except HTTPException:
         raise
@@ -782,9 +855,9 @@ async def trigger_automation(
 
 
 async def _dispatch_action(
-    auto, user, all_doc_uuids, callback_url, wait, timeout, temp_doc_uuids=None,
+    auto: Automation, user: User, all_doc_uuids: list[str], callback_url: str | None, wait: bool, timeout: int, temp_doc_uuids: list[str] | None=None,
     *, trigger_type: str = "api", extra_context: dict | None = None,
-):
+) -> dict | JSONResponse:
     if not auto.action_id:
         raise HTTPException(
             status_code=400,
@@ -927,7 +1000,7 @@ async def _dispatch_action(
 # ---------------------------------------------------------------------------
 
 
-async def _wait_for_workflow_event(trigger_event_id: str, timeout: int):
+async def _wait_for_workflow_event(trigger_event_id: str, timeout: int) -> object:
     """Poll WorkflowTriggerEvent until completed/failed or timeout. Returns output or None."""
     oid = ObjectId(trigger_event_id)
     elapsed = 0
@@ -947,7 +1020,7 @@ async def _wait_for_workflow_event(trigger_event_id: str, timeout: int):
     return None
 
 
-async def _wait_for_extraction_event(trigger_event_id: str, timeout: int):
+async def _wait_for_extraction_event(trigger_event_id: str, timeout: int) -> object:
     """Poll ExtractionTriggerEvent until completed/failed or timeout. Returns output or None."""
     oid = ObjectId(trigger_event_id)
     elapsed = 0

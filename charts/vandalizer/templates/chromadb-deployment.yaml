@@ -1,8 +1,8 @@
 {{- if .Values.chromadb.enabled }}
 {{/*
 ChromaDB vector store. The image tag is pinned deliberately: the backend's
-chromadb client speaks the v1 HTTP API; Chroma server >=1.0 is v2-only and
-incompatible. Bump the client and server together.
+chromadb client defaults to the v2 HTTP API, but server/client collection
+configuration contracts also differ across releases. Test and bump them together.
 */}}
 apiVersion: apps/v1
 kind: Deployment

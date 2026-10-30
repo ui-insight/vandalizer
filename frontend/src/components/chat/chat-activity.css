@@ -1,0 +1,6 @@
+.chat-activity-line { display:flex; align-items:center; gap:9px; min-height:28px; margin:4px 0 20px; color:#64748b; }
+.chat-activity-dot { width:6px; height:6px; flex-shrink:0; border-radius:50%; background:currentColor; animation:chat-activity-pulse 1.8s ease-in-out infinite; }
+.chat-activity-label { min-width:0; font-size:13px; line-height:1.5; overflow-wrap:anywhere; }
+.chat-activity-elapsed { flex-shrink:0; font-size:12px; font-variant-numeric:tabular-nums; }
+@keyframes chat-activity-pulse { 50% { opacity:.35; } }
+@media (prefers-reduced-motion:reduce) { .chat-activity-dot { animation:none; } }

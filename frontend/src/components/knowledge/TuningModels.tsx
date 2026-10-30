@@ -47,10 +47,10 @@ export function TuningModelsPicker({
   }, [kbUuid, judgeModel])
 
   if (error) {
-    return <div style={{ fontSize: 12, color: '#f87171' }}>{error}</div>
+    return <div style={{ fontSize: 12, color: 'var(--workspace-danger)' }}>{error}</div>
   }
   if (!plan) {
-    return <div style={{ fontSize: 12, color: '#888' }}>Loading models…</div>
+    return <div style={{ fontSize: 12, color: 'var(--workspace-muted)' }}>Loading models…</div>
   }
 
   const eligible = plan.models.filter(m => m.eligible).map(m => m.name)
@@ -79,19 +79,19 @@ export function TuningModelsPicker({
         trialsLabel={trialsLabel}
       />
       {plan.judge_model_fallback && (
-        <div style={{ fontSize: 11, color: '#fbbf24' }}>
+        <div style={{ fontSize: 11, color: 'var(--workspace-warning)' }}>
           The Validation grader is set to {plan.judge_model_fallback.configured}, which isn't
           configured any more, so {plan.judge_model_fallback.used} judges instead.
         </div>
       )}
       {plan.current_shares_judge_family && (
-        <div style={{ fontSize: 11, color: '#fbbf24' }}>
+        <div style={{ fontSize: 11, color: 'var(--workspace-warning)' }}>
           Your current model ({plan.current_model}) is from the judge's family, so the judge may
           rate your current settings a little high. Pick a judge from another family to avoid this.
         </div>
       )}
       {chosen.length === 0 && (
-        <div style={{ fontSize: 11, color: '#bbb' }}>
+        <div style={{ fontSize: 11, color: 'var(--workspace-muted)' }}>
           No challenger models — tuning only tries retrieval and prompt settings
           on {plan.current_model}.
         </div>
@@ -103,7 +103,7 @@ export function TuningModelsPicker({
         aria-expanded={advanced}
         style={{
           alignSelf: 'flex-start', padding: 0, background: 'transparent', border: 'none',
-          color: '#a78bfa', fontSize: 11, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer',
+          color: 'var(--workspace-info)', fontSize: 11, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer',
         }}
       >
         {advanced ? '▾' : '▸'} Advanced: choose the judge and challengers
@@ -112,16 +112,16 @@ export function TuningModelsPicker({
       {advanced && (
         <div style={{
           display: 'flex', flexDirection: 'column', gap: 10, padding: '10px 12px',
-          backgroundColor: '#181818', border: '1px solid #2a2a2a', borderRadius: 6,
+          backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)', borderRadius: 6,
         }}>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11, color: '#bbb' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11, color: 'var(--workspace-muted)' }}>
             Judge
             <select
               value={plan.judge_model}
               onChange={e => setJudge(e.target.value)}
               style={{
-                padding: '5px 8px', fontSize: 12, fontFamily: 'inherit', color: '#e5e5e5',
-                backgroundColor: '#262626', border: '1px solid #333', borderRadius: 4,
+                padding: '5px 8px', fontSize: 12, fontFamily: 'inherit', color: 'var(--workspace-text)',
+                backgroundColor: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 4,
               }}
             >
               {plan.models.map(m => (
@@ -133,7 +133,7 @@ export function TuningModelsPicker({
           </label>
 
           <fieldset style={{ margin: 0, padding: 0, border: 'none' }}>
-            <legend style={{ fontSize: 11, color: '#bbb', marginBottom: 4 }}>Challengers</legend>
+            <legend style={{ fontSize: 11, color: 'var(--workspace-muted)', marginBottom: 4 }}>Challengers</legend>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {plan.models.map(m => (
                 <label
@@ -141,7 +141,7 @@ export function TuningModelsPicker({
                   title={m.ineligible_reason ?? undefined}
                   style={{
                     display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12,
-                    color: m.eligible ? '#e5e5e5' : '#666',
+                    color: m.eligible ? 'var(--workspace-text)' : 'var(--workspace-muted)',
                     cursor: m.eligible ? 'pointer' : 'not-allowed',
                   }}
                 >
@@ -155,7 +155,7 @@ export function TuningModelsPicker({
                   <span>
                     {m.name}{m.is_current ? ' (current)' : ''}
                     {m.ineligible_reason && (
-                      <span style={{ display: 'block', fontSize: 11, color: '#777' }}>
+                      <span style={{ display: 'block', fontSize: 11, color: 'var(--workspace-muted)' }}>
                         {m.ineligible_reason}
                       </span>
                     )}
@@ -183,7 +183,7 @@ function ModelPlanSummary({
   const rows: [string, ReactNode][] = [
     [
       'Judge',
-      <>{judge}{judgeIsGrader && <span style={{ color: '#888' }}> · Validation grader</span>}</>,
+      <>{judge}{judgeIsGrader && <span style={{ color: 'var(--workspace-muted)' }}> · Validation grader</span>}</>,
     ],
     ['Current answer model', current],
     ['Challengers', challengers.length > 0 ? challengers.join(', ') : 'none'],
@@ -197,10 +197,10 @@ function ModelPlanSummary({
     >
       {rows.map(([label, value]) => (
         <div key={label} style={{ display: 'contents' }}>
-          <span style={{ color: '#888' }}>
+          <span style={{ color: 'var(--workspace-muted)' }}>
             {label === 'Judge' ? <TermDef term="judge">Judge</TermDef> : label}
           </span>
-          <span style={{ color: '#e5e5e5', wordBreak: 'break-word' }}>{value}</span>
+          <span style={{ color: 'var(--workspace-text)', wordBreak: 'break-word' }}>{value}</span>
         </div>
       ))}
     </div>
@@ -221,7 +221,7 @@ export function TuningModelsLine({ run }: { run: KBOptimizationRun }) {
     )
   }
   return (
-    <div data-testid="tuning-models-line" style={{ fontSize: 11, color: '#999', lineHeight: 1.5 }}>
+    <div data-testid="tuning-models-line" style={{ fontSize: 11, color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
       {parts.join(' · ')}
     </div>
   )

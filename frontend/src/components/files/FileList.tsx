@@ -55,11 +55,11 @@ export function FileList({
   const allSelected = onToggleSelect && selectedUuids && allUuids.length > 0 && allUuids.every(u => selectedUuids.has(u))
 
   const headerStyle: React.CSSProperties = {
-    padding: '8px 15px',
+    padding: "var(--workspace-space-8) 15px",
     textAlign: 'left',
-    fontSize: '0.8em',
+    fontSize: 'var(--workspace-font-meta)',
     fontWeight: 500,
-    color: '#6b7280',
+    color: '#555e68',
     cursor: onSort ? 'pointer' : undefined,
     userSelect: 'none',
     whiteSpace: 'nowrap',
@@ -79,7 +79,7 @@ export function FileList({
   }
 
   return (
-    <table className="w-full" style={{ fontSize: '1.05em', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+    <table className="file-table w-full" style={{ fontSize: 'var(--workspace-font-body)', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
       <colgroup>
         <col style={{ width: 32 }} />
         <col />
@@ -87,7 +87,7 @@ export function FileList({
       </colgroup>
       <thead>
         <tr style={{ borderBottom: '1px solid #dddddd' }}>
-          <th scope="col" style={{ padding: '8px 0 8px 15px', width: 32 }}>
+          <th scope="col" style={{ padding: "var(--workspace-space-8) 0 var(--workspace-space-8) 15px", width: 32 }}>
             {onToggleSelect && allUuids.length > 0 && (
               <input
                 type="checkbox"

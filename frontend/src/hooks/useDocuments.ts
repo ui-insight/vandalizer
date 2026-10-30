@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react'
+import { useCallback } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Document, Folder } from '../types/document'
 import { listContents } from '../api/documents'
@@ -16,7 +16,7 @@ export function useDocuments(folderId: string | null, teamUuid?: string) {
   const qc = useQueryClient()
   const queryKey = ['documents', folderId, teamUuid] as const
 
-  const { data, isLoading: loading } = useQuery<ContentsResult>({
+  const { data, isLoading: loading, error } = useQuery<ContentsResult>({
     queryKey,
     queryFn: () => listContents(folderId ?? undefined, teamUuid),
     // Auto-poll every 3s while any document is still moving through the
@@ -36,13 +36,12 @@ export function useDocuments(folderId: string | null, teamUuid?: string) {
   const documents = data?.documents ?? EMPTY_DOCUMENTS
   const folders = data?.folders ?? EMPTY_FOLDERS
 
-  // Stable refresh function
-  const queryKeyRef = useRef(queryKey)
-  queryKeyRef.current = queryKey
+  // A move changes both the source and destination. Mark every cached folder
+  // stale so returning to an already-visited destination shows the new contents.
   const refresh = useCallback(
-    () => qc.invalidateQueries({ queryKey: queryKeyRef.current }),
+    () => qc.invalidateQueries({ queryKey: ['documents'] }),
     [qc],
   )
 
-  return { documents, folders, loading, refresh }
+  return { documents, folders, loading, error, refresh }
 }

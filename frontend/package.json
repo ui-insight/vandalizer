@@ -1,7 +1,7 @@
 {
   "name": "frontend",
   "private": true,
-  "version": "0.0.0",
+  "version": "5.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,7 +12,10 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage --coverage.reporter=text",
     "test:e2e": "playwright test",
-    "ci": "npm run typecheck && npm run lint && npm run test:coverage && npm run build"
+    "demo:check": "node scripts/render-demo.mjs --check",
+    "demo:render": "node scripts/render-demo.mjs",
+    "ci": "npm run certification:check && npm run typecheck && npm run lint && npm run test:coverage && npm run build",
+    "certification:check": "node --test scripts/export-lessons.test.mjs && node scripts/export-lessons.mjs --check"
   },
   "dependencies": {
     "@fontsource-variable/public-sans": "^5.3.0",

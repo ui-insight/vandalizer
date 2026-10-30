@@ -45,6 +45,8 @@ export interface Automation {
   /** Schedule triggers: next and last firing, ISO UTC. */
   next_run_at?: string | null
   last_run_at?: string | null
+  last_event_status?: string | null
+  last_event_at?: string | null
 }
 
 /** Response of POST /api/automations/{id}/run-now. */

@@ -169,11 +169,11 @@ async def _can_decide_approval(approval: ApprovalRequest, user: User) -> bool:
 # ---------------------------------------------------------------------------
 
 
-@router.get("")
+@router.get("", response_model=None)
 async def list_my_reviews(
     status: Optional[str] = Query(None, description="pending | approved | rejected | expired | all"),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Reviews assigned to the current user."""
     query: dict = {"assigned_to_user_ids": user.user_id}
     if status and status != "all":
@@ -185,18 +185,18 @@ async def list_my_reviews(
 
     approvals = (
         await ApprovalRequest.find(query)
-        .sort(-ApprovalRequest.created_at)
+        .sort('-created_at')
         .to_list()
     )
     return {"reviews": [_approval_summary(a) for a in approvals]}
 
 
-@router.get("/team")
+@router.get("/team", response_model=None)
 async def list_team_reviews(
     team_id: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """All pending approvals on workflows owned by a team the user manages.
 
     Defaults to the user's current_team. Returns 403 if the user isn't a team
@@ -218,14 +218,14 @@ async def list_team_reviews(
 
     approvals = (
         await ApprovalRequest.find(query)
-        .sort(-ApprovalRequest.created_at)
+        .sort('-created_at')
         .to_list()
     )
     return {"reviews": [_approval_summary(a) for a in approvals]}
 
 
-@router.get("/count")
-async def my_review_count(user: User = Depends(get_current_user)):
+@router.get("/count", response_model=None)
+async def my_review_count(user: User = Depends(get_current_user)) -> dict[str, object]:
     """Pending count for the bell badge."""
     count = await ApprovalRequest.find(
         ApprovalRequest.status == STATUS_PENDING,
@@ -239,8 +239,8 @@ async def my_review_count(user: User = Depends(get_current_user)):
 # ---------------------------------------------------------------------------
 
 
-@router.get("/{approval_uuid}")
-async def get_review(approval_uuid: str, user: User = Depends(get_current_user)):
+@router.get("/{approval_uuid}", response_model=None)
+async def get_review(approval_uuid: str, user: User = Depends(get_current_user)) -> dict:
     approval = await ApprovalRequest.find_one(ApprovalRequest.uuid == approval_uuid)
     if not approval:
         raise HTTPException(status_code=404, detail="Review not found")
@@ -249,13 +249,13 @@ async def get_review(approval_uuid: str, user: User = Depends(get_current_user))
     return await _approval_full(approval)
 
 
-@router.post("/{approval_uuid}/approve")
+@router.post("/{approval_uuid}/approve", response_model=None)
 async def approve_review(
     approval_uuid: str,
     body: ApproveRequestBody,
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-):
+) -> dict[str, object]:
     approval = await ApprovalRequest.find_one(ApprovalRequest.uuid == approval_uuid)
     if not approval:
         raise HTTPException(status_code=404, detail="Review not found")
@@ -265,13 +265,16 @@ async def approve_review(
         raise HTTPException(status_code=403, detail="Not authorized to decide this review")
 
     now = datetime.datetime.now(tz=datetime.timezone.utc)
-    approval.status = STATUS_APPROVED
-    approval.reviewer_user_id = user.user_id
-    approval.reviewer_comments = body.comments
-    approval.decision_at = now
+    changes = {
+        "status": STATUS_APPROVED,
+        "reviewer_user_id": user.user_id,
+        "reviewer_comments": body.comments,
+        "decision_at": now,
+    }
     if body.edited_artifact is not None:
-        approval.edited_artifact = body.edited_artifact
-    await approval.save()
+        changes["edited_artifact"] = body.edited_artifact
+    if not await approval_service.update_pending_approval(approval, changes):
+        raise HTTPException(status_code=400, detail="Review changed, was already decided, or its deadline passed. Refresh the review before continuing.")
 
     # Resume the workflow
     from app.celery_app import celery
@@ -297,13 +300,13 @@ async def approve_review(
     return {"detail": "Approved, workflow resuming"}
 
 
-@router.post("/{approval_uuid}/reject")
+@router.post("/{approval_uuid}/reject", response_model=None)
 async def reject_review(
     approval_uuid: str,
     body: RejectRequestBody,
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-):
+) -> dict[str, object]:
     approval = await ApprovalRequest.find_one(ApprovalRequest.uuid == approval_uuid)
     if not approval:
         raise HTTPException(status_code=404, detail="Review not found")
@@ -313,11 +316,13 @@ async def reject_review(
         raise HTTPException(status_code=403, detail="Not authorized to decide this review")
 
     now = datetime.datetime.now(tz=datetime.timezone.utc)
-    approval.status = STATUS_REJECTED
-    approval.reviewer_user_id = user.user_id
-    approval.reviewer_comments = body.comments
-    approval.decision_at = now
-    await approval.save()
+    if not await approval_service.update_pending_approval(approval, {
+        "status": STATUS_REJECTED,
+        "reviewer_user_id": user.user_id,
+        "reviewer_comments": body.comments,
+        "decision_at": now,
+    }):
+        raise HTTPException(status_code=400, detail="Review changed, was already decided, or its deadline passed. Refresh the review before continuing.")
 
     # Mark workflow result failed
     result = await WorkflowResult.get(approval.workflow_result_id)

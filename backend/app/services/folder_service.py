@@ -24,7 +24,7 @@ async def create_folder(
 ) -> SmartFolder:
     parent_folder: SmartFolder | None = None
     if parent_id != "0":
-        parent_folder = await access_control.get_authorized_folder(parent_id, user)
+        parent_folder = await access_control.get_authorized_folder(parent_id, user, contribute=True)
         if not parent_folder:
             raise ValueError("Parent folder not found.")
 
@@ -190,6 +190,8 @@ async def convert_to_team_folder(folder_uuid: str, user: User) -> SmartFolder:
 
     # Refresh and return
     folder = await SmartFolder.find_one(SmartFolder.uuid == folder_uuid)
+    if folder is None:
+        raise ValueError("The folder is no longer available after the ownership change.")
     return folder
 
 
@@ -281,7 +283,7 @@ async def expand_folders_to_document_uuids(
     for doc in docs:
         if doc.uuid in seen_docs:
             continue
-        if access_control.can_view_document(doc, user, team_access, allow_admin=True):
+        if await access_control.get_authorized_document(doc.uuid, user, team_access=team_access, allow_admin=True):
             result.append(doc.uuid)
             seen_docs.add(doc.uuid)
     return result
@@ -319,6 +321,8 @@ async def convert_to_personal_folder(
     )
 
     folder = await SmartFolder.find_one(SmartFolder.uuid == folder_uuid)
+    if folder is None:
+        raise ValueError("The folder is no longer available after the ownership change.")
     return folder
 
 

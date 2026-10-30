@@ -7,16 +7,17 @@ import hashlib
 import json
 import logging
 from contextvars import ContextVar
-from typing import Callable, Optional
+from typing import Callable, Optional, TypeGuard, TypedDict
 
 import httpx
 from pydantic import BaseModel
-from pydantic_ai import Agent
+from pydantic_ai import Agent, AgentRunResult
 
 from app.models.kb_test_query import KBTestQuery
 from app.models.knowledge import KnowledgeBase, KnowledgeBaseSource
-from app.services.document_manager import DocumentManager
+from app.services.document_manager import DocumentManager, get_document_manager
 from app.services.extraction_judge import JUDGE_UNAVAILABLE
+from app.services.judge_variance import JudgeVarianceResult
 from app.services.llm_service import (
     RAG_SYSTEM_PROMPT,
     _get_model_config_sync,
@@ -27,7 +28,14 @@ from app.services.llm_service import (
 logger = logging.getLogger(__name__)
 
 
-def _judge_measured(judge: dict | None) -> bool:
+class ScoreComponent(TypedDict):
+    key: str
+    label: str
+    weight: float
+    value: float
+
+
+def _judge_measured(judge: dict | None) -> TypeGuard[dict]:
     """True when a judge block carries a real measurement.
 
     A judge outage, a per-query failure and an early-stopped trial all produce
@@ -36,9 +44,8 @@ def _judge_measured(judge: dict | None) -> bool:
     regressions notify their owner, how it would have emailed every one of them.
     Absence of a measurement is not a measurement of zero.
     """
-    return bool(judge) and judge.get("score") is not None
+    return judge is not None and judge.get("score") is not None
 
-_dm: DocumentManager | None = None
 
 # Module-level agent cache. Key: (purpose, model_name); value: (event_loop, agent).
 # The agent is reused only for calls on the SAME running event loop that first
@@ -148,7 +155,7 @@ class RAGConfig(BaseModel):
 
     model_config = {"extra": "forbid"}
 
-    def with_overrides(self, **kw) -> "RAGConfig":
+    def with_overrides(self, **kw: object) -> "RAGConfig":
         """Return a copy with the given fields overridden."""
         return self.model_copy(update=kw)
 
@@ -244,7 +251,7 @@ def _format_context_for_config(results: list[dict], cfg: RAGConfig) -> str:
     return "\n\n".join(blocks)
 
 
-def _usage_tokens(run) -> int:
+def _usage_tokens(run: AgentRunResult[str]) -> int:
     """Pull a conservative total token count from a pydantic-ai AgentRunResult.
 
     Sums input + output + cache-read + cache-write so the optimizer's budget
@@ -329,10 +336,7 @@ async def _maybe_rewrite_query(query: str, model_name: str) -> tuple[str, int]:
 
 
 def _get_dm() -> DocumentManager:
-    global _dm
-    if _dm is None:
-        _dm = DocumentManager()
-    return _dm
+    return get_document_manager()
 
 
 def _get_or_build_agent(purpose: str, model_name: str, system_prompt: str, model_settings: dict | None = None) -> Agent:
@@ -399,8 +403,10 @@ async def _configured_model_name(model_name: str | None) -> str | None:
     if _get_model_config_sync(model_name, doc) is not None:
         return model_name
     for m in doc.get("available_models") or []:
-        if isinstance(m, dict) and m.get("tag") == model_name and m.get("name"):
-            return m["name"]
+        if isinstance(m, dict) and m.get("tag") == model_name and isinstance(m.get("name"), str) and m["name"]:
+            name = m["name"]
+            if isinstance(name, str):
+                return name
     return None
 
 
@@ -708,7 +714,7 @@ async def retrieve_amendment_chunks(
     hits: list[dict] = []
     for amender in triggered[:MAX_AMENDERS_PER_TURN]:
         ids = links.search_ids.get(amender) or [amender]
-        where = {"source_id": ids[0]} if len(ids) == 1 else {"source_id": {"$in": ids}}
+        where: dict = {"source_id": ids[0]} if len(ids) == 1 else {"source_id": {"$in": ids}}
         try:
             found = await asyncio.to_thread(
                 dm.query_kb, kb_uuid, query, AMENDMENT_CHUNKS_PER_SOURCE, min_similarity, where=where,
@@ -1027,7 +1033,7 @@ def _verdict_for_score(score: float) -> str:
     return "PASS" if score >= 0.7 else ("WARN" if score >= 0.4 else "FAIL")
 
 
-def _parse_kb_verdict(raw, *, rubric: str | None = None, context_given: bool = True) -> dict:
+def _parse_kb_verdict(raw: object, *, rubric: str | None = None, context_given: bool = True) -> dict:
     """Normalise LLM output into a KB judge verdict dict.
 
     Extends the workflow validator's verdict shape with score, missing_facts,
@@ -1061,7 +1067,7 @@ def _parse_kb_verdict(raw, *, rubric: str | None = None, context_given: bool = T
     except (TypeError, ValueError):
         confidence = 0.5
 
-    def _str_list(v):
+    def _str_list(v: object) -> list[str]:
         if isinstance(v, list):
             return [str(x) for x in v if x is not None][:10]
         return []
@@ -1162,9 +1168,9 @@ async def _judge_answer(
     return verdict
 
 
-def _classify_discrimination(with_kb_score: float, baseline_score: float | None) -> str:
+def _classify_discrimination(with_kb_score: float | None, baseline_score: float | None) -> str:
     """Categorise a query by what its judge scores tell us about KB value."""
-    if baseline_score is None:
+    if baseline_score is None or with_kb_score is None:
         return "other"
     lift = with_kb_score - baseline_score
     if lift > 0.3:
@@ -1178,7 +1184,7 @@ def _classify_discrimination(with_kb_score: float, baseline_score: float | None)
 
 async def judge_test_queries(
     kb_uuid: str,
-    test_queries: list,
+    test_queries: list[KBTestQuery],
     model_name: str,
     *,
     mode: str = "judge",
@@ -1221,7 +1227,7 @@ async def judge_test_queries(
     sem = asyncio.Semaphore(max(1, concurrency))
     include_baseline = mode == "judge+baseline"
 
-    async def judge_one(tq) -> dict:
+    async def judge_one(tq: KBTestQuery) -> dict:
         async with sem:
             try:
                 # A model that stops at its output cap produces an answer the
@@ -1240,7 +1246,7 @@ async def judge_test_queries(
                 context = _format_retrieved_context(retrieved) if retrieved else None
                 with_judge = await _judge_answer(
                     query=tq.query,
-                    expected_answer=tq.expected_answer,
+                    expected_answer=tq.expected_answer or "",
                     actual_answer=actual_answer,
                     model_name=effective_judge,
                     retrieved_context=context,
@@ -1268,7 +1274,7 @@ async def judge_test_queries(
                         baseline_answer, baseline_tokens = bl, 0
                     baseline_judge = await _judge_answer(
                         query=tq.query,
-                        expected_answer=tq.expected_answer,
+                        expected_answer=tq.expected_answer or "",
                         actual_answer=baseline_answer,
                         model_name=effective_judge,
                         retrieved_context=None,
@@ -1361,10 +1367,9 @@ async def judge_test_queries(
         # callback after each completion and cancel the rest when it returns
         # True. Cancelled tasks become SKIPPED entries so the per-query table
         # still has one row per input query.
-        tasks: list[tuple[object, asyncio.Task]] = [
+        tasks: list[tuple[KBTestQuery, asyncio.Task[dict]]] = [
             (tq, asyncio.create_task(judge_one(tq))) for tq in judgeable
         ]
-        pending = {t for _, t in tasks}
         try:
             for fut in asyncio.as_completed([t for _, t in tasks]):
                 try:
@@ -1372,7 +1377,6 @@ async def judge_test_queries(
                 except asyncio.CancelledError:
                     continue
                 judged_results.append(result)
-                pending.discard(getattr(result, "_task", None))  # best-effort
                 partial_scores = [
                     r["judge"]["score"] for r in judged_results
                     if _judge_measured(r.get("judge"))
@@ -1432,7 +1436,7 @@ async def judge_test_queries(
     by_uuid = {r.get("query_uuid"): r for r in judged_results}
     for tq in judgeable:
         jr = by_uuid.get(getattr(tq, "uuid", ""))
-        if not _judge_measured(jr.get("judge") if jr else None):
+        if jr is None or not _judge_measured(jr.get("judge")):
             continue
         if jr["judge"].get("verdict") == "SKIPPED":
             continue
@@ -1511,7 +1515,7 @@ async def judge_test_queries(
 
 
 async def judge_baselines_only(
-    test_queries: list,
+    test_queries: list[KBTestQuery],
     model_name: str,
     *,
     concurrency: int = 4,
@@ -1531,7 +1535,7 @@ async def judge_baselines_only(
     sem = asyncio.Semaphore(max(1, concurrency))
     effective_judge = judge_model or model_name
 
-    async def one(tq) -> dict:
+    async def one(tq: KBTestQuery) -> dict:
         async with sem:
             try:
                 with capture_truncation() as baseline_truncations:
@@ -1542,7 +1546,7 @@ async def judge_baselines_only(
                     baseline_answer, baseline_tokens = bl, 0
                 baseline_judge = await _judge_answer(
                     query=tq.query,
-                    expected_answer=tq.expected_answer,
+                    expected_answer=tq.expected_answer or "",
                     actual_answer=baseline_answer,
                     model_name=effective_judge,
                     retrieved_context=None,
@@ -1590,7 +1594,7 @@ async def judge_baselines_only(
 async def _sample_judge_variance(
     kb_uuid: str,
     judged_details: list[dict],
-    test_queries_by_uuid: dict,
+    test_queries_by_uuid: dict[str, KBTestQuery],
     model_name: str,
 ) -> tuple[float | None, int]:
     """Legacy tuple-returning wrapper. Prefer ``_sample_judge_variance_detailed``
@@ -1604,10 +1608,10 @@ async def _sample_judge_variance(
 async def _sample_judge_variance_detailed(
     kb_uuid: str,
     judged_details: list[dict],
-    test_queries_by_uuid: dict,
+    test_queries_by_uuid: dict[str, KBTestQuery],
     model_name: str,
     max_samples: int | None = None,
-):
+) -> JudgeVarianceResult:
     """Re-judge a small sample to estimate judge nondeterminism (KB-specific).
 
     Returns ``JudgeVarianceResult`` with sigma, n, sampled_query_uuids, tokens.
@@ -1631,7 +1635,7 @@ async def _sample_judge_variance_detailed(
 
     # Build (judged_detail, test_query) sample pairs, dropping anything we
     # can't re-judge (no judge result, SKIPPED, no expected_answer).
-    samples: list[tuple[dict, object]] = []
+    samples: list[tuple[dict, KBTestQuery]] = []
     for d in judged_details:
         if not _judge_measured(d.get("judge")):
             continue
@@ -1642,11 +1646,11 @@ async def _sample_judge_variance_detailed(
             continue
         samples.append((d, tq))
 
-    async def judge_one(sample: tuple[dict, object]) -> tuple[float, int]:
+    async def judge_one(sample: tuple[dict, KBTestQuery]) -> tuple[float, int]:
         d, tq = sample
         replay = await _judge_answer(
             query=tq.query,
-            expected_answer=tq.expected_answer,
+            expected_answer=tq.expected_answer or "",
             actual_answer=d.get("actual_answer", "") or "",
             model_name=model_name,
             retrieved_context=None,
@@ -1685,7 +1689,7 @@ async def check_source_health(kb_uuid: str) -> dict:
     healthy = 0
 
     for source in sources:
-        entry = {
+        entry: dict = {
             "uuid": source.uuid,
             "source_type": source.source_type,
             "name": source.url_title or source.url or source.document_uuid or "Unknown",
@@ -1764,7 +1768,7 @@ async def check_chunk_coverage(kb_uuid: str) -> dict:
     }
 
 
-def _query_identity(tq) -> dict:
+def _query_identity(tq: KBTestQuery) -> dict:
     """The fields a run needs to stay readable after the live test set changes.
 
     An export re-joins each result row against the *current* test queries to
@@ -1788,7 +1792,7 @@ def _query_identity(tq) -> dict:
 UNCATEGORIZED = "uncategorized"
 
 
-def question_set_snapshot(test_queries: list) -> dict:
+def question_set_snapshot(test_queries: list[KBTestQuery]) -> dict:
     """Freeze the exact questions a run measured.
 
     Test sets change between runs — an import adds rows, an edit rewrites an
@@ -1983,7 +1987,7 @@ def kb_score_components(
         "source_health": source_health_ratio,
         "chunk_coverage": chunk_coverage_ratio,
     }
-    components = []
+    components: list[ScoreComponent] = []
     raw = 0.0
     for key, weight in weights.items():
         value = float(ratios.get(key) or 0.0) * 100
@@ -2008,6 +2012,7 @@ async def run_kb_validation(
     skip_judge: bool = False,
     model: Optional[str] = None,
     query_uuids: Optional[list[str]] = None,
+    validation_task_id: str | None = None,
 ) -> dict:
     """Run full validation on a knowledge base.
 
@@ -2262,6 +2267,9 @@ async def run_kb_validation(
         "answer_model": effective_answer_model if judge_payload else None,
         "answer_model_fallback": answer_model_fallback if judge_payload else None,
     }
+
+    if validation_task_id:
+        result["validation_task_id"] = validation_task_id
 
     # Persist the validation run
     from app.models.validation_run import SMOKE_TEST_SOURCE

@@ -1,15 +1,14 @@
 import { useCallback } from 'react'
 import { MODULES } from './modules'
-import type { CertificationProgress } from '../../types/certification'
+import type { CertificationProgress, ModuleDefinition } from '../../types/certification'
 
-export function useModuleLock(progress: CertificationProgress | null) {
+export function useModuleLock(progress: CertificationProgress | null, modules: ModuleDefinition[] = MODULES, prerequisites?: Record<string, string[]>) {
   return useCallback((moduleId: string): boolean => {
-    const module = MODULES.find(m => m.id === moduleId)
+    const module = modules.find(m => m.id === moduleId)
     if (!module) return true
-    if (module.number === 0) return false
-    if (progress?.unlocked) return false
-    const prevModule = MODULES.find(m => m.number === module.number - 1)
-    if (!prevModule) return false
-    return !progress?.modules[prevModule.id]?.completed
-  }, [progress])
+    if (prerequisites) return !prerequisites[moduleId] || prerequisites[moduleId].some(id => !progress?.modules[id]?.completed)
+    // A pinned enrollment needs its actual definition. The preserved legacy
+    // rubric has no prerequisites; display order must not invent new ones.
+    return !progress || Boolean(progress.enrollment_id)
+  }, [progress, modules, prerequisites])
 }

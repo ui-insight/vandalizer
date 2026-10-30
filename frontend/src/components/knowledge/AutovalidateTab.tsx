@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Sparkles, Loader2 } from 'lucide-react'
 import {
   startKBOptimization,
@@ -38,15 +38,17 @@ interface Props {
    * can't manage (e.g. a bookmarked verified catalog KB) so the panel can
    * navigate to their own, manageable copy. */
   onCloned?: (newUuid: string) => void
+  onChanged?: () => void
 }
 
 const POLL_INTERVAL_MS = 3000
 
-export function AutovalidateTab({ kbUuid, kbReady, canManage, queriesCount, onSwitchToQueries, onCloned }: Props) {
+export function AutovalidateTab({ kbUuid, kbReady, canManage, queriesCount, onSwitchToQueries, onCloned, onChanged }: Props) {
   const [run, setRun] = useState<KBOptimizationRun | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [loading, setLoading] = useState(true)
   const [actionPending, setActionPending] = useState<'cancel' | 'apply' | 'revert' | null>(null)
+  const actionRef = useRef(false)
   const [error, setError] = useState<string | null>(null)
   // When set, we're viewing a *historical* run (not the active/latest). The
   // results view renders read-only so users can't accidentally apply or
@@ -139,7 +141,9 @@ export function AutovalidateTab({ kbUuid, kbReady, canManage, queriesCount, onSw
   }
 
   const handleCancel = async () => {
-    if (!run) return
+    if (!run || actionRef.current) return
+    actionRef.current = true
+    setError(null)
     setActionPending('cancel')
     try {
       await cancelKBOptimization(kbUuid, run.uuid)
@@ -148,6 +152,7 @@ export function AutovalidateTab({ kbUuid, kbReady, canManage, queriesCount, onSw
     } catch (e) {
       setError((e as Error).message)
     } finally {
+      actionRef.current = false
       setActionPending(null)
     }
   }
@@ -167,31 +172,39 @@ export function AutovalidateTab({ kbUuid, kbReady, canManage, queriesCount, onSw
   }
 
   const doApply = async () => {
-    if (!run) return
+    if (!run || actionRef.current) return
+    actionRef.current = true
+    setError(null)
     setActionPending('apply')
     try {
       await applyKBOptimization(kbUuid, run.uuid)
       // Refresh so the UI flips to "applied" state with the revert button.
       const fresh = await getKBOptimization(kbUuid, run.uuid)
       setRun(fresh)
+      onChanged?.()
       setShowApplyPreview(false)
     } catch (e) {
       setError((e as Error).message)
     } finally {
+      actionRef.current = false
       setActionPending(null)
     }
   }
 
   const handleRevert = async () => {
-    if (!run) return
+    if (!run || actionRef.current) return
+    actionRef.current = true
+    setError(null)
     setActionPending('revert')
     try {
       await revertKBOptimization(kbUuid, run.uuid)
       const fresh = await getKBOptimization(kbUuid, run.uuid)
       setRun(fresh)
+      onChanged?.()
     } catch (e) {
       setError((e as Error).message)
     } finally {
+      actionRef.current = false
       setActionPending(null)
     }
   }
@@ -219,7 +232,7 @@ export function AutovalidateTab({ kbUuid, kbReady, canManage, queriesCount, onSw
 
   if (loading) {
     return (
-      <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 24, color: '#888' }}>
+      <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 'var(--workspace-space-24)', color: 'var(--workspace-muted)' }}>
         <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
         <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Loading…</span>
       </div>
@@ -229,7 +242,7 @@ export function AutovalidateTab({ kbUuid, kbReady, canManage, queriesCount, onSw
   // VIEWING A PAST RUN: read-only view, regardless of current state.
   if (viewingPast) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-12)' }}>
         {error && <ErrorBanner message={error} />}
         <PastRunBanner
           startedAt={viewingPast.started_at}
@@ -248,7 +261,7 @@ export function AutovalidateTab({ kbUuid, kbReady, canManage, queriesCount, onSw
 
   if (viewingPastLoading) {
     return (
-      <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 24, color: '#888' }}>
+      <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 'var(--workspace-space-24)', color: 'var(--workspace-muted)' }}>
         <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
         <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Loading…</span>
       </div>
@@ -301,6 +314,7 @@ export function AutovalidateTab({ kbUuid, kbReady, canManage, queriesCount, onSw
             onConfirm={() => void doApply()}
             onCancel={() => setShowApplyPreview(false)}
             applying={actionPending === 'apply'}
+            error={error}
           />
         )}
       </div>
@@ -309,7 +323,7 @@ export function AutovalidateTab({ kbUuid, kbReady, canManage, queriesCount, onSw
 
   // STATE A: idle
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-12)' }}>
       {error && <ErrorBanner message={error} />}
       <IdleHero
         kbUuid={kbUuid}
@@ -349,13 +363,13 @@ function FeedbackImpactCallout({ impact }: { impact: KBFeedbackImpact | null }) 
     // thumbs-up (n=N)" — useful even without a before/after split.
     return (
       <div style={{
-        margin: '8px 0 12px 0', padding: '8px 10px',
+        margin: "var(--workspace-space-8) 0 var(--workspace-space-12) 0", padding: "var(--workspace-space-8) var(--workspace-space-12)",
         backgroundColor: 'rgba(34, 197, 94, 0.06)',
-        border: '1px solid rgba(34, 197, 94, 0.22)', borderRadius: 6,
-        fontSize: 12, color: '#bbf7d0',
+        border: '1px solid rgba(34, 197, 94, 0.22)', borderRadius: 'var(--workspace-radius-small)',
+        fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-success)',
       }}>
         Since you tuned this KB, <b>{(after * 100).toFixed(0)}%</b> of chats grounded in it
-        got a thumbs-up <span style={{ color: '#888' }}>(n={impact.n_after} ratings)</span>.
+        got a thumbs-up <span style={{ color: 'var(--workspace-muted)' }}>(n={impact.n_after} ratings)</span>.
       </div>
     )
   }
@@ -363,15 +377,15 @@ function FeedbackImpactCallout({ impact }: { impact: KBFeedbackImpact | null }) 
   const positive = deltaPts >= 0
   return (
     <div style={{
-      margin: '8px 0 12px 0', padding: '8px 10px',
+      margin: "var(--workspace-space-8) 0 var(--workspace-space-12) 0", padding: "var(--workspace-space-8) var(--workspace-space-12)",
       backgroundColor: positive ? 'rgba(34, 197, 94, 0.06)' : 'rgba(245, 158, 11, 0.06)',
       border: '1px solid ' + (positive ? 'rgba(34, 197, 94, 0.22)' : 'rgba(245, 158, 11, 0.25)'),
-      borderRadius: 6, fontSize: 12, color: positive ? '#bbf7d0' : '#fde68a',
+      borderRadius: 'var(--workspace-radius-small)', fontSize: 'var(--workspace-font-meta)', color: positive ? 'var(--workspace-success)' : 'var(--workspace-warning)',
     }}>
       Since you tuned this KB, chat thumbs-up rate is{' '}
       <b>{positive ? '+' : ''}{deltaPts.toFixed(0)}pts</b>
       {' '}({(before * 100).toFixed(0)}% → {(after * 100).toFixed(0)}%,{' '}
-      <span style={{ color: '#888' }}>n={impact.n_before}→{impact.n_after} ratings</span>).
+      <span style={{ color: 'var(--workspace-muted)' }}>n={impact.n_before}→{impact.n_after} ratings</span>).
     </div>
   )
 }
@@ -417,42 +431,41 @@ function IdleHero({
 
   return (
     <div style={{
-      padding: 18, background: 'linear-gradient(135deg, #1f1f2e 0%, #1a1a1a 100%)',
-      border: '1px solid rgba(124, 58, 237, 0.25)', borderRadius: 8,
+      padding: 'var(--workspace-space-20)', background: 'var(--workspace-canvas)',
+      border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 25%, transparent)', borderRadius: 'var(--workspace-radius-medium)',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-        <Sparkles size={18} style={{ color: '#a78bfa' }} aria-hidden="true" />
-        <h3 style={{ margin: 0, fontSize: 15, color: '#fff' }}>Get a quality score for this KB — and a one-click recipe to improve it</h3>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-6)' }}>
+        <Sparkles size={18} style={{ color: 'var(--workspace-accent-ink)' }} aria-hidden="true" />
+        <h3 style={{ margin: 0, fontSize: 'var(--workspace-font-card-title)', color: 'var(--workspace-text)' }}>Compare retrieval settings against your test questions</h3>
       </div>
       <FeedbackImpactCallout impact={impact} />
-      <p style={{ margin: '0 0 12px 0', fontSize: 13, color: '#bbb', lineHeight: 1.5 }}>
-        Typically <b>10–20 minutes</b>, using roughly <b>$1–$5</b> worth of LLM
-        tokens — an estimate of AI usage, not a charge to you. We test your KB against
-        expected answers, try dozens of retrieval setups, and recommend the
-        best. Nothing changes until you click Apply.
+      <p style={{ margin: "0 0 var(--workspace-space-12) 0", fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
+        Review the test questions, measure a baseline, and choose a token budget.
+        This experiment uses model tokens; cost and duration depend on your model and test set.
+        Review the results before applying changes. Automatic application is optional in the wizard.
       </p>
       {coldStart && (
         <div style={{
-          padding: '10px 12px', marginBottom: 12,
-          backgroundColor: 'rgba(124, 58, 237, 0.06)',
-          border: '1px solid rgba(124, 58, 237, 0.2)', borderRadius: 6,
+          padding: "var(--workspace-space-12) var(--workspace-space-12)", marginBottom: 'var(--workspace-space-12)',
+          backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 6%, transparent)',
+          border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 20%, transparent)', borderRadius: 'var(--workspace-radius-small)',
         }}>
           <div style={{
-            fontSize: 10, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: 0.5,
-            marginBottom: 6, fontWeight: 600,
+            fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-accent-ink)', textTransform: 'uppercase', letterSpacing: 0.5,
+            marginBottom: 'var(--workspace-space-6)', fontWeight: 600,
           }}>
             What happens next
           </div>
           <ol style={{
-            margin: 0, paddingLeft: 20, fontSize: 12, color: '#ccc', lineHeight: 1.6,
+            margin: 0, paddingLeft: 'var(--workspace-space-20)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)', lineHeight: 1.6,
           }}>
             <li>We'll write test questions from your documents</li>
             <li>You'll review them before anything else runs</li>
-            <li>We try many setups and recommend the best — you decide whether to apply</li>
+            <li>We try many setups and recommend the best; you decide whether to apply</li>
           </ol>
         </div>
       )}
-      <ul style={{ fontSize: 12, color: '#999', margin: '0 0 10px 0', paddingLeft: 18, lineHeight: 1.7 }}>
+      <ul style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', margin: "0 0 var(--workspace-space-12) 0", paddingLeft: 'var(--workspace-space-20)', lineHeight: 1.7 }}>
         <li>See how much your knowledge base actually helps vs. asking the model directly</li>
         <li>Get a recommended setup with one-click apply</li>
         <li>Find out which documents are pulling weight and which aren't</li>
@@ -460,13 +473,13 @@ function IdleHero({
       <WhenToRunDisclosure kind="kb" />
       {blockedByManage ? (
         <div>
-          <p style={{ margin: '0 0 10px 0', fontSize: 12, color: '#bbb', lineHeight: 1.5 }}>
+          <p style={{ margin: "0 0 var(--workspace-space-12) 0", fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
             This is a shared catalog knowledge base, so you can't change it
             directly. Make your own copy to validate &amp; improve it — the
             original stays untouched.
           </p>
           {cloneError && (
-            <p role="alert" style={{ margin: '0 0 10px 0', fontSize: 12, color: '#fca5a5' }}>{cloneError}</p>
+            <p role="alert" style={{ margin: "0 0 var(--workspace-space-12) 0", fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-danger)' }}>{cloneError}</p>
           )}
           <button
             type="button"
@@ -474,12 +487,12 @@ function IdleHero({
             disabled={cloning || !onCloned}
             title={!onCloned ? 'Cloning is unavailable here' : ''}
             style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '8px 16px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
-              color: cloning ? '#888' : '#fff',
-              background: cloning ? '#222' : 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)',
-              border: '1px solid ' + (cloning ? '#333' : '#7c3aed'),
-              borderRadius: 6, cursor: cloning ? 'not-allowed' : 'pointer',
+              display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+              padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
+              color: cloning ? 'var(--workspace-muted)' : 'var(--workspace-text)',
+              background: cloning ? 'var(--workspace-surface)' : 'var(--workspace-canvas)',
+              border: '1px solid ' + (cloning ? 'var(--workspace-border)' : 'var(--highlight-color, #eab308)'),
+              borderRadius: 'var(--workspace-radius-small)', cursor: cloning ? 'not-allowed' : 'pointer',
             }}
           >
             {cloning
@@ -495,12 +508,12 @@ function IdleHero({
           disabled={disabled}
           title={reason || ''}
           style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            padding: '8px 16px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
-            color: disabled ? '#555' : '#fff',
-            background: disabled ? '#222' : 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)',
-            border: '1px solid ' + (disabled ? '#333' : '#7c3aed'),
-            borderRadius: 6, cursor: disabled ? 'not-allowed' : 'pointer',
+            display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+            padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
+            color: disabled ? 'var(--workspace-muted)' : 'var(--workspace-text)',
+            background: disabled ? 'var(--workspace-surface)' : 'var(--workspace-canvas)',
+            border: '1px solid ' + (disabled ? 'var(--workspace-border)' : 'var(--highlight-color, #eab308)'),
+            borderRadius: 'var(--workspace-radius-small)', cursor: disabled ? 'not-allowed' : 'pointer',
           }}
         >
           <Sparkles size={14} aria-hidden="true" />

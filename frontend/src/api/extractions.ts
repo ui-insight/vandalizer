@@ -1,4 +1,5 @@
 import { apiFetch, ApiError, rawFetch } from './client'
+import { filenameFromDisposition } from '../utils/contentDisposition'
 import type { SearchSet, SearchSetItem } from '../types/workflow'
 
 // SearchSet CRUD
@@ -50,7 +51,7 @@ export function listItems(searchSetUuid: string) {
   return apiFetch<SearchSetItem[]>(`/api/extractions/search-sets/${searchSetUuid}/items`)
 }
 
-export function updateItem(itemId: string, data: { searchphrase?: string; title?: string; is_optional?: boolean; enum_values?: string[] }) {
+export function updateItem(itemId: string, data: { searchphrase?: string; title?: string; is_optional?: boolean; enum_values?: string[]; description?: string }) {
   return apiFetch<SearchSetItem>(`/api/extractions/items/${itemId}`, {
     method: 'PATCH',
     body: JSON.stringify(data),
@@ -456,6 +457,29 @@ export function getExtractionQualityHistory(uuid: string) {
   return apiFetch<{ runs: QualityHistoryRun[] }>(`/api/extractions/search-sets/${uuid}/quality-history`)
 }
 
+export interface QualityRunFieldResult {
+  field_name: string
+  expected: string | null
+  replicates: { run: number; value: string | null }[]
+  most_common_value: string | null
+  accuracy: number | null
+  consistency: number | null
+}
+
+export interface QualityRunDocumentResult {
+  test_case_uuid: string
+  label: string
+  overall_accuracy: number | null
+  fields: QualityRunFieldResult[]
+}
+
+/** One Quality History run's per-document, per-field results. */
+export function getExtractionQualityRunResults(uuid: string, runUuid: string) {
+  return apiFetch<{ documents: QualityRunDocumentResult[] }>(
+    `/api/extractions/search-sets/${uuid}/quality-history/${encodeURIComponent(runUuid)}/results`,
+  )
+}
+
 export interface SparklinePoint {
   score: number
   created_at: string
@@ -466,6 +490,8 @@ export function getQualitySparkline(uuid: string, limit = 10) {
 }
 
 export interface QualityStatus {
+  num_test_cases?: number | null
+  num_runs?: number | null
   status: 'validated' | 'unvalidated'
   score: number | null
   tier: string | null
@@ -474,6 +500,12 @@ export interface QualityStatus {
   stale: boolean
   /** Monitoring found a regression here and nobody has reviewed it yet. */
   regression_pending_review?: boolean
+  /** A catalog author's rating with no measurement behind it; status is unvalidated. */
+  tier_asserted?: string | null
+  /** The model or graded cases changed since the score was measured (#1013 §5). */
+  model_changed?: boolean
+  test_cases_changed?: boolean
+  drift_reasons?: string[]
 }
 
 export function getQualityStatus(uuid: string) {
@@ -655,6 +687,12 @@ export interface ExtractionOptimizationRun {
   baseline_no_tool_score: number | null
   baseline_default_score: number | null
   optimized_score: number | null
+  /** Held-out re-scores: present when the run split its test set. The
+   *  headline is held-out exactly when holdout_optimized_score is set; pair
+   *  scores with reportedBaselineScore (shared/optimizerScores). */
+  optimized_score_train?: number | null
+  holdout_default_score?: number | null
+  holdout_optimized_score?: number | null
   /** Sample-size discount applied to the headline scores above so they live on
    *  the same scale as the certified ValidationRun / quality tile (Option A).
    *  Null on legacy runs (their scores were stored raw/un-discounted). */
@@ -673,14 +711,20 @@ export interface ExtractionOptimizationRun {
    *  Suppresses apply_on_finish — surface as "no significant improvement". */
   tied_with_baseline: boolean
   /** Reason tag from variance-aware winner selection. One of:
-   *  highest_score, default_in_cluster, closest_to_default,
-   *  tied_with_baseline_no_default_in_cluster, no_judge_variance. */
+   *  highest_score, default_in_cluster, closest_to_default, tied_with_baseline,
+   *  tied_on_reported_score (led on training cases, tied on the reported
+   *  holdout score), tied_with_baseline_no_default_in_cluster, no_judge_variance. */
   winner_selection_reason: string | null
   /** Candidate models excluded from the sweep because they share a family
    *  with the judge_model (self-preference guard). */
   excluded_models: string[]
   judge_model: string | null
   best_config: Record<string, unknown> | null
+  /** The trial best_config came from. On a tie it is the setup closest to
+   *  the current settings, not the top scorer. Absent on older runs. */
+  best_trial_id?: string | null
+  /** Model the current settings were measured with. Absent on older runs. */
+  baseline_model?: string | null
   trials: ExtractionTrial[]
   field_breakdown: Array<{ field: string; accuracy: number; consistency: number }>
   /** Cross-field rule outcome on the winning config. Null when no rules. */
@@ -941,9 +985,7 @@ export async function downloadValidationZip(uuid: string): Promise<void> {
     throw new ApiError(res.status, body.detail || 'Download failed')
   }
   const blob = await res.blob()
-  const disposition = res.headers.get('Content-Disposition') ?? ''
-  const match = disposition.match(/filename="([^"]+)"/)
-  const filename = match ? match[1] : `validation-${uuid}.zip`
+  const filename = filenameFromDisposition(res.headers.get('Content-Disposition'), `validation-${uuid}.zip`)
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -971,9 +1013,7 @@ export async function downloadValidationResults(uuid: string, runUuid?: string):
     throw new ApiError(res.status, body.detail || 'Download failed')
   }
   const blob = await res.blob()
-  const disposition = res.headers.get('Content-Disposition') ?? ''
-  const match = disposition.match(/filename="([^"]+)"/)
-  const filename = match ? match[1] : `validation-results-${uuid}.zip`
+  const filename = filenameFromDisposition(res.headers.get('Content-Disposition'), `validation-results-${uuid}.zip`)
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -1026,9 +1066,7 @@ export async function generateExampleTemplate(uuid: string): Promise<void> {
     throw new ApiError(res.status, body.detail || 'Generation failed')
   }
   const blob = await res.blob()
-  const disposition = res.headers.get('Content-Disposition') ?? ''
-  const match = disposition.match(/filename="([^"]+)"/)
-  const filename = match ? match[1] : 'template.pdf'
+  const filename = filenameFromDisposition(res.headers.get('Content-Disposition'), 'template.pdf')
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -1056,9 +1094,7 @@ export async function exportExtractionPdf(
     throw new ApiError(res.status, body.detail || 'Export failed')
   }
   const blob = await res.blob()
-  const disposition = res.headers.get('Content-Disposition') ?? ''
-  const match = disposition.match(/filename="([^"]+)"/)
-  const filename = match ? match[1] : 'extraction.pdf'
+  const filename = filenameFromDisposition(res.headers.get('Content-Disposition'), 'extraction.pdf')
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -1080,6 +1116,8 @@ export type CrossFieldRuleType =
   | 'cross_reference'
   | 'date_order'
   | 'custom_expression'
+  | 'product_equals'
+  | 'at_most_difference'
 
 export interface CrossFieldRule {
   id?: string
@@ -1106,6 +1144,17 @@ export interface CrossFieldRule {
   field_b?: string
   match_type?: 'contains' | 'equals'
   expression?: string
+  // product_equals: target_field = base_field × rate_field
+  base_field?: string
+  rate_field?: string
+  // at_most_difference: field ≤ minuend_field − sum(subtrahend_fields)
+  minuend_field?: string
+  subtrahend_fields?: string[]
+  // sum_equals / at_most_difference: an unstated amount counts as 0, and the
+  // result names it
+  missing_as_zero?: boolean
+  // Plain-language name, e.g. from a catalog workflow
+  label?: string
 }
 
 export interface CrossFieldRuleResult {

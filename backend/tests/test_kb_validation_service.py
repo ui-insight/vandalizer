@@ -479,6 +479,8 @@ def test_classify_discrimination():
     assert kb_validation_service._classify_discrimination(0.6, 0.5) == "other"
     # No baseline → "other" (judge-only mode)
     assert kb_validation_service._classify_discrimination(0.9, None) == "other"
+    assert kb_validation_service._classify_discrimination(None, 0.9) == "other"
+    assert kb_validation_service._classify_discrimination(None, None) == "other"
 
 
 @pytest.mark.asyncio

@@ -26,6 +26,80 @@ WINNER_TIE_SIGMAS = 2.0
 DEFAULT_JUDGE_NOISE_FLOOR = 0.02
 
 
+def tie_band(
+    judge_variance: float | None,
+    n_items_for_se: int,
+    fallback_noise_floor: float = DEFAULT_JUDGE_NOISE_FLOOR,
+) -> float:
+    """How close two scores must be to count as the same: ``2 × SE``, SE = σ/√N."""
+    sigma = judge_variance if judge_variance is not None else fallback_noise_floor
+    se = sigma / max(1, n_items_for_se) ** 0.5 if n_items_for_se else sigma
+    return WINNER_TIE_SIGMAS * se
+
+
+# The paired test needs this many queries before its verdict counts (the
+# comparison card's MIN_N_FOR_SIGNIFICANCE).
+MIN_N_FOR_LIFT_CI = 5
+
+
+def reported_baseline_score(
+    *,
+    holdout_optimized_score: float | None,
+    holdout_default_score: float | None,
+    baseline_default_score: float | None,
+) -> float | None:
+    """The current-settings score a run's headline is compared against.
+
+    When the winner was re-scored on held-out cases, the headline is that
+    held-out score, so the current settings must be the held-out score too.
+    Paired with the training-case baseline instead, the editor showed
+    Optimized 95% against Current 93% (a gap measured on different cases)
+    and chat, the gate and the card each read the gap differently. Falls
+    back to the training baseline when the held-out pair is incomplete.
+    """
+    if holdout_optimized_score is not None and holdout_default_score is not None:
+        return holdout_default_score
+    return baseline_default_score
+
+
+def tied_on_reported_scores(
+    *,
+    tied: bool,
+    optimized_score: float | None,
+    baseline_score: float | None,
+    band: float,
+    lift_ci: dict | None = None,
+) -> bool:
+    """Whether the result a run reports is within noise of the current settings.
+
+    ``pick_winner_variance_aware`` decides the tie on the winning trial's
+    training score. The run then reports a different number: the winner
+    re-scored on held-out cases, which drops when part of the training lead
+    was best-of-N luck. Chat read the flag and called 94% against 92% "a
+    real, if modest, gain", while the editor's card, looking at those same two
+    numbers, said the +2 pts were inside the judge's noise. One verdict has to
+    cover the numbers shown, so the tie is checked again on them: the
+    reported lift must clear the same band, and, when a paired test ran on
+    enough queries, that test must call it significant.
+    """
+    if tied:
+        return True
+    if (
+        optimized_score is not None
+        and baseline_score is not None
+        and abs(optimized_score - baseline_score) <= band
+    ):
+        return True
+    if lift_ci and (lift_ci.get("n_queries") or 0) >= MIN_N_FOR_LIFT_CI:
+        lower, upper = lift_ci.get("lower"), lift_ci.get("upper")
+        p_value = lift_ci.get("p_value")
+        if lower is not None and upper is not None and p_value is not None:
+            significant = (lower > 0 or upper < 0) and p_value < 0.05
+            if not significant:
+                return True
+    return False
+
+
 def pick_winner_variance_aware(
     trials: list[dict],
     *,
@@ -71,9 +145,7 @@ def pick_winner_variance_aware(
     completed.sort(key=lambda t: (-float(t["score"]), str(t.get("trial_id", ""))))
     top_score = float(completed[0]["score"])
 
-    sigma = judge_variance if judge_variance is not None else fallback_noise_floor
-    se = sigma / max(1, n_items_for_se) ** 0.5 if n_items_for_se else sigma
-    band = WINNER_TIE_SIGMAS * se
+    band = tie_band(judge_variance, n_items_for_se, fallback_noise_floor)
 
     tied_with_baseline = (
         baseline_default_score is not None

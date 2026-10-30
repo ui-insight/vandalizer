@@ -1,17 +1,9 @@
-import { useEffect } from 'react'
+import { TaskHelpLink } from '../shared/TaskHelpLink'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { X, Layers, Search, BookOpen, Sparkles, type LucideIcon } from 'lucide-react'
 import { KnowledgeTutorial } from './KnowledgeTutorial'
 
 export function KnowledgeExplainer({ onClose }: { onClose?: () => void }) {
-  useEffect(() => {
-    if (!onClose) return
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [onClose])
-
   return (
     <>
       <style>{`
@@ -37,39 +29,35 @@ export function KnowledgeExplainer({ onClose }: { onClose?: () => void }) {
         .kb-explainer-glow { animation: kbExplainerGlow 4s ease-in-out infinite; }
       `}</style>
 
+      <FocusTrap active={!!onClose} focusTrapOptions={{ escapeDeactivates: false, allowOutsideClick: true }}>
       <div
+        role={onClose ? 'dialog' : undefined}
+        aria-modal={onClose ? true : undefined}
+        aria-label={onClose ? 'About knowledge bases' : undefined}
+        onKeyDown={event => { if (onClose && event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); onClose() } }}
         className="kb-explainer-root"
+        tabIndex={0}
         style={{
           // As a modal (onClose set) it must sit above the panel header/search
           // chrome (zIndex 300), or that header bleeds through over the top.
           // As an inline empty-state it stays in flow below the header.
           position: 'absolute', inset: 0, zIndex: onClose ? 400 : 50,
-          background: 'radial-gradient(ellipse at top, #1f2740 0%, #131628 55%, #0c1020 100%)',
+          background: 'var(--workspace-canvas)',
           overflowY: 'auto',
         }}
       >
-        {/* Ambient glow */}
-        <div
-          className="kb-explainer-glow"
-          style={{
-            position: 'absolute', top: -120, left: '50%', transform: 'translateX(-50%)',
-            width: 520, height: 520, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(96, 165, 250, 0.18) 0%, transparent 65%)',
-            pointerEvents: 'none',
-          }}
-        />
-
-        {/* Close button */}
+        <TaskHelpLink topic="source-recovery">Help with missing or incomplete sources</TaskHelpLink>
+      {/* Close button */}
         {onClose && (
           <button
             onClick={onClose}
             style={{
               position: 'absolute', top: 14, right: 14, zIndex: 10,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: 32, height: 32, borderRadius: 8,
-              background: 'rgba(255,255,255,0.06)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              color: '#c0c7d6', cursor: 'pointer',
+              width: 32, height: 32, borderRadius: 'var(--workspace-radius-medium)',
+              background: 'var(--workspace-canvas)',
+              border: '1px solid var(--workspace-border)',
+              color: 'var(--workspace-muted)', cursor: 'pointer',
             }}
             aria-label="Close"
           >
@@ -77,31 +65,31 @@ export function KnowledgeExplainer({ onClose }: { onClose?: () => void }) {
           </button>
         )}
 
-        <div className="kb-explainer-content" style={{ padding: '48px 32px 56px', maxWidth: 720, margin: '0 auto', position: 'relative' }}>
+        <div className="kb-explainer-content" style={{ padding: "48px var(--workspace-space-32) 56px", maxWidth: 720, margin: '0 auto', position: 'relative' }}>
           {/* Hero */}
           <div className="kb-explainer-section" style={{ animationDelay: '60ms', textAlign: 'center', marginBottom: 28 }}>
             <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 14px',
+              display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)', padding: "var(--workspace-space-6) var(--workspace-space-16)",
               borderRadius: 999,
               background: 'rgba(96, 165, 250, 0.12)',
               border: '1px solid rgba(96, 165, 250, 0.3)',
-              fontSize: 11, fontWeight: 700, color: '#93c5fd',
+              fontSize: 'var(--workspace-font-meta)', fontWeight: 700, color: 'var(--workspace-info)',
               textTransform: 'uppercase', letterSpacing: '0.1em',
-              marginBottom: 18,
+              marginBottom: 'var(--workspace-space-20)',
             }}>
               <Sparkles size={12} /> Knowledge Bases
             </div>
             <h1 style={{
-              fontSize: 34, fontWeight: 700, color: '#fff', letterSpacing: '-0.025em',
-              lineHeight: 1.1, margin: '0 0 14px',
+              fontSize: 34, fontWeight: 700, color: 'var(--workspace-text)', letterSpacing: '-0.025em',
+              lineHeight: 1.1, margin: "0 0 var(--workspace-space-16)",
             }}>
               Ask anything.<br />Get answers from your sources.
             </h1>
             <p style={{
-              fontSize: 15, color: '#9aa3b8', maxWidth: 500, margin: '0 auto', lineHeight: 1.6,
+              fontSize: 'var(--workspace-font-card-title)', color: 'var(--workspace-muted)', maxWidth: 500, margin: '0 auto', lineHeight: 1.6,
             }}>
               A knowledge base turns a folder of documents, a stack of policies, or a website
-              into something you can talk to — with citations back to the exact source.
+              into something you can talk to, with citations back to the exact source.
             </p>
           </div>
 
@@ -120,12 +108,12 @@ export function KnowledgeExplainer({ onClose }: { onClose?: () => void }) {
             <Card
               icon={Search}
               title="Search"
-              body="Find the passages most relevant to any question — even when the wording doesn't match."
+              body="Find the passages most relevant to any question, even when the wording doesn't match."
             />
             <Card
               icon={BookOpen}
               title="Cite"
-              body="Every answer points back to the exact document and page it came from. No black boxes."
+              body="Open available source references to check the original passage. Missing or incomplete sources can limit an answer."
             />
           </Section>
 
@@ -136,24 +124,24 @@ export function KnowledgeExplainer({ onClose }: { onClose?: () => void }) {
             delay="380ms"
           >
             <UseCase
-              accent="#60a5fa"
+              accent="var(--workspace-info)"
               question="Is salary cap waivable on a K award?"
-              answer="Federal regulations KB returns the answer with a citation to 2 CFR §200.305 and the relevant NIH NOT-OD notice."
+              answer="Search a knowledge base of current sponsor guidance, then inspect the cited policy before making a decision."
             />
             <UseCase
-              accent="#a78bfa"
+              accent="var(--workspace-info)"
               question="What's the F&A rate cap for the Gates Foundation?"
-              answer="Sponsor policies KB pulls the matching clause from 200+ indexed funder pages — with the source URL."
+              answer="Sponsor policies KB pulls the matching clause from 200+ indexed funder pages, with the source URL."
             />
             <UseCase
-              accent="#34d399"
+              accent="var(--workspace-success)"
               question="What's our process for closing out a fixed-price subaward?"
               answer="Internal SOPs KB answers from your office's playbook so new staff stop opening tickets for the same questions."
             />
             <UseCase
-              accent="#f472b6"
+              accent="var(--workspace-info)"
               question="What did we tell DCAA about Q3 indirect costs?"
-              answer="Audit response KB surfaces the exact correspondence and exhibits — searchable months after the fact."
+              answer="Audit response KB surfaces the exact correspondence and exhibits, searchable months after the fact."
             />
           </Section>
 
@@ -162,7 +150,7 @@ export function KnowledgeExplainer({ onClose }: { onClose?: () => void }) {
             <Step num="1" title="Create a knowledge base" body="Name it after the question you want answered (e.g. 'NIH grant policies')." />
             <Step num="2" title="Add sources" body="Pick documents from your library, paste URLs, or point it at a website to crawl." />
             <Step num="3" title="Wait for it to build" body="Sources are chunked and indexed in the background. Status updates live." />
-            <Step num="4" title="Open chat and ask" body="Ask in plain English. You'll get answers with citations to the source documents." />
+            <Step num="4" title="Open chat and ask" body="Ask in plain English, then inspect available citations against your source documents." />
           </Section>
 
           {/* CTA */}
@@ -171,19 +159,20 @@ export function KnowledgeExplainer({ onClose }: { onClose?: () => void }) {
               <button
                 onClick={onClose}
                 style={{
-                  padding: '11px 26px', fontSize: 14, fontWeight: 600,
+                  padding: '11px 26px', fontSize: 'var(--workspace-font-body)', fontWeight: 600,
                   color: '#0c1020',
-                  background: 'linear-gradient(135deg, #93c5fd 0%, #60a5fa 100%)',
-                  border: 'none', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
+                  background: 'var(--workspace-canvas)',
+                  border: 'none', borderRadius: 'var(--workspace-radius-large)', cursor: 'pointer', fontFamily: 'inherit',
                   boxShadow: '0 6px 20px -6px rgba(96, 165, 250, 0.5)',
                 }}
               >
-                Got it — back to the knowledge base
+                Got it, back to the knowledge base
               </button>
             </div>
           )}
         </div>
       </div>
+      </FocusTrap>
     </>
   )
 }
@@ -196,15 +185,15 @@ function Section({
   return (
     <div className="kb-explainer-section" style={{ animationDelay: delay, marginBottom: 36 }}>
       <h2 style={{
-        fontSize: 20, fontWeight: 700, color: '#fff', margin: '0 0 4px',
+        fontSize: 'var(--workspace-font-page-title)', fontWeight: 700, color: 'var(--workspace-text)', margin: "0 0 var(--workspace-space-4)",
         letterSpacing: '-0.01em',
       }}>
         {title}
       </h2>
       {subtitle && (
-        <p style={{ fontSize: 13, color: '#7a8499', margin: '0 0 14px' }}>{subtitle}</p>
+        <p style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)', margin: "0 0 var(--workspace-space-16)" }}>{subtitle}</p>
       )}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: subtitle ? 0 : 14 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-12)', marginTop: subtitle ? 0 : 14 }}>
         {children}
       </div>
     </div>
@@ -214,24 +203,24 @@ function Section({
 function Card({ icon: Icon, title, body }: { icon: LucideIcon; title: string; body: string }) {
   return (
     <div style={{
-      display: 'flex', gap: 14, alignItems: 'flex-start',
-      padding: 16, borderRadius: 12,
-      background: 'rgba(255,255,255,0.03)',
-      border: '1px solid rgba(255,255,255,0.07)',
+      display: 'flex', gap: 'var(--workspace-space-16)', alignItems: 'flex-start',
+      padding: 'var(--workspace-space-16)', borderRadius: 'var(--workspace-radius-large)',
+      background: 'var(--workspace-canvas)',
+      border: '1px solid var(--workspace-border)',
     }}>
       <div style={{
-        width: 36, height: 36, borderRadius: 10,
+        width: 36, height: 36, borderRadius: 'var(--workspace-radius-large)',
         background: 'rgba(96, 165, 250, 0.12)',
         border: '1px solid rgba(96, 165, 250, 0.28)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
       }}>
-        <Icon size={18} style={{ color: '#93c5fd' }} />
+        <Icon size={18} style={{ color: 'var(--workspace-info)' }} />
       </div>
       <div>
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#e5e7eb', marginBottom: 4 }}>
+        <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 'var(--workspace-space-4)' }}>
           {title}
         </div>
-        <div style={{ fontSize: 13, color: '#9aa3b8', lineHeight: 1.55 }}>{body}</div>
+        <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)', lineHeight: 1.55 }}>{body}</div>
       </div>
     </div>
   )
@@ -240,23 +229,23 @@ function Card({ icon: Icon, title, body }: { icon: LucideIcon; title: string; bo
 function UseCase({ question, answer, accent }: { question: string; answer: string; accent: string }) {
   return (
     <div style={{
-      padding: 16, borderRadius: 12,
-      background: 'rgba(255,255,255,0.03)',
-      border: '1px solid rgba(255,255,255,0.07)',
+      padding: 'var(--workspace-space-16)', borderRadius: 'var(--workspace-radius-large)',
+      background: 'var(--workspace-canvas)',
+      border: '1px solid var(--workspace-border)',
       borderLeft: `3px solid ${accent}`,
     }}>
       <div style={{
-        display: 'inline-block', padding: '2px 8px', borderRadius: 6,
-        background: `${accent}22`, color: accent,
-        fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
-        marginBottom: 8,
+        display: 'inline-block', padding: "var(--workspace-space-2) var(--workspace-space-8)", borderRadius: 'var(--workspace-radius-small)',
+        background: `color-mix(in srgb, ${accent} 13.33%, transparent)`, color: accent,
+        fontSize: 'var(--workspace-font-meta)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
+        marginBottom: 'var(--workspace-space-8)',
       }}>
         Ask
       </div>
-      <div style={{ fontSize: 13.5, fontWeight: 600, color: '#e5e7eb', marginBottom: 8, lineHeight: 1.45, fontStyle: 'italic' }}>
+      <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 'var(--workspace-space-8)', lineHeight: 1.45, fontStyle: 'italic' }}>
         "{question}"
       </div>
-      <div style={{ fontSize: 13, color: '#9aa3b8', lineHeight: 1.55 }}>
+      <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)', lineHeight: 1.55 }}>
         <span style={{ color: accent, fontWeight: 600 }}>→ </span>{answer}
       </div>
     </div>
@@ -266,25 +255,25 @@ function UseCase({ question, answer, accent }: { question: string; answer: strin
 function Step({ num, title, body }: { num: string; title: string; body: string }) {
   return (
     <div style={{
-      display: 'flex', gap: 14, alignItems: 'flex-start',
-      padding: 14, borderRadius: 12,
-      background: 'rgba(255,255,255,0.03)',
-      border: '1px solid rgba(255,255,255,0.07)',
+      display: 'flex', gap: 'var(--workspace-space-16)', alignItems: 'flex-start',
+      padding: 'var(--workspace-space-16)', borderRadius: 'var(--workspace-radius-large)',
+      background: 'var(--workspace-canvas)',
+      border: '1px solid var(--workspace-border)',
     }}>
       <div style={{
         width: 28, height: 28, borderRadius: '50%',
-        background: 'linear-gradient(135deg, #93c5fd 0%, #60a5fa 100%)',
+        background: 'var(--workspace-canvas)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-        fontSize: 13, fontWeight: 700, color: '#0c1020',
+        fontSize: 'var(--workspace-font-control)', fontWeight: 700, color: '#0c1020',
         boxShadow: '0 2px 10px -2px rgba(96, 165, 250, 0.4)',
       }}>
         {num}
       </div>
       <div>
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#e5e7eb', marginBottom: 2 }}>
+        <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 'var(--workspace-space-2)' }}>
           {title}
         </div>
-        <div style={{ fontSize: 13, color: '#9aa3b8', lineHeight: 1.55 }}>{body}</div>
+        <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)', lineHeight: 1.55 }}>{body}</div>
       </div>
     </div>
   )

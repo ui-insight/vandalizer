@@ -78,6 +78,10 @@ class ExtractionOptimizationRun(Document):
     # is set and the in-sample score is the headline.
     optimized_score_train: Optional[float] = None
     holdout_default_score: Optional[float] = None
+    # The winner's held-out re-score, set only when it succeeded: the headline
+    # is held-out exactly when this is set, and only then may it be paired
+    # with ``holdout_default_score``. Same field as KBOptimizationRun.
+    holdout_optimized_score: Optional[float] = None
     # Sample-size discount applied to the headline scores above so the optimizer
     # lives on the same scale as the certified ValidationRun / quality tile
     # (Option A — see run_optimization). Shape: {sample_size_factor,
@@ -104,6 +108,8 @@ class ExtractionOptimizationRun(Document):
     #   "closest_to_default"      — multiple non-default trials are tied; pick
     #                               the one structurally closest to default
     #   "no_judge_variance"       — could not measure σ; default noise floor used
+    #   "tied_on_reported_score"  — led on training cases, but the reported
+    #                               (holdout) score is within 2 × SE of baseline
     winner_selection_reason: Optional[str] = None
     # True when no trial beat baseline_default by >= 2 × SE. Suppresses
     # apply_on_finish so we don't write a config change that the data can't
@@ -115,6 +121,13 @@ class ExtractionOptimizationRun(Document):
     excluded_models: list[str] = Field(default_factory=list)
 
     best_config: Optional[dict] = None
+    # The trial ``best_config`` came from. When results tie, the winner is the
+    # setup closest to the current one, not the top scorer, so the UI needs
+    # both to say which is which.
+    best_trial_id: Optional[str] = None
+    # Model the current settings (``baseline_default_score``) were measured
+    # with, so the score can be compared with validation runs on other models.
+    baseline_model: Optional[str] = None
     trials: list[dict] = Field(default_factory=list)
     # Each trial dict shape:
     # {
@@ -184,7 +197,7 @@ class ExtractionOptimizationRun(Document):
             "started_at",
         ]
 
-    def __init__(self, **data):
+    def __init__(self, **data: object) -> None:
         super().__init__(**data)
         if not self.uuid:
             self.uuid = uuid4().hex

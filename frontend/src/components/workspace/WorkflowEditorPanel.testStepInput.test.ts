@@ -11,6 +11,12 @@ const base = {
 const NEEDS_DOC = /Select a document in the library first/
 
 describe('describeTestStepInput', () => {
+  it('tests the pinned task document without requiring a global document selection', () => {
+    expect(describeTestStepInput({ ...base, taskName: 'AddDocument', pinnedDocUuid: 'pinned-1' })).toEqual({
+      docUuids: ['pinned-1'], candidates: ['pinned-1'], blockedHint: null,
+    })
+    expect(describeTestStepInput({ ...base, pinnedDocUuid: 'pinned-1', selectedDocUuids: ['unrelated'] }).docUuids).toEqual(['pinned-1'])
+  })
   it('tests an API Node with no document selected (the ticket)', () => {
     expect(describeTestStepInput({ ...base, taskName: 'APINode' })).toEqual({
       docUuids: [], candidates: [], blockedHint: null,

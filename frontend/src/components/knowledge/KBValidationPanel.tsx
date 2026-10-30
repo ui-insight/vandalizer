@@ -1,21 +1,22 @@
+import { QualityBadge } from '../library/QualityBadge'
+import { ValidationNav } from '../shared/ValidationNav'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ShieldCheck, Loader2, Sparkles, ChevronDown, ChevronRight } from 'lucide-react'
+import { ShieldCheck, Loader2, ChevronDown, ChevronRight } from 'lucide-react'
 import {
   listKBTestQueries,
   getKBQuality,
   getKBValidationGrader,
-  runKBValidationAsync,
   downloadKBValidationRunExport,
   type KBTestQuery,
   type KBValidationExportFormat,
   type KBValidationGrader,
-  type KBValidationMode,
   type KBValidationResult,
 } from '../../api/knowledge'
 import { describeKBScoreWithValues, explainKBScore } from './kbScoreFormula'
 import { AutovalidateTab } from './AutovalidateTab'
 import { KBTestQueriesTab } from './KBTestQueriesTab'
 import { KBValidationRunTab } from './KBValidationRunTab'
+import { useKBValidationRun } from '../../hooks/useKBValidationRun'
 import { KBQualityHistoryTab } from './KBQualityHistoryTab'
 
 type Tab = 'autovalidate' | 'queries' | 'run' | 'history'
@@ -31,6 +32,7 @@ interface Props {
   /** Called with the new KB's uuid after the user clones a KB they can't
    * manage, so the parent can navigate to their own copy. */
   onCloned?: (newUuid: string) => void
+  onRunCompleted?: (kbUuid: string) => void
   /** Collapse state is owned by the parent so it can trade screen space
    * between this panel and sibling sections (e.g. the Sources list). The
    * header stays visible when collapsed, keeping the latest score chip in
@@ -38,13 +40,6 @@ interface Props {
   collapsed?: boolean
   onToggleCollapsed?: () => void
 }
-
-// Validation runs off the request/response path (a background Celery task), so
-// the UI polls the quality history until the new run lands instead of blocking
-// on a single long HTTP call that would trip the 60s client fetch timeout.
-const POLL_INTERVAL_MS = 4000
-const MAX_POLL_MS = 10 * 60 * 1000 // give up after 10 min; the run still lands in History
-const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
 
 // One row of GET /knowledge/{uuid}/quality history. ``result_snapshot`` carries
 // the full KBValidationResult the Run-now tab renders, so we can hydrate the
@@ -65,18 +60,13 @@ type KBHistoryItem = {
  * must never stand in for the KB's quality score in the header. */
 const isSmokeTest = (h: KBHistoryItem) => h.source === 'smoke_test'
 
-const TAB_LABELS: { id: Tab; label: string; icon?: typeof Sparkles }[] = [
-  { id: 'autovalidate', label: 'Validate', icon: Sparkles },
-  { id: 'queries', label: 'Test Queries' },
-  { id: 'run', label: 'Run now' },
-  { id: 'history', label: 'History' },
-]
-
 /** Provenance summary for the score chip in the validation header. We surface
  * judge model, eval-set size, mode, and age so users can tell whether the
  * "85" they see is fresh, on a comparable judge, and on a comparable set —
  * which addresses the audit's "no labeling, no reconciliation" gap. */
 type LatestQualitySummary = {
+  tier?: string | null
+  limitedEvidence: boolean
   score: number
   // Overall-score composition + the judge's answer accuracy, so the chip's
   // hover can say the score is a composite instead of reading as "judged N".
@@ -91,20 +81,23 @@ type LatestQualitySummary = {
   createdAt: string | null
 }
 
-export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = true, onCloned, collapsed = false, onToggleCollapsed }: Props) {
-  const [tab, setTab] = useState<Tab>('autovalidate')
+export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = true, onCloned, onRunCompleted, collapsed = false, onToggleCollapsed }: Props) {
+  const [tab, setTab] = useState<Tab>('queries')
+  const [editingQuestion, setEditingQuestion] = useState(false)
+  const [draftNotice, setDraftNotice] = useState(false)
+  useEffect(() => { if (!editingQuestion) setDraftNotice(false) }, [editingQuestion])
   const [queries, setQueries] = useState<KBTestQuery[]>([])
   const [latestRun, setLatestRun] = useState<KBValidationResult | null>(null)
   // Persisted uuid of the run shown in the Run-now tab, so its results can be
   // exported. null until a run lands (or is hydrated from history).
   const [latestRunUuid, setLatestRunUuid] = useState<string | null>(null)
+  const [displayedRunDate, setDisplayedRunDate] = useState<string | null>(null)
   const [latestQuality, setLatestQuality] = useState<LatestQualitySummary | null>(null)
   const [loading, setLoading] = useState(false)
   // Run state lives here (not in KBValidationRunTab) so an in-flight validation
   // survives tab switches — the Run now tab is conditionally rendered and would
   // otherwise unmount mid-run, dropping its `running`/`error` local state and
   // showing the idle "Run Validation" button as if nothing were happening.
-  const [running, setRunning] = useState(false)
   const [runError, setRunError] = useState<string | null>(null)
   // Questions ticked on Test Queries and handed to Run now by "Run selected",
   // where the count and category mix are shown before the run starts.
@@ -112,6 +105,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
   // A "Run selected" hand-off applies to the visit it opened; choosing a tab
   // from the strip starts clean, so a later Run visit opens on the full set.
   const selectTab = (id: Tab) => {
+    if (id !== 'queries' && editingQuestion) { setDraftNotice(true); return }
     setHandedSelection(null)
     setTab(id)
   }
@@ -125,22 +119,10 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
   // mid-run). The polling loop awaits across many seconds, so it can resolve
   // long after React has torn the component down.
   const mountedRef = useRef(true)
-  useEffect(() => () => { mountedRef.current = false }, [])
-
-  // Roving focus for the tab strip (keyboard arrow navigation).
-  const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
-  const onTabKeyDown = (e: React.KeyboardEvent, idx: number) => {
-    if (!['ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(e.key)) return
-    e.preventDefault()
-    const n = TAB_LABELS.length
-    const next =
-      e.key === 'ArrowRight' ? (idx + 1) % n
-      : e.key === 'ArrowLeft' ? (idx - 1 + n) % n
-      : e.key === 'Home' ? 0
-      : n - 1
-    selectTab(TAB_LABELS[next].id)
-    tabRefs.current[next]?.focus()
-  }
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
 
   const refreshQueries = useCallback(async () => {
     try {
@@ -161,6 +143,8 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
     const snap = last?.result_snapshot ?? null
     setLatestQuality(last?.score != null ? {
       score: Number(last.score),
+      tier: snap?.quality_tier,
+      limitedEvidence: !!snap?.score_breakdown?.sample_size_penalty,
       breakdown: snap ? describeKBScoreWithValues(explainKBScore(snap).components) : null,
       answerAccuracy: snap?.retrieval_precision?.avg_judge_score ?? null,
       judgeModel: last.judge_model ?? null,
@@ -179,73 +163,15 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
     }
   }, [fetchHistory, applyLatestQuality])
 
-  // Run validation as a background task and poll for the result. The synchronous
-  // endpoint can take minutes for a large eval set and would blow past the
-  // client's 60s fetch timeout — the request aborted with "Request timed out"
-  // even though the server finished and persisted the run (it only surfaced
-  // later in History). Instead we enqueue the Celery task and poll the quality
-  // history until the new ValidationRun lands, then render its full snapshot.
-  const runValidation = useCallback(async (mode: KBValidationMode, queryUuids?: string[]) => {
-    setRunning(true)
+  const { start: runValidation, retry: retryValidation, running, progress, activeOptions } = useKBValidationRun(kbUuid, (uuid, result) => {
+    setLatestRun(result)
+    setLatestRunUuid(uuid)
+    setDisplayedRunDate(null)
     setRunError(null)
-    try {
-      // Remember the runs that already exist so we can spot the new one.
-      let priorUuids = new Set<string>()
-      try {
-        priorUuids = new Set(
-          (await fetchHistory()).map(h => h.uuid).filter((u): u is string => !!u),
-        )
-      } catch {
-        // Non-fatal — worst case we match the first completed run we see.
-      }
-
-      await runKBValidationAsync(
-        kbUuid,
-        queryUuids ? { mode, query_uuids: queryUuids } : { mode },
-      )
-
-      const deadline = Date.now() + MAX_POLL_MS
-      let result: KBValidationResult | null = null
-      let resultUuid: string | null = null
-      while (Date.now() < deadline) {
-        await sleep(POLL_INTERVAL_MS)
-        if (!mountedRef.current) return
-        let history: KBHistoryItem[]
-        try {
-          history = await fetchHistory()
-        } catch {
-          continue // transient fetch error — keep polling
-        }
-        // The freshest run we haven't seen before that carries a full validation
-        // payload (skips lightweight optimizer-apply / passive rows).
-        const fresh = history.find(
-          h => h.uuid && !priorUuids.has(h.uuid) && h.result_snapshot?.retrieval_precision,
-        )
-        if (fresh?.result_snapshot) {
-          result = fresh.result_snapshot
-          resultUuid = fresh.uuid ?? null
-          applyLatestQuality(history)
-          break
-        }
-      }
-      if (!mountedRef.current) return
-      if (result) {
-        setLatestRun(result)
-        setLatestRunUuid(resultUuid)
-        // Surface the new run in History without waiting for a reload.
-        setHistoryRefreshKey(k => k + 1)
-      } else {
-        setRunError(
-          'Validation is still running — large evaluation sets can take several ' +
-          'minutes. It will appear in the History tab when it finishes.',
-        )
-      }
-    } catch (e) {
-      if (mountedRef.current) setRunError((e as Error).message)
-    } finally {
-      if (mountedRef.current) setRunning(false)
-    }
-  }, [kbUuid, fetchHistory, applyLatestQuality])
+    setHistoryRefreshKey(k => k + 1)
+    void refreshHistory()
+    onRunCompleted?.(kbUuid)
+  })
 
   // Export the run currently shown in the Run-now tab. Failures surface in
   // the tab's existing error slot rather than dying silently.
@@ -283,13 +209,6 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
   }, [tab, refreshQueries])
 
   const latestScore = latestQuality?.score ?? null
-  const scoreColor =
-    latestScore == null ? '#666'
-    : latestScore >= 90 ? '#22c55e'
-    : latestScore >= 70 ? '#3b82f6'
-    : latestScore >= 50 ? '#f59e0b'
-    : '#ef4444'
-
   // Build the "source of this score" tooltip — answers the audit's #11 directly.
   // Leads with what the number IS (a composite) before who judged it, because
   // "Score: 91 · judged by X" read as the judge's score, which it is not.
@@ -328,58 +247,42 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
     : null
 
   return (
-    <div
+    <div className="validation-workspace"
       style={{
-        marginTop: 16,
-        padding: 12,
-        backgroundColor: '#1f1f1f',
-        border: '1px solid #2e2e2e',
-        borderRadius: 8,
+        marginTop: 'var(--workspace-space-12)',
+        padding: 'var(--workspace-space-12)',
+        backgroundColor: 'var(--workspace-surface)',
+        border: '1px solid var(--workspace-border)',
+        borderRadius: 'var(--workspace-radius-medium)',
       }}
     >
-      {/* Header — doubles as the collapse toggle when the parent controls it */}
-      <button
-        type="button"
-        onClick={onToggleCollapsed}
-        aria-expanded={onToggleCollapsed ? !collapsed : undefined}
-        disabled={!onToggleCollapsed}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-          marginBottom: collapsed ? 0 : 10, padding: 0,
-          background: 'transparent', border: 'none', fontFamily: 'inherit',
-          cursor: onToggleCollapsed ? 'pointer' : 'default', textAlign: 'left',
-        }}
-      >
-        {onToggleCollapsed && (
-          collapsed
-            ? <ChevronRight size={14} style={{ color: '#888', flexShrink: 0 }} />
-            : <ChevronDown size={14} style={{ color: '#888', flexShrink: 0 }} />
-        )}
-        <ShieldCheck size={16} style={{ color: '#7d8590' }} aria-hidden="true" />
-        <span style={{ fontSize: 14, fontWeight: 600, color: '#e5e5e5' }}>Validation</span>
-        {latestScore != null && (
-          <span
-            role="status"
-            aria-live="polite"
-            title={tooltip}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 4,
-              fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 8,
-              color: scoreColor, backgroundColor: 'rgba(255,255,255,0.05)',
-              border: `1px solid ${scoreColor}33`,
-            }}
-          >
-            <span style={{
-              width: 6, height: 6, borderRadius: '50%', backgroundColor: scoreColor,
-            }} />
-            {latestScore.toFixed(0)}
-          </span>
-        )}
+      {/* Keep the collapse control separate from the evaluation disclosure. */}
+      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--workspace-space-12)', marginBottom: collapsed ? 0 : 10 }}>
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          aria-expanded={onToggleCollapsed ? !collapsed : undefined}
+          disabled={!onToggleCollapsed}
+          style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)', padding: 0,
+            background: 'transparent', border: 'none', fontFamily: 'inherit',
+            cursor: onToggleCollapsed ? 'pointer' : 'default', textAlign: 'left' }}
+        >
+          {onToggleCollapsed && (
+            collapsed
+              ? <ChevronRight size={14} style={{ color: 'var(--workspace-muted)', flexShrink: 0 }} />
+              : <ChevronDown size={14} style={{ color: 'var(--workspace-muted)', flexShrink: 0 }} />
+          )}
+          <ShieldCheck size={16} style={{ color: 'var(--workspace-muted)' }} aria-hidden="true" />
+          <span style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: 'var(--workspace-text)' }}>Validation</span>
+        </button>
+        <QualityBadge tier={latestQuality?.tier} score={latestScore}
+          testCaseCount={latestQuality?.numQueries} lastValidatedAt={latestQuality?.createdAt}
+          limitedEvidence={latestQuality?.limitedEvidence} title={tooltip} />
         {provenance && (
           <span
             title={tooltip}
             style={{
-              fontSize: 10, color: '#666',
+              fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)',
               maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}
           >
@@ -390,7 +293,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
           <span
             title={`The applied optimization pins ${latestQuality.answerModelFallback.configured}, which is no longer in System Config. This score was answered by ${latestQuality.answerModelFallback.used}. Re-run Autovalidate or revert the optimization to clear this.`}
             style={{
-              fontSize: 10, color: '#f59e0b',
+              fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-warning)',
               maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}
           >
@@ -398,70 +301,35 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
           </span>
         )}
         {collapsed && running && (
-          <Loader2 size={12} style={{ color: '#888', animation: 'spin 1s linear infinite' }} aria-label="Validation running" />
+          <Loader2 size={12} style={{ color: 'var(--workspace-muted)', animation: 'spin 1s linear infinite' }} aria-label="Validation running" />
         )}
-        <span style={{ marginLeft: 'auto', fontSize: 11, color: '#888' }}>
+        <span style={{ marginLeft: 'auto', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)' }}>
           {queries.length} {queries.length === 1 ? 'query' : 'queries'}
         </span>
-      </button>
+      </div>
 
       {!collapsed && (<>
-      {/* Orientation hint — single sentence above the tab strip so new users
-          know what each tab is for without clicking through. */}
-      <div
-        style={{
-          fontSize: 11, color: '#888', marginBottom: 6, lineHeight: 1.5,
-        }}
-      >
-        <b style={{ color: '#bbb' }}>Validate</b> to score &amp; improve. <b style={{ color: '#bbb' }}>Run now</b> to spot-check.{' '}
-        <b style={{ color: '#bbb' }}>Test Queries</b> are the rubric.
-      </div>
-
-      {/* Tabs */}
-      <div role="tablist" aria-label="Validation views" style={{ display: 'flex', gap: 2, borderBottom: '1px solid #2e2e2e', marginBottom: 10 }}>
-        {TAB_LABELS.map((t, idx) => {
-          const active = tab === t.id
-          const Icon = t.icon
-          const isAuto = t.id === 'autovalidate'
-          return (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              id={`vtab-${t.id}`}
-              aria-selected={active}
-              aria-controls="vtabpanel"
-              tabIndex={active ? 0 : -1}
-              ref={el => { tabRefs.current[idx] = el }}
-              onKeyDown={e => onTabKeyDown(e, idx)}
-              onClick={() => selectTab(t.id)}
-              style={{
-                fontFamily: 'inherit',
-                display: 'inline-flex', alignItems: 'center', gap: 5,
-                background: 'transparent',
-                color: active ? '#fff' : '#888',
-                border: 'none',
-                padding: '6px 12px',
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-                borderBottom: active
-                  ? `2px solid ${isAuto ? '#a78bfa' : '#2563eb'}`
-                  : '2px solid transparent',
-                marginBottom: -1,
-              }}
-            >
-              {Icon && <Icon size={12} style={{ color: active ? (isAuto ? '#a78bfa' : '#fff') : '#888' }} aria-hidden="true" />}
-              {t.label}
-            </button>
-          )
-        })}
-      </div>
-
+      <ValidationNav active={tab === 'queries' ? 'examples' : tab === 'autovalidate' ? 'improve' : 'check'}
+        onChange={stage => selectTab(stage === 'examples' ? 'queries' : stage === 'improve' ? 'autovalidate' : 'run')}
+        running={running} summary={tab === 'queries' ? `${queries.length} test questions. Save expected answers to measure quality.`
+          : tab === 'autovalidate' ? 'Compare retrieval and answer settings, then review proposed changes.'
+          : 'Check answers against your examples. Review failures and their source evidence.'} />
+      {(tab === 'run' || tab === 'history') && <button type="button" onClick={() => selectTab(tab === 'history' ? 'run' : 'history')}
+        style={{ marginBottom: 12, padding: '8px 12px', background: '#fff', border: '1px solid var(--workspace-border)', borderRadius: 6, cursor: 'pointer' }}>
+        {tab === 'history' ? 'Back to latest result' : 'View run history'}
+      </button>}
+      {tab !== 'run' && progress && (
+        <div role={progress.phase === 'failed' ? 'alert' : 'status'} style={{ padding: "var(--workspace-space-12) 0", fontSize: 'var(--workspace-font-control)', color: progress.phase === 'failed' ? 'var(--workspace-danger)' : 'var(--workspace-muted)', lineHeight: 1.6 }}>
+          <div>{progress.message}</div>
+          {progress.delayed && <div>This check is taking longer than usual; it remains active.</div>}
+          {running && <button type="button" onClick={retryValidation} style={{ display: 'block', marginTop: 'var(--workspace-space-8)', padding: "7px var(--workspace-space-12)", color: 'var(--workspace-text)', background: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer' }}>Check status / reconnect</button>}
+        </div>
+      )}
+      {draftNotice && <p role="alert" className="validation-save-error">Save or cancel your question edits before leaving Examples. Your draft is still here.</p>}
       {/* Tab content */}
-      <div role="tabpanel" id="vtabpanel" aria-labelledby={`vtab-${tab}`}>
+      <div role="region" aria-label={tab === 'queries' ? 'Knowledge base examples' : tab === 'run' ? 'Knowledge base run and results' : tab === 'history' ? 'Validation history' : 'Improve knowledge base'}>
       {loading ? (
-        <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 24, color: '#888' }}>
+        <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 'var(--workspace-space-24)', color: 'var(--workspace-muted)' }}>
           <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
           <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Loading…</span>
         </div>
@@ -473,6 +341,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
           queriesCount={queries.length}
           onSwitchToQueries={() => setTab('queries')}
           onCloned={onCloned}
+          onChanged={() => { void refreshHistory(); onRunCompleted?.(kbUuid); setHistoryRefreshKey(key => key + 1) }}
         />
       ) : tab === 'queries' ? (
         <KBTestQueriesTab
@@ -481,8 +350,10 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
           canManage={canManage}
           queries={queries}
           onChange={refreshQueries}
+          onEditingChange={setEditingQuestion}
           running={running}
           onRunSelected={uuids => {
+            if (editingQuestion) { setDraftNotice(true); return }
             // Review before running: Run now opens on this selection (judge
             // only, so it costs what the handful of questions costs) and
             // states the count and categories; the user starts it there.
@@ -497,10 +368,15 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
           queries={queries}
           selectedUuids={handedSelection}
           latestRun={latestRun}
+          displayedRunLabel={latestRunUuid ? `Saved run ${displayedRunDate ? new Date(displayedRunDate).toLocaleString() + ' · ' : ''}${latestRunUuid}` : undefined}
           running={running}
+          progress={progress}
+          activeOptions={activeOptions}
+          onRetryStatus={retryValidation}
           error={runError}
-          onRun={runValidation}
+          onRun={(mode, queryUuids) => { setRunError(null); runValidation(mode, queryUuids) }}
           onExport={latestRunUuid ? exportLatestRun : undefined}
+          onChooseQuestions={() => setTab('queries')}
           grader={grader}
         />
       ) : (
@@ -510,6 +386,14 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
           refreshKey={historyRefreshKey}
           polling={running}
           kbHasSources={kbHasSources}
+          onOpenRun={(uuid, result, createdAt) => {
+            setLatestRun(result)
+            setLatestRunUuid(uuid)
+            setDisplayedRunDate(createdAt ?? null)
+            setHandedSelection(null)
+            setTab('run')
+
+          }}
         />
       )}
       </div>

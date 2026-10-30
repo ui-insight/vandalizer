@@ -15,12 +15,14 @@ export interface ChatSetup {
   kbUuids: string[]
   docUuids: string[]
   folderUuids: string[]
+  skillUuid?: string
 }
 
 /**
  * A link that opens a fresh chat with the same knowledge bases, library
- * documents and folders attached. It extends the single-KB `?kb=` link — `kb`
- * now takes a comma-separated list — so a link copied from a chip keeps
+ * documents, folders and Skill attached. The Skill is resolved using the
+ * recipient's access and its current instructions. It extends the single-KB
+ * `?kb=` link — `kb` now takes a comma-separated list — so a link copied from a chip keeps
  * working. It grants nothing: the recipient's own access decides what attaches.
  */
 export function buildChatSetupUrl(setup: ChatSetup): string {
@@ -28,6 +30,7 @@ export function buildChatSetupUrl(setup: ChatSetup): string {
   if (setup.kbUuids.length) params.set('kb', setup.kbUuids.join(','))
   if (setup.docUuids.length) params.set('docs', setup.docUuids.join(','))
   if (setup.folderUuids.length) params.set('folders', setup.folderUuids.join(','))
+  if (setup.skillUuid) params.set('skill', setup.skillUuid)
   return `${window.location.origin}/?${params.toString()}`
 }
 
@@ -59,7 +62,7 @@ export function useShareLink() {
       try {
         await navigator.clipboard.writeText(url)
         const what = label ? `“${label}”` : 'Link'
-        toast(`${what} copied — share it with anyone.`, 'success')
+        toast(`${what} copied. Share it with anyone.`, 'success')
       } catch {
         toast('Could not copy link to clipboard.', 'error')
       }

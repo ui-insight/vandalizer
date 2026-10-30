@@ -132,3 +132,22 @@ class TestMixedMarkers:
         absence of the flag on those keeps reading as measured."""
         note = page_note_for(_pages(), annotated=True)
         assert "[p. N]" in note and "~" not in note
+
+
+class TestNamesTheDocument:
+    """#1058: with several documents attached, a bare "p. 3" can't be
+    attributed, so the example the model copies names the file."""
+
+    def test_measured_note_example_names_the_file(self):
+        note = page_note_for(_pages(), annotated=True, title="sponsor-notice.pdf")
+        assert '"sponsor-notice.pdf, p. 3"' in note
+        # Run 3 on the deployed note: one answer in 24 cited the document's
+        # UUID from the scope list beside its name.
+        assert "with its file name (never its UUID)" in note
+
+    def test_interpolated_note_example_names_the_file(self):
+        note = page_note_for(_pages(approximate=True), annotated=True, title="scan.pdf")
+        assert '"scan.pdf, around p. 4"' in note
+
+    def test_without_a_title_the_example_is_the_bare_page(self):
+        assert '"p. 3"' in page_note_for(_pages(), annotated=True)

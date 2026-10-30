@@ -20,9 +20,11 @@ Two rules the call sites depend on:
 """
 
 from __future__ import annotations
+from pymongo.database import Database
+from celery import Task
+
 
 import logging
-from typing import Any
 
 from app.services.notification_service import create_notification_sync
 from app.tasks import TRANSIENT_EXCEPTIONS
@@ -34,7 +36,7 @@ logger = logging.getLogger(__name__)
 _ERROR_SNIPPET = 200
 
 
-def is_final_attempt(task: Any, exc: BaseException) -> bool:
+def is_final_attempt(task: Task, exc: BaseException) -> bool:
     """True when Celery will not retry `exc` for `task` again.
 
     A non-transient exception is never retried, so the first raise is also the
@@ -49,10 +51,10 @@ def is_final_attempt(task: Any, exc: BaseException) -> bool:
         return True
     if max_retries is None:
         return False
-    return retries >= max_retries
+    return bool(retries >= max_retries)
 
 
-def _snippet(error: Any) -> str:
+def _snippet(error: object) -> str:
     text = str(error or "").strip()
     if not text:
         return "No error detail was recorded."
@@ -60,10 +62,10 @@ def _snippet(error: Any) -> str:
 
 
 def notify_workflow_failed(
-    db,
+    db: Database[dict],
     *,
     workflow_doc: dict | None,
-    error: Any,
+    error: object,
     user_id: str | None = None,
     automation_name: str | None = None,
 ) -> None:
@@ -109,11 +111,11 @@ def notify_workflow_failed(
 
 
 def notify_extraction_failed(
-    db,
+    db: Database[dict],
     *,
     user_id: str | None,
     search_set_uuid: str | None,
-    error: Any,
+    error: object,
     search_set_name: str | None = None,
 ) -> None:
     """Notify the owner that an extraction run failed."""
@@ -144,7 +146,7 @@ def notify_extraction_failed(
         logger.exception("Failed to emit extraction failure notification")
 
 
-def notify_document_failed(db, *, doc: dict | None, error: Any) -> None:
+def notify_document_failed(db: Database[dict], *, doc: dict | None, error: object) -> None:
     """Notify the owner that a document could not be processed.
 
     Coalesced per user rather than per document: a 50-file upload where a dozen
@@ -176,12 +178,12 @@ def notify_document_failed(db, *, doc: dict | None, error: Any) -> None:
 
 
 def notify_delivery_failed(
-    db,
+    db: Database[dict],
     *,
     workflow_doc: dict | None = None,
     automation: dict | None = None,
     detail: str,
-    error: Any = None,
+    error: object = None,
     user_id: str | None = None,
 ) -> None:
     """Notify the owner that a run COMPLETED but a configured output did not
@@ -235,7 +237,7 @@ def notify_delivery_failed(
         logger.exception("Failed to emit delivery-failure notification")
 
 
-def notify_document_not_searchable(db, *, doc: dict | None, error: Any) -> None:
+def notify_document_not_searchable(db: Database[dict], *, doc: dict | None, error: object) -> None:
     """Notify the owner that a document was SAVED but search indexing failed.
 
     Deliberately not notify_document_failed: that title ("failed to process")
@@ -270,7 +272,7 @@ def notify_document_not_searchable(db, *, doc: dict | None, error: Any) -> None:
         logger.exception("Failed to emit document-unsearchable notification")
 
 
-def notify_kb_source_failed(db, *, kb_uuid: str, source_name: str | None, error: Any) -> None:
+def notify_kb_source_failed(db: Database[dict], *, kb_uuid: str, source_name: str | None, error: object) -> None:
     """Notify the KB owner that a source could not be ingested.
 
     Without this, a knowledge base with quietly errored sources answered
@@ -306,11 +308,11 @@ def notify_kb_source_failed(db, *, kb_uuid: str, source_name: str | None, error:
 
 
 def notify_project_kb_sync_failed(
-    db,
+    db: Database[dict],
     *,
     doc: dict | None,
     project: dict | None,
-    error: Any,
+    error: object,
     failed_at: str = "insert",
 ) -> None:
     """Notify the owner that a document is not indexed as its project's KB says.
@@ -383,10 +385,10 @@ def notify_project_kb_sync_failed(
 
 
 def notify_automation_failed(
-    db,
+    db: Database[dict],
     *,
     automation: dict | None,
-    error: Any,
+    error: object,
     detail: str | None = None,
 ) -> None:
     """Notify the owner that an automation could not be dispatched or run.

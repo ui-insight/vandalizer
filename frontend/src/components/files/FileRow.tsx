@@ -1,4 +1,5 @@
-import { Loader2, MoreHorizontal, AlertTriangle, Shield, AlertCircle } from 'lucide-react'
+import { documentReadinessMessage } from '../../utils/documentReadiness'
+import { Loader2, FileText, MoreHorizontal, AlertTriangle, Shield, AlertCircle } from 'lucide-react'
 import type { Document } from '../../types/document'
 import { formatFileDate } from '../../utils/time'
 import { stageCopy, isDocReady } from '../../utils/processingStatus'
@@ -31,7 +32,7 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
       role="row"
       aria-label={`Document: ${doc.title}`}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
+        if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
           e.preventDefault()
           onClick?.()
         }
@@ -55,7 +56,7 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
         {onToggleSelect && (
           <label
             className="flex items-center cursor-pointer"
-            style={{ padding: '12px 4px 12px 15px' }}
+            style={{ padding: "var(--workspace-space-12) var(--workspace-space-4) var(--workspace-space-12) 15px" }}
           >
             <input
               type="checkbox"
@@ -69,7 +70,7 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
       </td>
 
       {/* Name + icon */}
-      <td style={{ padding: '12px 15px' }}>
+      <td style={{ padding: "var(--workspace-space-12) 15px" }}>
         <div className="flex items-center min-w-0">
           {stillProcessing ? (
             <Loader2 className="h-4 w-4 animate-spin shrink-0 mr-2.5" style={{ color: 'var(--highlight-on-light, #806600)' }} />
@@ -138,10 +139,10 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
             >
               <AlertCircle className="h-4 w-4 text-amber-500" />
             </span>
-          ) : null}
+          ) : <FileText className="h-4 w-4 shrink-0 mr-2.5 text-gray-500" aria-hidden="true" />}
           <div style={{ minWidth: 0, flex: 1 }}>
             <span className="flex items-center gap-1.5">
-              <span
+              <span className="file-name" title={doc.title}
                 style={{
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
@@ -153,7 +154,7 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
               </span>
               {doc.classification && doc.classification !== 'unrestricted' && (
                 <span
-                  className="inline-flex items-center gap-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase"
+                  className="inline-flex items-center gap-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-xs font-semibold uppercase"
                   style={{
                     backgroundColor: CLASSIFICATION_STYLES[doc.classification]?.bg || '#f3f4f6',
                     color: CLASSIFICATION_STYLES[doc.classification]?.text || '#374151',
@@ -165,6 +166,11 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
                 </span>
               )}
             </span>
+            {!stillProcessing && (!doc.valid || doc.task_status === 'error' || doc.ingest_error || doc.extraction_low_quality || doc.ingestion_warning_text) && (
+              <p style={{ margin: '4px 0 0', fontSize: 12, lineHeight: 1.4, color: '#92400e', overflowWrap: 'anywhere', whiteSpace: 'normal' }}>
+                {documentReadinessMessage(doc)}
+              </p>
+            )}
             {snippet && (
               <span
                 style={{
@@ -172,10 +178,10 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
                   WebkitLineClamp: 2,
                   WebkitBoxOrient: 'vertical',
                   overflow: 'hidden',
-                  fontSize: '0.78em',
+                  fontSize: 'var(--workspace-font-meta)',
                   color: '#6b7280',
                   lineHeight: 1.4,
-                  marginTop: 2,
+                  marginTop: 'var(--workspace-space-2)',
                 }}
               >
                 {snippet}
@@ -188,9 +194,9 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
       {/* Modified — right-aligned, with hover-revealed action overlay */}
       <td
         style={{
-          padding: '12px 15px',
-          color: '#17181a6e',
-          fontSize: '0.8em',
+          padding: "var(--workspace-space-12) 15px",
+          color: '#59616b',
+          fontSize: 'var(--workspace-font-meta)',
           fontWeight: 300,
           whiteSpace: 'nowrap',
           textAlign: 'right',
@@ -198,7 +204,7 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
         }}
         title={doc.updated_at || doc.created_at || undefined}
       >
-        <span className="group-hover:opacity-0 transition-opacity">
+        <span className="file-modified-label">
           {stillProcessing ? (
             <span style={{ color: 'var(--highlight-on-light, #806600)' }}>{stageCopy(doc.task_status).short}</span>
           ) : (
@@ -207,18 +213,18 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
         </span>
         <div
           onClick={(e) => e.stopPropagation()}
-          className="opacity-0 group-hover:opacity-100 transition-opacity"
+          className="file-row-actions"
           style={{
             position: 'absolute',
-            right: 8,
+            right: 4,
             top: '50%',
             transform: 'translateY(-50%)',
             display: 'flex',
             alignItems: 'center',
             background: '#fff',
-            border: '1px solid #e5e7eb',
+            border: "1px solid var(--workspace-border)",
             borderRadius: 999,
-            padding: '2px',
+            padding: "var(--workspace-space-2)",
             boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
           }}
         >

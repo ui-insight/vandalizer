@@ -1,4 +1,5 @@
 """Chat API routes."""
+from collections.abc import AsyncGenerator
 
 import io
 import logging
@@ -9,10 +10,12 @@ from datetime import datetime, timezone
 from typing import Optional
 from urllib.parse import urlparse
 
+import anyio
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 
+from app.services.chat_stream_transport import with_heartbeats
 from app.config import Settings
 from app.dependencies import get_current_user, get_settings
 from app.rate_limit import limiter
@@ -31,11 +34,18 @@ from app.schemas.chat import (
     ChatRequest,
     ClearContextRequest,
     CompactContextRequest,
+    MemoryPauseRequest,
+    QueueMessageRequest,
+    StopTurnRequest,
     TruncateContextRequest,
 )
 from app.services import access_control, organization_service
 from app.services import activity_service, audit_service
 from app.services.chat_service import chat_stream
+from app.schemas.skills import SelectSkillRequest, SkillSnapshot
+from app.schemas.chat_export import ChatExportRequest
+from app.services.chat_export import MIME_TYPES, render_chat_export
+from app.services import skill_service
 
 logger = logging.getLogger(__name__)
 
@@ -60,14 +70,14 @@ async def _get_authorized_activity(activity_id: str, user: User) -> ActivityEven
     return activity
 
 
-@router.post("")
+@router.post("", response_model=None)
 @limiter.limit("30/minute")
 async def chat(
     request: Request,
     body: ChatRequest,
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-):
+) -> StreamingResponse:
     """Streaming chat endpoint. Returns newline-delimited JSON chunks."""
     user_id = user.user_id
     message = body.message
@@ -187,8 +197,54 @@ async def chat(
     activity: Optional[ActivityEvent] = None
     conversation: Optional[ChatConversation] = None
 
+    # Authorize Skill selection before creating activities or persisting a
+    # message. Existing snapshots stay pinned even if the author edits them.
+    if activity_id and len(str(activity_id).strip()) >= 10:
+        activity = await _get_authorized_activity(activity_id, user)
+        conversation = await ChatConversation.find_one(
+            ChatConversation.uuid == activity.conversation_id,
+            ChatConversation.user_id == user_id,
+        )
+    if body.retry:
+        history = await conversation.get_messages() if conversation else []
+        last_user = next((m for m in reversed(history) if m["role"] == "user"), None)
+        if not last_user or last_user["content"] != message:
+            raise HTTPException(409, "This message can no longer be retried. Reopen the conversation and send a new message.")
+    page_preview = None
+    if body.page_approval:
+        if not conversation:
+            raise HTTPException(404, "Conversation not found")
+        from app.services import chat_page_previews
+        from app.services.chat_artifact_tools import _call
+        page_preview = await _call(chat_page_previews.get, user_id, conversation.uuid, body.page_approval)
+    current_skill = getattr(conversation, "active_skill", None)
+    requested_skill = body.skill_uuid
+    explicit_skill = "skill_uuid" in body.model_fields_set
+    if conversation is None and body.project_uuid and not explicit_skill:
+        requested_skill = getattr(project, "default_skill_uuid", None)
+        explicit_skill = bool(requested_skill)
+    active_skill = await skill_service.resolve_active_skill(
+        user, current_skill if isinstance(current_skill, SkillSnapshot) else None,
+        requested_skill, explicit=explicit_skill,
+    )
+    if body.skill_version and (not active_skill or active_skill.version != body.skill_version):
+        raise HTTPException(status_code=409, detail="The selected Skill changed. Select it again before sending.")
+    if active_skill and body.run_demo:
+        raise HTTPException(status_code=422, detail="Remove the active Skill before running the sample demo.")
+
+    # Only the explicit sample-demo action sets run_demo. Natural-language
+    # requests such as "show me my workflows" belong to the assistant.
+
+    # Provision the onboarding sample ONLY when the scripted demo is actually
+    # going to run. Provisioning for every first-session message leaks the
+    # sample doc into normal chat and makes the agent hallucinate about it.
+    onboarding_ctx = None
+    if body.run_demo:
+        from app.services.onboarding_service import provision_onboarding_sample
+        onboarding_ctx = await provision_onboarding_sample(user)
+
     team_id = str(user.current_team) if user.current_team else None
-    if not activity_id or len(str(activity_id).strip()) < 10:
+    if activity is None:
         # New conversation
         conversation = ChatConversation(
             title=message.strip(),
@@ -206,28 +262,35 @@ async def chat(
             user_id=user_id,
             team_id=team_id,
             conversation_id=conversation.uuid,
+            project_uuid=body.project_uuid,
         )
+        activity.meta_summary = {"chat_turn_started": True}
 
         # Always set a placeholder title from the first message so the rail
         # shows something immediately while the AI title generates in the background.
         if not activity.title:
             first_line = (message or "").strip().splitlines()[0] if message else ""
+            # A message pasted in quotes left a stray quote on the name.
+            first_line = first_line.strip("\"'“”‘’ ")
             words = [w for w in first_line.split() if w]
             short = " ".join(words[:6]).strip() or "Chat"
             if len(short) > 80:
                 short = short[:77].rstrip() + "..."
             activity.title = short
-            await activity.save()
+        await activity.save()
     else:
         # Resume existing conversation
-        activity = await _get_authorized_activity(activity_id, user)
         activity.status = ActivityStatus.RUNNING.value
         activity.last_updated_at = datetime.now(timezone.utc)
+        activity.meta_summary = {
+            **(activity.meta_summary if isinstance(activity.meta_summary, dict) else {}),
+            "chat_turn_started": True,
+        }
+        # A conversation opened by attaching a file or link has no project
+        # until its first message names one (authorized above).
+        if body.project_uuid and not activity.project_uuid:
+            activity.project_uuid = body.project_uuid
         await activity.save()
-        conversation = await ChatConversation.find_one(
-            ChatConversation.uuid == activity.conversation_id,
-            ChatConversation.user_id == user_id,
-        )
         if not conversation:
             conversation = ChatConversation(
                 title=message.strip(),
@@ -255,12 +318,26 @@ async def chat(
     conversation.scope_document_uuids = selected_document_uuids
     conversation.scope_folder_uuids = selected_folder_uuids
     conversation.scope_knowledge_base_uuids = selected_kb_uuids
-    await conversation.add_message(
-        ChatRole.USER, message, source_documents=source_documents or None,
-    )
+    if current_skill != active_skill:
+        conversation.last_context_tokens = 0
+        conversation.last_context_message_count = -1
+    conversation.active_skill = active_skill
+    if body.retry:
+        # Keep partial answers and completed tool results, but reuse the user
+        # message. This also keeps the transcript correct after reopening it.
+        await conversation.save()
+    else:
+        await conversation.add_message(
+            ChatRole.USER, message, source_documents=source_documents or None,
+        )
 
-    async def generate():
+    async def generate() -> AsyncGenerator[str, None]:
         try:
+            if page_preview is not None:
+                from app.services.chat_page_approval import stream_save
+                async for chunk in stream_save(conversation, page_preview, str(activity.id), user_id):
+                    yield chunk
+                return
             async for chunk in chat_stream(
                 message=message,
                 document_uuids=document_uuids,
@@ -270,52 +347,63 @@ async def chat(
                 settings=settings,
                 model_override=body.model,
                 kbs=resolved_kbs,
+                project_uuid=body.project_uuid,
                 include_onboarding_context=body.include_onboarding_context,
                 is_first_session=body.is_first_session,
+                run_demo=body.run_demo,
+                user=user,
+                team_access=team_access,
+                onboarding_context=onboarding_ctx,
+                active_skill=active_skill,
+                retry=body.retry,
+                client_timezone=body.client_timezone,
             ):
                 yield chunk
         finally:
             # Safety net: chat_service handles normal completion, client
             # disconnects, and LLM errors. This catches anything that slips
             # through (early-return paths, save failures inside the exception
-            # handlers) so the activity rail never spins forever.
+            # handlers) so the activity rail never spins forever. Shielded:
+            # on a disconnect this runs inside a cancelled scope, where an
+            # unshielded await is cancelled before it reads anything.
             if activity:
-                try:
-                    ev = await ActivityEvent.get(activity.id)
-                    if ev and ev.status in (
-                        ActivityStatus.RUNNING.value,
-                        ActivityStatus.QUEUED.value,
-                    ):
-                        now = datetime.now(timezone.utc)
-                        ev.status = ActivityStatus.FAILED.value
-                        ev.error = "Chat stream ended without resolution."
-                        ev.finished_at = now
-                        ev.last_updated_at = now
-                        await ev.save()
-                except Exception:
-                    logger.exception(
-                        "Failed to reconcile activity %s after chat stream",
-                        activity.id,
-                    )
+                with anyio.CancelScope(shield=True):
+                    try:
+                        ev = await ActivityEvent.get(activity.id)
+                        if ev and ev.status in (
+                            ActivityStatus.RUNNING.value,
+                            ActivityStatus.QUEUED.value,
+                        ):
+                            now = datetime.now(timezone.utc)
+                            ev.status = ActivityStatus.FAILED.value
+                            ev.error = "Chat stream ended without resolution."
+                            ev.finished_at = now
+                            ev.last_updated_at = now
+                            await ev.save()
+                    except Exception:
+                        logger.exception(
+                            "Failed to reconcile activity %s after chat stream",
+                            activity.id,
+                        )
 
-    headers = {"X-Conversation-UUID": conversation.uuid}
+    headers = {"X-Conversation-UUID": conversation.uuid, "Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"}
     if activity:
         headers["X-Activity-ID"] = str(activity.id)
 
     return StreamingResponse(
-        generate(),
+        with_heartbeats(generate()),
         media_type="text/event-stream",
         headers=headers,
     )
 
 
-@router.post("/add-link")
+@router.post("/add-link", response_model=None)
 @limiter.limit("20/minute")
 async def add_link(
     request: Request,
     body: AddLinkRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Add a URL attachment to a chat conversation."""
     user_id = user.user_id
     activity: Optional[ActivityEvent] = None
@@ -346,7 +434,7 @@ async def add_link(
             ChatConversation.user_id == user_id,
         )
 
-    if not conversation or not activity:
+    if not conversation or not activity or activity.id is None:
         raise HTTPException(status_code=500, detail="Failed to create conversation")
 
     # Fetch URL content — uses trafilatura for main-content extraction and
@@ -371,12 +459,20 @@ async def add_link(
         await activity_service.activity_finish(
             activity.id, status=ActivityStatus.FAILED, error=reason
         )
-        raise HTTPException(status_code=400, detail=f"Failed to fetch URL: {reason}")
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Couldn't fetch that link ({reason}). Check the URL is "
+                "correct and publicly reachable, then try again."
+            ),
+        )
 
     url_attachment = UrlAttachment(
         url=body.link, title=title, content=content, user_id=user_id
     )
     await url_attachment.insert()
+    if url_attachment.id is None:
+        raise HTTPException(status_code=503, detail="The link attachment save could not be confirmed")
 
     conversation.url_attachments.append(url_attachment.id)
     conversation.updated_at = datetime.now()
@@ -397,14 +493,14 @@ async def add_link(
     }
 
 
-@router.post("/add-document")
+@router.post("/add-document", response_model=None)
 @limiter.limit("10/minute")
 async def add_document(
     request: Request,
     files: list[UploadFile] = File(...),
     current_activity_id: Optional[str] = Form(None),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Add file attachments to a chat conversation."""
     user_id = user.user_id
     activity: Optional[ActivityEvent] = None
@@ -435,7 +531,7 @@ async def add_document(
             ChatConversation.user_id == user_id,
         )
 
-    if not conversation or not activity:
+    if not conversation or not activity or activity.id is None:
         raise HTTPException(status_code=500, detail="Failed to create conversation")
 
     uploaded_attachments = []
@@ -494,6 +590,8 @@ async def add_document(
                 user_id=user_id,
             )
             await file_attachment.insert()
+            if file_attachment.id is None:
+                raise HTTPException(status_code=503, detail="The file attachment save could not be confirmed")
 
             conversation.file_attachments.append(file_attachment.id)
             await conversation.add_message(
@@ -511,13 +609,27 @@ async def add_document(
             })
         except Exception as e:
             logger.error(f"Error processing file {file.filename}: {e}")
+            # A DocumentReadError carries an actionable, user-facing message
+            # (e.g. "re-save it as PDF, DOCX, or plain text"); surfacing it
+            # beats the generic placeholder the user can do nothing with.
+            from app.services.document_readers import DocumentReadError
+
+            if isinstance(e, DocumentReadError):
+                placeholder = f"[This file couldn't be read: {e}]"
+            else:
+                placeholder = (
+                    "[This file couldn't be read — it may be corrupted, "
+                    "password-protected, or an unsupported format.]"
+                )
             file_attachment = FileAttachment(
                 filename=file.filename,
-                content=f"[Error processing file: {e}]",
+                content=placeholder,
                 file_type="",
                 user_id=user_id,
             )
             await file_attachment.insert()
+            if file_attachment.id is None:
+                raise HTTPException(status_code=503, detail="The file attachment save could not be confirmed")
             conversation.file_attachments.append(file_attachment.id)
 
     conversation.updated_at = datetime.now()
@@ -532,11 +644,11 @@ async def add_document(
     }
 
 
-@router.delete("/remove-document/{attachment_id}")
+@router.delete("/remove-document/{attachment_id}", response_model=None)
 async def remove_document(
     attachment_id: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Remove a file attachment from chat."""
     from beanie import PydanticObjectId
 
@@ -562,11 +674,11 @@ async def remove_document(
     return {"success": True}
 
 
-@router.delete("/remove-link/{attachment_id}")
+@router.delete("/remove-link/{attachment_id}", response_model=None)
 async def remove_link(
     attachment_id: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Remove a URL attachment from chat."""
     from beanie import PydanticObjectId
 
@@ -591,15 +703,15 @@ async def remove_link(
     return {"success": True}
 
 
-@router.get("/conversations")
+@router.get("/conversations", response_model=None)
 async def list_conversations(
     limit: int = 50,
     user: User = Depends(get_current_user),
-):
+) -> list[dict]:
     """List the user's chat conversations, most recent first."""
     conversations = await ChatConversation.find(
         ChatConversation.user_id == user.user_id,
-    ).sort(-ChatConversation.updated_at).limit(limit).to_list()
+    ).sort('-updated_at').limit(limit).to_list()
 
     return [
         {
@@ -737,11 +849,42 @@ async def _restore_scope(
     }
 
 
-@router.get("/history/{conversation_uuid}")
+@router.get("/skills/{skill_uuid}", response_model=None)
+async def preview_skill(skill_uuid: str, user: User = Depends(get_current_user)) -> SkillSnapshot:
+    return await skill_service.snapshot_skill(skill_uuid, user)
+
+
+@router.put("/history/{conversation_uuid}/skill", response_model=None)
+async def select_conversation_skill(
+    conversation_uuid: str,
+    body: SelectSkillRequest,
+    user: User = Depends(get_current_user),
+) -> dict[str, object]:
+    conversation = await ChatConversation.find_one({"uuid": conversation_uuid, "user_id": user.user_id})
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    running = await ActivityEvent.find_one({
+        "conversation_id": conversation_uuid, "user_id": user.user_id,
+        "status": {"$in": [ActivityStatus.RUNNING.value, ActivityStatus.QUEUED.value]},
+    })
+    # Attachment-only chats also have a RUNNING activity, but no model turn.
+    # They must still allow selecting a Skill before the first question.
+    if running and isinstance(running.meta_summary, dict) and running.meta_summary.get("chat_turn_started"):
+        raise HTTPException(status_code=409, detail="Wait for the current response before changing Skills.")
+    selected = await skill_service.snapshot_skill(body.skill_uuid, user) if body.skill_uuid else None
+    # Update only these fields, without replacing a stale conversation object.
+    await conversation.set({
+        "active_skill": selected.model_dump() if selected else None,
+        "last_context_tokens": 0, "last_context_message_count": -1,
+    })
+    return {"active_skill": selected}
+
+
+@router.get("/history/{conversation_uuid}", response_model=None)
 async def get_chat_history(
     conversation_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Get chat conversation history."""
     conversation = await ChatConversation.find_one(
         ChatConversation.uuid == conversation_uuid,
@@ -762,7 +905,6 @@ async def get_chat_history(
     })
     url_attachments = await conversation.get_url_attachments()
     file_attachments = await conversation.get_file_attachments()
-
     return {
         "activity_id": str(activity.id) if activity else None,
         "messages": messages,
@@ -786,15 +928,20 @@ async def get_chat_history(
         ],
         "context_mode": conversation.context_mode,
         "context_cutoff_index": conversation.context_cutoff_index,
+        "active_plan": conversation.active_plan,
+        "active_skill": (
+            conversation.active_skill.model_dump()
+            if isinstance(conversation.active_skill, SkillSnapshot) else None
+        ),
         "scope": await _restore_scope(conversation, messages, user),
     }
 
 
-@router.delete("/history/{conversation_uuid}")
+@router.delete("/history/{conversation_uuid}", response_model=None)
 async def delete_chat_history(
     conversation_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Delete a chat conversation and all related records."""
     conversation = await ChatConversation.find_one(
         ChatConversation.uuid == conversation_uuid,
@@ -832,11 +979,33 @@ async def delete_chat_history(
     return {"success": True, "message": "Conversation deleted successfully"}
 
 
-@router.post("/download")
+@router.post("/export", response_model=None)
+@limiter.limit("10/minute")
+async def export_chat(
+    request: Request,
+    body: ChatExportRequest,
+    user: User = Depends(get_current_user),
+) -> StreamingResponse:
+    """Download the supplied visible transcript; does not publish or fetch content."""
+    try:
+        data = await anyio.to_thread.run_sync(render_chat_export, body)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return StreamingResponse(
+        io.BytesIO(data), media_type=MIME_TYPES[body.format],
+        headers={
+            "Content-Disposition": f'attachment; filename="chat-export.{body.format}"',
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.post("/download", response_model=None)
 async def download_chat(
     body: ChatDownloadRequest,
     user: User = Depends(get_current_user),
-):
+) -> StreamingResponse:
     """Export chat content as TXT or CSV."""
     fmt = body.format.lower()
     content = body.content
@@ -863,11 +1032,72 @@ async def download_chat(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/truncate")
+@router.post("/queue", response_model=None)
+async def queue_message(
+    body: QueueMessageRequest,
+    user: User = Depends(get_current_user),
+) -> dict[str, object]:
+    """Queue a message typed while a turn is streaming (uplift plan Phase 10).
+
+    chat_stream drains the queue atomically before each model request and
+    folds queued messages into the running turn; leftovers (stopped/failed
+    turns) fold into the next turn instead. Not a replacement for sending a
+    message — the frontend only calls this while a stream is active.
+    """
+    conversation = await ChatConversation.find_one(
+        ChatConversation.uuid == body.conversation_uuid,
+        ChatConversation.user_id == user.user_id,
+    )
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    text = (body.message or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Message is empty")
+    if len(conversation.queued_messages or []) >= 10:
+        raise HTTPException(
+            status_code=409,
+            detail="Queue is full — wait for the current response to catch up.",
+        )
+
+    import datetime as _dt
+
+    await ChatConversation.get_motor_collection().update_one(
+        {"uuid": body.conversation_uuid, "user_id": user.user_id},
+        {"$push": {"queued_messages": {
+            "text": text[:4000],
+            "ts": _dt.datetime.now(_dt.timezone.utc).isoformat(),
+        }}},
+    )
+    return {"success": True}
+
+
+@router.post("/stop", response_model=None)
+async def stop_turn(
+    body: StopTurnRequest,
+    user: User = Depends(get_current_user),
+) -> dict[str, object]:
+    """Mark the streaming turn as stopped by the user.
+
+    The client calls this just before it aborts the stream. The abort cancels
+    the turn server-side either way; this flag is what lets chat_stream save
+    it as stopped (and its activity as canceled) rather than as a dropped
+    connection.
+    """
+    result = await ChatConversation.get_motor_collection().update_one(
+        {"uuid": body.conversation_uuid, "user_id": user.user_id},
+        {"$set": {"stop_requested": True}},
+    )
+    if not result.matched_count:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return {"success": True}
+
+
+@router.post("/truncate", response_model=None)
 async def truncate_context(
     body: TruncateContextRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Truncate conversation context — older messages remain visible but are excluded from LLM context."""
     conversation = await ChatConversation.find_one(
         ChatConversation.uuid == body.conversation_uuid,
@@ -883,6 +1113,10 @@ async def truncate_context(
 
     conversation.context_mode = "truncated"
     conversation.context_cutoff_index = cutoff
+    # The usage anchor measured the pre-truncation context; next turn falls
+    # back to token counting and re-anchors on real usage after that.
+    conversation.last_context_tokens = 0
+    conversation.last_context_message_count = -1
     await conversation.save()
 
     return {
@@ -892,11 +1126,11 @@ async def truncate_context(
     }
 
 
-@router.post("/compact")
+@router.post("/compact", response_model=None)
 async def compact_context(
     body: CompactContextRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Compact conversation context — summarize history with an LLM, keeping old messages visible."""
     conversation = await ChatConversation.find_one(
         ChatConversation.uuid == body.conversation_uuid,
@@ -905,59 +1139,46 @@ async def compact_context(
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-    messages = await conversation.get_messages()
-    if not messages:
+    if not conversation.messages:
         raise HTTPException(status_code=400, detail="No messages to compact")
 
-    # Build conversation text for summarization
-    conversation_text = "\n".join(
-        f"{m['role']}: {m['content']}" for m in messages
-    )
-
     from app.models.system_config import SystemConfig
+    from app.services.chat_compaction import CompactionError, compact_conversation
+    from app.services.chat_service import reset_cache_baseline
     from app.services.config_service import get_user_model_name
-    from app.services.llm_service import create_chat_agent, COMPACT_SYSTEM_PROMPT
 
     model_name = await get_user_model_name(user.user_id)
     cfg = await SystemConfig.get_config()
     sys_config_doc = cfg.model_dump() if cfg else {}
 
-    agent = create_chat_agent(
-        model_name,
-        system_prompt=COMPACT_SYSTEM_PROMPT,
-        system_config_doc=sys_config_doc,
-    )
-    from app.services.metering import metered_async
-    async with metered_async(
-        "chat_summarize",
-        user_id=user.user_id,
-        team_id=str(user.current_team) if getattr(user, "current_team", None) else None,
-    ):
-        result = await agent.run(
-            f"Summarize this conversation:\n\n{conversation_text}"
+    try:
+        # keep_tail=False: the user explicitly asked to compact NOW, so
+        # summarize everything (the auto path keeps a verbatim tail instead).
+        result = await compact_conversation(
+            conversation,
+            model_name=model_name,
+            sys_config_doc=sys_config_doc,
+            user_id=user.user_id,
+            team_id=str(user.current_team) if getattr(user, "current_team", None) else None,
+            keep_tail=False,
         )
-
-    summary = result.output if hasattr(result, "output") else str(result.data)
-    cutoff = len(conversation.messages)
-
-    conversation.context_mode = "compacted"
-    conversation.compact_summary = summary
-    conversation.context_cutoff_index = cutoff
-    await conversation.save()
+    except CompactionError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    reset_cache_baseline(conversation.uuid)
 
     return {
         "success": True,
         "context_mode": "compacted",
-        "context_cutoff_index": cutoff,
-        "summary": summary,
+        "context_cutoff_index": result.cutoff,
+        "summary": result.summary,
     }
 
 
-@router.post("/clear-context")
+@router.post("/clear-context", response_model=None)
 async def clear_context(
     body: ClearContextRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Clear conversation context — all existing messages become display-only."""
     conversation = await ChatConversation.find_one(
         ChatConversation.uuid == body.conversation_uuid,
@@ -969,6 +1190,10 @@ async def clear_context(
     conversation.context_mode = "truncated"
     conversation.context_cutoff_index = len(conversation.messages)
     conversation.compact_summary = None
+    # The usage anchor measured the pre-clear context; next turn falls back
+    # to token counting and re-anchors on real usage after that.
+    conversation.last_context_tokens = 0
+    conversation.last_context_message_count = -1
     await conversation.save()
 
     return {
@@ -976,3 +1201,52 @@ async def clear_context(
         "context_mode": "truncated",
         "context_cutoff_index": len(conversation.messages),
     }
+
+
+@router.get("/memory", response_model=None)
+async def get_user_memory(
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Return what the assistant remembers about this user's habits.
+
+    Shows the same items that feed the "Your patterns" block in the
+    system prompt, so the user can verify what the assistant references.
+    """
+    from app.services import user_memory_service
+
+    team_id = str(user.current_team) if user.current_team else None
+    return await user_memory_service.get_patterns(user.user_id, team_id)
+
+
+@router.put("/memory/paused", response_model=None)
+async def set_user_memory_paused(
+    req: MemoryPauseRequest,
+    user: User = Depends(get_current_user),
+) -> dict[str, object]:
+    """Turn assistant memory off or on for the current team scope.
+
+    While paused nothing new is recorded and the system prompt gets no
+    "Your patterns" block; what is already stored is kept.
+    """
+    from app.services import user_memory_service
+
+    team_id = str(user.current_team) if user.current_team else None
+    paused = await user_memory_service.set_paused(user.user_id, team_id, req.paused)
+    return {"paused": paused}
+
+
+@router.delete("/memory", response_model=None)
+async def clear_user_memory(
+    user: User = Depends(get_current_user),
+) -> dict[str, object]:
+    """Wipe the user's behavioral memory for the current team scope.
+
+    Research admins can use this if the patterns the assistant references
+    feel stale or wrong. Only clears the current (user, team) memory —
+    other team scopes keep their own.
+    """
+    from app.services import user_memory_service
+
+    team_id = str(user.current_team) if user.current_team else None
+    removed = await user_memory_service.clear_memory(user.user_id, team_id)
+    return {"success": True, "removed": removed}

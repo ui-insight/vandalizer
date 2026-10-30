@@ -1,0 +1,1655 @@
+import './tool-calls.css'
+import { getToolMeta as getMeta, TOOL_META, toolTarget, activeToolLabel } from './toolActivity'
+import { qualityPresentation } from '../../lib/qualityLabels'
+import { completedSkillSelection } from '../../lib/skillSelection'
+import { ChatPageCard } from '../artifacts/ChatPageCard'
+import type { ApprovalRecord } from './approvalHistory'
+import { certificationPayloadIssue } from '../../lib/certificationPayload'
+import { useEffect, useRef, useState } from 'react'
+import { AutomationSettings } from './AutomationSettings'
+import type { ReactNode } from 'react'
+import { AlertTriangle, Check, ChevronRight, ClipboardCopy, Download, ExternalLink, FileText, Loader2, Search, BookOpen, Globe, ScanText, Hammer, Workflow } from 'lucide-react'
+import { runModelLabel } from '../../lib/runModel'
+import { QualityBadge } from './QualityBadge'
+import { renderMarkdown } from './markdown'
+import { ExpandableValue, formatExtractedValue } from './extractionValue'
+import {
+  CertCheckCard,
+  CertCompletionCard,
+  CertLessonCard,
+  CertModuleCard,
+  CertProgressCard,
+} from './CertificationCards'
+import { useWorkspace } from '../../contexts/WorkspaceContext'
+import { useCertificationPanelOptional } from '../../contexts/CertificationPanelContext'
+import type { WorkspaceMode } from '../../contexts/WorkspaceContext'
+import type { ToolCallInfo, ToolResultInfo, QualityMeta } from '../../types/chat'
+import { getWorkflowStatus } from '../../api/workflows'
+import { WorkflowArtifactAction } from '../workspace/WorkflowArtifactAction'
+import { announceWorkflowEdited } from '../../lib/workflowEdits'
+import type { WorkflowStatus } from '../../types/workflow'
+
+// ---------------------------------------------------------------------------
+// Tool metadata
+// ---------------------------------------------------------------------------
+
+type ToolCategory = 'read' | 'extract' | 'write' | 'workflow'
+
+function CertificationResponseRecovery() {
+  const certification = useCertificationPanelOptional()
+  const [busy, setBusy] = useState(false)
+  const [notice, setNotice] = useState('')
+  return <div className="agent-tool-recovery" role="alert">
+    <p>Saved work may already exist. Inspect your current course progress and saved results before continuing. This message does not confirm a pass, an award or a failed write.</p>
+    {certification ? <button type="button" className="chat-action-btn" disabled={busy} onClick={async () => {
+      setBusy(true); setNotice('')
+      try { await certification.refresh(); setNotice('Current progress loaded. Open the learning panel to inspect your saved work.') }
+      catch { setNotice('Progress could not be refreshed. Keep your saved work and try this read again.') }
+      finally { setBusy(false) }
+    }}>{busy ? 'Checking saved progress…' : 'Check saved course progress'}</button> : <p>Open the learning panel to refresh progress and inspect your saved work.</p>}
+    {notice && <p role="status">{notice}</p>}
+  </div>
+}
+
+const CATEGORY_ICON = { read: Search, extract: ScanText, write: Hammer, workflow: Workflow } satisfies Record<ToolCategory, typeof Search>
+
+// ---------------------------------------------------------------------------
+// Context hints for ACTIVE (in-progress) tools
+// ---------------------------------------------------------------------------
+
+function getActiveHint(toolName: string, args: Record<string, unknown>): string {
+  const q = args.query || args.search || args.title || args.url
+  const queryStr = typeof q === 'string' ? (q.length > 50 ? q.slice(0, 47) + '...' : q) : ''
+
+  switch (toolName) {
+    case 'search_library':
+    case 'search_documents':
+    case 'list_extraction_sets':
+    case 'list_workflows':
+    case 'list_knowledge_bases':
+      return queryStr ? `for "${queryStr}"` : ''
+    case 'search_knowledge_base':
+      return queryStr ? `about "${queryStr}"` : ''
+    case 'run_extraction':
+    case 'check_compliance': {
+      const docs = Array.isArray(args.document_uuids) ? args.document_uuids.length : 0
+      return docs > 0 ? `on ${docs} document${docs !== 1 ? 's' : ''}` : ''
+    }
+    case 'create_extraction_from_document': {
+      const docs = Array.isArray(args.document_uuids) ? args.document_uuids.length : 0
+      return docs > 0 ? `from ${docs} document${docs !== 1 ? 's' : ''}` : ''
+    }
+    case 'get_workflow_status':
+      // The tool waits for the run to settle, so the line can sit here a while.
+      return args.wait === false ? '' : 'until it finishes (up to a minute)'
+    case 'get_app_help': {
+      const t = args.topic
+      return typeof t === 'string' && t
+        ? `about "${t.length > 40 ? t.slice(0, 37) + '...' : t}"`
+        : ''
+    }
+    case 'get_document_text':
+      return ''
+    case 'save_to_folder':
+      return queryStr ? `"${queryStr}"` : ''
+    case 'get_certification_module':
+    case 'get_certification_lesson':
+    case 'provision_certification_lab':
+    case 'check_certification_module':
+    case 'complete_certification_module':
+    case 'submit_certification_assessment': {
+      const m = args.module_id
+      return typeof m === 'string' && m ? `for "${m.replace(/_/g, ' ')}"` : ''
+    }
+    default:
+      return queryStr
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Rich result summaries — pulls names, counts, and quality naturally
+// ---------------------------------------------------------------------------
+
+interface ResultSummary {
+  /** Main description — e.g. 'Found "NSF Grant Proposal" template' */
+  text: string
+  /** Quality/accuracy annotation — e.g. '92% accuracy · 847 validations' */
+  qualityHint: string
+}
+
+/**
+ * The error a list-returning tool sends as its only entry, such as
+ * search_knowledge_base's `[{"error": ...}]` for a missing, inaccessible,
+ * still-indexing or unreachable knowledge base. Checking `.error` on the array
+ * itself never finds it, so the failure read as "Found 1 relevant passage".
+ */
+export function listErrorEntry(content: unknown): Record<string, unknown> | null {
+  if (!Array.isArray(content) || content.length !== 1) return null
+  const only = content[0] as Record<string, unknown> | null
+  return only && typeof only === 'object' && only.error ? only : null
+}
+
+/** Knowledge-base passages only: a search that matched nothing returns a lone `no_results` note. */
+function kbPassages(content: unknown): Array<Record<string, unknown>> {
+  if (!Array.isArray(content)) return []
+  return (content as Array<Record<string, unknown> | null>).filter(
+    (c): c is Record<string, unknown> => !!c && typeof c === 'object' && typeof c.content === 'string',
+  )
+}
+
+/** The approve button for a tool with no label of its own: "Approve run
+ * report", never "Approve approve …" for a tool whose name starts with the verb. */
+export function approveLabel(toolName: string): string {
+  if (toolName === 'create_html_artifact') return 'Save page'
+  if (toolName === 'revise_html_artifact') return 'Save new version'
+  const words = toolName.replaceAll('_', ' ').trim()
+  return /^approve\b/i.test(words) ? `A${words.slice(1)}` : `Approve ${words}`
+}
+
+function summarizeResult(toolName: string, content: unknown, quality: QualityMeta | null): ResultSummary {
+  const empty: ResultSummary = { text: '', qualityHint: '' }
+  if (content == null) return empty
+  const obj = content as Record<string, unknown>
+
+  const listError = listErrorEntry(content)
+  if (listError) return { text: String(listError.error), qualityHint: '' }
+  if (obj.error) return { text: String(obj.error), qualityHint: '' }
+  if (obj.needs_confirmation) return { text: obj.preview ? String(obj.preview) : 'Awaiting confirmation', qualityHint: '' }
+
+  // Build quality hint from sidecar
+  const qualityHint = formatQualityHint(quality)
+
+  switch (toolName) {
+    case 'search_library': {
+      if (!Array.isArray(content)) break
+      if (content.length === 0) return { text: 'No matching templates found', qualityHint: '' }
+      const first = content[0] as Record<string, unknown>
+      const name = first.name ? `"${first.name}"` : ''
+      const verified = first.verified ? ' (verified)' : ''
+      if (content.length === 1) {
+        return { text: `Found ${name}${verified}`, qualityHint }
+      }
+      return { text: `Found ${content.length} items: ${name}${verified}`, qualityHint }
+    }
+
+    case 'search_documents': {
+      if (!Array.isArray(content)) {
+        // A query that matched nothing comes back with the closest titles.
+        const near = Array.isArray(obj.did_you_mean) ? obj.did_you_mean as Record<string, unknown>[] : []
+        if (near.length === 0) return { text: 'No documents found', qualityHint: '' }
+        return { text: `No exact match · did you mean "${String(near[0].title).slice(0, 40)}"?`, qualityHint: '' }
+      }
+      if (content.length === 0) return { text: 'No documents found', qualityHint: '' }
+      const first = content[0] as Record<string, unknown>
+      const title = first.title ? `"${String(first.title).slice(0, 40)}"` : ''
+      if (content.length === 1) return { text: `Found ${title}`, qualityHint }
+      return { text: `Found ${content.length} documents: ${title}`, qualityHint }
+    }
+
+    case 'list_knowledge_bases': {
+      const counts = kbGroupCounts(content)
+      if (!counts) break
+      const parts = KB_GROUPS.filter(([key]) => counts[key] > 0).map(([key, label]) => `${counts[key]} ${label}`)
+      return { text: parts.length ? parts.join(' · ') : 'No knowledge bases found', qualityHint }
+    }
+
+    case 'list_extraction_sets':
+    case 'list_workflows': {
+      if (!Array.isArray(content)) break
+      const type = toolName === 'list_extraction_sets' ? 'template' :
+        toolName === 'list_workflows' ? 'workflow' : 'knowledge base'
+      if (content.length === 0) return { text: `No ${type}s found`, qualityHint: '' }
+      return { text: `Found ${content.length} ${type}${content.length !== 1 ? 's' : ''}`, qualityHint }
+    }
+
+    case 'list_documents': {
+      const docs = Array.isArray(obj.documents) ? obj.documents.length : 0
+      const folders = Array.isArray(obj.folders) ? obj.folders.length : 0
+      const parts: string[] = []
+      if (docs > 0) parts.push(`${docs} document${docs !== 1 ? 's' : ''}`)
+      if (folders > 0) parts.push(`${folders} folder${folders !== 1 ? 's' : ''}`)
+      return { text: parts.length > 0 ? parts.join(', ') : 'Empty folder', qualityHint }
+    }
+
+    case 'list_folders': {
+      if (!Array.isArray(content)) break
+      if (content.length === 0) return { text: 'No folders found', qualityHint: '' }
+      return { text: `Found ${content.length} folder${content.length !== 1 ? 's' : ''}`, qualityHint }
+    }
+
+    case 'search_knowledge_base': {
+      if (!Array.isArray(content)) break
+      const passages = kbPassages(content)
+      if (passages.length === 0) return { text: 'No matching passages', qualityHint: '' }
+      return { text: `Found ${passages.length} relevant passage${passages.length !== 1 ? 's' : ''}`, qualityHint }
+    }
+
+    case 'get_document_text': {
+      const title = obj.title ? `"${String(obj.title).slice(0, 40)}"` : ''
+      // Say which pages a read covered, so a partial read of a long
+      // document never looks like the whole thing (#1007).
+      const extent = obj.total_chars === 0 ? 'No readable text' : typeof obj.pages_returned === 'string' && typeof obj.page_count === 'number'
+        ? (obj.complete ? `all ${obj.page_count} pages` : `read pp. ${obj.pages_returned} of ${obj.page_count}`)
+        : obj.complete === false || obj.truncated === true ? 'Partly read' : obj.complete === true ? 'Read complete' : ''
+      return { text: [title, extent].filter(Boolean).join(' - '), qualityHint }
+    }
+
+    case 'run_extraction': {
+      const count = (obj.entity_count as number) || 0
+      const fields = Array.isArray(obj.fields) ? obj.fields.length : 0
+      const setName = obj.extraction_set ? `"${obj.extraction_set}"` : ''
+      const fieldHint = fields > 0 ? `${fields} field${fields === 1 ? '' : 's'}` : ''
+      const entityHint = `${count} entit${count !== 1 ? 'ies' : 'y'}`
+      const parts = [entityHint, fieldHint].filter(Boolean).join(', ')
+      return {
+        text: setName ? `${setName}: ${parts}` : parts,
+        qualityHint,
+      }
+    }
+
+    case 'propose_test_case': {
+      // Only a prepared session has fields. Anything else (a stored result
+      // without them, a plain message) read ": 0 fields ready to verify".
+      if (!Array.isArray(obj.fields)) break
+      const count = (obj.fields as unknown[]).length
+      const title = obj.document_title ? `"${String(obj.document_title).slice(0, 40)}"` : ''
+      const ready = `${count} field${count !== 1 ? 's' : ''} ready to verify`
+      return { text: title ? `${title}: ${ready}` : ready, qualityHint: '' }
+    }
+
+    case 'run_validation': {
+      if (obj.score != null) {
+        const tc = obj.num_test_cases || 0
+        return {
+          text: `${qualityPresentation({ score: obj.score as number, tier: typeof obj.tier === 'string' ? obj.tier : undefined, grade: typeof obj.grade === 'string' ? obj.grade : undefined }).label} · ${tc} test case${tc !== 1 ? 's' : ''}`,
+          qualityHint,
+        }
+      }
+      return { text: 'Validation complete', qualityHint: '' }
+    }
+
+    case 'list_test_cases': {
+      const count = (obj.count as number) || 0
+      const setName = obj.extraction_set ? `"${obj.extraction_set}"` : ''
+      return { text: `${setName}: ${count} test case${count !== 1 ? 's' : ''}`, qualityHint: '' }
+    }
+
+    case 'create_extraction_from_document': {
+      const fields = Array.isArray(obj.fields) ? (obj.fields as unknown[]).length : 0
+      const title = obj.title ? `"${String(obj.title).slice(0, 40)}"` : ''
+      if (fields > 0) {
+        return { text: `${title}: ${fields} field${fields !== 1 ? 's' : ''} discovered`, qualityHint: '' }
+      }
+      return { text: obj.message ? String(obj.message) : 'Created', qualityHint: '' }
+    }
+
+    case 'get_quality_info':
+      if (obj.score != null) return { text: qualityPresentation({ score: obj.score as number, tier: typeof obj.tier === 'string' ? obj.tier : undefined }).label, qualityHint }
+      return { text: obj.note ? String(obj.note) : 'No validation data', qualityHint: '' }
+
+    case 'create_knowledge_base':
+    case 'add_documents_to_kb':
+    case 'add_url_to_kb':
+      return { text: obj.message ? String(obj.message) : 'Done', qualityHint }
+
+    case 'run_workflow':
+      return { text: 'Started', qualityHint }
+
+    case 'get_workflow_status': {
+      const status = obj.status as string
+      if (status === 'completed') return { text: 'Completed', qualityHint }
+      if (status === 'paused') return { text: 'Paused, awaiting approval', qualityHint: '' }
+      if (status === 'failed') return { text: 'Failed', qualityHint: '' }
+      const done = (obj.steps_completed as number) || 0
+      const total = (obj.steps_total as number) || 0
+      return { text: `${done}/${total} steps`, qualityHint }
+    }
+
+    case 'get_app_help': {
+      if (obj.matched === false) return { text: 'No matching help topic', qualityHint: '' }
+      const topic = (obj.topic as Record<string, unknown> | undefined)?.title
+      return { text: topic ? `Help: ${String(topic)}` : 'Help topic found', qualityHint: '' }
+    }
+
+    case 'fetch_url': {
+      const title = obj.title ? `"${String(obj.title).slice(0, 50)}"` : 'page'
+      return { text: [`Read ${title}`, obj.truncated === true ? 'Partly read' : ''].filter(Boolean).join(' - '), qualityHint: '' }
+    }
+
+    case 'web_search': {
+      const results = Array.isArray(obj.results) ? obj.results.length : 0
+      if (results === 0) return { text: 'No web results', qualityHint: '' }
+      return { text: `Found ${results} web result${results !== 1 ? 's' : ''}`, qualityHint: '' }
+    }
+
+    case 'list_optimization_recommendations': {
+      const items = Array.isArray(obj.items) ? obj.items.length : 0
+      if (items === 0) return { text: 'No pending optimization suggestions', qualityHint: '' }
+      return { text: `${items} optimization suggestion${items !== 1 ? 's' : ''} pending`, qualityHint: '' }
+    }
+
+    case 'get_optimization_run': {
+      const status = obj.status as string | undefined
+      // Run scores are 0..1; score_percent carries the number the optimizer
+      // screens show. Rounding the raw 0.93 read "score 1/100 (was 1)".
+      const percent = (pct: unknown, raw: unknown) => typeof pct === 'number' ? pct
+        : typeof raw === 'number' ? Math.round(raw * 100) : null
+      const score = percent(obj.score_percent, obj.optimized_score ?? obj.score)
+      if (status === 'completed' && score != null) {
+        const was = percent(obj.baseline_score_percent, obj.baseline_score)
+        const base = was != null ? ` (was ${was})` : ''
+        const tie = obj.tied_with_baseline ? ' · no meaningful difference' : ''
+        return { text: `Completed, score ${score}/100${base}${tie}`, qualityHint: '' }
+      }
+      if (status) {
+        const phase = obj.phase ? ` · ${String(obj.phase)}` : ''
+        return { text: `${status}${phase}`, qualityHint: '' }
+      }
+      return { text: 'Optimization run', qualityHint: '' }
+    }
+
+    case 'start_optimization':
+    case 'apply_optimization':
+    case 'regenerate_validation_plan':
+      return { text: obj.message ? String(obj.message) : 'Done', qualityHint }
+
+    case 'create_html_artifact':
+    case 'revise_html_artifact':
+      return { text: `Saved private Page: ${String(obj.title || 'Untitled Page')}`, qualityHint }
+    case 'get_html_artifact':
+      return { text: `Read Page: ${String(obj.title || 'Untitled Page')}`, qualityHint }
+    case 'list_skills':
+      return { text: Array.isArray(content) ? `Found ${content.length} Skill${content.length === 1 ? '' : 's'}` : 'Skills', qualityHint: '' }
+    case 'get_skill':
+      return { text: 'Skill instructions inspected; selection unchanged', qualityHint: '' }
+    case 'select_skill':
+      return { text: typeof obj.message === 'string' ? obj.message : 'Skill selection', qualityHint: '' }
+    case 'save_to_folder': {
+      const t = obj.title ? `"${String(obj.title).slice(0, 40)}"` : 'document'
+      return { text: `Saved ${t}`, qualityHint }
+    }
+
+    case 'create_project': {
+      const t = obj.title ? `"${String(obj.title).slice(0, 40)}"` : 'project'
+      return { text: `Created project ${t}`, qualityHint }
+    }
+    case 'move_documents_to_project':
+      return { text: typeof obj.message === 'string' ? obj.message : 'File move result', qualityHint: '' }
+
+    case 'check_compliance': {
+      if (obj.rules_checked === 0) return { text: 'No compliance rules defined', qualityHint: '' }
+      const violations = (obj.total_violations as number) || 0
+      const docs = (obj.documents_checked as number) || 0
+      if (obj.all_compliant === true) {
+        return { text: `Configured rules passed for ${docs} document${docs !== 1 ? 's' : ''}`, qualityHint }
+      }
+      if (violations === 0) {
+        // all_compliant is null: some rule couldn't be confirmed, or not every
+        // requested document was read. Never summarize that as compliant.
+        return { text: 'Inconclusive: not every rule could be confirmed', qualityHint }
+      }
+      return {
+        text: `${violations} violation${violations !== 1 ? 's' : ''} across ${docs} document${docs !== 1 ? 's' : ''}`,
+        qualityHint,
+      }
+    }
+
+    case 'approve_workflow_step':
+    case 'reject_workflow_step':
+      return { text: obj.message ? String(obj.message) : 'Done', qualityHint: '' }
+
+    case 'create_automation':
+      return { text: obj.message ? String(obj.message) : 'Automation created', qualityHint: '' }
+
+    case 'create_workflow': {
+      const n = (obj.steps_created as number) || 0
+      const t = obj.name ? `"${String(obj.name).slice(0, 40)}"` : 'workflow'
+      return { text: `Built ${t}: ${n} step${n !== 1 ? 's' : ''}`, qualityHint: '' }
+    }
+
+    case 'update_workflow': {
+      const t = obj.name ? `"${String(obj.name).slice(0, 40)}"` : 'workflow'
+      return { text: `Updated ${t}${typeof obj.version === 'number' ? ` · version ${obj.version}` : ''}`, qualityHint: '' }
+    }
+
+    case 'get_workflow_definition': {
+      const n = Array.isArray(obj.steps) ? obj.steps.length : 0
+      const t = obj.name ? `"${String(obj.name).slice(0, 40)}"` : 'workflow'
+      return { text: `Read ${t}: ${n} step${n !== 1 ? 's' : ''}`, qualityHint: '' }
+    }
+
+    case 'get_certification_progress': {
+      const done = Number(obj.modules_completed ?? 0)
+      const total = Number(obj.modules_total ?? 0)
+      const level = obj.level ? String(obj.level) : ''
+      return {
+        text: `${done}/${total} modules · ${Number(obj.total_xp ?? 0).toLocaleString()} XP${level ? ` · ${level}` : ''}`,
+        qualityHint: '',
+      }
+    }
+
+    case 'get_certification_module':
+      return { text: obj.title ? `Module: "${obj.title}"` : 'Module loaded', qualityHint: '' }
+
+    case 'get_certification_lesson': {
+      const n = Number(obj.lesson_number ?? 0)
+      const total = Number(obj.lesson_count ?? 0)
+      return {
+        text: obj.title ? `Lesson ${n}/${total}: "${obj.title}"` : 'Lesson loaded',
+        qualityHint: '',
+      }
+    }
+
+    case 'check_certification_module': {
+      const checks = (obj.checks as Array<Record<string, unknown>>) || []
+      const passing = checks.filter((c) => c.passed).length
+      return {
+        text: obj.passed
+          ? `"${obj.title}" — ${checks.length > 0 && passing === checks.length ? 'all checks passed' : 'module requirements met; review check details'}`
+          : `"${obj.title}" — ${passing}/${checks.length} checks passing`,
+        qualityHint: '',
+      }
+    }
+
+    case 'complete_certification_module': {
+      const xp = Number(obj.xp_earned ?? 0)
+      return {
+        text: `"${obj.title}" complete${xp > 0 ? ` · +${xp} XP` : ''}`,
+        qualityHint: '',
+      }
+    }
+
+    case 'submit_certification_assessment':
+      return { text: 'Self-assessment saved', qualityHint: '' }
+  }
+
+  // Generic fallback
+  if (Array.isArray(content))
+    return { text: content.length > 0 ? `${content.length} results` : 'No results', qualityHint }
+  if (obj.message && typeof obj.message === 'string') return { text: String(obj.message), qualityHint }
+  return { text: '', qualityHint }
+}
+
+/**
+ * A tool call as a conversation export shows it: the line the chat shows,
+ * never the raw result. Exports used ``toolResultToText``, which falls back
+ * to JSON for most tools, so a 3-message certification chat printed as 4
+ * pages of `"module_id": "ai_literacy"` under the heading
+ * get_certification_progress (support ticket). Extraction results keep their
+ * values, as readable "Field: value" lines, because they are the answer.
+ */
+export function toolResultExportText(toolName: string, content: unknown): string {
+  const label = TOOL_META[toolName]?.label ?? 'Looked up workspace data'
+  const { text } = summarizeResult(toolName, content, null)
+  const lines = [text ? `${label} · ${text}` : label]
+  const obj = (content ?? {}) as Record<string, unknown>
+  if (toolName === 'run_extraction' && !obj.error && Array.isArray(obj.entities)) {
+    const entities = obj.entities as Array<Record<string, unknown>>
+    const fields = Array.isArray(obj.fields) ? (obj.fields as string[]) : Object.keys(entities[0] ?? {})
+    entities.forEach((entity, i) => {
+      if (entities.length > 1) lines.push(`Result ${i + 1}:`)
+      for (const f of fields) {
+        lines.push(`${f}: ${isEmptyValue(entity[f]) ? 'not found' : formatExtractedValue(entity[f])}`)
+      }
+    })
+  }
+  return lines.join('\n')
+}
+
+function formatQualityHint(quality: QualityMeta | null): string {
+  if (!quality) return ''
+  const status = qualityPresentation({ ...quality, testCaseCount: quality.num_test_cases, outdated: !!quality.plan_stale, needsReview: quality.active_alerts?.some(a => a.severity === 'critical') })
+  return `${status.label} · ${status.evidence}`
+}
+
+// ---------------------------------------------------------------------------
+// Data export utilities
+// ---------------------------------------------------------------------------
+
+function csvEscape(val: unknown): string {
+  const s = val == null ? '' : String(val)
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+    return `"${s.replace(/"/g, '""')}"`
+  }
+  return s
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+/** Serialize a tool result's content to a human-readable clipboard string. */
+export function toolResultToText(toolName: string, content: unknown): string {
+  if (content == null) return ''
+  const obj = content as Record<string, unknown>
+
+  // Extraction: entities as tab-delimited table
+  if (toolName === 'run_extraction' && Array.isArray(obj.entities)) {
+    const entities = obj.entities as Array<Record<string, unknown>>
+    const fields = (obj.fields as string[]) || (entities.length > 0 ? Object.keys(entities[0]) : [])
+    if (fields.length === 0) return JSON.stringify(content, null, 2)
+    const header = fields.join('\t')
+    const rows = entities.map(e => fields.map(f => e[f] != null ? String(e[f]) : '').join('\t'))
+    return [header, ...rows].join('\n')
+  }
+
+  // KB passages: source + content
+  if (toolName === 'search_knowledge_base' && Array.isArray(content)) {
+    return (content as Array<Record<string, unknown>>)
+      .map(c => `[${c.source_name || 'Source'}]\n${c.content || ''}`)
+      .join('\n\n')
+  }
+
+  if (toolName === 'list_knowledge_bases' && kbGroupCounts(content)) {
+    const counts = kbGroupCounts(content)!
+    const entries = kbEntries(content)
+    return KB_GROUPS.filter(([key]) => counts[key] > 0).map(([key, label]) =>
+      [`${label[0].toUpperCase() + label.slice(1)} (${counts[key]})`, ...entries.filter(e => e.group === key).map(e => String(e.title || e.uuid))].join('\n'),
+    ).join('\n\n')
+  }
+
+  // Lists: pull title/name
+  if (Array.isArray(content)) {
+    return (content as Array<Record<string, unknown>>)
+      .map(item => String(item.title || item.name || item.uuid || JSON.stringify(item)))
+      .join('\n')
+  }
+
+  // Workflow output
+  if (toolName === 'get_workflow_status' && obj.output != null) {
+    if (typeof obj.output === 'string') return obj.output
+    return JSON.stringify(obj.output, null, 2)
+  }
+
+  // Document text
+  if (toolName === 'get_document_text' && obj.text) return String(obj.text)
+
+  // list_documents
+  if (toolName === 'list_documents' && Array.isArray(obj.documents)) {
+    return (obj.documents as Array<Record<string, unknown>>)
+      .map(d => String(d.title || d.name || 'Untitled'))
+      .join('\n')
+  }
+
+  // Fallback
+  return typeof content === 'string' ? content : JSON.stringify(content, null, 2)
+}
+
+function extractionToCSV(content: Record<string, unknown>): string | null {
+  const entities = content.entities as Array<Record<string, unknown>> | undefined
+  if (!entities || entities.length === 0) return null
+  const fields = (content.fields as string[]) || Object.keys(entities[0])
+  if (fields.length === 0) return null
+  const header = fields.map(csvEscape).join(',')
+  const rows = entities.map(e => fields.map(f => csvEscape(e[f])).join(','))
+  return [header, ...rows].join('\n')
+}
+
+/** Check whether a tool result has meaningful copyable data. */
+function hasCopyableContent(toolName: string, content: unknown): boolean {
+  if (content == null) return false
+  const obj = content as Record<string, unknown>
+  if (obj.error || obj.needs_confirmation) return false
+  if (toolName === 'run_extraction') return Array.isArray(obj.entities) && obj.entities.length > 0
+  if (toolName === 'search_knowledge_base') return kbPassages(content).length > 0
+  if (toolName === 'get_workflow_status') return obj.status === 'completed' && obj.output != null
+  if (toolName === 'get_document_text') return Boolean(obj.text)
+  if (toolName === 'list_documents') return Array.isArray(obj.documents) && obj.documents.length > 0
+  if (Array.isArray(content)) return content.length > 0
+  return false
+}
+
+/** Does this tool result render a rich content block that has its own copy/export buttons? */
+function hasRichContent(toolName: string, obj: Record<string, unknown> | undefined): boolean {
+  if (!obj) return false
+  if (toolName === 'run_extraction' && obj.entities != null) return true
+  if (toolName === 'search_knowledge_base') return true
+  if (toolName === 'get_workflow_status' && obj.status === 'completed' && obj.output != null) return true
+  return false
+}
+
+/** Small inline copy button with checkmark feedback. */
+function CopyButton({ text, label = 'Copy data' }: { text: string; label?: string }) {
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
+  const handleCopy = async (event: React.MouseEvent) => {
+    event.stopPropagation()
+    try { await navigator.clipboard.writeText(text); setCopyState('copied') }
+    catch { setCopyState('failed') }
+  }
+  return <span className="agent-copy-control">
+    <button type="button" onClick={handleCopy} title={label} aria-label={label}
+      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 'var(--workspace-radius-small)', border: 'none', background: 'transparent', cursor: 'pointer', color: '#4b5563', flexShrink: 0 }}>
+      {copyState === 'copied' ? <Check size={14} /> : <ClipboardCopy size={14} />}
+    </button>
+    {copyState !== 'idle' && <span role="status" className={copyState === 'copied' ? 'sr-only' : 'text-xs text-red-800'}>{copyState === 'copied' ? `${label}: copied` : 'Copy failed. Try again or select the result text.'}</span>}
+  </span>
+}
+
+/** Small inline CSV download button. */
+function CSVDownloadButton({ csv, filename }: { csv: string; filename: string }) {
+  const handleDownload = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    downloadBlob(new Blob([csv], { type: 'text/csv' }), filename)
+  }
+  return (
+    <button
+      onClick={handleDownload}
+      title="Download CSV"
+      aria-label="Download CSV"
+      style={{
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        width: 36, height: 36, borderRadius: 'var(--workspace-radius-small)', border: 'none',
+        background: 'transparent', cursor: 'pointer',
+        color: '#4b5563', transition: 'color 0.15s',
+        flexShrink: 0,
+      }}
+    >
+      <Download size={14} />
+    </button>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Auto-shown rich content
+// ---------------------------------------------------------------------------
+
+/** Per-field source sidecar entry from run_extraction (index-aligned with entities). */
+interface FieldSource {
+  quote?: string
+  page?: number | null
+  page_approximate?: boolean
+  document_uuid?: string | null
+  document_title?: string | null
+  verified?: boolean
+}
+
+function isEmptyValue(v: unknown): boolean {
+  return v == null || formatExtractedValue(v).trim() === '' || String(v) === '--'
+}
+
+function sourceTooltip(src: FieldSource): string {
+  const page = src.page != null ? ` (p. ${src.page_approximate ? '~' : ''}${src.page})` : ''
+  return `\u201C${(src.quote || '').slice(0, 160)}\u201D \u2014 ${src.document_title || 'document'}${page}`
+}
+
+const NO_SOURCE_TOOLTIP =
+  "This value couldn't be traced back to the document \u2014 double-check it before relying on it"
+
+/** "p. 4" chip for a traced value; amber "no source" for an untraced one. */
+function FieldSourceChip({ src, actions }: { src?: FieldSource; actions?: KBSourceActions }) {
+  const verified = Boolean(src?.verified)
+  const clickable = verified && Boolean(src?.document_uuid) && Boolean(actions)
+  const label = verified
+    ? (src?.page != null ? `p. ${src.page_approximate ? '~' : ''}${src.page}` : 'source')
+    : 'no source'
+  const tooltip = verified && src
+    ? `${sourceTooltip(src)}${clickable ? ' \u2014 click to open' : ''}`
+    : NO_SOURCE_TOOLTIP
+
+  const handleOpen = () => {
+    if (!clickable || !actions || !src?.document_uuid) return
+    // Same contract as citation chips: the passage text is the primary
+    // anchor and an approximate page must keep its hedge in the viewer.
+    actions.setWorkspaceMode('files')
+    actions.viewDocument(src.document_uuid, src.document_title || 'Document', {
+      terms: src.quote ? [pickHighlightPhrase(src.quote)] : [],
+      page: src.page ?? null,
+      pageApproximate: src.page_approximate ?? false,
+    })
+  }
+
+  return (
+    <span
+      role={clickable ? 'button' : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={clickable ? handleOpen : undefined}
+      onKeyDown={clickable ? (e) => { if (e.key === 'Enter') handleOpen() } : undefined}
+      title={tooltip}
+      style={{
+        flexShrink: 0, fontSize: 'var(--workspace-font-meta)', lineHeight: '14px', padding: "0 var(--workspace-space-6)",
+        borderRadius: 7, whiteSpace: 'nowrap',
+        cursor: clickable ? 'pointer' : 'help',
+        color: verified ? '#1d4ed8' : '#b45309',
+        background: verified ? 'rgba(59,130,246,0.08)' : 'rgba(245,158,11,0.12)',
+        border: `1px solid ${verified ? 'rgba(59,130,246,0.25)' : 'rgba(245,158,11,0.3)'}`,
+      }}
+    >
+      {label}
+    </span>
+  )
+}
+
+/** "N of M values traced" summary under extraction results. */
+function SourceCoverageLine({ content }: { content: Record<string, unknown> }) {
+  const cov = content.source_coverage as
+    | { fields_with_verified_source?: number; fields_without_verified_source?: number }
+    | undefined
+  if (!cov) return null
+  const traced = cov.fields_with_verified_source ?? 0
+  const untraced = cov.fields_without_verified_source ?? 0
+  const total = traced + untraced
+  if (total === 0) return null
+  return (
+    <span style={{ fontSize: 'var(--workspace-font-meta)', color: untraced > 0 ? '#b45309' : '#6b7280' }}>
+      {traced} of {total} values traced to a source passage
+      {untraced > 0 && ' \u2014 double-check the untraced ones'}
+    </span>
+  )
+}
+
+/** Key-value pairs for single-entity extractions, compact table for multi. */
+function ExtractionContent({ content, actions }: { content: Record<string, unknown>; actions?: KBSourceActions }) {
+  const [showAll, setShowAll] = useState(false)
+  const entities = content.entities as Array<Record<string, unknown>> | undefined
+  if (!entities || entities.length === 0) return null
+  const fields = (content.fields as string[]) || Object.keys(entities[0])
+  if (fields.length === 0) return null
+  const sources = content.sources as Array<Record<string, FieldSource>> | undefined
+  // Absent `sources` means the run captured no source data at all — a result
+  // persisted before source tracking existed, replayed from history. That is
+  // not the same as "this field had no quote", and marking every field
+  // "no source" on such a run is a false alarm on all of them. Chips only
+  // render for a run that actually tried.
+  const hasSourceData = Array.isArray(content.sources)
+
+  const copyText = toolResultToText('run_extraction', content)
+  const csv = extractionToCSV(content)
+  const setName = content.extraction_set ? String(content.extraction_set).replace(/\s+/g, '_') : 'extraction'
+
+  // Single entity: key-value pairs
+  if (entities.length === 1) {
+    const entity = entities[0]
+    const entitySources = sources?.[0] || {}
+    // Every field renders, including empty ones: "the model found nothing"
+    // is an answer the user must see, not a row to hide.
+    const visibleLimit = showAll ? fields.length : 8
+    const shown = fields.slice(0, visibleLimit)
+    const remaining = fields.length - shown.length
+
+    return (
+      <div style={{ marginTop: 'var(--workspace-space-4)', marginLeft: 'var(--workspace-space-20)', fontSize: 'var(--workspace-font-meta)', lineHeight: 1.7 }}>
+        {shown.map((f) => {
+          const empty = isEmptyValue(entity[f])
+          return (
+            <div key={f} style={{ display: 'flex', gap: 'var(--workspace-space-8)', alignItems: 'baseline' }}>
+              <span style={{ color: '#9ca3af', minWidth: 140, flexShrink: 0 }}>{f}</span>
+              {empty ? (
+                <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>not found</span>
+              ) : (
+                <ExpandableValue value={entity[f]} />
+              )}
+              {!empty && hasSourceData && (
+                <FieldSourceChip src={entitySources[f]} actions={actions} />
+              )}
+            </div>
+          )
+        })}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginTop: 'var(--workspace-space-2)' }}>
+          {remaining > 0 && (
+            <button
+              onClick={() => setShowAll(true)}
+              style={{
+                background: 'none', border: 'none', padding: 'var(--workspace-space-8)', minWidth: 36, minHeight: 'var(--workspace-control-height)', cursor: 'pointer',
+                color: '#3b82f6', fontSize: 'var(--workspace-font-meta)',
+              }}
+            >
+              +{remaining} more fields
+            </button>
+          )}
+          {showAll && fields.length > 8 && (
+            <button
+              onClick={() => setShowAll(false)}
+              style={{
+                background: 'none', border: 'none', padding: 'var(--workspace-space-8)', minWidth: 36, minHeight: 'var(--workspace-control-height)', cursor: 'pointer',
+                color: '#3b82f6', fontSize: 'var(--workspace-font-meta)',
+              }}
+            >
+              Show less
+            </button>
+          )}
+          <SourceCoverageLine content={content} />
+          <span style={{ flex: 1 }} />
+          <CopyButton text={copyText} label="Copy extraction data" />
+          {csv && <CSVDownloadButton csv={csv} filename={`${setName}.csv`} />}
+        </div>
+      </div>
+    )
+  }
+
+  // Multiple entities: compact table with limited columns
+  const maxCols = showAll ? fields.length : 6
+  const maxRows = showAll ? entities.length : 12
+  const visibleFields = fields.slice(0, maxCols)
+  const hiddenCols = fields.length - visibleFields.length
+  const hiddenRows = entities.length - Math.min(entities.length, maxRows)
+
+  return (
+    <div style={{ overflowX: 'auto', marginTop: 'var(--workspace-space-4)', marginLeft: 'var(--workspace-space-20)' }}>
+      <table style={{
+        width: '100%', borderCollapse: 'collapse', fontSize: 'var(--workspace-font-meta)', lineHeight: 1.4,
+      }}>
+        <thead>
+          <tr>
+            {visibleFields.map((f) => (
+              <th key={f} style={{
+                textAlign: 'left', padding: "var(--workspace-space-4) var(--workspace-space-8)", borderBottom: "2px solid var(--workspace-border)",
+                fontWeight: 600, color: '#374151', whiteSpace: 'nowrap',
+              }}>
+                {f}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {entities.slice(0, maxRows).map((entity, i) => {
+            const rowSources = sources?.[i] || {}
+            return (
+              <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                {visibleFields.map((f) => {
+                  const empty = entity[f] == null
+                  const src = rowSources[f]
+                  const traced = Boolean(src?.verified)
+                  const cellTitle = empty || !hasSourceData
+                    ? undefined
+                    : traced && src ? sourceTooltip(src) : NO_SOURCE_TOOLTIP
+                  return (
+                    <td key={f} title={cellTitle} style={{
+                      padding: "var(--workspace-space-4) var(--workspace-space-8)", color: '#4b5563', maxWidth: 200,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      // A dotted underline marks values with a verified source
+                      // passage; hover shows the quote. Untraced values warn on
+                      // hover and count in the footer line.
+                      textDecoration: traced && !empty ? 'underline dotted rgba(59,130,246,0.45)' : undefined,
+                      textUnderlineOffset: traced && !empty ? 3 : undefined,
+                    }}>
+                      {entity[f] != null ? formatExtractedValue(entity[f]) : <span style={{ color: '#d1d5db' }}>--</span>}
+                    </td>
+                  )
+                })}
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+      <div style={{ color: '#c4c9d1', fontSize: 'var(--workspace-font-meta)', marginTop: 'var(--workspace-space-2)', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)' }}>
+        {!showAll && (hiddenRows > 0 || hiddenCols > 0) && (
+          <button
+            onClick={() => setShowAll(true)}
+            style={{
+              background: 'none', border: 'none', padding: 'var(--workspace-space-8)', minWidth: 36, minHeight: 'var(--workspace-control-height)', cursor: 'pointer',
+              color: '#3b82f6', fontSize: 'var(--workspace-font-meta)',
+            }}
+          >
+            {[hiddenRows > 0 && `+${hiddenRows} rows`, hiddenCols > 0 && `+${hiddenCols} cols`].filter(Boolean).join(', ')} - show all
+          </button>
+        )}
+        {showAll && (entities.length > 12 || fields.length > 6) && (
+          <button
+            onClick={() => setShowAll(false)}
+            style={{
+              background: 'none', border: 'none', padding: 'var(--workspace-space-8)', minWidth: 36, minHeight: 'var(--workspace-control-height)', cursor: 'pointer',
+              color: '#3b82f6', fontSize: 'var(--workspace-font-meta)',
+            }}
+          >
+            Show less
+          </button>
+        )}
+        <SourceCoverageLine content={content} />
+        <span style={{ flex: 1 }} />
+        <CopyButton text={copyText} label="Copy extraction data" />
+        {csv && <CSVDownloadButton csv={csv} filename={`${setName}.csv`} />}
+      </div>
+    </div>
+  )
+}
+
+/** Pick a short phrase from chunk content for PDF text-search highlighting. */
+export function pickHighlightPhrase(content: string): string {
+  const cleaned = content.replace(/\s+/g, ' ').trim()
+  if (cleaned.length <= 60) return cleaned
+  const cut = cleaned.slice(0, 60)
+  const lastSpace = cut.lastIndexOf(' ')
+  return lastSpace > 20 ? cut.slice(0, lastSpace) : cut
+}
+
+interface KBSourceActions {
+  viewDocument: (
+    uuid: string,
+    title: string,
+    highlight?: { terms: string[]; page: number | null; pageApproximate?: boolean },
+  ) => void
+  setHighlightTerms: (terms: string[]) => void
+  setWorkspaceMode: (mode: WorkspaceMode) => void
+}
+
+function KBPassages({ content, actions }: { content: unknown; actions?: KBSourceActions }) {
+  const passages = kbPassages(content)
+  if (passages.length === 0) return null
+  const copyText = toolResultToText('search_knowledge_base', content)
+
+  return (
+    <div style={{ marginTop: 'var(--workspace-space-4)', marginLeft: 'var(--workspace-space-20)', display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)' }}>
+      {passages.slice(0, 3).map((chunk, i) => {
+        const sourceType = chunk.source_type as string | undefined
+        const docUuid = chunk.document_uuid as string | undefined
+        const url = chunk.url as string | undefined
+        const sourceName = String(chunk.source_name || 'Source')
+        const chunkContent = String(chunk.content || '')
+        // The passage the model reads carries injected "[p. N]" markers at its
+        // page breaks. Those appear nowhere in the document, so anything that
+        // has to match this text against the document must use the verbatim
+        // copy — a marker inside the first ~60 characters would otherwise end
+        // up in the highlight phrase and match nothing.
+        const chunkVerbatim = String(chunk.content_verbatim || chunk.content || '')
+
+        const isDoc = sourceType === 'document' && docUuid
+        const isUrl = sourceType === 'url' && url
+        const isClickable = actions && (isDoc || isUrl)
+
+        const handleClick = () => {
+          if (!actions) return
+          if (isDoc) {
+            actions.setWorkspaceMode('files')
+            actions.viewDocument(docUuid, sourceName)
+            actions.setHighlightTerms([pickHighlightPhrase(chunkVerbatim)])
+          } else if (isUrl) {
+            window.open(url, '_blank', 'noopener,noreferrer')
+          }
+        }
+
+        return (
+          <div key={i} style={{
+            fontSize: 'var(--workspace-font-meta)', lineHeight: 1.5, color: '#6b7280',
+            padding: "var(--workspace-space-4) var(--workspace-space-8)", borderLeft: "2px solid var(--workspace-border)",
+            background: '#fafafa', borderRadius: '0 4px 4px 0',
+          }}>
+            <span
+              role={isClickable ? 'button' : undefined}
+              tabIndex={isClickable ? 0 : undefined}
+              onClick={isClickable ? handleClick : undefined}
+              onKeyDown={isClickable ? (e) => { if (e.key === 'Enter') handleClick() } : undefined}
+              style={{
+                fontWeight: 500, fontSize: 'var(--workspace-font-meta)',
+                color: isClickable ? '#3b82f6' : '#9ca3af',
+                cursor: isClickable ? 'pointer' : 'default',
+                display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+              }}
+            >
+              {isDoc && <FileText size={10} style={{ flexShrink: 0 }} />}
+              {isUrl && <ExternalLink size={9} style={{ flexShrink: 0 }} />}
+              {sourceName}
+            </span>
+            <span style={{ margin: "0 var(--workspace-space-6)", color: '#d1d5db' }}>&middot;</span>
+            <span>{chunkContent.slice(0, 200)}{chunkContent.length > 200 ? '...' : ''}</span>
+          </div>
+        )
+      })}
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <CopyButton text={copyText} label="Copy passages" />
+      </div>
+    </div>
+  )
+}
+
+/** Render completed workflow output as structured content. */
+function WorkflowOutput({ content }: { content: Record<string, unknown> }) {
+  const status = content.status as string | undefined
+  if (status !== 'completed') return null
+
+  const output = content.output
+  if (output == null) return null
+
+  const copyText = typeof output === 'string' ? output : JSON.stringify(output, null, 2)
+
+  // If output is a string, render it as markdown — workflows commonly emit a
+  // formatted report (headings, bold, bullets). Showing the raw source (or
+  // truncating it) was the old behavior and looked broken.
+  if (typeof output === 'string') {
+    if (output.trim().length === 0) return null
+    return (
+      <div style={{ marginTop: 'var(--workspace-space-4)', marginLeft: 'var(--workspace-space-20)' }}>
+        <div
+          className="chat-markdown select-text"
+          style={{
+            fontSize: 'var(--workspace-font-control)', lineHeight: 1.6,
+            color: '#374151', wordBreak: 'break-word',
+            maxHeight: 480, overflow: 'auto', padding: "var(--workspace-space-8) var(--workspace-space-12)",
+            background: '#fafafa', borderRadius: 'var(--workspace-radius-small)', border: '1px solid #f3f4f6',
+          }}
+          dangerouslySetInnerHTML={{ __html: renderMarkdown(output) }}
+        />
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--workspace-space-2)' }}>
+          <CopyButton text={copyText} label="Copy workflow output" />
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="agent-workflow-output">
+      <pre tabIndex={0} aria-label="Workflow output">{copyText}</pre>
+      <CopyButton text={copyText} label="Copy workflow output" />
+    </div>
+  )
+}
+
+const WORKFLOW_TERMINAL = new Set(['completed', 'failed', 'error', 'canceled'])
+const WORKFLOW_POLL_MS = 2500
+
+/**
+ * Live progress for a workflow kicked off via the chat `run_workflow` tool.
+ *
+ * The tool result only carries `{ session_id, status: 'running' }`, so without
+ * this the chat thread looks frozen for the whole run. We poll the same REST
+ * status endpoint the workspace uses — costs zero LLM tokens — and stop the
+ * moment the run reaches a terminal (or paused) state. On a history reload an
+ * already-finished run resolves in a single fetch and renders its output.
+ */
+export function WorkflowProgress({ sessionId, initialStatus, workflowId }: { sessionId: string; initialStatus?: string; workflowId?: string }) {
+  const { openWorkflow } = useWorkspace()
+  const [status, setStatus] = useState<WorkflowStatus | null>(null)
+  const [fetchFailed, setFetchFailed] = useState(false)
+  const [checking, setChecking] = useState(true)
+  const [attempt, setAttempt] = useState(0)
+  useEffect(() => {
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const tick = async () => {
+      setChecking(true)
+      try {
+        const next = await getWorkflowStatus(sessionId)
+        if (cancelled) return
+        setStatus(next)
+        setFetchFailed(false)
+        if (!WORKFLOW_TERMINAL.has(next.status) && next.status !== 'paused') timer = setTimeout(tick, WORKFLOW_POLL_MS)
+      } catch {
+        if (!cancelled) setFetchFailed(true)
+      } finally { if (!cancelled) setChecking(false) }
+    }
+    void tick()
+    return () => { cancelled = true; if (timer) clearTimeout(timer) }
+  }, [sessionId, attempt])
+
+  const effective = status?.status || initialStatus || 'running'
+  const done = status?.num_steps_completed ?? 0
+  const total = status?.num_steps_total ?? 0
+  const labels: Record<string, string> = { queued: 'Workflow queued', pending: 'Workflow queued', running: 'Workflow running', completed: 'Workflow complete', failed: 'Workflow failed', error: 'Workflow failed', canceled: 'Workflow canceled', paused: 'Awaiting workflow approval', pending_approval: 'Awaiting workflow approval' }
+  const failed = effective === 'failed' || effective === 'error'
+  const active = ['running', 'queued', 'pending'].includes(effective)
+  const partial = status?.steps_output && Object.keys(status.steps_output).length ? JSON.stringify(status.steps_output, null, 2) : null
+  return (
+    <section className="agent-workflow-progress" aria-label="Workflow run progress">
+      <div role="status" aria-atomic="true" className="agent-run-status">
+        {active && !fetchFailed ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : effective === 'completed' ? <Check size={14} aria-hidden="true" /> : <AlertTriangle size={14} aria-hidden="true" />}
+        <span>{fetchFailed ? 'Workflow status unavailable' : labels[effective] || `Workflow status: ${effective}`}{total > 0 && ` · ${done}/${total} steps completed`}</span>
+      </div>
+      {fetchFailed && <div role="alert" className="agent-run-error">Could not refresh this run. {status ? `Last known state: ${labels[effective] || effective}.` : 'Its current state is not confirmed.'} Checking again does not start another run.</div>}
+      {runModelLabel(status) && <p className="agent-run-model">{runModelLabel(status)}</p>}
+      {status?.current_step_name && <p><strong>{failed ? 'Failed step' : 'Current step'}:</strong> {status.current_step_name}</p>}
+      {failed && <p className="agent-run-error">{status?.error || status?.current_step_detail || 'The run reported a failure without further details.'}</p>}
+      {effective === 'canceled' && <p>The run was canceled. {partial ? 'Completed results remain available below.' : 'No completed step results were returned.'}</p>}
+      {effective === 'paused' && <p>Review the proposed step in the workflow runner before continuing.</p>}
+      {(fetchFailed || effective === 'paused') && <button type="button" className="chat-action-btn" disabled={checking} onClick={() => { setChecking(true); setAttempt(value => value + 1) }}>{checking ? 'Checking workflow status…' : 'Check workflow status'}</button>}
+      {workflowId && <button type="button" className="chat-action-btn" onClick={() => openWorkflow(workflowId, sessionId)}>Open this workflow run</button>}
+      {partial && effective !== 'completed' && <details><summary>Completed step results</summary><pre tabIndex={0} aria-label="Completed workflow step results">{partial}</pre><CopyButton text={partial} label="Copy completed step results" /></details>}
+      {effective === 'completed' && <WorkflowOutput content={{ status: 'completed', output: unwrapWorkflowOutput(status?.final_output) }} />}
+      {effective === 'completed' && <WorkflowArtifactAction sessionId={sessionId} />}
+      {effective === 'completed' && status && status.final_output == null && <p>No final output was returned for this run.</p>}
+    </section>
+  )
+}
+
+/** Workflow final_output may be wrapped as `{ output: ... }` — unwrap to match WorkflowOutput's contract. */
+export function unwrapWorkflowOutput(final: unknown): unknown {
+  let output = final
+  if (output && typeof output === 'object' && !Array.isArray(output) && 'output' in (output as Record<string, unknown>)) {
+    output = (output as Record<string, unknown>).output
+  }
+  // Runs resumed after an approval gate used to end on the review's storage
+  // wrapper, serialized: '{"value": "## Summary\n..."}'. Show the text inside.
+  if (typeof output === 'string' && output.trimStart().startsWith('{')) {
+    try {
+      const parsed: unknown = JSON.parse(output)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        const keys = Object.keys(parsed)
+        const value = (parsed as Record<string, unknown>).value
+        if (keys.length === 1 && keys[0] === 'value' && typeof value === 'string') return value
+      }
+    } catch { /* not JSON; show as is */ }
+  }
+  return output
+}
+
+interface VerificationLauncherActions {
+  viewDocument: (uuid: string, title: string) => void
+  setWorkspaceMode: (mode: WorkspaceMode) => void
+  openVerification: (sessionId: string) => void
+}
+
+function VerificationLauncher({
+  content,
+  actions,
+}: {
+  content: Record<string, unknown>
+  actions: VerificationLauncherActions
+}) {
+  const sessionId = content.verification_session_id as string | undefined
+  const docUuid = content.document_uuid as string | undefined
+  const docTitle = String(content.document_title || 'document')
+  const fields = (content.fields as Array<Record<string, unknown>>) || []
+  const label = String(content.label || '')
+
+  if (!sessionId || !docUuid) return null
+
+  const handleStart = () => {
+    actions.setWorkspaceMode('files')
+    actions.viewDocument(docUuid, docTitle)
+    actions.openVerification(sessionId)
+  }
+
+  return (
+    <div style={{ marginTop: 'var(--workspace-space-6)', marginLeft: 'var(--workspace-space-20)' }}>
+      <div style={{
+        border: '1px solid #fde68a',
+        background: '#fffbeb',
+        borderRadius: 'var(--workspace-radius-medium)',
+        padding: "var(--workspace-space-12) var(--workspace-space-12)",
+        fontSize: 'var(--workspace-font-meta)',
+        color: '#374151',
+      }}>
+        <div style={{ fontWeight: 600, marginBottom: 'var(--workspace-space-4)', color: '#92400e' }}>
+          Guided verification ready
+        </div>
+        <div style={{ lineHeight: 1.5, marginBottom: 'var(--workspace-space-8)' }}>
+          {fields.length} field{fields.length !== 1 ? 's' : ''} to confirm in{' '}
+          <span style={{ fontWeight: 500 }}>{label || docTitle}</span>.{' '}
+          The test case will be saved only after you finish reviewing each value in the document.
+        </div>
+        <button
+          onClick={handleStart}
+          className="chat-action-btn"
+          style={{ fontSize: 'var(--workspace-font-meta)', padding: "var(--workspace-space-6) var(--workspace-space-16)" }}
+        >
+          Open document to verify
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Exported single-tool status line — used for interleaved segment rendering
+// ---------------------------------------------------------------------------
+
+function ObligationReview({ review }: { review: Record<string, unknown> }) {
+  const items = Array.isArray(review.items) ? review.items.filter((item): item is string => typeof item === 'string') : []
+  const excluded = Array.isArray(review.excluded) ? review.excluded.filter((item): item is Record<string, unknown> => !!item && typeof item === 'object') : []
+  return <div className="agent-obligation-review">
+    <p>{items.length} {items.length === 1 ? 'item' : 'items'} to add to <strong>{String(review.project || 'this project')}</strong></p>
+    <ul aria-label="Items to add">{items.map((item, i) => <li key={i} className="agent-obligation-item">{item}</li>)}</ul>
+    {excluded.length > 0 && <>
+      <p><strong>Not included ({excluded.length})</strong></p>
+      <ul aria-label="Items not included">{excluded.map((item, i) => <li key={i}>
+        <strong>{String(item.title || 'Item')}</strong> — {String(item.explanation || 'More supporting information is needed.')}
+      </li>)}</ul>
+    </>}
+  </div>
+}
+
+/** Whether a tool result reports a failure: the test the status line uses. */
+export function toolResultFailed(name: string, content: unknown): boolean {
+  if (certificationPayloadIssue(name, content)) return true
+  const obj = (listErrorEntry(content) ?? content) as Record<string, unknown> | undefined
+  const canceled = obj?.status === 'canceled' || obj?.status === 'cancelled'
+  return !canceled && (Boolean(obj?.error) || obj?.status === 'failed' || obj?.status === 'error')
+}
+
+/** Failed calls the Assistant fixed itself: a later call to the same tool in
+ * the same reply succeeded. Support ticket: "Loading lesson · Failed" and
+ * "Building workflow failed – KB not found" stayed red, with a recovery
+ * button, after the retries a moment later worked. */
+export function recoveredCallIds(order: string[], results: Map<string, ToolResultInfo>): Set<string> {
+  const ok = (id: string) => {
+    const r = results.get(id)
+    return r ? !toolResultFailed(r.tool_name, r.content) : null
+  }
+  const recovered = new Set<string>()
+  order.forEach((id, i) => {
+    const name = results.get(id)?.tool_name
+    if (!name || ok(id) !== false) return
+    if (order.slice(i + 1).some(later => results.get(later)?.tool_name === name && ok(later) === true)) recovered.add(id)
+  })
+  return recovered
+}
+
+export function ToolStatusLine({
+  call,
+  result,
+  isActive,
+  onConfirm,
+  approvalHistory,
+  recovered = false,
+  names = {},
+}: {
+  call?: ToolCallInfo
+  result?: ToolResultInfo
+  isActive?: boolean
+  onConfirm?: (message: string, pageApproval?: string) => boolean | void
+  approvalHistory?: ApprovalRecord
+  /** This call failed, and a later call to the same tool succeeded. */
+  recovered?: boolean
+  names?: Record<string, string>
+}) {
+  const { viewDocument, setHighlightTerms, setWorkspaceMode, setVerificationSession, openWorkflow, openExtraction, openAutomation } = useWorkspace()
+  const name = result?.tool_name || call?.tool_name || 'unknown'
+  const meta = getMeta(name)
+  const ToolIcon = name.includes('knowledge_base') ? BookOpen : name === 'web_search' || name === 'fetch_url' ? Globe : name === 'get_document_text' ? FileText : CATEGORY_ICON[meta.category]
+  const args = call?.args || {}
+  const obj = (listErrorEntry(result?.content) ?? result?.content) as Record<string, unknown> | undefined
+  const certificationIssue = result ? certificationPayloadIssue(name, result.content) : null
+  const canceled = obj?.status === 'canceled' || obj?.status === 'cancelled'
+  const isError = Boolean(certificationIssue) || (!canceled && (Boolean(obj?.error) || obj?.status === 'failed' || obj?.status === 'error'))
+  const unconfirmed = !isActive && !!call && !result
+
+  const needsConfirmation = !isActive && obj?.needs_confirmation === true
+  const selectedSkill = name === 'select_skill' ? completedSkillSelection(result?.content) : undefined
+  // An editor showing a workflow chat just changed reloads its steps.
+  const editedWorkflowId = name === 'update_workflow' && !needsConfirmation && !isError && typeof obj?.workflow_id === 'string' ? obj.workflow_id : null
+  useEffect(() => {
+    if (editedWorkflowId) announceWorkflowEdited(editedWorkflowId, result?.tool_call_id)
+  }, [editedWorkflowId, result?.tool_call_id])
+  const [decision, setDecision] = useState<'approved' | 'canceled' | null>(null)
+  const decisionRef = useRef(false)
+  const [decisionError, setDecisionError] = useState<string | null>(null)
+  const decide = (value: 'approved' | 'canceled') => {
+    if (!onConfirm || decisionRef.current) return
+    decisionRef.current = true
+    try {
+      const accepted = value === 'approved' && ['create_html_artifact', 'revise_html_artifact'].includes(name) && typeof obj?.preview_id === 'string'
+        ? onConfirm('Yes, go ahead', obj.preview_id)
+        : onConfirm(value === 'approved' ? 'Yes, go ahead' : 'No, cancel that')
+      if (accepted === false) {
+        setDecisionError('The decision could not be sent yet. Wait for the current attachment or response, then try again.')
+        decisionRef.current = false
+        return
+      }
+      setDecision(value); setDecisionError(null)
+    } catch {
+      decisionRef.current = false
+      setDecisionError('The decision could not be sent. Try again.')
+    }
+  }
+  const executionLabel = needsConfirmation ? approvalHistory?.label ?? (decision === 'approved' ? 'Approval requested' : decision === 'canceled' ? 'Cancellation requested' : 'Awaiting approval')
+    : canceled ? 'Canceled' : certificationIssue ? 'Result needs review' : isError ? 'Failed' : unconfirmed ? 'Completion not confirmed' : isActive ? 'Running'
+    : name === 'run_workflow' && typeof obj?.session_id === 'string' ? 'Run accepted'
+    : name === 'select_skill' ? selectedSkill === null ? 'Skill removed' : selectedSkill ? 'Skill selected' : 'Change not confirmed'
+    : name === 'create_automation' && obj?.id && obj?.enabled === false ? 'Paused'
+    : obj?.status === 'queued' || obj?.status === 'pending' ? 'Queued'
+    : obj?.status === 'running' ? 'Running' : obj?.status === 'paused' ? 'Awaiting approval' : obj?.status && obj.status !== 'completed' ? 'Result received' : 'Completed'
+
+  const actionLabel = name === 'select_skill'
+    ? typeof obj?.approval_label === 'string' ? obj.approval_label : args.skill_uuid === null || obj?.skill_uuid === null ? 'Remove Skill' : 'Use Skill'
+    : ({ propose_obligations: 'Add to inbox', create_project: 'Create project', move_documents_to_project: 'Move files', create_workflow: 'Create workflow', update_workflow: 'Update workflow', create_automation: 'Create automation', create_extraction_from_document: 'Create extraction', run_workflow: 'Run workflow', run_validation: 'Run validation', approve_workflow_step: 'Approve step', complete_certification_module: 'Complete module' } as Record<string, string>)[name] ?? approveLabel(name)
+  const target = args.name ?? args.title ?? obj?.default_title
+  const artifact = !isActive && !needsConfirmation && !isError && obj
+    ? (name === 'create_workflow' || name === 'update_workflow') && typeof obj.workflow_id === 'string' ? { label: 'Open workflow', open: () => openWorkflow(obj.workflow_id as string) }
+      : name === 'create_extraction_from_document' && typeof obj.extraction_set_uuid === 'string' ? { label: 'Open extraction', open: () => openExtraction(obj.extraction_set_uuid as string) }
+      : name === 'create_automation' && typeof obj.id === 'string' ? { label: 'Open automation', open: () => openAutomation(obj.id as string) }
+      : null
+    : null
+
+
+  const sourceTarget = call ? toolTarget(call, names) : ''
+  const activeHint = isActive && !sourceTarget ? getActiveHint(name, args) : ''
+  const { text: summaryText } = certificationIssue ? { text: certificationIssue } : result
+    ? summarizeResult(name, result.content, result.quality ?? null)
+    : { text: '' }
+
+  const kbActions: KBSourceActions = { viewDocument, setHighlightTerms, setWorkspaceMode }
+
+  const verificationActions: VerificationLauncherActions = {
+    viewDocument,
+    setWorkspaceMode,
+    openVerification: (sessionId: string) => {
+      // Seed a minimal session placeholder; LeftPanel/DocumentViewer will
+      // fetch the full session from the backend and keep it fresh.
+      setVerificationSession({
+        uuid: sessionId,
+        search_set_uuid: String(obj?.extraction_set_uuid || ''),
+        document_uuid: String(obj?.document_uuid || ''),
+        document_title: String(obj?.document_title || ''),
+        label: String(obj?.label || ''),
+        status: 'pending',
+        test_case_uuid: null,
+        fields: ((obj?.fields as Array<Record<string, unknown>>) || []).map((f) => ({
+          key: String(f.key),
+          extracted: String(f.extracted ?? ''),
+          expected: null,
+          status: 'pending',
+        })),
+        all_resolved: false,
+        created_at: null,
+        updated_at: null,
+      })
+    },
+  }
+
+  // A failure the Assistant already fixed needs nothing from the user: no red
+  // state, no error text, no recovery button.
+  if (recovered && isError) {
+    return (
+      <div className="agent-tool-result" data-tool-state="Retried">
+        <p className="agent-tool-state" role="status" aria-atomic="true">{meta.label} · Retried</p>
+        <span style={{ color: '#6b7280', fontSize: 'var(--workspace-font-control)' }}>Didn&apos;t work the first time; the Assistant tried again below.</span>
+      </div>
+    )
+  }
+
+  if (['create_html_artifact', 'revise_html_artifact'].includes(name)) {
+    const uuid = typeof obj?.artifact_uuid === 'string' && /^[a-f0-9]{32}$/.test(obj.artifact_uuid) ? obj.artifact_uuid : undefined
+    const revision = typeof obj?.revision === 'string' ? obj.revision : undefined
+    return <ChatPageCard previewId={typeof obj?.preview_id === 'string' ? obj.preview_id : undefined} templateCheck={obj?.template_check} saving={args.confirmed === true} title={String(obj?.title || args.title || 'Untitled page')}
+      html={typeof obj?.artifact_preview_html === 'string' ? obj.artifact_preview_html : undefined}
+      warnings={Array.isArray(obj?.warnings) ? obj.warnings.filter((warning): warning is string => typeof warning === 'string') : []}
+      uuid={uuid} revision={revision} running={isActive} error={isError ? summaryText || 'The page could not be saved. Ask the assistant to check the result before retrying.' : undefined}
+      unconfirmed={unconfirmed || (!isActive && !needsConfirmation && !isError && !canceled && (!uuid || !revision))}
+      canceled={canceled} needsApproval={needsConfirmation} history={approvalHistory} decision={decision} decisionError={decisionError}
+      onDecide={onConfirm ? decide : undefined} revising={name === 'revise_html_artifact'} />
+  }
+
+  return (
+    <div className="agent-tool-result agent-tool-card" data-tool-state={executionLabel} data-tool-category={meta.category} data-tool-error={isError || undefined}>
+      <div className="agent-tool-header">
+        <span className="agent-tool-icon" aria-hidden="true"><ToolIcon size={18} /></span>
+        <div className="agent-tool-identity">
+          <div className="agent-tool-heading" role="status" aria-atomic="true">
+            <span className="agent-tool-name">{isActive && call ? activeToolLabel(call) : meta.label}</span>
+            <span className="sr-only"> · </span>
+            <span className="agent-tool-status">{isActive && <Loader2 size={11} className="agent-tool-spin" aria-hidden="true" />}{executionLabel}</span>
+          </div>
+          {(sourceTarget || activeHint) && <p className="agent-tool-target">{sourceTarget || activeHint}</p>}
+        </div>
+      </div>
+      {!(needsConfirmation && name === 'propose_obligations') && (!isActive || activeHint) && (summaryText || unconfirmed) && <p className="agent-tool-summary">{unconfirmed ? 'No result was received for this call.' : summaryText}</p>}
+      {result && !isActive && !isError && !needsConfirmation && !canceled && result.quality && (
+        <div className="agent-tool-evaluation"><QualityBadge quality={result.quality} showGrade /></div>
+      )}
+      {result && !isActive && !certificationIssue && hasCopyableContent(name, result.content) && !hasRichContent(name, obj) && (
+        <div className="agent-tool-copy"><CopyButton text={toolResultToText(name, result.content)} label="Copy result" /></div>
+      )}
+
+      {/* Auto-shown rich content (copy/export buttons are inside each block) */}
+      {result && name === 'run_extraction' && obj?.entities != null && (
+        <ExtractionContent content={obj} actions={kbActions} />
+      )}
+      {result && name === 'search_knowledge_base' && !isError && (
+        <KBPassages content={result.content} actions={kbActions} />
+      )}
+      {result && name === 'get_workflow_status' && obj?.status === 'completed' && obj?.output != null && (
+        <WorkflowOutput content={obj} />
+      )}
+      {result && name === 'run_workflow' && typeof obj?.session_id === 'string' && (
+        <WorkflowProgress key={obj.session_id} sessionId={obj.session_id as string} initialStatus={obj?.status as string | undefined} workflowId={typeof args.workflow_id === 'string' ? args.workflow_id : undefined} />
+      )}
+      {result && name === 'propose_test_case' && obj?.verification_session_id != null && (
+        <VerificationLauncher content={obj} actions={verificationActions} />
+      )}
+      {result && !isError && name === 'get_certification_progress' && obj?.modules != null && (
+        <CertProgressCard content={obj} />
+      )}
+      {result && !isError && name === 'get_certification_module' && obj?.module_id != null && (
+        <CertModuleCard content={obj} />
+      )}
+      {result && !isError && name === 'get_certification_lesson' && obj?.content != null && (
+        <CertLessonCard content={obj} />
+      )}
+      {result && !isError && name === 'check_certification_module' && obj?.checks != null && (
+        <CertCheckCard content={obj} />
+      )}
+      {result && !isError && name === 'complete_certification_module' && obj?.total_xp != null && (
+        <CertCompletionCard content={obj} />
+      )}
+
+      {certificationIssue && <CertificationResponseRecovery />}
+      {isError && !certificationIssue && <div className="agent-tool-recovery">
+        {typeof obj?.hint === 'string' && <p>{obj.hint}</p>}
+        {typeof obj?.error_detail === 'string' && <p>{obj.error_detail}</p>}
+        {onConfirm ? <button type="button" className="chat-action-btn" onClick={() => onConfirm(`Help me recover the failed ${name.replaceAll('_', ' ')} step. Review the existing results and explain the next action. Do not repeat completed changes without my approval.`)}>Review recovery options</button> : <p>Ask the Assistant to review this failed step. Keep completed results when deciding what to retry.</p>}
+      </div>}
+      {artifact && <button type="button" className="chat-action-btn" style={{ margin: "var(--workspace-space-8) 0 var(--workspace-space-8) var(--workspace-space-20)" }} onClick={artifact.open}>{artifact.label}</button>}
+      {name === 'create_automation' && !isActive && !isError && (!needsConfirmation || approvalHistory) && <AutomationSettings settings={obj?.automation_settings} />}
+      {needsConfirmation && approvalHistory && <section className="agent-approval" aria-label="Earlier action decision">
+        <strong>{approvalHistory.label}</strong><p>{approvalHistory.detail}</p>
+        {name === 'propose_obligations' && !!obj?.obligation_review && typeof obj.obligation_review === 'object' && <ObligationReview review={obj.obligation_review as Record<string, unknown>} />}
+      </section>}
+      {needsConfirmation && !approvalHistory && (
+        <section className="agent-approval" aria-label="Review proposed action">
+          <strong>{decision === 'approved' ? 'Approval requested' : decision === 'canceled' ? 'Cancellation requested' : 'Your approval is needed'}</strong>
+          {name === 'select_skill' && typeof obj?.skill_instructions === 'string' && <details>
+            <summary>Inspect Skill instructions</summary>
+            <pre className="max-h-60 overflow-auto whitespace-pre-wrap break-words text-sm">{obj.skill_instructions}</pre>
+          </details>}
+          {name === 'propose_obligations' && obj?.obligation_review && typeof obj.obligation_review === 'object'
+            ? <ObligationReview review={obj.obligation_review as Record<string, unknown>} />
+            : <dl><dt>Action</dt><dd>{actionLabel}</dd>{typeof target === 'string' && <><dt>Name</dt><dd>{target}</dd></>}<dt>Change</dt><dd>{typeof obj?.preview === 'string' ? obj.preview : 'Review the proposed action above before approving.'}</dd></dl>}
+          {name === 'create_automation' && <AutomationSettings settings={obj?.automation_settings} />}
+          {decision && <p>Check the Assistant’s next response for the outcome.</p>}
+          {decisionError && <p role="alert">{decisionError}</p>}
+          {!decision && !onConfirm && <p>Continue from the latest Assistant response to make a decision about this preview.</p>}
+          {!decision && onConfirm && <div className="agent-approval-actions">
+            <button type="button" onClick={() => decide('approved')}>{actionLabel}</button>
+            <button type="button" onClick={() => decide('canceled')}>Cancel action</button>
+          </div>}
+        </section>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Grouped display — fallback for persisted messages without segments
+// ---------------------------------------------------------------------------
+
+interface Props {
+  names?: Record<string, string>
+  toolCalls: ToolCallInfo[]
+  toolResults: ToolResultInfo[]
+  isStreaming?: boolean
+  onConfirm?: (message: string, pageApproval?: string) => boolean | void
+  approvalHistory?: Record<string, ApprovalRecord>
+}
+
+export function ToolCallDisplay({ names = {}, toolCalls, toolResults, isStreaming, onConfirm, approvalHistory }: Props) {
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+
+  if (toolCalls.length === 0 && toolResults.length === 0) return null
+
+  const resultMap = new Map(toolResults.map((r) => [r.tool_call_id, r]))
+
+  const allCallIds = new Set([
+    ...toolResults.map((r) => r.tool_call_id),
+    ...toolCalls.map((c) => c.tool_call_id),
+  ])
+  const recovered = recoveredCallIds([...allCallIds], resultMap)
+
+  const toggle = (id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-2)', margin: "var(--workspace-space-6) 0" }}>
+      {[...allCallIds].map((callId) => {
+        const result = resultMap.get(callId)
+        const call = toolCalls.find((c) => c.tool_call_id === callId)
+        const name = result?.tool_name || call?.tool_name || 'unknown'
+        const isActive = !result && isStreaming
+        const expanded = expandedIds.has(callId)
+        const expandable = result && hasExpandableContent(name, result.content)
+
+        return (
+          <div key={callId}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-2)' }}>
+              <div style={{ flex: 1 }}>
+                <ToolStatusLine names={names} call={call} result={result} isActive={isActive} onConfirm={onConfirm} approvalHistory={approvalHistory?.[call?.tool_call_id ?? result?.tool_call_id ?? '']} recovered={recovered.has(callId)} />
+              </div>
+              {expandable && (
+                <button
+                  type="button"
+                  aria-label={`Details for ${getMeta(name).label.toLowerCase()}`}
+                  aria-expanded={expanded}
+                  onClick={() => toggle(callId)}
+                  style={{
+                    display: 'flex', alignItems: 'center',
+                    background: 'none', border: 'none', padding: 'var(--workspace-space-8)', minWidth: 36, minHeight: 'var(--workspace-control-height)',
+                    cursor: 'pointer', color: '#c4c9d1', flexShrink: 0,
+                  }}
+                >
+                  <ChevronRight
+                    size={12}
+                    style={{
+                      transition: 'transform 0.15s',
+                      transform: expanded ? 'rotate(90deg)' : 'none',
+                    }}
+                  />
+                </button>
+              )}
+            </div>
+            {expanded && result && expandable && (
+              renderExpandedDetails(name, result.content)
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Expandable details for list-type results
+// ---------------------------------------------------------------------------
+
+/** The chat tool's groups, labelled as the Knowledge panel labels them. */
+const KB_GROUPS = [['mine', 'mine'], ['team', 'team'], ['verified', 'verified'], ['project', 'in projects']] as const
+type KBGroup = typeof KB_GROUPS[number][0]
+
+function kbGroupCounts(content: unknown): Record<KBGroup, number> | null {
+  const counts = (content as { counts?: unknown } | null)?.counts
+  if (!counts || typeof counts !== 'object') return null
+  const value = counts as Record<string, unknown>
+  return Object.fromEntries(KB_GROUPS.map(([key]) => [key, typeof value[key] === 'number' ? value[key] : 0])) as Record<KBGroup, number>
+}
+
+function kbEntries(content: unknown): Array<Record<string, unknown>> {
+  const items = (content as { knowledge_bases?: unknown } | null)?.knowledge_bases
+  return Array.isArray(items) ? items as Array<Record<string, unknown>> : []
+}
+
+function hasExpandableContent(toolName: string, content: unknown): boolean {
+  if (toolName === 'run_extraction') return false
+  if (toolName === 'list_knowledge_bases') return kbEntries(content).length > 0
+  if (toolName === 'search_knowledge_base') return false
+  if (Array.isArray(content) && content.length > 0) return true
+  if (toolName === 'list_documents') {
+    const obj = content as Record<string, unknown>
+    return Array.isArray(obj?.documents) && obj.documents.length > 0
+  }
+  return false
+}
+
+function renderExpandedDetails(toolName: string, content: unknown): ReactNode {
+  const obj = content as Record<string, unknown>
+
+  if (
+    ['search_documents', 'list_extraction_sets', 'list_workflows', 'search_library'].includes(toolName) &&
+    Array.isArray(content)
+  ) {
+    if (content.length === 0) return null
+    return (
+      <div style={{ marginTop: 'var(--workspace-space-2)', marginLeft: 'var(--workspace-space-20)', display: 'flex', flexDirection: 'column', gap: 1 }}>
+        {(content as Array<Record<string, unknown>>).slice(0, 10).map((item, i) => (
+          <div key={i} style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)' }}>
+            <span style={{ color: '#d1d5db' }}>&middot;</span>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {String(item.title || item.name || item.uuid || 'Untitled')}
+            </span>
+            {typeof item.extension === 'string' && (
+              <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#9ca3af', textTransform: 'uppercase' }}>
+                {item.extension.replace('.', '')}
+              </span>
+            )}
+          </div>
+        ))}
+        {content.length > 10 && (
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#9ca3af', marginLeft: 'var(--workspace-space-12)' }}>+{content.length - 10} more</div>
+        )}
+      </div>
+    )
+  }
+
+  if (toolName === 'list_knowledge_bases') {
+    const entries = kbEntries(content)
+    const counts = kbGroupCounts(content)
+    if (!entries.length || !counts) return null
+    return (
+      <div style={{ marginTop: 'var(--workspace-space-2)', marginLeft: 'var(--workspace-space-20)', display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)' }}>
+        {KB_GROUPS.map(([key, label]) => {
+          const rows = entries.filter(e => e.group === key)
+          if (!rows.length) return null
+          return (
+            <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#4b5563', fontWeight: 600 }}>{label[0].toUpperCase() + label.slice(1)} ({counts[key]})</div>
+              {rows.map((row, i) => (
+                <div key={i} style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)' }}>
+                  <span style={{ color: '#d1d5db' }}>&middot;</span>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {String(row.title || row.uuid || 'Untitled')}{typeof row.project === 'string' ? ` — ${row.project}` : ''}
+                  </span>
+                </div>
+              ))}
+              {counts[key] > rows.length && (
+                <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#9ca3af', marginLeft: 'var(--workspace-space-12)' }}>+{counts[key] - rows.length} more</div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
+  if (toolName === 'list_documents') {
+    const docs = Array.isArray(obj.documents) ? obj.documents : []
+    if (docs.length === 0) return null
+    return (
+      <div style={{ marginTop: 'var(--workspace-space-2)', marginLeft: 'var(--workspace-space-20)', display: 'flex', flexDirection: 'column', gap: 1 }}>
+        {(docs as Array<Record<string, unknown>>).slice(0, 10).map((item, i) => (
+          <div key={i} style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)' }}>
+            <span style={{ color: '#d1d5db' }}>&middot;</span>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {String(item.title || item.name || 'Untitled')}
+            </span>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <pre style={{
+      marginTop: 'var(--workspace-space-2)', marginLeft: 'var(--workspace-space-20)', fontSize: 'var(--workspace-font-meta)', lineHeight: 1.4,
+      color: '#9ca3af', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+      maxHeight: 150, overflow: 'auto',
+    }}>
+      {typeof content === 'string' ? content : JSON.stringify(content, null, 2)}
+    </pre>
+  )
+}

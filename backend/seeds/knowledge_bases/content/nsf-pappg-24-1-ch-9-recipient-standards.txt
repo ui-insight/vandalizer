@@ -1,0 +1,288 @@
+NSF PAPPG (NSF 24-1) — Chapter IX: Recipient Standards
+Source: https://www.nsf.gov/policies/pappg/24-1/ch-9-recipient-standards
+
+NSF encourages the increased involvement of academic researchers and educators with industry and private entrepreneurial ventures but recognizes that such interactions carry with them an increased risk of conflicts of interest. Chapter IX.A contains NSF's policy on conflicts of interest.
+
+2 CFR § 200 prescribes three separate sets of standards related to the financial and program management of Federal awards, each governing a different area: financial management, property management, and procurement management. Chapter IX.D, IX.E and IX.F implement these standards and extend their applicability to all types of recipients of NSF awards, including for-profit organizations.
+
+### A. Conflict of Interest Policies
+
+-
+NSF requires each recipient organization employing more than fifty persons to maintain an appropriate written and enforced policy on conflict of interest and that all conflicts of interest for each award be managed, reduced, or eliminated prior to the expenditure of the award funds. If the organization carries out agency-funded research through subrecipients or collaborators, the organization must take reasonable steps to ensure that:
+
+- the entity has its own policies in place that meet the requirements of this policy; or
+- investigators working for such entities follow the policies of the primary organization.
+
+Guidance for development of such policies has been issued by university associations and scientific societies.
+
+-
+An organizational conflict of interest policy should require that each investigator disclose to a responsible representative of the organization all significant financial interests of the investigator (including those of the investigator’s spouse and dependent children): (i) that would reasonably appear to be affected by the research or educational activities funded or proposed for funding by NSF; or (ii) in entities whose financial interests would reasonably appear to be affected by such activities.
+
+The term “investigator” means the PI, co-PIs, and any other person identified on the proposed project who is responsible for the design, conduct, or reporting of research or educational activities funded or proposed for funding by NSF.
+
+The term “significant financial interest” means anything of monetary value, including, but not limited to, salary or other payments for services (e.g., consulting fees or honoraria); equity interest (e.g., stocks, stock options, private equity, or other ownership interests); venture or other capital financing, and intellectual property rights (e.g., patents, copyrights, and royalties from such rights).
+
+The term does not include:
+
+- salary, royalties or other remuneration from the proposing organization;
+- any ownership interests in the organization, if the organization is an applicant under the Small Business Innovation Research Program (SBIR) or Small Business Technology Transfer Program (STTR);
+- income from seminars, lectures, or teaching engagements sponsored by public or non-profit entities;
+- income from service on advisory committees or review panels for public or nonprofit entities;
+- an equity interest that, when aggregated for the investigator and the investigator’s spouse and dependent children, meets both of the following tests: (i) does not exceed $10,000 in value as determined through reference to public prices or other reasonable measures of fair market value; and (ii) does not represent more than a 5% ownership interest in any single entity; or
+- salary, royalties, or other payments that, when aggregated for the investigator and the investigator’s spouse and dependent children, are not expected to exceed $10,000 during the prior twelve-month period.
+
+- An organizational policy must ensure that investigators have provided all required financial disclosures at the time the proposal is submitted to NSF. It must also require that those financial disclosures are updated during the period of the award, either on an annual basis, or as new reportable significant financial interests are obtained.
+-
+An organizational policy must designate one or more persons to review financial disclosures, determine whether a conflict of interest exists, and determine what conditions or restrictions, if any, should be imposed by the organization to manage, reduce or eliminate such conflict of interest. A conflict of interest exists when the reviewer(s) reasonably determines that a significant financial interest could directly and significantly affect the design, conduct, or reporting of NSF-funded research or educational activities.
+
+Examples of conditions or restrictions that might be imposed to manage, reduce, or eliminate conflicts of interest include, but are not limited to:
+
+- public disclosure of significant financial interests;
+- monitoring of research by independent reviewers;
+- modification of the research plan;
+- disqualification from participation in the portion of the NSF-funded research that would be affected by significant financial interests;
+- divestiture of significant financial interests; or
+- severance of relationships that create conflicts.
+
+If the reviewer(s) determines that imposing conditions or restrictions would be either ineffective or inequitable, and that the potential negative impacts that may arise from a significant financial interest are outweighed by interests of scientific progress, technology transfer, or the public health and welfare, then the reviewer(s) may allow the research to go forward without imposing such conditions or restrictions.
+
+- The organizational policy must include adequate enforcement mechanisms and provide for sanctions where appropriate.
+-
+The organizational policy must include arrangements for keeping NSF’s Office of the General Counsel (OGC) appropriately informed if the organization finds that it is unable to satisfactorily manage a conflict of interest and if the organization finds that research will proceed without the imposition of conditions or restrictions when a conflict of interest exists.[74]
+
+When OGC is notified of an unmanageable conflict of interest by a recipient, OGC will conduct the following review:
+
+- Examine a copy of the organization’s conflict of interest policy to ascertain if the policy includes procedures for addressing unmanageable conflicts.
+- Contact the recipient organization’s representative to determine what actions the organization plans/has taken with respect to the reported unmanageable conflict of interest, ensuring consistency with their conflict of interest policy.
+- Request confirmation from the recipient when proposed actions have been accomplished.
+
+- Organizations must maintain records of all financial disclosures and of all actions taken to resolve conflicts of interest for at least three years beyond the termination or completion of the award to which they relate, or until the resolution of any NSF action involving those records, whichever is longer.
+
+### B. Responsible and Ethical Conduct of Research (RECR)
+
+#### 1. Background
+
+The responsible and ethical conduct of research (RECR) is critical for excellence, as well as public trust, in science and engineering. RECR involves not only a responsibility to generate and disseminate knowledge with rigor and integrity, but also a responsibility to:
+
+- conduct peer review with the highest ethical standards;
+- diligently protect proprietary information and intellectual property from inappropriate disclosure; and
+- treat students and colleagues fairly and with respect.
+
+Consequently, education in RECR is considered essential in the preparation of future scientists and engineers.
+
+Section 7009 of the America Creating Opportunities to Meaningfully Promote Excellence in Technology, Education, and Science (COMPETES) Act (42 U.S.C. § 1862o–1), as amended, requires that each institution that applies for financial assistance from the Foundation for science and engineering research or education describe in its grant proposal a plan to provide appropriate training and oversight in the responsible and ethical conduct of research to undergraduate students, graduate students, postdoctoral researchers, faculty, and other senior/key personnel supported by the proposed research project. Such training must include mentor training and mentorship.
+
+NSF encourages consideration of the following reports by the National Academies of Sciences, Engineering, and Medicine in meeting RECR requirements: Fostering Integrity in Research; Sexual Harassment of Women: Climate, Culture, and Consequences in Academic Sciences, Engineering, and Medicine; and Reproducibility and Replicability in Science.
+
+The language specified below provides NSF's implementation of Section 7009, as amended.
+
+#### 2. Institutional Responsibilities
+
+- An institution must have a plan in place to provide appropriate training and oversight in the responsible and ethical conduct of research to undergraduate students, graduate students, postdoctoral researchers, faculty, and other senior/key personnel who will be supported by NSF to conduct research. As noted in Chapter II.D.1.d(iv), an institutional certification to this effect is required for each proposal.
+- NSF's RECR requirement applies to the breadth of research disciplines that the Foundation funds. The training provided should be effective and must be appropriately tailored to the specific needs and circumstances at each institution. Accordingly, it is the responsibility of each institution to determine the content, focus and the delivery method for the RECR training.[75] Such content, however, must include mentor training and mentorship as noted in Section B.1 above. While training plans are not required to be included in proposals submitted to NSF, institutions are advised that they are subject to review, upon request.
+- An institution must designate one or more persons to oversee compliance with the RECR training requirement.
+- Institutions are responsible for verifying that undergraduate students, graduate students, postdoctoral researchers, faculty, and other senior/key personnel supported by NSF to conduct research have received training in the responsible and ethical conduct of research.
+
+#### 3. NSF’s Responsibilities
+
+NSF will not tolerate research misconduct in proposing or performing research funded by NSF, in reviewing research proposals submitted to NSF, or in reporting research results funded by NSF. Allegations of research misconduct are taken seriously and are investigated by NSF’s Office of Inspector General (OIG). OIG refers completed investigations of research misconduct to NSF for action. Upon findings of research misconduct, NSF will take appropriate action against individuals or organizations.
+
+### C. Research Security
+
+NSF is committed to safeguarding the integrity and security of science while also keeping fundamental research open and collaborative. NSF seeks to address an age of new threats and challenges through close work with our partners in academia, law enforcement, intelligence, and other federal agencies. By fostering transparency, disclosure and other practices that reflect the values of research integrity, NSF is helping to lead the way in ensuring taxpayer-funded research remains secure.
+
+NSF’s research security initiatives seek to:
+
+- continue to increase the clarity and comprehensiveness of the Foundation’s disclosure requirements;
+- coordinate with U.S. government interagency partners to harmonize disclosure information to the extent practicable;
+- communicate and build awareness with the scientific community;
+- share knowledge and best practices;
+- improve transparency and clarification for disclosure; and
+- mitigate risk through assessment and analysis to better understand the scale and scope.
+
+In accordance with the Guidance for Implementation of National Security Presidential Memorandum 33 (NSPM-33) on National Security Strategy for United States Government-Supported Research and Development, the Foundation requires the following post-award updates to current and pending support information after issuance of an NSF award:
+
+-
+Post-award Disclosure of Current Support and In-Kind Contribution Information
+
+If an organization discovers that a PI or co-PI on an active NSF award failed to disclose current support or in-kind contribution information[76] as part of the proposal submission process (see PAPPG Chapter II.D.2.h(ii)), the AOR must submit the information specified in the applicable general term and condition article entitled, “Post-award Disclosure of Current Support and In-kind Contribution Information” within 30 calendar days of the identification of the undisclosed current support or in-kind contribution through use of the Notification and Request Module in Research.gov.
+
+NSF may consult with the AOR, or designee, if necessary, and determine the impact of the new information on the NSF-funded award, and, where necessary, take appropriate action.
+
+-
+Update of Current Support in Annual and Final Project Reports
+
+PIs and co-PIs on active NSF awards must indicate if there has been a change in active other support since submission of the proposal, or the last reporting period in their annual and final project report. If there has been a change, the individual must submit a revised current and pending support document prepared in SciENcv as part of their project report.
+
+NSF may consult with the PI or co-PI and the AOR, if necessary, and determine the impact of the new information on the NSF-funded award, and, where necessary, take appropriate action.
+
+### D. Financial Management Systems Standards
+
+NSF recipients are required to have financial management systems which meet the requirements of 2 CFR § 200.302.
+
+### E. Property Management Standards
+
+2 CFR §§ 200.310-316 prescribe standards for managing and disposing of property furnished by the Federal government or whose cost was charged to a project supported by a Federal award. In the rare instances where NSF awards involve the acquisition of real property, the real property standards of 2 CFR § 200.311 are applicable to such NSF awards. NSF implementation of the OMB standards on intangible property is contained in Chapter XI.D. Title to materials developed and supplies purchased under an NSF award will vest in the recipient, subject to the conditions identified the applicable award terms and conditions, and in Chapter IX.E.2.a. below.
+
+#### 1. Title to Equipment
+
+Title to equipment purchased or fabricated with NSF funds will normally vest in the recipient organization upon acquisition. This includes IHEs or other non-profit organizations, small businesses, or other for-profit organizations, foreign public entities or foreign organizations, and State, local or tribal governments. Only if specified in the award will title pass directly to the government upon acquisition and is then designated as Federally-owned property. For equipment use and disposition, the following applies:
+
+- For major facility awards, including associated upgrades, equipment is subject to the provisions of 2 CFR § 200.313.
+- For all other awards, such equipment is considered "exempt property" as outlined below and in accordance with the applicable award terms and conditions.
+
+#### 2. Conditions for Acquisition, Use, and Disposition of Equipment
+
+- Recipient Assurance. The recipient will assure each purchase of equipment is:
+
+-
+(i) necessary for the research or activity supported by the award;
+
+(ii) not otherwise reasonably available and accessible;
+
+(iii) of the type normally charged as a direct cost to sponsored agreements; and
+
+(iv) acquired in accordance with organizational practice.
+
+- General Purpose Equipment. Expenditures for general purpose equipment are typically not available for support. General Purpose Equipment is defined in 2 CFR §200.1.
+- Equipment Usage. The equipment must remain in use for the specific project for which it was obtained in accordance with 2 CFR § 200.313(c)(1) unless the provision in 2 CFR § 200.313(c)(4) applies.
+- Equipment Sharing. The equipment must be shared on other projects or programs in accordance with 2 CFR § 200.313(c)(1).
+- Property Management Requirements. The recipient shall maintain a property management system which, at a minimum, meets the requirements of 2 CFR § 200.313(d).
+- Competition. In accordance with 2 CFR § 200.313(c)(3), recipients shall not use equipment acquired with Federal funds to provide services for a fee that is less than private companin theies charge for equivalent services, unless specifically authorized by statute, for as long as the Federal government retains an interest equipment. (See section E.4 below, Principles Relating to the Use of NSF-Supported Research Instrumentation and Facilities.)
+- Right to Transfer Title.
+
+-
+(i) In accordance with 2 CFR § 200.313(e), NSF may identify items of equipment having a unit acquisition cost of $5,000 or more where NSF reserves the right to transfer the title to the Federal government or to a third party named by the Federal government at any time during the award period.
+
+(ii) In such cases where NSF elects to transfer the title, disposition instructions will be issued no later than 120 days after the end date of the NSF-supported project for which it was acquired.
+
+#### 3. Property Management Requirements for Federally-owned Property
+
+In the event that title to equipment or real property is vested in the Federal government, such Federally-owned property (FOP) must be identified, tagged or segregated in such a manner as to indicate clearly its ownership by the government. Unless otherwise provided in the award, such FOP must be used only for the performance of the project. The recipient must submit an annual inventory report and final inventory report for all FOP by NSF award number to NSF using the NSF's Central Property Inventory Repository (CPIR). The annual report must be received in the CPIR system no later than October 15 each year. Additionally, the final inventory report for all FOP is due upon the end date of the award for further agency guidance on utilization and disposition. (See Chapter IX.E.5). Contact the NSF Property Administrator at nsfproperty@nsf.gov for access to the CPIR system or for any property related questions.
+
+#### 4. Principles Relating to the Use of NSF-Supported Research Instrumentation and Facilities
+
+The following principles on use of NSF-supported instrumentation and facilities were adopted by the NSB:
+
+The National Science Foundation seeks the maximum productive use of the Nation's scientific instrumentation and research expertise. Ensuring that the highest quality instrumentation, facilities, and services are available to scientific users, both academic and industrial, is a key requirement, as are harmonious relations and cooperation between industry and universities. Private research and testing laboratories, as well as university, government, and industrial laboratories, have a contribution to make.
+
+The National Science Board recognizes that there may be circumstances where NSF recipients use NSF-supported research instrumentation to provide services in commerce for a fee, to an extent that such practice, (1) detracts from the performance of their obligation under the award, and/or (2) may have a material and deleterious effect on the success of private companies engaged in the provision of equivalent services. It is contrary to the NSF's intent for recipients to use NSF-supported research instrumentation or facilities to provide services for a fee in competition with private companies in a manner that is prohibited by 2 CFR § 200.313(c)(3).
+
+Recipients should implement the above principles and related award conditions in a reasonable manner. Recipients are expected to provide fair and adequate consideration of any complaints about use of instrumentation and facilities.
+
+#### 5. Excess Government Personal Property
+
+#### a. Policy
+
+-
+(i) As a means of expanding the ability of recipients to accomplish NSF objectives while conserving supply and equipment funds, NSF will continue to sponsor the transfer of excess government personal property to NSF recipients.
+
+(ii) Excess government personal property includes all types of personal equipment and materials (except consumable items such as drugs, paint, etc.), new or used, owned by the Federal government, and no longer needed by the holding agency, but having additional useful life. Under regulations established by the General Services Administration (GSA), the agency charged with operating this program, excess government personal property may be reported to, or requested from, GSA by other Federal agencies, including NSF.
+
+(iii) NSF will sponsor the transfer of excess government personal property to eligible organizations under one of the following conditions:
+
+-
+(a) the use of the property significantly furthers an NSF award-supported activity;
+
+(b) the property is such that it would have been procured under the award for which property is being requested if additional award funds had been available;
+
+(c) the property is used as part of the award activity and subsequently for research or science education purposes; or
+
+(d) the property is classified by GSA as scientific or engineering research equipment and has a unit acquisition cost of $1,000 or more. (See Chapter IX.E.5.f.)
+
+#### b. Eligibility
+
+Eligible organizations are NSF recipients that are public or private colleges or universities or non-profit organizations whose primary purpose is the conduct of research or science education activities. State and municipal governments, public health units, hospitals, for-profit firms, and individual PIs are not eligible for excess government personal property under NSF sponsorship.
+
+#### c. Procedures
+
+-
+(i) To access a worldwide inventory of available excess personal property, an eligible recipient should contact the Property Administrator (nsfproperty@nsf.gov), to become a registered user of GSAXcess®, GSA’s online personal property system.
+
+(ii) Recipients can visit GSAXcess® to screen for items that are necessary to accomplish the NSF supported project by searching GSA’s inventory and adding items to the Selection Cart. Excess personal property is reported by Category (Federal Supply Classification (FSC)) and includes the item control number, name, location, quantity available, and unit of issue, original acquisition cost, surplus release date and condition of items posted. In some instances a photograph of the property item is available.
+
+(iii) Materials and equipment so selected should be inspected whenever possible (see Chapter IX.E.5.d), or the holding Federal agency should be contacted by the recipient to verify the condition of the items, because interpretation of condition codes can vary among agencies.
+
+(iv) If the condition of the item is acceptable, the recipient should freeze items by Checkout of the Selection Cart to generate a Transfer Control Number/SF 122, Transfer Order Excess Personal Property.
+
+(v) The recipient should next submit the SF 122, Transfer Order Excess Personal Property and a separate written justification statement, if necessary, to the Property Administrator, DAS. The justification will explain why the property is needed to reduce the cost or enhance the performance under the specific grant for which the property is requested.
+
+(vi) The SF 122 should be signed by the AOR. The following information should also be provided on each SF 122:
+
+-
+(a) name of recipient;
+
+(b) award number;
+
+(c) award end date;
+
+(d) the statement “The above equipment is requested for use by the recipient in support of research or education as outlined in the award”; and
+
+(e) the statement "Transfer is in accordance with the provisions of 41 CFR § 101.43." The recipient should also verify the automatic release date with GSA to preclude loss of property before the transaction is processed.
+
+(vii) The written justification should detail the scientific need for the equipment as it relates to the particular award under which the equipment is to be used, and should cite the conditions of this section as being binding upon the recipient, should the property be acquired.
+
+(viii) Upon receipt by NSF, the SF 122 will be reviewed and forwarded to the appropriate GSA Office. Items are usually allocated on a first come, first served basis. Since GSA may have several freezes on a piece of equipment, first come, first served is interpreted as the first approved SF 122 received by the GSA office and designated Area Property Officer (APO). However, preference will be given by GSA to agencies which do not award title to equipment. As confirmation of approval, the recipient will receive copies of the SF 122 from the GSA APO. If the request is disapproved, it will be returned to the recipient with an appropriate explanation.
+
+(ix) Upon receipt of the requested property, the recipient should immediately return a copy of the SF 122 to NSF as evidence of delivery. Cancelations by GSA, or nonreceipt within a reasonable period of time should also be reported to NSF after follow-up inquiries have been made to GSA.
+
+#### d. Visiting Holding Agency Facilities
+
+-
+(i) Under current GSA regulations all non-Federal recipient representatives wishing to visit holding agency facilities to screen or freeze government excess personal property must receive prior certification from GSA. Because of current security protocols, the holding agency may require written authorization for access.
+
+(ii) The number of screeners on an award should be limited to no more than two persons. The primary screener should be the PI. However, if the PI finds it impossible to screen, the PI may designate, in writing, a substitute.
+
+(iii) Normally, certification will be on a regional basis; however, NSF will, under certain circumstances, sponsor recipient representatives who need to make interregional visits in order to secure equipment not readily available within their region.
+
+#### e. Dollar Limitation
+
+To ensure equitable distribution of excess government personal property, recipients may be authorized to acquire property under each NSF award up to a total acquisition cost equal to the dollar value of that particular award. Any request for excess property which causes the total to exceed the value of the award will require additional justification beyond that requested in Chapter IX.E.5.c. A higher percentage of excess property requested under a particular award by a recipient must be approved by an administrative level in NSF which is higher than the cognizant Program Officer. NSF will give full consideration to all factors in determining whether to approve transfers of excess property above the dollar value of a given award. Recipients are therefore urged to be selective in their requests for excess government personal property to limit quantities of each item where possible and to avoid stockpiling items for future use.
+
+#### f. Restrictions
+
+-
+(i) NSF will sponsor the transfer of excess government personal equipment to eligible organizations only under project awards. As defined in the GSA regulations, "project awards" refers to awards made for specific purposes with established termination dates, e.g., awards made to specific organizations to perform specific tasks within set time frames and costs. No excess property may be acquired on behalf of conference, publication-support awards, or travel awards. In addition, on "summer-type training awards," no property may be acquired after the training period has terminated. Further, recipients should exercise careful judgment on the appropriateness of requesting excess personal property when only a short period of time exists between the date of the property request and the completion or successful accomplishment of the NSF-supported activity. GSA will consider items of personal property as research equipment for transfer without reimbursement to NSF for use by a recipient when the property requested has a unit acquisition cost of $1,000 or more and is within Federal Supply Classification Groups:
+
+- (a) 12 Fire Control Equipment;
+- (b) 14 Guided Missiles;
+- (c) 43 Pumps and Compressors;
+- (d) 48 Valves;
+- (e) 58 Communication, Detection and Coherent Radiation Equipment;
+- (f) 59 Electrical and Electronic Equipment Components;
+- (g) 65 Medical, Dental and Veterinary Equipment and Supplies;
+- (h) 66 Instruments and Laboratory Equipment;
+- (i) 67 Photographic Equipment;
+- (j) 68 Chemical and Chemical Products; or
+- (k) 70 General Purpose Automatic Data Processing Equipment, Software, Supplies and Support Equipment.
+
+Automatic data processing equipment must be acquired under the provisions in 41 CFR § 201.23.
+
+- (ii) GSA will give consideration to the transfer without reimbursement of items of excess property in other Federal supply classification groups and items with a unit acquisition cost of less than $1,000, when NSF certifies that the item requested is a component part of or related to a piece of research equipment or is an otherwise difficult to acquire item needed for scientific or engineering research. Items of property determined by GSA to be common-use or general purpose property, regardless of classification or unit acquisition cost, shall not be transferred to a recipient for the purpose of cannibalization, unless the granting agency sends with the transfer request a supporting statement which clearly indicates that disassembly of the requested item for secondary use of its component parts, or for repair and maintenance of a similar item, has greater potential benefit than utilization of the item in its existing form and that a clear cost savings to the government will result, subject to final determination by GSA.
+
+#### g. Costs
+
+Excess government personal property is usually secured without cost. However, the recipient should specify the method of shipment and must pay all costs of packing, transportation and subsequent installation, rehabilitation and maintenance if required. Award funds may be used to pay such costs.
+
+#### h. Title
+
+Title to excess government personal property obtained by colleges, universities, and other non-profit recipients through NSF sponsorship remains with the government until the property is delivered to the recipient organization. Upon delivery, the recipient should forward to NSF a receipted SF 122 which clearly lists the items of property actually obtained by the recipient. Unless NSF informs the recipient to the contrary, when this SF 122 is received at NSF, title to all property acquired will automatically pass to and be vested in the recipient organization, subject to the understanding that the property will be used for research or for science education purposes as long as it has a useful life. At such time as the property is no longer useful for such purposes, it may be disposed of in accordance with organizational practices, but any proceeds therefrom shall be used by the recipient solely for research or science education purposes. Under certain conditions, such as when highly specialized equipment is involved, NSF may retain title to excess property. When such a condition exists, NSF will inform the recipient. Excess government personal property may not be transferred to a foreign country without the express written approval of the Grants and Agreements Officer.
+
+#### i. Accountability and Recordkeeping
+
+-
+(i) While no particular type of classification of accounts or inventory system is required, NSF expects that the responsible officials of the recipient organization will exercise careful stewardship of excess government personal property acquired in support of projects undertaken with NSF’s financial assistance. In accordance with Chapter IX.E.5.e, relating to the dollar limitation on the amount of excess government personal property provided by NSF, recipients should maintain appropriate inventory procedures that will enable them to identify those requests which require more extensive administrative and scientific justification. In those cases where title to excess government personal property remains with the government, the recipient must maintain suitable records to identify its location, description, utilization, and value. The use of excess government personal property under an NSF award is subject to inspection and audit by representatives of NSF at all reasonable times during the life of the award under which the property was acquired.
+
+(ii) Further details may be obtained from the Property Administrator, Division of Administrative Services, National Science Foundation, 2415 Eisenhower Avenue, Alexandria, VA 22314, or via email (nsfproperty@nsf.gov).
+
+### F. Procurement Standards
+
+NSF recipients shall adhere to the requirements of 2 CFR §§ 200.317-327 which prescribes standards for use by recipients in establishing procedures for the procurement of supplies and other expendable property, equipment, real property, and other services with Federal funds.
+
+#### Footnotes to Chapter IX
+
+[74] Recipient notifications of conflict of interest that cannot be managed, reduced, or eliminated and recipient notifications of situations where research will proceed without the imposition of conditions or restrictions when a conflict of interest exists, must be signed and submitted by the AOR via use of NSF’s electronic systems.
+
+[75] NSF has provided funding to the Online Ethics Center for S&E, an online collaborative resource environment that provides resources that may be used by the institution in developing their training plan. This site contains RECR resources by discipline, provides links to published codes of ethics, as well as includes pages dedicated to resources produced or used by specific professional groups.
+
+[76] The post-award disclosure requirement applies to current support (including in-kind contributions) that was active as of the date the proposal was submitted to NSF. See NSF Pre-award and Post-award Disclosures Relating to the Biographical Sketch and Current and Pending Support which has been developed to assist users in determining the types of activities that must be disclosed.

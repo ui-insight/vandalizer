@@ -1,0 +1,117 @@
+"""The RA inbox: deadlines, required material and sponsor limits per project (#999)."""
+from app.models.project import Project
+
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+
+from app.dependencies import get_current_user
+from app.models.obligation import Obligation
+from app.models.user import User
+from app.services import obligation_service, project_service
+
+router = APIRouter()
+
+
+async def _project_for(project_uuid: str, user: User, *, manage: bool) -> Project:
+    project = await project_service.get_authorized_project(project_uuid, user)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if manage and not await project_service.can_manage_project(project, user):
+        raise HTTPException(status_code=403, detail="Only the project's owner and editors can change its inbox.")
+    return project
+
+
+async def _obligation_for(obligation_uuid: str, user: User, *, manage: bool) -> tuple[Obligation, Project]:
+    ob = await Obligation.find_one(Obligation.uuid == obligation_uuid)
+    if not ob:
+        raise HTTPException(status_code=404, detail="Item not found")
+    project = await _project_for(ob.project_uuid, user, manage=manage)
+    return ob, project
+
+
+@router.get("", response_model=None)
+async def list_obligations(
+    project_uuid: Optional[str] = None,
+    include_dismissed: bool = False,
+    user: User = Depends(get_current_user),
+) -> dict[str, object]:
+    """Home: open items across your projects. With ``project_uuid``: that project's items."""
+    if project_uuid:
+        project = await _project_for(project_uuid, user, manage=False)
+        return {"items": await obligation_service.project_obligations(project, user)}
+    projects = await obligation_service.inbox_projects(user)
+    return {
+        "items": await obligation_service.inbox(
+            user, include_dismissed=include_dismissed, projects=projects,
+        ),
+        "inbox_hidden": bool(getattr(user, "home_inbox_hidden", False)),
+        # How many projects the list covers, so an empty inbox can say what
+        # it checked instead of vanishing (#1014 item 34).
+        "project_count": len(projects),
+    }
+
+
+class CreateObligationsRequest(BaseModel):
+    project_uuid: str
+    items: list[dict]
+
+
+@router.post("", response_model=None)
+async def create_obligations(body: CreateObligationsRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
+    """Add items by hand. Each is checked against the document it cites; rejected ones say why."""
+    project = await _project_for(body.project_uuid, user, manage=True)
+    checked = await obligation_service.propose(project, user, body.items)
+    # This manual endpoint has no calculation-preview approval handshake.
+    # Relative schedules go through the chat tool's server-enforced gate.
+    manual = []
+    for accepted in checked["accepted"]:
+        if accepted["clean"].get("deadline_calculation"):
+            checked["rejected"].append({"title": accepted["clean"]["title"],
+                                        "reason": "Review and approve calculated deadlines in project chat before adding them."})
+        else:
+            manual.append(accepted)
+    created = [await obligation_service.save_checked(project, user, a["clean"]) for a in manual]
+    return {
+        "created": [obligation_service.serialize(o, user, project.title) for o in created],
+        "rejected": checked["rejected"],
+    }
+
+
+class DoneRequest(BaseModel):
+    done: bool
+
+
+@router.post("/{obligation_uuid}/done", response_model=None)
+async def mark_done(obligation_uuid: str, body: DoneRequest, user: User = Depends(get_current_user)) -> dict:
+    """Done (or reopened) for everyone on the project."""
+    ob, project = await _obligation_for(obligation_uuid, user, manage=True)
+    if ob.status == "superseded":
+        raise HTTPException(status_code=409, detail="An amendment replaced this item; update the newer one instead.")
+    ob = await obligation_service.set_done(ob, user, body.done)
+    return obligation_service.serialize(ob, user, project.title)
+
+
+class DismissRequest(BaseModel):
+    dismissed: bool
+
+
+@router.post("/{obligation_uuid}/dismiss", response_model=None)
+async def dismiss(obligation_uuid: str, body: DismissRequest, user: User = Depends(get_current_user)) -> dict:
+    """Hide (or restore) an item on your own Home. Teammates still see it."""
+    ob, project = await _obligation_for(obligation_uuid, user, manage=False)
+    ob = await obligation_service.set_dismissed(ob, user, body.dismissed)
+    return obligation_service.serialize(ob, user, project.title)
+
+
+class InboxSettingsRequest(BaseModel):
+    inbox_hidden: bool
+
+
+@router.put("/home-settings", response_model=None)
+async def update_home_settings(body: InboxSettingsRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
+    """Turn the whole RA inbox on Home off or back on, for this account."""
+    user.home_inbox_hidden = body.inbox_hidden
+    await user.save()
+    return {"inbox_hidden": user.home_inbox_hidden}

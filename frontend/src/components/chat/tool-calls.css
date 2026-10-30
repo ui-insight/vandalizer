@@ -1,0 +1,33 @@
+/* Individual calls stay in the transcript, with evidence alongside the result. */
+.agent-tool-card { --tool-tint:#eff6ff; --tool-ink:#2563a8; padding:14px 16px; margin:10px 0; border:1px solid #dfe5ec; border-radius:12px; background:#fff; box-shadow:0 1px 2px #172b4d04; }
+.agent-tool-card[data-tool-category=extract] { --tool-tint:#fff8e7; --tool-ink:#8a610d; }
+.agent-tool-card[data-tool-category=write] { --tool-tint:#f0f7f3; --tool-ink:#347052; }
+.agent-tool-card[data-tool-category=workflow] { --tool-tint:#f3efff; --tool-ink:#7353ad; }
+.agent-tool-header { display:flex; align-items:flex-start; gap:11px; }
+.agent-tool-icon { display:grid; place-items:center; flex-shrink:0; width:34px; height:34px; border-radius:9px; color:var(--tool-ink); background:var(--tool-tint); }
+.agent-tool-identity { flex:1; min-width:0; }
+.agent-tool-heading { display:flex; align-items:center; flex-wrap:wrap; gap:6px 12px; min-height:34px; }
+.agent-tool-name { font-size:13px; font-weight:600; color:#263446; line-height:1.5; }
+.agent-tool-status { display:inline-flex; align-items:center; gap:5px; margin-left:auto; padding:2px 7px; border-radius:5px; background:#f1f5f9; color:#596579; font-size:11px; line-height:1.5; }
+.agent-tool-card[data-tool-state=Running] .agent-tool-status { background:var(--tool-tint); color:var(--tool-ink); }
+.agent-tool-card[data-tool-state="Awaiting approval"] .agent-tool-status { background:#fff8e7; color:#8a610d; }
+.agent-tool-card[data-tool-error=true] .agent-tool-status { background:#fff1f2; color:#b4233b; }
+.agent-tool-target { margin:2px 0 0; color:#64748b; font-size:12px; line-height:1.6; overflow-wrap:anywhere; }
+.agent-tool-summary { margin:10px 0 0; font-size:13px; line-height:1.65; color:#475569; }
+.agent-tool-card[data-tool-error=true] .agent-tool-summary { color:#a32d3d; }
+.agent-tool-evaluation { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; padding-top:12px; border-top:1px solid #edf0f4; }
+.agent-tool-copy { display:flex; justify-content:flex-end; margin-top:8px; }
+.agent-quality-badge { border-radius:9px !important; padding:8px 10px !important; gap:12px !important; text-align:left; max-width:100%; }
+.agent-quality-score { display:flex; flex-direction:column; align-items:center; flex-shrink:0; font-size:15px; font-weight:700; padding-right:10px; border-right:1px solid currentColor; line-height:1.5; }
+.agent-quality-score small { font-size:11px; font-weight:500; }
+.agent-tool-spin { animation:agent-tool-spin 1.3s linear infinite; }
+@keyframes agent-tool-spin { to { transform:rotate(360deg); } }
+@media (max-width:600px) { .agent-tool-card { padding:12px; } .agent-tool-heading { gap:5px 8px; } .agent-tool-status { margin-left:0; } }
+@media (prefers-reduced-motion:reduce) { .agent-tool-spin { animation:none; } }
+
+/* Keep each reviewed inbox item and its source readable at narrow widths. */
+.agent-obligation-review { line-height: 1.55; overflow-wrap: anywhere; }
+.agent-obligation-review p { margin: 10px 0; }
+.agent-obligation-review ul { list-style: disc; padding-left: 20px; margin: 10px 0 16px; }
+.agent-obligation-review li { margin-bottom: 10px; }
+.agent-obligation-item { white-space: pre-line; }

@@ -1,0 +1,274 @@
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ToolCallDisplay, ToolStatusLine, WorkflowProgress, toolResultToText } from './ToolCallDisplay'
+import { getWorkflowStatus } from '../../api/workflows'
+import type { WorkflowStatus } from '../../types/workflow'
+
+const workspace = { openWorkflow: vi.fn() }
+vi.mock('../../contexts/WorkspaceContext', () => ({ useWorkspace: () => workspace }))
+vi.mock('./CertificationCards', () => ({ useCertificationSync: vi.fn(), CertCheckCard: () => null }))
+vi.mock('../../api/workflows', () => ({ getWorkflowStatus: vi.fn() }))
+const courseRefresh = vi.hoisted(() => vi.fn())
+vi.mock('../../contexts/CertificationPanelContext', () => ({ useCertificationPanelOptional: () => ({ refresh: courseRefresh }) }))
+const status = (changes: Partial<WorkflowStatus> = {}): WorkflowStatus => ({ status:'running', num_steps_completed:1, num_steps_total:3, current_step_name:'Review findings', current_step_detail:null, current_step_preview:null, final_output:null, steps_output:{Extract:'Preserved findings'}, output_step_names:[], approval_request_id:null, ...changes })
+const call = {tool_name:'create_workflow', tool_call_id:'call-1',args:{name:'Review proposal'}}
+const result = (content: unknown) => ({tool_name:'create_workflow',tool_call_id:'call-1',content,quality:null})
+beforeEach(() => { vi.clearAllMocks() })
+
+describe('tool states and recovery', () => {
+  it('shows a readable mixed obligation batch once without raw checker text or IDs', () => {
+    const onConfirm = vi.fn()
+    const descriptions = ['Final report: Jun 30, 2026 (Award.pdf, p. 2)', 'Invoice: Aug 31, 2026 (Award.pdf, p. 3)', 'Closeout: Sep 30, 2026 (Award.pdf, p. 4)']
+    const { container } = render(<ToolStatusLine call={{ tool_name: 'propose_obligations', tool_call_id: 'mixed', args: {} }}
+      result={{ tool_name: 'propose_obligations', tool_call_id: 'mixed', quality: null, content: {
+        needs_confirmation: true, approval_key: 'internal-fingerprint',
+        preview: 'Raw legacy preview should not be repeated',
+        rejected: [{ title: 'Unsupported report', reason: 'the quote does not state July 30; cite the passage that gives the date' }],
+        obligation_review: { project: 'Award', items: descriptions,
+          excluded: ['Unsupported report', 'RPPR', 'Other report'].map(title => ({ title, explanation: 'The deadline needs clearer source evidence before it can be added.' })) },
+      } }} onConfirm={onConfirm} />)
+    expect(screen.getByRole('list', { name: 'Items to add' }).children).toHaveLength(3)
+    expect(screen.getByRole('list', { name: 'Items not included' }).children).toHaveLength(3)
+    for (const description of descriptions) expect(screen.getAllByText(description)).toHaveLength(1)
+    expect(container).not.toHaveTextContent('cite the passage')
+    expect(container).not.toHaveTextContent('internal-fingerprint')
+    expect(container).not.toHaveTextContent('Raw legacy preview')
+    fireEvent.click(screen.getByRole('button', { name: 'Add to inbox' }))
+    expect(onConfirm).toHaveBeenCalledOnce()
+  })
+
+  it('shows the calculated deadline before offering to add it to the RA inbox', () => {
+    const onConfirm = vi.fn()
+    render(<ToolStatusLine call={{ tool_name: 'propose_obligations', tool_call_id: 'deadlines', args: {} }}
+      result={{ tool_name: 'propose_obligations', tool_call_id: 'deadlines', quality: null, content: {
+        needs_confirmation: true,
+        preview: 'Final report: Feb 29, 2028. Formula: 2027-12-31 + 60 calendar days = 2028-02-29.',
+      } }} onConfirm={onConfirm} />)
+    expect(screen.getByRole('region', { name: 'Review proposed action' })).toHaveTextContent('2027-12-31 + 60 calendar days = 2028-02-29')
+    expect(onConfirm).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Add to inbox' }))
+    expect(onConfirm).toHaveBeenCalledWith('Yes, go ahead')
+  })
+
+  it('shows the exact Skill instructions before approving selection', () => {
+    const onConfirm = vi.fn()
+    render(<ToolStatusLine call={{ tool_name: 'select_skill', tool_call_id: 's1', args: { skill_uuid: 'review' } }}
+      result={{ tool_name: 'select_skill', tool_call_id: 's1', quality: null, content: { needs_confirmation: true,
+        title: 'Award review', preview: 'Use Award review for this conversation.',
+        skill_instructions: 'Review deadlines. <script>Do not execute this</script>' } }} onConfirm={onConfirm} />)
+    expect(screen.getByText('Inspect Skill instructions')).toBeInTheDocument()
+    expect(screen.getByText('Review deadlines. <script>Do not execute this</script>')).toBeInTheDocument()
+    expect(document.querySelector('script')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Use Skill' }))
+    expect(onConfirm).toHaveBeenCalledOnce()
+    expect(screen.getByRole('status')).toHaveTextContent('Approval requested')
+  })
+  it.each([false, true])('uses removal wording for a Skill preview (server label: %s)', serverLabel => {
+    const onConfirm = vi.fn()
+    render(<ToolStatusLine call={{ tool_name: 'select_skill', tool_call_id: 'remove', args: { skill_uuid: null } }}
+      result={{ tool_name: 'select_skill', tool_call_id: 'remove', quality: null, content: {
+        needs_confirmation: true, preview: 'Remove the active Skill from this conversation.',
+        ...(serverLabel ? { approval_label: 'Remove Skill', skill_uuid: null } : {}),
+      } }} onConfirm={onConfirm} />)
+    expect(screen.queryByText('Inspect Skill instructions')).not.toBeInTheDocument()
+    expect(screen.queryByText('Apply Skill selection')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Skill' }))
+    expect(onConfirm).toHaveBeenCalledWith('Yes, go ahead')
+  })
+  it.each([
+    [{ status: 'selected', active_skill: null }, 'Skill removed'],
+    [{ status: 'selected', active_skill: { uuid: 's1', title: 'Award Review', instructions: 'Check dates.', version: 'v1' } }, 'Skill selected'],
+    [{ status: 'selected' }, 'Change not confirmed'],
+    [{ status: 'selected', active_skill: { uuid: 's1' } }, 'Change not confirmed'],
+    [{ error: 'Access revoked' }, 'Failed'],
+  ])('shows the Skill outcome from its receipt (%j)', (content, label) => {
+    render(<ToolStatusLine result={{ tool_name: 'select_skill', tool_call_id: 's1', content, quality: null }} />)
+    expect(screen.getByRole('status')).toHaveTextContent(`Updating active Skill · ${label}`)
+  })
+  it.each([
+    [{needs_confirmation:true},'Awaiting approval'], [{status:'queued'},'Queued'], [{status:'running'},'Running'],
+    [{status:'failed', error_detail:'Review step failed'},'Failed'], [{status:'canceled',error:'Canceled by user'},'Canceled'],
+    [{status:'completed'},'Completed'], [{status:'custom_status'},'Result received'],
+  ])('identifies protocol state %j without inferring execution', (content,label) => {
+    render(<ToolStatusLine call={call} result={result(content)} />)
+    expect(screen.getByRole('status')).toHaveTextContent(`Building workflow · ${label}`)
+  })
+  it('keeps approval available after a blocked decision and prevents duplicate accepted decisions', () => {
+    const confirm = vi.fn().mockReturnValueOnce(false).mockReturnValue(true)
+    render(<ToolStatusLine call={call} result={result({needs_confirmation:true,preview:'Create a workflow'})} onConfirm={confirm} />)
+    fireEvent.click(screen.getByRole('button',{name:'Create workflow'}))
+    expect(screen.getByRole('alert')).toHaveTextContent('could not be sent yet')
+    fireEvent.click(screen.getByRole('button',{name:'Create workflow'}))
+    expect(screen.queryByRole('button',{name:'Create workflow'})).not.toBeInTheDocument()
+    expect(confirm).toHaveBeenCalledTimes(2)
+    expect(screen.getByRole('status')).toHaveTextContent('Approval requested')
+    expect(screen.getByText('Check the Assistant’s next response for the outcome.')).toBeInTheDocument()
+  })
+  it('offers persisted approvals without segments and reports cancellation as a request', () => {
+    const confirm=vi.fn()
+    render(<ToolCallDisplay toolCalls={[call]} toolResults={[result({needs_confirmation:true,preview:'Create a workflow'})]} onConfirm={confirm} />)
+    fireEvent.click(screen.getByRole('button',{name:'Cancel action'}))
+    expect(confirm).toHaveBeenCalledWith('No, cancel that')
+    expect(screen.getByRole('status')).toHaveTextContent('Cancellation requested')
+  })
+  it('shows the failed tool and protocol hint while requesting recovery without repeating completed changes', () => {
+    const confirm=vi.fn()
+    render(<ToolStatusLine call={call} result={result({error:'Permission changed',hint:'Choose an accessible project.'})} onConfirm={confirm} />)
+    expect(screen.getByText('Choose an accessible project.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button',{name:'Review recovery options'}))
+    expect(confirm.mock.calls[0][0]).toContain('Do not repeat completed changes without my approval.')
+  })
+})
+
+describe('workflow run recovery', () => {
+  it('retries only the same status read and exposes preserved output and the exact run', async () => {
+    vi.mocked(getWorkflowStatus).mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(status({status:'failed',error:'Missing source'}))
+    render(<WorkflowProgress sessionId="session-1" workflowId="workflow-1" initialStatus="queued" />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Checking again does not start another run')
+    fireEvent.click(screen.getByRole('button',{name:'Check workflow status'}))
+    await screen.findByText('Missing source')
+    expect(screen.getByRole('status')).toHaveTextContent('Workflow failed · 1/3 steps completed')
+    expect(screen.getByText('Failed step:')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('Completed step results'))
+    expect(screen.getByLabelText('Completed workflow step results')).toHaveTextContent('Preserved findings')
+    fireEvent.click(screen.getByRole('button',{name:'Open this workflow run'}))
+    expect(workspace.openWorkflow).toHaveBeenCalledWith('workflow-1','session-1')
+    expect(vi.mocked(getWorkflowStatus).mock.calls).toEqual([['session-1'],['session-1']])
+  })
+  it('keeps the last results when a later poll fails and resumes after an explicit check', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.mocked(getWorkflowStatus).mockResolvedValueOnce(status()).mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(status({status:'completed',final_output:{output:{summary:'Complete result '+ 'long '.repeat(100)}}}))
+      render(<WorkflowProgress sessionId="session-2" />)
+      await act(async () => { await Promise.resolve() })
+      await act(async () => { await vi.advanceTimersByTimeAsync(2500) })
+      expect(screen.getByRole('alert')).toHaveTextContent('Last known state: Workflow running')
+      expect(screen.getByLabelText('Completed workflow step results')).toHaveTextContent('Preserved findings')
+      await act(async () => { fireEvent.click(screen.getByRole('button',{name:'Check workflow status'})); await Promise.resolve() })
+      expect(screen.getByRole('status')).toHaveTextContent('Workflow complete')
+      expect(screen.getByLabelText('Workflow output')).toHaveTextContent('long '.repeat(100).trim())
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    } finally { vi.useRealTimers() }
+  })
+  it('labels a run waiting at an approval gate instead of showing the raw status', async () => {
+    vi.mocked(getWorkflowStatus).mockResolvedValue(status({status:'pending_approval',num_steps_completed:1,num_steps_total:2,current_step_name:'Approval'}))
+    render(<WorkflowProgress sessionId="session-4" />)
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Awaiting workflow approval · 1/2 steps completed'))
+  })
+  it('announces clipboard failure instead of claiming the result was copied', async () => {
+    Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:vi.fn().mockRejectedValueOnce(new Error('denied')).mockResolvedValueOnce(undefined)}})
+    vi.mocked(getWorkflowStatus).mockResolvedValue(status({status:'completed',final_output:'Saved result'}))
+    render(<WorkflowProgress sessionId="session-3" />)
+    fireEvent.click(await screen.findByRole('button',{name:'Copy workflow output'}))
+    await screen.findByText('Copy failed. Try again or select the result text.')
+    fireEvent.click(screen.getByRole('button',{name:'Copy workflow output'}))
+    await waitFor(()=>expect(screen.getByText('Copy workflow output: copied')).toBeInTheDocument())
+  })
+})
+
+it('renders a historical approval as a nonactionable record even when a callback exists', () => {
+  const confirm = vi.fn()
+  render(<ToolStatusLine call={call} result={result({ needs_confirmation: true, preview: 'Create a workflow' })} onConfirm={confirm} approvalHistory={{ label: 'Workflow created', detail: 'Inspect the result below.' }} />)
+  expect(screen.getByRole('region', { name: 'Earlier action decision' })).toHaveTextContent('Workflow created')
+  expect(screen.queryByRole('button', { name: 'Create workflow' })).toBeNull()
+  expect(screen.queryByText('Your approval is needed')).toBeNull()
+  expect(confirm).not.toHaveBeenCalled()
+})
+
+describe('knowledge base listing', () => {
+  const kbCall = { tool_name: 'list_knowledge_bases', tool_call_id: 'kb-1', args: {} }
+  const content = {
+    scope: 'all',
+    counts: { mine: 2, team: 1, verified: 25, project: 1 },
+    knowledge_bases: [
+      { uuid: 'a', title: 'My Policies', group: 'mine' },
+      { uuid: 'b', title: 'Award Terms', group: 'mine' },
+      { uuid: 'c', title: 'Team Handbook', group: 'team' },
+      { uuid: 'd', title: '2 CFR 200', group: 'verified' },
+      { uuid: 'e', title: 'Project KB', group: 'project', project: 'Grant X' },
+    ],
+  }
+
+  it('summarizes each group from the full counts, not the listed rows', () => {
+    render(<ToolStatusLine call={kbCall} result={{ tool_name: 'list_knowledge_bases', tool_call_id: 'kb-1', content, quality: null }} />)
+    expect(screen.getByText('2 mine · 1 team · 25 verified · 1 in projects')).toBeInTheDocument()
+  })
+
+  it('copies the groups separately', () => {
+    expect(toolResultToText('list_knowledge_bases', content)).toBe(
+      'Mine (2)\nMy Policies\nAward Terms\n\nTeam (1)\nTeam Handbook\n\nVerified (25)\n2 CFR 200\n\nIn projects (1)\nProject KB',
+    )
+  })
+})
+
+it.each([
+  ['get_certification_progress', { modules: { wrong: 'shape' } }],
+  ['get_certification_lesson', { content: 'Incomplete teaching payload' }],
+  ['check_certification_module', { passed: 'false', checks: {} }],
+  ['complete_certification_module', { total_xp: 125, certified: 'false' }],
+  ['submit_certification_assessment', { stored: false }],
+])('does not render malformed %s as a successful course operation', (tool_name, content) => {
+  const confirm = vi.fn()
+  render(<ToolStatusLine call={{ tool_name, tool_call_id: 'cert-bad', args: {} }} result={{ tool_name, tool_call_id: 'cert-bad', content, quality: null }} onConfirm={confirm} />)
+  expect(screen.getByRole('status')).toHaveTextContent('Result needs review')
+  expect(screen.getByRole('alert')).toHaveTextContent('Saved work may already exist')
+  expect(screen.queryByRole('button', { name: 'Complete the module' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Review recovery options' })).not.toBeInTheDocument()
+  expect(confirm).not.toHaveBeenCalled()
+})
+
+
+it('keeps the tool summary consistent with an optional check that did not pass', () => {
+  const tool_name = 'check_certification_module'
+  render(<ToolStatusLine result={{ tool_name, tool_call_id: 'advisory', quality: null, content: { module_id: 'foundations', title: 'Foundations', passed: true, stars: 1, checks: [{ name: 'Required run', passed: true, detail: 'Saved' }, { name: 'Enrichment', passed: false, detail: 'Optional' }] } }} />)
+  expect(screen.getByText('"Foundations" — module requirements met; review check details')).toBeInTheDocument()
+  expect(screen.queryByText(/all checks passed/)).not.toBeInTheDocument()
+})
+
+
+it('checks saved progress after an uncertain write without asking the agent to repeat it', async () => {
+  courseRefresh.mockRejectedValueOnce(new Error('Offline')).mockResolvedValueOnce(undefined)
+  const confirm = vi.fn(), tool_name = 'complete_certification_module'
+  render(<ToolStatusLine result={{ tool_name, tool_call_id: 'uncertain', content: { total_xp: 100 }, quality: null }} onConfirm={confirm} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Check saved course progress' }))
+  await screen.findByText('Progress could not be refreshed. Keep your saved work and try this read again.')
+  fireEvent.click(screen.getByRole('button', { name: 'Check saved course progress' }))
+  await screen.findByText('Current progress loaded. Open the learning panel to inspect your saved work.')
+  expect(courseRefresh).toHaveBeenCalledTimes(2)
+  expect(confirm).not.toHaveBeenCalled()
+})
+
+describe('document search with no exact match', () => {
+  const search = { tool_name: 'search_documents', tool_call_id: 'call-s', args: { query: 'nih-ro1-neuroscience.pdf' } }
+  const searched = (content: unknown) => ({ tool_name: 'search_documents', tool_call_id: 'call-s', content, quality: null })
+  it('names the closest title instead of a bare not-found', () => {
+    render(<ToolStatusLine call={search} result={searched({ documents: [], did_you_mean: [{ uuid: 'd1', title: 'nih-r01-neuroscience.pdf' }] })} />)
+    expect(screen.getByText('No exact match · did you mean "nih-r01-neuroscience.pdf"?')).toBeInTheDocument()
+  })
+  it('still says nothing was found when nothing is close', () => {
+    render(<ToolStatusLine call={search} result={searched({ documents: [], did_you_mean: [] })} />)
+    expect(screen.getByText('No documents found')).toBeInTheDocument()
+  })
+})
+
+it('keeps individual parallel calls and their source names visible', () => {
+  render(<ToolCallDisplay isStreaming names={{ kb: 'Research policies', doc: 'Proposal.pdf' }} toolResults={[]} toolCalls={[
+    { tool_name: 'search_knowledge_base', tool_call_id: 'search', args: { kb_uuid: 'kb', query: 'eligibility' } },
+    { tool_name: 'get_document_text', tool_call_id: 'read', args: { document_uuid: 'doc' } },
+  ]} />)
+  expect(screen.getAllByRole('status')).toHaveLength(2)
+  expect(screen.getByText('Research policies · eligibility')).toBeVisible()
+  expect(screen.getByText('Proposal.pdf')).toBeVisible()
+})
+
+it('surfaces recorded grades with their sample size but never attaches them to a failed call', () => {
+  const quality = { score: 94, tier: 'excellent', grade: 'A', num_test_cases: 12, last_validated_at: null }
+  const { rerender } = render(<ToolStatusLine call={call} result={{ ...result({ status: 'completed' }), quality }} />)
+  const badge = screen.getByRole('button', { name: /Grade A/ })
+  expect(badge).toHaveTextContent('Grade A')
+  expect(badge).toHaveTextContent('94/100')
+  expect(badge).toHaveTextContent('Tested on 12 examples')
+  rerender(<ToolStatusLine call={call} result={{ ...result({ error: 'Unavailable' }), quality }} />)
+  expect(screen.queryByRole('button', { name: /Grade A/ })).not.toBeInTheDocument()
+  expect(screen.getByRole('status')).toHaveTextContent('Failed')
+})

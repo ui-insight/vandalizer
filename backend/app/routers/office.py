@@ -68,8 +68,8 @@ class UpdateIntakeRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-@router.get("/status")
-async def office_status(user: User = Depends(get_current_user)):
+@router.get("/status", response_model=None)
+async def office_status(user: User = Depends(get_current_user)) -> dict[str, object]:
     """Check M365 connection status for current user."""
     return {
         "connected": getattr(user, "m365_enabled", False),
@@ -82,17 +82,17 @@ async def office_status(user: User = Depends(get_current_user)):
 # ---------------------------------------------------------------------------
 
 
-@router.get("/intakes")
-async def list_intakes(user: User = Depends(get_current_user)):
+@router.get("/intakes", response_model=None)
+async def list_intakes(user: User = Depends(get_current_user)) -> dict[str, object]:
     intakes = await IntakeConfig.find(
         IntakeConfig.owner_user_id == user.user_id
     ).sort("-created_at").to_list()
     return {"intakes": [_intake_to_dict(i) for i in intakes]}
 
 
-@router.post("/intakes")
+@router.post("/intakes", response_model=None)
 @limiter.limit("30/minute")
-async def create_intake(request: Request, req: CreateIntakeRequest, user: User = Depends(get_current_user)):
+async def create_intake(request: Request, req: CreateIntakeRequest, user: User = Depends(get_current_user)) -> dict:
     from beanie import PydanticObjectId
 
     if req.default_workflow:
@@ -115,14 +115,14 @@ async def create_intake(request: Request, req: CreateIntakeRequest, user: User =
     return _intake_to_dict(intake)
 
 
-@router.patch("/intakes/{intake_uuid}")
+@router.patch("/intakes/{intake_uuid}", response_model=None)
 @limiter.limit("30/minute")
 async def update_intake(
     request: Request,
     intake_uuid: str,
     req: UpdateIntakeRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     intake = await _get_owned_intake(intake_uuid, user)
     if not intake:
         raise HTTPException(status_code=404, detail="Intake not found")
@@ -146,9 +146,9 @@ async def update_intake(
     return _intake_to_dict(intake)
 
 
-@router.delete("/intakes/{intake_uuid}")
+@router.delete("/intakes/{intake_uuid}", response_model=None)
 @limiter.limit("30/minute")
-async def delete_intake(request: Request, intake_uuid: str, user: User = Depends(get_current_user)):
+async def delete_intake(request: Request, intake_uuid: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     intake = await _get_owned_intake(intake_uuid, user)
     if not intake:
         raise HTTPException(status_code=404, detail="Intake not found")
@@ -161,12 +161,12 @@ async def delete_intake(request: Request, intake_uuid: str, user: User = Depends
 # ---------------------------------------------------------------------------
 
 
-@router.get("/workitems")
+@router.get("/workitems", response_model=None)
 async def list_work_items(
     status: Optional[str] = Query(None),
     limit: int = Query(50, ge=1, le=200),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     query: dict = {"owner_user_id": user.user_id}
     if status:
         query["status"] = status
@@ -174,17 +174,17 @@ async def list_work_items(
     return {"items": [_work_item_to_dict(i) for i in items]}
 
 
-@router.get("/workitems/{item_uuid}")
-async def get_work_item(item_uuid: str, user: User = Depends(get_current_user)):
+@router.get("/workitems/{item_uuid}", response_model=None)
+async def get_work_item(item_uuid: str, user: User = Depends(get_current_user)) -> dict:
     item = await _get_owned_work_item(item_uuid, user)
     if not item:
         raise HTTPException(status_code=404, detail="Work item not found")
     return _work_item_to_dict(item)
 
 
-@router.post("/workitems/{item_uuid}/approve")
+@router.post("/workitems/{item_uuid}/approve", response_model=None)
 @limiter.limit("30/minute")
-async def approve_work_item(request: Request, item_uuid: str, user: User = Depends(get_current_user)):
+async def approve_work_item(request: Request, item_uuid: str, user: User = Depends(get_current_user)) -> dict:
     item = await _get_owned_work_item(item_uuid, user)
     if not item:
         raise HTTPException(status_code=404, detail="Work item not found")
@@ -201,13 +201,13 @@ async def approve_work_item(request: Request, item_uuid: str, user: User = Depen
 # ---------------------------------------------------------------------------
 
 
-@router.post("/intakes/{intake_uuid}/subscribe")
+@router.post("/intakes/{intake_uuid}/subscribe", response_model=None)
 @limiter.limit("10/minute")
 async def create_graph_subscription(
     request: Request,
     intake_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Create a Graph subscription for an IntakeConfig."""
     from app.services.graph_client import GraphClient
 
@@ -243,6 +243,7 @@ async def create_graph_subscription(
         resource=resource,
         change_type=change_type,
         notification_url=notification_url,
+        expiration=datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=2),
         client_state=client_state,
     )
 
@@ -263,11 +264,11 @@ async def create_graph_subscription(
     return {"subscription_id": gs.subscription_id, "uuid": gs.uuid, "expiration": str(gs.expiration)}
 
 
-@router.delete("/intakes/{intake_uuid}/subscribe")
+@router.delete("/intakes/{intake_uuid}/subscribe", response_model=None)
 async def delete_graph_subscription(
     intake_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Delete Graph subscriptions for an IntakeConfig."""
     from app.services.graph_client import GraphClient
     from app.models.passive import GraphSubscription
@@ -301,14 +302,14 @@ async def delete_graph_subscription(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/intakes/{intake_uuid}/triage/{item_uuid}")
+@router.post("/intakes/{intake_uuid}/triage/{item_uuid}", response_model=None)
 @limiter.limit("20/minute")
 async def manual_triage(
     request: Request,
     intake_uuid: str,
     item_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Manually trigger triage for a work item."""
     intake = await _get_owned_intake(intake_uuid, user)
     if not intake:
@@ -328,14 +329,14 @@ async def manual_triage(
     return {"status": "dispatched"}
 
 
-@router.post("/intakes/{intake_uuid}/process/{item_uuid}")
+@router.post("/intakes/{intake_uuid}/process/{item_uuid}", response_model=None)
 @limiter.limit("20/minute")
 async def manual_process(
     request: Request,
     intake_uuid: str,
     item_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Manually process a work item through its matched workflow."""
     intake = await _get_owned_intake(intake_uuid, user)
     if not intake:

@@ -2,13 +2,15 @@
 
 import asyncio
 import datetime
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.config import Settings
 from app.dependencies import get_current_user, get_settings
+from app.models.activity import ActivityEvent
 from app.models.automation import Automation
-from app.models.certification import CertificationProgress
+from app.services.certification_versions.readers import has_earned_certification
 from app.models.chat import ChatConversation
 from app.models.document import SmartDocument
 from app.models.knowledge import KnowledgeBase
@@ -20,8 +22,11 @@ from app.models.user import User
 from app.models.user_config import UserModelConfig
 from app.models.workflow import Workflow, WorkflowResult
 from app.schemas.config import (
+    ActiveAlertItem,
+    HomeDocument,
     ModelInfo,
     OnboardingStatusResponse,
+    RecentActivityItem,
     ThemeConfigResponse,
     UpdateThemeConfigRequest,
     UpdateUserConfigRequest,
@@ -35,6 +40,9 @@ from app.services.config_service import (
 from app.services import workflow_service
 from app.services.version_service import get_current_version
 
+from app.services.home_alerts import ReviewAlertRequest
+
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -43,8 +51,8 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 
 
-@router.get("/version")
-async def get_version(settings: Settings = Depends(get_settings)):
+@router.get("/version", response_model=None)
+async def get_version(settings: Settings = Depends(get_settings)) -> dict[str, object]:
     """Public  - the build and environment this instance is running, for the UI
     version footer. Lets users tell deployments apart (different envs deploy at
     different times). `deployment_label` falls back to `environment` when unset.
@@ -56,8 +64,20 @@ async def get_version(settings: Settings = Depends(get_settings)):
     }
 
 
+def _model_context_window(model: dict) -> int:
+    """The window the context budget will use for this model.
+
+    A model saved without a window stores None; ``m.get(..., 128000)`` then
+    returned None and failed the response schema. This is the same number the
+    budget planner uses: the configured window, else its name-based guess.
+    """
+    from app.services.context_budget import resolve_context_window
+
+    return resolve_context_window(model.get("name", ""), model)
+
+
 @router.get("/models", response_model=list[ModelInfo])
-async def get_models(user: User = Depends(get_current_user)):
+async def get_models(user: User = Depends(get_current_user)) -> list[ModelInfo]:
     models = await get_llm_models()
     return [
         ModelInfo(
@@ -69,7 +89,7 @@ async def get_models(user: User = Depends(get_current_user)):
             tier=m.get("tier", ""),
             privacy=m.get("privacy", ""),
             supports_structured=m.get("supports_structured", True),
-            context_window=m.get("context_window", 128000),
+            context_window=_model_context_window(m),
             cost_per_1m_input=m.get("cost_per_1m_input"),
             cost_per_1m_output=m.get("cost_per_1m_output"),
         )
@@ -79,7 +99,7 @@ async def get_models(user: User = Depends(get_current_user)):
 
 
 @router.get("/user", response_model=UserConfigResponse)
-async def get_user_config(user: User = Depends(get_current_user)):
+async def get_user_config(user: User = Depends(get_current_user)) -> UserConfigResponse:
     user_config, models, _ = await reconcile_user_model_config(
         user.user_id, create_if_missing=True
     )
@@ -93,7 +113,7 @@ async def get_user_config(user: User = Depends(get_current_user)):
             tier=m.get("tier", ""),
             privacy=m.get("privacy", ""),
             supports_structured=m.get("supports_structured", True),
-            context_window=m.get("context_window", 128000),
+            context_window=_model_context_window(m),
             cost_per_1m_input=m.get("cost_per_1m_input"),
             cost_per_1m_output=m.get("cost_per_1m_output"),
         )
@@ -113,7 +133,7 @@ async def get_user_config(user: User = Depends(get_current_user)):
 
 
 @router.put("/user", response_model=UserConfigResponse)
-async def update_user_config(req: UpdateUserConfigRequest, user: User = Depends(get_current_user)):
+async def update_user_config(req: UpdateUserConfigRequest, user: User = Depends(get_current_user)) -> UserConfigResponse:
     user_config, models, _ = await reconcile_user_model_config(
         user.user_id, create_if_missing=True
     )
@@ -144,7 +164,7 @@ async def update_user_config(req: UpdateUserConfigRequest, user: User = Depends(
             tier=m.get("tier", ""),
             privacy=m.get("privacy", ""),
             supports_structured=m.get("supports_structured", True),
-            context_window=m.get("context_window", 128000),
+            context_window=_model_context_window(m),
             cost_per_1m_input=m.get("cost_per_1m_input"),
             cost_per_1m_output=m.get("cost_per_1m_output"),
         )
@@ -188,7 +208,7 @@ def _validate_image_data_url(value: str, field: str) -> str:
 
 
 @router.get("/theme", response_model=ThemeConfigResponse)
-async def get_theme():
+async def get_theme() -> ThemeConfigResponse:
     """Public endpoint  - returns brand theme so the landing page can render it."""
     config = await SystemConfig.get_config()
     return ThemeConfigResponse(
@@ -203,7 +223,7 @@ async def get_theme():
 
 
 @router.put("/theme", response_model=ThemeConfigResponse)
-async def update_theme(req: UpdateThemeConfigRequest, user: User = Depends(get_current_user)):
+async def update_theme(req: UpdateThemeConfigRequest, user: User = Depends(get_current_user)) -> ThemeConfigResponse:
     if not user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
     config = await SystemConfig.get_config()
@@ -240,12 +260,14 @@ async def update_theme(req: UpdateThemeConfigRequest, user: User = Depends(get_c
 # ---------------------------------------------------------------------------
 
 
-@router.get("/features")
+@router.get("/features", response_model=None)
 async def get_features(
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-):
+) -> dict[str, object]:
     """Return feature flags for the current deployment."""
+    from app.services import web_search_service
+
     config = await SystemConfig.get_config()
     return {
         "m365_enabled": False,
@@ -253,6 +275,9 @@ async def get_features(
         # True only on the fleet collector instance — gates the admin telemetry
         # dashboard so it stays hidden on every other deployment.
         "telemetry_collector_enabled": settings.telemetry_collector_enabled,
+        # A provider is set up: the workflow editor warns on a Web Search step
+        # that would otherwise stop its run.
+        "web_search_enabled": web_search_service.is_configured(config.model_dump()),
     }
 
 
@@ -261,65 +286,398 @@ async def get_features(
 # ---------------------------------------------------------------------------
 
 
+def _compute_maturity_stage(
+    *,
+    doc_count: int,
+    extraction_run_count: int,
+    workflows: list,
+    has_enabled_automation: bool,
+    is_certified: bool,
+) -> str:
+    """Determine user maturity stage for progressive guidance."""
+    if is_certified or has_enabled_automation:
+        return "architect"
+    if workflows:
+        return "builder"
+    if extraction_run_count >= 3:
+        return "practitioner"
+    if doc_count > 0:
+        return "explorer"
+    return "newcomer"
+
+
+def _generate_daily_guidance(
+    *,
+    recent_activity: list,
+    active_alerts: list,
+    maturity_stage: str,
+    has_only_onboarding_docs: bool,
+    doc_count: int,
+) -> str | None:
+    """Synthesize alerts + activity + maturity into a single actionable sentence."""
+    # Post-demo: bridge to real work
+    if has_only_onboarding_docs:
+        return (
+            "You've seen Vandalizer in action with a sample proposal. "
+            "Choose your next task: ask a question, explore a knowledge base, or build a workflow."
+        )
+
+    # Critical alerts take priority
+    critical = [a for a in active_alerts if getattr(a, "severity", "") == "critical"]
+    if critical:
+        return f"Your {critical[0].item_name} has a critical quality issue — want me to diagnose it?"
+
+    # Warning alerts
+    warnings = [a for a in active_alerts if getattr(a, "severity", "") == "warning"]
+    if warnings:
+        return f"Your {warnings[0].item_name} flagged a quality warning — want me to take a look?"
+
+    # Failed recent activity
+    failed = [a for a in recent_activity if getattr(a, "status", "") == "failed"]
+    if failed:
+        title = getattr(failed[0], "title", "activity") or "activity"
+        return f'Your "{title}" run failed — want me to help figure out what went wrong?'
+
+    # Running activity
+    running = [a for a in recent_activity if getattr(a, "status", "") == "running"]
+    if running:
+        title = getattr(running[0], "title", "activity") or "activity"
+        return f'Your "{title}" is still running — I can check on it when you\'re ready.'
+
+    # Maturity-driven nudge for users with no pressing items
+    if maturity_stage == "newcomer" and doc_count == 0:
+        return "Start with a question or a task. Add documents or a knowledge base when you need sources."
+    if maturity_stage == "explorer" and doc_count > 0:
+        return "You have documents ready — want me to run an extraction template on them?"
+
+    # Recent success — offer next step
+    completed = [a for a in recent_activity if getattr(a, "status", "") == "completed"]
+    if completed:
+        title = getattr(completed[0], "title", "") or "activity"
+        return f'Your latest "{title}" completed successfully — ready to continue?'
+
+    return None
+
+
+def _generate_since_last_visit(
+    *,
+    last_login_at: datetime.datetime | None,
+    recent_activity: list,
+    active_alerts: list,
+) -> str | None:
+    """Summarize what happened since the user was last here."""
+    last_login_at = _as_aware_utc(last_login_at)
+    if not last_login_at:
+        return None
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    delta = now - last_login_at
+    if delta.total_seconds() < 3600:  # Less than 1 hour — not meaningful
+        return None
+
+    # Count events since last visit
+    completed_since = 0
+    failed_since = 0
+    for ev in recent_activity:
+        ev_time = _as_aware_utc(getattr(ev, "last_updated_at", None))
+        if ev_time and ev_time > last_login_at:
+            status = getattr(ev, "status", "")
+            if status == "completed":
+                completed_since += 1
+            elif status == "failed":
+                failed_since += 1
+
+    new_alerts = sum(
+        1 for a in active_alerts
+        if (created_at := _as_aware_utc(getattr(a, "created_at", None))) and created_at > last_login_at
+    )
+
+    parts: list[str] = []
+
+    # Format time away
+    hours = delta.total_seconds() / 3600
+    if hours < 24:
+        time_str = f"{int(hours)} hour{'s' if int(hours) != 1 else ''}"
+    else:
+        days = int(hours / 24)
+        time_str = f"{days} day{'s' if days != 1 else ''}"
+
+    if completed_since == 0 and failed_since == 0 and new_alerts == 0:
+        return None
+
+    parts.append(f"Since you were last here ({time_str} ago):")
+    if completed_since > 0:
+        parts.append(f"{completed_since} run{'s' if completed_since != 1 else ''} completed successfully")
+    if failed_since > 0:
+        parts.append(f"{failed_since} run{'s' if failed_since != 1 else ''} failed")
+    if new_alerts > 0:
+        parts.append(f"{new_alerts} quality alert{'s' if new_alerts != 1 else ''} raised")
+
+    return " — ".join(parts) if len(parts) > 1 else None
+
+
+def _generate_action_pills(
+    *,
+    doc_count: int,
+    onboarding_doc_count: int,
+    search_sets: list,
+    workflows: list,
+    knowledge_bases: list,
+    has_chatted_with_docs: bool,
+    quality_map: dict[str, float],
+    maturity_stage: str = "newcomer",
+) -> list[str]:
+    """Generate up to 4 personalised, action-oriented suggestion pills."""
+    pills: list[str] = []
+
+    # 0. Post-demo: user has only the onboarding sample, no user-uploaded docs
+    has_only_sample = doc_count > 0 and doc_count == onboarding_doc_count
+    if has_only_sample:
+        pills.append("Ask me anything about the sample NSF proposal")
+        pills.append("Help me plan and carry out a task")
+        pills.append("Find the knowledge bases available to me")
+        pills.append("Help me turn a recurring task into a workflow")
+        return pills[:4]
+
+    # No "pick up where I left off" pill: pills are sent to the agent as
+    # prompts, and reopening a past conversation or run is navigation the
+    # agent has no tool for. The home's resume card opens it by activity id.
+
+    ready_kbs = [kb for kb in knowledge_bases if getattr(kb, "status", "") == "ready"]
+
+    # 1. Run extraction on latest docs
+    if doc_count > 0 and search_sets:
+        top_ss = search_sets[0]
+        label = top_ss.title
+        score = quality_map.get(top_ss.uuid)
+        if score is not None:
+            label += f" ({round(score)}% validated)"
+        pills.append(f"Run {label} on your latest documents")
+
+    # 2. Query a ready knowledge base
+    if ready_kbs:
+        pills.append(f"Ask your {ready_kbs[0].title} knowledge base a question")
+
+    # 3. Run a workflow
+    if workflows and doc_count > 0:
+        pills.append(f"Run {workflows[0].name} on your documents")
+
+    # 4. Build extraction template from docs
+    if doc_count > 0 and not search_sets:
+        pills.append("Build an extraction template from your documents")
+
+    # 5. Turn extraction set into workflow
+    if search_sets and not workflows:
+        pills.append(f"Turn {search_sets[0].title} into a repeatable workflow")
+
+    # 6. Chat with docs
+    if doc_count > 0 and not has_chatted_with_docs:
+        pills.append("Select a document and ask me about it")
+
+    # 7. Empty workspace
+    if doc_count == 0:
+        pills.append("Help me plan and carry out a task")
+        pills.append("Help me turn a recurring task into a workflow")
+
+    # 8. Maturity-aware escalation pills (fill remaining slots)
+    if len(pills) < 4:
+        if maturity_stage == "explorer" and search_sets:
+            pills.append(f"Check quality score for {search_sets[0].title}")
+        elif maturity_stage == "practitioner" and search_sets and not workflows:
+            pills.append(f"Chain {search_sets[0].title} into a repeatable workflow")
+        elif maturity_stage == "builder":
+            pills.append("Set up a folder watch to automate your workflow")
+        elif maturity_stage == "architect":
+            low_quality = [ss for ss in search_sets if quality_map.get(ss.uuid, 100) < 80]
+            if low_quality:
+                pills.append(f"Tune {low_quality[0].title} to improve extraction accuracy")
+
+    return pills[:4]
+
+
+async def _activity_project_titles(events: list, user: User) -> dict[str, str]:
+    """Title of each event's project, for projects the viewer can still open.
+
+    A project the viewer lost access to (or that was deleted) is left out,
+    so a continuation row never names a project they can't see.
+    """
+    from app.services import project_service
+
+    titles: dict[str, str] = {}
+    for project_uuid in {getattr(ev, "project_uuid", None) for ev in events}:
+        if not isinstance(project_uuid, str) or not project_uuid:
+            continue
+        try:
+            project = await project_service.get_authorized_project(project_uuid, user)
+        except Exception:
+            logger.warning("Could not resolve project %s for a Home activity row", project_uuid)
+            project = None
+        if project:
+            titles[project_uuid] = project.title or "Untitled project"
+    return titles
+
+
 @router.get("/onboarding-status", response_model=OnboardingStatusResponse)
-async def get_onboarding_status(user: User = Depends(get_current_user)):
+async def get_onboarding_status(user: User = Depends(get_current_user)) -> OnboardingStatusResponse:
     uid = user.user_id
 
+    # These groups keep every read concurrent while preserving each result type.
     (
-        doc_count,
-        workflows,
-        ss_count,
-        library_items,
-        membership_count,
-        automations,
-        knowledge_bases,
-        doc_chat_count,
-        conversation_count,
-        cert_progress,
+        (doc_count, onboarding_doc_count, workflows, search_sets, library_items),
+        (membership_count, automations, knowledge_bases, doc_chat_count, conversation_count),
+        (is_certified, recent_activities, extraction_run_count),
     ) = await asyncio.gather(
-        SmartDocument.find(SmartDocument.user_id == uid).count(),
-        Workflow.find(Workflow.user_id == uid).to_list(),
-        SearchSet.find(SearchSet.user_id == uid).count(),
-        LibraryItem.find(LibraryItem.added_by_user_id == uid).to_list(),
-        TeamMembership.find(TeamMembership.user_id == uid).count(),
-        Automation.find(Automation.user_id == uid).to_list(),
-        KnowledgeBase.find(KnowledgeBase.user_id == uid).to_list(),
-        # Conversations with at least one file or URL attachment + messages
-        ChatConversation.find({
-            "user_id": uid,
-            "messages": {"$ne": []},
-            "$or": [
-                {"file_attachments": {"$ne": []}},
-                {"url_attachments": {"$ne": []}},
-            ],
-        }).count(),
-        # Any conversations at all
-        ChatConversation.find(ChatConversation.user_id == uid).count(),
-        CertificationProgress.find_one(CertificationProgress.user_id == uid),
+        asyncio.gather(
+            SmartDocument.find(SmartDocument.user_id == uid).count(),
+            SmartDocument.find(SmartDocument.user_id == uid, SmartDocument.is_onboarding_sample == True).count(),  # noqa: E712
+            Workflow.find(Workflow.user_id == uid).to_list(),
+            SearchSet.find(SearchSet.user_id == uid).to_list(),
+            LibraryItem.find(LibraryItem.added_by_user_id == uid).to_list(),
+        ),
+        asyncio.gather(
+            TeamMembership.find(TeamMembership.user_id == uid).count(),
+            Automation.find(Automation.user_id == uid).to_list(),
+            KnowledgeBase.find(KnowledgeBase.user_id == uid).to_list(),
+            ChatConversation.find({'user_id': uid, 'messages': {'$ne': []}, '$or': [{'file_attachments': {'$ne': []}}, {'url_attachments': {'$ne': []}}]}).count(),
+            ChatConversation.find(ChatConversation.user_id == uid).count(),
+        ),
+        asyncio.gather(
+            has_earned_certification(uid),
+            ActivityEvent.find({'user_id': uid, 'status': {'$in': ['completed', 'failed', 'running', 'queued']}}).sort('-last_updated_at').limit(3).to_list(),
+            ActivityEvent.find({'user_id': uid, 'type': 'search_set_run', 'status': 'completed'}).count(),
+        ),
     )
+
+    # Notices only for owned tools. Workflow ObjectIds and extraction UUIDs
+    # are different namespaces; keep the kind in every filter.
+    from app.models.quality_alert import QualityAlert
+    from app.models.validation_run import ValidationRun
+    from app.services.home_alerts import alert_item
+
+    quality_map: dict[str, float] = {}
+    ss_uuids = [ss.uuid for ss in search_sets]
+    pairs = []
+    if ss_uuids:
+        pairs.append({"item_kind": "search_set", "item_id": {"$in": ss_uuids}})
+    if workflows:
+        pairs.append({"item_kind": "workflow", "item_id": {"$in": [str(w.id) for w in workflows]}})
+    if knowledge_bases:
+        pairs.append({"item_kind": "knowledge_base", "item_id": {"$in": [kb.uuid for kb in knowledge_bases]}})
+    quality_alerts = await QualityAlert.find(
+        {"$or": pairs, "acknowledged": {"$ne": True}}
+    ).sort("-created_at").limit(10).to_list() if pairs else []
+    if ss_uuids:
+        vr_list = await ValidationRun.find(
+            {"item_kind": "search_set", "item_id": {"$in": ss_uuids}}
+        ).sort("-created_at").to_list()
+        for vr in vr_list:
+            if vr.item_id not in quality_map and vr.accuracy is not None:
+                quality_map[vr.item_id] = round(vr.accuracy * 100)
+
+    recent_documents = await SmartDocument.find({
+        "user_id": uid, "raw_text": {"$type": "string", "$ne": ""},
+        "soft_deleted": {"$ne": True}, "task_status": "complete",
+    }).sort("-created_at").limit(3).to_list()
+
+    has_enabled_automation = any(getattr(a, "enabled", False) for a in automations)
+
+    maturity_stage = _compute_maturity_stage(
+        doc_count=doc_count,
+        extraction_run_count=extraction_run_count,
+        workflows=workflows,
+        has_enabled_automation=has_enabled_automation,
+        is_certified=is_certified,
+    )
+
+    pills = _generate_action_pills(
+        doc_count=doc_count,
+        onboarding_doc_count=onboarding_doc_count,
+        search_sets=search_sets,
+        workflows=workflows,
+        knowledge_bases=knowledge_bases,
+        has_chatted_with_docs=doc_chat_count > 0,
+        quality_map=quality_map,
+        maturity_stage=maturity_stage,
+    )
+
+    # Format recent activity for frontend briefing
+    from app.services.chat_service import _relative_time
+
+    project_titles = await _activity_project_titles(recent_activities[:3], user)
+    recent_activity_items = [
+        RecentActivityItem(
+            id=str(ev.id),
+            type=ev.type,
+            title=ev.title or "Activity",
+            relative_time=_relative_time(ev.last_updated_at) if ev.last_updated_at else "",
+            status=ev.status,
+            item_kind="search_set" if ev.search_set_uuid else "workflow" if ev.workflow else None,
+            item_id=ev.search_set_uuid or (str(ev.workflow) if ev.workflow else None),
+            pending_review=bool((ev.meta_summary or {}).get("pending_review_uuid")),
+            project_title=project_titles.get(getattr(ev, "project_uuid", None) or ""),
+        )
+        for ev in recent_activities[:3]
+    ]
+
+    alert_items = [alert_item(alert) for alert in quality_alerts]
+
+    # Unprocessed doc count: simple heuristic — all docs are unprocessed if
+    # user has never run an extraction
+    unprocessed = doc_count if (doc_count > 0 and extraction_run_count == 0) else 0
+
+    has_only_sample = doc_count > 0 and doc_count == onboarding_doc_count
+
+    daily_guidance = _generate_daily_guidance(
+        recent_activity=recent_activities,
+        active_alerts=quality_alerts,
+        maturity_stage=maturity_stage,
+        has_only_onboarding_docs=has_only_sample,
+        doc_count=doc_count,
+    )
+
+    since_last_visit = _generate_since_last_visit(
+        last_login_at=user.last_login_at,
+        recent_activity=recent_activities,
+        active_alerts=quality_alerts,
+    )
+
+    # Update last_login_at for future delta computation (fire-and-forget)
+    user.last_login_at = datetime.datetime.now(datetime.timezone.utc)
+    asyncio.ensure_future(user.save())
 
     return OnboardingStatusResponse(
         has_documents=doc_count > 0,
         has_workflows=len(workflows) > 0,
         has_run_workflow=any(getattr(w, "num_executions", 0) > 0 for w in workflows),
-        has_extraction_sets=ss_count > 0,
+        has_extraction_sets=len(search_sets) > 0,
         has_library_items=len(library_items) > 0,
         has_pinned_item=any(getattr(i, "pinned", False) for i in library_items),
         has_favorited_item=any(getattr(i, "favorited", False) for i in library_items),
         has_team_members=membership_count > 1,
         has_automations=len(automations) > 0,
-        has_enabled_automation=any(getattr(a, "enabled", False) for a in automations),
+        has_enabled_automation=has_enabled_automation,
         has_knowledge_base=len(knowledge_bases) > 0,
         has_ready_knowledge_base=any(getattr(kb, "status", "") == "ready" for kb in knowledge_bases),
         has_chatted_with_docs=doc_chat_count > 0,
         has_conversations=conversation_count > 0,
         first_session_completed=user.first_session_completed,
-        is_certified=bool(cert_progress and cert_progress.certified),
+        is_certified=is_certified,
+        suggestion_pills=pills,
+        has_only_onboarding_docs=(doc_count > 0 and doc_count == onboarding_doc_count),
+        top_extraction_set_name=search_sets[0].title if search_sets else None,
+        top_workflow_name=workflows[0].name if workflows else None,
+        recent_documents=[HomeDocument(uuid=d.uuid, title=d.title or "Untitled document") for d in recent_documents],
+        recent_activity=recent_activity_items,
+        active_alerts=alert_items,
+        maturity_stage=maturity_stage,
+        unprocessed_doc_count=unprocessed,
+        daily_guidance=daily_guidance,
+        since_last_visit=since_last_visit,
     )
 
 
-@router.post("/first-session-complete", status_code=204)
-async def mark_first_session_complete(user: User = Depends(get_current_user)):
+@router.post("/first-session-complete", status_code=204, response_model=None)
+async def mark_first_session_complete(user: User = Depends(get_current_user)) -> None:
     """Mark the first-session onboarding as completed so it won't show again."""
     if not user.first_session_completed:
         user.first_session_completed = True
@@ -350,8 +708,8 @@ def _as_aware_utc(dt: datetime.datetime | None) -> datetime.datetime | None:
 _DATETIME_MIN_UTC = datetime.datetime.min.replace(tzinfo=datetime.timezone.utc)
 
 
-@router.get("/automation-stats")
-async def get_automation_stats(user: User = Depends(get_current_user)):
+@router.get("/automation-stats", response_model=None)
+async def get_automation_stats(user: User = Depends(get_current_user)) -> dict[str, object]:
     visible_workflows = await workflow_service.list_workflows(
         user=user,
         skip=0,
@@ -415,3 +773,30 @@ async def get_automation_stats(user: User = Depends(get_current_user)):
             )[:20]
         ],
     }
+
+
+@router.get("/home-alerts/{uuid}/evidence", response_model=None)
+async def home_alert_evidence(uuid: str, user: User = Depends(get_current_user)) -> dict[str, object]:
+    from app.services.home_alerts import owned_alert
+    from app.services.quality_service import get_quality_history
+    alert = await owned_alert(uuid, user)
+    # Legacy notices have no run ID. Display history as history, never claim
+    # a later run or merely matching score is the evaluation behind a notice.
+    history = await get_quality_history(alert.item_kind, alert.item_id, limit=5)
+    return {"runs": history, "linked_run": False}
+
+
+@router.patch("/home-alerts/{uuid}", response_model=ActiveAlertItem)
+async def review_home_alert(
+    uuid: str,
+    body: "ReviewAlertRequest",
+    user: User = Depends(get_current_user),
+) -> ActiveAlertItem:
+    from app.services.home_alerts import owned_alert, alert_item
+    alert = await owned_alert(uuid, user)
+    alert.review_state = body.state if body.state != "acknowledged" else "in_review"
+    alert.acknowledged = body.state == "acknowledged"
+    alert.acknowledged_by = user.user_id if alert.acknowledged else None
+    alert.acknowledged_at = datetime.datetime.now(datetime.timezone.utc) if alert.acknowledged else None
+    await alert.save()
+    return alert_item(alert)

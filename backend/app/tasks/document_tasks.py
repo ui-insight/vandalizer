@@ -4,14 +4,24 @@ Ported from Flask app/utilities/document_manager.py.
 Uses pymongo (sync) for DB access — same pattern as workflow_tasks.py.
 """
 
+from __future__ import annotations
+
+from pymongo.database import Database
+
 import datetime
 import logging
 import os
 import uuid
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from celery import Task
+    from app.services.document_manager import DocumentManager
 
 from app.celery_app import celery_app
 from app.services.document_readers import DocumentReadError, UnreadableFileError
+from app.services.extraction_generations import extraction_generation_filter
 from app.services.ocr_client import OcrUnavailableError
 from app.tasks import TRANSIENT_EXCEPTIONS, get_sync_db
 from app.utils import kb_source_currency as currency
@@ -19,14 +29,14 @@ from app.utils import kb_source_currency as currency
 logger = logging.getLogger(__name__)
 
 
-def _find_project_for_folder(db, folder_uuid: str | None) -> dict | None:
+def _find_project_for_folder(db: Database[dict], folder_uuid: str | None) -> dict | None:
     """Walk a folder's ancestry and return the Project that owns its root, if any."""
     if not folder_uuid or folder_uuid == "0":
         return None
 
     # Collect the folder plus every ancestor up to the root.
     ancestors: list[str] = []
-    cursor = folder_uuid
+    cursor: str | None = folder_uuid
     seen: set[str] = set()
     while cursor and cursor != "0" and cursor not in seen:
         seen.add(cursor)
@@ -61,7 +71,7 @@ class ProjectKbDeleteFailed(ProjectKbRefreshFailed):
     """
 
 
-def _ingest_into_project_kb(db, dm, doc: dict, text: str) -> bool:
+def _ingest_into_project_kb(db: Database[dict], dm: DocumentManager, doc: dict, text: str) -> bool:
     """Best-effort: add a freshly-ingested document to its Project's implicit KB.
 
     Walks the document's folder ancestry to find the owning project, then mirrors
@@ -104,7 +114,7 @@ def _ingest_into_project_kb(db, dm, doc: dict, text: str) -> bool:
         return False
 
 
-def _add_document_chunks_to_kb(dm, kb_uuid: str, doc: dict, text: str) -> int:
+def _add_document_chunks_to_kb(dm: DocumentManager, kb_uuid: str, doc: dict, text: str) -> int:
     """The one place that calls ``dm.add_to_kb`` for a project-KB document.
 
     Both the insert branch and the refresh branch of ``_mirror_into_project_kb``
@@ -119,7 +129,7 @@ def _add_document_chunks_to_kb(dm, kb_uuid: str, doc: dict, text: str) -> int:
     )
 
 
-def _mirror_into_project_kb(db, dm, doc: dict, project: dict, text: str) -> None:
+def _mirror_into_project_kb(db: Database[dict], dm: DocumentManager, doc: dict, project: dict, text: str) -> None:
     kb_uuid = project["kb_uuid"]
     doc_uuid = doc["uuid"]
     existing = db.knowledge_base_sources.find_one(
@@ -284,7 +294,7 @@ def _mirror_into_project_kb(db, dm, doc: dict, project: dict, text: str) -> None
     )
 
 
-def _remove_from_project_kb(db, dm, doc: dict, project: dict) -> None:
+def _remove_from_project_kb(db: Database[dict], dm: DocumentManager, doc: dict, project: dict) -> None:
     """Best-effort: drop a document's chunks from a Project's implicit KB.
 
     Used when a document is moved out of (or to a different) project so the old
@@ -318,7 +328,7 @@ def _remove_from_project_kb(db, dm, doc: dict, project: dict) -> None:
 
 
 @celery_app.task(bind=True, name="tasks.document.sync_project_kb")
-def sync_project_kb_on_move(self, document_uuid: str, old_folder_uuid: str | None) -> str:
+def sync_project_kb_on_move(self: Task, document_uuid: str, old_folder_uuid: str | None) -> str:
     """Re-sync a document's project-KB membership after it is moved between folders.
 
     Moving a file into a project's folder tree must add it to that project's
@@ -369,7 +379,7 @@ def sync_project_kb_on_move(self, document_uuid: str, old_folder_uuid: str | Non
 
 
 @celery_app.task(bind=True, name="tasks.document.sync_project_kb_folder")
-def sync_project_kb_on_folder_move(self, folder_uuid: str, old_parent_id: str | None) -> int:
+def sync_project_kb_on_folder_move(self: Task, folder_uuid: str, old_parent_id: str | None) -> int:
     """Re-sync project-KB membership for every document under a moved folder.
 
     Moving a folder subtree into/out of a project changes the owning project for
@@ -431,7 +441,7 @@ def sync_project_kb_on_folder_move(self, folder_uuid: str, old_parent_id: str | 
     return synced
 
 
-def _notify_document_processing_failed(db, document_uuid: str, message: str) -> None:
+def _notify_document_processing_failed(db: Database[dict], document_uuid: str, message: str) -> None:
     """Tell the uploader their document never became readable.
 
     Both callers swallow the exception and return "" rather than re-raising, so
@@ -446,7 +456,7 @@ def _notify_document_processing_failed(db, document_uuid: str, message: str) -> 
     notify_document_failed(db, doc=doc, error=message)
 
 
-def _is_last_extraction_attempt(task) -> bool:
+def _is_last_extraction_attempt(task: Task) -> bool:
     """True when an OCR outage raised now would not be retried. Never raises:
     unsure means not final, which keeps today's retry-then-fail behavior."""
     try:
@@ -474,8 +484,9 @@ def _is_last_extraction_attempt(task) -> bool:
     default_retry_delay=5,
 )
 def perform_extraction_and_update(
-    self, document_uuid: str, extension: str,
+    self: Task, document_uuid: str, extension: str,
     force_ocr: bool = False, ocr_required: bool = False,
+    extraction_revision: int = 0,
 ) -> str:
     """Extract text from a document file (PDF, DOCX, XLSX, etc.).
 
@@ -487,10 +498,14 @@ def perform_extraction_and_update(
     )
 
     db = get_sync_db()
-    doc = db.smart_document.find_one({"uuid": document_uuid})
+    generation_query = extraction_generation_filter(document_uuid, extraction_revision)
+    doc = db.smart_document.find_one(generation_query)
     if not doc:
         logger.warning("Document %s not found", document_uuid)
         return ""
+
+    # A replaced file or changed owner is not the source this reader opened.
+    generation_query.update({field: {'$eq': doc[field]} for field in ('_id', 'path', 'user_id', 'team_id') if field in doc})
 
     from app.config import Settings
 
@@ -501,8 +516,8 @@ def perform_extraction_and_update(
     extension = (extension or "").lower().lstrip(".")
 
     try:
-        db.smart_document.update_one(
-            {"uuid": document_uuid},
+        result = db.smart_document.update_one(
+            generation_query,
             # updated_at is the retry route's staleness clock: a document
             # whose worker died mid-extraction is told apart from one still
             # being read by how long ago this write happened.
@@ -512,6 +527,9 @@ def perform_extraction_and_update(
                 "updated_at": datetime.datetime.now(),
             }},
         )
+
+        if not result.matched_count:
+            return ""
 
         raw_text = ""
         text_markers: list[dict] = []
@@ -554,12 +572,15 @@ def perform_extraction_and_update(
             # On the last attempt an OCR outage no longer has a retry to wait
             # for: a PDF sent to OCR only for pages the local reading can't
             # see is stored with those pages named, rather than failed (#955).
+            def on_stage(stage: str) -> None:
+                advance_task_status(db, document_uuid, stage, extraction_revision)
+
             final_attempt = _is_last_extraction_attempt(self)
             raw_text, text_markers = extract_text_with_markers(
                 str(absolute_path), extension, report=ocr_report,
                 force_ocr=force_ocr, ocr_required=ocr_required,
                 local_on_ocr_outage=final_attempt,
-                on_stage=lambda stage: advance_task_status(db, document_uuid, stage),
+                on_stage=on_stage,
             )
             if ocr_report.get("ocr_unavailable_local_fallback"):
                 logger.warning(
@@ -679,10 +700,12 @@ def perform_extraction_and_update(
                 # makes the next retry require OCR rather than fall back to
                 # the layer this run just refused.
                 error_fields["text_layer_rejected"] = True
-            db.smart_document.update_one(
-                {"uuid": document_uuid},
+            result = db.smart_document.update_one(
+                generation_query,
                 {"$set": error_fields},
             )
+            if not result.matched_count:
+                return ""
             # Every other terminal-error branch notifies; this one silently
             # relied on the user noticing the row state — which the file list
             # didn't render either. Same coalesced bell as the rest.
@@ -710,12 +733,12 @@ def perform_extraction_and_update(
         if num_pages is not None:
             update_fields["num_pages"] = num_pages
 
-        db.smart_document.update_one(
-            {"uuid": document_uuid},
+        result = db.smart_document.update_one(
+            generation_query,
             {"$set": update_fields},
         )
 
-        return raw_text
+        return raw_text if result.matched_count else ""
 
     except FileNotFoundError as e:
         # The source file vanished between upload and extraction — a document
@@ -730,8 +753,8 @@ def perform_extraction_and_update(
             "The uploaded file is no longer available "
             "(it may have been deleted during processing)."
         )
-        db.smart_document.update_one(
-            {"uuid": document_uuid},
+        result = db.smart_document.update_one(
+            generation_query,
             {
                 "$set": {
                     "raw_text": "",
@@ -745,13 +768,16 @@ def perform_extraction_and_update(
                 }
             },
         )
-        _notify_document_processing_failed(db, document_uuid, message)
+        if result.matched_count:
+            _notify_document_processing_failed(db, document_uuid, message)
         return ""
 
     except OcrUnavailableError as e:
         # Must be re-raised, not recorded: the catch-all below would swallow it
         # before `autoretry_for` ever saw it, which is the exact shape of the
         # original defect — an outage written off as an unreadable document.
+        if not db.smart_document.find_one(generation_query, {"_id": 1}):
+            return ""
         if self.request.retries < self.max_retries:
             logger.warning(
                 "OCR unavailable for document %s (attempt %d/%d) — retrying: %s",
@@ -772,8 +798,8 @@ def perform_extraction_and_update(
             "retry once the service is back, or contact your administrator if "
             "it keeps happening."
         )
-        db.smart_document.update_one(
-            {"uuid": document_uuid},
+        result = db.smart_document.update_one(
+            generation_query,
             {
                 "$set": {
                     "raw_text": "",
@@ -785,7 +811,8 @@ def perform_extraction_and_update(
                 }
             },
         )
-        _notify_document_processing_failed(db, document_uuid, message)
+        if result.matched_count:
+            _notify_document_processing_failed(db, document_uuid, message)
         return ""
 
     except DocumentReadError as e:
@@ -796,8 +823,8 @@ def perform_extraction_and_update(
         # file, the way FileNotFoundError and OCR outages already don't.
         logger.warning("Document %s is not readable text: %s", document_uuid, e)
         message = str(e)
-        db.smart_document.update_one(
-            {"uuid": document_uuid},
+        result = db.smart_document.update_one(
+            generation_query,
             {
                 "$set": {
                     "raw_text": "",
@@ -812,14 +839,15 @@ def perform_extraction_and_update(
                 }
             },
         )
-        _notify_document_processing_failed(db, document_uuid, message)
+        if result.matched_count:
+            _notify_document_processing_failed(db, document_uuid, message)
         return ""
 
     except Exception as e:
         logger.exception("Error extracting text from document %s", document_uuid)
         message = f"Text extraction failed: {str(e)[:300]}"
-        db.smart_document.update_one(
-            {"uuid": document_uuid},
+        result = db.smart_document.update_one(
+            generation_query,
             {
                 "$set": {
                     "raw_text": "",
@@ -831,11 +859,12 @@ def perform_extraction_and_update(
                 }
             },
         )
-        _notify_document_processing_failed(db, document_uuid, message)
+        if result.matched_count:
+            _notify_document_processing_failed(db, document_uuid, message)
         return ""
 
 
-def advance_task_status(db, document_uuid: str, status: str) -> bool:
+def advance_task_status(db: Database[dict], document_uuid: str, status: str, extraction_revision: int = 0) -> bool:
     """Move a document to ``status`` unless extraction already marked it failed.
 
     Applies to *every* post-extraction status write, not just the terminal
@@ -857,7 +886,7 @@ def advance_task_status(db, document_uuid: str, status: str) -> bool:
     Returns True when the document was advanced.
     """
     result = db.smart_document.update_one(
-        {"uuid": document_uuid, "task_status": {"$ne": "error"}},
+        {**extraction_generation_filter(document_uuid, extraction_revision), "task_status": {"$ne": "error"}},
         {"$set": {"task_status": status}},
     )
     if not result.matched_count:
@@ -868,21 +897,23 @@ def advance_task_status(db, document_uuid: str, status: str) -> bool:
     return bool(result.matched_count)
 
 
-def mark_complete_unless_errored(db, document_uuid: str) -> bool:
+def mark_complete_unless_errored(db: Database[dict], document_uuid: str, extraction_revision: int = 0) -> bool:
     """Advance a document to "complete" unless extraction already failed."""
-    return advance_task_status(db, document_uuid, "complete")
+    return advance_task_status(db, document_uuid, "complete", extraction_revision)
 
 
-def _record_ingestion_result(db, document_uuid: str, fields: dict) -> None:
+def _record_ingestion_result(db: Database[dict], document_uuid: str, fields: dict, extraction_revision: int = 0) -> bool:
     """Persist ingestion bookkeeping, then advance the status if it's allowed.
 
-    Two writes on purpose. Chunk counts and readiness flags are true whatever
-    extraction did, so they are always recorded; only the status transition is
-    conditional. Folding them into one guarded write would silently drop the
-    bookkeeping for documents that failed extraction.
+    Within the same generation, record chunk counts even if extraction failed;
+    only the status transition excludes errors. Superseded generations cannot
+    write either bookkeeping or status.
     """
-    db.smart_document.update_one({"uuid": document_uuid}, {"$set": fields})
-    mark_complete_unless_errored(db, document_uuid)
+    result = db.smart_document.update_one(extraction_generation_filter(document_uuid, extraction_revision), {"$set": fields})
+    if not result.matched_count:
+        return False
+    mark_complete_unless_errored(db, document_uuid, extraction_revision)
+    return True
 
 
 @celery_app.task(
@@ -893,30 +924,34 @@ def _record_ingestion_result(db, document_uuid: str, fields: dict) -> None:
     max_retries=3,
     default_retry_delay=5,
 )
-def update_document_fields(self, document_uuid: str) -> None:
+def update_document_fields(self: Task, document_uuid: str, extraction_revision: int = 0) -> None:
     """Mark document extraction as complete, then check folder watch automations.
 
     Skips the complete status if extraction already flagged the doc as errored —
     we don't want to mask a silent OCR failure with a green checkmark.
     """
     db = get_sync_db()
-    doc = db.smart_document.find_one({"uuid": document_uuid}, {"task_status": 1})
+    generation_query = extraction_generation_filter(document_uuid, extraction_revision)
+    doc = db.smart_document.find_one(generation_query, {"task_status": 1})
     if not doc:
         logger.warning("Document %s not found for update", document_uuid)
         return
 
     if doc.get("task_status") == "error":
-        db.smart_document.update_one(
-            {"uuid": document_uuid},
+        result = db.smart_document.update_one(
+            {**generation_query, "task_status": "error"},
             {"$set": {"task_id": None}},
         )
-        _resume_pending_kb_sources(db, document_uuid, extraction_failed=True)
+        if result.matched_count:
+            _resume_pending_kb_sources(db, document_uuid, extraction_failed=True)
         return
 
-    db.smart_document.update_one(
-        {"uuid": document_uuid},
+    result = db.smart_document.update_one(
+        {**generation_query, "task_status": {"$ne": "error"}},
         {"$set": {"task_id": None, "task_status": "complete"}},
     )
+    if not result.matched_count:
+        return
 
     # Now that raw_text is populated, ingest any KB sources that were added
     # before extraction finished and parked in "pending" (see
@@ -930,7 +965,7 @@ def update_document_fields(self, document_uuid: str) -> None:
         logger.error("Error checking folder watch automations for %s: %s", document_uuid, e)
 
 
-def _resume_pending_kb_sources(db, document_uuid: str, extraction_failed: bool) -> None:
+def _resume_pending_kb_sources(db: Database[dict], document_uuid: str, extraction_failed: bool) -> None:
     """Settle KB document-sources that were waiting on this document's extraction.
 
     A KB source added before its document finished extracting is parked in
@@ -975,7 +1010,7 @@ def _resume_pending_kb_sources(db, document_uuid: str, extraction_failed: bool) 
         )
 
 
-def _check_folder_watch_automations(db, document_uuid: str) -> None:
+def _check_folder_watch_automations(db: Database[dict], document_uuid: str) -> None:
     """Check if any folder watch automations match this document's folder."""
     from bson import ObjectId
 
@@ -1102,7 +1137,7 @@ def _check_folder_watch_automations(db, document_uuid: str) -> None:
             logger.info("Skipping automation %s: unsupported action_type '%s'", auto.get("name"), action_type)
 
 
-def _run_automation_extraction(db, automation: dict, search_set_uuid: str, doc: dict) -> None:
+def _run_automation_extraction(db: Database[dict], automation: dict, search_set_uuid: str, doc: dict) -> None:
     """Run an extraction search set against a document (sync, for Celery workers)."""
     from datetime import datetime, timezone
 
@@ -1141,16 +1176,20 @@ def _run_automation_extraction(db, automation: dict, search_set_uuid: str, doc: 
         ss_doc = db.search_set.find_one({"uuid": search_set_uuid})
         extraction_config = effective_extraction_config(ss_doc)
 
-        # Load field metadata
-        field_metadata = {}
-        for item in ss_items:
-            meta = {}
-            if item.get("enum_values"):
-                meta["enum_values"] = item["enum_values"]
-            if item.get("optional"):
-                meta["optional"] = True
-            if meta:
-                field_metadata[item["searchphrase"]] = meta
+        # Load field metadata, in the list shape the engine reads
+        # ({"key", ...} per field). This was a dict keyed by field name, which
+        # the engine iterated as strings: any field with allowed values or an
+        # optional flag raised TypeError. It also read "optional", a key the
+        # items don't have.
+        field_metadata = [
+            {
+                "key": item["searchphrase"],
+                "is_optional": item.get("is_optional", False),
+                "enum_values": item.get("enum_values", []),
+                "description": item.get("description"),
+            }
+            for item in ss_items
+        ]
 
         engine = ExtractionEngine(system_config_doc=sys_config)
         results = engine.extract(
@@ -1185,7 +1224,7 @@ def _run_automation_extraction(db, automation: dict, search_set_uuid: str, doc: 
         )
 
 
-def _process_extraction_outputs(db, automation: dict, results: dict) -> None:
+def _process_extraction_outputs(db: Database[dict], automation: dict, results: dict | list[dict]) -> None:
     """Process output_config for an extraction automation."""
 
     from app.services.output_handlers import (
@@ -1201,6 +1240,7 @@ def _process_extraction_outputs(db, automation: dict, results: dict) -> None:
 
     # Build a result-like dict for notification/webhook handlers
     result_doc = {
+        "automation_user_id": automation.get("user_id"),
         "status": "completed",
         "trigger_type": automation.get("trigger_type", "folder_watch"),
         "final_output": {"output": results},
@@ -1268,15 +1308,16 @@ def _process_extraction_outputs(db, automation: dict, results: dict) -> None:
     max_retries=3,
     default_retry_delay=5,
 )
-def cleanup_document(self, document_uuid: str) -> None:
+def cleanup_document(self: Task, document_uuid: str, extraction_revision: int = 0) -> None:
     """Error handler — mark document as errored with details.
 
     If the extraction task already wrote a specific error_message before raising,
     keep it (it's more diagnostic than the generic fallback below).
     """
     db = get_sync_db()
+    generation_query = extraction_generation_filter(document_uuid, extraction_revision)
     existing = db.smart_document.find_one(
-        {"uuid": document_uuid}, {"error_message": 1}
+        generation_query, {"error_message": 1}
     )
     if not existing:
         logger.warning("Document %s not found for cleanup", document_uuid)
@@ -1293,7 +1334,7 @@ def cleanup_document(self, document_uuid: str) -> None:
         )
 
     db.smart_document.update_one(
-        {"uuid": document_uuid},
+        {**generation_query, 'error_message': existing.get('error_message')},
         {"$set": update_fields},
     )
 
@@ -1306,7 +1347,7 @@ def cleanup_document(self, document_uuid: str) -> None:
     max_retries=3,
     default_retry_delay=5,
 )
-def perform_semantic_ingestion(self, raw_text: str, document_uuid: str, user_id: str) -> str:
+def perform_semantic_ingestion(self: Task, raw_text: str, document_uuid: str, user_id: str, extraction_revision: int = 0) -> str:
     """Chunk text and embed into ChromaDB for RAG search.
 
     Writes back ``chromadb_ready`` / ``chunk_count`` / ``ingest_error`` so the
@@ -1316,7 +1357,8 @@ def perform_semantic_ingestion(self, raw_text: str, document_uuid: str, user_id:
     from app.services.document_manager import DocumentManager
 
     db = get_sync_db()
-    doc = db.smart_document.find_one({"uuid": document_uuid})
+    generation_query = extraction_generation_filter(document_uuid, extraction_revision)
+    doc = db.smart_document.find_one(generation_query)
     if not doc:
         logger.warning("Document %s not found for semantic ingestion", document_uuid)
         return ""
@@ -1324,7 +1366,7 @@ def perform_semantic_ingestion(self, raw_text: str, document_uuid: str, user_id:
     # Guarded: a document whose extraction just failed must not be dragged back
     # into an in-progress state, because that erases the error and lets the
     # terminal write below mark it complete.
-    advance_task_status(db, document_uuid, "readying")
+    advance_task_status(db, document_uuid, "readying", extraction_revision)
 
     # If the caller passed empty raw_text, fall back to whatever the
     # extraction task already wrote to the DB.
@@ -1354,7 +1396,7 @@ def perform_semantic_ingestion(self, raw_text: str, document_uuid: str, user_id:
         )
     except Exception as e:
         logger.exception("Semantic ingestion failed for %s", document_uuid)
-        _record_ingestion_result(
+        recorded = _record_ingestion_result(
             db,
             document_uuid,
             {
@@ -1362,7 +1404,10 @@ def perform_semantic_ingestion(self, raw_text: str, document_uuid: str, user_id:
                 "chunk_count": 0,
                 "ingest_error": str(e)[:500],
             },
+            extraction_revision,
         )
+        if not recorded:
+            return ""
         # The amber icon on the file row was the only signal; the owner of a
         # 50-file upload never sees row 37's icon. Bell once retries are
         # exhausted — the document is saved, but search/chat cannot see it.
@@ -1375,7 +1420,7 @@ def perform_semantic_ingestion(self, raw_text: str, document_uuid: str, user_id:
             notify_document_not_searchable(db, doc=doc, error=e)
         raise
 
-    _record_ingestion_result(
+    recorded = _record_ingestion_result(
         db,
         document_uuid,
         {
@@ -1383,7 +1428,10 @@ def perform_semantic_ingestion(self, raw_text: str, document_uuid: str, user_id:
             "chunk_count": chunk_count,
             "ingest_error": None,
         },
+        extraction_revision,
     )
+    if not recorded:
+        return ""
 
     # If this document lives in a Project, mirror it into the project's implicit
     # KB. Best-effort: a failure here must not fail document ingestion.
@@ -1415,7 +1463,7 @@ _EXTRACTION_ABANDONED_MESSAGE = (
 
 
 @celery_app.task(bind=True, name="tasks.document.reap_stuck")
-def reap_stuck_documents(self) -> None:
+def reap_stuck_documents(self: Task) -> None:
     """Self-heal documents whose task_status is stuck in an in-progress stage.
 
     Two failure modes, two sweeps:
@@ -1444,11 +1492,16 @@ def reap_stuck_documents(self) -> None:
             "soft_deleted": {"$ne": True},
             "raw_text": {"$ne": ""},
         },
-        {"uuid": 1},
+        {"uuid": 1, "_extraction_restart_revision": 1},
     ))
 
     for doc in orphans:
-        update_document_fields.delay(doc["uuid"])
+        revision = doc.get('_extraction_restart_revision', 0)
+        if type(revision) is not int or revision < 0:
+            logger.warning("Skipping invalid extraction revision for %s", doc['uuid'])
+            continue
+        kwargs = {'extraction_revision': revision} if revision else {}
+        update_document_fields.delay(doc["uuid"], **kwargs)
 
     if orphans:
         logger.info(
@@ -1456,9 +1509,10 @@ def reap_stuck_documents(self) -> None:
         )
 
     _reap_abandoned_extractions(db)
+    _reap_abandoned_validations(db)
 
 
-def _reap_abandoned_extractions(db) -> int:
+def _reap_abandoned_extractions(db: Database[dict]) -> int:
     """Sweep 2 of reap_stuck_documents: fail locks whose worker is dead.
 
     Returns the number of documents flipped to error.
@@ -1486,7 +1540,7 @@ def _reap_abandoned_extractions(db) -> int:
                 {"updated_at": None, "created_at": {"$lt": cutoff}},
             ],
         },
-        {"uuid": 1, "updated_at": 1},
+        {"uuid": 1, "updated_at": 1, "created_at": 1, "_extraction_restart_revision": 1},
     ))
 
     reaped = 0
@@ -1495,9 +1549,9 @@ def _reap_abandoned_extractions(db) -> int:
         try:
             # Flip to error; never fake completion. update_document_fields is
             # deliberately NOT used here: it forces task_status="complete" and
-            # re-runs _check_folder_watch_automations, which has no dedup, so
-            # a reaped document would be presented as read (with no text) and
-            # would re-fire every folder-watch automation on its folder.
+            # re-runs _check_folder_watch_automations, so a reaped document
+            # would be presented as read (with no text) and could trigger
+            # automations even though ingestion has failed.
             #
             # The filter repeats processing=True and the updated_at we
             # matched on so a worker that finished (or a retry that re-took
@@ -1505,16 +1559,20 @@ def _reap_abandoned_extractions(db) -> int:
             # either changes at least one of the two.
             result = db.smart_document.update_one(
                 {
-                    "uuid": document_uuid,
+                    **extraction_generation_filter(document_uuid, doc.get('_extraction_restart_revision', 0)),
                     "processing": True,
+                    "task_status": {"$in": _IN_PROGRESS_TASK_STATUSES},
                     "updated_at": doc.get("updated_at"),
+                    "created_at": doc.get("created_at"),
                 },
                 {"$set": {
                     "processing": False,
+                    "validating": False,
+                    "_validation_heartbeat_at": None,
                     "task_status": "error",
                     "task_id": None,
                     "error_message": _EXTRACTION_ABANDONED_MESSAGE,
-                }},
+                }, "$inc": {"_extraction_restart_revision": 1}},
             )
             if not result.matched_count:
                 continue
@@ -1543,4 +1601,41 @@ def _reap_abandoned_extractions(db) -> int:
             "— marked failed with a retry hint",
             reaped,
         )
+    return reaped
+
+
+def _reap_abandoned_validations(db: Database[dict]) -> int:
+    """Fail a lost validation chord after extraction has settled, retaining text.
+
+    Each current chunk and summary renews the heartbeat. A reaped generation
+    cannot later certify the document via an old callback or start queued model
+    work. No automatic redispatch or successful validation is inferred.
+    """
+    from app.services.extraction_staleness import EXTRACTION_STALE_AFTER
+
+    cutoff = datetime.datetime.now() - EXTRACTION_STALE_AFTER
+    rows = db.smart_document.find({
+        'processing': False, 'validating': True, 'soft_deleted': {'$ne': True},
+        '$or': [
+            {'_validation_heartbeat_at': {'$lt': cutoff}},
+            {'_validation_heartbeat_at': None, 'updated_at': {'$lt': cutoff}},
+            {'_validation_heartbeat_at': None, 'updated_at': None, 'created_at': {'$lt': cutoff}},
+        ],
+    }, {'uuid': 1, '_extraction_restart_revision': 1, '_validation_heartbeat_at': 1,
+        'updated_at': 1, 'created_at': 1})
+    reaped = 0
+    for doc in rows:
+        try:
+            result = db.smart_document.update_one({
+                **extraction_generation_filter(doc['uuid'], doc.get('_extraction_restart_revision', 0)),
+                'processing': False, 'validating': True,
+                '_validation_heartbeat_at': doc.get('_validation_heartbeat_at'),
+                'updated_at': doc.get('updated_at'), 'created_at': doc.get('created_at'),
+            }, {'$set': {
+                'validating': False, 'valid': False, '_validation_heartbeat_at': None,
+                'validation_feedback': 'Document validation stopped without finishing. Retry extraction to run the document checks again.',
+            }, '$inc': {'_extraction_restart_revision': 1}})
+            reaped += bool(result.matched_count)
+        except Exception:
+            logger.exception('Failed to reconcile stalled validation for %s', doc['uuid'])
     return reaped

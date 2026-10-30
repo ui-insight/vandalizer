@@ -80,15 +80,15 @@ export function WebSourceRefreshBar({
     <div
       data-testid="web-source-refresh-bar"
       style={{
-        display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8,
-        padding: '6px 8px', marginBottom: 8, borderRadius: 6,
-        backgroundColor: '#262626', border: '1px solid #333', fontSize: 11, color: '#aaa',
+        display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--workspace-space-8)',
+        padding: "var(--workspace-space-6) var(--workspace-space-8)", marginBottom: 'var(--workspace-space-8)', borderRadius: 'var(--workspace-radius-small)',
+        backgroundColor: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)',
       }}
     >
       <span style={{ flex: 1, minWidth: 140 }}>
         {webCount} web source{webCount === 1 ? '' : 's'}{oldestText ? ` · ${oldestText}` : ''}
       </span>
-      <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)' }}>
         Auto-refresh
         <select
           aria-label="Refresh web sources automatically"
@@ -96,8 +96,8 @@ export function WebSourceRefreshBar({
           disabled={!canManage}
           onChange={e => setInterval_(e.target.value)}
           style={{
-            fontSize: 11, fontFamily: 'inherit', padding: '2px 4px', borderRadius: 4,
-            backgroundColor: '#1e1e1e', color: '#ddd', border: '1px solid #3a3a3a',
+            fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit', padding: "var(--workspace-space-2) var(--workspace-space-4)", borderRadius: 'var(--workspace-radius-small)',
+            backgroundColor: 'var(--workspace-canvas)', color: 'var(--workspace-text)', border: '1px solid var(--workspace-border)',
           }}
         >
           <option value="off">Off</option>
@@ -112,9 +112,9 @@ export function WebSourceRefreshBar({
           onClick={refreshAll}
           disabled={busy}
           style={{
-            display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontFamily: 'inherit',
-            padding: '3px 8px', borderRadius: 4, cursor: busy ? 'default' : 'pointer',
-            backgroundColor: 'transparent', color: '#ddd', border: '1px solid #3a3a3a',
+            display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)', fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
+            padding: "var(--workspace-space-4) var(--workspace-space-8)", borderRadius: 'var(--workspace-radius-small)', cursor: busy ? 'default' : 'pointer',
+            backgroundColor: 'transparent', color: 'var(--workspace-text)', border: '1px solid var(--workspace-border)',
           }}
         >
           <RefreshCw size={11} style={busy ? { animation: 'spin 1s linear infinite' } : undefined} />

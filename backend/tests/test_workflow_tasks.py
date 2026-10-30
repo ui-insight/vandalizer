@@ -1134,8 +1134,8 @@ class TestBuildStepsData:
         task_data = steps_data[1]["tasks"][0]["data"]
         assert task_data["keys"] == ["amount", "status"]
         assert task_data["field_metadata"] == [
-            {"key": "amount", "is_optional": True, "enum_values": []},
-            {"key": "status", "is_optional": False, "enum_values": ["open", "closed"]},
+            {"key": "amount", "is_optional": True, "enum_values": [], "description": None},
+            {"key": "status", "is_optional": False, "enum_values": ["open", "closed"], "description": None},
         ]
 
     def test_fixed_documents_are_merged(self):
@@ -1928,7 +1928,7 @@ class TestBudgetHookPassesInFlightSpend:
         mock_engine.usage = MagicMock(tokens_in=700, tokens_out=200)
         mock_build.return_value = mock_engine
 
-        def fake_check_sync(user_id, *, extra_used=0):
+        def fake_check_sync(user_id, *, extra_used=0, feature=None):
             captured["user_id"] = user_id
             captured["extra_used"] = extra_used
 

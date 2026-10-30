@@ -5,6 +5,7 @@ turns an uploaded file into rows the import endpoint can upsert as
 ``KBTestQuery`` records. Pure parsing — no DB access — so it unit-tests
 without Beanie.
 """
+from collections.abc import Iterable, Sequence
 
 import csv
 import datetime
@@ -63,7 +64,7 @@ def _unwrap_quoted_cell(raw: str) -> tuple[str, bool]:
     return text, False
 
 
-def _names_one_known_source(text: str, known_source_names) -> bool:
+def _names_one_known_source(text: str, known_source_names: Sequence[str]) -> bool:
     """True when the cell, taken whole, names a single source in the KB.
 
     Same substring rule the validation run scores with, so a cell this keeps
@@ -75,7 +76,7 @@ def _names_one_known_source(text: str, known_source_names) -> bool:
     return any(needle in name.lower() for name in known_source_names if name)
 
 
-def _split_source_labels(raw: str, known_source_names=()) -> list[str]:
+def _split_source_labels(raw: str, known_source_names: Sequence[str]=()) -> list[str]:
     """Split a source-label cell into individual labels.
 
     Commas are the obvious separator, but real source names contain them —
@@ -115,7 +116,7 @@ def _split_source_labels(raw: str, known_source_names=()) -> list[str]:
     return _unwrap_parts(text.split(","))
 
 
-def _unwrap_parts(parts) -> list[str]:
+def _unwrap_parts(parts: Iterable[str]) -> list[str]:
     """Trim each split part and drop quotes wrapping one whole part.
 
     ``"Monitoring, Reporting"; Subpart E`` is the semicolon form written by an
@@ -135,7 +136,7 @@ def _normalize_header(value: str) -> str:
     return " ".join(value.replace("_", " ").strip().lower().split())
 
 
-def _cell_to_str(value) -> str:
+def _cell_to_str(value: object) -> str:
     """Coerce a spreadsheet cell to clean text.
 
     Excel stores bare numbers as floats, so an ID column of ``1, 2, 3`` reads
@@ -180,7 +181,7 @@ def _raw_rows_from_xlsx(data: bytes) -> list[list[str]]:
 
 
 def parse_test_query_import(
-    filename: str, data: bytes, known_source_names=(),
+    filename: str, data: bytes, known_source_names: Sequence[str]=(),
 ) -> tuple[list[dict], list[dict]]:
     """Parse an uploaded CSV/XLSX into (rows, row_errors).
 

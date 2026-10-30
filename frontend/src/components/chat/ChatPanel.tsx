@@ -1,106 +1,143 @@
-import { useEffect, useRef, useState, useCallback, type DragEvent } from 'react'
-import { Loader2, BookOpen, ArrowDown, ChevronRight, Shield, CheckCircle2, Upload, Sparkles, FolderKanban } from 'lucide-react'
-import { useQueryClient } from '@tanstack/react-query'
+import { isPagePreparation } from '../../lib/chatProgress'
+import { ChatActivityIndicator } from './ChatActivityIndicator'
+import { conversationNearMemoryLimit } from '../../lib/contextNudge'
+import { approvalHistoryFor } from './approvalHistory'
+import { useEffect, useLayoutEffect, useRef, useState, useCallback, type DragEvent } from 'react'
+import { Loader2, BookOpen, X, ArrowDown, Upload, Zap, Sparkles, FolderKanban } from 'lucide-react'
+import { useQueryClient, useQueries } from '@tanstack/react-query'
 import { ChatMessage } from './ChatMessage'
+import { ChatScrollRegion } from './ChatScrollRegion'
 import { ChatInput } from './ChatInput'
 import { AttachmentList } from './AttachmentList'
+import { ChatSkillDialog } from './ChatSkillDialog'
+import { ExistingFilesDialog } from '../files/ExistingFilesDialog'
+import { FileProcessingCell, type ProcessingCellDoc } from './FileProcessingCell'
+import { ChatExportActions } from './ChatExportActions'
+import { TrialTopUpDialog } from '../trial/TrialTopUpDialog'
+import { FirstSessionHome, ReturningHome } from './HomeExperience'
+import { RAInbox } from './RAInbox'
+import { HomeWorkQueue } from './HomeWorkQueue'
+import { OnboardingStepper } from './WelcomeExperience'
+import { ConceptStrip } from './ConceptTip'
 import { ContextMeter } from './ContextMeter'
 import { ContextLimitDialog } from './ContextLimitDialog'
+import { PlanChecklist } from './PlanChecklist'
+import { MemoryPanel } from './MemoryPanel'
+import { ProjectChatBadge } from './ProjectChatBadge'
+import { ProjectSuggestedActions } from '../projects/ProjectSuggestedActions'
 import { AttachKBModal } from './AttachKBModal'
 import { useChat } from '../../hooks/useChat'
+import { useCertificationPanelOptional } from '../../contexts/CertificationPanelContext'
+import { isCertificationWriteResult } from '../../lib/certificationEvents'
+import { useChatWriteAnnouncer } from '../../lib/chatWrites'
+import { CertificationRefreshNotice } from '../certification/CertificationRefreshNotice'
+import { CertificationChatRecovery } from '../certification/CertificationChatRecovery'
 import { useProject } from '../../hooks/useProjects'
 import { useOnboarding } from '../../hooks/useOnboarding'
+import { useOpenActivity } from '../../hooks/useOpenActivity'
 import { useWorkspace, MAX_ATTACHED_KBS, type PendingChatMessage } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
 import { useBranding } from '../../contexts/BrandingContext'
 import { buildChatSetupUrl, useShareLink } from '../../lib/shareLink'
 import { addLink, removeDocument, removeLink, truncateContext, compactContext, clearContext } from '../../api/chat'
-import { uploadFile } from '../../api/files'
-import { convertDocumentsToKB } from '../../api/knowledge'
-import { getUserConfig, updateUserConfig, markFirstSessionComplete } from '../../api/config'
+import { useChatUploads } from '../../hooks/useChatUploads'
+import { pollStatus } from '../../api/documents'
+import { convertDocumentsToKB, getKnowledgeBase } from '../../api/knowledge'
+import { markFirstSessionComplete } from '../../api/config'
 import type { FileAttachment, UrlAttachment } from '../../types/chat'
-import type { ModelInfo } from '../../types/workflow'
-import { stageCopy } from '../../utils/processingStatus'
-
-const LOADING_WORDS = [
-  'Thinking', 'Vandalizing', 'Pondering', 'Analyzing',
-  'Processing', 'Reading', 'Reviewing',
-]
-
-function StreamingLabel() {
-  const [index, setIndex] = useState(0)
-  const [fade, setFade] = useState(true)
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setFade(false)
-      setTimeout(() => {
-        setIndex(i => (i + 1) % LOADING_WORDS.length)
-        setFade(true)
-      }, 200)
-    }, 2000)
-    return () => clearInterval(interval)
-  }, [])
-
-  return (
-    <span style={{
-      opacity: fade ? 1 : 0,
-      transition: 'opacity 0.2s ease',
-      fontSize: 13,
-      color: '#6b7280',
-    }}>
-      {LOADING_WORDS[index]}&hellip;
-    </span>
-  )
-}
+import { useChatModelPreference } from '../../hooks/useChatModelPreference'
+import { stageCopy, isDocReady } from '../../utils/processingStatus'
+import { partitionNewFiles } from './attachmentDedup'
+import { shouldAutoContinueAfterAttach } from './autoContinue'
 
 interface ChatPanelProps {
+  workspaceLabel?: string
+  initialDraft?: string
+  onDraftChange?: (draft: string) => void
   conversationToLoad?: string | null
   pendingMessage?: PendingChatMessage | null
   onPendingMessageConsumed?: () => void
 }
 
-export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessageConsumed }: ChatPanelProps) {
+export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessageConsumed, initialDraft, onDraftChange, workspaceLabel }: ChatPanelProps) {
+  const certification = useCertificationPanelOptional()
+  const announceChatWrite = useChatWriteAnnouncer()
   const branding = useBranding()
   const brandIcon = branding.iconUrl
   const {
     messages,
-    setMessages,
     streamingContent,
+    activity,
     thinkingContent,
     thinkingDuration,
     isStreaming,
+    isLoadingHistory,
     activityId,
     conversationUuid,
     error,
+    activeToolCalls,
+    toolResults,
+    segments,
     errorDetails,
     clearError,
+    retry,
+    continueRun,
     contextTokens,
     contextMode,
     contextCutoffIndex,
     contextNotices,
+    contextMeter,
+    compactionStatus,
+    planTasks,
+    queuedMessages,
+    awaitingPageApproval,
+    queueMessage,
+    resumeQueuedMessages,
     suggestedModel,
     setContextTokens,
     setContextMode,
     setContextCutoffIndex,
     send,
+    stop,
     loadHistory,
+    activeSkill,
+    initializeProjectSkill,
+    projectSkillBlocked,
+    selectSkill,
+    isSelectingSkill,
     setActivity,
-  } = useChat()
+  } = useChat({ onLiveToolResult: result => {
+    if (isCertificationWriteResult(result)) void certification?.refreshAfterWrite()
+    announceChatWrite(result)
+  } })
 
-  const { bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, setSelectedFolderUuids, selectedFolderNames, setSelectedFolderNames, activeKBs, activeKBUuid, activeKBTitle, activateKB, attachKBs, replaceKBs, detachKB, activeProjectUuid, activeProjectTitle, setCurrentConversationUuid, focusChatSignal } = useWorkspace()
+  const { setWorkspaceMode, openWorkflow, openExtraction, workspaceMode, activeRightTab, openWorkflowId, openExtractionId, openAutomationId, bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, setSelectedFolderUuids, selectedFolderNames, setSelectedFolderNames, activeKBs, activeKBUuid, activeKBTitle, activateKB, attachKBs, replaceKBs, detachKB, activeProjectUuid, activeProjectTitle, activeProjectRole, deactivateProject, setCurrentConversationUuid, focusChatSignal, focusChat, triggerNewChat } = useWorkspace()
 
   // When scoped to a project, surface its file/index status so the empty state
   // reflects the project (not a generic assistant) and sets honest expectations.
   const { project: scopedProject } = useProject(activeProjectUuid ?? '')
+  useEffect(() => {
+    if (!conversationToLoad && !pendingMessage?.skillUuid) void initializeProjectSkill(activeProjectUuid)
+  }, [activeProjectUuid, conversationToLoad, pendingMessage?.skillUuid, initializeProjectSkill])
+
   const projectFileCount = scopedProject?.capabilities?.files.count ?? 0
   const projectIndexed = scopedProject?.capabilities?.knowledge.documents ?? 0
   const projectEmpty = !!activeProjectUuid && projectFileCount === 0
   const projectIndexing = !!activeProjectUuid && projectFileCount > 0 && projectIndexed < projectFileCount
+  const kbHealth = useQueries({ queries: activeKBs.map(kb => ({
+    queryKey: ['knowledge-base-health', kb.uuid], queryFn: () => getKnowledgeBase(kb.uuid),
+    staleTime: 30_000, refetchInterval: 30_000, retry: false,
+  })) })
+  const knowledgeHealth = Object.fromEntries(activeKBs.map((kb, index) => {
+    const query = kbHealth[index]
+    const data = query.data
+    return [kb.uuid, data ? `${data.sources_ready}/${data.total_sources} sources ready${data.sources_failed ? ` · ${data.sources_failed} need attention` : ''}` : query.isError ? 'Source status unavailable' : 'Checking sources…']
+  }))
   const [convertingToKB, setConvertingToKB] = useState(false)
   const { toast } = useToast()
+  const { openActivityById } = useOpenActivity()
   const shareLink = useShareLink()
-  const { pills: onboardingPills, isFirstSession, loading: onboardingLoading } = useOnboarding()
+  const { pills: onboardingPills, isFirstSession, loading: onboardingLoading, status: onboardingStatus, refetchStatus } = useOnboarding()
   // Lock the first-session flag once it's set so remounts/refetches can't
   // flip it mid-conversation (markFirstSessionComplete fires early).
   const lockedFirstSession = useRef<boolean | null>(null)
@@ -108,40 +145,52 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     lockedFirstSession.current = isFirstSession
   }
   const effectiveFirstSession = lockedFirstSession.current ?? isFirstSession
-  const firstSessionSeeded = useRef(false)
   const firstSessionMarked = useRef(false)
   const [fileAttachments, setFileAttachments] = useState<FileAttachment[]>([])
   const [urlAttachments, setUrlAttachments] = useState<UrlAttachment[]>([])
-  const [attachLoading, setAttachLoading] = useState(false)
-  const [selectedModel, setSelectedModel] = useState<string>('')
+  const [linkLoading, setLinkLoading] = useState(false)
+  const modelPreference = useChatModelPreference()
+  const { selectedModel, models: modelsList } = modelPreference
   const [showAttachKB, setShowAttachKB] = useState(false)
-  const [modelsList, setModelsList] = useState<ModelInfo[]>([])
+  const [showExistingFiles, setShowExistingFiles] = useState(false)
+  const [skillDialog, setSkillDialog] = useState<'change' | 'inspect' | null>(null)
+  const [draftInsertion, setDraftInsertion] = useState<{ id: number; text: string }>()
   const [showContextDialog, setShowContextDialog] = useState(false)
-  const contextDialogShownRef = useRef(false)
+  const [showContextNudge, setShowContextNudge] = useState(false)
+  const contextNudgeShownRef = useRef(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const readingPosition = useRef(0)
+  const restoringReadingPosition = useRef(false)
+  // Docs dropped this session — shown as "processing…" until the docs poll
+  // confirms readiness, so a freshly dropped file's chip reflects state at once.
+  const [justDroppedUuids, setJustDroppedUuids] = useState<Set<string>>(new Set())
+  // Latest poll'd task_status per dropped uuid, so the in-chat processing cell
+  // can show the live stage ("Reading text…", "Indexing…") and progress.
+  const [dropStatusByUuid, setDropStatusByUuid] = useState<Record<string, string | null>>({})
+  const [documentErrors, setDocumentErrors] = useState<Record<string, string>>({})
+  useEffect(() => {
+    // A retry started in Files supersedes the previous processing failure.
+    const resumed = selectedDocsProcessing.filter(doc => doc.status && !/error|fail/i.test(doc.status))
+    setDocumentErrors(prev => {
+      if (!resumed.some(doc => doc.uuid in prev)) return prev
+      const next = { ...prev }
+      resumed.forEach(doc => { delete next[doc.uuid] })
+      return next
+    })
+  }, [selectedDocsProcessing])
+  // Dropped uuids that just finished, kept briefly so the cell shows a clear
+  // "Ready" / "Couldn't process" confirmation before fading out.
+  const [recentlyReady, setRecentlyReady] = useState<Record<string, 'ready' | 'error'>>({})
+  const readyTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  useEffect(() => () => { Object.values(readyTimers.current).forEach(clearTimeout) }, [])
+  // A message sent while attached docs are still processing; auto-fires once ready.
+  const [heldMessage, setHeldMessage] = useState<{ message: string; includeOnboardingContext?: boolean } | null>(null)
   const lastLoadedConvo = useRef<string | null>(null)
   const prevStreamingRef = useRef(false)
   const [showScrollDown, setShowScrollDown] = useState(false)
-  const prevScrollInfo = useRef({ scrollHeight: 0, scrollTop: 0, clientHeight: 0 })
   const [dragOver, setDragOver] = useState(false)
   const dragCounter = useRef(0)
 
-
-  // Load saved model preference on mount
-  useEffect(() => {
-    getUserConfig().then(cfg => {
-      if (cfg.available_models?.length) {
-        setModelsList(cfg.available_models)
-      }
-      if (cfg.model) {
-        setSelectedModel(cfg.model)
-      } else if (cfg.available_models?.length) {
-        const first = cfg.available_models[0].tag || cfg.available_models[0].name
-        setSelectedModel(first)
-        updateUserConfig({ model: first }).catch(() => {})
-      }
-    }).catch(() => {})
-  }, [])
 
   // Derive the context window size for the currently selected model
   const contextWindow = (() => {
@@ -151,37 +200,24 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     return match?.context_window ?? 128000
   })()
 
-  // Auto-trigger context limit dialog when usage exceeds 90%
+  // When context runs low, show a dismissible inline nudge rather than a
+  // blocking modal — far less jarring for a first-time user mid-conversation.
+  // The backend meter (warn/compact/block ladder) is authoritative when
+  // present; the local 90%-of-window ratio is the fallback before the first
+  // context_meter chunk arrives.
   useEffect(() => {
-    if (contextTokens > 0 && contextWindow > 0) {
-      const ratio = contextTokens / contextWindow
-      if (ratio >= 0.9 && !contextDialogShownRef.current) {
-        contextDialogShownRef.current = true
-        setShowContextDialog(true)
-      } else if (ratio < 0.9) {
-        contextDialogShownRef.current = false
-      }
+    const low = conversationNearMemoryLimit(contextMeter, contextTokens, contextWindow)
+    if (low && !contextNudgeShownRef.current) {
+      contextNudgeShownRef.current = true
+      setShowContextNudge(true)
+    } else if (!low) {
+      contextNudgeShownRef.current = false
+      setShowContextNudge(false)
     }
-  }, [contextTokens, contextWindow])
-
-  // Seed the first-session conversation with an opening assistant message
-  useEffect(() => {
-    if (effectiveFirstSession && !onboardingLoading && messages.length === 0 && !firstSessionSeeded.current && !conversationToLoad) {
-      firstSessionSeeded.current = true
-      setMessages([{
-        role: 'assistant',
-        content:
-          `Hi, I'm your ${branding.appName} assistant. Before I show you around, I'd love to ` +
-          "know a bit about your work.\n\n" +
-          "What kind of documents do you spend the most time processing? " +
-          "Grant proposals, compliance reviews, progress reports, or something else entirely?",
-      }])
-    }
-  }, [effectiveFirstSession, onboardingLoading, messages.length, setMessages, conversationToLoad])
+  }, [contextTokens, contextWindow, contextMeter])
 
   const handleModelChange = (model: string) => {
-    setSelectedModel(model)
-    updateUserConfig({ model }).catch(() => {})
+    modelPreference.select(model)
   }
 
   const handleTruncate = async () => {
@@ -213,7 +249,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   // reset. It sticks for the rest of the conversation, which is what the
   // model picker already does.
   const handleUseSuggestedModel = async (name: string) => {
-    setSelectedModel(name)
+    modelPreference.select(name, false)
   }
 
   const handleConvertToKB = async () => {
@@ -233,7 +269,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       setSelectedDocNames(remainingNames)
       activateKB(kb.uuid, kb.title)
       clearError()
-      toast('Converted to Knowledge Base — ask your question again.', 'success')
+      toast('Converted to Knowledge Base. Ask your question again.', 'success')
     } catch (e) {
       toast(
         e instanceof Error ? e.message : 'Could not convert the documents to a Knowledge Base.',
@@ -244,18 +280,39 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     }
   }
 
+  // Remember handoff position without rendering during a native control's
+  // click/key capture phase. A render there can restore its old checked value
+  // before React receives the change event.
+  const rememberReadingPosition = useCallback(() => {
+    const el = scrollContainerRef.current
+    if (el && el.offsetParent !== null && !restoringReadingPosition.current) readingPosition.current = el.scrollTop
+  }, [])
+
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current
-    if (!el) return
-    prevScrollInfo.current = {
-      scrollHeight: el.scrollHeight,
-      scrollTop: el.scrollTop,
-      clientHeight: el.clientHeight,
-    }
+    if (!el || el.offsetParent === null || restoringReadingPosition.current) return
+    readingPosition.current = el.scrollTop
     const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
     setShowScrollDown(distFromBottom > 80)
   }, [])
 
+  // Hiding a panel can clamp its scroll position as its dimensions collapse.
+  // Restore the last visible reading position when returning from a source or editor.
+  useLayoutEffect(() => {
+    const el = scrollContainerRef.current
+    if (!el || el.offsetParent === null) return
+    const top = readingPosition.current
+    restoringReadingPosition.current = true
+    el.scrollTo({ top, behavior: 'instant' })
+    const frame = requestAnimationFrame(() => {
+      el.scrollTo({ top, behavior: 'instant' })
+      restoringReadingPosition.current = false
+    })
+    return () => { cancelAnimationFrame(frame); restoringReadingPosition.current = false }
+  }, [workspaceMode, activeRightTab, openWorkflowId, openExtractionId, openAutomationId])
+
+  // Incoming content never auto-scrolls the view — it accumulates below the
+  // fold and the scroll-down arrow appears, so reading isn't interrupted.
   useEffect(() => {
     const el = scrollContainerRef.current
     if (!el) return
@@ -263,13 +320,12 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     if (distFromBottom > 80) {
       setShowScrollDown(true)
     }
-  }, [messages, streamingContent])
+  }, [messages, streamingContent, thinkingContent, segments])
 
   const prevConvoRef = useRef(conversationUuid)
   useEffect(() => {
     if (conversationUuid !== prevConvoRef.current) {
       prevConvoRef.current = conversationUuid
-      prevScrollInfo.current = { scrollHeight: 0, scrollTop: 0, clientHeight: 0 }
       setShowScrollDown(false)
     }
   }, [conversationUuid])
@@ -286,7 +342,6 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     if (messages.length > prevMsgCount.current) {
       const lastMsg = messages[messages.length - 1]
       if (lastMsg?.role === 'user') {
-        prevScrollInfo.current = { scrollHeight: 0, scrollTop: 0, clientHeight: 0 }
         setShowScrollDown(false)
         const el = scrollContainerRef.current
         if (el) el.scrollTop = el.scrollHeight
@@ -298,7 +353,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const scrollToBottom = useCallback(() => {
     setShowScrollDown(false)
     const el = scrollContainerRef.current
-    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+    if (el) requestAnimationFrame(() => el.scrollTo({ top: el.scrollHeight, left: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' }))
   }, [])
 
   useEffect(() => {
@@ -311,6 +366,10 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   useEffect(() => {
     if (conversationToLoad && conversationToLoad !== lastLoadedConvo.current) {
       lastLoadedConvo.current = conversationToLoad
+      // The scope remembers a new conversation after the response headers arrive.
+      // A later parent render must not reload that same live conversation and
+      // detach its stream (for example when resizing or refreshing project data).
+      if (conversationToLoad === conversationUuid) return
       loadHistory(conversationToLoad).then((data) => {
         if (data) {
           // Re-attach what the conversation was asked against (support
@@ -339,20 +398,36 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           const el = scrollContainerRef.current
           if (el) el.scrollTop = el.scrollHeight
         }, 50)
+      }).catch(() => {
+        // loadHistory sets its own error state; swallow here so a failed
+        // history fetch doesn't surface as an unhandled promise rejection.
       })
     }
-  }, [conversationToLoad, loadHistory, setSelectedDocUuids, setSelectedDocNames, setSelectedFolderUuids, setSelectedFolderNames, replaceKBs, toast])
+  }, [conversationToLoad, conversationUuid, loadHistory, setSelectedDocUuids, setSelectedDocNames, setSelectedFolderUuids, setSelectedFolderNames, replaceKBs, toast])
 
   const pendingHandled = useRef<PendingChatMessage | null>(null)
   useEffect(() => {
-    if (pendingMessage && pendingMessage !== pendingHandled.current && !isStreaming) {
+    if (pendingMessage && pendingMessage !== pendingHandled.current && (!projectSkillBlocked || !!pendingMessage.skillUuid) && !isStreaming && !isLoadingHistory && !isSelectingSkill) {
       pendingHandled.current = pendingMessage
       const docs = pendingMessage.documentUuids ?? selectedDocUuids
       const folders = pendingMessage.folderUuids ?? selectedFolderUuids
-      send(pendingMessage.message, docs, undefined, undefined, undefined, folders)
+      if (pendingMessage.draftOnly) {
+        setDraftInsertion(previous => ({ id: (previous?.id ?? 0) + 1, text: pendingMessage.message }))
+        focusChat()
+      } else if (pendingMessage.skillUuid && pendingMessage.skillSelectionOnly) {
+        void selectSkill(pendingMessage.skillUuid)
+        focusChat()
+      } else if (pendingMessage.skillUuid) {
+        void send(pendingMessage.message, docs, selectedModel || undefined,
+          activeKBs.map(kb => kb.uuid), undefined, folders, undefined, undefined,
+          activeProjectUuid || undefined, pendingMessage.skillUuid)
+        focusChat()
+      } else {
+        send(pendingMessage.message, docs, undefined, undefined, undefined, folders)
+      }
       onPendingMessageConsumed?.()
     }
-  }, [pendingMessage, isStreaming, send, onPendingMessageConsumed])
+  }, [pendingMessage, projectSkillBlocked, isStreaming, isLoadingHistory, isSelectingSkill, focusChat, send, selectSkill, onPendingMessageConsumed, selectedDocUuids, selectedFolderUuids, selectedModel, activeKBs, activeProjectUuid])
 
   const hasDocContext = fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0 || selectedFolderUuids.length > 0
 
@@ -364,11 +439,119 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     : null)
   const processingCount = processingDoc ? 1 : selectedDocsProcessing.length
 
-  const handleSend = (message: string, includeOnboardingContext?: boolean) => {
-    // In first-session mode, every message uses the first-session system prompt.
+  // Per-document readiness: a selected doc is "processing" if FileBrowser
+  // reports it not-ready, or it was just dropped and hasn't been reported yet.
+  // Drives the live chip state and the send gate (Phase 4).
+  const processingByUuid: Record<string, boolean> = {}
+  for (const d of selectedDocsProcessing) {
+    processingByUuid[d.uuid] = !isDocReady({ task_status: d.status })
+  }
+  for (const uuid of justDroppedUuids) {
+    if (!(uuid in processingByUuid)) processingByUuid[uuid] = true
+  }
+  const anySelectedProcessing = selectedDocUuids.some(u => processingByUuid[u])
+
+  // Build the in-chat processing cell: every attached doc still working, plus
+  // any that just finished (kept briefly via recentlyReady) so the user gets a
+  // visible "Ready" beat. Best-known stage comes from the poll, falling back to
+  // FileBrowser's report. Skips docs the user has since removed.
+  const statusFor = (u: string): string | null => {
+    if (u in dropStatusByUuid) return dropStatusByUuid[u]
+    const d = selectedDocsProcessing.find(x => x.uuid === u)
+    return d ? d.status : null
+  }
+  const processingCellDocs: ProcessingCellDoc[] = []
+  for (const u of selectedDocUuids) {
+    if (processingByUuid[u]) {
+      processingCellDocs.push({ uuid: u, name: selectedDocNames[u] || 'Document', status: statusFor(u), phase: 'processing' })
+    }
+  }
+  for (const [u, phase] of Object.entries(recentlyReady)) {
+    if (!processingByUuid[u] && selectedDocUuids.includes(u) && !processingCellDocs.some(d => d.uuid === u)) {
+      processingCellDocs.push({ uuid: u, name: selectedDocNames[u] || 'Document', status: statusFor(u), phase })
+    }
+  }
+
+  // Poll just-dropped docs to authoritative readiness. FileBrowser only reports
+  // status for docs selected *in the browser*, so a chat-dropped doc may never
+  // appear in selectedDocsProcessing — poll_status is the source of truth here.
+  // Clears each uuid once text extraction completes (or fails), which both
+  // stops its chip spinning and releases any held message.
+  useEffect(() => {
+    if (justDroppedUuids.size === 0) return
+    let cancelled = false
+    const tick = async () => {
+      const uuids = [...justDroppedUuids]
+      const results = await Promise.all(
+        uuids.map(u => pollStatus(u).then(r => ({ u, r })).catch(() => null)),
+      )
+      if (cancelled) return
+      const ok = results.filter(
+        (x): x is { u: string; r: Awaited<ReturnType<typeof pollStatus>> } => x !== null,
+      )
+      // Capture the live stage so the in-chat cell can name what's happening.
+      setDropStatusByUuid(prev => {
+        const next = { ...prev }
+        for (const { u, r } of ok) next[u] = r.status
+        return next
+      })
+      const done = ok.filter(({ r }) => r.complete || !!r.raw_text || !!r.error_message)
+      if (done.length) {
+        setDocumentErrors(prev => {
+          const next = { ...prev }
+          for (const { u, r } of done) {
+            if (r.error_message) next[u] = r.error_message
+            else delete next[u]
+          }
+          return next
+        })
+        // Flag each finished doc as ready/errored for a brief grace window, then
+        // clear it so the cell can collapse once the user has seen the result.
+        setRecentlyReady(prev => {
+          const next = { ...prev }
+          for (const { u, r } of done) next[u] = r.error_message ? 'error' : 'ready'
+          return next
+        })
+        for (const { u } of done) {
+          if (readyTimers.current[u]) clearTimeout(readyTimers.current[u])
+          readyTimers.current[u] = setTimeout(() => {
+            setRecentlyReady(prev => { const n = { ...prev }; delete n[u]; return n })
+            setDropStatusByUuid(prev => { const n = { ...prev }; delete n[u]; return n })
+            delete readyTimers.current[u]
+          }, 4000)
+        }
+        setJustDroppedUuids(prev => {
+          const next = new Set(prev)
+          done.forEach(({ u }) => next.delete(u))
+          return next
+        })
+      }
+    }
+    tick()
+    const id = setInterval(tick, 2500)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [justDroppedUuids])
+
+  const handleSend = (message: string, includeOnboardingContext?: boolean, pageApproval?: string) => {
+    if (isLoadingHistory || isStreaming || isSelectingSkill || projectSkillBlocked) return false
+    if (conversationUuid && !activityId) {
+      toast('Reopen this conversation from Activity before sending.', 'info')
+      return false
+    }
+    if (chatUploads.uploading || linkLoading) {
+      toast('Wait for the attachment transfer to finish before sending.', 'info')
+      return false
+    }
+    // Auto-hold: if the user attached document(s) that aren't readable yet,
+    // don't fire a question at a file the model can't see. Queue it and let the
+    // readiness effect below auto-send once text extraction finishes.
+    if (anySelectedProcessing && !pageApproval) {
+      setHeldMessage({ message, includeOnboardingContext })
+      return true
+    }
     // Use the locked ref so remounts / refetches can't flip this mid-conversation.
     const firstSession = effectiveFirstSession && !hasDocContext && !activeKBUuid && !activeProjectUuid
-    send(message, selectedDocUuids, selectedModel || undefined, activeKBs.map(kb => kb.uuid), includeOnboardingContext, selectedFolderUuids, firstSession || undefined, activeProjectUuid || undefined)
+    send(message, selectedDocUuids, selectedModel || undefined, activeKBs.map(kb => kb.uuid), includeOnboardingContext, selectedFolderUuids, firstSession || undefined, undefined, activeProjectUuid || undefined, undefined, pageApproval)
     // Defer markFirstSessionComplete until the user has had enough exchanges
     // to experience the value discovery (at least 3 user messages).
     // messages.length counts both user + assistant; 4 = 2 full exchanges done.
@@ -376,36 +559,88 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       firstSessionMarked.current = true
       markFirstSessionComplete().catch(() => {})
     }
+    return true
+  }
+
+  // Keep the latest handleSend in a ref so the auto-fire effect can call it
+  // without re-subscribing on every render (handleSend isn't memoized).
+  const handleSendRef = useRef(handleSend)
+  handleSendRef.current = handleSend
+
+  // When the user attaches content right after the assistant asked for it, keep
+  // the conversation moving instead of leaving the assistant idle. We queue a
+  // brief acknowledgement as a held message; the effect above sends it once any
+  // freshly-uploaded doc finishes processing. Guards keep it unobtrusive: only
+  // when the assistant spoke last (it's waiting on the user), nothing is already
+  // streaming, and the user hasn't queued their own message (which takes
+  // precedence — handleSend overwrites this held message).
+  const maybeContinueAfterAttach = (what: string) => {
+    const last = messages[messages.length - 1]
+    if (!shouldAutoContinueAfterAttach({
+      lastMessageRole: last?.role, isStreaming, hasHeldMessage: !!heldMessage,
+    })) return
+    setHeldMessage({ message: `I've attached ${what}.` })
+  }
+
+  const handleRunDemo = () => {
+    // Once the user brings their own sources, demonstrate value on those
+    // sources through the normal send path (including processing readiness).
+    if (hasDocContext || activeKBs.length > 0 || activeProjectUuid || activeSkill) {
+      handleSend('Show me what you can do with the content attached to this chat. Start with a brief summary, extract the most useful facts or action items, and cite the sources. Suggest a relevant next step based on what you find.')
+      return
+    }
+    if (isLoadingHistory) return false
+    if (chatUploads.uploading || linkLoading) {
+      toast('Wait for the attachment transfer to finish before sending.', 'info')
+      return false
+    }
+    send(
+      `Show me what ${branding.appName} can do`,
+      selectedDocUuids,
+      selectedModel || undefined,
+      undefined, // knowledgeBaseUuids
+      undefined, // includeOnboardingContext
+      undefined, // folderUuids
+      undefined, // isFirstSession
+      true, // runDemo
+    )
   }
 
 
   const queryClient = useQueryClient()
 
-  const handleAttachFile = async (files: File[]) => {
-    setAttachLoading(true)
-    try {
-      // Upload to the file browser (single source of truth) and auto-select
-      const newNames: Record<string, string> = {}
-      const newUuids: string[] = []
-      for (const file of files) {
-        const ext = file.name.split('.').pop() || ''
-        const base64 = await fileToBase64(file)
-        const result = await uploadFile({ contentAsBase64String: base64, fileName: file.name, extension: ext })
-        if (result.uuid) {
-          newUuids.push(result.uuid)
-          newNames[result.uuid] = file.name
-        }
-      }
-      if (newUuids.length > 0) {
-        setSelectedDocUuids([...selectedDocUuids, ...newUuids])
-        setSelectedDocNames({ ...selectedDocNames, ...newNames })
-        queryClient.invalidateQueries({ queryKey: ['documents'] })
-      }
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Failed to upload file', 'error')
-    } finally {
-      setAttachLoading(false)
-    }
+  const chatUploads = useChatUploads((uuid, file) => {
+    setSelectedDocUuids(prev => prev.includes(uuid) ? prev : [...prev, uuid])
+    setSelectedDocNames(prev => ({ ...prev, [uuid]: file.name }))
+    setJustDroppedUuids(prev => new Set([...prev, uuid]))
+    void queryClient.invalidateQueries({ queryKey: ['documents'] })
+    maybeContinueAfterAttach(`"${file.name}"`)
+  })
+  // Auto-fire a held message once all attached docs are readable. A doc that
+  // errored out counts as "ready" (isDocReady), so the turn fires and the
+  // backend explains the failure rather than the message hanging forever.
+  useEffect(() => {
+    if (!heldMessage || projectSkillBlocked || anySelectedProcessing || chatUploads.uploading || linkLoading || isStreaming || isSelectingSkill || isLoadingHistory) return
+    const { message, includeOnboardingContext } = heldMessage
+    setHeldMessage(null)
+    handleSendRef.current(message, includeOnboardingContext)
+  }, [heldMessage, projectSkillBlocked, anySelectedProcessing, chatUploads.uploading, linkLoading, isStreaming, isSelectingSkill, isLoadingHistory])
+
+  const attachLoading = chatUploads.uploading || linkLoading
+  const handleAttachFile = (files: File[]) => {
+    const { toUpload: uploadNames, dupes } = partitionNewFiles(
+      files.map(file => file.name),
+      [...selectedDocUuids.map(uuid => selectedDocNames[uuid]).filter(Boolean), ...chatUploads.uploads.map(item => item.file.name)],
+    )
+    const uploadSet = new Set(uploadNames)
+    const seen = new Set<string>()
+    const toUpload = files.filter(file => {
+      if (!uploadSet.has(file.name) || seen.has(file.name)) return false
+      seen.add(file.name)
+      return true
+    })
+    if (dupes.length) toast(`${dupes[0]}${dupes.length > 1 ? ` and ${dupes.length - 1} more` : ''} already added. Retry failed uploads below.`, 'info')
+    chatUploads.add(toUpload)
   }
 
   // Share what this chat is looking at, so a co-worker doesn't rebuild it
@@ -416,11 +651,13 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       kbUuids: activeKBs.map(kb => kb.uuid),
       docUuids: selectedDocUuids,
       folderUuids: selectedFolderUuids,
+      skillUuid: activeSkill?.uuid,
     })
     const parts = [
       activeKBs.length && `${activeKBs.length} knowledge base${activeKBs.length === 1 ? '' : 's'}`,
       selectedDocUuids.length && `${selectedDocUuids.length} document${selectedDocUuids.length === 1 ? '' : 's'}`,
       selectedFolderUuids.length && `${selectedFolderUuids.length} folder${selectedFolderUuids.length === 1 ? '' : 's'}`,
+      activeSkill && `Skill: ${activeSkill.title}`,
     ].filter(Boolean)
     const leftOut = fileAttachments.length + urlAttachments.length > 0
       ? ' Files uploaded into this chat and web links aren\u2019t included.'
@@ -434,7 +671,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   }
 
   const handleAttachLink = async (url: string) => {
-    setAttachLoading(true)
+    setLinkLoading(true)
     try {
       const result = await addLink(url, activityId)
       setUrlAttachments((prev) => [
@@ -449,10 +686,11 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       if (result.activity_id && result.conversation_uuid) {
         setActivity(result.activity_id, result.conversation_uuid)
       }
+      maybeContinueAfterAttach(result.title ? `"${result.title}"` : url)
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Failed to add website', 'error')
     } finally {
-      setAttachLoading(false)
+      setLinkLoading(false)
     }
   }
 
@@ -508,32 +746,43 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     }
   }
 
-  const handleExport = (format: string) => {
-    const text = messages
-      .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}:\n${m.content}`)
-      .join('\n\n---\n\n')
-    if (format === 'text') {
-      const blob = new Blob([text], { type: 'text/plain' })
-      downloadBlob(blob, 'conversation.txt')
-    } else if (format === 'csv') {
-      const rows = [['Role', 'Content']]
-      messages.forEach(m => rows.push([m.role, m.content.replace(/"/g, '""')]))
-      const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n')
-      const blob = new Blob([csv], { type: 'text/csv' })
-      downloadBlob(blob, 'conversation.csv')
-    } else if (format === 'pdf') {
-      const html = `<html><head><title>Conversation</title><style>body{font-family:sans-serif;padding:40px;max-width:800px;margin:0 auto}
-      .msg{margin-bottom:20px;padding:12px;border-radius:8px}.user{background:#f3f4f6;border-left:4px solid #eab308}
-      .assistant{background:#fafafa}.role{font-weight:bold;margin-bottom:4px;font-size:12px;text-transform:uppercase;color:#666}</style></head>
-      <body>${messages.map(m => `<div class="msg ${m.role}"><div class="role">${m.role}</div><div>${m.content.replace(/\n/g, '<br>')}</div></div>`).join('')}</body></html>`
-      const win = window.open('', '_blank')
-      if (win) { win.document.write(html); win.document.close(); win.print() }
-    }
-  }
+  // Titles of everything selected this session, by ID, so an export can name
+  // what each message was sent with after the selection has changed. It only
+  // grows: an ID's title doesn't change by being deselected.
+  // The out-of-tokens notice's top-up: on success the blocked message is sent again.
+  const [topUpOpen, setTopUpOpen] = useState(false)
+  const scopeNamesRef = useRef<Record<string, string>>({})
+  useEffect(() => {
+    Object.assign(scopeNamesRef.current, selectedDocNames, selectedFolderNames)
+    for (const kb of activeKBs) if (kb.title) scopeNamesRef.current[kb.uuid] = kb.title
+    if (activeProjectUuid && activeProjectTitle) scopeNamesRef.current[activeProjectUuid] = activeProjectTitle
+  }, [selectedDocNames, selectedFolderNames, activeKBs, activeProjectUuid, activeProjectTitle])
+
+  const homeActionsDisabled = isLoadingHistory || attachLoading || !!processingDoc
+  const showFirstSessionHome = workspaceMode === 'chat' && effectiveFirstSession && !hasDocContext && !activeKBUuid && !activeProjectUuid && messages.length === 0 && !isStreaming && !isLoadingHistory && !onboardingLoading
+  const showReturningHome = workspaceMode === 'chat' && !effectiveFirstSession
+    && messages.length === 0
+    && !isStreaming
+    && !onboardingLoading
+    && !isLoadingHistory
+    && !bannerProcessingDoc
+    && !activeProjectUuid
+    && !activeKBUuid
+    && !hasDocContext
+  const showSupportingHome = workspaceMode !== 'chat' && !hasDocContext && !activeKBUuid && !activeProjectUuid && messages.length === 0 && !isStreaming && !isLoadingHistory && !onboardingLoading
+  const showContextualEmptyState = (!effectiveFirstSession || hasDocContext || !!activeKBUuid || !!activeProjectUuid)
+    && messages.length === 0
+    && !isStreaming
+    && !onboardingLoading
+    && !isLoadingHistory
+    && !showReturningHome
+    && !showSupportingHome
+
+  const showHome = showFirstSessionHome || showReturningHome
 
   return (
     <div
-      className="flex h-full flex-col"
+      className={`chat-pane flex h-full min-h-0 flex-col${showHome ? ' chat-pane--home' : ''}`}
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -551,7 +800,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 8,
+            gap: 'var(--workspace-space-8)',
             backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 6%, rgba(255,255,255,0.95))',
             border: '2px dashed var(--highlight-color, #eab308)',
             borderRadius: 'var(--ui-radius, 12px)',
@@ -559,28 +808,45 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           }}
         >
           <Upload size={32} style={{ color: 'var(--highlight-on-light, #806600)' }} />
-          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--highlight-on-light, #806600)' }}>
+          <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: 'var(--highlight-on-light, #806600)' }}>
             Drop files to add to chat &amp; files
           </div>
-          <div style={{ fontSize: 12, color: '#6b7280' }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
             pdf, doc, docx, xls, xlsx, csv, txt, md
           </div>
         </div>
       )}
 
       {/* Attachments bar */}
+      {showExistingFiles && <ExistingFilesDialog
+        attachedUuids={selectedDocUuids}
+        onAttach={files => {
+          setSelectedDocUuids(previous => [...new Set([...previous, ...files.map(file => file.uuid)])])
+          setSelectedDocNames(previous => ({ ...previous, ...Object.fromEntries(files.map(file => [file.uuid, file.title])) }))
+          focusChat()
+        }}
+        onClose={() => setShowExistingFiles(false)}
+      />}
       <AttachmentList
+        activeSkill={activeSkill}
+        skillBusy={isStreaming || isLoadingHistory || isSelectingSkill}
+        onChangeSkill={() => setSkillDialog('change')}
+        onRemoveSkill={() => void selectSkill(null)}
+        onInspectSkill={() => setSkillDialog('inspect')}
         fileAttachments={fileAttachments}
         urlAttachments={urlAttachments}
         selectedDocUuids={selectedDocUuids}
         selectedDocNames={selectedDocNames}
+        processingByUuid={processingByUuid}
+        documentErrors={documentErrors}
         selectedFolderUuids={selectedFolderUuids}
         selectedFolderNames={selectedFolderNames}
         knowledgeBases={activeKBs}
+        knowledgeHealth={knowledgeHealth}
         onDetachKB={detachKB}
         onShareKB={(kb) => shareLink('kb', kb.uuid, kb.title || undefined)}
         onShareSetup={
-          activeKBs.length + selectedDocUuids.length + selectedFolderUuids.length > 0
+          activeSkill || activeKBs.length + selectedDocUuids.length + selectedFolderUuids.length > 0
             ? handleShareSetup
             : undefined
         }
@@ -600,153 +866,190 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         }}
       />
 
-      {attachLoading && (
-        <div className="flex items-center gap-2 border-b border-gray-200 bg-[color-mix(in_srgb,var(--highlight-color),white_90%)] px-4 py-2 text-xs text-highlight-on-light">
-          <div className="chat-loader" style={{ width: 30 }} />
-          Processing document... This may take a moment for PDFs and scanned files.
+      {skillDialog && activeSkill && <ChatSkillDialog
+        mode={skillDialog}
+        skill={activeSkill}
+        disabled={isStreaming || isLoadingHistory || isSelectingSkill}
+        onSelect={selectSkill}
+        onClose={() => setSkillDialog(null)}
+      />}
+
+      {chatUploads.uploads.length > 0 && (
+        <div className="chat-upload-list" aria-label="File uploads">
+          {chatUploads.uploads.map(upload => (
+            <div key={upload.id} className="chat-upload-item">
+              <div role="status"><strong>{upload.file.name}</strong><span>
+                {upload.status === 'uploading' ? 'Uploading… It will be attached to your next question. Nothing runs until you send it.' : upload.status === 'canceled' ? 'Upload canceled. Check Files before retrying if the transfer had already reached the server.' : `Upload failed: ${upload.error}`}
+              </span></div>
+              {upload.status === 'uploading'
+                ? <button type="button" onClick={() => chatUploads.cancel(upload.id)} aria-label={`Cancel upload: ${upload.file.name}`}>Cancel upload</button>
+                : <><button type="button" onClick={() => chatUploads.retry(upload)} aria-label={`Retry upload: ${upload.file.name}`}>Retry</button><button type="button" onClick={() => chatUploads.dismiss(upload.id)} aria-label={`Dismiss upload: ${upload.file.name}`}>Dismiss</button></>}
+            </div>
+          ))}
         </div>
       )}
 
-      {/* Messages area */}
-      <div
-        ref={scrollContainerRef}
-        onScroll={handleScroll}
-        className="flex-1 overflow-y-auto hide-scrollbar"
-        style={{ padding: '20px 20px 180px 20px', position: 'relative' }}
-      >
-        {/* First-session: value proposition welcome */}
-        {effectiveFirstSession && !onboardingLoading && (
-          <div style={{ maxWidth: 640, margin: '0 auto 20px' }}>
-            {/* Header banner */}
-            <div
-              className="relative overflow-hidden text-white"
-              style={{
-                padding: '28px 24px',
-                borderRadius: 'var(--ui-radius, 12px)',
-                background: 'linear-gradient(135deg, var(--highlight-complement, #6a11cb), color-mix(in srgb, var(--highlight-color, #f1b300) 70%, #ffffff 30%))',
-              }}
-            >
-              <div
-                style={{
-                  position: 'absolute', top: '-50%', left: '-50%',
-                  width: '200%', height: '200%',
-                  background: 'radial-gradient(circle at center, rgba(255,255,255,0.15), transparent 70%)',
-                  animation: 'rotateBG 32s linear infinite',
-                }}
+      {linkLoading && <div role="status" className="px-4 py-2 text-sm text-gray-600">Adding website…</div>}
+      {effectiveFirstSession && hasDocContext && (
+        <div className="first-task-progress" role="status">
+          <strong>{messages.some(message => message.role === 'assistant') ? '3. Check the evidence' : '2. Ask a question'}</strong>
+          <span>{messages.some(message => message.role === 'assistant') ? 'Open source references in the answer to compare it with the original document. Then use Export conversation for handoff, or ask the assistant to turn this task into a reusable workflow.' : 'Your document is attached. Ask a specific question, such as “What are the key deadlines?”'}</span>
+        </div>
+      )}
+      {isLoadingHistory && <div role="status" className="px-4 py-3 text-sm text-gray-600">Loading conversation…</div>}
+      {/* Keep one composer mounted across home, source selection, and chat. */}
+      <div className="chat-composer-slot">
+        {projectSkillBlocked && <div className="flex gap-3 px-4 py-2 text-sm"><button className="underline" onClick={() => void initializeProjectSkill(activeProjectUuid, true)}>Retry default Skill</button><button className="underline" onClick={() => void selectSkill(null)}>Continue without Skill</button></div>}
+        {showHome && <div className="home-compose-heading">
+          <p className="home-eyebrow">{branding.orgName}{workspaceLabel ? ` · ${workspaceLabel}` : ''}</p>
+          <h2>What would you like to get done?</h2>
+        </div>}
+        {(attachLoading || anySelectedProcessing || isLoadingHistory) && <div role="status" className="px-4 py-2 text-xs text-gray-600">{attachLoading ? 'Attachments are transferring. Keep typing; Send becomes available when the transfer finishes.' : isLoadingHistory ? 'Loading this conversation. Keep typing; Send becomes available when it has loaded.' : 'Attached files are processing. Send will queue your question until processing finishes.'}</div>}
+        {/* Busy-chat submissions wait for their own turn. */}
+        {modelPreference.error && <div role="alert" className="px-4 py-2 text-sm text-red-800">{modelPreference.error} <button type="button" onClick={modelPreference.retry} className="underline">Retry model preference</button></div>}
+        {modelPreference.saving && <p role="status" className="px-4 py-1 text-xs text-gray-600">Saving default model…</p>}
+        {!showHome && <CertificationRefreshNotice />}
+        <ChatInput
+          initialDraft={initialDraft}
+          draftInsertion={draftInsertion}
+          onDraftChange={onDraftChange}
+          onSend={async (msg) => {
+            if (isStreaming) await queueMessage(msg, selectedDocUuids, selectedModel || undefined, activeKBs.map(kb => kb.uuid), undefined, selectedFolderUuids, undefined, undefined, activeProjectUuid || undefined)
+            else if (!handleSend(msg)) throw new Error('Message was not sent. Check the current conversation and attachments, then try again.')
+          }}
+          onAttachFile={handleAttachFile}
+          onAddExistingFiles={() => setShowExistingFiles(true)}
+          onAttachLink={handleAttachLink}
+          onAddKnowledge={() => setShowAttachKB(true)}
+          disabled={false}
+          sendDisabled={attachLoading || isLoadingHistory || isSelectingSkill || projectSkillBlocked}
+          isStreaming={isStreaming}
+          onStop={stop}
+          selectedModel={selectedModel}
+          onModelChange={handleModelChange}
+          onModelsLoaded={modelPreference.setModels}
+          exportActions={<ChatExportActions messages={messages} scope="conversation" names={scopeNamesRef.current} artifactSource={{ conversation_uuid: conversationUuid ?? undefined, project_uuid: activeProjectUuid ?? undefined }} disabled={isStreaming || isLoadingHistory} />}
+          onNewChat={() => { triggerNewChat(); focusChat() }}
+          hasMessages={messages.length > 0}
+          hasDocuments={fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0 || selectedFolderUuids.length > 0}
+          memoryControl={<MemoryPanel />}
+          navigationControl={showScrollDown ? <button type="button" onClick={scrollToBottom} aria-label="Scroll to bottom" title="Latest message" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-700 hover:bg-gray-100"><ArrowDown size={18} /></button> : null}
+          focusSignal={focusChatSignal}
+          contextMeter={
+            messages.length > 0 && (contextMeter || contextTokens > 0) ? (
+              <ContextMeter
+                tokensUsed={contextMeter?.estimated_tokens ?? contextTokens}
+                contextWindow={contextMeter?.context_window ?? contextWindow}
+                state={contextMeter?.state}
+                percentUntilCompact={contextMeter?.percent_until_compact}
+                onClick={() => setShowContextDialog(true)}
               />
-              <div className="relative z-[1] flex items-center gap-4">
-                {brandIcon && (
-                  <div style={{ animation: 'float 3s ease-in-out infinite' }} className="shrink-0">
-                    <img src={brandIcon} alt={branding.orgName} style={{ width: 22, height: 35, objectFit: 'contain' }} className="opacity-90" />
-                  </div>
-                )}
-                <div>
-                  <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3 }}>
-                    Welcome to {branding.appName}
-                  </div>
-                  <div style={{ fontSize: 13, opacity: 0.8, marginTop: 2, fontWeight: 400 }}>
-                    AI-powered document intelligence for research administration
-                  </div>
-                </div>
-              </div>
-            </div>
+            ) : null
+          }
+        />
+      </div>
 
-            {/* Value proposition cards */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-              <div style={{
-                display: 'flex', gap: 12, padding: '14px 16px',
-                borderRadius: 'var(--ui-radius, 12px)',
-                backgroundColor: '#fff', border: '1px solid #e5e7eb',
-              }}>
-                <div style={{
-                  flexShrink: 0, width: 36, height: 36, borderRadius: 8,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 10%, white)',
-                  color: 'var(--highlight-on-light, #806600)',
-                }}>
-                  <Shield size={18} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#111827', lineHeight: 1.3 }}>
-                    Your documents stay private
-                  </div>
-                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 3, lineHeight: 1.5 }}>
-                    Unlike ChatGPT and Claude, your files never leave your institution's control. You choose the model. If it's a private endpoint, your data never touches a third party.
-                  </div>
-                </div>
-              </div>
-
-              <div style={{
-                display: 'flex', gap: 12, padding: '14px 16px',
-                borderRadius: 'var(--ui-radius, 12px)',
-                backgroundColor: '#fff', border: '1px solid #e5e7eb',
-              }}>
-                <div style={{
-                  flexShrink: 0, width: 36, height: 36, borderRadius: 8,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 10%, white)',
-                  color: 'var(--highlight-on-light, #806600)',
-                }}>
-                  <CheckCircle2 size={18} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#111827', lineHeight: 1.3 }}>
-                    Workflows you can trust
-                  </div>
-                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 3, lineHeight: 1.5 }}>
-                    Every extraction workflow has documented quality metrics. Accuracy, consistency, and edge cases are tested and maintained, so you see exactly how well it performs before you trust it.
-                  </div>
-                </div>
-              </div>
-
-              <div style={{
-                display: 'flex', gap: 12, padding: '14px 16px',
-                borderRadius: 'var(--ui-radius, 12px)',
-                backgroundColor: '#fff', border: '1px solid #e5e7eb',
-              }}>
-                <div style={{
-                  flexShrink: 0, width: 36, height: 36, borderRadius: 8,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 10%, white)',
-                  color: 'var(--highlight-on-light, #806600)',
-                }}>
-                  <Upload size={18} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#111827', lineHeight: 1.3 }}>
-                    Built for research administration
-                  </div>
-                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 3, lineHeight: 1.5 }}>
-                    Purpose-built for grants, compliance, and institutional documents. Multi-format support, automatic OCR, and team collaboration, not a generic chatbot with a file upload bolted on.
-                  </div>
-                </div>
-              </div>
-            </div>
+      {/* Messages area */}
+      <ChatScrollRegion
+        scrollRef={scrollContainerRef}
+        isStreaming={isStreaming}
+        conversationUuid={conversationUuid}
+        role="region"
+        aria-label="Conversation"
+        tabIndex={0}
+        onScroll={handleScroll}
+        // Focus can scroll a citation just before it opens another pane,
+        // before the browser has delivered its scroll event. Save that final
+        // visible position before the action changes the workspace.
+        onClickCapture={rememberReadingPosition}
+        onKeyDownCapture={rememberReadingPosition}
+        className="chat-conversation min-h-0 flex-1 overflow-y-auto hide-scrollbar"
+        style={{ padding: "var(--workspace-space-20) var(--workspace-space-20) var(--workspace-space-24)", position: 'relative' }}
+      >
+        {showSupportingHome && <div className="supporting-assistant-home">
+          <h2>Ask about your work</h2>
+          <p>Select files or a knowledge base, then ask a question. Your current work stays open.</p>
+          <button type="button" onClick={focusChat}>Start a conversation</button>
+          <button type="button" onClick={() => setShowAttachKB(true)}>Choose a knowledge base</button>
+        </div>}
+        {/* First-session guidance in the main Chat workspace. */}
+        {showFirstSessionHome && (
+          <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
+            <FirstSessionHome
+              embedded
+              orgName={branding.orgName}
+              brandIcon={brandIcon}
+              disabled={homeActionsDisabled}
+              onRunDemo={handleRunDemo}
+              onAttachFiles={handleAttachFile}
+              onFocusComposer={focusChat}
+              onChooseKnowledgeBase={() => setShowAttachKB(true)}
+              onSendMessage={(msg) => handleSend(msg)}
+            />
           </div>
         )}
 
-        {/* Empty state: banner + contextual pills (non-first-session users) */}
-        {!effectiveFirstSession && messages.length === 0 && !isStreaming && !onboardingLoading && (
+        {showReturningHome && (
+          <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
+            <ReturningHome
+              embedded
+              orgName={branding.orgName}
+              brandIcon={brandIcon}
+              disabled={homeActionsDisabled}
+              onRunDemo={handleRunDemo}
+              onAttachFiles={handleAttachFile}
+              onFocusComposer={focusChat}
+              onChooseKnowledgeBase={() => setShowAttachKB(true)}
+              onSendMessage={(msg) => handleSend(msg)}
+              onOpenActivity={openActivityById}
+              status={onboardingStatus}
+              suggestionPills={onboardingPills}
+              workQueue={<HomeWorkQueue />}
+              workspaceLabel={workspaceLabel}
+              onOpenProjects={() => setWorkspaceMode('projects')}
+              onPrepareTask={(prompt, document) => {
+                if (document) {
+                  setSelectedDocUuids([document.uuid])
+                  setSelectedDocNames({ [document.uuid]: document.title })
+                  setSelectedFolderUuids([])
+                  setSelectedFolderNames({})
+                }
+                setDraftInsertion(previous => ({ id: (previous?.id ?? 0) + 1, text: prompt }))
+                focusChat()
+              }}
+              onNoticeChanged={refetchStatus}
+              onChooseDocuments={() => setWorkspaceMode('files')}
+              onSelectDocument={doc => {
+                setSelectedDocUuids([doc.uuid])
+                setSelectedDocNames({ [doc.uuid]: doc.title })
+                setSelectedFolderUuids([])
+                setSelectedFolderNames({})
+                focusChat()
+              }}
+              onOpenTool={alert => {
+                if (!alert.item_id) return
+                if (alert.item_kind === 'search_set') openExtraction(alert.item_id)
+                else if (alert.item_kind === 'workflow') openWorkflow(alert.item_id)
+                else if (alert.item_kind === 'knowledge_base') activateKB(alert.item_id, alert.item_name)
+              }}
+            />
+          </div>
+        )}
+
+        {/* Empty state: banner + contextual pills for scoped/project/doc states */}
+        {showContextualEmptyState && (
           <div style={{ maxWidth: 640, margin: '0 auto' }}>
             <div
-              className="relative overflow-hidden text-white"
+              className="relative overflow-hidden"
               style={{
-                padding: '28px 24px',
+                padding: "var(--workspace-space-20) var(--workspace-space-20)",
                 borderRadius: 'var(--ui-radius, 12px)',
-                background: 'linear-gradient(135deg, var(--highlight-complement, #6a11cb), color-mix(in srgb, var(--highlight-color, #f1b300) 70%, #ffffff 30%))',
+                background: '#f6f8fa', color: '#30363d', border: "1px solid var(--workspace-border)",
                 transition: 'filter 0.3s ease',
               }}
             >
-              <div
-                style={{
-                  position: 'absolute', top: '-50%', left: '-50%',
-                  width: '200%', height: '200%',
-                  background: 'radial-gradient(circle at center, rgba(255,255,255,0.15), transparent 70%)',
-                  animation: 'rotateBG 32s linear infinite',
-                }}
-              />
               <div className="relative z-[1] flex items-center gap-4">
-                <div style={{ animation: 'float 3s ease-in-out infinite' }} className="shrink-0">
+                <div className="shrink-0">
                   {bannerProcessingDoc ? (
                     <Loader2 className="h-7 w-7 opacity-90 animate-spin" />
                   ) : activeProjectUuid ? (
@@ -760,44 +1063,48 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                   )}
                 </div>
                 <div>
-                  <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3 }}>
+                  <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, lineHeight: 1.3 }}>
                     {bannerProcessingDoc
                       ? processingCount > 1
                         ? `Preparing ${processingCount} documents…`
                         : stageCopy(bannerProcessingDoc.status).title
                       : activeProjectUuid
-                        ? `Chat with ${activeProjectTitle ?? 'this project'}`
+                        ? 'Ask about this project'
                         : activeKBUuid
                           ? `Knowledge Base: ${activeKBTitle}`
                           : hasDocContext
                             ? 'Documents ready for analysis'
-                            : 'What would you like to work on?'}
+                            : onboardingStatus?.maturity_stage && onboardingStatus.maturity_stage !== 'newcomer'
+                              ? 'Welcome back'
+                              : 'What would you like to work on?'}
                   </div>
-                  <div style={{ fontSize: 13, opacity: 0.8, marginTop: 2, fontWeight: 400 }}>
+                  <div style={{ fontSize: 'var(--workspace-font-control)', opacity: 0.8, marginTop: 'var(--workspace-space-2)', fontWeight: 400 }}>
                     {bannerProcessingDoc
                       ? processingCount > 1
                         ? "We'll be ready as soon as each document finishes processing."
                         : stageCopy(bannerProcessingDoc.status).message
                       : activeProjectUuid
                         ? projectEmpty
-                          ? 'No files in this project yet — add files in the Files tab and I’ll answer from them. You can still ask me anything.'
+                          ? 'No files in this project yet. Add files in the Files tab and I’ll answer from them. You can still ask me anything.'
                           : projectIndexing
-                            ? 'Indexing this project’s files — you can chat now; answers get better as indexing finishes.'
+                            ? 'Indexing this project’s files. You can chat now; answers get better as indexing finishes.'
                             : `Ask questions across every file in this project (${projectFileCount} ${projectFileCount === 1 ? 'file' : 'files'}).`
                         : activeKBUuid
                           ? 'Ask questions grounded in your indexed documents and sources.'
                           : hasDocContext
                             ? 'Summarize, extract data, compare, or ask anything about your selected documents.'
-                            : 'Select documents to analyze, activate a knowledge base, or ask me anything.'}
+                            : (onboardingStatus?.recent_activity?.length ?? 0) > 0
+                              ? 'Here\'s what\'s been happening in your workspace.'
+                              : 'Select documents to analyze, activate a knowledge base, or ask me anything.'}
                   </div>
                 </div>
               </div>
               {bannerProcessingDoc && (
-                <div className="relative z-[1]" style={{ marginTop: 16, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)', overflow: 'hidden' }}>
+                <div className="relative z-[1]" style={{ marginTop: 'var(--workspace-space-16)', height: 4, borderRadius: 2, backgroundColor: '#dfe3e6', overflow: 'hidden' }}>
                   <div
                     className="animate-pulse"
                     style={{
-                      height: '100%', borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.7)',
+                      height: '100%', borderRadius: 2, backgroundColor: '#806600',
                       width: `${Math.round(stageCopy(bannerProcessingDoc.status).progress * 100)}%`,
                       transition: 'width 0.5s ease',
                     }}
@@ -806,33 +1113,86 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
               )}
             </div>
 
-            <div style={{ marginTop: 16, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {(activeProjectUuid ? (projectEmpty ? [
-                'What can you help me do with this project?',
-                'How should I organize the files for this grant?',
-              ] : [
-                'Summarize everything in this project',
-                'What are the key dates and deadlines?',
-                'List the documents and what each covers',
-              ]) : activeKBUuid ? [
+            {/* What each proposal or award needs, from its documents (#999). */}
+            <RAInbox />
+
+            <div style={{ marginTop: 'var(--workspace-space-16)', display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-8)' }}>
+              {/* Inside a project, surface project-specific actions (run pinned
+                  tools, summarize, gaps) instead of generic onboarding/demo. */}
+              {activeProjectUuid && (
+                <ProjectSuggestedActions
+                  projectUuid={activeProjectUuid}
+                  role={activeProjectRole}
+                  disabled={!!bannerProcessingDoc}
+                  onSend={(msg) => handleSend(msg)}
+                />
+              )}
+              {/* Demonstrate on attached sources; use the sample only without a scope. */}
+              {!activeProjectUuid && !(onboardingStatus?.has_run_workflow || onboardingStatus?.is_certified || (onboardingStatus?.has_extraction_sets && onboardingStatus?.has_workflows) || (onboardingStatus?.maturity_stage && ['practitioner', 'builder', 'architect'].includes(onboardingStatus.maturity_stage))) && (
+              <button
+                disabled={homeActionsDisabled}
+                onClick={handleRunDemo}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 'var(--workspace-space-6)',
+                  padding: "var(--workspace-space-8) var(--workspace-space-16)",
+                  fontSize: 'var(--workspace-font-control)',
+                  fontWeight: 500,
+                  fontFamily: 'inherit',
+                  border: "1px solid color-mix(in srgb, var(--highlight-color, #eab308) 40%, var(--workspace-border))",
+                  borderRadius: 20,
+                  backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 6%, white)',
+                  color: '#374151',
+                  cursor: homeActionsDisabled ? 'default' : 'pointer',
+                  transition: 'all 0.15s',
+                  opacity: homeActionsDisabled ? 0.5 : 1,
+                }}
+                onMouseEnter={e => {
+                  if (homeActionsDisabled) return
+                  e.currentTarget.style.borderColor = 'var(--highlight-color, #eab308)'
+                  e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--highlight-color, #eab308) 12%, white)'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--highlight-color, #eab308) 40%, #e5e7eb)'
+                  e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--highlight-color, #eab308) 6%, white)'
+                }}
+              >
+                <Zap size={13} style={{ color: 'var(--highlight-color, #eab308)' }} />
+                Show me what you can do
+              </button>
+              )}
+              {/* Contextual suggestion pills (suppressed inside a project — the
+                  project actions above take their place) */}
+              {!activeProjectUuid && (activeKBUuid ? [
                 'Summarize the key points across all sources',
                 'What are the most important facts and figures?',
                 'List every topic covered',
               ] : hasDocContext ? [
                 'Summarize this in 5 bullet points',
-                'Extract all names, dates, and numbers',
-                'List every action item and deadline',
+                ...(onboardingStatus?.top_extraction_set_name
+                  ? [`Run ${onboardingStatus.top_extraction_set_name} on selected documents`]
+                  : ['Extract all names, dates, and numbers']),
+                ...(onboardingStatus?.top_workflow_name
+                  ? [`Run ${onboardingStatus.top_workflow_name} on selected documents`]
+                  : ['List every action item and deadline']),
               ] : onboardingPills).map(suggestion => (
                 <button
                   key={suggestion}
                   disabled={!!bannerProcessingDoc}
-                  onClick={() => handleSend(suggestion, !activeKBUuid && !hasDocContext && !activeProjectUuid)}
+                  onClick={() => {
+                    // Server-generated action pills don't need onboarding context injection —
+                    // the workspace inventory in the system prompt provides the context.
+                    const hasServerPills = (onboardingStatus?.suggestion_pills?.length ?? 0) > 0
+                    const needsOnboardingContext = !activeKBUuid && !hasDocContext && !hasServerPills
+                    handleSend(suggestion, needsOnboardingContext)
+                  }}
                   style={{
-                    padding: '8px 14px',
-                    fontSize: 13,
+                    padding: "var(--workspace-space-8) var(--workspace-space-16)",
+                    fontSize: 'var(--workspace-font-control)',
                     fontWeight: 500,
                     fontFamily: 'inherit',
-                    border: '1px solid #e5e7eb',
+                    border: "1px solid var(--workspace-border)",
                     borderRadius: 20,
                     backgroundColor: '#fff',
                     color: '#374151',
@@ -854,6 +1214,27 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                 </button>
               ))}
             </div>
+
+            {/* Concept glossary — teach the core nouns to users still new to the
+                platform's vocabulary. Gated on maturity (newcomer/explorer) rather
+                than absence of context, so the definitions stay reachable even when
+                docs or a KB are selected — that's exactly when the jargon shows up.
+                Hidden inside projects (noisier) and for practitioners+ (who know it). */}
+            {!activeProjectUuid && ['newcomer', 'explorer'].includes(onboardingStatus?.maturity_stage ?? 'newcomer') && (
+              <div style={{ marginTop: 'var(--workspace-space-16)' }}>
+                <ConceptStrip />
+              </div>
+            )}
+
+            {/* Getting-started stepper for returning users who haven't finished basics */}
+            {onboardingStatus && !effectiveFirstSession && hasDocContext && (
+              <div style={{ marginTop: 'var(--workspace-space-12)' }}>
+                <OnboardingStepper
+                  status={onboardingStatus}
+                  hasChatAboutDocs={onboardingStatus.has_chatted_with_docs}
+                />
+              </div>
+            )}
           </div>
         )}
 
@@ -868,9 +1249,9 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 12,
-                    margin: '12px 0',
-                    fontSize: 11,
+                    gap: 'var(--workspace-space-12)',
+                    margin: "var(--workspace-space-12) 0",
+                    fontSize: 'var(--workspace-font-meta)',
                     color: '#6b7280',
                     userSelect: 'none',
                   }}>
@@ -881,48 +1262,86 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                 )}
                 <div style={isExcluded ? { opacity: 0.5 } : undefined}>
                   <ChatMessage
+                artifactSource={{ conversation_uuid: conversationUuid ?? undefined, project_uuid: activeProjectUuid ?? undefined }}
                     message={msg}
-                    messageIndex={i}
-                    conversationUuid={conversationUuid || undefined}
+                    exportNames={scopeNamesRef.current}
+                    approvalHistory={approvalHistoryFor(msg, messages.slice(i + 1), isStreaming)}
+                    onSendMessage={msg.role === 'assistant' && i === messages.length - 1 && !isStreaming ? (m, pageApproval) => handleSend(m, undefined, pageApproval) : undefined}
                   />
                 </div>
               </div>
             )
           })}
 
-        {/* Streaming: thinking-only phase */}
-        {isStreaming && thinkingContent && !streamingContent && (
-          <ChatMessage
-            message={{ role: 'assistant', content: '' }}
-            streamingThinking={thinkingContent}
-            isStreaming
-          />
+        {/* Live file-processing cell: in-stream visibility for dropped/attached
+            files during a conversation (the empty-state banner covers the
+            no-messages case). Flips to a "Ready" beat before fading out. */}
+        {(messages.length > 0 || isStreaming) && (
+          <FileProcessingCell docs={processingCellDocs} />
         )}
 
-        {/* Streaming: text phase */}
-        {isStreaming && streamingContent && (
+        {/* Keep the same live message when thinking becomes text/tools, so
+            expanded reasoning and its height survive the transition. */}
+        {isStreaming && (thinkingContent || streamingContent || segments.length > 0) && (
           <ChatMessage
+                artifactSource={{ conversation_uuid: conversationUuid ?? undefined, project_uuid: activeProjectUuid ?? undefined }}
             message={{ role: 'assistant', content: streamingContent }}
+            exportNames={scopeNamesRef.current}
+            activity={activity}
+            compactionStatus={compactionStatus}
             streamingThinking={thinkingContent || undefined}
             thinkingDuration={thinkingDuration}
+            activeToolCalls={activeToolCalls}
+            toolResults={toolResults}
+            streamSegments={segments}
             isStreaming
           />
         )}
 
-        {/* Loading indicator */}
-        {isStreaming && !streamingContent && !thinkingContent && (
-          <div role="status" aria-live="polite" style={{ padding: 15, marginBottom: 15, backgroundColor: '#00000008', borderRadius: 'var(--ui-radius, 12px)' }}>
-            <div className="thinking-shimmer" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#6b7280' }}>
-              <ChevronRight size={14} />
-              <StreamingLabel />
+        {isStreaming && !activeToolCalls?.length && (!thinkingContent || activity?.phase === 'writing' || isPagePreparation(activity)) && <ChatActivityIndicator activity={activity} names={scopeNamesRef.current} compactionStatus={compactionStatus} />}
+
+        {/* Held message: queued while attached docs finish processing. Renders
+            as the user's bubble with a waiting note; auto-sends when ready. */}
+        {heldMessage && !isStreaming && (() => {
+          const names = selectedDocUuids
+            .filter(u => processingByUuid[u])
+            .map(u => selectedDocNames[u] || 'document')
+          const joined = names.slice(0, 2).join(', ') + (names.length > 2 ? `, +${names.length - 2}` : '')
+          return (
+            <div style={{
+              padding: 15, marginBottom: 'var(--workspace-space-12)', color: 'white', backgroundColor: '#191919',
+              borderLeft: '7px solid var(--highlight-color, #f1b300)', borderRadius: 'var(--ui-radius, 12px)',
+              opacity: 0.85,
+            }}>
+              <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">{heldMessage.message}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginTop: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: '#d1d5db' }}>
+                <Loader2 size={13} className="animate-spin" style={{ color: 'var(--highlight-color, #f1b300)' }} />
+                <span style={{ flex: 1 }}>Waiting for {joined || 'your file'} to finish processing…</span>
+                <button
+                  onClick={() => setHeldMessage(null)}
+                  className="rounded px-2 py-0.5 text-xs text-gray-300 hover:text-white"
+                  style={{ border: '1px solid #4b5563', background: 'transparent' }}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
 
         {error && (
           <div role="alert" className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 border border-red-200">
-            <div>{error}</div>
-            {errorDetails?.suggestedAction === 'convert_to_kb' && (errorDetails.oversizeDocuments?.length ?? 0) > 0 && (
+            <div className="flex items-start gap-2">
+              <div className="flex-1">{error}</div>
+              <button
+                onClick={clearError}
+                aria-label="Dismiss error"
+                className="flex shrink-0 items-center justify-center rounded p-0.5 text-red-400 hover:text-red-600"
+              >
+                <X size={14} />
+              </button>
+            </div>
+            {errorDetails?.suggestedAction === 'convert_to_kb' && (errorDetails.oversizeDocuments?.length ?? 0) > 0 ? (
               <div className="mt-2 flex items-center gap-2">
                 <button
                   onClick={handleConvertToKB}
@@ -945,65 +1364,224 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                   Builds a searchable index so chat can read the document a chunk at a time.
                 </span>
               </div>
+            ) : errorDetails?.code === 'trial_budget_exhausted' ? (
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  onClick={() => setTopUpOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-700"
+                >
+                  Top up and retry
+                </button>
+                <span className="text-xs text-red-600/80">
+                  Your last message wasn't carried out. Top up here and it's sent again, including an approval or button you just clicked.
+                </span>
+              </div>
+            ) : errorDetails?.suggestedAction === 'continue' ? (
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  onClick={continueRun}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-700"
+                >
+                  Continue
+                </button>
+                <span className="text-xs text-red-600/80">
+                  Picks up where the response left off — completed work is kept.
+                </span>
+              </div>
+            ) : (
+              <div className="mt-2">
+                <button
+                  onClick={retry}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-700"
+                >
+                  Retry
+                </button>
+              </div>
             )}
+            <CertificationChatRecovery messages={messages} toolCalls={activeToolCalls} toolResults={toolResults} />
+            <TrialTopUpDialog open={topUpOpen} onClose={() => setTopUpOpen(false)} onToppedUp={retry} />
           </div>
         )}
 
-        {contextNotices.length > 0 && (
-          <div role="alert" className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 border border-amber-200">
-            <div className="font-medium mb-1">
-              {contextNotices.some((n) => n.action.startsWith('documents_'))
-                ? 'About your selected documents:'
-                : 'Context was compacted to fit the model:'}
+        {showContextNudge && (
+          <div className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 border border-amber-200">
+            <div className="flex items-start gap-2">
+              <div className="flex-1">
+                This conversation is getting long and is close to the model's memory limit.
+                You can trim or summarize older messages so replies stay sharp.
+              </div>
+              <button
+                onClick={() => setShowContextNudge(false)}
+                aria-label="Dismiss"
+                className="flex shrink-0 items-center justify-center rounded p-0.5 text-amber-500 hover:text-amber-700"
+              >
+                <X size={14} />
+              </button>
             </div>
-            <ul className="list-disc pl-4 space-y-0.5">
-              {contextNotices.map((n, i) => (
-                <li key={i}>{n.detail}</li>
-              ))}
-            </ul>
+            <div className="mt-2">
+              <button
+                onClick={() => { setShowContextNudge(false); setShowContextDialog(true) }}
+                className="inline-flex items-center gap-1.5 rounded-md bg-amber-500 px-2.5 py-1 text-xs font-medium text-gray-950 hover:bg-amber-400"
+              >
+                Manage memory
+              </button>
+            </div>
           </div>
         )}
+
+        {/* Pending requests wait for their own turns. */}
+        {queuedMessages.length > 0 && (
+          <div className="mt-2 space-y-1">
+            {!isStreaming && <div className="text-xs text-gray-600">{awaitingPageApproval
+              ? <p role="status">Queued messages are waiting for your Page decision. Save or cancel the preview above before continuing. If saving failed, retry the save first.</p>
+              : <><p>These messages have not been sent yet.</p><button type="button" className="underline" onClick={resumeQueuedMessages}>Send queued messages</button></>}</div>}
+            {queuedMessages.map((m, i) => (
+              <div key={`${i}-${m.slice(0, 24)}`} className="flex justify-end">
+                <div className="max-w-[80%] rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-1.5 text-sm text-gray-600">
+                  {m}
+                  <span className="ml-2 text-xs font-medium uppercase tracking-wide text-gray-600">
+                    {isStreaming ? 'Queued' : awaitingPageApproval ? 'Waiting for Page decision' : 'Waiting for next turn'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Live task checklist for multi-step agent work (Phase 8). */}
+        {planTasks && planTasks.length > 0 && <PlanChecklist tasks={planTasks} isStreaming={isStreaming} />}
+
+        {/* Auto-compaction can take a while — show progress instead of dead
+            air; the context_notice that follows reports the outcome. */}
+        {compactionStatus === 'started' && (
+          <div className="mt-2 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-800 border border-blue-200">
+            Summarizing earlier conversation to free up memory…
+          </div>
+        )}
+
+        {/* Notices are keyed by `action` so a trust warning never wears the
+            "Context was compacted" label. Unknown actions fall into a neutral
+            bucket rather than borrowing the compaction heading. */}
+        {(() => {
+          const notReady = contextNotices.filter(n => n.action === 'documents_not_ready')
+          const failed = contextNotices.filter(n => n.action === 'documents_extraction_failed')
+          const lowQuality = contextNotices.filter(n => n.action === 'documents_low_quality')
+          const kbFailed = contextNotices.filter(n => n.action === 'kb_retrieval_failed')
+          const routing = contextNotices.filter(
+            n => n.action === 'model_routed' || n.action === 'model_not_routed',
+          )
+          const partlySent = contextNotices.filter(
+            n => n.action === 'documents_trimmed' || n.action === 'attachments_trimmed',
+          )
+          const COMPACTION_ACTIONS = new Set([
+            'auto_compacted', 'autocompact_unavailable', 'history_trimmed', 'over_budget',
+          ])
+          const HANDLED = new Set([
+            'documents_not_ready', 'documents_extraction_failed',
+            'documents_low_quality', 'kb_retrieval_failed',
+            'model_routed', 'model_not_routed',
+            'documents_trimmed', 'attachments_trimmed',
+          ])
+          const compacted = contextNotices.filter(n => COMPACTION_ACTIONS.has(n.action))
+          const other = contextNotices.filter(
+            n => !HANDLED.has(n.action) && !COMPACTION_ACTIONS.has(n.action),
+          )
+          return (
+            <>
+              {notReady.length > 0 && (
+                <div className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 border border-amber-200">
+                  <div className="font-medium mb-1">Still processing</div>
+                  <ul className="list-disc pl-4 space-y-0.5">
+                    {notReady.map((n, i) => <li key={i}>{n.detail}</li>)}
+                  </ul>
+                  <div className="mt-2">
+                    <button
+                      onClick={retry}
+                      className="inline-flex items-center gap-1.5 rounded-md bg-amber-500 px-2.5 py-1 text-xs font-medium text-gray-950 hover:bg-amber-400"
+                    >
+                      Resend now
+                    </button>
+                  </div>
+                </div>
+              )}
+              {failed.length > 0 && (
+                <div className="mt-2 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 border border-red-200">
+                  <div className="font-medium mb-1">Couldn't read these files</div>
+                  <ul className="list-disc pl-4 space-y-0.5">
+                    {failed.map((n, i) => <li key={i}>{n.detail}</li>)}
+                  </ul>
+                  <div className="mt-2 text-red-600/80">
+                    This usually means the file is scanned/image-only, password-protected,
+                    or in an unsupported format. Try re-saving it as a text-based PDF or
+                    DOCX and re-uploading from the Files tab — or paste the relevant text
+                    here directly.
+                  </div>
+                </div>
+              )}
+              {lowQuality.length > 0 && (
+                <div role="alert" className="mt-2 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 border border-red-200">
+                  <div className="font-medium mb-1">Answers about these documents may be unreliable</div>
+                  <ul className="list-disc pl-4 space-y-0.5">
+                    {lowQuality.map((n, i) => <li key={i}>{n.detail}</li>)}
+                  </ul>
+                </div>
+              )}
+              {kbFailed.length > 0 && (
+                <div role="alert" className="mt-2 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 border border-red-200">
+                  <div className="font-medium mb-1">This answer is not grounded in your documents</div>
+                  <ul className="list-disc pl-4 space-y-0.5">
+                    {kbFailed.map((n, i) => <li key={i}>{n.detail}</li>)}
+                  </ul>
+                </div>
+              )}
+              {routing.length > 0 && (
+                <div className="mt-2 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-800 border border-blue-200">
+                  <div className="font-medium mb-1">Model note</div>
+                  <ul className="list-disc pl-4 space-y-0.5">
+                    {routing.map((n, i) => <li key={i}>{n.detail}</li>)}
+                  </ul>
+                </div>
+              )}
+              {partlySent.length > 0 && (
+                <div className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 border border-amber-200">
+                  <div className="font-medium mb-1">Only part of a large file was sent</div>
+                  <ul className="list-disc pl-4 space-y-0.5">
+                    {partlySent.map((n, i) => <li key={i}>{n.detail}</li>)}
+                  </ul>
+                </div>
+              )}
+              {compacted.length > 0 && (
+                <div className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 border border-amber-200">
+                  <div className="font-medium mb-1">Context was compacted to fit the model:</div>
+                  <ul className="list-disc pl-4 space-y-0.5">
+                    {compacted.map((n, i) => <li key={i}>{n.detail}</li>)}
+                  </ul>
+                </div>
+              )}
+              {other.length > 0 && (
+                <div className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 border border-amber-200">
+                  <div className="font-medium mb-1">Notices</div>
+                  <ul className="list-disc pl-4 space-y-0.5">
+                    {other.map((n, i) => <li key={i}>{n.detail}</li>)}
+                  </ul>
+                </div>
+              )}
+            </>
+          )
+        })()}
         </div>{/* end centering wrapper */}
 
-      </div>
+      </ChatScrollRegion>
 
-      {/* Scroll to bottom button */}
-      {showScrollDown && (
-        <div style={{ display: 'flex', justifyContent: 'center', position: 'relative' }}>
-          <button
-            onClick={scrollToBottom}
-            style={{
-              position: 'absolute',
-              bottom: 8,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 36,
-              height: 36,
-              borderRadius: '50%',
-              border: '1px solid #d1d5db',
-              backgroundColor: '#fff',
-              color: '#374151',
-              cursor: 'pointer',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
-              zIndex: 10,
-              transition: 'background-color 0.15s, box-shadow 0.15s',
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.backgroundColor = '#f3f4f6'
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.18)'
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.backgroundColor = '#fff'
-              e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.12)'
-            }}
-            aria-label="Scroll to bottom"
-          >
-            <ArrowDown size={18} />
-          </button>
-        </div>
+      {/* Project active badge — entering a project clears the KB, so normally
+          only one of these shows; render project-first for deterministic order. */}
+      {activeProjectUuid && (
+        <ProjectChatBadge
+          projectUuid={activeProjectUuid}
+          fallbackTitle={activeProjectTitle}
+          onExit={deactivateProject}
+        />
       )}
-
 
 
       {showAttachKB && (
@@ -1024,29 +1602,6 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         />
       )}
 
-      {/* Input */}
-      <ChatInput
-        onSend={handleSend}
-        onAttachFile={handleAttachFile}
-        onAttachLink={handleAttachLink}
-        onAddKnowledge={() => setShowAttachKB(true)}
-        disabled={isStreaming}
-        selectedModel={selectedModel}
-        onModelChange={handleModelChange}
-        onExport={handleExport}
-        hasMessages={messages.length > 0}
-        hasDocuments={fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0 || selectedFolderUuids.length > 0}
-        focusSignal={focusChatSignal}
-        contextMeter={
-          messages.length > 0 && contextTokens > 0 ? (
-            <ContextMeter
-              tokensUsed={contextTokens}
-              contextWindow={contextWindow}
-              onClick={() => setShowContextDialog(true)}
-            />
-          ) : null
-        }
-      />
 
       {/* Context limit dialog */}
       <ContextLimitDialog
@@ -1057,29 +1612,14 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         onClear={handleClearContext}
         suggestedModel={suggestedModel}
         onUseModel={handleUseSuggestedModel}
-        percent={contextWindow > 0 ? Math.round((contextTokens / contextWindow) * 100) : 0}
+        percent={
+          contextMeter
+            ? Math.round((contextMeter.estimated_tokens / contextMeter.effective_window) * 100)
+            : contextWindow > 0
+              ? Math.round((contextTokens / contextWindow) * 100)
+              : 0
+        }
       />
     </div>
   )
-}
-
-function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      const result = reader.result as string
-      resolve(result.split(',')[1])
-    }
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
 }

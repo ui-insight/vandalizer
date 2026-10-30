@@ -20,8 +20,16 @@ from app.schemas.documents import (
 from app.services import document_usage as document_usage_service
 from app.services import file_service
 from app.services import knowledge_service
+from app.utils.file_validation import ALLOWED_EXTS
+from app.utils.content_disposition import content_disposition
 
 router = APIRouter()
+
+
+@router.get("/upload-policy", response_model=None)
+async def upload_policy(user: User = Depends(get_current_user), settings: Settings = Depends(get_settings)) -> dict[str, object]:
+    """The same deployment limits enforced by upload_document."""
+    return {"extensions": sorted(ALLOWED_EXTS), "max_size_bytes": settings.max_upload_size_mb * 1024 * 1024}
 
 
 _RANGE_RE = re.compile(r"^bytes=(\d*)-(\d*)$")
@@ -62,14 +70,14 @@ def _parse_range_header(header: str, total: int) -> tuple[int, int] | None:
     return start, end
 
 
-@router.post("/upload")
+@router.post("/upload", response_model=None)
 @limiter.limit("30/minute")
 async def upload(
     request: Request,
     body: UploadRequest,
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-):
+) -> dict:
     try:
         result = await file_service.upload_document(
             blob=body.contentAsBase64String,
@@ -109,12 +117,12 @@ def _resolve_media_type(extension: str, title: str) -> str:
     return media_type or "application/octet-stream"
 
 
-@router.head("/download")
+@router.head("/download", response_model=None)
 async def download_head(
     docid: str,
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-):
+) -> Response:
     result = await file_service.download_document(docid, settings, user=user)
     if not result:
         raise HTTPException(status_code=404, detail="File not found")
@@ -130,14 +138,14 @@ async def download_head(
     )
 
 
-@router.get("/download")
+@router.get("/download", response_model=None)
 async def download(
     docid: str,
     inline: bool = Query(False, description="Serve with inline disposition for in-browser viewers."),
     range_header: str | None = Header(None, alias="Range"),
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-):
+) -> Response:
     result = await file_service.download_document(docid, settings, user=user)
     if not result:
         raise HTTPException(status_code=404, detail="File not found")
@@ -157,7 +165,7 @@ async def download(
             status_code=206,
             media_type=media_type,
             headers={
-                "Content-Disposition": f'{disposition}; filename="{result.title}"',
+                "Content-Disposition": content_disposition(result.title, disposition),
                 "Content-Range": f"bytes {start}-{end}/{total}",
                 "Content-Length": str(len(chunk)),
                 "Accept-Ranges": "bytes",
@@ -168,19 +176,19 @@ async def download(
         io.BytesIO(data),
         media_type=media_type,
         headers={
-            "Content-Disposition": f'{disposition}; filename="{result.title}"',
+            "Content-Disposition": content_disposition(result.title, disposition),
             "Content-Length": str(total),
             "Accept-Ranges": "bytes",
         },
     )
 
 
-@router.post("/download-bulk")
+@router.post("/download-bulk", response_model=None)
 async def download_bulk(
     doc_ids: list[str] = Body(..., embed=True),
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-):
+) -> StreamingResponse:
     """Download multiple files as a single zip archive."""
     if not doc_ids:
         raise HTTPException(status_code=400, detail="No document IDs provided")
@@ -202,12 +210,12 @@ async def download_bulk(
     )
 
 
-@router.get("/{doc_uuid}/sheet-json")
+@router.get("/{doc_uuid}/sheet-json", response_model=None)
 async def sheet_json(
     doc_uuid: str,
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-):
+) -> dict:
     """Return evaluated rows for an .xlsx file so the viewer can render
     formula results instead of blank cells when Excel didn't cache them.
     """
@@ -224,11 +232,11 @@ async def sheet_json(
     return result
 
 
-@router.get("/{doc_uuid}/usage")
+@router.get("/{doc_uuid}/usage", response_model=None)
 async def usage(
     doc_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     """Where this document is used: knowledge bases, extractions, workflows,
     and its folder path. Read it before deleting."""
     result = await document_usage_service.document_usage(doc_uuid, user=user)
@@ -237,13 +245,13 @@ async def usage(
     return result
 
 
-@router.delete("/{doc_uuid}")
+@router.delete("/{doc_uuid}", response_model=None)
 async def delete(
     doc_uuid: str,
     remove_from_knowledge_bases: bool = Query(False),
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-):
+) -> dict[str, object]:
     """Delete a document. Knowledge-base sources built from it keep their
     ingested copy — and keep answering — unless ``remove_from_knowledge_bases``
     is set, in which case they are removed from every KB the caller manages;
@@ -257,11 +265,11 @@ async def delete(
     return {"ok": True, "knowledge_bases_removed": removed, "knowledge_bases_kept": kept}
 
 
-@router.patch("/rename")
+@router.patch("/rename", response_model=None)
 async def rename(
     body: RenameDocumentRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     try:
         ok = await file_service.rename_document(body.uuid, body.newName, user=user)
     except ValueError as e:
@@ -271,11 +279,11 @@ async def rename(
     return {"ok": True}
 
 
-@router.patch("/move")
+@router.patch("/move", response_model=None)
 async def move(
     body: MoveFileRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     try:
         ok = await file_service.move_document(body.fileUUID, body.folderID, user=user)
     except ValueError as e:

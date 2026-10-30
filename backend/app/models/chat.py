@@ -6,12 +6,15 @@ from typing import Optional
 
 from beanie import Document, PydanticObjectId
 from pydantic import Field
+from app.schemas.skills import SkillSnapshot
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
     ModelResponse,
     SystemPromptPart,
     TextPart,
+    ToolCallPart,
+    ToolReturnPart,
     UserPromptPart,
 )
 
@@ -22,6 +25,24 @@ class ChatRole(str, Enum):
     ASSISTANT = "assistant"
 
 
+# Replay-time micro-compaction (uplift plan Phase 3): old read-tool results
+# are replaced with this marker when the conversation nears its context
+# budget. Replay-only — the stored segments (and the UI/audit trail) keep the
+# full payloads. The agentic system prompt tells the model it can re-run the
+# tool if it needs the data again.
+CLEARED_TOOL_RESULT_MARKER = "[Old tool result content cleared]"
+
+
+def wrap_queued_user_message(text: str) -> str:
+    """Frame a mid-run queued user message for the model (uplift plan
+    Phase 10). Used identically at live-injection time (llm_service history
+    processor) and at replay time (queued_user segments below), so what the
+    model sees is byte-stable across turns — which also keeps the prompt
+    cache intact."""
+    return (
+        "[The user sent this message while you were working. Address it as "
+        "part of your current reply.]\n" + text
+    )
 # A selection can expand to a lot of documents — folder expansion alone allows
 # 500 per folder — and this is written on every turn. Past this the record says
 # so rather than growing without bound.
@@ -41,13 +62,23 @@ def _cap_source_documents(docs: Optional[list[dict]]) -> Optional[list[dict]]:
 class ChatMessage(Document):
     role: ChatRole
     message: str
+    active_skill: Optional[SkillSnapshot] = None
     thinking: Optional[str] = None
     thinking_duration: Optional[float] = None
+    tool_calls: Optional[list[dict]] = None
+    tool_results: Optional[list[dict]] = None
+    segments: Optional[list[dict]] = None
     citations: Optional[list[dict]] = None
     # Dollar amounts / percentages in a KB answer that no retrieved snippet
     # states — likely recalled from the model's memory, which can predate the
     # current regulation. Chat shows them under the answer.
     unsupported_figures: Optional[list[str]] = None
+    # Sentences that conclude a rule from the sources' silence (#1012).
+    silence_inferences: Optional[list[str]] = None
+    # Set on a turn that ended early: "stopped" when the user pressed Stop,
+    # "connection" when the stream died (disconnect, error, tool budget). The
+    # chat shows which, so a reopened transcript doesn't call a Stop a failure.
+    interruption: Optional[str] = None
     # Sources a KB answer cites for text they don't contain — the cited snippet
     # shares almost none of the words the answer attributes to it. Chat shows
     # them under the answer.
@@ -68,29 +99,122 @@ class ChatMessage(Document):
         name = "chat_message"
 
     def to_dict(self) -> dict:
-        d = {"role": self.role.value, "content": self.message}
+        d: dict[str, object] = {"role": self.role.value, "content": self.message}
+        if self.active_skill:
+            d["active_skill"] = self.active_skill.model_dump()
         if self.thinking:
             d["thinking"] = self.thinking
         if self.thinking_duration is not None:
             d["thinking_duration"] = self.thinking_duration
+        if self.tool_calls:
+            d["tool_calls"] = self.tool_calls
+        if self.tool_results:
+            d["tool_results"] = self.tool_results
+        if self.segments:
+            d["segments"] = self.segments
         if self.citations:
             d["citations"] = self.citations
         if self.unsupported_figures:
             d["unsupported_figures"] = self.unsupported_figures
+        if self.silence_inferences:
+            d["silence_inferences"] = self.silence_inferences
+        if self.interruption:
+            d["interruption"] = self.interruption
         if self.unsupported_citations:
             d["unsupported_citations"] = self.unsupported_citations
         if self.source_documents:
             d["source_documents"] = self.source_documents
         return d
 
-    def to_model_message(self) -> ModelMessage:
+    def to_model_messages(
+        self, cleared_tool_call_ids: frozenset[str] | set[str] = frozenset(),
+    ) -> list[ModelMessage]:
+        """Reconstruct pydantic-ai messages for this stored chat message.
+
+        Assistant turns may expand into multiple messages when tool calls were
+        made: the original ModelResponse (text + ToolCallParts), followed by a
+        ModelRequest of ToolReturnParts, then any subsequent ModelResponse
+        chunks. Walking ``segments`` preserves the interleaved order so the
+        model sees real tool results on the next turn instead of fabricating
+        them from its own prior text.
+
+        Tool results whose call id is in ``cleared_tool_call_ids`` replay as
+        ``CLEARED_TOOL_RESULT_MARKER`` instead of their stored content
+        (micro-compaction; the ToolCallPart/ToolReturnPart pairing stays
+        intact so the API never sees an orphaned tool call).
+        """
         if self.role == ChatRole.USER:
-            return ModelRequest(parts=[UserPromptPart(content=self.message)])
-        elif self.role == ChatRole.ASSISTANT:
-            return ModelResponse(parts=[TextPart(content=self.message)])
-        elif self.role == ChatRole.SYSTEM:
-            return ModelRequest(parts=[SystemPromptPart(content=self.message)])
-        return ModelRequest(parts=[UserPromptPart(content=self.message)])
+            return [ModelRequest(parts=[UserPromptPart(content=self.message)])]
+        if self.role == ChatRole.SYSTEM:
+            return [ModelRequest(parts=[SystemPromptPart(content=self.message)])]
+        if self.role != ChatRole.ASSISTANT:
+            return [ModelRequest(parts=[UserPromptPart(content=self.message)])]
+
+        if not self.segments:
+            if self.message:
+                return [ModelResponse(parts=[TextPart(content=self.message)])]
+            return []
+
+        messages: list[ModelMessage] = []
+        response_parts: list = []
+        request_parts: list = []
+
+        def flush_response() -> None:
+            if response_parts:
+                messages.append(ModelResponse(parts=list(response_parts)))
+                response_parts.clear()
+
+        def flush_request() -> None:
+            if request_parts:
+                messages.append(ModelRequest(parts=list(request_parts)))
+                request_parts.clear()
+
+        for seg in self.segments:
+            kind = seg.get("kind")
+            if kind == "text":
+                flush_request()
+                content = seg.get("content", "")
+                if content:
+                    response_parts.append(TextPart(content=content))
+            elif kind == "tool_call":
+                flush_request()
+                call = seg.get("call", {})
+                call_id = call.get("tool_call_id") or ""
+                if not call_id:
+                    continue
+                response_parts.append(ToolCallPart(
+                    tool_name=call.get("tool_name", ""),
+                    args=call.get("args", {}),
+                    tool_call_id=call_id,
+                ))
+            elif kind == "tool_result":
+                flush_response()
+                result = seg.get("result", {})
+                call_id = result.get("tool_call_id") or ""
+                if not call_id:
+                    continue
+                content = result.get("content", "")
+                if call_id in cleared_tool_call_ids:
+                    content = CLEARED_TOOL_RESULT_MARKER
+                request_parts.append(ToolReturnPart(
+                    tool_name=result.get("tool_name", ""),
+                    content=content,
+                    tool_call_id=call_id,
+                ))
+            elif kind == "queued_user":
+                # A message the user sent mid-turn (Phase 10). It was
+                # injected into the request alongside that batch's tool
+                # returns, so it replays in exactly that position.
+                flush_response()
+                content = seg.get("content", "")
+                if content:
+                    request_parts.append(UserPromptPart(
+                        content=wrap_queued_user_message(content)
+                    ))
+
+        flush_response()
+        flush_request()
+        return messages
 
 
 class FileAttachment(Document):
@@ -141,6 +265,11 @@ class ChatConversation(Document):
     user_id: str
     team_id: Optional[str] = None
     is_first_session: bool = False
+    active_skill: Optional[SkillSnapshot] = None
+    # Set once a certification tool runs in this chat. From then on its turns
+    # are metered as "certification_chat", which a trial account's own token
+    # budget doesn't count (see trial_budget.BUDGET_EXEMPT_FEATURES).
+    is_certification: bool = False
     messages: list[PydanticObjectId] = []
     file_attachments: list[PydanticObjectId] = []
     url_attachments: list[PydanticObjectId] = []
@@ -161,6 +290,62 @@ class ChatConversation(Document):
     context_cutoff_index: int = 0
     compact_summary: Optional[str] = None
 
+    # Usage anchor for cheap context estimation (uplift plan Phase 2).
+    # Stamped after each successful turn: the provider-reported context size
+    # of that turn's final model request (input + cache read/write + output),
+    # and the stored-message count at stamping time. The next turn's size is
+    # then anchor + rough(new user message) — no tokenizer pass over history.
+    # message_count mismatch (or 0 anchor) means "anchor stale, fall back to
+    # token counting"; truncate/compact/clear endpoints reset these.
+    last_context_tokens: int = 0
+    last_context_message_count: int = -1
+
+    # Mid-run message queue (uplift plan Phase 10). Messages the user typed
+    # while a turn was streaming; chat_stream drains this atomically before
+    # each model request and injects them into the running turn. Entries:
+    # {"text": str, "ts": iso timestamp}.
+    queued_messages: list[dict] = []
+
+    # Set by POST /api/chat/stop just before the client aborts the stream, so
+    # the cancelled turn is recorded as the user's Stop rather than a dropped
+    # connection. Cleared when the next turn starts.
+    stop_requested: bool = False
+
+    # Latest task checklist from update_plan (uplift plan Phase 8), persisted
+    # so a follow-up turn and a page reload resume the same visible plan.
+    # Each entry: {"content", "active_form", "status"}.
+    active_plan: Optional[list[dict]] = None
+
+    # Resumable usage-limit hits (uplift plan Phase 5). When a turn stops at
+    # the per-turn tool budget, resume_pending arms a one-shot "resume
+    # directly, no recap" reminder for the next turn (the frontend offers a
+    # Continue button). resume_attempts counts consecutive limit hits so a
+    # task that can't finish in 3 continuations stops being offered one;
+    # reset on any successfully completed turn.
+    resume_attempts: int = 0
+    resume_pending: bool = False
+
+    # Auto-compaction circuit breaker (uplift plan Phase 4). Consecutive
+    # failed auto-compact attempts; at 3 the trigger stops retrying (Claude
+    # Code once measured 1,279 sessions burning ~250K calls/day on a hopeless
+    # compact loop). Reset to 0 on any successful compaction.
+    consecutive_autocompact_failures: int = 0
+
+    # Replay-time micro-compaction boundary (uplift plan Phase 3). Compactable
+    # tool results in messages BEFORE this index replay as
+    # CLEARED_TOOL_RESULT_MARKER. Monotonic — it only advances (chat_service
+    # moves it when the context estimate crosses the trigger), so the replayed
+    # prefix stays byte-stable between advances and the provider prompt cache
+    # keeps hitting.
+    tool_results_cleared_before: int = 0
+
+    # Write-tool confirmation handshake. Each entry is
+    # {"fp": <fingerprint>, "turn": <message-count when armed>, "tool": <name>}.
+    # A write tool only executes when a matching entry was armed on an EARLIER
+    # turn, so the agent cannot self-confirm a mutation within a single turn —
+    # a real user message must intervene. See chat_tools._confirm_gate.
+    pending_confirmations: list[dict] = []
+
     class Settings:
         name = "chat_conversation"
         indexes = [
@@ -177,22 +362,35 @@ class ChatConversation(Document):
         content: str,
         thinking: Optional[str] = None,
         thinking_duration: Optional[float] = None,
+        tool_calls: Optional[list[dict]] = None,
+        tool_results: Optional[list[dict]] = None,
+        segments: Optional[list[dict]] = None,
         citations: Optional[list[dict]] = None,
         source_documents: Optional[list[dict]] = None,
         unsupported_figures: Optional[list[str]] = None,
+        silence_inferences: Optional[list[str]] = None,
+        interruption: Optional[str] = None,
         unsupported_citations: Optional[list[str]] = None,
     ) -> ChatMessage:
         msg = ChatMessage(
             role=role,
             message=content,
+            active_skill=self.active_skill,
             thinking=thinking or None,
             thinking_duration=thinking_duration,
+            tool_calls=tool_calls or None,
+            tool_results=tool_results or None,
+            segments=segments or None,
             citations=citations or None,
             unsupported_figures=unsupported_figures or None,
+            silence_inferences=silence_inferences or None,
+            interruption=interruption or None,
             unsupported_citations=unsupported_citations or None,
             source_documents=_cap_source_documents(source_documents),
         )
         await msg.insert()
+        if msg.id is None:
+            raise RuntimeError("Inserted chat message has no database ID")
         self.messages.append(msg.id)
         self.updated_at = datetime.datetime.now()
         await self.save()
@@ -201,13 +399,58 @@ class ChatConversation(Document):
     async def get_messages(self) -> list[dict]:
         msgs = await ChatMessage.find({"_id": {"$in": self.messages}}).to_list()
         order = {mid: i for i, mid in enumerate(self.messages)}
-        msgs.sort(key=lambda m: order.get(m.id, 0))
+        msgs.sort(key=lambda m: order.get(m.id, 0) if m.id is not None else 0)
         return [m.to_dict() for m in msgs]
 
-    async def to_model_messages(self) -> list[ModelMessage]:
+    def _cleared_tool_call_ids(
+        self, msgs: list["ChatMessage"], compactable_tools: frozenset[str] | set[str],
+    ) -> set[str]:
+        """Tool-call ids whose results replay as the cleared marker.
+
+        A result is cleared when its message sits before the persisted
+        ``tool_results_cleared_before`` boundary AND its tool is compactable
+        (read-type, safely re-runnable — never write-tool previews, which the
+        confirm gate replays verbatim). Floor: the single most recent
+        compactable result in the whole conversation is always kept, so the
+        model retains at least one concrete result to ground on even when
+        every result is old.
+        """
+        boundary = self.tool_results_cleared_before or 0
+        if boundary <= 0 or not compactable_tools:
+            return set()
+
+        last_compactable_id: str | None = None
+        for m in msgs:
+            for seg in (m.segments or []):
+                if seg.get("kind") != "tool_result":
+                    continue
+                r = seg.get("result", {})
+                if r.get("tool_name") in compactable_tools and r.get("tool_call_id"):
+                    last_compactable_id = r["tool_call_id"]
+
+        cleared: set[str] = set()
+        for i, m in enumerate(msgs):
+            if i >= boundary:
+                break
+            for seg in (m.segments or []):
+                if seg.get("kind") != "tool_result":
+                    continue
+                r = seg.get("result", {})
+                call_id = r.get("tool_call_id")
+                if (
+                    call_id
+                    and call_id != last_compactable_id
+                    and r.get("tool_name") in compactable_tools
+                ):
+                    cleared.add(call_id)
+        return cleared
+
+    async def to_model_messages(
+        self, compactable_tools: frozenset[str] | set[str] | None = None,
+    ) -> list[ModelMessage]:
         msgs = await ChatMessage.find({"_id": {"$in": self.messages}}).to_list()
         order = {mid: i for i, mid in enumerate(self.messages)}
-        msgs.sort(key=lambda m: order.get(m.id, 0))
+        msgs.sort(key=lambda m: order.get(m.id, 0) if m.id is not None else 0)
 
         result: list[ModelMessage] = []
 
@@ -217,13 +460,20 @@ class ChatConversation(Document):
                 content=f"Previous conversation summary:\n{self.compact_summary}"
             )]))
 
+        cleared_ids = (
+            self._cleared_tool_call_ids(msgs, compactable_tools)
+            if compactable_tools
+            else set()
+        )
+
         # Only include messages from the cutoff index onward
         if self.context_mode in ("truncated", "compacted") and self.context_cutoff_index > 0:
             active_msgs = msgs[self.context_cutoff_index:]
         else:
             active_msgs = msgs
 
-        result.extend([m.to_model_message() for m in active_msgs])
+        for m in active_msgs:
+            result.extend(m.to_model_messages(cleared_tool_call_ids=cleared_ids))
         return result
 
     async def get_file_attachments(self) -> list[FileAttachment]:

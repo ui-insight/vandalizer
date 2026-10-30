@@ -23,10 +23,13 @@ expect. Step removal and retry-policy trials are deferred to a later phase.
 
 from __future__ import annotations
 
+from typing import overload
+
 import asyncio
 import datetime
 import hashlib
 import logging
+import math
 import random
 from typing import Any
 
@@ -38,7 +41,13 @@ from app.models.workflow import Workflow, WorkflowResult
 from app.models.workflow_optimization_run import WorkflowOptimizationRun
 from app.services.budget_enforcer import BudgetEnforcer
 from app.services.config_service import get_user_model_name
-from app.services.optimization_common import build_apply_preview, pick_winner_variance_aware
+from app.services.optimization_common import (
+    build_apply_preview,
+    pick_winner_variance_aware,
+    tie_band,
+    reported_baseline_score,
+    tied_on_reported_scores,
+)
 from app.services.optimizer_notifications import notify_run_terminal
 from app.services.workflow_prompt_variants import PROMPT_VARIANTS
 
@@ -145,6 +154,14 @@ def _revoke_task(run_doc: WorkflowOptimizationRun) -> None:
             "Could not revoke Celery task %s for workflow optimization run %s",
             task_id, run_doc.uuid, exc_info=True,
         )
+
+
+@overload
+async def reap_one(run_doc: WorkflowOptimizationRun) -> WorkflowOptimizationRun: ...
+
+
+@overload
+async def reap_one(run_doc: None) -> None: ...
 
 
 async def reap_one(run_doc: WorkflowOptimizationRun | None) -> WorkflowOptimizationRun | None:
@@ -290,6 +307,8 @@ async def run_optimization(
         from app.services.workflow_service import _measure_no_workflow_baseline, get_workflow
 
         wf_data = await get_workflow(workflow_id)
+        if wf_data is None:
+            raise OptimizationInputError(f"Workflow not found: {workflow_id}")
 
         # No-workflow baseline (single-shot prompt against the source text).
         # Best-effort — `_measure_no_workflow_baseline` returns None when the
@@ -538,6 +557,7 @@ async def run_optimization(
                         )
                         if holdout_winner.get("score") is not None:
                             run_doc.optimized_score = holdout_winner.get("score")
+                            run_doc.holdout_optimized_score = holdout_winner.get("score")
                     except Exception as e:
                         logger.warning("Holdout re-score (winner) failed: %s", e)
 
@@ -579,6 +599,26 @@ async def run_optimization(
         # not silently apply the winner's config — honor it before _apply_best.
         if await _is_cancelled(run_doc):
             return await _finalize_cancelled(run_doc)
+
+        # The tie was decided on training scores; the headline is now the
+        # holdout score. Decide it again on the numbers the run reports.
+        if trial_results and run_doc.best_config is not None:
+            regated = tied_on_reported_scores(
+                tied=run_doc.tied_with_baseline,
+                optimized_score=run_doc.optimized_score,
+                baseline_score=reported_baseline_score(
+                    holdout_optimized_score=run_doc.holdout_optimized_score,
+                    holdout_default_score=run_doc.holdout_default_score,
+                    baseline_default_score=run_doc.baseline_default_score,
+                ),
+                band=tie_band(
+                    run_doc.judge_variance, n_items,
+                    fallback_noise_floor=DEFAULT_WORKFLOW_JUDGE_NOISE_FLOOR,
+                ),
+            )
+            if regated and not run_doc.tied_with_baseline:
+                run_doc.winner_selection_reason = "tied_on_reported_score"
+            run_doc.tied_with_baseline = regated
 
         # Apply-on-finish only when the winner cleared the significance band.
         applied = bool(
@@ -724,7 +764,7 @@ async def _resolve_test_inputs(
     return out
 
 
-async def _load_result_for_test_input(test_input: dict):
+async def _load_result_for_test_input(test_input: dict) -> WorkflowResult | None:
     """Fetch the original WorkflowResult so baseline_no_workflow can re-use
     its ``steps_output`` to pull the source document text. Returns None when
     the result has been deleted since the expected_output was saved."""
@@ -893,8 +933,8 @@ def _build_candidates(
 
     # 3. Uniform-model trials — every LLM step uses model X
     for m in swap_models[:3]:
-        overrides = {s["name"]: {"model": m, "prompt_variant": "default"} for s in llm_steps}
-        _add(f"uniform-{_model_short(m)}", overrides)
+        uniform_overrides = {s["name"]: {"model": m, "prompt_variant": "default"} for s in llm_steps}
+        _add(f"uniform-{_model_short(m)}", uniform_overrides)
 
     # 4. Random samples (per-step independent draws) to fill quota.
     #
@@ -1458,10 +1498,10 @@ def _compute_workflow_variance(samples: list[tuple[dict, dict]]) -> float | None
         return None
     mean = sum(deltas) / len(deltas)
     variance = sum((d - mean) ** 2 for d in deltas) / (len(deltas) - 1)
-    return round(variance ** 0.5, 4)
+    return round(math.sqrt(variance), 4)
 
 
-def _serialize_for_judge(final_output) -> str | None:
+def _serialize_for_judge(final_output: object) -> str | None:
     """Same serialization as workflow_service._serialize_output, kept inline so
     the optimizer doesn't depend on a private helper."""
     import base64 as _b64

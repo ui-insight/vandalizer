@@ -22,6 +22,8 @@ resolver does.
 """
 
 from __future__ import annotations
+from pymongo.database import Database
+
 
 import json
 import re
@@ -29,7 +31,7 @@ import re
 __all__ = ["_extract_json", "_resolve_model_name"]
 
 
-def _get_db():
+def _get_db() -> Database[dict]:
     from app.tasks import get_sync_db
 
     return get_sync_db()
@@ -61,7 +63,9 @@ def _resolve_model_name(user_id: str | None = None) -> str:
         for key in ("name", "tag"):
             for m in models:
                 if m.get(key) == value and m.get("name"):
-                    return m["name"]
+                    name = m["name"]
+                    if isinstance(name, str):
+                        return name
         return ""
 
     if user_id:
@@ -74,8 +78,9 @@ def _resolve_model_name(user_id: str | None = None) -> str:
     if default and any(m.get("name") == default for m in models):
         return default
     for m in models:
-        if m.get("name"):
-            return m["name"]
+        name = m.get("name")
+        if isinstance(name, str) and name:
+            return name
     return ""
 
 
@@ -93,14 +98,18 @@ def _extract_json(text: str) -> dict | list:
         text = text.strip()
 
     try:
-        return json.loads(text)
+        parsed = json.loads(text)
+        if isinstance(parsed, (dict, list)):
+            return parsed
     except json.JSONDecodeError:
         pass
 
     for i, ch in enumerate(text):
         if ch in ("{", "["):
             try:
-                return json.loads(text[i:])
+                parsed = json.loads(text[i:])
+                if isinstance(parsed, (dict, list)):
+                    return parsed
             except json.JSONDecodeError:
                 continue
 

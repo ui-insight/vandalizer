@@ -73,6 +73,10 @@ class WorkflowOptimizationRun(Document):
     # ``overfitting_warning`` is set and the in-sample score is the headline.
     optimized_score_train: Optional[float] = None
     holdout_default_score: Optional[float] = None
+    # The winner's held-out re-score, set only when it succeeded: the headline
+    # is held-out exactly when this is set, and only then may it be paired
+    # with ``holdout_default_score``. Same field as KBOptimizationRun.
+    holdout_optimized_score: Optional[float] = None
     train_input_ids: list[str] = Field(default_factory=list)
     holdout_input_ids: list[str] = Field(default_factory=list)
     overfitting_warning: bool = False
@@ -141,7 +145,7 @@ class WorkflowOptimizationRun(Document):
             "started_at",
         ]
 
-    def __init__(self, **data):
+    def __init__(self, **data: object) -> None:
         super().__init__(**data)
         if not self.uuid:
             self.uuid = uuid4().hex

@@ -6,6 +6,14 @@ enqueues ``tasks.project.duplicate`` to deep-copy the folder subtree, files,
 and knowledge-base ingestion, which can take a while for large projects.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from celery import Task
+
+
 import logging
 
 from app.celery_app import celery_app
@@ -22,11 +30,11 @@ logger = logging.getLogger(__name__)
     max_retries=2,
 )
 def duplicate_project_task(
-    self, source_project_uuid: str, new_project_uuid: str, user_id: str
+    self: Task, source_project_uuid: str, new_project_uuid: str, user_id: str
 ) -> dict:
     """Deep-copy a project's folders + files + KB ingestion in the background."""
 
-    async def _run():
+    async def _run() -> dict:
         from app.config import Settings
         from app.database import init_db
         from app.services import project_service

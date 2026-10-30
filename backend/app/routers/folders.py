@@ -14,15 +14,16 @@ from app.schemas.documents import (
     RenameFolderRequest,
 )
 from app.services import file_service, folder_service
+from app.utils.content_disposition import content_disposition
 
 router = APIRouter()
 
 
-@router.post("/create")
+@router.post("/create", response_model=None)
 async def create(
     body: CreateFolderRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     team_id: str | None = None
     if body.folder_type == "team" and user.current_team:
         from app.models.team import Team
@@ -50,23 +51,23 @@ async def create(
     }
 
 
-@router.patch("/rename")
+@router.patch("/rename", response_model=None)
 async def rename(
     body: RenameFolderRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     ok = await folder_service.rename_folder(body.uuid, body.newName, user)
     if not ok:
         raise HTTPException(status_code=404, detail="Folder not found")
     return {"ok": True}
 
 
-@router.get("/{folder_uuid}/export")
+@router.get("/{folder_uuid}/export", response_model=None)
 async def export(
     folder_uuid: str,
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-):
+) -> StreamingResponse:
     """Stream a zip of every document in the folder subtree, preserving structure."""
     manifest = await folder_service.collect_export_entries(folder_uuid, user)
     if manifest is None:
@@ -90,16 +91,16 @@ async def export(
     return StreamingResponse(
         buf,
         media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{filename}.zip"'},
+        headers={"Content-Disposition": content_disposition(f"{filename}.zip")},
     )
 
 
-@router.patch("/{folder_uuid}/move")
+@router.patch("/{folder_uuid}/move", response_model=None)
 async def move(
     folder_uuid: str,
     body: MoveFolderRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     try:
         folder = await folder_service.move_folder(folder_uuid, body.parent_id, user)
     except ValueError as e:
@@ -114,11 +115,11 @@ async def move(
     }
 
 
-@router.delete("/{folder_uuid}")
+@router.delete("/{folder_uuid}", response_model=None)
 async def delete(
     folder_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     try:
         ok = await folder_service.delete_folder(folder_uuid, user)
     except ValueError as e:
@@ -128,11 +129,11 @@ async def delete(
     return {"ok": True}
 
 
-@router.patch("/{folder_uuid}/convert-to-team")
+@router.patch("/{folder_uuid}/convert-to-team", response_model=None)
 async def convert_to_team(
     folder_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     try:
         folder = await folder_service.convert_to_team_folder(folder_uuid, user)
     except ValueError as e:
@@ -147,10 +148,10 @@ async def convert_to_team(
     }
 
 
-@router.get("/all")
+@router.get("/all", response_model=None)
 async def list_all_folders(
     user: User = Depends(get_current_user),
-):
+) -> list[dict]:
     """Return all folders for the current user, including subfolders."""
     from app.services.access_control import get_team_access_context
 
@@ -189,11 +190,11 @@ async def list_all_folders(
     ]
 
 
-@router.get("/breadcrumbs/{folder_uuid}")
+@router.get("/breadcrumbs/{folder_uuid}", response_model=None)
 async def breadcrumbs(
     folder_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> list[dict]:
     crumbs = await folder_service.get_breadcrumbs(folder_uuid, user)
     if crumbs is None:
         raise HTTPException(status_code=404, detail="Folder not found")

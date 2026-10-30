@@ -1,3 +1,4 @@
+import { SectionPage } from '../components/layout/SectionPage'
 import { useState } from 'react'
 import { useSearch } from '@tanstack/react-router'
 import { ShieldCheck, BookOpen, FolderOpen, Users, Pin } from 'lucide-react'
@@ -29,8 +30,10 @@ export default function Verification() {
   if (!user?.is_examiner) {
     return (
       <PageLayout>
-        <div className="text-center py-12 text-gray-500">
-          You do not have examiner access.
+        <div className="mx-auto max-w-5xl">
+          <h1 className="mb-2 text-xl font-semibold text-gray-900">My sharing requests</h1>
+          <p className="mb-5 text-sm text-gray-600">See the examiner’s feedback on your submissions. Open the item to make changes and submit it again from its sharing menu.</p>
+          <VerificationQueue focusRequestUuid={search.request} />
         </div>
       </PageLayout>
     )
@@ -41,56 +44,13 @@ export default function Verification() {
 
   return (
     <PageLayout>
-      <div style={{ display: 'flex', gap: 0, minHeight: 'calc(100vh - 130px)' }}>
-        {/* Sidebar */}
-        <nav style={{
-          width: 220, flexShrink: 0,
-          borderRight: '1px solid #e5e7eb',
-          backgroundColor: '#fff',
-          padding: '20px 0',
-          borderRadius: 'var(--ui-radius, 12px) 0 0 var(--ui-radius, 12px)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 20px', marginBottom: 20 }}>
-            <ShieldCheck size={20} color="#6b7280" />
-            <h1 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Shared items</h1>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '0 8px' }}>
-            {visibleTabs.map(tab => {
-              const Icon = tab.icon
-              const isActive = activeTab === tab.key
-              return (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    padding: '10px 14px', border: 'none', cursor: 'pointer',
-                    fontSize: 14, fontWeight: isActive ? 600 : 400,
-                    color: isActive ? '#111827' : '#6b7280',
-                    backgroundColor: isActive ? '#f3f4f6' : 'transparent',
-                    borderRadius: 8, fontFamily: 'inherit',
-                    transition: 'background-color 0.15s, color 0.15s',
-                    width: '100%', textAlign: 'left',
-                    borderLeft: isActive ? '3px solid var(--highlight-color, #eab308)' : '3px solid transparent',
-                  }}
-                >
-                  <Icon size={18} style={{ flexShrink: 0 }} />
-                  {tab.label}
-                </button>
-              )
-            })}
-          </div>
-        </nav>
-
-        {/* Content */}
-        <div style={{ flex: 1, padding: '20px 32px', minWidth: 0 }}>
+      <SectionPage title="Shared items" icon={ShieldCheck} label="Shared item sections" sections={visibleTabs} active={activeTab} onSelect={setActiveTab}>
           {activeTab === 'queue' && <VerificationQueue focusRequestUuid={search.request} />}
           {activeTab === 'catalog' && <VerifiedCatalog />}
           {activeTab === 'coverage' && <CatalogCoverageTab />}
           {activeTab === 'collections' && <CollectionsManager />}
           {activeTab === 'examiners' && isAdmin && <ExaminerManager />}
-        </div>
-      </div>
+      </SectionPage>
     </PageLayout>
   )
 }

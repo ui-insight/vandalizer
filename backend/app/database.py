@@ -1,10 +1,12 @@
 import logging
 
-from beanie import init_beanie
-from motor.motor_asyncio import AsyncIOMotorClient
+from beanie import Document, init_beanie
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
 from app.config import Settings
 from app.models.user import User
+from app.models.artifact import Artifact
+from app.models.page_template import PageTemplate, PageTemplateDraft
 from app.models.team import Team, TeamMembership, TeamInvite, TeamJoinLink
 from app.models.document import SmartDocument
 from app.models.folder import SmartFolder
@@ -16,11 +18,13 @@ from app.models.workflow import (
     WorkflowAttachment,
     WorkflowResult,
     WorkflowArtifact,
+    WorkflowVersion,
 )
 from app.models.system_config import SystemConfig
 from app.models.user_config import UserModelConfig
 from app.models.chat import ChatMessage, FileAttachment, UrlAttachment, ChatConversation
 from app.models.activity import ActivityEvent
+from app.models.certification_journey import CertificationJourneyEvent
 from app.models.library import LibraryFolder, LibraryItem, Library
 from app.models.feedback import ChatFeedback, ExtractionQualityRecord, ProductFeedback
 from app.models.verification import VerificationRequest, VerifiedItemMetadata, VerifiedCollection
@@ -42,26 +46,36 @@ from app.models.extraction_test_case import ExtractionTestCase
 from app.models.extraction_optimization_run import ExtractionOptimizationRun
 from app.models.workflow_optimization_run import WorkflowOptimizationRun
 from app.models.validation_run import ValidationRun
+from app.models.kb_validation_task import KBValidationTask
+from app.models.automation_launch import AutomationLaunch
 from app.models.quality_alert import QualityAlert
+from app.models.verification_session import VerificationSession
 from app.models.regression_suite_run import RegressionSuiteRun
 from app.models.demo import DemoApplication, PostExperienceResponse
 from app.models.passive import WorkflowTriggerEvent, ExtractionTriggerEvent, GraphSubscription, M365AuditEntry
-from app.models.certification import CertificationProgress
+from app.models.certification import CertificationProgress, CertificationEnrollment, CertificationEnrollmentSelection, CertificationCredential, CertificationAttempt, CertificationRecoveryRecord, CertificationLabInput, CertificationScenarioAttempt, CertificationLabExecution, CertificationReviewAttempt, CertificationLearnerDecision, CertificationProcessSubmission, CertificationWorkflowDesignSubmission, CertificationUpgradeDecision, CertificationCompletionNotice, CertificationUpgradeActivation, CertificationSavedCourseSelection, CertificationSelectionPreparationRecovery
 from app.models.organization import Organization
 from app.models.audit_log import AuditLog, AdminAuditLog
 from app.models.approval import ApprovalRequest
 from app.models.notification import Notification
 from app.models.support import SupportTicket, SupportCounter
 from app.models.feedback_prompt import FeedbackPrompt, FeedbackPromptResponse
+from app.models.user_memory import UserMemory
 from app.models.email_log import EmailLog
 from app.models.api_key import ApiKey
+from app.models.obligation import Obligation
 from app.models.credential import Credential
 from app.models.llm_usage import LlmUsageRecord
 from app.models.project import Project, ProjectMembership, ProjectPin, ProjectJoinLink
 from app.models.telemetry import TelemetryHeartbeat
+from app.models.web_search_usage import WebSearchUsage
 
-ALL_MODELS = [
+ALL_MODELS: list[type[Document]] = [
+    Obligation,
     User,
+    Artifact,
+    PageTemplate,
+    PageTemplateDraft,
     Team,
     TeamMembership,
     TeamInvite,
@@ -76,6 +90,7 @@ ALL_MODELS = [
     WorkflowAttachment,
     WorkflowResult,
     WorkflowArtifact,
+    WorkflowVersion,
     SystemConfig,
     UserModelConfig,
     ChatMessage,
@@ -83,6 +98,7 @@ ALL_MODELS = [
     UrlAttachment,
     ChatConversation,
     ActivityEvent,
+    CertificationJourneyEvent,
     LibraryFolder,
     LibraryItem,
     Library,
@@ -109,7 +125,10 @@ ALL_MODELS = [
     ExtractionOptimizationRun,
     WorkflowOptimizationRun,
     ValidationRun,
+    KBValidationTask,
+    AutomationLaunch,
     QualityAlert,
+    VerificationSession,
     RegressionSuiteRun,
     DemoApplication,
     PostExperienceResponse,
@@ -118,6 +137,23 @@ ALL_MODELS = [
     GraphSubscription,
     M365AuditEntry,
     CertificationProgress,
+    CertificationEnrollment,
+    CertificationEnrollmentSelection,
+    CertificationCredential,
+    CertificationAttempt,
+    CertificationRecoveryRecord,
+    CertificationLabInput,
+    CertificationScenarioAttempt,
+    CertificationLabExecution,
+    CertificationReviewAttempt,
+    CertificationLearnerDecision,
+    CertificationProcessSubmission,
+    CertificationWorkflowDesignSubmission,
+    CertificationUpgradeDecision,
+    CertificationCompletionNotice,
+    CertificationUpgradeActivation,
+    CertificationSavedCourseSelection,
+    CertificationSelectionPreparationRecovery,
     Organization,
     AuditLog,
     AdminAuditLog,
@@ -127,6 +163,7 @@ ALL_MODELS = [
     SupportCounter,
     FeedbackPrompt,
     FeedbackPromptResponse,
+    UserMemory,
     EmailLog,
     ApiKey,
     Credential,
@@ -136,6 +173,7 @@ ALL_MODELS = [
     ProjectPin,
     ProjectJoinLink,
     TelemetryHeartbeat,
+    WebSearchUsage,
 ]
 
 
@@ -171,7 +209,7 @@ def get_client() -> AsyncIOMotorClient:
     return _client
 
 
-async def _run_pre_index_migrations(db) -> None:
+async def _run_pre_index_migrations(db: AsyncIOMotorDatabase) -> None:
     """Data fixes that must land before Beanie builds indexes.
 
     A unique index declared in a model's ``Settings.indexes`` is built by
@@ -255,7 +293,7 @@ async def init_db(
         _indexes_ensured = True
 
 
-def _rebind_models(db) -> bool:
+def _rebind_models(db: AsyncIOMotorDatabase) -> bool:
     """Point every already-initialized model at ``db``; False to fall back.
 
     This is the part of ``init_beanie`` that depends on the client
@@ -266,15 +304,17 @@ def _rebind_models(db) -> bool:
     back to the full ``init_beanie``.
     """
     try:
+        collections: list[tuple[type[Document], str]] = []
         for model in ALL_MODELS:
             model_settings = model.get_settings()
             if model_settings.timeseries is not None or model_settings.union_doc is not None:
                 return False
             if not model_settings.name:
                 return False
-        for model in ALL_MODELS:
+            collections.append((model, model_settings.name))
+        for model, collection_name in collections:
             model.set_database(db)
-            model.set_collection(db[model.get_settings().name])
+            model.set_collection(db[collection_name])
     except Exception:
         logger.warning("Rebinding Beanie models failed; running init_beanie", exc_info=True)
         return False

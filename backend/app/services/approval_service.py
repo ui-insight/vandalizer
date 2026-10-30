@@ -8,6 +8,7 @@ Handles:
 """
 
 from __future__ import annotations
+from pymongo.database import Database
 
 import datetime
 import logging
@@ -27,7 +28,6 @@ from app.models.approval import (
     ASSIGNEE_WORKFLOW_OWNER,
     ApprovalRequest,
     STATUS_APPROVED,
-    STATUS_ESCALATED,
     STATUS_EXPIRED,
     STATUS_PENDING,
     STATUS_REJECTED,
@@ -40,6 +40,36 @@ from app.models.team import TeamMembership
 from app.models.workflow import Workflow, WorkflowResult
 
 logger = logging.getLogger(__name__)
+
+
+async def update_pending_approval(
+    approval: ApprovalRequest, changes: dict, *, allow_expired: bool = False,
+) -> bool:
+    """Claim a pending transition before dispatching any of its side effects.
+
+    Assignment and deadline are part of the comparison so a stale reviewer or
+    timeout sweep cannot overwrite a reassignment, extension, or other decision.
+    """
+    now = datetime.datetime.now(datetime.timezone.utc)
+    deadline = approval.expires_at
+    if deadline and deadline.tzinfo is None:
+        deadline = deadline.replace(tzinfo=datetime.timezone.utc)
+    if not allow_expired and deadline and deadline <= now:
+        return False
+    result = await ApprovalRequest.get_motor_collection().update_one(
+        {
+            "_id": approval.id,
+            "status": STATUS_PENDING,
+            "assigned_to_user_ids": approval.assigned_to_user_ids,
+            "expires_at": approval.expires_at,
+        },
+        {"$set": changes},
+    )
+    if result.modified_count != 1:
+        return False
+    for key, value in changes.items():
+        setattr(approval, key, value)
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -82,7 +112,7 @@ async def resolve_assignees(
     return [workflow.user_id] if workflow.user_id else []
 
 
-def resolve_assignees_sync(db, role: str, workflow_doc: dict, explicit_user_ids: list[str]) -> list[str]:
+def resolve_assignees_sync(db: Database[dict], role: str, workflow_doc: dict, explicit_user_ids: list[str]) -> list[str]:
     """Sync variant for use inside Celery tasks (pymongo handle).
 
     Mirrors `resolve_assignees` but uses sync pymongo so the Celery worker
@@ -108,8 +138,8 @@ def resolve_assignees_sync(db, role: str, workflow_doc: dict, explicit_user_ids:
             return [user_id] if user_id else []
         memberships = list(db.team_membership.find({"team": team_oid}))
         admins = [m.get("user_id") for m in memberships if m.get("role") in ("owner", "admin")]
-        admins = [a for a in admins if a]
-        return admins or ([user_id] if user_id else [])
+        assignee_ids = [a for a in admins if isinstance(a, str) and a]
+        return assignee_ids or ([user_id] if user_id else [])
 
     logger.warning("Unknown assignee_role %r — defaulting to workflow owner", role)
     return [user_id] if user_id else []
@@ -120,7 +150,7 @@ def resolve_assignees_sync(db, role: str, workflow_doc: dict, explicit_user_ids:
 # ---------------------------------------------------------------------------
 
 
-def detect_artifact_kind(value) -> str:
+def detect_artifact_kind(value: object) -> str:
     """Best-effort guess at the renderer to use on the review screen.
 
     The output of the previous step can be almost anything. We try to identify
@@ -251,7 +281,7 @@ async def expire_overdue_approvals() -> dict:
     overdue = await ApprovalRequest.find(
         ApprovalRequest.status == STATUS_PENDING,
         ApprovalRequest.expires_at != None,  # noqa: E711
-        ApprovalRequest.expires_at < now,
+        {"expires_at": {"$lt": now}},
     ).to_list()
 
     counts = {"approved": 0, "rejected": 0, "escalated": 0, "expired": 0, "skipped": 0}
@@ -259,10 +289,26 @@ async def expire_overdue_approvals() -> dict:
         action = approval.timeout_action or TIMEOUT_NONE
 
         if action == TIMEOUT_APPROVE:
-            approval.status = STATUS_APPROVED
-            approval.decision_at = now
-            approval.reviewer_comments = "Auto-approved on timeout"
-            await approval.save()
+            changes = {"status": STATUS_APPROVED, "decision_at": now, "reviewer_comments": "Auto-approved on timeout"}
+        elif action == TIMEOUT_REJECT:
+            changes = {"status": STATUS_REJECTED, "decision_at": now, "reviewer_comments": "Auto-rejected on timeout"}
+        elif action == TIMEOUT_ESCALATE:
+            changes = {
+                "status": STATUS_PENDING, "escalated_at": now,
+                "assigned_to_user_ids": list(set(approval.assigned_to_user_ids + approval.escalation_user_ids)),
+                "expires_at": now + datetime.timedelta(days=2), "timeout_action": TIMEOUT_NONE,
+            }
+        elif action == TIMEOUT_NONE:
+            changes = {"status": STATUS_EXPIRED, "expired_at": now}
+        else:
+            counts["skipped"] += 1
+            logger.warning("Unknown timeout_action %r on approval %s", action, approval.uuid)
+            continue
+        if not await update_pending_approval(approval, changes, allow_expired=True):
+            counts["skipped"] += 1
+            continue
+
+        if action == TIMEOUT_APPROVE:
             celery.send_task(
                 "tasks.workflow.resume_after_approval",
                 kwargs={"approval_uuid": approval.uuid},
@@ -278,10 +324,6 @@ async def expire_overdue_approvals() -> dict:
             )
 
         elif action == TIMEOUT_REJECT:
-            approval.status = STATUS_REJECTED
-            approval.decision_at = now
-            approval.reviewer_comments = "Auto-rejected on timeout"
-            await approval.save()
             result = await WorkflowResult.get(approval.workflow_result_id)
             if result:
                 result.status = "failed"
@@ -302,20 +344,6 @@ async def expire_overdue_approvals() -> dict:
             )
 
         elif action == TIMEOUT_ESCALATE:
-            approval.status = STATUS_ESCALATED
-            approval.escalated_at = now
-            # Add escalation users as reviewers; keep status pending semantics
-            # via a separate ESCALATED status that the UI surfaces as urgent.
-            new_assignees = list(set(approval.assigned_to_user_ids + approval.escalation_user_ids))
-            approval.assigned_to_user_ids = new_assignees
-            # Reset to pending so reviewers can act, but mark we've escalated.
-            approval.status = STATUS_PENDING
-            approval.escalated_at = now
-            # Push out the deadline so we don't escalate again immediately.
-            approval.expires_at = now + datetime.timedelta(days=2)
-            approval.timeout_action = TIMEOUT_NONE
-            await approval.save()
-
             for uid in approval.escalation_user_ids:
                 await notification_service.create_notification(
                     user_id=uid,
@@ -343,19 +371,12 @@ async def expire_overdue_approvals() -> dict:
             # The activity, though, has to stop reading as in-flight: no one can
             # decide an expired review, so the run is not going to move on its
             # own and the rail would spin on it indefinitely.
-            approval.status = STATUS_EXPIRED
-            approval.expired_at = now
-            await approval.save()
             await end_approval_wait(
                 approval.workflow_result_id,
                 approval_uuid=approval.uuid,
                 error="Review deadline passed with no decision — run is still paused.",
             )
             counts["expired"] += 1
-
-        else:
-            counts["skipped"] += 1
-            logger.warning("Unknown timeout_action %r on approval %s", action, approval.uuid)
 
     if any(counts.values()):
         logger.info("Approval timeout sweep: %s", counts)

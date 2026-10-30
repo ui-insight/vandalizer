@@ -15,7 +15,7 @@ export type KindFilter = '' | 'workflow' | 'search_set' | 'knowledge_base'
 export type SortOption = '' | 'quality' | 'name' | 'adoption' | 'validations'
 // Keyed on the tiers compute_quality_tier emits — the only vocabulary a
 // measured item can carry.
-export type QualityFilter = '' | 'excellent' | 'good' | 'fair'
+export type QualityFilter = '' | 'strong' | 'mixed' | 'improvement' | 'unevaluated' | 'review'
 
 export const CATALOG_PAGE_SIZE = 30
 
@@ -29,12 +29,14 @@ export const SORT_OPTIONS: [SortOption, string][] = [
 
 export const QUALITY_FILTER_OPTIONS: [QualityFilter, string][] = [
   ['', 'Any quality'],
-  ['excellent', 'Excellent'],
-  ['good', 'Good'],
-  ['fair', 'Fair'],
+  ['strong', 'Strong on tested examples'],
+  ['mixed', 'Mixed results'],
+  ['improvement', 'Needs improvement'],
+  ['unevaluated', 'Not evaluated'],
+  ['review', 'Needs review'],
 ]
 
-/** How many excellent-tier items the "Top Rated" spotlight shows. */
+/** Maximum number of measured strong results in the spotlight. */
 export const SPOTLIGHT_SIZE = 6
 
 /** The landing view's two sections: the spotlight, and everything else.
@@ -45,15 +47,13 @@ export const SPOTLIGHT_SIZE = 6
 export function splitSpotlight(items: VerifiedCatalogItem[]): {
   spotlight: VerifiedCatalogItem[]; rest: VerifiedCatalogItem[]; topRatedCount: number
 } {
-  const top = items.filter(i => i.quality_tier === 'excellent').sort(spotlightOrder)
+  const top = items.filter(i => !i.quality_asserted && i.quality_score != null && !i.regression_pending_review && ['excellent', 'good'].includes(i.quality_tier || '')).sort(spotlightOrder)
   const spotlight = top.slice(0, SPOTLIGHT_SIZE)
   const shown = new Set(spotlight.map(i => i.id))
   return { spotlight, rest: items.filter(i => !shown.has(i.id)), topRatedCount: top.length }
 }
 
-/** Measured top-tier items lead the spotlight; hand-asserted ones follow. Both
- *  stay eligible so a fresh install still has a landing page, but the earned
- *  rating always outranks the typed one. */
+/** Keep measured items ahead of author assertions when ordering catalog items. */
 export function spotlightOrder(a: VerifiedCatalogItem, b: VerifiedCatalogItem): number {
   return Number(!!a.quality_asserted) - Number(!!b.quality_asserted)
 }
@@ -96,17 +96,23 @@ export function useCatalogBrowser({ lockedKind, loadErrorMessage, onLoadMoreErro
     return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current) }
   }, [searchQuery])
 
-  // Load collections once (counts scoped to the locked kind when there is one)
-  useEffect(() => {
-    browseCollections(lockedKind || undefined)
-      .then(d => setCollections(d.collections))
-      // The knowledge-base tab never surfaced this (its Retry does not refetch
-      // collections); keep that, and report it where the library tab always did.
-      .catch(() => { if (!lockedKind) setError('Failed to load collections') })
-    listFeaturedCollections(lockedKind || undefined)
-      .then(d => setFeaturedCollections(d.collections))
-      .catch(() => {})
+  const [collectionsError, setCollectionsError] = useState<string | null>(null)
+  const collectionRequest = useRef(0)
+  const retryCollections = useCallback(async () => {
+    const request = ++collectionRequest.current
+    setCollectionsError(null)
+    const results = await Promise.allSettled([
+      browseCollections(lockedKind || undefined),
+      listFeaturedCollections(lockedKind || undefined),
+    ])
+    if (request !== collectionRequest.current) return
+    const [all, featured] = results
+    if (all.status === 'fulfilled') setCollections(all.value.collections)
+    if (featured.status === 'fulfilled') setFeaturedCollections(featured.value.collections)
+    if (results.some(result => result.status === 'rejected')) setCollectionsError('Some collections could not be loaded.')
   }, [lockedKind])
+  const invalidateCollections = useCallback(() => { collectionRequest.current++ }, [])
+  useEffect(() => { void retryCollections(); return invalidateCollections }, [retryCollections, invalidateCollections])
 
   const queryParams = useCallback((skip: number) => ({
     kind: kindFilter || undefined,
@@ -122,35 +128,47 @@ export function useCatalogBrowser({ lockedKind, loadErrorMessage, onLoadMoreErro
   // Only the user-chosen kind narrows; a locked kind is the whole population.
   const narrowed = !!(kindFilterState || debouncedSearch || qualityFilter || tagFilter || selectedCollectionId)
 
-  // Fetch items when filters change
+  // A filter change invalidates both the current page and any pending next page.
+  const requestVersion = useRef(0)
+  const morePending = useRef(false)
   const refresh = useCallback(async () => {
+    const request = ++requestVersion.current
+    morePending.current = false
+    setLoadingMore(false)
     setLoading(true)
     setError(null)
+    setItems([])
+    setTotal(0)
     try {
       const data = await listVerifiedItems(queryParams(0))
+      if (request !== requestVersion.current) return
       setItems(data.items)
       setTotal(data.total)
-      // Sort doesn't change the result count, so any fetch without narrowing
-      // filters carries the true "all items" total.
       if (!narrowed) setAllTotal(data.total)
     } catch {
-      setError(loadErrorMessage)
+      if (request === requestVersion.current) setError(loadErrorMessage)
     } finally {
-      setLoading(false)
+      if (request === requestVersion.current) setLoading(false)
     }
   }, [queryParams, narrowed, loadErrorMessage])
 
-  useEffect(() => { refresh() }, [refresh])
+  const invalidateItems = useCallback(() => { requestVersion.current++ }, [])
+  useEffect(() => { void refresh(); return invalidateItems }, [refresh, invalidateItems])
 
   const handleLoadMore = async () => {
+    if (morePending.current || loading || items.length >= total) return
+    const request = requestVersion.current
+    morePending.current = true
     setLoadingMore(true)
     try {
       const data = await listVerifiedItems(queryParams(items.length))
-      setItems(prev => [...prev, ...data.items])
+      if (request !== requestVersion.current) return
+      setItems(prev => [...prev, ...data.items.filter(item => !prev.some(existing => existing.id === item.id))])
+      setTotal(data.total)
     } catch {
-      onLoadMoreError('Failed to load more items')
+      if (request === requestVersion.current) onLoadMoreError('Failed to load more items. Your current results are preserved; retry Load more.')
     } finally {
-      setLoadingMore(false)
+      if (request === requestVersion.current) { morePending.current = false; setLoadingMore(false) }
     }
   }
 
@@ -165,6 +183,7 @@ export function useCatalogBrowser({ lockedKind, loadErrorMessage, onLoadMoreErro
 
   const clearFilters = () => {
     setSearchQuery('')
+    setDebouncedSearch('')
     setKindFilter('')
     setQualityFilter('')
     setTagFilter('')
@@ -174,7 +193,7 @@ export function useCatalogBrowser({ lockedKind, loadErrorMessage, onLoadMoreErro
 
   const hasActiveFilters = !!(kindFilterState || qualityFilter || tagFilter || sortOption || selectedCollectionId || debouncedSearch)
   // Show the hero landing when no filters are active
-  const showHero = !hasActiveFilters && !loading
+  const showHero = !hasActiveFilters && !loading && !error
 
   // Split items for the hero landing: the spotlight, and every item it does
   // not show (excellent-tier ones past the spotlight included).
@@ -185,7 +204,7 @@ export function useCatalogBrowser({ lockedKind, loadErrorMessage, onLoadMoreErro
 
   return {
     items, total, allTotal, collections, featuredCollections, regularCollections,
-    loading, loadingMore, error,
+    loading, loadingMore, error, collectionsError, retryCollections,
     searchQuery, setSearchQuery,
     kindFilter, setKindFilter,
     qualityFilter, setQualityFilter,

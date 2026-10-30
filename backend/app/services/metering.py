@@ -17,6 +17,9 @@ propagates (see workflow_engine.process).
 """
 
 from __future__ import annotations
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from tiktoken import Encoding
 
 import contextlib
 import json
@@ -37,11 +40,11 @@ _CHARS_PER_TOKEN_FALLBACK = 4
 # ---------------------------------------------------------------------------
 # Token estimation (used when the provider/gateway returns no usage)
 # ---------------------------------------------------------------------------
-_encoding: Any = None
+_encoding: Encoding | None = None
 _encoding_failed = False
 
 
-def _get_encoding():
+def _get_encoding() -> Encoding | None:
     global _encoding, _encoding_failed
     if _encoding is None and not _encoding_failed:
         try:
@@ -297,7 +300,7 @@ def metered(
     if user_id:
         from app.services.trial_budget import check_sync
 
-        check_sync(user_id)
+        check_sync(user_id, feature=feature)
     scope = MeterScope(
         feature=feature, user_id=user_id, team_id=team_id,
         activity_id=activity_id, space=space,
@@ -327,7 +330,7 @@ async def metered_async(
     if user_id:
         from app.services.trial_budget import check_async
 
-        await check_async(user_id)
+        await check_async(user_id, feature)
     scope = MeterScope(
         feature=feature, user_id=user_id, team_id=team_id,
         activity_id=activity_id, space=space,

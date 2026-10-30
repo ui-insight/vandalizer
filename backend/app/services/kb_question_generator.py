@@ -8,6 +8,7 @@ remains meaningful.
 """
 
 from __future__ import annotations
+from chromadb.api.types import GetResult
 
 import asyncio
 import datetime
@@ -281,7 +282,7 @@ class KBQuestionGenerator:
         existing = await KBTestQuery.find(
             KBTestQuery.knowledge_base_uuid == kb_uuid,
         ).to_list()
-        return [q.external_id for q in existing if getattr(q, "external_id", None)]
+        return [q.external_id for q in existing if q.external_id is not None]
 
     async def _filter_contradicted_absence_questions(
         self,
@@ -413,13 +414,13 @@ class KBQuestionGenerator:
         extras_needed = max(0, target_count - len(sampled))
         if extras_needed > 0:
             try:
-                all_got = collection.get(limit=max(extras_needed * 4, 20))
+                all_got: GetResult | None = collection.get(limit=max(extras_needed * 4, 20))
             except Exception as e:
                 logger.debug("Failed to fetch extra chunks: %s", e)
-                all_got = {}
-            ids = (all_got or {}).get("ids") or []
-            docs = (all_got or {}).get("documents") or []
-            metas = (all_got or {}).get("metadatas") or []
+                all_got = None
+            ids = all_got["ids"] if all_got else []
+            docs = (all_got["documents"] or []) if all_got else []
+            metas = (all_got["metadatas"] or []) if all_got else []
             pool = []
             for cid, doc, meta in zip(ids, docs, metas):
                 if cid in seen_ids or not doc:

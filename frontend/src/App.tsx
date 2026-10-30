@@ -90,7 +90,11 @@ export default function App() {
                 <ConfirmProvider>
                   <CertificationPanelProvider>
                     <RouterProvider router={router} />
-                    <CertificationPanel />
+                    <CertificationPanel onOpenWorkspace={() => router.navigate({ to: '/', search: previous => ({
+                      ...previous, mode: 'files', tab: previous.tab === 'library' ? 'library' : undefined,
+                      workflow: previous.workflow, extraction: previous.extraction, automation: previous.automation,
+                      kb: previous.kb, project: previous.project, workflow_share_token: previous.workflow_share_token,
+                    }) })} />
                   </CertificationPanelProvider>
                 </ConfirmProvider>
               </ToastProvider>

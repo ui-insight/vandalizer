@@ -1,22 +1,38 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { TemplatesBrowser } from '../artifacts/TemplatesBrowser'
+import { useNavigate, useSearch } from '@tanstack/react-router'
+import { PanelsTopLeft } from 'lucide-react'
+import { PagesBrowser } from '../artifacts/PagesBrowser'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
 import { ArrowLeft, FileText, Link2, Search, X } from 'lucide-react'
 import { FileBrowser } from '../files/FileBrowser'
 import type { ContentMatch } from '../files/FileBrowser'
 import { DocumentViewer } from '../files/DocumentViewer'
 import { DocumentUsageDialog } from '../files/DocumentUsageDialog'
 import { RawTextModal } from '../files/RawTextModal'
+import { VerificationNavBar } from '../files/VerificationNavBar'
 import { ItemPickerModal } from './ItemPickerModal'
 import { KBPickerModal } from '../files/KBPickerModal'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
+import { useTeams } from '../../hooks/useTeams'
 import { useToast } from '../../contexts/ToastContext'
 import { pollStatus, searchDocuments } from '../../api/documents'
+import { getVerificationSession } from '../../api/verificationSessions'
 import { runWorkflow } from '../../api/workflows'
 import { addDocumentsToKB } from '../../api/knowledge'
 import type { Folder } from '../../types/document'
 
 export function LeftPanel() {
-  const { setSelectedDocUuids, setSelectedDocNames, setSelectedFolderUuids, setSelectedFolderNames, highlightTerms, highlightPage, highlightPageApproximate, setHighlightTerms, setProcessingDoc, setSelectedDocsProcessing, viewDocumentRequest, clearViewDocumentRequest, focusChat, openWorkflow, openExtraction, activateKB, activeProjectRootFolder, activeProjectTitle, activeProjectTeamId, workspaceMode, setOpenDocumentUuid } = useWorkspace()
+  const {
+    selectedDocUuids, selectedDocNames, selectedFolderUuids, setSelectedDocUuids, setSelectedDocNames, setSelectedFolderUuids, setSelectedFolderNames,
+    highlightTerms, highlightPage, highlightPageApproximate, setHighlightTerms,
+    setProcessingDoc, setSelectedDocsProcessing, updateDocumentReadiness, viewDocumentRequest, clearViewDocumentRequest,
+    verificationSession, setVerificationSession, setVerificationCompletion,
+    focusChat, openWorkflow, openExtraction, activateKB,
+    activeProjectRootFolder, activeProjectTitle, activeProjectTeamId, activeProjectUuid, activeProjectRole,
+    workspaceMode, setOpenDocumentUuid,
+  } = useWorkspace()
   const { toast } = useToast()
+  const { currentTeam } = useTeams()
   // Folder targeted by the workflow / KB picker modals (null = closed).
   const [workflowPickerFolder, setWorkflowPickerFolder] = useState<Folder | null>(null)
   const [kbPickerFolder, setKbPickerFolder] = useState<Folder | null>(null)
@@ -25,13 +41,23 @@ export function LeftPanel() {
     title: string
     processing?: boolean
     taskStatus?: string | null
+    preserveChatScope?: boolean
+    previousSelection?: { uuids: string[]; names: Record<string, string> }
   } | null>(null)
+  const filesSearch = useSearch({ from: '/' })
+  const navigateFiles = useNavigate({ from: '/' })
+  const filesView = filesSearch.files === 'templates' ? 'templates' : filesSearch.files === 'pages' ? 'pages' : 'documents'
+  const setFilesView = useCallback((view: 'documents' | 'pages' | 'templates') => { void navigateFiles({ to: '/', search: prev => ({ ...prev, files: view === 'documents' ? undefined : view }) }) }, [navigateFiles])
   const [showRawText, setShowRawText] = useState(false)
   const [showUsage, setShowUsage] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [contentSearchState, setContentSearchState] = useState<'loading' | 'error' | null>(null)
+  const [searchAttempt, setSearchAttempt] = useState(0)
   const [contentMatches, setContentMatches] = useState<ContentMatch[]>([])
   const [currentFolder, setCurrentFolder] = useState<string | null>(null)
+  const listScroller = useRef<HTMLDivElement>(null)
+  const listPosition = useRef(0)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const pollRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
@@ -43,7 +69,16 @@ export function LeftPanel() {
   // whole browser — upload, subfolders, drag-to-move, rename — scoped in.
   useEffect(() => {
     setCurrentFolder(activeProjectRootFolder ?? null)
-  }, [activeProjectRootFolder])
+    setViewingDoc(null)
+    setShowRawText(false)
+    setShowUsage(false)
+    setSearchQuery('')
+    setSearchOpen(false)
+    setContentMatches([])
+    setWorkflowPickerFolder(null)
+    setKbPickerFolder(null)
+    listPosition.current = 0
+  }, [activeProjectRootFolder, currentTeam?.uuid])
 
   // When a document is being viewed, ignore checkbox selection changes from FileBrowser
   // (the documents list refresh triggers onSelectionChange with empty selection, which
@@ -53,7 +88,7 @@ export function LeftPanel() {
   }, [setSelectedDocUuids])
 
   const handleDocNamesChange = useCallback((names: Record<string, string>) => {
-    if (!viewingDocRef.current) setSelectedDocNames(names)
+    if (!viewingDocRef.current) setSelectedDocNames(previous => ({ ...previous, ...names }))
   }, [setSelectedDocNames])
 
   const handleFolderSelectionChange = useCallback((uuids: string[]) => {
@@ -61,7 +96,7 @@ export function LeftPanel() {
   }, [setSelectedFolderUuids])
 
   const handleFolderNamesChange = useCallback((names: Record<string, string>) => {
-    if (!viewingDocRef.current) setSelectedFolderNames(names)
+    if (!viewingDocRef.current) setSelectedFolderNames(previous => ({ ...previous, ...names }))
   }, [setSelectedFolderNames])
 
   // "Ask about folder": scope the chat to just this folder, drop any
@@ -118,9 +153,12 @@ export function LeftPanel() {
   // apply it instead of the default clear, so the terms survive the open.
   useEffect(() => {
     if (viewDocumentRequest) {
-      setViewingDoc({ uuid: viewDocumentRequest.uuid, title: viewDocumentRequest.title })
-      setSelectedDocUuids([viewDocumentRequest.uuid])
-      setSelectedDocNames({ [viewDocumentRequest.uuid]: viewDocumentRequest.title })
+      setFilesView('documents')
+      setViewingDoc({ uuid: viewDocumentRequest.uuid, title: viewDocumentRequest.title, preserveChatScope: viewDocumentRequest.preserveChatScope })
+      if (!viewDocumentRequest.preserveChatScope) {
+        setSelectedDocUuids([viewDocumentRequest.uuid])
+        setSelectedDocNames({ [viewDocumentRequest.uuid]: viewDocumentRequest.title })
+      }
       if (viewDocumentRequest.highlight) {
         setHighlightTerms(
           viewDocumentRequest.highlight.terms,
@@ -132,7 +170,32 @@ export function LeftPanel() {
       }
       clearViewDocumentRequest()
     }
-  }, [viewDocumentRequest, clearViewDocumentRequest, setSelectedDocUuids, setSelectedDocNames, setHighlightTerms])
+  }, [viewDocumentRequest, clearViewDocumentRequest, setSelectedDocUuids, setSelectedDocNames, setHighlightTerms, setFilesView])
+
+  // Once a verification session is active, fetch the full state from the
+  // backend so we have persisted field statuses (the chat tool result only
+  // seeds the UUID + extracted values).
+  const verificationActive = Boolean(
+    verificationSession && viewingDoc && verificationSession.document_uuid === viewingDoc.uuid,
+  )
+  useEffect(() => {
+    if (!verificationSession) return
+    if (verificationSession.status !== 'pending') return
+    // Only refetch if we haven't already loaded persisted state (created_at is
+    // set after a round-trip from the backend).
+    if (verificationSession.created_at) return
+    let cancelled = false
+    getVerificationSession(verificationSession.uuid)
+      .then((s) => {
+        if (!cancelled) setVerificationSession(s)
+      })
+      .catch(() => {
+        // If we can't fetch, leave the seeded session in place.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [verificationSession?.uuid, verificationSession?.created_at, verificationSession?.status, setVerificationSession])
 
   // Publish the document the viewer is showing, so panels that link into it
   // (chat source citations) can tell "open this" from "already open". Only
@@ -187,17 +250,16 @@ export function LeftPanel() {
     if (searchOpen) searchInputRef.current?.focus()
   }, [searchOpen])
 
-  // Close search when navigating to a doc
-  useEffect(() => {
-    if (viewingDoc) {
-      setSearchOpen(false)
-      setSearchQuery('')
-      setContentMatches([])
-    }
+  // Keep list controls mounted and restore the visible list position on return.
+  useLayoutEffect(() => {
+    if (!viewingDoc) listScroller.current?.scrollTo({ top: listPosition.current, behavior: 'instant' })
   }, [viewingDoc])
 
   // Debounced content search
   useEffect(() => {
+    let cancelled = false
+    setContentSearchState(searchQuery.trim() ? 'loading' : null)
+    setContentMatches([])
     if (debounceRef.current) clearTimeout(debounceRef.current)
     if (!searchQuery.trim()) {
       setContentMatches([])
@@ -206,6 +268,8 @@ export function LeftPanel() {
     debounceRef.current = setTimeout(async () => {
       try {
         const data = await searchDocuments(searchQuery.trim())
+        if (cancelled) return
+        setContentSearchState(null)
         setContentMatches(
           data.items.map(item => ({
             uuid: item.uuid,
@@ -223,13 +287,16 @@ export function LeftPanel() {
           }))
         )
       } catch {
+        if (cancelled) return
+        setContentSearchState('error')
         setContentMatches([])
       }
     }, 300)
     return () => {
+      cancelled = true
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }, [searchQuery])
+  }, [searchQuery, searchAttempt])
 
   const handleCloseSearch = () => {
     setSearchOpen(false)
@@ -238,127 +305,96 @@ export function LeftPanel() {
   }
 
   return (
-    <div className="h-full overflow-hidden bg-panel-bg relative">
-      {/* Black header bar - matches Flask .main-panel .header */}
-      <div
-        className="relative z-[300] flex items-center"
-        style={{
-          height: 50,
-          backgroundColor: 'var(--color-panel-dark)',
-          boxShadow: '0 0px 23px -8px rgb(211, 211, 211)',
-          padding: '0 15px',
-        }}
-      >
-        {/* Back button */}
-        <div style={{ paddingLeft: 15, width: 50, flexShrink: 0 }}>
-          {viewingDoc && (
-            <button
-              type="button"
-              aria-label="Close document"
-              onClick={() => { setViewingDoc(null); setSelectedDocUuids([]); setSelectedDocNames({}); setHighlightTerms([]) }}
-              className="bg-transparent border-0 p-0 cursor-pointer"
-            >
-              <ArrowLeft className="h-6 w-6 text-white" />
-            </button>
-          )}
+    <aside aria-label="Files" className="flex h-full min-h-0 flex-col overflow-hidden bg-panel-bg relative">
+      <nav aria-label="Files views" className="files-view-tabs">
+        <button aria-pressed={filesView === 'documents'} onClick={() => setFilesView('documents')}><FileText size={16} aria-hidden="true" />Documents</button>
+        <button aria-pressed={filesView === 'pages'} onClick={() => setFilesView('pages')}><PanelsTopLeft size={16} aria-hidden="true" />Pages</button>
+        <button aria-pressed={filesView === 'templates'} onClick={() => setFilesView('templates')}><PanelsTopLeft size={16} aria-hidden="true" />Templates</button>
+      </nav>
+      {filesView === 'templates' && <div className="min-h-0 flex-1 overflow-auto"><TemplatesBrowser /></div>}
+      {filesView === 'pages' && <div className="min-h-0 flex-1 overflow-auto"><PagesBrowser key={activeProjectUuid ?? 'all'} projectUuid={activeProjectUuid ?? undefined} canManage={activeProjectRole === 'owner' || activeProjectRole === 'editor'} /></div>}
+      <div className="min-h-0 flex-1 flex-col" style={{ display: filesView === 'documents' ? 'flex' : 'none' }}>
+      {viewingDoc && <header className="workspace-document-header">
+        <button type="button" aria-label="Close document" className="workspace-header-icon"
+          onClick={() => { setViewingDoc(null); if (!viewingDoc.preserveChatScope) { setSelectedDocUuids(viewingDoc.previousSelection?.uuids ?? []); setSelectedDocNames(viewingDoc.previousSelection?.names ?? {}) } setHighlightTerms([]) }}>
+          <ArrowLeft size={20} />
+        </button>
+        <h2>{viewingDoc.title}</h2>
+        <div className="workspace-section-actions">
+          <button type="button" onClick={() => setShowUsage(true)} className="workspace-header-icon" title="Where is this used?" aria-label="Where is this used?"><Link2 size={20} /></button>
+          <button type="button" onClick={() => setShowRawText(true)} className="workspace-header-icon" title="View extracted text" aria-label="View extracted text"><FileText size={20} /></button>
         </div>
-
-        {/* Title or search input - centered */}
-        <div className="flex-1 text-center" style={{ minWidth: 0 }}>
-          {searchOpen && !viewingDoc ? (
-            <div className="flex items-center gap-2 mx-auto" style={{ maxWidth: 'calc(100% - 60px)' }}>
-              <Search className="h-4 w-4 text-gray-400 shrink-0" />
-              <input
-                ref={searchInputRef}
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search files and content..."
-                style={{
-                  flex: 1, border: 'none', background: 'none', outline: 'none',
-                  fontSize: 15, color: '#fff',
-                }}
-              />
-              <button
-                type="button"
-                aria-label="Close search"
-                onClick={handleCloseSearch}
-                className="bg-transparent border-0 p-0 cursor-pointer"
-              >
-                <X className="h-4 w-4 text-gray-400 hover:text-white" />
-              </button>
-            </div>
-          ) : (
-            <p
-              className="m-0 truncate text-white"
-              title={viewingDoc ? viewingDoc.title : undefined}
-              style={{
-                fontSize: 18,
-                fontWeight: 600,
-                margin: '0 auto',
-                paddingLeft: 8,
-                paddingRight: 8,
-              }}
-            >
-              {viewingDoc ? viewingDoc.title : 'Select or Upload PDFs'}
-            </p>
-          )}
-        </div>
-
-        {/* Right controls */}
-        <div style={{ paddingRight: 15, minWidth: 50, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'flex-end' }}>
-          {viewingDoc ? (
-            <>
-              <button
-                onClick={() => setShowUsage(true)}
-                className="bg-transparent border-0 p-0 cursor-pointer"
-                title="Where is this used?"
-                aria-label="Where is this used?"
-              >
-                <Link2 className="h-5 w-5 text-white" />
-              </button>
-              <button
-                onClick={() => setShowRawText(true)}
-                className="bg-transparent border-0 p-0 cursor-pointer"
-                title="View extracted text"
-              >
-                <FileText className="h-5 w-5 text-white" />
-              </button>
-            </>
-          ) : !searchOpen ? (
-            <button
-              onClick={() => setSearchOpen(true)}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: 32, height: 32, borderRadius: 6, border: 'none',
-                background: 'none', cursor: 'pointer', color: '#fff',
-              }}
-              title="Search files"
-            >
-              <Search size={16} />
-            </button>
-          ) : null}
-        </div>
-      </div>
+      </header>}
 
       {/* Content area */}
-      {viewingDoc ? (
-        <div style={{ height: 'calc(100% - 50px)' }}>
+      {viewingDoc && (
+        <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
           <DocumentViewer
             docUuid={viewingDoc.uuid}
             highlightTerms={highlightTerms}
             highlightPage={highlightPage}
             highlightPageApproximate={highlightPageApproximate}
-            onClearHighlights={() => setHighlightTerms([])}
+            onClearHighlights={verificationActive ? undefined : () => setHighlightTerms([])}
             processing={viewingDoc.processing}
             taskStatus={viewingDoc.taskStatus}
+            hideHighlightNavBar={verificationActive}
           />
+          {verificationActive && verificationSession && (
+            <div
+              style={{
+                position: 'absolute',
+                left: 0,
+                right: 0,
+                bottom: 12,
+                pointerEvents: 'none',
+                zIndex: 200,
+              }}
+            >
+              <div style={{ pointerEvents: 'auto' }}>
+                <VerificationNavBar
+                  session={verificationSession}
+                  onSessionUpdated={setVerificationSession}
+                  onActiveValueChange={(value) => {
+                    // Drive the PDF's runtime string search to the active field value.
+                    setHighlightTerms(value ? [value] : [])
+                  }}
+                  onCompleted={({ session, testCaseUuid, outcome }) => {
+                    const approved = session.fields.filter((f) => f.status === 'approved').length
+                    const corrected = session.fields.filter((f) => f.status === 'corrected').length
+                    const skipped = session.fields.filter((f) => f.status === 'skipped').length
+                    setVerificationCompletion({
+                      sessionId: session.uuid,
+                      extractionSetUuid: session.search_set_uuid,
+                      documentTitle: session.document_title,
+                      testCaseUuid,
+                      outcome,
+                      approvedCount: approved,
+                      correctedCount: corrected,
+                      skippedCount: skipped,
+                    })
+                    setVerificationSession(null)
+                    setHighlightTerms([])
+                  }}
+                />
+              </div>
+            </div>
+          )}
         </div>
-      ) : (
-        <div className="overflow-auto hide-scrollbar" style={{ height: 'calc(100% - 50px)', paddingTop: 10, paddingBottom: 60 }}>
+      )}
+        <div ref={listScroller} onScroll={event => { if (!viewingDoc) listPosition.current = event.currentTarget.scrollTop }} className="overflow-auto hide-scrollbar" style={{ display: viewingDoc ? 'none' : undefined, flex: 1, minHeight: 0, paddingBottom: 60 }}>
           <FileBrowser
+            searchAction={!searchOpen && <button type="button" title="Search files" aria-label="Search files" onClick={() => setSearchOpen(true)} className="workspace-header-icon"><Search size={18} /></button>}
+            searchField={searchOpen && <div className="workspace-file-search">
+              <Search size={16} aria-hidden="true" />
+              <input ref={searchInputRef} type="search" aria-label="Search files and content" placeholder="Search files and content..." value={searchQuery} onChange={event => setSearchQuery(event.target.value)} />
+              <button type="button" aria-label="Close search" className="workspace-header-icon" onClick={handleCloseSearch}><X size={18} /></button>
+            </div>}
+            selectedDocumentUuids={selectedDocUuids}
+            selectedFolderUuids={selectedFolderUuids}
             searchQuery={searchQuery}
             contentMatches={contentMatches}
+            contentSearchState={contentSearchState}
+            onRetryContentSearch={() => setSearchAttempt(value => value + 1)}
             currentFolder={currentFolder}
             onFolderNavigate={setCurrentFolder}
             rootFolder={activeProjectRootFolder}
@@ -370,6 +406,7 @@ export function LeftPanel() {
                 title: doc.title,
                 processing: doc.processing,
                 taskStatus: doc.task_status,
+                previousSelection: { uuids: selectedDocUuids, names: selectedDocNames },
               }
               // Sync-update the ref so handleSelectionChange's guard sees
               // "viewing" immediately. When the auto-open-after-upload effect
@@ -383,6 +420,7 @@ export function LeftPanel() {
             }}
             onSelectionChange={handleSelectionChange}
             onDocNamesChange={handleDocNamesChange}
+            onDocumentReadinessChange={updateDocumentReadiness}
             onFolderSelectionChange={handleFolderSelectionChange}
             onFolderNamesChange={handleFolderNamesChange}
             onSelectionProcessingChange={handleSelectionProcessingChange}
@@ -391,7 +429,6 @@ export function LeftPanel() {
             onAddFolderToKB={setKbPickerFolder}
           />
         </div>
-      )}
 
       {showUsage && viewingDoc && (
         <DocumentUsageDialog
@@ -422,6 +459,7 @@ export function LeftPanel() {
           onClose={() => setKbPickerFolder(null)}
         />
       )}
-    </div>
+      </div>
+    </aside>
   )
 }

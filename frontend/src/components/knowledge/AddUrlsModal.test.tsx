@@ -1,224 +1,145 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { AddUrlsModal } from './AddUrlsModal'
-import type { UrlPreview, UrlPreviewPage } from '../../api/knowledge'
 
-vi.mock('../../api/knowledge', () => ({
-  previewUrlsForKB: vi.fn(),
-  cancelUrlPreview: vi.fn(),
-  getUrlPreview: vi.fn(),
-  getUrlPreviewPageText: vi.fn(),
-  commitUrlPreview: vi.fn(),
+const api = vi.hoisted(() => ({
+  getSourceSuggestionsAvailable: vi.fn(),
+  suggestSources: vi.fn(),
+  readSitemap: vi.fn(),
 }))
+vi.mock('../../api/knowledge', () => api)
 
-import { cancelUrlPreview, commitUrlPreview, getUrlPreview, getUrlPreviewPageText, previewUrlsForKB } from '../../api/knowledge'
-
-function page(overrides: Partial<UrlPreviewPage>): UrlPreviewPage {
-  return {
-    page_id: 'p', url: 'https://example.gov/p', final_url: null, title: null, parent_url: null,
-    verdict: 'good', addable: true, reason: null, excerpt: 'Allowable costs.', char_count: 16,
-    chunk_count: 1, truncated: false, warnings: [], ...overrides,
-  }
-}
-
-const PAGES: UrlPreviewPage[] = [
-  page({ page_id: 'good', title: 'Policy', url: 'https://example.gov/policy', chunk_count: 4, char_count: 3800,
-    excerpt: 'Allowable costs under the award.' }),
-  page({ page_id: 'low', url: 'https://example.gov/short', verdict: 'low', chunk_count: 1,
-    reason: 'Navigation or near-empty page — 29 characters of content, below the 1200 minimum' }),
-  page({ page_id: 'empty', url: 'https://example.gov/blank', verdict: 'empty', addable: false,
-    reason: 'Blocked by the site\'s bot protection', excerpt: '' }),
-  page({ page_id: 'child', title: 'Rule A', url: 'https://example.gov/rule-a', parent_url: 'https://example.gov/policy',
-    chunk_count: 3 }),
-]
-
-function preview(status: UrlPreview['status'], pages = PAGES): UrlPreview {
-  return { preview_uuid: 'pv-1', status, error_message: null, crawl_enabled: true, pages }
-}
-
-async function enterAndPreview() {
-  fireEvent.change(screen.getByLabelText('URLs to add, one per line'), {
-    target: { value: 'https://example.gov/policy\nhttps://example.gov/short' },
-  })
-  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Preview pages' })) })
-}
-
-async function poll() {
-  await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
-}
+const paste = (value: string) =>
+  fireEvent.change(screen.getByLabelText(/Links, or any text with links in it/), { target: { value } })
 
 describe('AddUrlsModal', () => {
   beforeEach(() => {
-    vi.useFakeTimers()
-    vi.mocked(previewUrlsForKB).mockReset().mockResolvedValue({ preview_uuid: 'pv-1', status: 'running' })
-    vi.mocked(getUrlPreview).mockReset().mockResolvedValue(preview('ready'))
-    vi.mocked(getUrlPreviewPageText).mockReset()
-    vi.mocked(commitUrlPreview).mockReset().mockResolvedValue({ ok: true, queued: 2 })
-    vi.mocked(cancelUrlPreview).mockReset().mockResolvedValue({ ok: true, canceled: true })
+    Object.values(api).forEach(fn => fn.mockReset())
+    api.getSourceSuggestionsAvailable.mockResolvedValue({ available: false })
   })
-  afterEach(() => { vi.useRealTimers() })
 
-  it('previews before adding anything, and a double-click starts one preview', async () => {
-    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onClose={vi.fn()} />)
-    fireEvent.change(screen.getByLabelText('URLs to add, one per line'), {
-      target: { value: 'https://example.gov/policy' },
+  // A double-clicked Add button used to fire two POSTs, enqueueing two ingest
+  // runs that raced each other and ingested the same URL twice (duplicate-
+  // source support ticket). Submit must latch after the first click.
+  it('fires onSubmit only once for a rapid double-click', () => {
+    const onSubmit = vi.fn()
+    render(<AddUrlsModal onSubmit={onSubmit} onClose={vi.fn()} />)
+    paste('https://example.com/a\nhttps://example.com/b')
+    fireEvent.click(screen.getByRole('button', { name: 'Review links' }))
+
+    const button = screen.getByRole('button', { name: 'Add 2 URLs' })
+    fireEvent.click(button)
+    fireEvent.click(button)
+
+    expect(onSubmit).toHaveBeenCalledTimes(1)
+    expect(onSubmit).toHaveBeenCalledWith(['https://example.com/a', 'https://example.com/b'], false, 5, '')
+    expect(screen.getByRole('button', { name: 'Adding…' })).toBeDisabled()
+  })
+
+  it('does not go on with no links entered', () => {
+    render(<AddUrlsModal onSubmit={vi.fn()} onClose={vi.fn()} />)
+    expect(screen.getByRole('button', { name: 'Review links' })).toBeDisabled()
+    paste('no links here, just words')
+    expect(screen.getByText('0 links found.')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Review links' })).toBeDisabled()
+  })
+
+  // Smart paste: the links are pulled out of an email or document.
+  it('picks links out of pasted text and lets the user deselect before adding', () => {
+    const onSubmit = vi.fn()
+    render(<AddUrlsModal onSubmit={onSubmit} onClose={vi.fn()} />)
+    paste('Hi — the policy is at https://a.gov/policy, the FAQ at www.a.gov/faq. Thanks!')
+    expect(screen.getByText('2 links found.')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Review links' }))
+
+    fireEvent.click(screen.getByLabelText('https://www.a.gov/faq'))
+    fireEvent.click(screen.getByRole('button', { name: 'Add 1 URL' }))
+    expect(onSubmit).toHaveBeenCalledWith(['https://a.gov/policy'], false, 5, '')
+  })
+
+  it('reads links from an uploaded file', async () => {
+    const onSubmit = vi.fn()
+    render(<AddUrlsModal onSubmit={onSubmit} onClose={vi.fn()} />)
+    fireEvent.click(screen.getByRole('tab', { name: 'File' }))
+    const file = new File(['title,url\nPAPPG,https://nsf.gov/pappg\nGPS,https://nih.gov/gps\n'], 'links.csv', { type: 'text/csv' })
+    fireEvent.change(screen.getByLabelText(/File of links/), { target: { files: [file] } })
+
+    expect(await screen.findByText('2 links found in links.csv.')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Review links' }))
+    expect(screen.getByText('From links.csv.')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Add 2 URLs' }))
+    expect(onSubmit).toHaveBeenCalledWith(['https://nsf.gov/pappg', 'https://nih.gov/gps'], false, 5, '')
+  })
+
+  it('says when a file has no links', async () => {
+    render(<AddUrlsModal onSubmit={vi.fn()} onClose={vi.fn()} />)
+    fireEvent.click(screen.getByRole('tab', { name: 'File' }))
+    fireEvent.change(screen.getByLabelText(/File of links/), { target: { files: [new File(['nothing'], 'notes.txt')] } })
+    expect(await screen.findByText('No web links found in notes.txt.')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Review links' })).toBeDisabled()
+  })
+
+  it('reads a sitemap and adds only the picked pages', async () => {
+    api.readSitemap.mockResolvedValue({
+      sitemap_url: 'https://a.gov/sitemap.xml', sitemaps_read: 1, truncated: false, errors: [],
+      pages: [
+        { url: 'https://a.gov/grants', lastmod: '2026-09-01T00:00:00Z', in_kb: false },
+        { url: 'https://a.gov/held', lastmod: null, in_kb: true },
+        { url: 'https://a.gov/news', lastmod: null, in_kb: false },
+      ],
     })
-    const button = screen.getByRole('button', { name: 'Preview pages' })
-    await act(async () => { fireEvent.click(button); fireEvent.click(button) })
+    const onSubmit = vi.fn()
+    render(<AddUrlsModal kbUuid="kb-1" onSubmit={onSubmit} onClose={vi.fn()} />)
+    fireEvent.click(screen.getByRole('tab', { name: 'Sitemap' }))
+    fireEvent.change(screen.getByLabelText(/Sitemap or site address/), { target: { value: 'a.gov' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Read sitemap' }))
 
-    expect(previewUrlsForKB).toHaveBeenCalledTimes(1)
-    expect(previewUrlsForKB).toHaveBeenCalledWith('kb-1', ['https://example.gov/policy'], false, 5, '')
-    expect(commitUrlPreview).not.toHaveBeenCalled()
+    expect(await screen.findByText('From https://a.gov/sitemap.xml.')).toBeTruthy()
+    expect(api.readSitemap).toHaveBeenCalledWith('kb-1', 'a.gov')
+    // A sitemap offers pages to choose from: nothing starts checked.
+    expect(screen.getByText(/0 of 2 selected/)).toBeTruthy()
+    expect(screen.getByText('Updated 2026-09-01')).toBeTruthy()
+    expect(screen.getByLabelText('https://a.gov/held')).toBeDisabled()
+
+    fireEvent.click(screen.getByLabelText('https://a.gov/grants'))
+    fireEvent.click(screen.getByRole('button', { name: 'Add 1 URL' }))
+    expect(onSubmit).toHaveBeenCalledWith(['https://a.gov/grants'], false, 5, '')
   })
 
-  it('does not preview with no URLs entered', () => {
-    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onClose={vi.fn()} />)
-    expect(screen.getByRole('button', { name: 'Preview pages' })).toBeDisabled()
+  it('shows why a sitemap could not be read', async () => {
+    api.readSitemap.mockRejectedValue(new Error('No sitemap was found for a.gov'))
+    render(<AddUrlsModal kbUuid="kb-1" onSubmit={vi.fn()} onClose={vi.fn()} />)
+    fireEvent.click(screen.getByRole('tab', { name: 'Sitemap' }))
+    fireEvent.change(screen.getByLabelText(/Sitemap or site address/), { target: { value: 'a.gov' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Read sitemap' }))
+    expect(await screen.findByText('No sitemap was found for a.gov')).toBeTruthy()
   })
 
-  it('shows what each page adds: good kept, low unticked with its reason, empty not addable', async () => {
-    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onClose={vi.fn()} />)
-    await enterAndPreview()
-    await poll()
-
-    expect((screen.getByLabelText('Add Policy') as HTMLInputElement).checked).toBe(true)
-    expect(screen.getByText(/4 chunks/)).toBeTruthy()
-    expect((screen.getByLabelText('Add https://example.gov/short') as HTMLInputElement).checked).toBe(false)
-    expect(screen.getByText(/29 characters of content/)).toBeTruthy()
-    const empty = screen.getByLabelText('Add https://example.gov/blank') as HTMLInputElement
-    expect(empty.disabled).toBe(true)
-    expect(screen.getByText('Empty or blocked')).toBeTruthy()
-    expect(screen.getByText(/found by crawling https:\/\/example.gov\/policy/)).toBeTruthy()
-    // Good + crawled child kept: 4 + 3 chunks.
-    expect(screen.getByText('2 pages kept · 7 chunks')).toBeTruthy()
+  it('blocks a selection over the per-add limit', () => {
+    const onSubmit = vi.fn()
+    render(<AddUrlsModal onSubmit={onSubmit} onClose={vi.fn()} />)
+    paste(Array.from({ length: 30 }, (_, i) => `https://a.gov/${i}`).join('\n'))
+    fireEvent.click(screen.getByRole('button', { name: 'Review links' }))
+    fireEvent.click(screen.getByText('Enable crawling'))
+    expect(screen.getByText(/At most 25 links can be added at once with crawling on; 30 are selected/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Add 30 URLs' })).toBeDisabled()
   })
 
-  it('cannot add while pages are still being fetched', async () => {
-    vi.mocked(getUrlPreview).mockResolvedValue(preview('running', PAGES.slice(0, 1)))
-    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onClose={vi.fn()} />)
-    await enterAndPreview()
-    await poll()
-
-    expect(screen.getByText(/Fetching pages… 1 page so far/)).toBeTruthy()
-    expect(screen.getByRole('button', { name: /^Add / })).toBeDisabled()
+  it('filters a long list and selects only what is shown', () => {
+    render(<AddUrlsModal onSubmit={vi.fn()} onClose={vi.fn()} />)
+    paste([...Array.from({ length: 12 }, (_, i) => `https://a.gov/news/${i}`), 'https://a.gov/grants/1'].join('\n'))
+    fireEvent.click(screen.getByRole('button', { name: 'Review links' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Clear' }))
+    fireEvent.change(screen.getByLabelText('Filter links'), { target: { value: 'grants' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Select 1 shown' }))
+    expect(screen.getByRole('button', { name: 'Add 1 URL' })).toBeEnabled()
   })
 
-  it('adds only the kept pages, once, and reports the count', async () => {
-    const onCommitted = vi.fn()
-    render(<AddUrlsModal kbUuid="kb-1" onCommitted={onCommitted} onClose={vi.fn()} />)
-    await enterAndPreview()
-    await poll()
-
-    fireEvent.click(screen.getByLabelText('Add https://example.gov/short'))  // keep the thin one
-    fireEvent.click(screen.getByLabelText('Add Rule A'))                     // drop the crawled one
-    const add = screen.getByRole('button', { name: 'Add 2 pages' })
-    await act(async () => { fireEvent.click(add); fireEvent.click(add) })
-
-    expect(commitUrlPreview).toHaveBeenCalledTimes(1)
-    expect(commitUrlPreview).toHaveBeenCalledWith('kb-1', 'pv-1', ['good', 'low'])
-    expect(onCommitted).toHaveBeenCalledWith(2)
-  })
-
-  it('shows a page\'s text, and loads the rest on request', async () => {
-    vi.mocked(getUrlPreviewPageText).mockResolvedValue({ page_id: 'good', text: 'The whole policy text.' })
-    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onClose={vi.fn()} />)
-    await enterAndPreview()
-    await poll()
-
-    fireEvent.click(screen.getAllByRole('button', { name: 'Show text' })[0])
-    expect(screen.getByText('Allowable costs under the award.')).toBeTruthy()
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Show all 3,800 characters/ })) })
-    expect(getUrlPreviewPageText).toHaveBeenCalledWith('kb-1', 'pv-1', 'good')
-    expect(screen.getByText('The whole policy text.')).toBeTruthy()
-  })
-
-  it('Back returns to the URLs as typed', async () => {
-    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onClose={vi.fn()} />)
-    await enterAndPreview()
-    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
-    expect((screen.getByLabelText('URLs to add, one per line') as HTMLTextAreaElement).value)
-      .toBe('https://example.gov/policy\nhttps://example.gov/short')
-  })
-  // Support ticket: "Fetching pages…" spun for 10+ minutes with no pages and
-  // no error. A stuck preview now says so and offers Retry and Cancel.
-  const stalled = (): UrlPreview => ({
-    ...preview('running', []),
-    stalled: true,
-    stall_message: "This is taking longer than expected. The server hasn't started fetching yet.",
-  })
-
-  it('says a stuck preview is taking longer than expected, with Retry and Cancel', async () => {
-    vi.mocked(getUrlPreview).mockResolvedValue(preview('running', []))
-    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onClose={vi.fn()} />)
-    await enterAndPreview()
-    await poll()
-    expect(screen.queryByText(/taking longer than expected/)).not.toBeInTheDocument()
-
-    vi.mocked(getUrlPreview).mockResolvedValue(stalled())
-    await poll()
-    expect(screen.getByText(/taking longer than expected/)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Cancel preview' })).toBeInTheDocument()
-  })
-
-  // Dev outage 2026-10-20: the worker container was down for a day, and Retry
-  // just queued another preview nothing would run.
-  it('offers no Retry when no worker is running to pick the preview up', async () => {
-    vi.mocked(getUrlPreview).mockResolvedValue({
-      ...stalled(),
-      stall_message: "The server's background workers aren't running, so the preview can't start.",
-      workers_down: true,
-    })
-    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onClose={vi.fn()} />)
-    await enterAndPreview()
-    await poll()
-    expect(screen.getByText(/background workers aren't running/)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Cancel preview' })).toBeInTheDocument()
-  })
-
-  it('Retry stops the stuck preview and starts a new one with the same URLs', async () => {
-    vi.mocked(getUrlPreview).mockResolvedValue(stalled())
-    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onClose={vi.fn()} />)
-    await enterAndPreview()
-    await poll()
-    vi.mocked(previewUrlsForKB).mockResolvedValue({ preview_uuid: 'pv-2', status: 'running' })
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Retry' })) })
-
-    expect(cancelUrlPreview).toHaveBeenCalledWith('kb-1', 'pv-1')
-    expect(previewUrlsForKB).toHaveBeenCalledTimes(2)
-    expect(vi.mocked(previewUrlsForKB).mock.calls[1][1]).toEqual(
-      ['https://example.gov/policy', 'https://example.gov/short'],
-    )
-  })
-
-  it('Cancel stops the preview and returns to the URLs as typed', async () => {
-    vi.mocked(getUrlPreview).mockResolvedValue(stalled())
-    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onClose={vi.fn()} />)
-    await enterAndPreview()
-    await poll()
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Cancel preview' })) })
-
-    expect(cancelUrlPreview).toHaveBeenCalledWith('kb-1', 'pv-1')
-    expect(screen.getByLabelText('URLs to add, one per line')).toHaveValue(
-      'https://example.gov/policy\nhttps://example.gov/short',
-    )
-  })
-
-  it('closing the dialog stops a preview that is still fetching', async () => {
-    vi.mocked(getUrlPreview).mockResolvedValue(preview('running', []))
-    const { unmount } = render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onClose={vi.fn()} />)
-    await enterAndPreview()
-    await poll()
-    unmount()
-    expect(cancelUrlPreview).toHaveBeenCalledWith('kb-1', 'pv-1')
-  })
-
-  it('closing after the preview finished cancels nothing', async () => {
-    const { unmount } = render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onClose={vi.fn()} />)
-    await enterAndPreview()
-    await poll()
-    unmount()
-    expect(cancelUrlPreview).not.toHaveBeenCalled()
+  it('keeps the pasted text on Back', async () => {
+    render(<AddUrlsModal onSubmit={vi.fn()} onClose={vi.fn()} />)
+    paste('https://a.gov/x')
+    fireEvent.click(screen.getByRole('button', { name: 'Review links' }))
+    fireEvent.click(screen.getByRole('button', { name: /Back/ }))
+    await waitFor(() => expect((screen.getByLabelText(/Links, or any text/) as HTMLTextAreaElement).value).toBe('https://a.gov/x'))
   })
 })

@@ -7,6 +7,13 @@ Uses pymongo (sync) for DB access.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from celery import Task
+
+from pymongo.database import Database
+
 import base64
 import io
 import logging
@@ -21,13 +28,13 @@ from app.tasks import TRANSIENT_EXCEPTIONS
 logger = logging.getLogger(__name__)
 
 
-def _get_db():
+def _get_db() -> Database[dict]:
     from app.tasks import get_sync_db
 
     return get_sync_db()
 
 
-def _audit(db, action: str, **kwargs) -> None:
+def _audit(db: Database[dict], action: str, **kwargs: object) -> None:
     """Write an immutable audit entry."""
     db.m365_audit_entry.insert_one({
         "uuid": uuid4().hex,
@@ -64,7 +71,7 @@ def _attachment_rejection(filename: str, content_bytes: bytes) -> str | None:
 
 
 def _save_attachment_as_document(
-    db,
+    db: Database[dict],
     content_bytes: bytes,
     filename: str,
     user_id: str,
@@ -91,6 +98,7 @@ def _save_attachment_as_document(
         "folder": "",
         "raw_text": "",
         "processing": False,
+        "validating": True,
         "created_at": datetime.now(timezone.utc),
         "updated_at": datetime.now(timezone.utc),
     }
@@ -132,7 +140,7 @@ def _trigger_text_extraction(doc: dict) -> None:
     default_retry_delay=10,
 )
 def ingest_email_message(
-    self,
+    self: Task,
     user_id: str,
     message_resource: str,
     intake_config_id: str,
@@ -250,7 +258,7 @@ def ingest_email_message(
     default_retry_delay=10,
 )
 def ingest_drive_item(
-    self,
+    self: Task,
     user_id: str,
     item_resource: str,
     intake_config_id: str,
@@ -356,7 +364,7 @@ def ingest_drive_item(
     max_retries=3,
     default_retry_delay=10,
 )
-def triage_work_item(self, work_item_id: str) -> dict:
+def triage_work_item(self: Task, work_item_id: str) -> dict:
     """Classify a work item and route it to the right workflow."""
     from bson import ObjectId
 
@@ -422,6 +430,8 @@ def triage_work_item(self, work_item_id: str) -> dict:
     from app.services.passive_triggers import create_m365_trigger
     # Reload to get updated fields
     work_item = db.work_items.find_one({"_id": work_item["_id"]})
+    if work_item is None:
+        return {"error": "Work item disappeared before workflow dispatch"}
     event = create_m365_trigger(workflow, work_item)
 
     db.work_items.update_one(
@@ -435,7 +445,7 @@ def triage_work_item(self, work_item_id: str) -> dict:
     return {"status": "dispatched", "workflow": workflow.get("name"), "trigger_event": event["uuid"]}
 
 
-def _match_workflow(db, work_item: dict, intake: dict):
+def _match_workflow(db: Database[dict], work_item: dict, intake: dict) -> dict | None:
     """Match a work item to a workflow using triage rules or the default."""
     if intake.get("triage_enabled") and intake.get("triage_rules"):
         category = (work_item.get("triage_category") or "").lower()
@@ -468,7 +478,7 @@ def _match_workflow(db, work_item: dict, intake: dict):
     max_retries=3,
     default_retry_delay=10,
 )
-def renew_graph_subscriptions(self) -> dict:
+def renew_graph_subscriptions(self: Task) -> dict:
     """Renew Graph subscriptions expiring within 24 hours."""
     from app.services.graph_client import GraphClient
 
@@ -506,7 +516,7 @@ def renew_graph_subscriptions(self) -> dict:
     max_retries=3,
     default_retry_delay=10,
 )
-def send_daily_digest(self) -> dict:
+def send_daily_digest(self: Task) -> dict:
     """Send daily summary to Teams channels."""
     from app.services.graph_client import GraphClient
     from app.services.teams_cards import build_daily_digest_card

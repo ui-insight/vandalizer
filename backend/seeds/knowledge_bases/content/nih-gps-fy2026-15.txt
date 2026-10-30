@@ -1,0 +1,205 @@
+NIH Grants Policy Statement (FY 2026 revision) — Chapter 15: Consortium Agreements
+Source: https://grants.nih.gov/policy-and-compliance/nihgps
+
+15 CONSORTIUM AGREEMENTS
+15.1 GENERAL
+This chapter includes the requirements for an applicant/recipient under consortium agreements in which
+the recipient collaborates with one or more other organizations in carrying out the grant-supported
+research, NIH does not have a direct legal relationship with its subrecipients. The recipient, as the direct
+and primary recipient of NIH grant funds, is accountable to NIH for the performance of the project, the
+appropriate expenditure of grant funds by all parties, applicable reporting requirements, and all other
+obligations of the recipient, as specified in the NIHGPS. In addition, the terms and conditions flow down
+to subrecipients in accordance with 2 CFR Part 200.101(b)(2) — the requirements that apply to the recipient, including the intellectual property requirements in IIA and the program income requirements of the
+award, also apply to consortium participant(s). Exceptions are noted in this chapter. The recipient is
+responsible for including the applicable requirements of the NIHGPS in its agreements with collaborating organizations (see Written Agreement in this chapter).
+Under grants that include consortium agreements:
+ l The direct recipient must confirm in SAM.gov that a potential subrecipient is not suspended,
+debarred, or otherwise excluded from receiving Federal funds (see 2 CFR Part 180.300).
+ l The award will be made to a single recipient with a single PD/PI  even though one or more organizations other than the recipient will carry out portions of the planned programmatic activity.
+When the multiple PD/PI model is used, all PD/PIs are listed on the award regardless of organization affiliation, with the Contact PD/PI so noted.
+ l The pass-through entity must perform a substantive role in the conduct of the planned research
+and not merely serve as a conduit of funds to another party or parties. This includes being able to
+provide appropriate oversight of all scientific, programmatic, financial, and administrative matters related to the grant.
+ l Subrecipients (at all tiers) must provide the pass-through entity with a certification statement as
+outlined in 2 CFR Part 200.415(b) whenever applying for funds, requesting payment, and submitting financial reports. The certification must be maintained pursuant to the requirements of 2
+CFR 200.334.
+Applicants are expected to detail their proposed collaborations as part of the grant application. If the
+application is approved as submitted, no further approval is required unless, during performance, the
+recipient plans to undertake additional or alternative collaborations that would constitute a change in the
+scope of the approved project (see Administrative Requirements—Changes in Project and Budget in
+IIA).
+Applicants for STTR grants should follow the specific requirements for research collaboration established for that program (see Grants to For-Profit Organizations chapter).
+Applicants proposing international research collaborations must use the Collaborative International
+Research Award structure (see "Grants to Foreign Organizations, International Organizations,  Domestic
+Grants with Foreign Components and Collaborative International Research Awards" on page IIB-115
+and Collaborative International Research Awards chapter). Due to NIH’s need to have a direct legal relationship with foreign (non-U.S.) organizations receiving federal award funds, foreign organizations may
+not serve as subrecipients on consortium agreements.
+(GPS page IIB-109)
+
+The following information must be provided to NIH as part of a competing application that proposes consortium arrangements:
+ l Include all proposed performance sites; those of the applicant organization and the consortium
+participant(s); and
+ l Non-modular grant applications must include complete detailed budgets for each consortium participant. Modular grant applications must include an estimate of consortium total costs (direct
+costs plus indirect costs) each year as part of the budget narrative justification (see Modular
+Applications and Awards chapter).
+For the consortium site, it is appropriate and expected that someone will be designated as the consortium
+lead investigator responsible for ensuring proper conduct of the project or program at the consortium
+site. However, this individual must only be assigned the PD/PI role when a multiple PD/PI application is
+being submitted. Otherwise, this individual should be assigned some other project role in the Senior/Key
+Personnel section of the application.
+The signature (or electronic equivalent) of the AOR/SO on the application signifies that the applicant
+organization and all proposed consortium participants understand and agree with the following statement:
+“The  appropriate  programmatic  and  administrative  personnel  of  each  organization
+involved in this grant application are aware of the NIH consortium agreement policy and
+are prepared to establish the necessary inter-organizational agreement(s) consistent with
+that policy.”
+NIH may request additional information before award and may place a specific award condition(s) on
+the award.
+15.2 ADMINISTRATIVE AND OTHER REQUIREMENTS
+The following highlights several areas within the consortium relationship that the recipient needs to
+address with consortium organizations receiving subawards under a grant to ensure compliance with NIH
+requirements. The requirement for a written agreement addressing these and other areas is specified in
+this section. NIH will not support any agreement that does not meet the minimum requirements outlined
+in the written agreement section below (15.2.1). NIH reserves the right to request copies of the written
+agreement and relevant supporting documentation as needed, as part of its oversight responsibilities. Failure to provide requested documentation may lead to remedies for noncompliance and potential enforcement actions (see 8.5, Specific award conditions and remedies for noncompliance).
+NIH expects recipients to ask potential subrecipients, at the application stage, to submit language in their
+letters of support indicating their awareness of these requirements and the subrecipient’s willingness to
+abide by all requirements should an award be issued.
+Note that most of these requirements only apply to a recipient’s consortium relationships with subrecipients. When the relationship is with a vendor that is providing routine goods and services within normal business operations that are ancillary to the operation of the research program, the public policy
+requirements listed below do not apply. The vendor must also be providing similar goods and services to
+many different purchasers and provide them in a competitive environment.
+15.2.1 Written Agreement
+The recipient must enter into a formal written agreement, signed and agreed to by both parties, with each
+consortium participant/subrecipient that addresses the negotiated arrangements for meeting the scientific,
+(GPS page IIB-110)
+
+administrative, financial, and reporting requirements of the grant, including those necessary to ensure
+compliance with all applicable Federal regulations and policies and facilitate an efficient collaborative
+venture. If a subrecipient is unwilling to sign the written agreement outlining the requirements below,
+then a subaward cannot be issued. At a minimum, this agreement must include the following:
+ l Identification of the individual who will serve as the consortium lead investigator and other individuals responsible for the research activity at each consortium participant along with their roles
+and responsibilities.
+ l When multiple PD/PIs are involved at different organizations, only the Contact PD/PI is required
+to have the official relationship with the applicant organization. PD/PIs in the leadership team at
+other organizations must have a documented relationship with a consortium organization, but
+need not be employees. Any consortium agreement must address the unique aspects to these individuals holding the PD/PI role including the requirement for the pass-through entity to secure
+and retain all PD/PI signatures for all applications, progress reports, and post-award prior
+approval requests.  Further, such signatures must be made available to NIH or other authorized
+DHHS or Federal officials upon request.  See Multiple Program Director/Principal Investigator
+Applications and Awards for additional information.
+ l Procedures for directing and monitoring the research effort.
+ l Procedures to be followed in reimbursing each consortium participant for its effort, including dollar ceiling, method and schedule of reimbursement, type of supporting documentation required,
+procedures for review and approval of expenditures of grant funds at each organization and timing of applicable reporting requirements. This includes provisions on access to core facilities and
+resources and whether access will be provided as a fee-for-service.
+ l If different from those of the recipient, a determination of policies to be followed in such areas
+as travel reimbursement and salaries and fringe benefits (the policies of the consortium participant may be used as long as they meet NIH requirements).
+ l Terms that establish whether the Financial Conflict of Interest policy of the pass-through entity
+or that of the subrecipient will apply to the subrecipient’s Investigators.
+ l If the subrecipient’s Investigators must comply with the pass-through entity's Financial Conflict
+of Interest policy, the subrecipient shall certify as part of the written agreement that its policy
+complies with the 2011 revised FCOI regulation (42 CFR Part 50 Subpart F). If the subrecipient
+cannot provide such certification, the agreement shall state that subrecipient Investigators are subject to the Financial Conflict of Interest policy of the pass-through entity for disclosing Significant Financial Interests that are directly related to the subrecipient’s work for the passthrough entity.
+ l If the subrecipient’s Investigators must comply with the subrecipient’s Financial Conflict of
+Interest policy, the written agreement shall specify time period(s) for the subrecipient to report
+all identified Financial Conflicts of Interest to the pass-through entity. Such time period(s) shall
+be sufficient to enable the pass-through entity to provide timely FCOI reports, as necessary, to
+the PHS as required by the regulation.
+ l Alternatively, if the subrecipient’s Investigators must comply with the pass-through entity’s Financial Conflict of Interest policy, the written agreement shall specify time period(s) for the subrecipient to submit all Investigator disclosures of Significant Financial Interests to the passthrough entity. Such time period(s) shall be sufficient to enable the pass-through entity to comply timely with its review, management, and reporting obligations under the 2011 revised FCOI
+regulation.
+(GPS page IIB-111)
+
+l A provision addressing ownership and disposition of data produced under the consortium agreement. This includes whether cell lines, samples or other resources will be freely available to
+other investigators in the scientific community or will be provided to particular investigators
+only.
+ l A provision making NIH data sharing and inventions and patent policy, including a requirement
+to report inventions to the recipient (see Administrative Requirements—Availability of Research
+Results: Publications, Intellectual Property Rights, and Sharing Research Resources in IIA),
+applicable to each consortium participant and its employees in order to ensure that the rights of
+the parties to the consortium agreement are protected and that the recipient can fulfill its responsibilities to NIH.
+ l Expectations for authorship and co-authorship on publications.
+ l Provisions regarding property (other than intellectual property), program income, publications,
+reporting, and audit necessary for the recipient to fulfill its obligations to NIH.
+ l Provisions regarding compliance with requirements for a UEI and subrecipient reporting under
+FFATA (see Recipient Reporting of Subrecipient Data and Executive Compensation Information
+for FFATA). Note, the recipient must provide the FAIN to all subrecipients to aid in this requirement.
+ l Incorporation of applicable public policy requirements and provisions indicating the intent of
+each consortium participant to comply, including submission of applicable assurances and certifications (see Public Policy Requirements, Objectives, and Other Appropriation Mandates in
+IIA).
+ l All required certifications in 2 CFR Part 200.415 must be outlined in the agreement.
+ l Provisions regarding immediate termination of the subaward if the direct recipient determines
+that the subrecipient is suspended, debarred, or otherwise excluded from receiving Federal funds.
+15.2.2 Public Policy Requirements and Objectives
+The recipient is responsible for determining whether a consortium participant, including foreign consortium participants under domestic or foreign grants, has filed assurances with NIH that would cover its
+activities within the consortium and, if not, for ensuring that any required assurances or certifications are
+submitted to NIH. See Public Policy Requirements, Objectives, and Other Appropriation Mandates in
+IIA for the full statement of these requirements and their applicability to consortium participants.
+The recipient is responsible for ensuring that all sites engaged in human subjects research have an appropriate OHRP-approved assurance and IRB approval of the research consistent with 45 CFR Part 46 (see
+Guidance on Engagement of Institutions in Human Subjects Research and for complying with NIH prior
+approval requirements related to the addition of sites not included in the approved application (see
+Administrative Requirements—Changes in Project and Budget in IIA). The list of organizations with
+approved assurances is available at the OHRP Web site.
+The animal welfare requirements that apply to recipients also apply to consortium participants and subprojects. The primary recipient is responsible for including these requirements in its agreements with collaborating organizations, and for ensuring that all sites engaged in research involving the use of live
+vertebrate animals have an approved Animal Welfare Assurance and that the activity has valid IACUC
+approval. The approval of more than one IACUC is not required if the recipient and performance site(s)
+have Assurances; the institutions may exercise discretion in determining which IACUC reviews research
+protocols and under which institutional program the research will be conducted. If the pass-through
+entity does not have an approved domestic or foreign Assurance and the animal work will be conducted
+(GPS page IIB-112)
+
+at an institution with an Assurance, the recipient must obtain an Inter-institutional Assurance from
+OLAW. Under the Inter-institutional Assurance, the recipient and performance site agree that the
+research will be conducted under the auspices and program of animal care and use of the performance
+site's Assurance. The recipient is further responsible for complying with NIH prior approval requirements related to the addition of sites not included in the approved application (see Administrative
+Requirements—Changes in Project and Budget—Prior Approval Requirements in IIA). See the OLAW
+web site for a list of domestic organizations and foreign organizations with approved assurances.
+15.2.3 Allowable and Unallowable Costs
+The recipient must include in consortium agreements the applicable government-wide cost principles and
+NIH cost policies described in the Cost Considerations chapter in IIA and, as appropriate, requirements
+related to allowable and unallowable costs in other sections of IIB. For example, a university recipient
+must flow down the cost principles of 2 CFR Part 200, Appendix IX to a consortium participant that is a
+hospital. This includes the application of F&A rates in determining consortium budgets and the reimbursement of costs.
+Recipients must use an approved federally recognized indirect cost rate negotiated between the subrecipient and the Federal Government. If no such rate exists, the recipient must use either a rate it has
+negotiated with the subrecipient, including for-profit organizations (except for the SBIR/STTR program,
+as described in 18.5.4.3,or a de minimis indirect cost rate of up to 10 percent of modified total direct
+costs (MTDC) if the subrecipient has never received a negotiated indirect cost rate from the Federal
+Government.  Recipients are reminded that F&A reimbursement rates are restricted for certain classes of
+awards. If the consortium participant is a Federal organization, direct costs will be limited and no F&A
+will be provided. (See Reimbursement of Indirect Costs.)  For more information on allowable costs to
+Federal organizations, see Grants to Federal Institutions and Payments to Federal Employees Under
+Grants.
+15.2.4 Approval Authorities
+The recipient is responsible for obtaining NIH awarding IC approval for any actions to be undertaken by
+consortium participants that require prior approval. Recipients may establish requirements for review of
+consortium participants’ activities consistent with those requirements and with any authorities provided
+to the recipient; however, a recipient may not provide any authority to a consortium participant that the
+recipient has not been provided under its NIH award. SBIR and STTR recipients are required to seek
+prior approval when adding a new subaward to a project post award, where the arrangement was not originally a part of the peer reviewed and approved application. A foreign risk assessment is required for
+the entity selected for the subaward when the prior approval request is submitted through submission of
+an updated SBIR STTR Foreign Disclosure Form via the “SBIR STTR Foreign Disclosure Request for
+Additional Materials” (RAM) feature in eRA Commons. The recipient must receive official written
+approval notification from the NIH Grants Management Official prior to signing a subaward agreement.
+Regardless of whether there is a change in scope, in all cases, if a recipient (or consortium participant)
+proposes the transfer of work to a foreign site, awarding IC prior approval is required.
+15.2.5 Tangible Personal Property
+15.2.5.1 Exempt Property
+If the recipient provides exempt property to a consortium participant or authorizes a consortium participant to purchase property that would be considered exempt if acquired by the recipient, the recipient
+(GPS page IIB-113)
+
+may vest title in the consortium participant upon transfer or purchase or may reserve the right to do so at
+a later time. The recipient also may establish its own use, disposition, and accountability requirements,
+provided they are consistent with the NIH right to transfer title (see Administrative Requirements—Management Systems and Procedures—Property Management System Standards—Equipment and Supplies
+in IIA).
+15.2.5.2 Nonexempt Property
+If the recipient provides nonexempt property to a consortium participant or authorizes a consortium participant to purchase property that would be considered nonexempt if purchased by the recipient, title to
+such property must remain with the recipient or be vested in the recipient upon acquisition of the property. The recipient may establish use, accountability, and disposition requirements for the property,
+provided they are consistent with, and do not impair, the recipient’s ability to comply with the requirements of 2 CFR Part 200.311, as appropriate.
+15.2.6 Audit
+The recipient must require consortium participants to comply with the requirements of 2 CFR Part 200,
+Subpart F or 2 CFR Part 200.501, as applicable, for audit  of NIH grant funds expended by consortium
+participants. A consortium participant also may be a direct NIH recipient or contractor or may be receiving funds only under the consortium agreement. Regardless, if a non-profit consortium participant meets
+the  2 CFR Part 200.501  threshold criterion of aggregate annual expenditures of $1,000,000 or more
+under applicable Federal awards, the recipient must receive a copy of that organization’s  2 CFR
+Part 200.501  audit and take appropriate action to resolve any findings that relate to the consortium agreement. The recipient is not responsible for resolving crosscutting findings. If a consortium participant will
+not reach that expenditure threshold, the recipient is responsible for monitoring the organization’s activities to ensure compliance with NIH requirements. The recipient may not require a consortium participant to have an audit and charge the audit costs to NIH grant funds unless required or authorized by 2
+CFR Part 200.501.
+(GPS page IIB-114)

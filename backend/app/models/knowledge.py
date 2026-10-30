@@ -100,7 +100,7 @@ class KnowledgeBaseSource(Document):
         # first and then builds.
         indexes = ["uuid", "knowledge_base_uuid"]
 
-    def __init__(self, **data):
+    def __init__(self, **data: object) -> None:
         super().__init__(**data)
         if not self.uuid:
             self.uuid = uuid4().hex
@@ -146,7 +146,7 @@ class KnowledgeBaseSourceVersion(Document):
         name = "knowledge_base_source_versions"
         indexes = ["uuid", "source_uuid", "knowledge_base_uuid"]
 
-    def __init__(self, **data):
+    def __init__(self, **data: object) -> None:
         super().__init__(**data)
         if not self.uuid:
             self.uuid = uuid4().hex
@@ -254,7 +254,7 @@ class KnowledgeBaseReference(Document):
         name = "knowledge_base_references"
         indexes = ["uuid", "user_id", "source_kb_uuid", "team_id"]
 
-    def __init__(self, **data):
+    def __init__(self, **data: object) -> None:
         super().__init__(**data)
         if not self.uuid:
             self.uuid = uuid4().hex
@@ -321,7 +321,7 @@ class KnowledgeBase(Document):
         name = "knowledge_bases"
         indexes = ["uuid", "user_id", "team_id"]
 
-    def __init__(self, **data):
+    def __init__(self, **data: object) -> None:
         super().__init__(**data)
         if not self.uuid:
             self.uuid = uuid4().hex

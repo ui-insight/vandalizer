@@ -1,5 +1,6 @@
 """Request/response models for config endpoints."""
 
+import datetime
 from typing import Optional
 
 from pydantic import BaseModel
@@ -58,6 +59,38 @@ class UpdateThemeConfigRequest(BaseModel):
     icon_hide_in_nav: Optional[bool] = None
 
 
+class RecentActivityItem(BaseModel):
+    id: str  # ActivityEvent id — the frontend opens the item by it
+    type: str  # conversation | search_set_run | workflow_run
+    title: str
+    relative_time: str  # "2h ago", "yesterday"
+    status: str  # completed | failed | running
+    item_kind: Optional[str] = None
+    item_id: Optional[str] = None
+    pending_review: bool = False
+    # Title of the project the work was done in, when the viewer can open it.
+    project_title: Optional[str] = None
+
+
+class ActiveAlertItem(BaseModel):
+    message: str
+    severity: str  # info | warning | critical
+    item_name: str
+    uuid: Optional[str] = None
+    item_kind: Optional[str] = None
+    item_id: Optional[str] = None
+    alert_type: Optional[str] = None
+    previous_score: Optional[float] = None
+    current_score: Optional[float] = None
+    created_at: Optional[datetime.datetime] = None
+    review_state: str = "new"
+
+
+class HomeDocument(BaseModel):
+    uuid: str
+    title: str
+
+
 class OnboardingStatusResponse(BaseModel):
     has_documents: bool = False
     has_workflows: bool = False
@@ -75,3 +108,14 @@ class OnboardingStatusResponse(BaseModel):
     has_conversations: bool = False
     first_session_completed: bool = False
     is_certified: bool = False
+    suggestion_pills: list[str] = []
+    has_only_onboarding_docs: bool = False
+    top_extraction_set_name: Optional[str] = None
+    top_workflow_name: Optional[str] = None
+    recent_documents: list[HomeDocument] = []
+    recent_activity: list[RecentActivityItem] = []
+    active_alerts: list[ActiveAlertItem] = []
+    maturity_stage: str = "newcomer"
+    unprocessed_doc_count: int = 0
+    daily_guidance: Optional[str] = None
+    since_last_visit: Optional[str] = None

@@ -117,6 +117,8 @@ export function applyCatalogUpgrade(prune: boolean) {
 // Usage
 
 export interface UsageStats {
+  period_start?: string | null
+  period_end?: string | null
   conversations: number
   search_runs: number
   workflows_started: number
@@ -176,10 +178,11 @@ export interface UserLeaderboardResponse {
   capped: boolean
 }
 
-export function getUserLeaderboard(days?: number, limit: number = 500) {
+export function getUserLeaderboard(days?: number, limit: number = 500, offset = 0) {
   const params = new URLSearchParams()
   if (days) params.set('days', String(days))
   params.set('limit', String(limit))
+  params.set('offset', String(offset))
   return apiFetch<UserLeaderboardResponse>(`/api/admin/users?${params.toString()}`)
 }
 
@@ -202,10 +205,11 @@ export interface TeamLeaderboardResponse {
   capped: boolean
 }
 
-export function getTeamLeaderboard(days?: number, limit: number = 500) {
+export function getTeamLeaderboard(days?: number, limit: number = 500, offset = 0) {
   const params = new URLSearchParams()
   if (days) params.set('days', String(days))
   params.set('limit', String(limit))
+  params.set('offset', String(offset))
   return apiFetch<TeamLeaderboardResponse>(`/api/admin/teams?${params.toString()}`)
 }
 
@@ -334,10 +338,12 @@ export interface PaginatedWorkflows {
   summary: WorkflowSummaryStats | null
 }
 
-export function getWorkflowEvents(page: number = 1, status?: string, search?: string) {
+export function getWorkflowEvents(page: number = 1, status?: string, search?: string, period?: { from?: string; until?: string }) {
   let url = `/api/admin/workflows?page=${page}&per_page=50`
   if (status) url += `&status=${encodeURIComponent(status)}`
   if (search) url += `&search=${encodeURIComponent(search)}`
+  if (period?.from) url += `&started_after=${encodeURIComponent(period.from)}`
+  if (period?.until) url += `&started_before=${encodeURIComponent(period.until)}`
   return apiFetch<PaginatedWorkflows>(url)
 }
 
@@ -361,13 +367,16 @@ export interface SystemConfigData {
   quality_config: Record<string, unknown>
   auth_methods: string[]
   oauth_providers: Record<string, unknown>[]
-  available_models: { id: string; name: string; tag: string; external: boolean; thinking: boolean; endpoint?: string; api_protocol?: string; api_key?: string; speed?: string; tier?: string; privacy?: string; supports_structured?: boolean; multimodal?: boolean; supports_pdf?: boolean; context_window?: number; request_timeout_seconds?: number | null; response_reserve_tokens?: number | null; temperature?: number | null }[]
+  available_models: { id: string; name: string; tag: string; external: boolean; thinking: boolean; endpoint?: string; api_protocol?: string; api_key?: string; speed?: string; tier?: string; privacy?: string; supports_structured?: boolean; multimodal?: boolean; supports_pdf?: boolean; context_window?: number | null; context_window_source?: ContextWindowSource | null; context_window_status?: ContextWindowStatus; request_timeout_seconds?: number | null; response_reserve_tokens?: number | null; temperature?: number | null }[]
   default_model: string
   long_document_model?: string
   /** The model that grades every validation run; empty = the default model. */
   validation_judge_model?: string
   ocr_endpoint: string
   ocr_api_key: string
+  web_search_endpoint: string
+  web_search_api_key: string
+  web_search_provider: string
   ocr_provider: OcrProvider
   ocr_options: Record<string, unknown>
   ocr_async: boolean
@@ -388,7 +397,7 @@ export function getSystemConfig() {
   return apiFetch<SystemConfigData>('/api/admin/config')
 }
 
-export function updateSystemConfig(data: { extraction_config?: Record<string, unknown>; quality_config?: Record<string, unknown>; retention_config?: Record<string, unknown>; ocr_endpoint?: string; ocr_api_key?: string; ocr_provider?: OcrProvider; ocr_options?: Record<string, unknown>; ocr_async?: boolean; ocr_timeout_seconds?: number; llm_endpoint?: string; default_team_id?: string; support_contacts?: { user_id: string; email: string; name: string }[]; outbound_url_allowed_hosts?: string[] }) {
+export function updateSystemConfig(data: { extraction_config?: Record<string, unknown>; quality_config?: Record<string, unknown>; retention_config?: Record<string, unknown>; ocr_endpoint?: string; ocr_api_key?: string; web_search_endpoint?: string; web_search_api_key?: string; web_search_provider?: string; ocr_provider?: OcrProvider; ocr_options?: Record<string, unknown>; ocr_async?: boolean; ocr_timeout_seconds?: number; llm_endpoint?: string; default_team_id?: string; support_contacts?: { user_id: string; email: string; name: string }[]; outbound_url_allowed_hosts?: string[] }) {
   return apiFetch<{ status: string }>('/api/admin/config', { method: 'PUT', body: JSON.stringify(data) })
 }
 
@@ -429,8 +438,8 @@ export interface IsolatedUsersResponse {
   capped: boolean
 }
 
-export function adminListAllTeams(limit: number = 500) {
-  return apiFetch<AdminTeamListResponse>(`/api/admin/teams/all?limit=${limit}`)
+export function adminListAllTeams(limit: number = 500, offset = 0, q = '') {
+  return apiFetch<AdminTeamListResponse>(`/api/admin/teams/all?limit=${limit}&offset=${offset}&q=${encodeURIComponent(q)}`)
 }
 
 export function adminCreateTeam(name: string) {
@@ -448,8 +457,8 @@ export function adminRemoveUserFromTeam(teamUuid: string, userId: string) {
   return apiFetch<{ ok: boolean }>(`/api/admin/teams/${teamUuid}/members/${encodeURIComponent(userId)}`, { method: 'DELETE' })
 }
 
-export function getIsolatedUsers(limit: number = 500) {
-  return apiFetch<IsolatedUsersResponse>(`/api/admin/users/isolated?limit=${limit}`)
+export function getIsolatedUsers(limit: number = 500, offset = 0) {
+  return apiFetch<IsolatedUsersResponse>(`/api/admin/users/isolated?limit=${limit}&offset=${offset}`)
 }
 
 export function updateUserRoles(userId: string, roles: { is_admin?: boolean; is_staff?: boolean; is_examiner?: boolean }) {
@@ -460,6 +469,13 @@ export function updateUserRoles(userId: string, roles: { is_admin?: boolean; is_
 }
 
 // Models
+
+/** Where a model's context window came from. */
+export type ContextWindowSource = 'detected' | 'entered'
+/** Whether a saved model's context window is known (computed by the server).
+ *  "unconfirmed" is a value with no recorded source, which is what the model
+ *  form's old 128,000 placeholder saved; "missing" means no value at all. */
+export type ContextWindowStatus = ContextWindowSource | 'unconfirmed' | 'missing'
 
 export type ModelFormData = {
   name: string
@@ -476,6 +492,7 @@ export type ModelFormData = {
   multimodal?: boolean
   supports_pdf?: boolean
   context_window?: number
+  context_window_source?: ContextWindowSource | ''
   request_timeout_seconds?: number | null
   response_reserve_tokens?: number | null
   temperature?: number | null
@@ -512,6 +529,20 @@ export function probeModel(data: {
   return apiFetch<ProbeModelResult>('/api/admin/config/probe-model', {
     method: 'POST',
     body: JSON.stringify(data),
+  })
+}
+
+/** Probe a saved model's endpoint and record the window it reports. A window
+ *  an admin entered is only replaced with force. */
+export function probeSavedModelContextWindow(modelId: string, force = false) {
+  return apiFetch<{
+    probe: ProbeModelResult
+    applied: boolean
+    entered_differs: boolean
+    models: SystemConfigData['available_models']
+  }>(`/api/admin/config/models/${encodeURIComponent(modelId)}/context-window/probe`, {
+    method: 'POST',
+    body: JSON.stringify({ force }),
   })
 }
 
@@ -563,6 +594,13 @@ export type OcrTestResult = {
 
 export function testOcr(data: { ocr_endpoint: string; ocr_api_key: string; ocr_provider?: OcrProvider }) {
   return apiFetch<OcrTestResult>('/api/admin/config/test-ocr', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export function testWebSearch(data: { web_search_provider: string; web_search_endpoint: string; web_search_api_key: string }) {
+  return apiFetch<{ status: string; result_count: number; message: string }>('/api/admin/config/test-web-search', {
     method: 'POST',
     body: JSON.stringify(data),
   })
@@ -902,10 +940,49 @@ export function getEmailAnalytics(days: number = 30) {
   return apiFetch<EmailAnalyticsResponse>(`/api/admin/email-analytics?days=${days}`)
 }
 
+export interface V5AnnouncementTriggerResponse {
+  sent: number
+  eligible: number
+  dry_run: boolean
+}
+
+export function triggerV5LaunchAnnouncement(batch_size: number, dry_run: boolean) {
+  return apiFetch<V5AnnouncementTriggerResponse>('/api/admin/announcements/v5-launch', {
+    method: 'POST',
+    body: JSON.stringify({ batch_size, dry_run }),
+  })
+}
+
+export interface AgenticDripBackfillResponse {
+  enrolled: number
+  eligible: number
+  dry_run: boolean
+}
+
+export function backfillAgenticChatDrip(batch_size: number, dry_run: boolean) {
+  return apiFetch<AgenticDripBackfillResponse>('/api/admin/announcements/backfill-agentic-drip', {
+    method: 'POST',
+    body: JSON.stringify({ batch_size, dry_run }),
+  })
+}
+
 // Certifications
 
 export interface CertificationProgressItem {
   user_id: string
+  progress_id?: string
+  enrollment_id?: string | null
+  course_version?: string | null
+  course_title?: string | null
+  enrollment_state?: string | null
+  is_active?: boolean | null
+  /** A newer optional course is offered to this enrollment's course; null when unknown. */
+  optional_update_available?: boolean | null
+  can_unlock?: boolean
+  progression_policy_id?: string | null
+  learning_order?: string | null
+  unlock_unavailable_reason?: string | null
+  reconciliation_error?: string | null
   name: string | null
   email: string | null
   level: string
@@ -920,6 +997,7 @@ export interface CertificationProgressItem {
 }
 
 export interface CertificationProgressDetail extends CertificationProgressItem {
+  support_summary?: CertificationSupportSummary | null
   modules: Record<string, {
     completed?: boolean
     stars?: number
@@ -929,24 +1007,65 @@ export interface CertificationProgressDetail extends CertificationProgressItem {
   }>
 }
 
+export interface CertificationSupportSummary {
+  access_changes?: {
+    state: 'recorded' | 'not_recorded' | 'unavailable'
+    historical_unlocked: boolean
+    older_available: boolean
+    changes: { request_id: string; actor_user_id: string; previous_unlocked: boolean; unlocked: boolean; reason: string; recorded_at: string; credit_effect: 'none' }[]
+  }
+  operations?: CertificationSupportOperations | null
+  observed_at: string
+  read_only: true
+  manifest_sha256?: string
+  position_status: 'saved' | 'not_recorded' | 'unavailable'
+  last_saved_lesson: { module_id: string; module_title: string; lesson_id: string; lesson_title: string; revision: number; saved_at: string | null } | null
+  pending_credential: boolean
+  explanation: string
+  pending_completions: { attempt_id: string; module_id: string; module_title: string; state: string; in_flight: boolean; next_step: string }[]
+  recent_completions: { attempt_id?: string; module_id?: string; module_title?: string; state: string; created_at?: string | null; next_step: string; selected_evidence?: { review_attempt_id?: string; scenario_attempt_id?: string }; failed_required_outcomes?: { outcome_id: string; statement: string }[] }[]
+  older_completions_available: boolean
+}
+
+export interface CertificationSupportOperations {
+  worker_marked_in_flight: boolean
+  course_change_pending: boolean
+  groups: {
+    kind: 'automatic_review' | 'lab_run' | 'private_handoff'
+    more_pending: boolean
+    more_recent: boolean
+    records: {
+      request_id?: string
+      module_id?: string
+      module_title?: string
+      state: string
+      next_step: string
+      references?: Record<string, string>
+      failed_required_outcomes?: { outcome_id: string; statement: string }[]
+    }[]
+  }[]
+}
+
 export interface CertificationProgressListResponse {
   items: CertificationProgressItem[]
   total: number
   capped: boolean
 }
 
-export function getCertificationProgressList(limit: number = 500) {
-  return apiFetch<CertificationProgressListResponse>(`/api/admin/certifications?limit=${limit}`)
+export function getCertificationProgressList(limit: number = 500, offset = 0, q = '') {
+  return apiFetch<CertificationProgressListResponse>(`/api/admin/certifications?limit=${limit}&offset=${offset}&q=${encodeURIComponent(q)}`)
 }
 
-export function getCertificationProgressDetail(userId: string) {
-  return apiFetch<CertificationProgressDetail>(`/api/admin/certifications/${userId}`)
+export function getCertificationProgressDetail(userId: string, enrollmentId?: string) {
+  return apiFetch<CertificationProgressDetail>(`/api/admin/certifications/${encodeURIComponent(userId)}${enrollmentId ? `?enrollment_id=${encodeURIComponent(enrollmentId)}` : ''}`)
 }
 
-export function setCertificationUnlock(userId: string, unlocked: boolean) {
+export interface CertificationAccessRequest { request_id: string; unlocked: boolean; reason: string }
+
+export function setCertificationUnlock(userId: string, request: CertificationAccessRequest, enrollmentId?: string) {
   return apiFetch<{ user_id: string; unlocked: boolean }>(
-    `/api/admin/certifications/${userId}/unlock`,
-    { method: 'PUT', body: JSON.stringify({ unlocked }) },
+    `/api/admin/certifications/${encodeURIComponent(userId)}/unlock${enrollmentId ? `?enrollment_id=${encodeURIComponent(enrollmentId)}` : ''}`,
+    { method: 'PUT', body: JSON.stringify(request) },
   )
 }
 
@@ -1115,10 +1234,13 @@ export interface AdminKBListResponse {
 
 /** Org-wide KB inventory for reviewing names/versions. Backend gates on
  * admin-or-staff; renaming a KB you don't own additionally requires full admin. */
-export function getAdminKnowledgeBases(params?: { search?: string; limit?: number }) {
+export function getAdminKnowledgeBases(params?: { search?: string; status?: string; sort?: 'title' | 'updated'; limit?: number; offset?: number }) {
   const qs = new URLSearchParams()
   if (params?.search) qs.set('search', params.search)
+  if (params?.status) qs.set('status', params.status)
+  if (params?.sort) qs.set('sort', params.sort)
   if (params?.limit) qs.set('limit', String(params.limit))
+  if (params?.offset) qs.set('offset', String(params.offset))
   const q = qs.toString()
   return apiFetch<AdminKBListResponse>(`/api/admin/knowledge-bases${q ? `?${q}` : ''}`)
 }
@@ -1194,4 +1316,68 @@ export function getOptimizerActivity(params?: {
   if (params?.limit) qs.set('limit', String(params.limit))
   const q = qs.toString()
   return apiFetch<OptimizerActivityResponse>(`/api/admin/optimizer/activity${q ? `?${q}` : ''}`)
+}
+
+export interface CertificationRecoverySnapshot {
+  user_id: string
+  enrollment_id: string
+  course_version: string
+  course_title: string
+  manifest_sha256: string
+  selection_revision: number
+  review_sha256: string
+  kind: 'none' | 'worker' | 'attempt'
+  write_id: string | null
+  attempt_id: string | null
+  module_id: string | null
+  module_title: string | null
+  attempt_state: string | null
+  in_flight: boolean
+  can_recover: boolean
+  explanation: string
+  operation: string | null
+  started_at: string | null
+  total_xp: number
+  certified: boolean
+}
+
+export interface CertificationRecoveryReceipt {
+  request_id: string
+  enrollment_id: string
+  status: 'no_assessment_started' | 'saved_result' | 'retry_saved_grade' | 'interrupted_before_grade' | 'review_changed'
+  attempt_id: string | null
+  reason: string
+  actor_user_id: string
+}
+
+export interface CertificationRecoveryReview {
+  review: CertificationRecoverySnapshot
+  can_apply: boolean
+  history: {
+    request_id: string
+    actor_user_id: string
+    reason: string
+    state: 'started' | 'completed'
+    created_at: string
+    attempt_id: string | null
+    write_id: string | null
+    review_sha256: string
+    review: CertificationRecoverySnapshot
+    can_resume: boolean
+    result: CertificationRecoveryReceipt | null
+  }[]
+}
+
+export interface CertificationRecoveryAction {
+  request_id: string
+  review_sha256: string
+  reason: string
+}
+
+export function getCertificationRecovery(userId: string, enrollmentId: string) {
+  return apiFetch<CertificationRecoveryReview>(`/api/admin/certifications/${encodeURIComponent(userId)}/recovery?enrollment_id=${encodeURIComponent(enrollmentId)}`)
+}
+
+export function recoverCertificationCompletion(userId: string, enrollmentId: string, body: CertificationRecoveryAction) {
+  return apiFetch<CertificationRecoveryReceipt>(`/api/admin/certifications/${encodeURIComponent(userId)}/recovery?enrollment_id=${encodeURIComponent(enrollmentId)}`, { method: 'POST', body: JSON.stringify(body) })
 }

@@ -1,0 +1,53 @@
+"""Source-fidelity guidance shared by Page generation and tool feedback."""
+
+PAGE_LANGUAGE_RULES = (
+    "In replies, call this feature a Page (plural Pages), never an artifact or HTML artifact. "
+    "Describe actions and outcomes, not tool calls: 'I prepared the Page preview' or 'Saved the Page'. "
+    "Do not narrate function names, confirmation flags, raw field names, internal IDs or character counts, "
+    "including tool names rewritten with spaces. Use the Page title and a returned version number "
+    "such as 'Version 2'; if no number was returned, say 'the previous version' or 'the saved version'. "
+    "Never infer a version number from a revision ID. The actual buttons are 'Save page' and 'Save new version', "
+    "not 'Approve create html artifact' or 'Approve revise html artifact'. Before approval, say the preview "
+    "is ready, not saved. For sharing, say 'Open the Page and choose Share'. IDs may appear only inside "
+    "link destinations, never in visible link labels or prose."
+)
+
+PAGE_SOURCE_FIDELITY_RULES = (
+    "For a Page built from documents or spreadsheets, read the original source before authoring or revising; "
+    "an earlier generated page or chat summary is not source evidence. Read all relevant rows and columns, "
+    "following get_document_text continuation offsets when needed. Preserve every category and every year's "
+    "exact value in separate table cells, including repeated values and the final year. Keep units, year "
+    "labels and category labels aligned with the source. Never replace individual yearly cells with a range, "
+    "'each year', an average or a rounded abbreviation. Chart labels and number cards must agree with those cells. "
+    "A summary may accompany the full table, but label it 'Calculated summary' and compute it from all relevant "
+    "source values; a range uses the true minimum and maximum, not the first and last values or an assumed trend. "
+    "Do not invent statements about how the source is organized: exact source cells are not 'ranges in the source'. "
+    "Distinguish source notes actually present in the document from your own calculations and presentation choices. "
+    "Check every displayed value and source claim against the original before proposing a preview or saving. "
+    "If source values are missing, truncated or ambiguous, retrieve them or clearly mark them unavailable; never guess. "
+    "HTML sanitization, saving and publication do not verify factual accuracy. Never claim source verification "
+    "unless you actually compared the content with the source. "
+    "Only the current attachment list determines which documents are attached. A workbook's sheet names, "
+    "links, or references to other documents do not make those documents attached or available. "
+    "Never claim you cross-checked against reference documents unless their actual content was supplied "
+    "or successfully read; name the real sources and distinguish workspace reads from attachments. "
+    "A failed read, a document listing, or an earlier assistant summary is not evidence of verification. "
+    "If only part of a large source was read, describe that limited scope instead of claiming a complete check."
+)
+
+
+PAGE_INTERACTION_RULES = (
+    "Pages support useful interactivity without JavaScript. When interactivity is requested, offer and include "
+    "appropriate native HTML controls in the preview: a clickable table of contents for long pages, KPI cards "
+    "linked to their corresponding chart or table, expandable 'Source notes' and 'Calculated summary' sections, "
+    "and normal web or email links to supplied sources or contacts. Do not say all interactivity is impossible. "
+    "Use real <a href='#budget-chart'> links with matching unique id='budget-chart' targets; keep target headings "
+    "outside collapsed details. Use <details><summary>Source notes</summary>...</details> and a separate "
+    "Calculated summary disclosure when those sections have content. Keep essential figures and full data tables "
+    "visible, and preserve existing links, IDs and disclosures when revising. Use http/https links and mailto links "
+    "only for known destinations; never invent source URLs or contact addresses. Web/contact links open separately. "
+    "Use descriptive link labels, visible focus styling, and clear clickable summary labels. No onclick handlers, "
+    "fake filter/sort controls, forms, scripts, or remote assets. Explain briefly that these links and expandable "
+    "sections work without scripts; live charts, filters and table sorting remain unsupported. Describe only the "
+    "controls actually included in the preview, not a fully interactive application."
+)

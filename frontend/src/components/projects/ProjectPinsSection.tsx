@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useState, type ComponentType } from 'react'
+import { useEffect, useState, type ComponentType } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { Plus, Workflow, FileSearch, Zap, BookOpen, X, Search } from 'lucide-react'
 import { useWorkflows } from '../../hooks/useWorkflows'
 import { useSearchSets } from '../../hooks/useExtractions'
 import { useAutomations } from '../../hooks/useAutomations'
 import { useKnowledgeBases } from '../../hooks/useKnowledgeBases'
-import { listProjectPins, addProjectPin, removeProjectPin } from '../../api/projects'
+import { useProjectPins } from '../../hooks/useProjectPins'
 import type { ProjectPin } from '../../types/project'
 
 const TYPE_META: Record<string, { icon: ComponentType<{ size?: number; className?: string }>; label: string }> = {
@@ -43,30 +43,26 @@ export function ProjectPinsSection({ projectUuid, onChange, onOpen }: { projectU
   const { searchSets } = useSearchSets()
   const { automations } = useAutomations()
   const { knowledgeBases } = useKnowledgeBases()
-  const [pins, setPins] = useState<ProjectPin[]>([])
+  const projectPins = useProjectPins(projectUuid)
+  const { pins: allPins, loading, error, refresh } = projectPins
+  const pins = allPins.filter(p => !['skill', 'artifact'].includes(p.pin_type))
   const [adding, setAdding] = useState(false)
-
-  const load = useCallback(() => {
-    listProjectPins(projectUuid).then(setPins).catch(() => {})
-  }, [projectUuid])
-  useEffect(() => { load() }, [load])
-
+  const [mutationError, setMutationError] = useState<string | null>(null)
+  const [pending, setPending] = useState(false)
   const pinnedSet = new Set(pins.map(key))
-
   const pin = async (pinType: string, targetId: string) => {
-    try {
-      await addProjectPin(projectUuid, { pin_type: pinType, target_id: targetId })
-      load()
-      onChange?.()
-    } catch { /* ignore */ }
+    if (pending) return
+    setPending(true); setMutationError(null)
+    try { await projectPins.pin(pinType, targetId); onChange?.() }
+    catch (error) { setMutationError(error instanceof Error ? error.message : 'Could not pin this tool. Try again.') }
+    finally { setPending(false) }
   }
-
   const unpin = async (p: ProjectPin) => {
-    try {
-      await removeProjectPin(projectUuid, p.pin_type, p.target_id)
-      load()
-      onChange?.()
-    } catch { /* ignore */ }
+    if (pending) return
+    setPending(true); setMutationError(null)
+    try { await projectPins.unpin(p.pin_type, p.target_id); onChange?.() }
+    catch (error) { setMutationError(error instanceof Error ? error.message : 'Could not unpin this tool. Try again.') }
+    finally { setPending(false) }
   }
 
   const open = (p: ProjectPin) => {
@@ -86,14 +82,16 @@ export function ProjectPinsSection({ projectUuid, onChange, onOpen }: { projectU
   }
 
   return (
-    <div className="mt-8">
+    <div className="project-detail-card">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Pinned tools</h2>
-        <button type="button" onClick={() => setAdding(a => !a)} className="flex items-center gap-1 text-sm text-highlight hover:underline">
+        <h2 className="project-section-title">Pinned tools</h2>
+        <button type="button" onClick={() => setAdding(a => !a)} className="project-button">
           <Plus size={14} /> Pin a tool
         </button>
       </div>
 
+      {mutationError && <p role="alert" className="mb-3 text-sm text-red-800">{mutationError}</p>}
+      {pending && <p role="status" className="mb-3 text-sm text-gray-600">Updating pinned tools…</p>}
       {adding && (
         <div className="mb-3 rounded-lg border border-gray-200 bg-white p-3">
           <label className="mb-3 flex items-center gap-2 rounded-md border border-gray-200 px-2 py-1.5 text-sm focus-within:border-highlight">
@@ -108,21 +106,21 @@ export function ProjectPinsSection({ projectUuid, onChange, onOpen }: { projectU
             />
           </label>
           <PickerList title="Workflows" items={workflows.map(w => ({ id: w.id, name: w.name }))} total={workflowTotal} query={debouncedQuery} pinType="workflow" pinnedSet={pinnedSet} onPin={pin} />
-          <PickerList title="Extractions" items={searchSets.filter(s => matches(s.title)).map(s => ({ id: s.uuid, name: s.title }))} query={debouncedQuery} pinType="extraction" pinnedSet={pinnedSet} onPin={pin} />
+          <PickerList title="Extractions" items={searchSets.filter(s => (!s.set_type || s.set_type === 'extraction') && matches(s.title)).map(s => ({ id: s.uuid, name: s.title }))} query={debouncedQuery} pinType="extraction" pinnedSet={pinnedSet} onPin={pin} />
           <PickerList title="Automations" items={automations.filter(a => matches(a.name)).map(a => ({ id: a.id, name: a.name }))} query={debouncedQuery} pinType="automation" pinnedSet={pinnedSet} onPin={pin} />
           <PickerList title="Knowledge bases" items={knowledgeBases.filter(k => matches(k.title)).map(k => ({ id: k.uuid, name: k.title }))} query={debouncedQuery} pinType="knowledge_base" pinnedSet={pinnedSet} onPin={pin} />
-          {debouncedQuery && workflows.length + searchSets.filter(s => matches(s.title)).length + automations.filter(a => matches(a.name)).length + knowledgeBases.filter(k => matches(k.title)).length === 0 && (
+          {debouncedQuery && workflows.length + searchSets.filter(s => (!s.set_type || s.set_type === 'extraction') && matches(s.title)).length + automations.filter(a => matches(a.name)).length + knowledgeBases.filter(k => matches(k.title)).length === 0 && (
             <div className="text-xs text-gray-500">Nothing matches “{debouncedQuery}”.</div>
           )}
         </div>
       )}
 
-      {pins.length === 0 ? (
+      {loading ? <p role="status" className="text-sm text-gray-600">Loading pinned tools…</p> : error ? <p role="alert" className="text-sm text-red-800">{error} <button type="button" className="underline" onClick={() => void refresh()}>Retry pins</button></p> : pins.length === 0 ? (
         <div className="rounded-lg border border-dashed border-gray-200 p-4 text-center text-sm text-gray-500">
           No pinned tools. Pin the workflows, extractions, automations, and knowledge bases you use for this project.
         </div>
       ) : (
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid gap-2">
           {pins.map(p => {
             const meta = TYPE_META[p.pin_type] ?? TYPE_META.workflow
             const Icon = meta.icon
@@ -130,10 +128,10 @@ export function ProjectPinsSection({ projectUuid, onChange, onOpen }: { projectU
               <div key={key(p)} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white p-3">
                 <Icon size={16} className="shrink-0 text-gray-500" />
                 <button type="button" onClick={() => open(p)} className="min-w-0 flex-1 text-left">
-                  <div className="truncate text-sm font-medium text-gray-900">{p.name}</div>
+                  <div className="break-words text-sm font-medium text-gray-900">{p.name}</div>
                   <div className="text-xs text-gray-500">{meta.label}</div>
                 </button>
-                <button type="button" onClick={() => unpin(p)} title="Unpin" aria-label="Unpin" className="p-1 text-gray-500 hover:text-red-500">
+                <button type="button" onClick={() => unpin(p)} title="Unpin" aria-label={`Unpin ${p.name}`} disabled={pending} className="p-1 text-gray-500 hover:text-red-500">
                   <X size={14} />
                 </button>
               </div>

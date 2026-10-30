@@ -56,7 +56,29 @@ class User(Document):
     onboarding_drip_step: int = 0  # 0=not started, 1-4=sent step N
     onboarding_drip_next_at: Optional[datetime.datetime] = None  # when to send next drip
     last_nudge_sent_at: Optional[datetime.datetime] = None
-    email_preferences: dict = {}  # {"onboarding": True, "nudges": True}
+    # Shared across every marketing-class sender (drips, nudges, one-shot
+    # sends) — the cross-sequence frequency cap keys off this.
+    last_marketing_email_at: Optional[datetime.datetime] = None
+    email_preferences: dict = {}  # {"onboarding": True, "nudges": True, "announcements": True}
+    # The RA inbox on Home (#999) can be turned off per user.
+    home_inbox_hidden: bool = False
+
+    # v5.0 launch — one-time announcement send tracking
+    v5_announcement_sent_at: Optional[datetime.datetime] = None
+
+    # Agentic chat tutorial drip (separate from the cert-module onboarding drip)
+    agentic_drip_step: int = 0  # 0=not started, 1-5=sent step N
+    agentic_drip_next_at: Optional[datetime.datetime] = None
+
+    # Chat-milestone tracking (powers post-launch engagement nudges)
+    first_chat_workflow_at: Optional[datetime.datetime] = None
+    chat_workflow_count: int = 0
+    powerup_milestone_sent_at: Optional[datetime.datetime] = None  # 30-workflow upsell
+    certification_complete_sent_at: Optional[datetime.datetime] = None
+
+    # Role segmentation for drips (optional — set at registration or by admin)
+    # Values: "research_admin", "pi", "sponsored_programs", "compliance", "it", "other"
+    role_segment: Optional[str] = None
 
     class Settings:
         name = "user"

@@ -6,6 +6,8 @@ export interface SearchSetItem {
   title: string | null;
   is_optional: boolean;
   enum_values: string[];
+  /** What the field means and other labels documents use for it; sent to the model with the name. */
+  description?: string | null;
   pdf_binding?: string | null;
 }
 
@@ -124,6 +126,8 @@ export interface WorkflowCitation {
   score?: number | null;
   similarity?: number | null;
   content_preview?: string;
+  /** A web result's address (Web Search step); the chip opens it. */
+  url?: string | null;
 }
 
 export interface WorkflowStatus {
@@ -140,6 +144,9 @@ export interface WorkflowStatus {
   error?: string | null;
   error_payload?: WorkflowErrorPayload | null;
   retrieved_sources?: WorkflowCitation[];
+  /** The run's model, and the models its steps actually ran on. */
+  model?: string | null;
+  models_used?: string[];
 }
 
 export interface ModelInfo {

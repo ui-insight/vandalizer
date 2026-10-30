@@ -12,11 +12,12 @@ PROJECT_STATES = ("draft", "active", "submitted", "awarded", "closeout", "archiv
 # Capability kinds a project can pin. Pins are *references* to existing
 # user/team-owned artifacts — pinning never moves or copies the artifact, so a
 # workflow can be pinned into many projects and stay in the owner's library.
-PIN_TYPES = ("workflow", "extraction", "automation", "knowledge_base")
+PIN_TYPES = ("workflow", "extraction", "automation", "knowledge_base", "skill", "artifact")
 
 # Project-local collaborator roles. Deliberately lighter than Team roles: a
 # Project ACL is for sharing one unit of work (read-mostly), not running an org.
 PROJECT_ROLES = ("viewer", "editor")
+PROJECT_CONTEXT_MAX_LENGTH = 12000
 
 
 class Project(Document):
@@ -31,6 +32,7 @@ class Project(Document):
     uuid: str
     title: str
     description: Optional[str] = None
+    context: Optional[str] = Field(default=None, max_length=PROJECT_CONTEXT_MAX_LENGTH)
     owner_user_id: str
     # Team UUID (matches SmartFolder/SmartDocument.team_id). None = personal
     # project. Both Team and Project scopes are optional by design.
@@ -42,6 +44,7 @@ class Project(Document):
     # collection auto-ingests every file dropped into the project, so
     # "chat with this project" works with no KB-building. Set at creation.
     kb_uuid: Optional[str] = None
+    default_skill_uuid: Optional[str] = None
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
     updated_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
 

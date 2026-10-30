@@ -118,7 +118,7 @@ const leadership: Track = {
       id: 'title',
       title: 'Vandalizer',
       body: 'AI document intelligence for research administration.\n\n*Self-hosted · open source · built by a university, for universities.*',
-      note: 'Open with the problem your office actually feels — the next slide.',
+      note: 'Open with the problem your office actually feels, on the next slide.',
     },
     {
       id: 'problem',
@@ -134,10 +134,10 @@ const leadership: Track = {
       id: 'what',
       title: 'What Vandalizer does',
       body: [
-        '- **Extract** — pull dates, budgets, requirements into clean structured data',
-        '- **Chat** — ask questions of your documents, answers cited to the source',
-        '- **Automate** — process new files the moment they arrive',
-        '- **Collaborate** — shared, repeatable workflows across the team',
+        '- **Extract:** pull dates, budgets, requirements into clean structured data',
+        '- **Chat:** ask questions of your documents, answers cited to the source',
+        '- **Automate:** process new files the moment they arrive',
+        '- **Collaborate:** shared, repeatable workflows across the team',
       ].join('\n'),
     },
     {
@@ -155,7 +155,7 @@ const leadership: Track = {
       id: 'cost',
       title: 'What it costs',
       body: [
-        '- **Software:** free — open source, no license fee',
+        '- **Software:** free, open source, no license fee',
         '- **Hardware:** a single commodity server (~16 GB RAM); **no GPU** with a cloud model',
         '- **AI usage:** pay-as-you-go to your chosen LLM provider, or $0 with a local model',
         '- **People:** IT stands it up with a guided installer in an afternoon',
@@ -177,17 +177,17 @@ const leadership: Track = {
       body: [
         '- Set your **name, logo, icon, and brand color** in the admin UI',
         '- Carries through the header, sign-in, browser tab, chat, and **email**',
-        '- Staff see *your* tool — not a generic "Vandalizer" install',
+        '- Staff see *your* tool, not a generic "Vandalizer" install',
         '- A quiet "Powered by Vandalizer" credit and NSF acknowledgement remain',
       ].join('\n'),
-      note: 'Branding is a runtime setting — applied the moment you save, no redeploy.',
+      note: 'Branding is a runtime setting, applied the moment you save, no redeploy.',
     },
     {
       id: 'credibility',
       title: 'Where it comes from',
       body: [
         'Built at the **University of Idaho** under the **NSF GRANTED** program',
-        '(Award #2427549) — purpose-built for research administration and',
+        '(Award #2427549): purpose-built for research administration and',
         'designed from day one for **other institutions to adopt**.',
       ].join('\n'),
     },
@@ -306,16 +306,16 @@ const deploy: Track = {
       title: 'LLM options',
       body: [
         '- **Cloud:** any OpenAI-compatible endpoint, plus native Anthropic',
-        '- **Local / on-prem:** Ollama or vLLM — can run fully air-gapped',
+        '- **Local / on-prem:** Ollama or vLLM, can run fully air-gapped',
         '- **Aggregators:** OpenRouter and custom endpoints',
-        '- Configured **at runtime** in the admin UI — no redeploy to change models',
+        '- Configured **at runtime** in the admin UI: no redeploy to change models',
       ].join('\n'),
     },
     {
       id: 'install',
       title: 'How you install it',
       body: [
-        '- **Supported path:** `./setup.sh` — guided installer; creates an admin',
+        '- **Supported path:** `./setup.sh`, a guided installer; creates an admin',
         '  account and seeds a starter catalog of templates',
         '- **Scripted path:** Docker Compose directly (`compose.yaml`)',
         '- Full guidance in **DEPLOY.md**',
@@ -331,7 +331,7 @@ const deploy: Track = {
         '- Local model (Ollama / vLLM): nothing leaves — fully air-gapped',
         '- Secrets (LLM keys, OAuth tokens) **encrypted at rest** (Fernet)',
         '- JWT sessions; OAuth (Azure AD, Google, Okta) and SAML supported',
-        '- Optional M365 / Graph integration — off unless you configure it',
+        '- Optional M365 / Graph integration: off unless you configure it',
       ].join('\n'),
     },
     {
@@ -339,7 +339,7 @@ const deploy: Track = {
       title: 'Day-2 operations',
       body: [
         '- **Back up:** MongoDB data, the uploads volume, and the ChromaDB volume',
-        '- Redis is an ephemeral broker — nothing to back up',
+        '- Redis is an ephemeral broker: nothing to back up',
         '- Immutable audit log for administrative actions',
         '- Models, OCR endpoints, auth, and **white-label branding** managed from **/admin**',
       ].join('\n'),
@@ -354,7 +354,7 @@ const deploy: Track = {
     {
       id: 'architecture',
       heading: 'Architecture',
-      body: 'A React single-page app is served behind nginx, which proxies a FastAPI backend. The backend uses MongoDB for application data, Redis as the Celery task broker, and ChromaDB as the vector store for retrieval-augmented chat. Celery workers handle asynchronous jobs — document processing, extraction, and knowledge-base ingestion. External services are reached over HTTPS: your chosen LLM provider, optional Microsoft 365 / Graph, and an optional OCR endpoint.',
+      body: 'A React single-page app is served behind nginx, which proxies a FastAPI backend. The backend uses MongoDB for application data, Redis as the Celery task broker, and ChromaDB as the vector store for retrieval-augmented chat. Celery workers handle asynchronous jobs: document processing, extraction, and knowledge-base ingestion. External services are reached over HTTPS: your chosen LLM provider, optional Microsoft 365 / Graph, and an optional OCR endpoint.',
     },
     {
       id: 'requirements',
@@ -405,9 +405,9 @@ const team: Track = {
   ],
   pitch: {
     spoken:
-      'Vandalizer offers RA organizations a suite of AI-powered tools that are specifically designed to streamline administrative processes. Think of Vandalizer as a smart workspace for our documents. Vandalizer offers a store of "workflows" — a coordinated sequence of AI-powered processes. Workflows can be applied to quickly surface important information in selected documents, like deadlines, budgets, or PI names, and to generate new documents like a Notice of Award summary or a budget justification. Vandalizer also gives RAs the power to set up automations, so new files get processed as they arrive. This platform eases the burden of structured, repeatable tasks, freeing up time for RAs to turn to responsibilities that require their institutional knowledge and professional judgment. The team that created Vandalizer also provides a certification course to help RAs achieve productive results with Vandalizer while remaining secure and compliant.',
+      'Vandalizer offers RA organizations a suite of AI-powered tools that are specifically designed to streamline administrative processes. Think of Vandalizer as a smart workspace for our documents. Vandalizer offers a store of "workflows" — a coordinated sequence of AI-powered processes. Workflows can be applied to quickly surface important information in selected documents, like deadlines, budgets, or PI names, and to generate new documents like a Notice of Award summary or a budget justification. Vandalizer also gives RAs the power to set up automations, so new files get processed as they arrive. This platform eases the burden of structured, repeatable tasks, freeing up time for RAs to turn to responsibilities that require their institutional knowledge and professional judgment. The team also provides a certification course for practicing document-workflow skills and checking AI outputs against sources. An earned certificate records the completed course; it does not replace institutional review or guarantee future output accuracy.',
     written:
-      'Vandalizer offers RA organizations a suite of AI-powered tools that are specifically designed to streamline administrative processes. The platform introduces a shared workspace for RA organizations to process administrative documents with AI-powered tasks and automations. At its center is a store of "workflows" — coordinated sequences of AI-powered processes. Each workflow is designed to achieve a specific outcome, but generally they surface important information in selected documents (like deadlines, budgets, or PI names) and generate new documents like a Notice of Award summary or a budget justification. Vandalizer also gives RAs the power to set up automations, so new files get processed as they arrive. This platform eases the burden of structured, repeatable tasks, freeing up time for RAs to pursue responsibilities that require their institutional knowledge and professional judgment. The team that created Vandalizer also provides a certification course to help RAs ensure that they achieve productive results with Vandalizer while remaining secure and compliant in the process.',
+      'Vandalizer offers RA organizations a suite of AI-powered tools that are specifically designed to streamline administrative processes. The platform introduces a shared workspace for RA organizations to process administrative documents with AI-powered tasks and automations. At its center is a store of "workflows" — coordinated sequences of AI-powered processes. Each workflow is designed to achieve a specific outcome, but generally they surface important information in selected documents (like deadlines, budgets, or PI names) and generate new documents like a Notice of Award summary or a budget justification. Vandalizer also gives RAs the power to set up automations, so new files get processed as they arrive. This platform eases the burden of structured, repeatable tasks, freeing up time for RAs to pursue responsibilities that require their institutional knowledge and professional judgment. The team also provides a certification course for practicing document-workflow skills and checking AI outputs against sources. An earned certificate records the completed course; it does not replace institutional review or guarantee future output accuracy.',
   },
   slides: [
     {
@@ -428,7 +428,7 @@ const team: Track = {
       id: 'extract',
       title: '2 · Build an extraction task',
       body: [
-        '- Define the fields you want — deadlines, budgets, PI names, terms',
+        '- Define the fields you want: deadlines, budgets, PI names, terms',
         '- Chain steps together into a repeatable pipeline',
         '- Test on one document, then **run it across a whole batch**',
         '- Download results as JSON, CSV, or a ZIP',
@@ -454,14 +454,14 @@ const team: Track = {
     },
     {
       id: 'projects',
-      title: '5 · Projects — tie it all together',
+      title: '5 · Projects: tie it all together',
       body: [
         '- Gather one grant or effort into a single **Project**',
         '- Its **files, knowledge base, chat, and pinned tools** live in one place',
         '- Chat answers **only from that project’s documents**',
         '- Keep it personal, share it with your team, or invite a collaborator by link',
       ].join('\n'),
-      note: 'A project’s knowledge base builds itself from the files you add — no extra setup.',
+      note: 'A project’s knowledge base builds itself from the files you add, with no extra setup.',
     },
     {
       id: 'automate',
@@ -484,7 +484,7 @@ const team: Track = {
     {
       id: 'certify',
       title: '8 · Get certified',
-      body: 'The built-in **Vandal Workflow Architect** course walks you from your first upload to building validated workflows — hands-on, inside the product.\n\nSign in and start: **/**',
+      body: 'The built-in **Vandal Workflow Architect** course walks you from your first upload to building validated workflows, hands-on, inside the product.\n\nSign in and start: **/**',
       note: 'Offer to run a live build of one real workflow with the team.',
     },
   ],
@@ -512,7 +512,7 @@ const team: Track = {
     {
       id: 'projects',
       heading: 'Projects',
-      body: 'When a piece of work — a grant, a contract, a compliance effort — spans many documents and tools, gather it into a **Project**. A project has its own folder of files, an automatic knowledge base built from those files, a chat that answers only from the project’s documents, and a place to pin the workflows and automations you use for it. Keep a project personal, share it with your team, or send a collaborator a viewer or editor invite link. Everything for that effort stays in one scoped workspace instead of scattered across the library.',
+      body: 'When a piece of work (a grant, a contract, a compliance effort) spans many documents and tools, gather it into a **Project**. A project has its own folder of files, an automatic knowledge base built from those files, a chat that answers only from the project’s documents, and a place to pin the workflows and automations you use for it. Keep a project personal, share it with your team, or send a collaborator a viewer or editor invite link. Everything for that effort stays in one scoped workspace instead of scattered across the library.',
     },
     {
       id: 'automate',
@@ -554,7 +554,7 @@ const researchers: Track = {
     {
       id: 'title',
       title: 'Vandalizer for your proposals',
-      body: 'How your research administration office uses AI to support you — faster.',
+      body: 'How your research administration office uses AI to support you, faster.',
     },
     {
       id: 'benefit',

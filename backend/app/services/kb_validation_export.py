@@ -17,6 +17,8 @@ extraction-results export in ``routers/extractions.py``.
 """
 
 from __future__ import annotations
+from app.models.knowledge import KnowledgeBase
+from app.models.validation_run import ValidationRun
 
 from typing import Any
 
@@ -138,7 +140,7 @@ RESULT_COLUMNS = [
 ]
 
 
-def _answer_model(snap: dict, vr) -> str | None:
+def _answer_model(snap: dict, vr: ValidationRun) -> str | None:
     """The model that generated the run's graded answers, if recorded."""
     recorded = snap.get("answer_model") or getattr(vr, "model", None)
     return recorded if isinstance(recorded, str) and recorded else None
@@ -146,8 +148,8 @@ def _answer_model(snap: dict, vr) -> str | None:
 
 def build_kb_validation_results_export(
     *,
-    kb,
-    vr,
+    kb: KnowledgeBase,
+    vr: ValidationRun,
     test_queries: list,
     catalog_version: str | None,
     exported_by_user_id: str,

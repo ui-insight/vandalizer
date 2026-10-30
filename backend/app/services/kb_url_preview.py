@@ -11,6 +11,8 @@ reviewed is exactly what is indexed.
 """
 
 from __future__ import annotations
+from motor.motor_asyncio import AsyncIOMotorCollection
+
 
 import datetime
 import logging
@@ -77,7 +79,7 @@ def _now() -> datetime.datetime:
     return datetime.datetime.now(tz=datetime.timezone.utc)
 
 
-def _collection():
+def _collection() -> AsyncIOMotorCollection:
     return KBUrlPreview.get_motor_collection()
 
 
@@ -128,7 +130,7 @@ class _Recorder:
         if not doc or doc.get("status") != "running":
             raise PreviewCanceled()
 
-    async def record(self, url: str, verdict: str, **fields) -> KBUrlPreviewPage:
+    async def record(self, url: str, verdict: str, **fields: object) -> KBUrlPreviewPage:
         self.seen.add(normalize_crawl_url(url))
         page = KBUrlPreviewPage(
             preview_uuid=self.preview.uuid,
@@ -315,7 +317,7 @@ async def cancel_preview(preview: KBUrlPreview) -> bool:
         {"uuid": preview.uuid, "status": "running"},
         {"$set": {"status": "canceled"}},
     )
-    return result.modified_count == 1
+    return bool(result.modified_count == 1)
 
 
 async def check_progress(preview: KBUrlPreview, now: datetime.datetime | None = None) -> str | None:
@@ -392,7 +394,7 @@ async def claim_for_commit(preview: KBUrlPreview) -> bool:
         {"uuid": preview.uuid, "status": "ready"},
         {"$set": {"status": "committing"}},
     )
-    return result.modified_count == 1
+    return bool(result.modified_count == 1)
 
 
 async def commit_preview(preview_uuid: str, page_ids: list[str]) -> int:
@@ -465,7 +467,7 @@ async def commit_preview(preview_uuid: str, page_ids: list[str]) -> int:
         added += 1
         if is_seed:
             seeds[page.url] = source
-        elif parent:
+        elif parent and page.parent_url:
             children.setdefault(page.parent_url, []).append(page.url)
 
     # A seed's crawl record, as an add writes it: the pages kept, and the

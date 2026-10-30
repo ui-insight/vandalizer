@@ -1,7 +1,12 @@
-import { useState, useCallback, useRef } from 'react'
-import { streamChat, getHistory, type ChatHistory } from '../api/chat'
+import { hasPendingPageApproval, pageDecision } from '../lib/pageApprovals'
+import { isPagePreparation } from '../lib/chatProgress'
+import { getProjectDefaultSkill } from '../api/projects'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { streamChat, getHistory, previewSkill, selectConversationSkill, stopChatTurn, type ChatHistory } from '../api/chat'
+import type { ChatActivity, SkillSnapshot } from '../types/chat'
 import { expandSnippetRefs, markUsed } from '../utils/snippetRefs'
-import type { ChatMessage, Citation, ContextBudgetPlan, OversizeDocument, StreamChunk, SuggestedModel } from '../types/chat'
+import { completedSkillSelection } from '../lib/skillSelection'
+import type { ChatMessage, Citation, ContextBudgetPlan, ContextMeterInfo, OversizeDocument, PlanTask, StreamChunk, StreamSegment, SuggestedModel, ToolCallInfo, ToolResultInfo } from '../types/chat'
 
 export interface ContextNotice {
   action: string
@@ -12,22 +17,72 @@ export interface ContextNotice {
 export interface ChatError {
   message: string
   code?: string
-  suggestedAction?: 'convert_to_kb'
+  suggestedAction?: 'convert_to_kb' | 'continue'
   oversizeDocuments?: OversizeDocument[]
 }
+
+/** Longest Stop waits for the server to record it before aborting anyway. */
+const STOP_NOTICE_WAIT_MS = 1500
 
 const THINK_BLOCK_RE = /<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>\n?/g
 const THINK_TRAILING_RE = /<think(?:ing)?>[\s\S]*$/
 
-export function useChat() {
+/** Stable identity for a citation so repeated `sources` chunks don't duplicate chips. */
+function citationKey(c: Citation): string {
+  return (
+    c.chunk_id ||
+    `${c.document_id ?? ''}|${c.page ?? ''}|${c.sheet ?? ''}|${(c.content_preview ?? '').slice(0, 40)}`
+  )
+}
+
+/** Map raw fetch/stream failures to a message a first-time user can act on. */
+function toFriendlyError(e: unknown): string {
+  if (e instanceof Error) {
+    const m = e.message || ''
+    if (/failed to fetch|load failed|networkerror|network error|err_|connection|stalled/i.test(m)) {
+      return m && /stalled/i.test(m)
+        ? m
+        : 'Connection lost before the response finished. Check your network and try again.'
+    }
+    return m || 'Chat failed'
+  }
+  return 'Chat failed'
+}
+
+type SendArgs = [
+  message: string,
+  documentUuids?: string[],
+  model?: string,
+  knowledgeBaseUuids?: string[],
+  includeOnboardingContext?: boolean,
+  folderUuids?: string[],
+  isFirstSession?: boolean,
+  runDemo?: boolean,
+  projectUuid?: string,
+  skillUuid?: string,
+  pageApproval?: string,
+]
+
+interface ChatEvents {
+  /** Called only from the incoming stream, never while loading/replaying history. */
+  onLiveToolResult?: (result: ToolResultInfo) => void
+}
+
+export function useChat({ onLiveToolResult }: ChatEvents = {}) {
+  const liveResultHandler = useRef(onLiveToolResult)
+  liveResultHandler.current = onLiveToolResult
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [streamingContent, setStreamingContent] = useState('')
   const [thinkingContent, setThinkingContent] = useState('')
   const [thinkingDuration, setThinkingDuration] = useState<number | null>(null)
   const [isStreaming, setIsStreaming] = useState(false)
+  const [activity, setActivityProgress] = useState<ChatActivity | null>(null)
   const [conversationUuid, setConversationUuid] = useState<string | null>(null)
   const [activityId, setActivityId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [activeToolCalls, setActiveToolCalls] = useState<ToolCallInfo[]>([])
+  const [toolResults, setToolResults] = useState<ToolResultInfo[]>([])
+  const [segments, setSegments] = useState<StreamSegment[]>([])
   const [errorDetails, setErrorDetails] = useState<ChatError | null>(null)
   const [contextTokens, setContextTokens] = useState(0)
   const [contextMode, setContextMode] = useState<'full' | 'truncated' | 'compacted'>('full')
@@ -37,47 +92,248 @@ export function useChat() {
   // privacy rule. The context dialog offers it only when it is set.
   const [suggestedModel, setSuggestedModel] = useState<SuggestedModel | null>(null)
   const [contextNotices, setContextNotices] = useState<ContextNotice[]>([])
+  // Latest backend-computed meter. Deliberately NOT cleared on send — the new
+  // turn's meter arrives within the first stream chunks and replacing beats a
+  // flash of "no meter" every turn.
+  const [contextMeter, setContextMeter] = useState<ContextMeterInfo | null>(null)
+  // Auto-compaction lifecycle for the in-flight turn ('started' while the
+  // backend summarizes older messages — can take a while, so the UI shows a
+  // status line instead of dead air).
+  const [compactionStatus, setCompactionStatus] = useState<'started' | 'done' | 'failed' | null>(null)
+  // Live checklist from update_plan (Phase 8). Survives across turns of the
+  // same conversation (a follow-up "continue" resumes it); cleared on reset
+  // and seeded from history on load.
+  const [planTasks, setPlanTasks] = useState<PlanTask[] | null>(null)
+  // Busy-chat submissions become separate turns after the current stream
+  // completes. Never inject a new request into an older model response.
+  const [queuedMessages, setQueuedMessages] = useState<string[]>([])
+  const queuedRequestsRef = useRef<SendArgs[]>([])
+  const [queuePaused, setQueuePaused] = useState(false)
+  const awaitingPageApproval = hasPendingPageApproval(messages)
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false)
+  const historyLoadVersion = useRef(0)
+  const [activeSkill, setActiveSkill] = useState<SkillSnapshot | null>(null)
+  const [isSelectingSkill, setIsSelectingSkill] = useState(false)
+  const skillSelectionVersion = useRef(0)
+  const manualSkillSelection = useRef(false)
+  const projectDefaultScope = useRef<string | null | undefined>(undefined)
+  const [projectSkillBlocked, setProjectSkillBlocked] = useState(false)
+
+  const initializeProjectSkill = useCallback(async (projectUuid: string | null, retry = false) => {
+    if (conversationUuid || messages.length || isLoadingHistory || manualSkillSelection.current) return
+    if (!retry && projectDefaultScope.current === projectUuid) return
+    projectDefaultScope.current = projectUuid
+    const version = ++skillSelectionVersion.current
+    setActiveSkill(null); setProjectSkillBlocked(false)
+    setIsSelectingSkill(!!projectUuid)
+    if (!projectUuid) return
+    setError(null)
+    try {
+      const { active_skill } = await getProjectDefaultSkill(projectUuid)
+      if (version === skillSelectionVersion.current) setActiveSkill(active_skill)
+    } catch {
+      if (version === skillSelectionVersion.current) {
+        setProjectSkillBlocked(true)
+        setError('Could not load the project default Skill. Retry, choose a Skill, or continue without one.')
+      }
+    } finally {
+      if (version === skillSelectionVersion.current) setIsSelectingSkill(false)
+    }
+  }, [conversationUuid, messages.length, isLoadingHistory])
+
+  const selectSkill = useCallback(async (uuid: string | null) => {
+    if (isStreaming || isLoadingHistory || isSelectingSkill) return false
+    manualSkillSelection.current = true
+    const version = ++skillSelectionVersion.current
+    setIsSelectingSkill(true)
+    setError(null)
+    try {
+      const skill = conversationUuid
+        ? (await selectConversationSkill(conversationUuid, uuid)).active_skill
+        : uuid ? await previewSkill(uuid) : null
+      if (version !== skillSelectionVersion.current) return false
+      setActiveSkill(skill)
+      setProjectSkillBlocked(false)
+      return true
+    } catch (e) {
+      if (version === skillSelectionVersion.current) setError(e instanceof Error ? e.message : 'Could not select Skill')
+      return false
+    } finally {
+      if (version === skillSelectionVersion.current) setIsSelectingSkill(false)
+    }
+  }, [conversationUuid, isStreaming, isLoadingHistory, isSelectingSkill])
 
   const streamingRef = useRef('')
   const thinkingRef = useRef('')
   const thinkingDurationRef = useRef<number | null>(null)
+  const toolCallsRef = useRef<ToolCallInfo[]>([])
+  const toolResultsRef = useRef<ToolResultInfo[]>([])
+  const segmentsRef = useRef<StreamSegment[]>([])
+  const abortRef = useRef<AbortController | null>(null)
   const citationsRef = useRef<Citation[]>([])
+  const lastSendArgsRef = useRef<SendArgs | null>(null)
+  const lastSendAcceptedRef = useRef(false)
   const unsupportedFiguresRef = useRef<string[]>([])
+  const silenceInferencesRef = useRef<string[]>([])
   const unsupportedCitationsRef = useRef<string[]>([])
-  // Bumped whenever the panel moves to another conversation (open or new).
-  // A stream from an earlier generation keeps running server-side and is
-  // saved to its own conversation, but must not write into this one.
-  const viewGeneration = useRef(0)
 
-  /** Drop the in-flight turn's live display. */
+  /** Drop the streaming turn's live display and release Stop's handle. */
   const clearLiveTurn = useCallback(() => {
+    abortRef.current = null
     setIsStreaming(false)
+    setActivityProgress(null)
     setStreamingContent('')
     setThinkingContent('')
     setThinkingDuration(null)
+    setActiveToolCalls([])
+    setToolResults([])
+    setSegments([])
+  }, [])
+
+  const queueMessage = useCallback(async (...args: SendArgs) => {
+    const text = args[0].trim()
+    if (!text) throw new Error('Message is empty')
+    if (queuedRequestsRef.current.length >= 10) throw new Error('Queue is full. Wait for a reply before adding another message.')
+    // Callers may supply the current selection. Otherwise retain source/model
+    // context, but never repeat a demo, Skill selection or page approval.
+    const previous = lastSendArgsRef.current
+    const next: SendArgs = args.length > 1 ? [...args] : [text,
+      previous?.[1], previous?.[2], previous?.[3], undefined, previous?.[5],
+      undefined, undefined, previous?.[8]]
+    next[0] = text
+    next[1] = [...(next[1] ?? [])]
+    next[3] = next[3] ? [...next[3]] : undefined
+    next[5] = next[5] ? [...next[5]] : undefined
+    queuedRequestsRef.current.push(next)
+    setQueuedMessages(queuedRequestsRef.current.map(request => request[0]))
   }, [])
 
   const send = useCallback(
-    async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuids?: string[], includeOnboardingContext?: boolean, folderUuids?: string[], isFirstSession?: boolean, projectUuid?: string) => {
+    async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuids?: string[], includeOnboardingContext?: boolean, folderUuids?: string[], isFirstSession?: boolean, runDemo?: boolean, projectUuid?: string, skillUuid?: string, pageApproval?: string, retry = false) => {
+      if (abortRef.current || (awaitingPageApproval && !pageApproval && !pageDecision(message) && !retry)) {
+        await queueMessage(message, documentUuids, model, knowledgeBaseUuids, includeOnboardingContext, folderUuids, isFirstSession, runDemo, projectUuid, skillUuid, pageApproval)
+        return
+      }
+      if (isLoadingHistory || isSelectingSkill || (projectSkillBlocked && !skillUuid)) return
+      if (conversationUuid && !activityId) {
+        setError('This conversation could not be resumed. Reopen it from Activity before sending.')
+        return
+      }
+      let turnSkill = activeSkill
+      if (skillUuid) {
+        // Resolve and run in one operation: React state updates from selection
+        // must not make this turn use the previous Skill's snapshot.
+        manualSkillSelection.current = true
+        const version = ++skillSelectionVersion.current
+        setIsSelectingSkill(true)
+        setError(null)
+        try {
+          turnSkill = conversationUuid
+            ? (await selectConversationSkill(conversationUuid, skillUuid)).active_skill
+            : await previewSkill(skillUuid)
+          if (version !== skillSelectionVersion.current) return
+          if (!turnSkill) throw new Error('Could not load Skill')
+          setActiveSkill(turnSkill)
+          setProjectSkillBlocked(false)
+          message = message.trim() || `Run the ${turnSkill.title} skill.`
+        } catch (e) {
+          if (version === skillSelectionVersion.current) setError(toFriendlyError(e))
+          return
+        } finally {
+          if (version === skillSelectionVersion.current) setIsSelectingSkill(false)
+        }
+      }
+      const deliveredResults = new Set<string>()
+      lastSendArgsRef.current = [message, documentUuids, model, knowledgeBaseUuids, includeOnboardingContext, folderUuids, isFirstSession, runDemo, projectUuid, skillUuid, pageApproval]
+      if (!retry) lastSendAcceptedRef.current = false
       setError(null)
+      setPlanTasks(null) // The previous turn's plan must not label this new action.
       setErrorDetails(null)
       setIsStreaming(true)
+      setActivityProgress({ phase: 'starting' })
       setStreamingContent('')
       setThinkingContent('')
       setThinkingDuration(null)
+      setActiveToolCalls([])
+      setToolResults([])
+      setSegments([])
       setContextPlan(null)
       setContextNotices([])
+      setCompactionStatus(null)
       streamingRef.current = ''
       thinkingRef.current = ''
       thinkingDurationRef.current = null
+      toolCallsRef.current = []
+      toolResultsRef.current = []
+      segmentsRef.current = []
       citationsRef.current = []
       unsupportedFiguresRef.current = []
+      silenceInferencesRef.current = []
       unsupportedCitationsRef.current = []
-      const generation = viewGeneration.current
-      const ownsView = () => viewGeneration.current === generation
 
+      // Capture the invocation before tool results can change turnSkill.
+      const invokedSkill = turnSkill
       // Add user message immediately
-      setMessages((prev) => [...prev, { role: 'user', content: message }])
+      if (!retry) setMessages((prev) => [...prev, { role: 'user', content: message, ...(invokedSkill ? { active_skill: invokedSkill } : {}), request_scope: { documents: [...documentUuids], folders: [...(folderUuids ?? [])], knowledgeBases: [...(knowledgeBaseUuids ?? [])], ...(projectUuid ? { project: projectUuid } : {}) } }])
+
+      // Build and append an assistant message from whatever has accumulated so
+      // far. Shared by the normal-completion, user-stop, and network-failure
+      // paths so a partial response is never silently discarded.
+      const commitAssistantMessage = (interruption?: 'stopped' | 'connection') => {
+        // Expanded the same way the server stores it, so a reload reads the same.
+        const finalContent = expandSnippetRefs(
+          streamingRef.current.replace(THINK_BLOCK_RE, '').trim(),
+          citationsRef.current,
+        )
+        if (!finalContent && toolResultsRef.current.length === 0 && toolCallsRef.current.length === 0) return
+        const assistantMsg: ChatMessage = { role: 'assistant', content: finalContent, ...(turnSkill ? { active_skill: turnSkill } : {}), ...(interruption ? { interruption } : {}) }
+        if (thinkingRef.current) {
+          assistantMsg.thinking = thinkingRef.current
+          if (thinkingDurationRef.current != null) {
+            assistantMsg.thinking_duration = thinkingDurationRef.current
+          }
+        }
+        if (toolCallsRef.current.length > 0 || toolResultsRef.current.length > 0) {
+          assistantMsg.tool_calls = [
+            ...toolCallsRef.current,
+            ...toolResultsRef.current.map((r) => ({
+              tool_name: r.tool_name,
+              tool_call_id: r.tool_call_id,
+              args: {},
+            })),
+          ]
+          assistantMsg.tool_results = [...toolResultsRef.current]
+        }
+        if (segmentsRef.current.length > 0) {
+          assistantMsg.segments = segmentsRef.current
+            .map((seg) =>
+              seg.kind === 'text'
+                ? { ...seg, content: expandSnippetRefs(seg.content.replace(THINK_BLOCK_RE, '').replace(THINK_TRAILING_RE, ''), citationsRef.current) }
+                : seg,
+            )
+            .filter((seg) => seg.kind !== 'text' || seg.content.trim().length > 0)
+        }
+        if (citationsRef.current.length) {
+          assistantMsg.citations = citationsRef.current
+        }
+        if (unsupportedFiguresRef.current.length) {
+          assistantMsg.unsupported_figures = unsupportedFiguresRef.current
+        }
+        if (silenceInferencesRef.current.length) {
+          assistantMsg.silence_inferences = silenceInferencesRef.current
+        }
+        if (unsupportedCitationsRef.current.length) {
+          assistantMsg.unsupported_citations = unsupportedCitationsRef.current
+        }
+        setMessages((prev) => [...prev, assistantMsg])
+      }
+
+      const controller = new AbortController()
+      abortRef.current = controller
+      // Opening another conversation detaches this stream (abortRef moves on)
+      // without aborting it, so the server still finishes this turn in its own
+      // conversation. Nothing a detached stream does may touch the open chat.
+      const ownsView = () => abortRef.current === controller
 
       try {
         const result = await streamChat(
@@ -86,19 +342,81 @@ export function useChat() {
           activityId,
           (chunk: StreamChunk) => {
             if (!ownsView()) return
-            if (chunk.kind === 'text') {
+            if (chunk.kind === 'activity') {
+              if (chunk.activity) setActivityProgress(chunk.activity)
+            } else if (chunk.kind === 'text') {
+              setActivityProgress(previous => isPagePreparation(previous) || previous?.phase === 'writing' ? previous : { phase: 'writing' })
               streamingRef.current += chunk.content
               // Strip any residual think tags the backend parser missed
               const display = streamingRef.current
                 .replace(THINK_BLOCK_RE, '')
                 .replace(THINK_TRAILING_RE, '')
               setStreamingContent(expandSnippetRefs(display, citationsRef.current))
+
+              // Build ordered segments
+              const segs = segmentsRef.current
+              const last = segs[segs.length - 1]
+              if (last && last.kind === 'text') {
+                last.content += chunk.content
+              } else {
+                segs.push({ kind: 'text', content: chunk.content })
+              }
+              setSegments([...segs])
             } else if (chunk.kind === 'thinking') {
+              setActivityProgress(previous => isPagePreparation(previous) || previous?.phase === 'model' ? previous : { phase: 'model' })
               thinkingRef.current += chunk.content
               setThinkingContent(thinkingRef.current)
             } else if (chunk.kind === 'thinking_done') {
               thinkingDurationRef.current = chunk.duration ?? null
               setThinkingDuration(chunk.duration ?? null)
+            } else if (chunk.kind === 'tool_call') {
+              setActivityProgress({ phase: 'tool_running', tool_name: chunk.tool_name, tool_call_id: chunk.tool_call_id })
+              // update_plan renders as the pinned checklist (plan_update
+              // chunk), not as a tool status line.
+              if (chunk.tool_name === 'update_plan') return
+              const call: ToolCallInfo = {
+                tool_name: chunk.tool_name!,
+                tool_call_id: chunk.tool_call_id!,
+                args: chunk.args || {},
+              }
+              toolCallsRef.current = [...toolCallsRef.current, call]
+              setActiveToolCalls([...toolCallsRef.current])
+              segmentsRef.current.push({ kind: 'tool_call', call })
+              setSegments([...segmentsRef.current])
+            } else if (chunk.kind === 'tool_result') {
+              setActivityProgress({ phase: 'reviewing', tool_name: chunk.tool_name, tool_call_id: chunk.tool_call_id })
+              if (chunk.tool_name === 'update_plan') return
+              const res: ToolResultInfo = {
+                tool_name: chunk.tool_name!,
+                tool_call_id: chunk.tool_call_id!,
+                content: chunk.content,
+                quality: chunk.quality || null,
+              }
+              if (res.tool_name === 'select_skill' && res.content && typeof res.content === 'object') {
+                const skill = completedSkillSelection(res.content)
+                if (skill !== undefined) {
+                  turnSkill = skill
+                  manualSkillSelection.current = true
+                  setActiveSkill(skill)
+                  setContextTokens(0)
+                }
+              }
+              // Dispatch before rendering: React may batch the call, result and
+              // end-of-stream into one mount. Transcript replay never enters here.
+              const eventKey = JSON.stringify([res.tool_name, res.tool_call_id, res.content])
+              if (!deliveredResults.has(eventKey)) {
+                deliveredResults.add(eventKey)
+                liveResultHandler.current?.(res)
+              }
+              toolResultsRef.current = [...toolResultsRef.current, res]
+              setToolResults([...toolResultsRef.current])
+              // Remove from active calls
+              toolCallsRef.current = toolCallsRef.current.filter(
+                (c) => c.tool_call_id !== chunk.tool_call_id,
+              )
+              setActiveToolCalls([...toolCallsRef.current])
+              segmentsRef.current.push({ kind: 'tool_result', result: res })
+              setSegments([...segmentsRef.current])
             } else if (chunk.kind === 'usage') {
               setContextTokens(chunk.request_tokens ?? 0)
             } else if (chunk.kind === 'context_budget') {
@@ -110,14 +428,39 @@ export function useChat() {
                   setContextTokens(chunk.plan.total_input_tokens)
                 }
               }
+            } else if (chunk.kind === 'context_meter') {
+              if (chunk.meter) {
+                setContextMeter(chunk.meter)
+              }
+            } else if (chunk.kind === 'compaction') {
+              setCompactionStatus(chunk.status ?? null)
+            } else if (chunk.kind === 'plan_update') {
+              if (chunk.plan_tasks) {
+                setPlanTasks(chunk.plan_tasks)
+              }
+            } else if (chunk.kind === 'queue_consumed') {
+              const consumed = chunk.content
+              // Legacy server queues can still be replayed by older clients.
+              // They are separate from this view's pending next turns.
+              setMessages((prev) => [...prev, { role: 'user', content: consumed }])
             } else if (chunk.kind === 'sources') {
               if (chunk.sources?.length) {
-                citationsRef.current = [...citationsRef.current, ...chunk.sources]
+                const seen = new Set(citationsRef.current.map(citationKey))
+                const merged = [...citationsRef.current]
+                for (const s of chunk.sources) {
+                  const k = citationKey(s)
+                  if (!seen.has(k)) {
+                    seen.add(k)
+                    merged.push(s)
+                  }
+                }
+                citationsRef.current = merged
               }
             } else if (chunk.kind === 'sources_used') {
               citationsRef.current = markUsed(citationsRef.current, chunk.used_refs ?? [])
             } else if (chunk.kind === 'grounding_warning') {
               unsupportedFiguresRef.current = chunk.unsupported_figures ?? []
+              silenceInferencesRef.current = chunk.silence_inferences ?? []
               unsupportedCitationsRef.current = chunk.unsupported_citations ?? []
             } else if (chunk.kind === 'context_notice') {
               setContextNotices((prev) => [
@@ -143,83 +486,142 @@ export function useChat() {
           includeOnboardingContext,
           folderUuids,
           isFirstSession,
+          runDemo,
+          controller.signal,
           projectUuid,
+          identity => {
+            if (controller.signal.aborted || !ownsView()) return
+            lastSendAcceptedRef.current = true
+            setConversationUuid(identity.conversationUuid)
+            setActivityId(identity.activityId)
+          },
+          turnSkill?.uuid ?? null,
+          turnSkill?.version,
+          retry && lastSendAcceptedRef.current && !!activityId,
+          pageApproval,
         )
         if (!ownsView()) return
 
+        lastSendAcceptedRef.current = true
         setConversationUuid(result.conversationUuid)
         setActivityId(result.activityId)
 
         // Add assistant message from accumulated stream
-        // Expanded the same way the server stores it, so a reload reads the same.
-        const finalContent = expandSnippetRefs(
-          streamingRef.current.replace(THINK_BLOCK_RE, '').trim(),
-          citationsRef.current,
-        )
-        if (finalContent) {
-          const assistantMsg: ChatMessage = {
-            role: 'assistant',
-            content: finalContent,
-          }
-          if (thinkingRef.current) {
-            assistantMsg.thinking = thinkingRef.current
-            if (thinkingDurationRef.current != null) {
-              assistantMsg.thinking_duration = thinkingDurationRef.current
-            }
-          }
-          if (citationsRef.current.length) {
-            assistantMsg.citations = citationsRef.current
-          }
-          if (unsupportedFiguresRef.current.length) {
-            assistantMsg.unsupported_figures = unsupportedFiguresRef.current
-          }
-          if (unsupportedCitationsRef.current.length) {
-            assistantMsg.unsupported_citations = unsupportedCitationsRef.current
-          }
-          setMessages((prev) => [...prev, assistantMsg])
-        }
+        commitAssistantMessage()
       } catch (e) {
-        if (ownsView()) setError(e instanceof Error ? e.message : 'Chat failed')
+        if (!ownsView()) return
+        const wasAborted =
+          (e instanceof DOMException && e.name === 'AbortError') ||
+          (e instanceof Error && e.name === 'AbortError')
+        if (wasAborted) {
+          // Keep partial output locally. Stopping the stream does not establish
+          // whether an already-started server action completed or was canceled.
+          commitAssistantMessage('stopped')
+        } else {
+          // Network drop or stalled stream. Preserve the partial response (same
+          // as the Stop path) so the user doesn't lose a half-written answer,
+          // then surface a recoverable, plain-language error.
+          commitAssistantMessage('connection')
+          const friendly = toFriendlyError(e)
+          setError(friendly)
+          setErrorDetails({ message: friendly })
+        }
       } finally {
         if (ownsView()) clearLiveTurn()
       }
     },
-    [activityId, clearLiveTurn],
+    [activityId, conversationUuid, isLoadingHistory, isSelectingSkill, projectSkillBlocked, activeSkill, clearLiveTurn, queueMessage, awaitingPageApproval],
   )
+
+  useEffect(() => {
+    if (isStreaming || abortRef.current || isLoadingHistory || isSelectingSkill || projectSkillBlocked || error || queuePaused || awaitingPageApproval) return
+    if (conversationUuid && !activityId) return
+    const next = queuedRequestsRef.current.shift()
+    if (!next) return
+    setQueuedMessages(queuedRequestsRef.current.map(request => request[0]))
+    void send(...next)
+  }, [queuedMessages, isStreaming, isLoadingHistory, isSelectingSkill, projectSkillBlocked, error, queuePaused, awaitingPageApproval, conversationUuid, activityId, send])
+
+  const resumeQueuedMessages = useCallback(() => {
+    if (awaitingPageApproval) return
+    setError(null)
+    setErrorDetails(null)
+    setQueuePaused(false)
+  }, [awaitingPageApproval])
+
+  /** Hand the view over to another conversation. The in-flight stream keeps
+   * running server-side and its turn is saved there; it just stops writing
+   * into this hook's state. */
+  const detachLiveTurn = useCallback(() => {
+    clearLiveTurn()
+    queuedRequestsRef.current = []
+    setQueuedMessages([])
+    setQueuePaused(false)
+  }, [clearLiveTurn])
+
+  const stop = useCallback(() => {
+    setQueuePaused(true)
+    const controller = abortRef.current
+    if (!controller) return
+    // Tell the server first, so the turn is saved as stopped rather than as a
+    // lost connection. Don't let a slow or failed request hold up the abort.
+    const told = conversationUuid
+      ? Promise.race([
+          stopChatTurn(conversationUuid).catch(() => undefined),
+          new Promise((resolve) => setTimeout(resolve, STOP_NOTICE_WAIT_MS)),
+        ])
+      : Promise.resolve()
+    void told.then(() => controller.abort())
+  }, [conversationUuid])
 
   // Resolves to the loaded history so the caller can restore what the
   // conversation was attached to; null on failure, or when another chat was
   // opened before this one's history arrived.
   const loadHistory = useCallback(async (uuid: string): Promise<ChatHistory | null> => {
-    const generation = ++viewGeneration.current
-    clearLiveTurn()
-    setMessages([])
+    const version = ++historyLoadVersion.current
+    manualSkillSelection.current = true
+    setProjectSkillBlocked(false)
+    skillSelectionVersion.current += 1
+    setIsSelectingSkill(false)
+    setActiveSkill(null)
+    detachLiveTurn()
+    setIsLoadingHistory(true)
     setError(null)
     setErrorDetails(null)
-    // Until history says which activity this chat belongs to, a send must not
-    // reuse the previous chat's activity.
     setActivityId(null)
     setConversationUuid(uuid)
+    setMessages([])
+    lastSendArgsRef.current = null
     try {
       const data = await getHistory(uuid)
-      if (generation !== viewGeneration.current) return null
+      if (version !== historyLoadVersion.current) return null
       setMessages(data.messages)
-      // Without it the next question would start a new conversation.
       setActivityId(data.activity_id ?? null)
-      if (data.context_mode) setContextMode(data.context_mode)
-      if (data.context_cutoff_index != null) setContextCutoffIndex(data.context_cutoff_index)
+      setContextMode(data.context_mode ?? 'full')
+      setContextCutoffIndex(data.context_cutoff_index ?? 0)
+      setPlanTasks(data.active_plan ?? null)
+      setActiveSkill(data.active_skill ?? null)
       return data
     } catch (e) {
-      if (generation === viewGeneration.current) {
+      if (version === historyLoadVersion.current) {
         setError(e instanceof Error ? e.message : 'Failed to load history')
       }
       return null
+    } finally {
+      if (version === historyLoadVersion.current) setIsLoadingHistory(false)
     }
-  }, [clearLiveTurn])
+  }, [detachLiveTurn])
 
   const reset = useCallback(() => {
-    viewGeneration.current += 1
-    clearLiveTurn()
+    manualSkillSelection.current = false
+    projectDefaultScope.current = undefined
+    setProjectSkillBlocked(false)
+    historyLoadVersion.current += 1
+    skillSelectionVersion.current += 1
+    setIsSelectingSkill(false)
+    setActiveSkill(null)
+    detachLiveTurn()
+    setIsLoadingHistory(false)
     setMessages([])
     setConversationUuid(null)
     setActivityId(null)
@@ -230,12 +632,34 @@ export function useChat() {
     setContextCutoffIndex(0)
     setContextPlan(null)
     setContextNotices([])
-  }, [clearLiveTurn])
+    setContextMeter(null)
+    setCompactionStatus(null)
+    setPlanTasks(null)
+  }, [detachLiveTurn])
 
   const clearError = useCallback(() => {
     setError(null)
     setErrorDetails(null)
   }, [])
+
+  /** Re-send without discarding a partial reply or its completed artifacts. */
+  const retry = useCallback(() => {
+    const args = lastSendArgsRef.current
+    if (!args) return
+    void send(...args, true)
+  }, [send])
+
+  /** Resume a turn that stopped at the tool budget (usage_limit_resumable).
+   * Unlike retry(), this keeps the partial exchange — the backend armed a
+   * one-shot "resume directly, no recap" instruction for the next turn. */
+  const continueRun = useCallback(() => {
+    const args = lastSendArgsRef.current
+    if (!args) return
+    const [, ...contextArgs] = args
+    setError(null)
+    setErrorDetails(null)
+    send('Continue', ...contextArgs)
+  }, [send])
 
   const setActivity = useCallback((newActivityId: string, newConversationUuid: string) => {
     setActivityId(newActivityId)
@@ -243,28 +667,48 @@ export function useChat() {
   }, [])
 
   return {
+    activeSkill,
+    initializeProjectSkill,
+    projectSkillBlocked,
+    selectSkill,
+    isSelectingSkill,
     messages,
     setMessages,
     streamingContent,
     thinkingContent,
     thinkingDuration,
     isStreaming,
+    activity,
     conversationUuid,
     activityId,
     error,
+    activeToolCalls,
+    toolResults,
+    segments,
     errorDetails,
     clearError,
+    retry,
+    continueRun,
     contextTokens,
     contextMode,
     contextCutoffIndex,
     contextPlan,
     suggestedModel,
     contextNotices,
+    contextMeter,
+    compactionStatus,
+    planTasks,
+    queuedMessages,
+    awaitingPageApproval,
+    queueMessage,
+    resumeQueuedMessages,
     setContextTokens,
     setContextMode,
     setContextCutoffIndex,
     send,
+    stop,
     loadHistory,
+    isLoadingHistory,
     reset,
     setActivity,
   }

@@ -1,5 +1,8 @@
+import { qualityPresentation } from '../../lib/qualityLabels'
+import { createPortal } from '../shared/panelPortal'
+import { usePanelEffect } from '../shared/usePanelEffect'
 import { useEffect, useRef, useState } from 'react'
-import { FocusTrap } from 'focus-trap-react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { Search, X, Workflow, FileText, Users, Compass, Loader2, Pin, Star } from 'lucide-react'
 import { listLibraries, listItems, listVerifiedItems } from '../../api/library'
 import { useAuth } from '../../hooks/useAuth'
@@ -13,6 +16,10 @@ interface PickerItem {
   description?: string | null
   owner?: 'mine' | 'team' | 'explore'
   qualityTier?: string | null
+  qualityScore?: number | null
+  qualityAsserted?: boolean
+  regressionPending?: boolean
+  testCaseCount?: number
   pinned?: boolean
   favorited?: boolean
 }
@@ -42,15 +49,25 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [items, setItems] = useState<PickerItem[]>([])
   const [loading, setLoading] = useState(false)
-  const [libraries, setLibraries] = useState<Library[]>([])
+  const [libraries, setLibraries] = useState<Library[] | null>(null)
+  const [libraryError, setLibraryError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [retry, setRetry] = useState(0)
+  const [libraryRetry, setLibraryRetry] = useState(0)
   const searchRef = useRef<HTMLInputElement>(null)
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const backdropRef = useRef<HTMLDivElement>(null)
 
   // Fetch libraries on mount to get personal/team library IDs
   useEffect(() => {
-    listLibraries(teamId).then(setLibraries).catch(() => {})
-  }, [teamId])
+    let cancelled = false
+    setLibraries(null)
+    setLibraryError(null)
+    listLibraries(teamId)
+      .then(result => { if (!cancelled) setLibraries(result) })
+      .catch(() => { if (!cancelled) setLibraryError('Could not load your libraries. Please retry.') })
+    return () => { cancelled = true }
+  }, [teamId, libraryRetry])
 
   // Debounce search input
   useEffect(() => {
@@ -65,9 +82,15 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
   }, [])
 
   // Close on Escape
-  useEffect(() => {
+  usePanelEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') {
+        // Consume Escape before closing: a parent wizard may re-render and
+        // install its window handler during this same event's propagation.
+        e.preventDefault()
+        e.stopPropagation()
+        onClose()
+      }
     }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
@@ -77,6 +100,8 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
+    setError(null)
+    if (scope !== 'explore' && !libraries) return
 
     const fetchItems = async () => {
       try {
@@ -96,12 +121,16 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
             name: item.display_name || item.name,
             description: item.description,
             owner: 'explore' as const,
+            qualityAsserted: item.quality_asserted,
+            testCaseCount: item.test_case_count,
             qualityTier: item.quality_tier,
+            qualityScore: item.quality_score,
+            regressionPending: item.regression_pending_review,
           }))
         } else {
           // Use library items so mine/team tabs match the Library page
           const targetScope = scope === 'mine' ? 'personal' : 'team'
-          const lib = libraries.find(l => l.scope === targetScope)
+          const lib = libraries?.find(l => l.scope === targetScope)
           if (lib) {
             const filterKind = kind === 'workflow' ? 'workflow' : 'search_set'
             let libItems = await listItems(lib.id, {
@@ -125,6 +154,8 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
               description: item.description,
               owner: scope as 'mine' | 'team',
               qualityTier: item.quality_tier,
+            qualityScore: item.quality_score,
+            regressionPending: item.regression_pending_review,
               pinned: item.pinned,
               favorited: item.favorited,
             }))
@@ -139,6 +170,7 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
       } catch {
         if (!cancelled) {
           setItems([])
+          setError('Could not load items. Please retry.')
           setLoading(false)
         }
       }
@@ -146,7 +178,7 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
 
     fetchItems()
     return () => { cancelled = true }
-  }, [scope, debouncedSearch, kind, libraries])
+  }, [scope, debouncedSearch, kind, libraries, retry])
 
   const kindLabel = kind === 'workflow' ? 'Workflow'
     : kind === 'prompt' ? 'Prompt'
@@ -167,13 +199,9 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
       : [{ value: 'explore' as const, label: 'Explore', icon: Compass }]),
   ]
 
-  const tierColors: Record<string, { bg: string; text: string }> = {
-    gold: { bg: '#fef3c7', text: '#92400e' },
-    silver: { bg: '#f3f4f6', text: '#4b5563' },
-    bronze: { bg: '#fed7aa', text: '#9a3412' },
-  }
 
-  return (
+
+  const dialog = (
     <div
       ref={backdropRef}
       onClick={e => { if (e.target === backdropRef.current) onClose() }}
@@ -181,31 +209,32 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
         position: 'absolute', inset: 0, zIndex: 50,
         backgroundColor: 'rgba(0,0,0,0.3)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: 16,
+        padding: 'var(--workspace-space-16)',
       } : {
         position: 'fixed', inset: 0, zIndex: 9999,
         backgroundColor: 'rgba(0,0,0,0.5)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: 20,
+        padding: 'var(--workspace-space-20)',
       }}
     >
       <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
       <div
+        className="action-picker"
         role="dialog"
         aria-modal="true"
         aria-label={`Select ${kindLabel}`}
         style={{
-        backgroundColor: '#fff', borderRadius: 12,
+        backgroundColor: '#fff', borderRadius: 'var(--workspace-radius-large)',
         width: '100%', maxWidth: inline ? 480 : 560, maxHeight: inline ? '90%' : '80vh',
         display: 'flex', flexDirection: 'column',
-        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+        boxShadow: 'var(--workspace-shadow-dialog)',
       }}>
         {/* Header */}
         <div style={{
-          padding: '16px 20px 0', display: 'flex', alignItems: 'center',
+          padding: "var(--workspace-space-16) var(--workspace-space-20) 0", display: 'flex', alignItems: 'center',
           justifyContent: 'space-between',
         }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: '#111827' }}>
+          <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 700, color: '#111827' }}>
             Select {kindLabel}
           </div>
           <button
@@ -214,7 +243,7 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
             aria-label="Close"
             style={{
               background: 'none', border: 'none', cursor: 'pointer',
-              color: '#6b7280', padding: 4, borderRadius: 6,
+              color: '#555e68', padding: 'var(--workspace-space-4)', borderRadius: 'var(--workspace-radius-small)',
               display: 'flex', alignItems: 'center',
             }}
           >
@@ -223,11 +252,11 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
         </div>
 
         {/* Search bar */}
-        <div style={{ padding: '12px 20px 0' }}>
+        <div style={{ padding: "var(--workspace-space-12) var(--workspace-space-20) 0" }}>
           <div style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            padding: '8px 12px', backgroundColor: '#f9fafb',
-            border: '1.5px solid #e5e7eb', borderRadius: 8,
+            display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)',
+            padding: "var(--workspace-space-8) var(--workspace-space-12)", backgroundColor: '#f9fafb',
+            border: "1.5px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)',
           }}>
             <Search size={16} style={{ color: '#9ca3af', flexShrink: 0 }} />
             <input
@@ -237,8 +266,8 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
               placeholder={`Search ${kindPlural}...`}
               aria-label={`Search ${kindPlural}`}
               style={{
-                border: 'none', outline: 'none', flex: 1,
-                backgroundColor: 'transparent', fontSize: 14,
+                border: 'none', flex: 1, minWidth: 0,
+                backgroundColor: 'transparent', fontSize: 'var(--workspace-font-body)',
                 fontFamily: 'inherit', color: '#111827',
               }}
             />
@@ -249,7 +278,7 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
                 aria-label="Clear search"
                 style={{
                   background: 'none', border: 'none', cursor: 'pointer',
-                  color: '#9ca3af', padding: 2, display: 'flex',
+                  color: '#9ca3af', padding: 'var(--workspace-space-2)', display: 'flex',
                 }}
               >
                 <X size={14} />
@@ -260,8 +289,8 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
 
         {/* Scope tabs */}
         <div style={{
-          display: 'flex', gap: 0, padding: '12px 20px 0',
-          borderBottom: '1px solid #e5e7eb',
+          display: 'flex', gap: 0, padding: "var(--workspace-space-12) var(--workspace-space-20) 0",
+          borderBottom: "1px solid var(--workspace-border)",
         }}>
           {SCOPE_TABS.map(tab => {
             const active = scope === tab.value
@@ -269,14 +298,16 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
             return (
               <button
                 key={tab.value}
+                type="button"
+                aria-pressed={active}
                 onClick={() => setScope(tab.value)}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '8px 16px', fontSize: 13, fontWeight: 600,
+                  display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+                  padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-control)', fontWeight: 600,
                   fontFamily: 'inherit', cursor: 'pointer',
-                  color: active ? '#2563eb' : '#6b7280',
+                  color: active ? 'var(--highlight-on-light, #806600)' : '#555e68',
                   backgroundColor: 'transparent', border: 'none',
-                  borderBottom: active ? '2px solid #2563eb' : '2px solid transparent',
+                  borderBottom: active ? '2px solid var(--highlight-on-light, #806600)' : '2px solid transparent',
                   marginBottom: -1, transition: 'color 0.15s',
                 }}
               >
@@ -289,44 +320,53 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
 
         {/* Items list */}
         <div style={{
-          flex: 1, overflowY: 'auto', padding: '8px 12px 12px',
+          flex: 1, overflowY: 'auto', padding: "var(--workspace-space-8) var(--workspace-space-12) var(--workspace-space-12)",
           minHeight: 0,
         }}>
-          {loading ? (
+          {(error || (scope !== 'explore' && libraryError)) ? (
+            <div role="alert" className="picker-feedback">
+              <p>{scope !== 'explore' && libraryError || error}</p>
+              <button type="button" onClick={() => libraryError && scope !== 'explore' ? setLibraryRetry(n => n + 1) : setRetry(n => n + 1)}>Retry loading</button>
+            </div>
+          ) : loading || search !== debouncedSearch ? (
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              gap: 8, padding: 40, color: '#9ca3af', fontSize: 13,
+              gap: 'var(--workspace-space-8)', padding: 'var(--workspace-space-24)', color: '#555e68', fontSize: 'var(--workspace-font-control)',
             }}>
               <Loader2 size={16} className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} />
               Loading...
             </div>
           ) : items.length === 0 ? (
             <div style={{
-              textAlign: 'center', padding: '40px 20px', color: '#9ca3af', fontSize: 13,
+              textAlign: 'center', padding: "var(--workspace-space-24) var(--workspace-space-12)", color: '#555e68', fontSize: 'var(--workspace-font-control)',
             }}>
               {debouncedSearch
                 ? `No ${kindPlural} matching "${debouncedSearch}"`
                 : scope === 'mine'
-                  ? `You haven't created any ${kindPlural} yet.`
+                  ? `No ${kindPlural} saved in your library yet.`
                   : scope === 'team'
                     ? `No team ${kindPlural} found.`
                     : `No ${kindPlural} shared with everyone yet.`
               }
+              <p className="wizard-field-help">{debouncedSearch ? 'Clear your search or try another scope.' : 'Try another scope to find an action.'}</p>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)' }}>
               {items.map(item => {
                 const isSelected = item.id === currentId
                 return (
                   <button
                     key={item.id}
+                    type="button"
+                    aria-pressed={isSelected}
+                    className="action-picker-item"
                     onClick={() => onSelect(item.id, item.name)}
                     style={{
-                      display: 'flex', alignItems: 'flex-start', gap: 12,
-                      padding: '10px 12px', textAlign: 'left', width: '100%',
-                      backgroundColor: isSelected ? '#eff6ff' : '#fff',
-                      border: isSelected ? '1.5px solid #3b82f6' : '1.5px solid transparent',
-                      borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit',
+                      display: 'flex', alignItems: 'flex-start', gap: 'var(--workspace-space-12)',
+                      padding: "var(--workspace-space-12) var(--workspace-space-12)", textAlign: 'left', width: '100%',
+                      backgroundColor: isSelected ? '#f7f4e8' : '#fff',
+                      border: isSelected ? '1.5px solid var(--highlight-on-light, #806600)' : '1.5px solid transparent',
+                      borderRadius: 'var(--workspace-radius-medium)', cursor: 'pointer', fontFamily: 'inherit',
                       transition: 'background-color 0.1s, border-color 0.1s',
                     }}
                     onMouseEnter={e => {
@@ -337,21 +377,21 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
                     }}
                   >
                     <div style={{
-                      width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-                      backgroundColor: kind === 'workflow' ? '#ede9fe' : '#dbeafe',
+                      width: 32, height: 32, borderRadius: 'var(--workspace-radius-medium)', flexShrink: 0,
+                      backgroundColor: kind === 'workflow' ? '#ede9fe' : '#f7f4e8',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       marginTop: 1,
                     }}>
                       {kind === 'workflow'
                         ? <Workflow size={16} style={{ color: '#7c3aed' }} />
-                        : <FileText size={16} style={{ color: '#2563eb' }} />
+                        : <FileText size={16} style={{ color: 'var(--highlight-on-light, #806600)' }} />
                       }
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', minWidth: 0 }}>
                         <div style={{
-                          fontSize: 14, fontWeight: 600, color: '#111827',
-                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#111827',
+                          overflowWrap: 'anywhere',
                         }}>
                           {item.name}
                         </div>
@@ -368,27 +408,21 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
                       </div>
                       {item.description && (
                         <div style={{
-                          fontSize: 12, color: '#6b7280', marginTop: 2,
-                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          fontSize: 'var(--workspace-font-meta)', color: '#555e68', marginTop: 'var(--workspace-space-2)',
+                          overflowWrap: 'anywhere',
                         }}>
                           {item.description}
                         </div>
                       )}
                     </div>
-                    {item.qualityTier && tierColors[item.qualityTier] && (
-                      <span style={{
-                        fontSize: 10, fontWeight: 700, padding: '2px 8px',
-                        borderRadius: 10, textTransform: 'uppercase', flexShrink: 0,
-                        backgroundColor: tierColors[item.qualityTier].bg,
-                        color: tierColors[item.qualityTier].text,
-                      }}>
-                        {item.qualityTier}
-                      </span>
-                    )}
+                    {(kind === 'workflow' || kind === 'extraction') && <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#59616b', maxWidth: 190 }}>
+                      {qualityPresentation({ tier: item.qualityTier, score: item.qualityScore, asserted: item.qualityAsserted, needsReview: item.regressionPending, testCaseCount: item.testCaseCount }).label}
+                      <span style={{ display: 'block' }}>{qualityPresentation({ tier: item.qualityTier, score: item.qualityScore, asserted: item.qualityAsserted, testCaseCount: item.testCaseCount }).evidence}</span>
+                    </span>}
                     {isSelected && (
                       <span style={{
-                        fontSize: 10, fontWeight: 700, padding: '2px 8px',
-                        borderRadius: 10, backgroundColor: '#dbeafe', color: '#1d4ed8',
+                        fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: "var(--workspace-space-2) var(--workspace-space-8)",
+                        borderRadius: 'var(--workspace-radius-large)', backgroundColor: '#f7f4e8', color: '#554400',
                         flexShrink: 0,
                       }}>
                         Selected
@@ -404,4 +438,5 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
       </FocusTrap>
     </div>
   )
+  return inline ? dialog : createPortal(dialog, document.body)
 }
