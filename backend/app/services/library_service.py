@@ -5,9 +5,9 @@ from __future__ import annotations
 import datetime
 import logging
 import uuid as uuid_mod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
-from beanie import PydanticObjectId
+from beanie import Document, PydanticObjectId
 from beanie.operators import In
 from bson import ObjectId as BsonObjectId
 
@@ -70,6 +70,12 @@ class UnderlyingDeleteError(Exception):
         super().__init__(code)
 
 
+def _persisted_id(document: Document) -> PydanticObjectId:
+    if document.id is None:
+        raise ValueError('The saved library object has no database identity')
+    return document.id
+
+
 async def _resolve_team_oid(team_id: str) -> PydanticObjectId:
     """Resolve a team identifier (ObjectId string or UUID) to a PydanticObjectId.
 
@@ -89,7 +95,7 @@ async def _resolve_team_oid(team_id: str) -> PydanticObjectId:
     # Fall back to UUID lookup
     team = await Team.find_one(Team.uuid == team_id)
     if team:
-        return team.id
+        return _persisted_id(team)
 
     raise ValueError(f"Team not found: {team_id}")
 
@@ -183,7 +189,7 @@ async def _backfill_verified_library(lib: Library) -> None:
             created_at=now,
         )
         await new_item.insert()
-        lib.items.append(new_item.id)
+        lib.items.append(_persisted_id(new_item))
 
     if lib.items:
         lib.updated_at = now
@@ -312,7 +318,7 @@ async def add_item(
     )
     await li.insert()
 
-    lib.items.append(li.id)
+    lib.items.append(_persisted_id(li))
     lib.updated_at = now
     await lib.save()
 
@@ -383,7 +389,7 @@ async def ensure_bookmark(
         created_at=now,
     )
     await li.insert()
-    lib.items.append(li.id)
+    lib.items.append(_persisted_id(li))
     lib.updated_at = now
     await lib.save()
     return li
@@ -443,6 +449,7 @@ async def _delete_underlying_object(item: LibraryItem, user: User) -> None:
     """
     from app.services import search_set_service, workflow_service
 
+    # Prefetch entries are keyed by item kind as well as database identity.
     if item.kind == LibraryItemKind.WORKFLOW:
         wf = await Workflow.get(item.item_id)
         if not wf:
@@ -596,7 +603,7 @@ async def get_library_items(
         for item, _deref, lookup_id in candidates
         if (item.kind.value, lookup_id) not in metas
     ])
-    quality_cfg = (await SystemConfig.get_config()).get_quality_config() if latest_runs else None
+    quality_cfg = (await SystemConfig.get_config()).get_quality_config() if latest_runs else {}
 
     results = []
     for item, deref, quality_lookup_id in candidates:
@@ -707,7 +714,7 @@ async def _apply_run_based_last_used(items: list[dict], user: User) -> None:
         for item in run_based:
             item["last_used_at"] = None
         return
-    pipeline = [
+    pipeline: list[dict] = [
         {"$match": {"user_id": user.user_id, "$or": or_clauses}},
         {"$group": {
             "_id": {"$ifNull": ["$workflow", "$search_set_uuid"]},
@@ -970,7 +977,7 @@ async def list_folders(
     folder_uuids = [f.uuid for f in folders]
     counts: dict[str, int] = {}
     if folder_uuids:
-        pipeline = [
+        pipeline: list[dict] = [
             {"$match": {"folder": {"$in": folder_uuids}}},
             {"$group": {"_id": "$folder", "count": {"$sum": 1}}},
         ]
@@ -1057,7 +1064,11 @@ def _item_created_at(item: LibraryItem) -> str | None:
     return _iso_utc(item.created_at)
 
 
-_NOT_PREFETCHED = object()
+class _NotPrefetched:
+    pass
+
+
+_NOT_PREFETCHED = _NotPrefetched()
 
 
 async def _prefetch_targets(items: list[LibraryItem]) -> dict:
@@ -1080,8 +1091,8 @@ async def _prefetch_targets(items: list[LibraryItem]) -> dict:
 async def _dereference_item(
     item: LibraryItem,
     user: User | None = None,
-    team_access=None,
-    target=_NOT_PREFETCHED,
+    team_access: access_control.TeamAccessContext | None = None,
+    target: Workflow | SearchSet | _NotPrefetched | None = _NOT_PREFETCHED,
 ) -> dict | None:
     """Load the actual Workflow or SearchSet and return combined dict.
 
@@ -1101,8 +1112,9 @@ async def _dereference_item(
     creator_user_id: str | None = None
     can_delete_underlying = False
 
+    # Prefetch entries are keyed by item kind as well as database identity.
     if item.kind == LibraryItemKind.WORKFLOW:
-        wf = await Workflow.get(item.item_id) if target is _NOT_PREFETCHED else target
+        wf = await Workflow.get(item.item_id) if target is _NOT_PREFETCHED else cast(Workflow | None, target)
         if not wf:
             return None
         name = wf.name
@@ -1111,7 +1123,7 @@ async def _dereference_item(
         if user is not None and team_access is not None:
             can_delete_underlying = access_control.can_manage_workflow(wf, user, team_access)
     elif item.kind == LibraryItemKind.SEARCH_SET:
-        ss = await SearchSet.get(item.item_id) if target is _NOT_PREFETCHED else target
+        ss = await SearchSet.get(item.item_id) if target is _NOT_PREFETCHED else cast(SearchSet | None, target)
         if not ss:
             return None
         name = ss.title
@@ -1153,7 +1165,7 @@ async def _attach_authors(items: list[dict]) -> list[dict]:
     """
     from app.services.user_lookup import resolve_authors
 
-    creator_ids = [i.get("creator_user_id") for i in items if i.get("creator_user_id")]
+    creator_ids = [creator_id for i in items if isinstance(creator_id := i.get("creator_user_id"), str) and creator_id]
     author_map = await resolve_authors(creator_ids) if creator_ids else {}
     for entry in items:
         cid = entry.pop("creator_user_id", None)
@@ -1230,7 +1242,7 @@ async def _clone_underlying_object(
                         data=dict(task.data or {}),
                     )
                     await new_task.insert()
-                    new_task_ids.append(new_task.id)
+                    new_task_ids.append(_persisted_id(new_task))
             new_step = WorkflowStep(
                 name=step.name,
                 tasks=new_task_ids,
@@ -1238,11 +1250,11 @@ async def _clone_underlying_object(
                 is_output=step.is_output,
             )
             await new_step.insert()
-            new_step_ids.append(new_step.id)
+            new_step_ids.append(_persisted_id(new_step))
 
         new_wf.steps = new_step_ids
         await new_wf.save()
-        return new_wf.id
+        return _persisted_id(new_wf)
 
     elif item.kind == LibraryItemKind.SEARCH_SET:
         from app.models.extraction_test_case import ExtractionTestCase
@@ -1306,7 +1318,7 @@ async def _clone_underlying_object(
             )
             await new_tc.insert()
 
-        return new_ss.id
+        return _persisted_id(new_ss)
 
     elif item.kind == LibraryItemKind.KNOWLEDGE_BASE:
         from app.models.knowledge import KnowledgeBase
@@ -1333,7 +1345,7 @@ async def _clone_underlying_object(
             clone.team_id = team_id
             clone.shared_with_team = bool(team_id)
             await clone.save()
-        return clone.id
+        return _persisted_id(clone)
 
     raise CloneSourceMissingError(
         f"Library item {item.id} has unsupported kind: {item.kind!r}"

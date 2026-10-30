@@ -685,3 +685,14 @@ class TestSaveExtractionAsMarkdown:
         assert "# Grant Extract" in content
         assert "| PI | Alice |" in content
         assert "| Amount | $50k |" in content
+
+
+@pytest.mark.parametrize('url', [None, 12, {}, []])
+def test_invalid_webhook_url_is_rejected_before_database_or_network(url):
+    from app.services.output_handlers import call_webhook
+
+    with patch('app.services.output_handlers.get_sync_db') as db, patch('app.services.output_handlers.httpx.post') as post:
+        with pytest.raises(ValueError, match='webhook URL is required'):
+            call_webhook({}, {'url': url})
+        db.assert_not_called()
+        post.assert_not_called()

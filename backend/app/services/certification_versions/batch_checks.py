@@ -3,6 +3,8 @@
 These functions do not authenticate client evidence, approve a retry or award
 credit. Repositories must supply decoded captures and durable engine receipts.
 """
+from collections.abc import Sequence
+from .batch_case import BatchCase
 import datetime
 
 from .attempts import encode
@@ -11,7 +13,7 @@ from .catalog import CourseCatalogError
 from .validation_checks import canonical as numeric_or_name
 
 
-def canonical(value, comparison):
+def canonical(value: object, comparison: str) -> tuple[str, str | None]:
     if comparison != 'exact_text':
         return numeric_or_name(value, comparison)
     if not isinstance(value, str) or not value.strip() or len(value) > 1000:
@@ -19,11 +21,11 @@ def canonical(value, comparison):
     return ('value', ' '.join(value.split()).casefold())
 
 
-def item_id(batch_id, document_id: str):
+def item_id(batch_id: str, document_id: str) -> str:
     return encode({'batch_id': batch_id, 'document_id': document_id})[1][:32]
 
 
-def check_item(case, snapshot, result, *, batch_id, run_id: str, attempt_kind) -> dict:
+def check_item(case: BatchCase, snapshot: dict, result: dict, *, batch_id: str, run_id: str, attempt_kind: str) -> dict:
     source = next((s for s in snapshot['documents'] if s['source_id'] == result.get('source_id')), None)
     # Each guard names its own reason so a rejection can be traced to it.
     if (source is None or snapshot['case'] != case.public_definition()
@@ -59,7 +61,7 @@ def check_item(case, snapshot, result, *, batch_id, run_id: str, attempt_kind) -
         raise CourseCatalogError('Check each of the five original logical fields')
     entities = result.get('entities')
     complete = result['status'] == 'completed' and isinstance(entities, list) and len(entities) == 1 and isinstance(entities[0], dict)
-    output = entities[0] if complete else {}
+    output = entities[0] if complete and isinstance(entities, list) else {}
     expectations = {e.field: e for e in case.expectations if e.source_id == source['source_id']}
     checks = []
     for field in case.fields:
@@ -78,7 +80,7 @@ def check_item(case, snapshot, result, *, batch_id, run_id: str, attempt_kind) -
         'source_supported': all(c['matches_source'] for c in checks), 'credit_awarded': False}
 
 
-def check_inventory(case, snapshot, results, *, batch_id, run_id: str, attempt_kind, source_ids) -> dict:
+def check_inventory(case: BatchCase, snapshot: dict, results: Sequence[dict], *, batch_id: str, run_id: str, attempt_kind: str, source_ids: Sequence[str]) -> dict:
     required = tuple(s.id for s in case.sources)
     allowed = case.pilot_source_ids if attempt_kind == 'pilot' else required if attempt_kind == 'batch' else None
     if (attempt_kind not in ('pilot', 'batch', 'retry') or allowed is not None and tuple(source_ids) != allowed
@@ -100,7 +102,7 @@ def check_inventory(case, snapshot, results, *, batch_id, run_id: str, attempt_k
         'credit_awarded': False, 'module_completion_eligible': False}
 
 
-def check_recovery(case, snapshot, originals, retries, *, batch_id) -> dict:
+def check_recovery(case: BatchCase, snapshot: dict, originals: Sequence[dict], retries: Sequence[dict], *, batch_id: str) -> dict:
     """Reconcile final retry receipts selected by a trusted saved recovery chain.
 
     Every retry must target an originally failed item. A caller cannot use a

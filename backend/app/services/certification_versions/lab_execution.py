@@ -5,6 +5,7 @@ An uncertain provider call is never silently retried. Recovery requires a
 separate reviewed disposition; this module does not revoke running workers.
 """
 from __future__ import annotations
+from .writes import WriteLease
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -33,7 +34,7 @@ MAX_RESULT_BYTES = 8 * 1024 * 1024
 EXECUTION_TIMEOUT_SECONDS = 120
 
 
-def implementation_digest():
+def implementation_digest() -> str:
     services = Path(__file__).resolve().parents[1]
     paths = [Path(__file__), services / 'extraction_engine.py', services / 'extraction_sources.py',
              Path(__file__).with_name('learner_decisions.py'), Path(__file__).with_name('scope_proposal.py'),
@@ -44,10 +45,10 @@ def implementation_digest():
                    'packages': {name: version(name) for name in ('pydantic-ai-slim', 'pydantic', 'httpx', 'openai', 'anthropic', 'google-genai')}})[1]
 
 
-def runtime_digest(config):
+def runtime_digest(config: dict) -> str:
     # Credential rotation need not alter assessment requirements. Never store
     # credentials or raw routing configuration in a learner's receipt.
-    def without_credentials(value):
+    def without_credentials(value: object) -> object:
         if isinstance(value, dict):
             return {key: without_credentials(item) for key, item in value.items()
                     if key.lower() not in {'api_key', 'password', 'secret', 'token', 'access_token', 'refresh_token'}}
@@ -57,7 +58,7 @@ def runtime_digest(config):
     return encode(without_credentials(config))[1]
 
 
-def execution_plan(snapshot, system_config) -> dict:
+def execution_plan(snapshot: dict, system_config: dict) -> dict:
     if snapshot.get('record_kind') == 'saved_workflow_design':
         raise EnrollmentConflict('A saved workflow design is not executable lab input')
     if snapshot.get('record_kind') == 'connected_workflow_input':
@@ -144,7 +145,7 @@ class LabExecutionJournal:
         return self.decode(raw) if raw else None
 
     @staticmethod
-    def check_operation(operation: CourseOperation, identity):
+    def check_operation(operation: CourseOperation, identity: dict) -> WriteLease:
         progress = operation.progress
         if not operation.writable:
             raise EnrollmentConflict('Assessed execution requires a writable enrollment operation')
@@ -160,7 +161,7 @@ class LabExecutionJournal:
 
 
 
-    async def _finish(self, saved, lease, result, started_at) -> None:
+    async def _finish(self, saved: dict, lease: WriteLease, result: dict, started_at: str) -> None:
         payload = {**result, 'run_id': saved['run_id'], 'plan_sha256': saved['plan_sha256'],
                    'authorization_sha256': encode(saved['authorization'])[1] if saved.get('authorization') is not None else None,
                    'started_at': started_at, 'finished_at': datetime.datetime.now(datetime.timezone.utc).isoformat()}
@@ -174,7 +175,7 @@ class LabExecutionJournal:
 
 
 class LabExecutionRepository(LabExecutionJournal):
-    async def prepare(self, operation: CourseOperation, input_snapshot_id, run_id: str, system_config_doc):
+    async def prepare(self, operation: CourseOperation, input_snapshot_id: str, run_id: str, system_config_doc: dict) -> dict | None:
         from .learner_decisions import execution_requirement
         from .scope_proposal import capture_proposal
         from .repair_case import capture_repair_case
@@ -213,7 +214,7 @@ class LabExecutionRepository(LabExecutionJournal):
         return await self.get(operation.user_id, run_id)
 
 
-    async def execute(self, operation, run_id: str, system_config_doc, *, expected_approval=None):
+    async def execute(self, operation: CourseOperation, run_id: str, system_config_doc: dict, *, expected_approval: dict | None=None) -> dict | None:
         from app.services.extraction_engine import ExtractionEngine
         from .learner_decisions import LearnerDecisionRepository
         saved = await self.get(operation.user_id, run_id)

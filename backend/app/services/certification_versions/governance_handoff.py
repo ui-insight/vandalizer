@@ -1,4 +1,5 @@
 """Atomic private JSON-copy rehearsal: disclosed no-write rejection, explicit exact retry."""
+from .runtime import CourseOperation
 from typing import Self
 from copy import deepcopy
 import datetime
@@ -42,7 +43,7 @@ class GovernanceHandoffRequest(ContractModel):
         return self
 
 
-def validate_release(body, release) -> None:
+def validate_release(body: GovernanceHandoffRequest, release: dict) -> None:
     if (release['uuid'] != body.release_id or encode(release)[1] != body.release_sha256
             or release['submission']['choice'] != 'approve' or release['run_id'] != body.run_id
             or release['case']['case_sha256'] != body.case_sha256
@@ -50,20 +51,21 @@ def validate_release(body, release) -> None:
         raise EnrollmentConflict('The exact learner release must approve these same private memo bytes')
 
 
-def validate_previous(body, previous) -> None:
+def validate_previous(body: GovernanceHandoffRequest, previous: dict | None) -> dict:
     if (previous is None or previous['uuid'] != body.previous_failed_id or encode(previous)[1] != body.previous_failed_sha256
             or previous['status'] != 'failed' or previous['submission']['action'] != 'attempt'
             or any(previous['submission'][k] != getattr(body, k) for k in ('run_id', 'case_sha256', 'memo_id', 'memo_sha256', 'file_sha256', 'destination_id'))):
         raise EnrollmentConflict('Retry only the original confirmed failed handoff with the same checked memo bytes')
+    return previous
 
 
-class GovernanceHandoffRepository(GovernanceJournal):
+class GovernanceHandoffRepository(GovernanceJournal[GovernanceHandoffRequest]):
     request_model = GovernanceHandoffRequest
     prompt_id = 'governance_private_training_handoff'
     channel = 'authenticated_learner_governance_private_handoff'
 
     @classmethod
-    def validate(cls, saved, body) -> None:
+    def validate(cls, saved: dict, body: GovernanceHandoffRequest) -> None:
         release = GovernanceReleaseRepository.decode(embedded_record(saved['release']))
         validate_release(body, release)
         if (any(saved[k] != release[k] for k in IDENTITY_KEYS) or saved['case'] != release['case']
@@ -77,14 +79,14 @@ class GovernanceHandoffRepository(GovernanceJournal):
                 raise ValueError('The first attempt must preserve the disclosed rejection before any destination copy')
         else:
             previous = saved['previous_failed_receipt']
-            validate_previous(body, previous)
+            previous = validate_previous(body, previous)
             cls.decode(embedded_record(previous))
             if (any(previous[k] != saved[k] for k in IDENTITY_KEYS)
                     or saved['status'] != 'delivered' or saved['reason'] != 'private_training_copy_saved'
                     or saved['destination_written'] is not True or saved['destination_copy'] != release['memo']['file']):
                 raise ValueError('The destination must contain exactly the originally checked, approved bytes')
 
-    async def build(self, operation, body) -> dict:
+    async def build(self, operation: CourseOperation, body: GovernanceHandoffRequest) -> dict:
         release = await GovernanceReleaseRepository().get(operation.user_id, body.release_id)
         if release is None:
             raise EnrollmentConflict('Read your saved memo release before attempting a private handoff')
@@ -93,7 +95,7 @@ class GovernanceHandoffRepository(GovernanceJournal):
         previous = None
         if body.action == 'retry_failed_handoff':
             previous = await self.get(operation.user_id, body.previous_failed_id)
-            validate_previous(body, previous)
+            previous = validate_previous(body, previous)
             LabExecutionRepository.check_operation(operation, previous)
         raw = await self.records.find_one({'uuid': body.memo_id, 'user_id': operation.user_id})
         if (raw is None or raw.get('record_sha256') != body.memo_sha256
@@ -130,7 +132,7 @@ class GovernanceHandoffRepository(GovernanceJournal):
             'destination_written': delivered, 'destination_copy': deepcopy(release['memo']['file']) if delivered else None,
             'submitted_at': claimed_at, 'external_delivery': False}
 
-    async def after_save(self, operation, saved, *, replay) -> None:
+    async def after_save(self, operation: CourseOperation, saved: dict, *, replay: bool) -> None:
         lease = LabExecutionRepository.check_operation(operation, saved)
         await LabInputRepository._check_lease(lease)
         # An old failure replay must not unlock a newer retry or delivered copy.

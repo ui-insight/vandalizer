@@ -4,6 +4,7 @@ These checks consume verified saved inputs/results. They cannot authenticate a
 client result, provide a release grade or award credit. The automatic reviewer
 still evaluates the learner's rationale, causal repair and coverage limits.
 """
+from collections.abc import Sequence
 from decimal import Decimal
 import re
 
@@ -15,7 +16,7 @@ ABSENCE = {'not found', 'not stated', 'not named', 'none', 'null', 'n/a', 'na'}
 AMOUNT = re.compile(r'^(?:USD\s*|\$\s*)?((?:0|[1-9][0-9]*|[1-9][0-9]{0,2}(?:,[0-9]{3})+)(?:\.[0-9]{1,2})?)(?:\s*USD)?$', re.I)
 
 
-def canonical(value, comparison):
+def canonical(value: object, comparison: str) -> tuple[str, str | None]:
     """Deliberately bounded syntax, with no substring or approximate matching."""
     if value is None:
         return ('absent', None)
@@ -34,7 +35,7 @@ def canonical(value, comparison):
     raise CourseCatalogError('Unsupported validation comparison')
 
 
-def check_case(case: ValidationCase, snapshot, suite_case, result) -> dict:
+def check_case(case: ValidationCase, snapshot: dict, suite_case: dict, result: dict) -> dict:
     """Check all three fields, including explicit absence in an optional field.
 
     `result` is a durable engine receipt supplied by the authenticated collector,
@@ -57,7 +58,7 @@ def check_case(case: ValidationCase, snapshot, suite_case, result) -> dict:
     entities = result.get('entities')
     terminal = result.get('status') == 'completed'
     complete = terminal and isinstance(entities, list) and len(entities) == 1 and isinstance(entities[0], dict)
-    output = entities[0] if complete else {}
+    output = entities[0] if complete and isinstance(entities, list) else {}
     checks = []
     for field in case.fields:
         expected = expectations[field.title]
@@ -85,7 +86,7 @@ def check_case(case: ValidationCase, snapshot, suite_case, result) -> dict:
         'optional_absence_checked': True, 'consistency_proves_accuracy': False, 'credit_awarded': False}
 
 
-def check_suite(case, snapshot, cases, results) -> dict:
+def check_suite(case: ValidationCase, snapshot: dict, cases: Sequence[dict], results: Sequence[dict]) -> dict:
     required = [s.id for s in case.sources]
     if ([s['source_id'] for s in cases] != required or [r.get('source_id') for r in results] != required):
         raise CourseCatalogError('Validation requires every distinct assigned case in its original order')
@@ -97,7 +98,7 @@ def check_suite(case, snapshot, cases, results) -> dict:
         'credit_awarded': False, 'module_completion_eligible': False}
 
 
-def verify_repair_inputs(original_snapshot, corrected_snapshot, original_cases, corrected_cases):
+def verify_repair_inputs(original_snapshot: dict, corrected_snapshot: dict, original_cases: Sequence[dict], corrected_cases: Sequence[dict]) -> list[str]:
     """A repaired revision preserves its source, learner and complete test suite."""
     for key in ('user_id', 'enrollment_id', 'course_version', 'manifest_sha256', 'artifact_id'):
         if original_snapshot[key] != corrected_snapshot[key]:
@@ -117,7 +118,7 @@ def verify_repair_inputs(original_snapshot, corrected_snapshot, original_cases, 
     return changed
 
 
-def check_repair(case, original_snapshot, corrected_snapshot, original_cases, corrected_cases, original_results, corrected_results) -> dict:
+def check_repair(case: ValidationCase, original_snapshot: dict, corrected_snapshot: dict, original_cases: Sequence[dict], corrected_cases: Sequence[dict], original_results: Sequence[dict], corrected_results: Sequence[dict]) -> dict:
     """Require a real failure and the entire same suite on a changed revision."""
     changed = verify_repair_inputs(original_snapshot, corrected_snapshot, original_cases, corrected_cases)
     before = check_suite(case, original_snapshot, original_cases, original_results)

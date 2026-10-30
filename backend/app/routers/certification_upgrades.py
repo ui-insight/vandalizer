@@ -38,17 +38,17 @@ async def transfer_delivery(user: User, method: Callable[[], Callable[Concatenat
 
 @router.get('/credit-transfer-preview', response_model=None)
 async def preview_credit_transfer(enrollment_id: EnrollmentId, user: User = Depends(get_current_user)) -> dict:
-    return await transfer_delivery(user, CreditTransfer().preview, True, enrollment_id)
+    return await transfer_delivery(user, lambda: CreditTransfer().preview, True, enrollment_id)
 
 
 @router.post('/credit-transfers', response_model=None)
 async def apply_credit_transfer(payload: CreditTransferRequest, user: User = Depends(get_current_user)) -> dict:
-    return await transfer_delivery(user, CreditTransfer().apply, True, payload)
+    return await transfer_delivery(user, lambda: CreditTransfer().apply, True, payload)
 
 
 @router.get('/credit-transfers/{request_id}', response_model=None)
 async def saved_credit_transfer(request_id: RequestId, user: User = Depends(get_current_user)) -> dict:
-    return await transfer_delivery(user, CreditTransfer().saved, False, request_id)
+    return await transfer_delivery(user, lambda: CreditTransfer().saved, False, request_id)
 
 
 async def deliver(user: User, method: Callable[[], Callable[Concatenate[str, P], Awaitable[dict]]], enabled: bool, *args: P.args, **kwargs: P.kwargs) -> dict:

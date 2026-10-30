@@ -31,8 +31,9 @@ from .upgrade_activation import UpgradeActivationRepository, UpgradeActivationRe
 from .writes import closed_fence
 
 
-def plain(value):
-    return json.loads(json.dumps(value, default=str))
+def plain(value: dict) -> dict:
+    normalized: dict = json.loads(json.dumps(value, default=str))
+    return normalized
 
 
 class PreparationRecoveryRequest(BaseModel):
@@ -50,7 +51,7 @@ class SelectionPreparationRecovery:
     def records(self) -> AsyncIOMotorCollection:
         return CertificationSelectionPreparationRecovery.get_motor_collection()
 
-    async def inspect(self, user_id: str):
+    async def inspect(self, user_id: str) -> dict:
         selection = await self.repository.selections.find_one({'user_id': user_id})
         marker = (selection or {}).get('active_write') or {}
         if (not selection or selection.get('in_flight_writes') != 1 or selection.get('pending_transition_id')
@@ -103,7 +104,7 @@ class SelectionPreparationRecovery:
                 'original_request_id': marker['selection_request']['request_id'], 'write_id': marker['id'],
                 'operation': marker['operation'], 'preview_sha256': encode(first)[1]}
 
-    async def delivery_status(self, user_id: str, selection):
+    async def delivery_status(self, user_id: str, selection: dict) -> dict | None:
         marker = selection.get('active_write') or {}
         if marker.get('operation') == 'recover_selection_preparation':
             raw = await self.records.find_one({'uuid': marker.get('recovery_id'), 'user_id': user_id})
@@ -165,7 +166,7 @@ class SelectionPreparationRecovery:
             raise CourseCatalogError('The preparation recovery record failed integrity verification') from exc
 
     @staticmethod
-    def result(raw, intent) -> dict:
+    def result(raw: dict, intent: dict) -> dict:
         selection = intent['snapshot']['selection']
         marker = selection['active_write']
         return {'kind': 'selection_preparation_recovery.1', 'recovery_id': raw['uuid'],
@@ -176,24 +177,24 @@ class SelectionPreparationRecovery:
                 'selection_changed': False, 'credit_changed': False, 'assessments_repeated': False}
 
     @staticmethod
-    def marker(raw, intent) -> dict:
+    def marker(raw: dict, intent: dict) -> dict:
         snapshot = intent['snapshot']
         original = snapshot['selection']['active_write']
         return {'id': raw['uuid'], 'operation': 'recover_selection_preparation', 'recovery_id': raw['uuid'],
                 'enrollment_id': snapshot['selection']['active_enrollment_id'], 'original_write_id': original['id'],
                 'original_marker_sha256': encode(original)[1]}
 
-    def query(self, raw, intent) -> dict:
+    def query(self, raw: dict, intent: dict) -> dict:
         selection = intent['snapshot']['selection']
         return {'user_id': raw['user_id'], 'active_enrollment_id': selection['active_enrollment_id'],
                 'revision': selection['revision'], 'in_flight_writes': 1, 'pending_transition_id': None,
                 'active_write': self.marker(raw, intent)}
 
-    async def clear(self, raw, intent) -> None:
+    async def clear(self, raw: dict, intent: dict) -> None:
         await self.repository.selections.update_one(self.query(raw, intent),
             {'$set': {'in_flight_writes': 0}, '$unset': {'active_write': ''}})
 
-    async def recover(self, user_id: str, body):
+    async def recover(self, user_id: str, body: object) -> dict:
         request = PreparationRecoveryRequest.model_validate(body)
         raw = await self.records.find_one({'uuid': request.request_id})
         if raw is None:
@@ -248,7 +249,7 @@ class SelectionPreparationRecovery:
             raise EnrollmentConflict('The original selection changed; keep its committed result or active worker')
         return await self.finish(raw, intent)
 
-    async def finish(self, raw, intent):
+    async def finish(self, raw: dict, intent: dict) -> dict:
         snapshot = intent['snapshot']
         marker = snapshot['selection']['active_write']
         if await self.repository.selections.find_one(self.query(raw, intent)) is None:

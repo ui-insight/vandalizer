@@ -428,3 +428,11 @@ async def test_workflow_save_route_authorizes_before_reading_run_output(client, 
     assert first.json()["uuid"] == again.json()["uuid"]
     assert first.json()["source"]["session_id"] == "run1"
     assert first.json()["public_token"] is None
+
+
+def test_unconfirmed_page_save_returns_retryable_error(db, monkeypatch):
+    monkeypatch.setattr(db.html_artifacts, 'find_one_and_update', lambda *args, **kwargs: None)
+    with pytest.raises(HTTPException) as error:
+        make(db)
+    assert error.value.status_code == 503
+    assert 'same request' in error.value.detail

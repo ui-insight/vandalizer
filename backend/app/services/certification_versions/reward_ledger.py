@@ -14,15 +14,29 @@ Lifetime earned XP sums earned XP only; carried XP is shown, never added twice.
 Recorded totals that the rule cannot explain are reported, not rewritten.
 """
 from __future__ import annotations
+from collections.abc import Mapping, Sequence
+from typing import Protocol
+from .catalog import CourseModule
+from .enrollments import EnrollmentRepository
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from app.models.certification import CertificationProgress
     from app.services.certification_versions.catalog import CoursePackage
 
 
 
-def _module(item, saved, star_bonus, legacy) -> dict:
+class RewardProgress(Protocol):
+    @property
+    def enrollment_id(self) -> str | None: ...
+
+    @property
+    def modules(self) -> Mapping[str, object]: ...
+
+    @property
+    def total_xp(self) -> int: ...
+
+
+def _module(item: CourseModule, saved: object, star_bonus: int, legacy: bool) -> dict:
     if not isinstance(saved, dict):
         saved = {}
     completed = saved.get('completed') is True
@@ -39,7 +53,7 @@ def _module(item, saved, star_bonus, legacy) -> dict:
             'explained': star_xp == expected_star_xp and (completed or earned == 0)}
 
 
-def enrollment_rewards(package: CoursePackage, progress: CertificationProgress, *, provenance=None, credential_id=None) -> dict:
+def enrollment_rewards(package: CoursePackage, progress: RewardProgress, *, provenance: str | None=None, credential_id: str | None=None) -> dict:
     legacy = provenance == 'legacy_version_unknown'
     modules = [_module(item, progress.modules.get(item.id), package.manifest.star_bonus_xp, legacy)
                for item in package.manifest.modules]
@@ -57,7 +71,7 @@ def enrollment_rewards(package: CoursePackage, progress: CertificationProgress, 
             'credential_id': credential_id}
 
 
-def user_rewards(rows) -> dict:
+def user_rewards(rows: Sequence[dict]) -> dict:
     """Combine per-enrollment ledgers; carried XP never enters the lifetime total."""
     credentials = [row['credential_id'] for row in rows if row['credential_id']]
     return {'enrollments': rows, 'lifetime_earned_xp': sum(row['earned_xp'] for row in rows),
@@ -72,7 +86,7 @@ def user_rewards(rows) -> dict:
             ]}
 
 
-async def load_user_rewards(repository, user_id: str):
+async def load_user_rewards(repository: EnrollmentRepository, user_id: str) -> dict:
     from .credentials import CredentialRepository
     credentials = CredentialRepository()
     rows = []

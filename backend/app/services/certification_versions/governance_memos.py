@@ -1,4 +1,5 @@
 """Build exact private JSON memo bytes from checked repair and learner accountability."""
+from .runtime import CourseOperation
 from typing import Self
 import base64
 from typing import Annotated, Literal
@@ -36,7 +37,7 @@ class GovernanceMemoRequest(ContractModel):
         return self
 
 
-def memo_file(body, run) -> dict:
+def memo_file(body: GovernanceMemoRequest, run: dict) -> dict:
     if (run['state'] != 'completed' or run['plan']['phase'] != 'repair' or body.run_id != run['run_id']
             or body.result_sha256 != encode(run['result'])[1] or body.case_sha256 != run['plan']['case_sha256']
             or body.owner_user_id != run['plan']['user_id'] or run['result']['checks']['source_supported'] is not True
@@ -64,20 +65,20 @@ def memo_file(body, run) -> dict:
         'sha256': digest, 'byte_length': len(data), 'content_base64': base64.b64encode(data).decode(), 'memo': memo}
 
 
-class GovernanceMemoRepository(GovernanceJournal):
+class GovernanceMemoRepository(GovernanceJournal[GovernanceMemoRequest]):
     request_model = GovernanceMemoRequest
     prompt_id = 'governance_accountable_memo'
     channel = 'authenticated_learner_governance_memo'
 
     @classmethod
-    def validate(cls, saved, body) -> None:
+    def validate(cls, saved: dict, body: GovernanceMemoRequest) -> None:
         run = GovernancePreparation.decode(saved['execution'])
         if (any(saved[k] != (run['run_id'] if k == 'run_id' else run['plan'][k]) for k in IDENTITY_KEYS)
                 or saved['case'] != run['plan']['input_snapshot']['case'] or saved['file'] != memo_file(body, run)
                 or saved['release_authorized'] is not False or saved['delivery_confirmed'] is not False):
             raise ValueError('The memo changed its owned repair, complete checked values or learner accountability')
 
-    async def build(self, operation, body) -> dict:
+    async def build(self, operation: CourseOperation, body: GovernanceMemoRequest) -> dict:
         run = await GovernancePreparation().get(operation.user_id, body.run_id)
         if run is None:
             raise EnrollmentConflict('Inspect your completed repair before preparing the accountable memo')

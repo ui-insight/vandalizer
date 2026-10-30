@@ -13,13 +13,13 @@ from .governance_scope import GovernanceScopeCorrection
 from .lab_execution import execution_plan, implementation_digest as extraction_implementation_digest
 
 
-def implementation_digest():
+def implementation_digest() -> str:
     folder = Path(__file__).parent
     paths = sorted(folder.glob('governance_*.py')) + [folder / 'connected_workflow_approval.py', folder / 'batch_checks.py', folder / 'validation_checks.py']
     return encode({'extraction': extraction_implementation_digest(), 'files': {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}})[1]
 
 
-def validate_scope_binding(snapshot, correction, case):
+def validate_scope_binding(snapshot: dict, correction: dict, case: GovernanceCase) -> str:
     snapshot = GovernanceInputRepository.decode(embedded_input(snapshot))
     serialized, digest = encode(correction)
     correction = GovernanceScopeCorrection.decode({**correction, 'record_json': serialized, 'record_sha256': digest})
@@ -30,7 +30,7 @@ def validate_scope_binding(snapshot, correction, case):
     return digest
 
 
-def extraction_input(snapshot, run_id: str, phase: str='original') -> dict:
+def extraction_input(snapshot: dict, run_id: str, phase: str='original') -> dict:
     # Both complete records jointly inform one result. Preserve exact text and
     # source boundaries; do not let separate per-document outputs masquerade as
     # a reconciled award/amendment interpretation.
@@ -42,7 +42,7 @@ def extraction_input(snapshot, run_id: str, phase: str='original') -> dict:
         'field_metadata': [{'key': f['searchphrase'].strip(), 'is_optional': f['is_optional'], 'enum_values': f['enum_values']} for f in snapshot['artifact']['fields']]}
 
 
-def validate_repair_binding(snapshot, correction, case, finding):
+def validate_repair_binding(snapshot: dict, correction: dict, case: GovernanceCase, finding: dict) -> tuple[dict, list[str], str]:
     from .governance_findings import GovernanceFindingRepository
     from .governance_preparation import GovernancePreparation
     snapshot = GovernanceInputRepository.decode(embedded_input(snapshot))
@@ -63,8 +63,10 @@ def validate_repair_binding(snapshot, correction, case, finding):
     return original, changed, digest
 
 
-def governance_plan(snapshot, correction, case, system_config, *, run_id: str, finding=None) -> dict:
-    original, changed, finding_hash = None, [], None
+def governance_plan(snapshot: dict, correction: dict, case: GovernanceCase, system_config: dict, *, run_id: str, finding: dict | None=None) -> dict:
+    original: dict | None = None
+    changed: list[str] = []
+    finding_hash: str | None = None
     if finding is None:
         digest = validate_scope_binding(snapshot, correction, case)
         phase = 'original'

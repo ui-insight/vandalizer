@@ -1,6 +1,12 @@
 """Extraction API routes  - SearchSet CRUD and extraction execution."""
 
 from __future__ import annotations
+from collections.abc import AsyncIterator
+from app.config import Settings
+from app.models.search_set import SearchSet, SearchSetItem
+from app.models.validation_run import ValidationRun
+from app.models.extraction_optimization_run import ExtractionOptimizationRun
+from app.schemas.extractions import ValidationPortability
 
 import asyncio
 import datetime
@@ -56,7 +62,7 @@ router = APIRouter()
 # Helpers
 # ---------------------------------------------------------------------------
 
-async def _attach_quality(ss) -> dict:
+async def _attach_quality(ss: SearchSet) -> dict:
     """Query quality data for a SearchSet from VerifiedItemMetadata or latest ValidationRun."""
     from app.models.verification import VerifiedItemMetadata
     from app.services.quality_service import get_latest_validation
@@ -90,7 +96,7 @@ async def _attach_quality(ss) -> dict:
     }
 
 
-async def _ss_response(ss, *, can_manage: bool = True) -> SearchSetResponse:
+async def _ss_response(ss: SearchSet, *, can_manage: bool = True) -> SearchSetResponse:
     """Build a SearchSetResponse with quality data attached.
 
     ``can_manage`` defaults True because most callers reach here only after a
@@ -108,12 +114,12 @@ async def _ss_response(ss, *, can_manage: bool = True) -> SearchSetResponse:
         extraction_config=ss.extraction_config,
         fillable_pdf_url=ss.fillable_pdf_url,
         can_manage=can_manage,
-        validation_portability=portability,
+        validation_portability=ValidationPortability.model_validate(portability) if portability is not None else None,
         **quality,
     )
 
 
-async def _get_search_set_or_404(uuid: str, user: User, *, manage: bool = False):
+async def _get_search_set_or_404(uuid: str, user: User, *, manage: bool = False) -> SearchSet:
     ss = await access_control.get_authorized_search_set(
         uuid,
         user,
@@ -125,7 +131,7 @@ async def _get_search_set_or_404(uuid: str, user: User, *, manage: bool = False)
     return ss
 
 
-async def _get_search_set_item_or_404(item_id: str, user: User):
+async def _get_search_set_item_or_404(item_id: str, user: User) -> SearchSetItem:
     item = await svc.get_search_set_item(item_id)
     if not item or not item.searchset:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -154,7 +160,7 @@ async def _authorize_documents(document_uuids: list[str], user: User) -> list[st
 # ---------------------------------------------------------------------------
 
 @router.post("/search-sets", response_model=SearchSetResponse)
-async def create_search_set(req: CreateSearchSetRequest, user: User = Depends(get_current_user)):
+async def create_search_set(req: CreateSearchSetRequest, user: User = Depends(get_current_user)) -> SearchSetResponse:
     team_id = str(user.current_team) if user.current_team else None
     try:
         ss = await svc.create_search_set(
@@ -176,7 +182,7 @@ async def list_search_sets(
     scope: str | None = Query(default=None),
     search: str | None = Query(default=None),
     user: User = Depends(get_current_user),
-):
+) -> list[SearchSetResponse]:
     sets = await svc.list_search_sets(user=user, skip=skip, limit=limit, scope=scope, search=search)
     team_access = await access_control.get_team_access_context(user)
     return [
@@ -191,7 +197,7 @@ async def list_search_sets(
 
 
 @router.get("/search-sets/{uuid}", response_model=SearchSetResponse)
-async def get_search_set(uuid: str, user: User = Depends(get_current_user)):
+async def get_search_set(uuid: str, user: User = Depends(get_current_user)) -> SearchSetResponse:
     ss = await _get_search_set_or_404(uuid, user)
     team_access = await access_control.get_team_access_context(user)
     can_manage = access_control.can_manage_search_set(
@@ -201,7 +207,7 @@ async def get_search_set(uuid: str, user: User = Depends(get_current_user)):
 
 
 @router.patch("/search-sets/{uuid}", response_model=SearchSetResponse)
-async def update_search_set(uuid: str, req: UpdateSearchSetRequest, user: User = Depends(get_current_user)):
+async def update_search_set(uuid: str, req: UpdateSearchSetRequest, user: User = Depends(get_current_user)) -> SearchSetResponse:
     await _get_search_set_or_404(uuid, user, manage=True)
     try:
         ss = await svc.update_search_set(uuid, title=req.title, extraction_config=req.extraction_config)
@@ -233,7 +239,7 @@ async def delete_search_set(uuid: str, user: User = Depends(get_current_user)) -
 
 
 @router.post("/search-sets/{uuid}/clone", response_model=SearchSetResponse)
-async def clone_search_set(uuid: str, user: User = Depends(get_current_user)):
+async def clone_search_set(uuid: str, user: User = Depends(get_current_user)) -> SearchSetResponse:
     await _get_search_set_or_404(uuid, user)
     ss = await svc.clone_search_set(uuid, user.user_id)
     if not ss:
@@ -241,8 +247,8 @@ async def clone_search_set(uuid: str, user: User = Depends(get_current_user)):
     return await _ss_response(ss)
 
 
-@router.get("/search-sets/{uuid}/export")
-async def export_search_set(uuid: str, user: User = Depends(get_current_user)):
+@router.get("/search-sets/{uuid}/export", response_model=None)
+async def export_search_set(uuid: str, user: User = Depends(get_current_user)) -> StreamingResponse:
     """Download extraction definition as a shareable JSON file."""
     import io
     from app.services import export_import_service as eis
@@ -262,8 +268,8 @@ async def export_search_set(uuid: str, user: User = Depends(get_current_user)):
     )
 
 
-@router.get("/search-sets/{uuid}/download-validation")
-async def download_validation_zip(uuid: str, user: User = Depends(get_current_user)):
+@router.get("/search-sets/{uuid}/download-validation", response_model=None)
+async def download_validation_zip(uuid: str, user: User = Depends(get_current_user)) -> StreamingResponse:
     """Download a zip with the full validation setup: setup metadata, answer key,
     snapshotted source text for every test case, and original source documents
     where available and accessible.
@@ -394,7 +400,7 @@ def _build_validation_results_export(
     *,
     ss_uuid: str,
     ss_title: str,
-    vr,
+    vr: ValidationRun,
     doc_by_case: dict[str, dict],
     exported_by_user_id: str,
     exported_at: str,
@@ -481,12 +487,12 @@ def _build_validation_results_export(
     return payload, csv_rows
 
 
-@router.get("/search-sets/{uuid}/download-results")
+@router.get("/search-sets/{uuid}/download-results", response_model=None)
 async def download_validation_results(
     uuid: str,
     run_uuid: Optional[str] = Query(default=None),
     user: User = Depends(get_current_user),
-):
+) -> StreamingResponse:
     """Download the raw results of a validation run: the extracted value for
     every replicate of every document/field, with expected values and per-field
     accuracy/consistency. Defaults to the most recent extraction validation run
@@ -553,7 +559,7 @@ async def download_validation_results(
 
     # Build the tidy CSV (one row per document × field × replicate) by hand —
     # the values are already escaped-safe small strings; quote anything risky.
-    def _csv_cell(v) -> str:
+    def _csv_cell(v: object) -> str:
         s = str(v)
         if any(c in s for c in (",", '"', "\n", "\r")):
             return '"' + s.replace('"', '""') + '"'
@@ -599,7 +605,7 @@ async def import_search_set(
     file: UploadFile = File(...),
     target_uuid: Optional[str] = Form(None),
     user: User = Depends(get_current_user),
-):
+) -> SearchSetResponse:
     """Import an extraction from an exported JSON file.
 
     If *target_uuid* is provided, items are appended to that existing SearchSet
@@ -633,7 +639,7 @@ async def upload_pdf_template(
     uuid: str,
     file: UploadFile = File(...),
     user: User = Depends(get_current_user),
-):
+) -> SearchSetResponse:
     """Attach a fillable PDF template; auto-generate extraction items from its form fields."""
     from pathlib import Path
     from pydantic import BaseModel as PydanticBase
@@ -750,13 +756,13 @@ async def upload_pdf_template(
     return await _ss_response(ss)
 
 
-@router.post("/search-sets/{uuid}/generate-template")
+@router.post("/search-sets/{uuid}/generate-template", response_model=None)
 @limiter.limit("10/minute")
 async def generate_pdf_template(
     request: Request,
     uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> Response:
     """Generate an example fillable PDF from the current extraction items and attach it as the template."""
     from pathlib import Path
     from app.config import Settings
@@ -796,12 +802,12 @@ async def generate_pdf_template(
     )
 
 
-@router.post("/search-sets/{uuid}/export-pdf")
+@router.post("/search-sets/{uuid}/export-pdf", response_model=None)
 async def export_pdf(
     uuid: str,
     req: ExportPDFRequest,
     user: User = Depends(get_current_user),
-):
+) -> Response:
     """Download a filled PDF template or a clean report PDF with extraction results."""
     from pathlib import Path
     from app.config import Settings
@@ -862,7 +868,7 @@ async def export_pdf(
 # ---------------------------------------------------------------------------
 
 @router.post("/search-sets/{uuid}/items", response_model=SearchSetItemResponse)
-async def add_item(uuid: str, req: SearchSetItemRequest, user: User = Depends(get_current_user)):
+async def add_item(uuid: str, req: SearchSetItemRequest, user: User = Depends(get_current_user)) -> SearchSetItemResponse:
     await _get_search_set_or_404(uuid, user, manage=True)
     item = await svc.add_item(
         uuid, req.searchphrase, req.searchtype, req.title, user.user_id,
@@ -878,7 +884,7 @@ async def add_item(uuid: str, req: SearchSetItemRequest, user: User = Depends(ge
 
 
 @router.get("/search-sets/{uuid}/items", response_model=list[SearchSetItemResponse])
-async def list_items(uuid: str, user: User = Depends(get_current_user)):
+async def list_items(uuid: str, user: User = Depends(get_current_user)) -> list[SearchSetItemResponse]:
     await _get_search_set_or_404(uuid, user)
     items = await svc.list_items(uuid)
     return [
@@ -893,7 +899,7 @@ async def list_items(uuid: str, user: User = Depends(get_current_user)):
 
 
 @router.patch("/items/{item_id}", response_model=SearchSetItemResponse)
-async def update_item(item_id: str, req: UpdateSearchSetItemRequest, user: User = Depends(get_current_user)):
+async def update_item(item_id: str, req: UpdateSearchSetItemRequest, user: User = Depends(get_current_user)) -> SearchSetItemResponse:
     await _get_search_set_item_or_404(item_id, user)
     item = await svc.update_item(
         item_id, searchphrase=req.searchphrase, title=req.title,
@@ -983,7 +989,7 @@ EXTRACTION_NO_VALUES_ERROR = (
 )
 
 
-def _entity_has_values(entity) -> bool:
+def _entity_has_values(entity: object) -> bool:
     """Whether an extracted entity carries at least one real value.
 
     A dict of nothing but nulls is not a result. Testing the dict for
@@ -1004,7 +1010,7 @@ def _entity_has_values(entity) -> bool:
     )
 
 
-def _evaluate_cross_field_rules(search_set, values: dict) -> Optional[dict]:
+def _evaluate_cross_field_rules(search_set: SearchSet, values: dict) -> Optional[dict]:
     """Run a search set's cross-field rules over one run's merged values.
 
     Returns ``{"results", "summary"}``, or None when the set has no rules — so
@@ -1035,7 +1041,7 @@ def _evaluate_cross_field_rules(search_set, values: dict) -> Optional[dict]:
 
 
 async def run_recorded_extraction(
-    ss,
+    ss: SearchSet,
     document_uuids: list[str],
     *,
     user_id: str,
@@ -1432,15 +1438,15 @@ async def run_extraction_integrated(
         # having to dig into server logs.
         doc_diagnostics = []
         for doc_uuid in all_doc_uuids:
-            doc = await SmartDocument.find_one(SmartDocument.uuid == doc_uuid)
-            if doc:
+            diagnostic_doc = await SmartDocument.find_one(SmartDocument.uuid == doc_uuid)
+            if diagnostic_doc:
                 doc_diagnostics.append({
-                    "uuid": doc.uuid,
-                    "title": doc.title,
-                    "task_status": getattr(doc, "task_status", None),
-                    "processing": doc.processing,
-                    "raw_text_len": len(doc.raw_text or ""),
-                    "error_message": getattr(doc, "error_message", None),
+                    "uuid": diagnostic_doc.uuid,
+                    "title": diagnostic_doc.title,
+                    "task_status": getattr(diagnostic_doc, "task_status", None),
+                    "processing": diagnostic_doc.processing,
+                    "raw_text_len": len(diagnostic_doc.raw_text or ""),
+                    "error_message": getattr(diagnostic_doc, "error_message", None),
                 })
 
         return {
@@ -1459,7 +1465,7 @@ async def run_extraction_integrated(
             await _cleanup_ephemeral_docs(created_doc_uuids, user, settings)
 
 
-async def _cleanup_ephemeral_docs(uuids: list[str], user: User, settings) -> None:
+async def _cleanup_ephemeral_docs(uuids: list[str], user: User, settings: Settings) -> None:
     """Best-effort delete of API-created docs (Mongo + file + ChromaDB).
 
     Failures are logged and swallowed so cleanup never surfaces as an error
@@ -1874,10 +1880,10 @@ async def get_extraction_quality_status(
             "regression_pending_review": bool(meta.regression_pending_review),
         }
 
-    measured_meta = meta is not None and meta.quality_score is not None
-    score = meta.quality_score if measured_meta else latest.get("score") if latest else None
+    measured_meta = meta if meta is not None and meta.quality_score is not None else None
+    score = measured_meta.quality_score if measured_meta else latest.get("score") if latest else None
     if measured_meta:
-        tier = meta.quality_tier
+        tier = measured_meta.quality_tier
     else:
         # A saved run can precede catalog metadata. Interpret it with the same
         # configured thresholds rather than presenting a missing tier as poor.
@@ -2010,7 +2016,7 @@ async def find_best_settings(
 
     from app.services.extraction_tuning_service import find_best_settings_stream
 
-    async def generate():
+    async def generate() -> AsyncIterator[str]:
         try:
             async for event in find_best_settings_stream(
                 search_set_uuid=uuid,
@@ -2050,7 +2056,7 @@ async def clear_tuning_result(uuid: str, user: User = Depends(get_current_user))
 # ---------------------------------------------------------------------------
 
 
-def _iso_utc(dt):
+def _iso_utc(dt: datetime.datetime | None) -> str | None:
     """ISO-8601 string with an explicit UTC offset.
 
     Datetimes read back from Mongo are naive (the Motor client isn't tz_aware),
@@ -2067,7 +2073,7 @@ def _iso_utc(dt):
     return dt.astimezone(_dt.timezone.utc).isoformat()
 
 
-def _elapsed_seconds(started_at, completed_at):
+def _elapsed_seconds(started_at: datetime.datetime | None, completed_at: datetime.datetime | None) -> int | None:
     """Server-authoritative elapsed seconds for the live run timer.
 
     Computed on the server so the readout can't be corrupted by client/server
@@ -2088,7 +2094,7 @@ def _elapsed_seconds(started_at, completed_at):
     return max(0, int((end - start).total_seconds()))
 
 
-def _serialize_extraction_optimization_run(run) -> dict:
+def _serialize_extraction_optimization_run(run: ExtractionOptimizationRun) -> dict:
     return {
         "uuid": run.uuid,
         "search_set_uuid": run.search_set_uuid,
@@ -2341,7 +2347,7 @@ async def get_active_extraction_optimization(
     return {"run": _serialize_extraction_optimization_run(run) if run else None}
 
 
-def _summarise_extraction_optimization_run(run) -> dict:
+def _summarise_extraction_optimization_run(run: ExtractionOptimizationRun) -> dict:
     """Compact projection of a run for history list views — drops trials and
     field_breakdown that bloat the response and aren't needed for a list.
     Mirrors the shape KB's _summarise_optimization_run uses so the shared
@@ -2415,6 +2421,8 @@ async def get_extraction_optimization(
         raise HTTPException(status_code=404, detail="Optimization run not found")
     # Self-heal a forever-"Cancelling…"/"Running…" run the next time it's polled.
     run = await reap_one(run)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Optimization run not found")
     return _serialize_extraction_optimization_run(run)
 
 

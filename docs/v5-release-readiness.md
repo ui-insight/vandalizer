@@ -58,7 +58,7 @@ network-policy enforcement and deployment identity still need deployed QA.
 ## Typing
 
 The original mypy baseline was 3,141 errors. The dependency pass reduced it to
-3,098; the current follow-up reduces it to 1,142 across 524 source files. The
+3,098; the current follow-up reduces it to 824 across 524 source files. The
 models, schemas, database helpers, URL helpers and observability setup pass their
 focused type check. Workflow execution, automatic review, review persistence and
 review recovery, and the knowledge-base, admin, workflow and Home/config APIs
@@ -85,6 +85,13 @@ completion journals and legacy access wrappers now pass mypy. Captured batch,
 validation and governance inputs, plus saved reviews and generated output artifact
 verification, have explicit model/storage contracts. PDF, workbook and DOCX readers
 use their actual library result types.
+Execution plans, batch/validation checks, governance journals, release-impact reports,
+legacy backfill/completion and selection-recovery contracts now pass the full check.
+Artifact, automation, extraction, verification and library APIs have explicit return
+contracts; raw response serialization is preserved. Artifact storage, workflow output,
+source grounding and query-import helpers are typed. UTC serialization overloads
+preserve the distinction between missing timestamps and actual datetimes. Feedback
+eligibility still runs its nine independent observations concurrently.
 
 The follow-up adds validator, database, record-reader and execution contracts,
 separates shared repository storage from incompatible submission signatures,
@@ -162,7 +169,22 @@ continue to use their existing Pydantic validation at the API boundary.
   exited (the count fell from three to two). The test now checks newly surviving
   thread identities, which also catches a leak masked by another thread's exit.
   Eight focused checks pass on Python 3.12; all five cleanup checks and an explicit
-  background-thread-exit reproduction pass on Python 3.11. Fresh CI remains required.
+  background-thread-exit reproduction pass on Python 3.11. Both Python jobs passed
+  at `29be876b`; that run failed only a credit-transfer persistence test because
+  three routes still passed bound methods to the new lazy dispatch helper. Those
+  routes now pass factories, with route-level coverage for preview, apply, saved
+  reads and disabled-rollout construction. Fresh CI remains required.
+- Execution, governance, transition, recovery and legacy preservation persistence:
+  221 passed against disposable MongoDB. A final run with stable implementation
+  fingerprints passed all 107 execution/credit-transfer checks, including the
+  previously failing credit-transfer HTTP integration. Both containers were removed.
+- This contract batch also passed 301 release/preservation unit tests, 138
+  PDF/source/import checks, 96 artifact/output checks, 151 automation checks,
+  243 extraction/library checks (88 optional cases skipped), and 85 focused
+  dispatch/artifact/webhook regressions. Catalog route tests passed 141 cases
+  (four optional cases skipped); the nine-query feedback concurrency test passed.
+  Every changed application file is checked
+  against the full mypy output before committing, rather than only its original errors.
 - Certification enrollment and practical delivery persistence: 518 passed
   against a disposable MongoDB container, removed after the run.
 - Chroma's disposable container check passes locally and is included in CI.

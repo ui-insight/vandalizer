@@ -13,6 +13,10 @@ evidence, so every legacy record becomes `legacy_version_unknown` (reported as
 `legacy_unversioned`). A stray version hint blocks backfill for reconciliation
 rather than being trusted or discarded.
 """
+from collections.abc import Mapping, Sequence
+from motor.motor_asyncio import AsyncIOMotorDatabase
+from .catalog import CourseCatalog, CoursePackage
+from .enrollments import EnrollmentRepository
 from collections import Counter
 from datetime import datetime, timezone
 import hashlib
@@ -35,21 +39,23 @@ class BackfillChanged(ValueError):
     pass
 
 
-def digest(value):
+def digest(value: object) -> str:
     return hashlib.sha256(json_util.dumps(value, sort_keys=True).encode()).hexdigest()
 
 
-def user_key(user_id: str):
+def user_key(user_id: str) -> str:
     """Stable pseudonymous key; reports never print account identifiers."""
     return hashlib.sha256(('vandalizer:certification:backfill:' + user_id).encode()).hexdigest()[:16]
 
 
-def _count(value):
+def _count(value: object) -> int:
     return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else 0
 
 
-def summarize(raw, package=None):
-    modules = raw.get('modules') if isinstance(raw.get('modules'), dict) else {}
+def summarize(raw: dict, package: CoursePackage | None=None) -> dict:
+    modules = raw.get('modules')
+    if not isinstance(modules, dict):
+        modules = {}
     rows = {key: value for key, value in modules.items() if isinstance(value, dict)}
     completed = sorted(key for key, value in rows.items() if value.get('completed') is True)
     dates = sorted(str(rows[key]['completed_at']) for key in completed if rows[key].get('completed_at'))
@@ -77,7 +83,7 @@ def summarize(raw, package=None):
     return summary
 
 
-def classify(user_id: str, progress, enrollments, selections):
+def classify(user_id: str, progress: Sequence[dict], enrollments: Sequence[dict], selections: Sequence[dict]) -> tuple[str, list[str]]:
     legacy = [row for row in progress if not row.get('enrollment_id')]
     reasons = set()
     if len(legacy) > 1:
@@ -110,7 +116,7 @@ def classify(user_id: str, progress, enrollments, selections):
     return ('needs_reconciliation' if reasons else status), sorted(reasons)
 
 
-async def read_records(database, *, max_records: int=100000):
+async def read_records(database: AsyncIOMotorDatabase, *, max_records: int=100000) -> dict[str, list[dict]]:
     result, count = {}, 0
     for kind, name in COLLECTIONS.items():
         rows = await database[name].find({}).sort('_id', 1).limit(max_records - count + 1).to_list(None)
@@ -121,7 +127,7 @@ async def read_records(database, *, max_records: int=100000):
     return result
 
 
-def build_plan(records, catalog):
+def build_plan(records: Mapping[str, list[dict]], catalog: CourseCatalog) -> tuple[dict, dict[str, str]]:
     registry = catalog.registry()
     continuation = registry.get('legacy_continuation')
     blockers, package = [], None
@@ -132,8 +138,8 @@ def build_plan(records, catalog):
             package = catalog.load(continuation)
         except CourseCatalogError:
             blockers.append('legacy_continuation_not_supported')
-    owners = Counter()
-    grouped = {}
+    owners: Counter[str] = Counter()
+    grouped: dict[str, dict[str, list[dict]]] = {}
     for kind, rows in records.items():
         for row in rows:
             owner = row.get('user_id')
@@ -141,24 +147,25 @@ def build_plan(records, catalog):
                 owners[kind] += 1
                 continue
             grouped.setdefault(owner, {key: [] for key in COLLECTIONS})[kind].append(row)
-    users, internal = [], {}
-    known = Counter()
-    for owner, rows in sorted(grouped.items(), key=lambda item: user_key(item[0])):
-        for row in rows['enrollments']:
+    users: list[dict] = []
+    internal: dict[str, str] = {}
+    known: Counter[str] = Counter()
+    for owner, user_records in sorted(grouped.items(), key=lambda item: user_key(item[0])):
+        for row in user_records['enrollments']:
             if row.get('provenance') in ('new_enrollment', 'explicit_upgrade'):
                 try:
                     verified = catalog.load(row['course_version'], preview=True).manifest_sha256 == row.get('manifest_sha256')
                 except (CourseCatalogError, KeyError, ValueError):
                     verified = False
                 known[row['course_version'] if verified else 'unverifiable_versioned_record'] += 1
-        if not any(not row.get('enrollment_id') for row in rows['progress']):
+        if not any(not row.get('enrollment_id') for row in user_records['progress']):
             continue
-        status, reasons = classify(owner, rows['progress'], rows['enrollments'], rows['selections'])
-        legacy = next(row for row in rows['progress'] if not row.get('enrollment_id'))
+        status, reasons = classify(owner, user_records['progress'], user_records['enrollments'], user_records['selections'])
+        legacy = next(row for row in user_records['progress'] if not row.get('enrollment_id'))
         key = user_key(owner)
         internal[key] = owner
         users.append({'user_key': key, 'status': status, 'reasons': reasons, 'summary': summarize(legacy, package)})
-    totals = Counter()
+    totals: Counter[str] = Counter()
     for row in users:
         item = row['summary']
         totals.update(users=1, completed_modules=len(item['completed_modules']), stars=item['stars'],
@@ -181,7 +188,7 @@ def build_plan(records, catalog):
     return plan, internal
 
 
-async def dry_run(database, catalog, *, max_records: int=100000) -> dict:
+async def dry_run(database: AsyncIOMotorDatabase, catalog: CourseCatalog, *, max_records: int=100000) -> dict:
     first = await read_records(database, max_records=max_records)
     second = await read_records(database, max_records=max_records)
     if digest(first) != digest(second):
@@ -190,7 +197,7 @@ async def dry_run(database, catalog, *, max_records: int=100000) -> dict:
     return {**plan, 'dry_run': True, 'observed_at': datetime.now(timezone.utc).isoformat()}
 
 
-async def apply(repository, database, *, expected_plan_sha256, max_records: int=100000) -> dict:
+async def apply(repository: EnrollmentRepository, database: AsyncIOMotorDatabase, *, expected_plan_sha256: str, max_records: int=100000) -> dict:
     """Backfill the reviewed plan's ready/resume users, then reconcile before/after."""
     before, internal = build_plan(await read_records(database, max_records=max_records), repository.catalog)
     if before['plan_sha256'] != expected_plan_sha256:

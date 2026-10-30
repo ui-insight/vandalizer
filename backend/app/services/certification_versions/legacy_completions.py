@@ -4,6 +4,7 @@ The latest result is saved atomically with progress before being copied to its
 insert-only receipt collection. Losing that copy or its response is recoverable
 without evaluating changed learner answers or workspace artifacts again.
 """
+from motor.motor_asyncio import AsyncIOMotorCollection
 import datetime
 import hashlib
 import json
@@ -24,15 +25,15 @@ def validate_request_id(request_id: object) -> None:
         raise EnrollmentConflict('Completion requires a valid original request reference')
 
 
-def records():
+def records() -> AsyncIOMotorCollection:
     return CertificationProgress.get_motor_collection().database[COLLECTION]
 
 
-def record_id(user_id: str, progress_id, request_id: str):
+def record_id(user_id: str, progress_id: str, request_id: str) -> str:
     return hashlib.sha256(json.dumps([user_id, progress_id, request_id], separators=(',', ':')).encode()).hexdigest()
 
 
-def payload(progress, receipt, module_id: str | None=None, request_id: str | None=None):
+def payload(progress: CertificationProgress, receipt: object, module_id: str | None=None, request_id: str | None=None) -> dict:
     if (not isinstance(receipt, dict) or receipt.get('kind') != KIND
             or receipt.get('user_id') != progress.user_id or receipt.get('progress_id') != str(progress.id)
             or not isinstance(receipt.get('module_id'), str) or not receipt['module_id']
@@ -48,7 +49,7 @@ def payload(progress, receipt, module_id: str | None=None, request_id: str | Non
     return result
 
 
-async def persist_pending(progress) -> None:
+async def persist_pending(progress: CertificationProgress) -> None:
     receipt = progress.completion_receipt
     if not isinstance(receipt, dict) or receipt.get('kind') != KIND:
         return
@@ -62,14 +63,14 @@ async def persist_pending(progress) -> None:
             raise EnrollmentConflict('The original completion receipt changed; do not repeat this assessment')
 
 
-async def previous(progress, module_id: str, request_id: str):
+async def previous(progress: CertificationProgress, module_id: str, request_id: str) -> dict | None:
     validate_request_id(request_id)
     await persist_pending(progress)
     receipt = await records().find_one({'_id': record_id(progress.user_id, str(progress.id), request_id)})
     return payload(progress, receipt, module_id, request_id) if receipt else None
 
 
-def prepare(progress, module_id: str, request_id: str, result):
+def prepare(progress: CertificationProgress, module_id: str, request_id: str, result: dict) -> dict:
     validate_request_id(request_id)
     result = {**result, 'module_id': module_id, 'attempt_id': request_id}
     serialized, digest = encode(result)

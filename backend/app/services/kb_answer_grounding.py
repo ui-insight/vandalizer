@@ -104,7 +104,7 @@ def _number_forms(value: float, unit: str) -> list[str]:
     ]
 
 
-def _keyed_figures(node, key: str = "") -> list[str]:
+def _keyed_figures(node: object, key: str = "") -> list[str]:
     """Percent and dollar forms of the numbers under score- and cost-like keys."""
     if isinstance(node, dict):
         return [f for k, v in node.items() for f in _keyed_figures(v, str(k))]
@@ -365,7 +365,8 @@ def _covers_page(source: dict, pages: set[int]) -> bool:
     if not isinstance(start, int):
         # A sheet or a web page has no page to disagree with.
         return True
-    end = source.get("page_end") if isinstance(source.get("page_end"), int) else start
+    page_end = source.get("page_end")
+    end = page_end if isinstance(page_end, int) else start
     return any(start <= p <= end for p in pages)
 
 
@@ -430,7 +431,7 @@ def expand_snippet_refs(
         locator = format_page(page, s.get("page_approximate"))
         return f"{title}, {locator}" if locator else title
 
-    def expand(m: re.Match) -> str:
+    def expand(m: re.Match[str]) -> str:
         labels: list[str] = []
         for n in map(int, _DIGITS_RE.findall(m.group(0))):
             s = by_ref.get(n)

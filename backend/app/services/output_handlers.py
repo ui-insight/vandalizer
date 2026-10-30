@@ -19,7 +19,7 @@ from app.tasks import get_sync_db
 logger = logging.getLogger(__name__)
 
 
-def _render_chainable_text(output_data, workflow_name: str) -> str:
+def _render_chainable_text(output_data: object, workflow_name: str) -> str:
     """Render workflow output as markdown so the saved doc is chainable as text."""
     import io
     buf = io.StringIO()
@@ -172,7 +172,7 @@ def save_results_to_folder(result_doc: dict, storage_config: dict) -> str:
     return str(file_path)
 
 
-def _save_as_csv(file_path: Path, data) -> None:
+def _save_as_csv(file_path: Path, data: object) -> None:
     if not data:
         file_path.write_text("")
         return
@@ -186,21 +186,21 @@ def _save_as_csv(file_path: Path, data) -> None:
     elif isinstance(data, dict):
         # Transpose to Field/Value rows instead of dumping into one wide row
         with open(file_path, "w", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(["Field", "Value"])
+            row_writer = csv.writer(f)
+            row_writer.writerow(["Field", "Value"])
             for k, v in data.items():
                 cell = json.dumps(v, default=str) if isinstance(v, (dict, list)) else str(v)
-                writer.writerow([str(k), cell])
+                row_writer.writerow([str(k), cell])
     else:
         file_path.write_text(str(data))
 
 
-def _save_as_json(file_path: Path, data) -> None:
+def _save_as_json(file_path: Path, data: object) -> None:
     with open(file_path, "w") as f:
         json.dump(data, f, indent=2, default=str)
 
 
-def _save_workflow_as_text(file_path: Path, data) -> None:
+def _save_workflow_as_text(file_path: Path, data: object) -> None:
     """Save workflow output as human-readable plain text."""
     with open(file_path, "w") as f:
         if isinstance(data, list) and data and isinstance(data[0], dict):
@@ -216,7 +216,7 @@ def _save_workflow_as_text(file_path: Path, data) -> None:
             f.write(str(data) if data else "")
 
 
-def render_workflow_markdown(data, title: str = "Results") -> str:
+def render_workflow_markdown(data: object, title: str = "Results") -> str:
     """Render workflow output as Markdown — shared by the download endpoint and
     the save-to-folder .md writer so both surfaces produce identical files."""
     lines = [f"# {title.replace('_', ' ')}", ""]
@@ -237,12 +237,12 @@ def render_workflow_markdown(data, title: str = "Results") -> str:
     return "\n".join(lines) + "\n"
 
 
-def _save_workflow_as_markdown(file_path: Path, data, title: str = "Results") -> None:
+def _save_workflow_as_markdown(file_path: Path, data: object, title: str = "Results") -> None:
     """Save workflow output as a Markdown table."""
     file_path.write_text(render_workflow_markdown(data, title))
 
 
-def _save_workflow_as_docx(file_path: Path, data) -> None:
+def _save_workflow_as_docx(file_path: Path, data: object) -> None:
     """Save workflow output as a Word document (same rendering as the
     docx download in the workflows router)."""
     from app.services.docx_service import data_to_docx_bytes
@@ -250,7 +250,7 @@ def _save_workflow_as_docx(file_path: Path, data) -> None:
     file_path.write_bytes(data_to_docx_bytes(data))
 
 
-def _save_workflow_as_pdf(file_path: Path, data, title: str = "Results") -> None:
+def _save_workflow_as_pdf(file_path: Path, data: object, title: str = "Results") -> None:
     """Save workflow output as a beautifully formatted PDF.
 
     String payloads are rendered as markdown (headings, lists, tables, bold,
@@ -393,6 +393,7 @@ def _send_email(recipients: list[str], subject: str, html_body: str) -> None:
     msg["To"] = ", ".join(recipients)
     msg.attach(MIMEText(html_body, "html"))
 
+    server: smtplib.SMTP
     try:
         if settings.smtp_use_tls:
             server = smtplib.SMTP_SSL(settings.smtp_host, settings.smtp_port)
@@ -606,6 +607,8 @@ def call_webhook(result_doc: dict, webhook_config: dict) -> None:
     from app.utils.url_validation import validate_outbound_url
 
     url = webhook_config.get("url")
+    if not isinstance(url, str):
+        raise ValueError("A webhook URL is required")
     validate_outbound_url(url)  # raises ValueError for internal/private URLs
     method = webhook_config.get("method", "POST").upper()
 

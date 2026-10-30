@@ -1,4 +1,10 @@
 """PDF generation service — fallback report when no fillable template is attached."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.platypus import Paragraph, SimpleDocTemplate, Table
 
 import datetime
 import json
@@ -270,7 +276,7 @@ def _format_inline(text: str) -> str:
     return text
 
 
-def _safe_paragraph(raw: str, style, **kwargs):
+def _safe_paragraph(raw: str, style: ParagraphStyle, *, bulletText: str | None = None) -> Paragraph:
     """Build a Paragraph from a markdown string, falling back to escaped text.
 
     Reportlab's paraparser raises ValueError on malformed mini-HTML (e.g. tags
@@ -280,10 +286,10 @@ def _safe_paragraph(raw: str, style, **kwargs):
     from reportlab.platypus import Paragraph
 
     try:
-        return Paragraph(_format_inline(raw), style, **kwargs)
+        return Paragraph(_format_inline(raw), style, bulletText=bulletText)
     except ValueError:
         logger.warning("PDF inline-markdown parse failed; falling back to plain text", exc_info=True)
-        return Paragraph(_xml_escape(raw), style, **kwargs)
+        return Paragraph(_xml_escape(raw), style, bulletText=bulletText)
 
 
 _WORKFLOW_FONT_LOCK = Lock()
@@ -309,7 +315,7 @@ def _register_workflow_fonts() -> None:
         _WORKFLOW_FONTS_READY = True
 
 
-def _styles() -> dict:
+def _styles() -> dict[str, ParagraphStyle]:
     """Build the named ParagraphStyle dictionary used by the renderer."""
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib import colors
@@ -481,7 +487,7 @@ def _styles() -> dict:
     return s
 
 
-def _heading_style(level: int, styles: dict):
+def _heading_style(level: int, styles: dict[str, ParagraphStyle]) -> ParagraphStyle:
     return styles[f"h{min(max(level, 1), 6)}"]
 
 
@@ -498,7 +504,7 @@ def _split_table_row(line: str) -> list[str]:
     return cells
 
 
-def _build_table_flowable(headers: list[str], rows: list[list[str]], styles: dict, usable_width: float):
+def _build_table_flowable(headers: list[str], rows: list[list[str]], styles: dict[str, ParagraphStyle], usable_width: float) -> Table:
     from reportlab.platypus import Table, TableStyle
     from reportlab.lib import colors
 
@@ -549,7 +555,7 @@ def _build_table_flowable(headers: list[str], rows: list[list[str]], styles: dic
     return table
 
 
-def _markdown_to_story(text: str, styles: dict, usable_width: float) -> list:
+def _markdown_to_story(text: str, styles: dict[str, ParagraphStyle], usable_width: float) -> list:
     """Convert a markdown string into a list of reportlab Flowables."""
     from reportlab.platypus import Paragraph, Spacer, Preformatted
 
@@ -681,7 +687,7 @@ def _markdown_to_story(text: str, styles: dict, usable_width: float) -> list:
     return story
 
 
-def _doc_template(buf: BytesIO):
+def _doc_template(buf: BytesIO) -> SimpleDocTemplate:
     """Build the default SimpleDocTemplate with letter pagesize and 1-inch margins."""
     from reportlab.platypus import SimpleDocTemplate
     from reportlab.lib.pagesizes import letter
@@ -698,11 +704,11 @@ def _doc_template(buf: BytesIO):
     )
 
 
-def _usable_width(doc) -> float:
-    return doc.width  # SimpleDocTemplate exposes width = pagesize - margins
+def _usable_width(doc: SimpleDocTemplate) -> float:
+    return float(doc.width)  # SimpleDocTemplate exposes width = pagesize - margins
 
 
-def _header_flowables(title: str, subtitle: str | None, styles: dict) -> list:
+def _header_flowables(title: str, subtitle: str | None, styles: dict[str, ParagraphStyle]) -> list:
     from reportlab.platypus import Paragraph
 
     flow = [Paragraph(_xml_escape(title), styles["title"])]
@@ -711,7 +717,7 @@ def _header_flowables(title: str, subtitle: str | None, styles: dict) -> list:
     return flow
 
 
-def _kv_table_flowable(data: dict, styles: dict, usable_width: float):
+def _kv_table_flowable(data: dict, styles: dict[str, ParagraphStyle], usable_width: float) -> Table:
     """Render a flat dict as a two-column Field/Value table."""
     headers = ["Field", "Value"]
     rows = []
@@ -757,7 +763,7 @@ def _kv_table_flowable(data: dict, styles: dict, usable_width: float):
     return table
 
 
-def render_workflow_pdf(data, title: str = "Workflow Results", subtitle: str | None = None) -> bytes:
+def render_workflow_pdf(data: object, title: str = "Workflow Results", subtitle: str | None = None) -> bytes:
     """Render workflow output (markdown string / dict / list-of-dicts) to PDF bytes.
 
     Dispatches on the runtime type of ``data``:

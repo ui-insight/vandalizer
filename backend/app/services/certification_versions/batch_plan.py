@@ -1,4 +1,5 @@
 """Resolve a bounded pilot, full batch or exact failed-item retry; no dispatch."""
+from collections.abc import Sequence
 from copy import deepcopy
 import hashlib
 from pathlib import Path
@@ -12,31 +13,33 @@ from .enrollments import EnrollmentConflict
 from .lab_execution import execution_plan, implementation_digest as extraction_implementation_digest
 
 
-def implementation_digest():
+def implementation_digest() -> str:
     folder = Path(__file__).parent
     paths = sorted(folder.glob('batch_*.py')) + [folder / 'connected_workflow_approval.py', folder / 'validation_checks.py']
     return encode({'extraction': extraction_implementation_digest(),
         'files': {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in paths}})[1]
 
 
-def embedded_input(snapshot) -> dict:
+def embedded_input(snapshot: dict) -> dict:
     serialized, digest = encode(snapshot)
     return {**{key: snapshot[key] for key in ('uuid', 'user_id', 'enrollment_id', 'module_id', 'course_version', 'manifest_sha256', 'artifact_id')},
             'record_json': serialized, 'record_sha256': digest}
 
 
-def _original_run(snapshot, run, phase) -> None:
+def _original_run(snapshot: dict, run: dict | None, phase: str) -> dict:
     if (run is None or run['state'] != 'completed' or run['plan']['phase'] != phase
             or run['plan']['input_snapshot'] != snapshot or run['result']['status'] != 'completed'
             or any(run['plan'][key] != snapshot[key] for key in ('user_id', 'enrollment_id', 'module_id', 'course_version', 'manifest_sha256'))):
         raise EnrollmentConflict('Use the exact complete original run, captured revision and course for this next action')
+    return run
 
 
-def bind_inputs(snapshot, case, *, run_id: str, phase, parent=None, failed_source_id=None, previous_retry=None) -> dict:
+def bind_inputs(snapshot: dict, case: BatchCase, *, run_id: str, phase: str, parent: dict | None=None, failed_source_id: str | None=None, previous_retry: dict | None=None) -> dict:
     """Parents must be decoded by the trusted durable-run repository first."""
     snapshot = BatchInputRepository.decode(embedded_input(snapshot))
     if not isinstance(case, BatchCase) or snapshot['case'] != case.public_definition():
         raise EnrollmentConflict('The saved inputs must bind this exact original batch case')
+    sources: tuple[str, ...]
     if phase == 'pilot':
         if parent is not None or previous_retry is not None or failed_source_id is not None:
             raise EnrollmentConflict('A new pilot cannot silently inherit another run or retry scope')
@@ -44,22 +47,22 @@ def bind_inputs(snapshot, case, *, run_id: str, phase, parent=None, failed_sourc
     elif phase == 'batch':
         if previous_retry is not None or failed_source_id is not None:
             raise EnrollmentConflict('A complete batch is not a targeted retry')
-        _original_run(snapshot, parent, 'pilot')
+        parent = _original_run(snapshot, parent, 'pilot')
         checks = check_inventory(case, snapshot, parent['result']['item_results'], batch_id=parent['run_id'],
             run_id=parent['run_id'], attempt_kind='pilot', source_ids=case.pilot_source_ids)
         if not checks['all_items_completed'] or not checks['all_values_source_supported']:
             raise EnrollmentConflict('Inspect and repair a complete source-supported pilot before scaling')
         sources, batch_id = tuple(s.id for s in case.sources), run_id
     elif phase == 'retry':
-        _original_run(snapshot, parent, 'batch')
+        parent = _original_run(snapshot, parent, 'batch')
         original_results = parent['result']['item_results']
         check_inventory(case, snapshot, original_results, batch_id=parent['run_id'], run_id=parent['run_id'],
                         attempt_kind='batch', source_ids=tuple(s.id for s in case.sources))
         original = next((r for r in original_results if r['source_id'] == failed_source_id), None)
-        if original is None or original['status'] != 'failed':
+        if failed_source_id is None or original is None or original['status'] != 'failed':
             raise EnrollmentConflict('Only an exact confirmed failed original item may be retried; preserve successful items')
         if previous_retry is not None:
-            _original_run(snapshot, previous_retry, 'retry')
+            previous_retry = _original_run(snapshot, previous_retry, 'retry')
             if previous_retry['plan']['batch_id'] != parent['run_id'] or previous_retry['plan']['source_ids'] != [failed_source_id]:
                 raise EnrollmentConflict('A subsequent retry must preserve the same failed item and original batch')
             checks = check_inventory(case, snapshot, previous_retry['result']['item_results'], batch_id=parent['run_id'],
@@ -77,7 +80,7 @@ def bind_inputs(snapshot, case, *, run_id: str, phase, parent=None, failed_sourc
         'previous_retry_sha256': encode(previous_retry)[1] if previous_retry else None}
 
 
-def item_plans(snapshot, *, run_id: str, batch_id, phase, source_ids):
+def item_plans(snapshot: dict, *, run_id: str, batch_id: str, phase: str, source_ids: Sequence[str]) -> list[dict]:
     sources = {s['source_id']: s for s in snapshot['documents']}
     return [{'item_id': item_id(batch_id, sources[sid]['document_id']), 'batch_id': batch_id, 'run_id': run_id,
         'attempt_kind': phase, 'source_id': sid, 'document_id': sources[sid]['document_id'],
@@ -87,7 +90,7 @@ def item_plans(snapshot, *, run_id: str, batch_id, phase, source_ids):
                            for f in snapshot['artifact']['fields']]} for sid in source_ids]
 
 
-def batch_plan(snapshot, case, system_config, *, run_id: str, phase, parent=None, failed_source_id=None, previous_retry=None) -> dict:
+def batch_plan(snapshot: dict, case: BatchCase, system_config: dict, *, run_id: str, phase: str, parent: dict | None=None, failed_source_id: str | None=None, previous_retry: dict | None=None) -> dict:
     try:
         binding = bind_inputs(snapshot, case, run_id=run_id, phase=phase, parent=parent,
                               failed_source_id=failed_source_id, previous_retry=previous_retry)

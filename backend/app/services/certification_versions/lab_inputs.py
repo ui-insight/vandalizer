@@ -5,6 +5,8 @@ The current legacy grader is unchanged. A future runner must consume this saved
 payload, bind its execution receipt, and record learner decisions separately.
 """
 from __future__ import annotations
+from app.services.storage import StorageBackend
+from .writes import WriteLease
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -57,7 +59,7 @@ class LabInputRepository:
         raw = await self.records.find_one({'uuid': snapshot_id, 'user_id': user_id})
         return self.decode(raw) if raw else None
 
-    async def capture_extraction(self, operation: CourseOperation, module_id: str, artifact_id: str, request_id: str, storage):
+    async def capture_extraction(self, operation: CourseOperation, module_id: str, artifact_id: str, request_id: str, storage: StorageBackend) -> dict:
         """Only owned artifacts and currently readable owned sources qualify.
 
         The caller holds the enrollment write boundary. Retrying an identical
@@ -153,6 +155,6 @@ class LabInputRepository:
         return payload
 
     @staticmethod
-    async def _check_lease(lease) -> None:
+    async def _check_lease(lease: WriteLease) -> None:
         if await CertificationProgress.get_motor_collection().find_one(lease.progress_filter(), {'_id': 1}) is None:
             raise EnrollmentConflict('Lab preparation no longer owns the enrollment write boundary')

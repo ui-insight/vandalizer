@@ -4,6 +4,7 @@ MongoDB stores self-contained HTML with no external assets. Atomic append/CAS
 keeps revisions immutable and avoids transactions on standalone deployments.
 25 x 256 KiB stays well below MongoDB's document size limit.
 """
+from pymongo.database import Database
 import hashlib
 import secrets
 import re
@@ -90,7 +91,7 @@ def clean_html(html: str, title: str) -> tuple[str, list[str]]:
     ] if removed else []
 
 
-def _revision(title, html, base="", source=None):
+def _revision(title: str, html: str, base: str="", source: dict | None=None) -> dict:
     content, warnings = clean_html(html, title)
     digest = hashlib.sha256((title.strip() + "\n" + content).encode()).hexdigest()
     return {"uuid": hashlib.sha256((base + digest).encode()).hexdigest()[:32], "title": title.strip(),
@@ -98,7 +99,7 @@ def _revision(title, html, base="", source=None):
             "created_at": datetime.now(timezone.utc), "source": source or {"kind": "editor"}}
 
 
-def create(db, user_id, title, html, request_id, source=None):
+def create(db: Database[dict], user_id: str, title: str, html: str, request_id: str, source: dict | None=None) -> dict:
     uid = hashlib.sha256(f"{user_id}\0{request_id}".encode()).hexdigest()[:32]
     revision = _revision(title, html, source=source)
     now = datetime.now(timezone.utc)
@@ -108,6 +109,8 @@ def create(db, user_id, title, html, request_id, source=None):
         "latest_revision": revision["uuid"], "published_revision": None, "public_token": None, "publications": [],
         "created_at": now, "updated_at": now, "deleted_at": None,
     }}, upsert=True, return_document=ReturnDocument.AFTER)
+    if doc is None:
+        raise HTTPException(503, "The page save could not be confirmed. Retry the same request.")
     if doc.get("deleted_at"):
         raise HTTPException(410, "This page was deleted. Start a new page.")
     if doc["revisions"][0]["sha256"] != revision["sha256"]:
@@ -115,7 +118,7 @@ def create(db, user_id, title, html, request_id, source=None):
     return doc
 
 
-def rename(db, doc, title):
+def rename(db: Database[dict], doc: dict, title: str) -> dict:
     """Change the owner's library name without modifying immutable versions."""
     saved = db.html_artifacts.find_one_and_update({
         "uuid": doc["uuid"], "user_id": doc["user_id"], "deleted_at": None,
@@ -125,7 +128,7 @@ def rename(db, doc, title):
     return saved
 
 
-def duplicate(db, doc, user_id, request_id):
+def duplicate(db: Database[dict], doc: dict, user_id: str, request_id: str) -> dict:
     """Copy the latest accessible version; never inherit sharing or provenance."""
     key = f"duplicate:{doc['uuid']}:{request_id}"
     uid = hashlib.sha256(f"{user_id}\0{key}".encode()).hexdigest()[:32]
@@ -141,21 +144,22 @@ def duplicate(db, doc, user_id, request_id):
     })
 
 
-def get(db, uuid):
+def get(db: Database[dict], uuid: str) -> dict:
     doc = db.html_artifacts.find_one({"uuid": uuid, "deleted_at": None})
     if not doc:
         raise HTTPException(404, "Page not found")
     return doc
 
 
-def revision(doc, uuid=None):
-    selected = next((r for r in doc["revisions"] if r["uuid"] == (uuid or doc["latest_revision"])), None)
+def revision(doc: dict, uuid: str | None=None) -> dict:
+    revisions: list[dict] = doc["revisions"]
+    selected = next((r for r in revisions if r["uuid"] == (uuid or doc["latest_revision"])), None)
     if not selected:
         raise HTTPException(404, "Page revision not found")
     return selected
 
 
-def revise(db, doc, title, html, base_revision, source=None):
+def revise(db: Database[dict], doc: dict, title: str, html: str, base_revision: str, source: dict | None=None) -> dict:
     new = _revision(title, html, base_revision, source)
     if any(r["uuid"] == new["uuid"] for r in doc["revisions"]):
         return doc  # a retried save must not append again
@@ -176,14 +180,15 @@ def revise(db, doc, title, html, base_revision, source=None):
     return saved
 
 
-def team_revision(doc):
+def team_revision(doc: dict) -> str | None:
     """Existing shares default to publication (or latest), never all history."""
     if not doc.get("team_id"):
         return None
-    return doc.get("team_revision") or doc.get("published_revision") or doc["latest_revision"]
+    selected: str = doc.get("team_revision") or doc.get("published_revision") or doc["latest_revision"]
+    return selected
 
 
-def team_view(doc):
+def team_view(doc: dict) -> dict:
     selected = team_revision(doc)
     if not selected:
         raise HTTPException(404, "Page not found")
@@ -197,7 +202,7 @@ def team_view(doc):
             "updated_at": visible["created_at"]}
 
 
-def _pin_legacy_team_revision(db, doc) -> None:
+def _pin_legacy_team_revision(db: Database[dict], doc: dict) -> None:
     # Freeze old shares before changing latest/publication. Otherwise removing a
     # public link or saving a draft would silently expose a different revision.
     if doc.get("team_id") and not doc.get("team_revision"):
@@ -207,7 +212,7 @@ def _pin_legacy_team_revision(db, doc) -> None:
             {"$set": {"team_revision": team_revision(doc)}})
 
 
-def share_team(db, doc, team_id, selected=None):
+def share_team(db: Database[dict], doc: dict, team_id: str | None, selected: str | None=None) -> dict:
     selected = (selected or team_revision(doc) or doc.get("published_revision") or doc["latest_revision"]) if team_id else None
     if selected:
         revision(doc, selected)
@@ -218,7 +223,7 @@ def share_team(db, doc, team_id, selected=None):
     return saved
 
 
-def visible_metadata_stages(user_id):
+def visible_metadata_stages(user_id: str) -> list[dict]:
     """Select the visible title/date BEFORE search, sort, and pagination."""
     owner = {"$eq": ["$user_id", user_id]}
     selected = {"$cond": [owner, "$latest_revision",
@@ -233,7 +238,7 @@ def visible_metadata_stages(user_id):
     ]
 
 
-def metadata(doc, owner=False):
+def metadata(doc: dict, owner: bool=False) -> dict:
     if not owner:
         doc = team_view(doc)
     current = revision(doc)
@@ -253,7 +258,7 @@ def metadata(doc, owner=False):
     return result
 
 
-def publish_separate(db, doc, selected):
+def publish_separate(db: Database[dict], doc: dict, selected: str) -> dict:
     """One revocable, immutable public link per explicitly published revision."""
     revision(doc, selected)
     saved = db.html_artifacts.find_one_and_update({
@@ -268,13 +273,13 @@ def publish_separate(db, doc, selected):
     return saved if saved is not None else get(db, doc["uuid"])
 
 
-def unpublish_separate(db, doc, selected) -> None:
+def unpublish_separate(db: Database[dict], doc: dict, selected: str) -> None:
     revision(doc, selected)
     db.html_artifacts.update_one({"uuid": doc["uuid"], "user_id": doc["user_id"], "deleted_at": None},
         {"$pull": {"publications": {"revision": selected}}})
 
 
-def publish(db, doc, selected):
+def publish(db: Database[dict], doc: dict, selected: str) -> dict | None:
     revision(doc, selected)
     _pin_legacy_team_revision(db, doc)
     return db.html_artifacts.find_one_and_update({"uuid": doc["uuid"], "deleted_at": None}, {
@@ -282,15 +287,15 @@ def publish(db, doc, selected):
     }, return_document=ReturnDocument.AFTER)
 
 
-def unpublish(db, doc) -> None:
+def unpublish(db: Database[dict], doc: dict) -> None:
     _pin_legacy_team_revision(db, doc)
     db.html_artifacts.update_one({"uuid": doc["uuid"], "user_id": doc["user_id"], "deleted_at": None},
         {"$set": {"public_token": None, "published_revision": None}})
 
 
-def workflow_html(output, title):
+def workflow_html(output: object, title: str) -> str:
     """Render report content without chat transcript titles or role headings."""
-    def has_file(value):
+    def has_file(value: object) -> bool:
         if isinstance(value, dict):
             return value.get("type") == "file_download" or any(has_file(v) for v in value.values())
         return isinstance(value, list) and any(has_file(v) for v in value)
@@ -308,7 +313,7 @@ def workflow_html(output, title):
     return render_report_markdown(content)
 
 
-def from_workflow(db, result, user_id, step=None, *, recreate_deleted=False):
+def from_workflow(db: Database[dict], result: dict, user_id: str, step: str | None=None, *, recreate_deleted: bool=False) -> dict:
     if result.get("status") != "completed":
         raise HTTPException(409, "Finish the workflow before creating its page.")
     session_id = result["session_id"]
@@ -351,7 +356,7 @@ def from_workflow(db, result, user_id, step=None, *, recreate_deleted=False):
     })
 
 
-def deliver_workflow_artifact(db, result, user_id):
+def deliver_workflow_artifact(db: Database[dict], result: dict, user_id: str) -> dict[str, str]:
     """Idempotent output delivery, with a visible failure and a manual retry path."""
     failure = "The HTML page could not be created. Use Save as page on the completed run to retry."
     try:
@@ -367,6 +372,6 @@ def deliver_workflow_artifact(db, result, user_id):
         return {"status": "failed", "error": failure}
 
 
-def output_enabled(config):
+def output_enabled(config: object) -> bool:
     setting = config.get("artifact") if isinstance(config, dict) else None
     return isinstance(setting, dict) and setting.get("enabled") is True
