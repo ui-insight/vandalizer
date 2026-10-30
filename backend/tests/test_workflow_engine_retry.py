@@ -174,3 +174,39 @@ def test_retry_returns_none_when_no_fallback_set():
     node.process = MagicMock()
     assert _retry_node_with_fallback(node, {}) is None
     node.process.assert_not_called()
+
+
+def test_real_prompt_node_calls_fallback_model(monkeypatch):
+    """A retry must change the model sent to the provider, not just task metadata."""
+    from app.services import workflow_engine
+
+    calls = []
+
+    def chat(*, model, **kwargs):
+        calls.append(model)
+        return "" if model == "primary" else "Recovered answer"
+
+    monkeypatch.setattr(workflow_engine, "llm_chat_model", chat)
+    engine = workflow_engine.build_workflow_engine(
+        [{"name": "Answer", "tasks": [{"name": "Prompt", "data": {
+            "prompt": "Answer the question", "_retry_on_empty": True,
+            "_fallback_model": "fallback",
+        }}]}],
+        model="primary",
+    )
+
+    output, _ = engine.execute()
+
+    assert calls == ["primary", "fallback"]
+    assert output == "Recovered answer"
+
+
+def test_prompt_refuses_missing_model_before_provider_call(monkeypatch):
+    from app.services import workflow_engine
+
+    chat = MagicMock()
+    monkeypatch.setattr(workflow_engine, "llm_chat_model", chat)
+    node = workflow_engine.PromptNode({"prompt": "Answer the question"})
+    with pytest.raises(ValueError, match="Prompt needs a configured model"):
+        node.process({})
+    chat.assert_not_called()

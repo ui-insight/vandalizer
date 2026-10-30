@@ -88,7 +88,7 @@ def execute_approved_chain(run, case, system_config, *, checkpoint, should_stop)
             if sources != stage['effective_input_sources']:
                 raise EnrollmentConflict('Effective stage inputs differ from the approved plan')
             if stage['task_type'] == 'Extraction':
-                context = {'kind': 'extraction_documents', 'documents': [
+                context: dict[str, object] = {'kind': 'extraction_documents', 'documents': [
                     {'text': text, 'metadata': metadata}
                     for text, metadata in workflow_engine._build_extraction_inputs(data, upstream, sources)]}
             else:

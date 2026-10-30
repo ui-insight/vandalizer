@@ -58,9 +58,11 @@ network-policy enforcement and deployment identity still need deployed QA.
 ## Typing
 
 The original mypy baseline was 3,141 errors. The dependency pass reduced it to
-3,098; the current follow-up reduces it to 2,828 across 524 source files. The
+3,098; the current follow-up reduces it to 2,693 across 524 source files. The
 models, schemas, database helpers, URL helpers and observability setup pass their
-focused type check. The full workflow remains advisory; the backlog is not clear.
+focused type check. Workflow execution, automatic review, review persistence and
+review recovery now have no mypy diagnostics either. The full check remains
+advisory; the backlog is not clear.
 
 The follow-up adds validator, database, record-reader and execution contracts,
 separates shared repository storage from incompatible submission signatures,
@@ -70,10 +72,21 @@ unchecked bodies exposed additional issues, which were corrected rather than
 suppressed. Frozen legacy rubric artifacts are unchanged. No global checks have
 been disabled and no blanket error suppression added.
 
+The workflow pass found a real retry defect: updating the fallback model in task
+configuration did not update the cached model used by several concrete nodes.
+Nodes now read and validate the current model when calling it. A regression
+checks that the first call uses the primary model and the retry uses the fallback.
+Automatic-review completion and recovery also reject a disappeared saved receipt
+instead of returning `None` as a successful assessment. Structured review uses
+the SDK's explicit tool/output retry budgets, preserving one citation repair.
+
 ## Verification
 
-- Follow-up full local backend suite: 8,870 passed, 2,130 skipped. The skipped
-  persistence/provider cases are not deployment QA evidence.
+- First follow-up full local backend suite: 8,870 passed, 2,130 skipped.
+  The workflow/review pass: 8,869 passed, 2,041 skipped, 89 deselected; three
+  additional failures were model-less test fixtures, corrected and verified
+  in the focused rerun. Skipped persistence/provider cases are not deployment
+  QA evidence.
 - Foundation regressions: 107 passed. Certification regressions after the
   repository contracts: 1,556 passed; the subsequent focused selection,
   recovery, batch and workflow checks: 236 passed. Ruff passes.
@@ -81,6 +94,10 @@ been disabled and no blanket error suppression added.
   disposable MongoDB across validation, connected failure practice, batch,
   output, governance and advanced workflow execution. The container was removed.
   Published-course preservation, Bandit and endpoint-map checks also pass.
+- Workflow/context/template regressions: 1,181 passed in the sandbox; the
+  remaining public-host DNS test passed with network access. Automatic-review
+  regressions: 38 passed. Review persistence, recovery, deduplication, result
+  integrity and grading correction checks: 70 passed against disposable MongoDB.
 - Chroma's disposable container check passes locally and is included in CI.
   Its Compose renderer uses an empty temporary environment fixture so it
   never depends on or reads an operator's real `backend/.env`.

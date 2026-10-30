@@ -4,6 +4,7 @@ Internal staged caller only: evidence must already be authenticated and verified
 by its producer. No client evidence endpoint, earned credit or staff queue exists.
 """
 from __future__ import annotations
+from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -21,9 +22,10 @@ from pymongo.errors import DuplicateKeyError
 
 from app.models.certification import CertificationReviewAttempt
 from .attempts import encode
-from .automatic_review import AutomaticReviewPolicy, evaluate_draft_structured_review, review_packet, reviewer_identity
+from .automatic_review import ReviewModel, AutomaticReviewPolicy, evaluate_draft_structured_review, review_packet, reviewer_identity
 from .catalog import CourseCatalogError
-from .enrollments import EnrollmentConflict
+from .enrollments import EnrollmentConflict, EnrollmentRepository
+from .writes import WriteLease
 from .lab_execution import LabExecutionRepository
 from .lab_inputs import LabInputRepository
 from .outcomes import OutcomeContract, package_outcomes
@@ -35,7 +37,7 @@ class ReviewAlreadyExists(EnrollmentConflict):
         self.detail = {'code': 'CERTIFICATION_REVIEW_EXISTS', 'message': str(self), 'attempt_id': attempt_id}
 
 
-def evidence_request_digest(record):
+def evidence_request_digest(record: dict) -> str:
     """Identify one trusted evidence packet independently of a tab's request ID."""
     return encode({key: record.get(key) for key in (
         'user_id', 'enrollment_id', 'module_id', 'course_version', 'manifest_sha256',
@@ -86,7 +88,13 @@ class ReviewAttemptRepository:
         raw = await self.records.find_one({'uuid': attempt_id, 'user_id': user_id})
         return self.decode(raw) if raw else None
 
-    async def prepare_from_run(self, operation, run_id: str, request_id: str, *, actor_user_id: str, model_name, system_config):
+    async def require_saved(self, user_id: str, attempt_id: str) -> dict:
+        saved = await self.get(user_id, attempt_id)
+        if saved is None:
+            raise EnrollmentConflict('The saved assessment is no longer available; reload before continuing')
+        return saved
+
+    async def prepare_from_run(self, operation: CourseOperation, run_id: str, request_id: str, *, actor_user_id: str, model_name: str, system_config: dict) -> dict:
         """Prepare from saved records only; callers cannot supply grading text.
 
         An identical request keeps its original collected evidence even if the
@@ -122,7 +130,7 @@ class ReviewAttemptRepository:
             actor_user_id=actor_user_id, model_name=model_name, system_config=system_config,
             _provenance=packet['provenance'])
 
-    async def prepare_from_process(self, operation, submission_id, request_id: str, *, actor_user_id: str, model_name, system_config):
+    async def prepare_from_process(self, operation: CourseOperation, submission_id: str, request_id: str, *, actor_user_id: str, model_name: str, system_config: dict) -> dict:
         from .process_evidence import assemble_process
         if actor_user_id != operation.user_id or not re.fullmatch(r'[a-f0-9]{32}', request_id):
             raise EnrollmentConflict('Process review requires the authenticated learner and a request identity')
@@ -142,7 +150,7 @@ class ReviewAttemptRepository:
             actor_user_id=actor_user_id, model_name=model_name, system_config=system_config,
             _provenance=packet['provenance'])
 
-    async def prepare_from_workflow_design(self, operation, submission_id, request_id: str, *, actor_user_id: str, model_name, system_config):
+    async def prepare_from_workflow_design(self, operation: CourseOperation, submission_id: str, request_id: str, *, actor_user_id: str, model_name: str, system_config: dict) -> dict:
         from .workflow_design_evidence import assemble_workflow_design
         if actor_user_id != operation.user_id or not re.fullmatch(r'[a-f0-9]{32}', request_id):
             raise EnrollmentConflict('Workflow Design review requires the authenticated learner and a request identity')
@@ -162,7 +170,7 @@ class ReviewAttemptRepository:
             actor_user_id=actor_user_id, model_name=model_name, system_config=system_config,
             _provenance=packet['provenance'])
 
-    async def prepare_from_connected_review(self, operation, submission_id, request_id: str, *, actor_user_id: str, model_name, system_config):
+    async def prepare_from_connected_review(self, operation: CourseOperation, submission_id: str, request_id: str, *, actor_user_id: str, model_name: str, system_config: dict) -> dict:
         from .connected_workflow_evidence import assemble_connected_review
         if actor_user_id != operation.user_id or not re.fullmatch(r'[a-f0-9]{32}', request_id):
             raise EnrollmentConflict('Connected review requires the authenticated learner and a request identity')
@@ -182,7 +190,7 @@ class ReviewAttemptRepository:
             actor_user_id=actor_user_id, model_name=model_name, system_config=system_config,
             _provenance=packet['provenance'])
 
-    async def prepare_from_budget_review(self, operation, submission_id, request_id: str, *, actor_user_id: str, model_name, system_config):
+    async def prepare_from_budget_review(self, operation: CourseOperation, submission_id: str, request_id: str, *, actor_user_id: str, model_name: str, system_config: dict) -> dict:
         from .advanced_workflow_evidence import assemble_budget_review
         if actor_user_id != operation.user_id or not re.fullmatch(r'[a-f0-9]{32}', request_id):
             raise EnrollmentConflict('Budget review requires the authenticated learner and a request identity')
@@ -202,7 +210,7 @@ class ReviewAttemptRepository:
             actor_user_id=actor_user_id, model_name=model_name, system_config=system_config,
             _provenance=packet['provenance'])
 
-    async def prepare_from_output_review(self, operation, submission_id, request_id: str, *, actor_user_id: str, model_name, system_config):
+    async def prepare_from_output_review(self, operation: CourseOperation, submission_id: str, request_id: str, *, actor_user_id: str, model_name: str, system_config: dict) -> dict:
         from .output_workflow_evidence import assemble_output_review
         if actor_user_id != operation.user_id or not re.fullmatch(r'[a-f0-9]{32}', request_id):
             raise EnrollmentConflict('Output review requires the authenticated learner and a request identity')
@@ -222,7 +230,7 @@ class ReviewAttemptRepository:
             actor_user_id=actor_user_id, model_name=model_name, system_config=system_config,
             _provenance=packet['provenance'])
 
-    async def prepare_from_validation_review(self, operation, submission_id, request_id: str, *, actor_user_id: str, model_name, system_config):
+    async def prepare_from_validation_review(self, operation: CourseOperation, submission_id: str, request_id: str, *, actor_user_id: str, model_name: str, system_config: dict) -> dict:
         from .validation_evidence import assemble_validation_review
         if actor_user_id != operation.user_id or not re.fullmatch(r'[a-f0-9]{32}', request_id):
             raise EnrollmentConflict('Validation review requires the authenticated learner and a request identity')
@@ -242,7 +250,7 @@ class ReviewAttemptRepository:
             actor_user_id=actor_user_id, model_name=model_name, system_config=system_config,
             _provenance=packet['provenance'])
 
-    async def prepare_from_batch_review(self, operation, submission_id, request_id: str, *, actor_user_id: str, model_name, system_config):
+    async def prepare_from_batch_review(self, operation: CourseOperation, submission_id: str, request_id: str, *, actor_user_id: str, model_name: str, system_config: dict) -> dict:
         from .batch_evidence import assemble_batch_review
         if actor_user_id != operation.user_id or not re.fullmatch(r'[a-f0-9]{32}', request_id):
             raise EnrollmentConflict('Batch review requires the authenticated learner and a request identity')
@@ -262,7 +270,7 @@ class ReviewAttemptRepository:
             actor_user_id=actor_user_id, model_name=model_name, system_config=system_config,
             _provenance=packet['provenance'])
 
-    async def prepare_from_governance_review(self, operation, submission_id, request_id: str, *, actor_user_id: str, model_name, system_config):
+    async def prepare_from_governance_review(self, operation: CourseOperation, submission_id: str, request_id: str, *, actor_user_id: str, model_name: str, system_config: dict) -> dict:
         from .governance_evidence import assemble_governance_review
         if actor_user_id != operation.user_id or not re.fullmatch(r'[a-f0-9]{32}', request_id):
             raise EnrollmentConflict('Governance review requires the authenticated learner and a request identity')
@@ -282,7 +290,7 @@ class ReviewAttemptRepository:
             actor_user_id=actor_user_id, model_name=model_name, system_config=system_config,
             _provenance=packet['provenance'])
 
-    async def prepare_retry(self, operation: CourseOperation, parent_attempt_id, request_id: str, *, actor_user_id: str, system_config):
+    async def prepare_retry(self, operation: CourseOperation, parent_attempt_id: str, request_id: str, *, actor_user_id: str, system_config: dict) -> dict:
         """Start one explicit technical retry using the original saved evidence.
 
         Replaying either request returns its own receipt. A failed child can be
@@ -302,7 +310,7 @@ class ReviewAttemptRepository:
             actor_user_id=actor_user_id, model_name=record['reviewer']['model_name'],
             system_config=system_config, _parent_attempt_id=parent_attempt_id, _provenance=record.get('provenance'))
 
-    async def prepare_correction(self, operation: CourseOperation, parent_attempt_id, request_id: str, *, correction, system_config):
+    async def prepare_correction(self, operation: CourseOperation, parent_attempt_id: str, request_id: str, *, correction: dict, system_config: dict) -> dict:
         """Regrade graded work after a supported grading correction, keeping the original.
 
         The child reruns the automatic review on the parent's exact evidence and
@@ -322,8 +330,8 @@ class ReviewAttemptRepository:
             system_config=system_config, _parent_attempt_id=parent_attempt_id, _provenance=record.get('provenance'),
             _correction=correction)
 
-    async def prepare(self, operation: CourseOperation, module_id: str, evidence, request_id: str, *, actor_user_id: str, model_name, system_config,
-                      _parent_attempt_id=None, _provenance=None, _correction=None):
+    async def prepare(self, operation: CourseOperation, module_id: str, evidence: Iterable[object], request_id: str, *, actor_user_id: str, model_name: str, system_config: dict,
+                      _parent_attempt_id: str | None=None, _provenance: dict | None=None, _correction: dict | None=None) -> dict:
         if actor_user_id != operation.user_id or not re.fullmatch(r'[a-f0-9]{32}', request_id):
             raise EnrollmentConflict('Automatic review requires the authenticated learner and a request identity')
         if not isinstance(model_name, str) or not model_name.strip() or len(model_name) > 200:
@@ -393,9 +401,9 @@ class ReviewAttemptRepository:
                 if existing is None and evidence_digest is not None:
                     await self.reject_duplicate_evidence(record, evidence_digest)
                 raise EnrollmentConflict('This review request identity or technical retry was already claimed')
-        return await self.get(actor_user_id, request_id)
+        return await self.require_saved(actor_user_id, request_id)
 
-    async def reject_duplicate_evidence(self, record, digest) -> None:
+    async def reject_duplicate_evidence(self, record: dict, digest: str) -> None:
         scope = {key: record[key] for key in ('user_id', 'enrollment_id', 'module_id',
                                              'course_version', 'manifest_sha256')}
         # New records have an atomic unique key. Historical receipts are read
@@ -408,7 +416,7 @@ class ReviewAttemptRepository:
             if saved['attempt_id'] != record['uuid'] and evidence_request_digest(saved['record']) == digest:
                 raise ReviewAlreadyExists(saved['attempt_id'])
 
-    async def evaluate(self, operation, attempt_id: str, system_config, *, call_model=None):
+    async def evaluate(self, operation: CourseOperation, attempt_id: str, system_config: dict, *, call_model: ReviewModel | None=None) -> dict:
         from .review_recovery import bind_review_worker
         saved = await self.get(operation.user_id, attempt_id)
         if saved is None:
@@ -431,7 +439,7 @@ class ReviewAttemptRepository:
             {'$set': {'state': 'evaluating', 'worker_id': lease.write_id, **timing}},
         )
         if claimed.modified_count != 1:
-            return await self.get(operation.user_id, attempt_id)
+            return await self.require_saved(operation.user_id, attempt_id)
         started_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
         try:
             result = await evaluate_draft_structured_review(contract, record['module_id'], record['evidence'],
@@ -442,9 +450,9 @@ class ReviewAttemptRepository:
         except Exception:
             result = self._unavailable('reviewer_execution_error')
         await self._finish(saved, lease, result, started_at)
-        return await self.get(operation.user_id, attempt_id)
+        return await self.require_saved(operation.user_id, attempt_id)
 
-    async def evaluate_saved(self, repository, user_id: str, enrollment_id: str, attempt_id: str, system_config, *, call_model=None):
+    async def evaluate_saved(self, repository: EnrollmentRepository, user_id: str, enrollment_id: str, attempt_id: str, system_config: dict, *, call_model: ReviewModel | None=None) -> dict:
         """Self-service orchestration; reconcile expired work before dispatch.
 
         Recovery never creates a retry or repeats a model call. A technical retry
@@ -457,17 +465,19 @@ class ReviewAttemptRepository:
             return saved
         async with repository.write_boundary(user_id, enrollment_id, operation='evaluate_automatic_review',
                                               review_attempt_id=attempt_id) as progress:
+            if progress.course_version is None:
+                raise EnrollmentConflict('Automatic review requires a versioned enrollment')
             package = repository.catalog.load(progress.course_version)
             return await self.evaluate(CourseOperation(user_id, package, progress, True), attempt_id,
                                        system_config, call_model=call_model)
 
     @staticmethod
-    def _unavailable(reason) -> dict:
+    def _unavailable(reason: str) -> dict:
         return {'status': 'grading_unavailable', 'passed': None, 'retryable': True, 'reason': reason,
                 'credit_awarded': False, 'module_completion_eligible': False, 'staff_review_required': False}
 
     @staticmethod
-    def with_saved_checks(saved, assessment):
+    def with_saved_checks(saved: dict, assessment: dict) -> dict:
         supporting = saved['record'].get('provenance', {}).get('supporting_checks')
         if supporting is not None:
             assessment = {**assessment, 'supporting_checks': deepcopy(supporting),
@@ -500,7 +510,7 @@ class ReviewAttemptRepository:
                 assessment = {**assessment, 'passed': False, 'status': 'revision_required'}
         return assessment
 
-    async def _finish(self, saved, lease, assessment, started_at) -> None:
+    async def _finish(self, saved: dict, lease: WriteLease, assessment: dict, started_at: str) -> None:
         assessment = self.with_saved_checks(saved, assessment)
         result = {'attempt_id': saved['attempt_id'], 'record_sha256': saved['record_sha256'],
                   'assessment': assessment, 'started_at': started_at,

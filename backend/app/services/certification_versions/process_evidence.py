@@ -16,7 +16,7 @@ from .catalog import CourseCatalogError
 from .enrollments import EnrollmentConflict
 from .lab_execution import LabExecutionRepository
 from .lab_inputs import LabInputRepository
-from .outcomes import package_outcomes
+from .outcomes import require_package_outcomes
 from .practical_evidence import EvidenceAssemblyUnavailable
 from .process_case import load_process_case
 from .process_submissions import ProcessSubmissionRepository
@@ -30,7 +30,7 @@ async def assemble_process(operation: CourseOperation, submission_id, *, actor_u
         raise EvidenceAssemblyUnavailable('Select your saved process design before requesting assessment')
     lease = LabExecutionRepository.check_operation(operation, saved)
     case = load_process_case(operation.package)
-    contract = package_outcomes(operation.package)
+    contract = require_package_outcomes(operation.package)
     if (saved['module_id'] != case.module_id or saved['case'] != case.public_definition()
             or saved['submission']['case_sha256'] != case.digest):
         raise CourseCatalogError('The saved process design does not match its original assigned case')

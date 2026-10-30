@@ -5,7 +5,8 @@ This module is not an HTTP payload validator or a completed practical grader.
 A model verdict cannot replace missing evidence, deterministic checks, calibrated
 release requirements or authenticated learner decisions.
 """
-from typing import Self
+from collections.abc import Awaitable, Callable, Iterable, Sequence
+from typing import Protocol, Self, TypeVar
 import asyncio
 from copy import deepcopy
 from datetime import datetime
@@ -20,7 +21,18 @@ from pydantic import Field, model_validator
 
 from .attempts import encode
 from .lab_execution import runtime_digest
-from .outcomes import ContractModel
+from .outcomes import ContractModel, OrderingPoint, Outcome, OutcomeContract
+
+ReviewModel = Callable[[str, dict, str], Awaitable[object]]
+
+
+class OutcomeRequirements(Protocol):
+    @property
+    def id(self) -> str: ...
+
+    @property
+    def evidence(self) -> tuple[str, ...]: ...
+
 
 REVIEW_TIMEOUT_SECONDS = 240  # one reply plus one citation repair; inside the 300s recovery deadline
 MAX_PACKET_BYTES = 200_000
@@ -89,14 +101,23 @@ class ReviewResponse(ContractModel):
     outcomes: tuple[OutcomeDecision, ...] = Field(min_length=1, max_length=32)
 
 
+class DecisionResponse(Protocol):
+    @property
+    def outcomes(self) -> tuple[OutcomeDecision, ...]: ...
+
+
+DecisionResponseT = TypeVar('DecisionResponseT', bound=DecisionResponse)
+
+
+
 _JSON_ESCAPE = re.compile(r'\\(["\\/bfnrt]|u[0-9a-fA-F]{4})')
 
 
-def _spaced(text):
+def _spaced(text: str) -> str:
     return ' '.join(text.split())
 
 
-def quote_found(quote, text) -> bool:
+def quote_found(quote: str, text: str) -> bool:
     """Whether a citation is a verbatim span of the evidence as a person reads it.
 
     Evidence records are JSON, often with JSON nested inside strings, so a
@@ -118,7 +139,7 @@ def quote_found(quote, text) -> bool:
     return needle in _spaced(text)
 
 
-def validate_decisions(response, outcomes, evidence):
+def validate_decisions(response: DecisionResponseT, outcomes: Sequence[OutcomeRequirements], evidence: Sequence[ReviewEvidence]) -> DecisionResponseT:
     ids = [decision.outcome_id for decision in response.outcomes]
     if len(set(ids)) != len(ids) or set(ids) != {outcome.id for outcome in outcomes}:
         raise ValueError('The reviewer must cover every requested outcome exactly once')
@@ -136,11 +157,11 @@ def validate_decisions(response, outcomes, evidence):
     return response
 
 
-def _timestamps(evidence, point):
+def _timestamps(evidence: Sequence[ReviewEvidence], point: OrderingPoint) -> list[tuple[datetime, ReviewEvidence, str]]:
     """Every ``point.key`` value in evidence of ``point.kind``, with its verbatim source text."""
-    found = []
+    found: list[tuple[datetime, ReviewEvidence, str]] = []
 
-    def walk(value, item) -> None:
+    def walk(value: object, item: ReviewEvidence) -> None:
         if isinstance(value, dict):
             for key, child in value.items():
                 if key == point.key and isinstance(child, str):
@@ -165,7 +186,7 @@ def _timestamps(evidence, point):
     return found
 
 
-def ordering_violations(outcomes, evidence):
+def ordering_violations(outcomes: Sequence[Outcome], evidence: Sequence[ReviewEvidence]) -> dict[str, dict]:
     """Contradictions for outcomes whose declared timestamp order is broken.
 
     The earliest ``earlier`` timestamp must not follow the earliest ``later``
@@ -191,7 +212,7 @@ def ordering_violations(outcomes, evidence):
     return violations
 
 
-def citation_problems(response, evidence, outcomes=()):
+def citation_problems(response: ReviewResponse, evidence: Sequence[ReviewEvidence], outcomes: Sequence[OutcomeRequirements]=()) -> list[str]:
     """Learner-free feedback naming each citation that is not a verbatim span,
     and each supported outcome missing a required evidence kind."""
     by_id = {item.id: item for item in evidence}
@@ -220,7 +241,7 @@ UNAVAILABLE_REVISION = ('The saved record for this check is unavailable, so it c
                         'Complete or retry the check so it is saved, then request review again.')
 
 
-def availability_gaps(outcomes, evidence):
+def availability_gaps(outcomes: Sequence[Outcome], evidence: Sequence[ReviewEvidence]) -> dict[str, dict]:
     """Unclear decisions for outcomes whose declared record is marked unavailable.
 
     A lost record is neither learner success nor learner failure, so it can
@@ -254,19 +275,19 @@ def availability_gaps(outcomes, evidence):
     return gaps
 
 
-async def _call_model(model_name, system_config, payload):
+async def _call_model(model_name: str, system_config: dict, payload: str) -> ReviewResponse:
     from types import SimpleNamespace
     from pydantic_ai import Agent, ModelRetry
     from app.services.llm_service import get_agent_model
     request = json.loads(payload)
     outcomes = tuple(SimpleNamespace(id=item['id'], evidence=tuple(item['evidence'])) for item in request['requirements'])
     evidence = tuple(ReviewEvidence.model_validate(item) for item in request['evidence'])
-    agent = Agent(get_agent_model(model_name, system_config_doc=system_config),
+    agent: Agent[None, ReviewResponse] = Agent(get_agent_model(model_name, system_config_doc=system_config),
                   output_type=ReviewResponse, system_prompt=SYSTEM_PROMPT,
-                  model_settings={'temperature': 0.0}, retries=0, output_retries=1)
+                  model_settings={'temperature': 0.0}, retries={'tools': 0, 'output': 1})
 
     @agent.output_validator
-    def check_citations(output):
+    def check_citations(output: ReviewResponse) -> ReviewResponse:
         # Let the model repair a misquoted span once; the caller still
         # re-validates everything independently.
         problems = citation_problems(output, evidence, outcomes)
@@ -283,24 +304,24 @@ async def _call_model(model_name, system_config, payload):
     return result.output
 
 
-def review_packet(contract, module_id: str, evidence):
+def review_packet(contract: OutcomeContract, module_id: str, evidence: Iterable[object]) -> tuple[tuple[Outcome, ...], tuple[ReviewEvidence, ...], str]:
     module = next((module for module in contract.modules if module.module_id == module_id), None)
     outcomes = tuple(outcome for outcome in module.outcomes if outcome.method == 'structured_review') if module else ()
     if not outcomes:
         raise ValueError('This module has no declared structured-review outcomes')
-    evidence = tuple(ReviewEvidence.model_validate(item) for item in evidence)
-    if len(evidence) > 128 or len({item.id for item in evidence}) != len(evidence):
+    checked = tuple(ReviewEvidence.model_validate(item) for item in evidence)
+    if len(checked) > 128 or len({item.id for item in checked}) != len(checked):
         raise ValueError('Evidence identities must be unique and bounded')
     allowed_kinds = {kind for outcome in outcomes for kind in outcome.evidence}
-    if any(item.kind not in allowed_kinds for item in evidence):
+    if any(item.kind not in allowed_kinds for item in checked):
         raise ValueError('Only evidence relevant to the requested outcomes may be supplied')
-    packet, evidence_digest = encode([item.model_dump(mode='json') for item in evidence])
+    packet, evidence_digest = encode([item.model_dump(mode='json') for item in checked])
     if len(packet.encode()) > MAX_PACKET_BYTES:
         raise ValueError('The review evidence packet exceeds the size limit')
-    return outcomes, evidence, evidence_digest
+    return outcomes, checked, evidence_digest
 
 
-def reviewer_identity(model_name, system_config) -> dict:
+def reviewer_identity(model_name: str, system_config: dict) -> dict:
     paths = [Path(__file__), Path(__file__).with_name('review_attempts.py'), Path(__file__).with_name('review_recovery.py'),
              Path(__file__).parents[1] / 'llm_service.py']
     implementation = encode({'files': {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in paths},
@@ -311,14 +332,14 @@ def reviewer_identity(model_name, system_config) -> dict:
             'sdk_version': version('pydantic-ai-slim'), 'temperature': 0.0}
 
 
-async def evaluate_draft_structured_review(contract, module_id: str, evidence, *, model_name, system_config, call_model=None) -> dict:
+async def evaluate_draft_structured_review(contract: OutcomeContract, module_id: str, evidence: Iterable[object], *, model_name: str, system_config: dict, call_model: ReviewModel | None=None) -> dict:
     """Review structured outcomes only, using a caller-verified evidence packet.
 
     No API/chat integration exists. Deterministic outcomes are deliberately not
     delegated to the model. A successful response is not module completion.
     """
     system_config = deepcopy(system_config)
-    outcomes, evidence, evidence_digest = review_packet(contract, module_id, evidence)
+    outcomes, checked, evidence_digest = review_packet(contract, module_id, evidence)
     policy = AutomaticReviewPolicy()
     identity = {'policy_id': policy.policy_id, 'policy_sha256': encode(policy.model_dump(mode='json'))[1],
                 'rubric_id': contract.rubric_id, 'contract_sha256': encode(contract.model_dump(mode='json'))[1],
@@ -326,7 +347,7 @@ async def evaluate_draft_structured_review(contract, module_id: str, evidence, *
                 'assessed_outcome_ids': [outcome.id for outcome in outcomes],
                 'assessment_kind': 'structured_review_draft', 'credit_awarded': False,
                 'module_completion_eligible': False, 'staff_review_required': False}
-    present = {item.kind for item in evidence}
+    present = {item.kind for item in checked}
     missing = [{'outcome_id': outcome.id, 'verdict': 'unclear',
                 'explanation': 'Required evidence is missing: ' + ', '.join(sorted(set(outcome.evidence) - present)),
                 'citations': [], 'revision_instruction': 'Provide the missing saved evidence (' + ', '.join(sorted(set(outcome.evidence) - present)) + '). ' + outcome.practice}
@@ -341,12 +362,12 @@ async def evaluate_draft_structured_review(contract, module_id: str, evidence, *
                 'model_called': False, 'retryable': True, 'reason': 'reviewer_not_configured'}
     reviewer = reviewer_identity(model_name, system_config)
     payload = encode({'requirements': [outcome.model_dump(mode='json') for outcome in outcomes],
-                      'evidence': [item.model_dump(mode='json') for item in evidence]})[0]
+                      'evidence': [item.model_dump(mode='json') for item in checked]})[0]
     # One model call per attempt; a retry is an explicit, separately saved
     # attempt. The adapter may ask the model to repair a citation within it.
     try:
         raw = await asyncio.wait_for((call_model or _call_model)(model_name, system_config, payload), REVIEW_TIMEOUT_SECONDS)
-        response = validate_decisions(ReviewResponse.model_validate(raw), outcomes, evidence)
+        response = validate_decisions(ReviewResponse.model_validate(raw), outcomes, checked)
     except asyncio.CancelledError:
         raise
     except Exception:
@@ -357,8 +378,8 @@ async def evaluate_draft_structured_review(contract, module_id: str, evidence, *
     # A broken timestamp order is a critical failure the model cannot excuse.
     # A lost record cannot support an outcome, but a contradiction the model
     # found elsewhere still stands.
-    vetoes = ordering_violations(outcomes, evidence)
-    gaps = availability_gaps(outcomes, evidence)
+    vetoes = ordering_violations(outcomes, checked)
+    gaps = availability_gaps(outcomes, checked)
     decisions = [vetoes.get(item['outcome_id'])
                  or (gaps.get(item['outcome_id']) if item['verdict'] == 'supported' else None)
                  or item for item in response.model_dump(mode='json')['outcomes']]

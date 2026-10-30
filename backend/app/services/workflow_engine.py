@@ -15,7 +15,12 @@ import re
 import threading
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
-from typing import NoReturn
+from collections.abc import Callable, Iterable
+from typing import Protocol
+
+from pydantic_ai.settings import ModelSettings
+from pydantic_ai.usage import RunUsage
+from pymongo.database import Database
 from urllib.parse import urljoin
 
 import httpx
@@ -38,6 +43,15 @@ logger = logging.getLogger(__name__)
 # Token usage accumulator
 # ---------------------------------------------------------------------------
 
+class UsageSource(Protocol):
+    def usage(self) -> RunUsage: ...
+
+
+class NamedNode(Protocol):
+    @property
+    def name(self) -> str: ...
+
+
 class UsageAccumulator:
     """Thread-safe token usage accumulator for workflow/extraction LLM calls."""
     __slots__ = ("tokens_in", "tokens_out", "_lock")
@@ -47,7 +61,7 @@ class UsageAccumulator:
         self.tokens_out = 0
         self._lock = threading.Lock()
 
-    def record(self, result) -> None:
+    def record(self, result: UsageSource) -> None:
         """Record usage from a pydantic-ai RunResult."""
         try:
             usage = result.usage()
@@ -74,7 +88,7 @@ def sanitize_step_name(name: str) -> str:
     return name or "step"
 
 
-def build_step_output_keys(nodes) -> list[str]:
+def build_step_output_keys(nodes: Iterable[NamedNode]) -> list[str]:
     """Per-node ``steps_output`` keys, disambiguated for duplicate step names.
 
     Keys are derived from the step name, so two steps sharing a name used to
@@ -111,7 +125,7 @@ def _extract_text_from_html(html: str) -> str:
     return text.strip()
 
 
-def format_extraction_results(data) -> str:
+def format_extraction_results(data: object) -> str:
     """Convert extraction JSON results into a markdown bullet list."""
     if data is None:
         return ""
@@ -139,7 +153,7 @@ def format_extraction_results(data) -> str:
     return "\n".join(line for line in lines if line is not None)
 
 
-def _stringify_value(value):
+def _stringify_value(value: object) -> str:
     if value is None:
         return "N/A"
     if isinstance(value, (list, tuple)):
@@ -193,7 +207,7 @@ RULE_CHECKS_LABEL = "Checks computed by Vandalizer (exact arithmetic; report the
 _CHECK_STATUS_LABELS = {"pass": "PASS", "fail": "FAIL", "unparseable": "NOT CHECKED"}
 
 
-def evaluate_rule_checks(rules, entities) -> list[dict]:
+def evaluate_rule_checks(rules: object, entities: object) -> list[dict]:
     """Run an Extraction task's cross-field rules on each extracted entity.
 
     Returns one ``{"entity": i, "label", "results": [...]}`` per entity that
@@ -234,7 +248,7 @@ def evaluate_rule_checks(rules, entities) -> list[dict]:
     return checks
 
 
-def describe_rule_checks(checks) -> str:
+def describe_rule_checks(checks: object) -> str:
     """Plain-text form of :func:`evaluate_rule_checks` for a model step."""
     if not isinstance(checks, list) or not checks:
         return ""
@@ -333,7 +347,7 @@ def _resolve_input_sources(data: dict, prev_step_name: str | None = None) -> lis
     return deduped or ["step_input"]
 
 
-def _stringify_context(value) -> str:
+def _stringify_context(value: object) -> str:
     if value is None or value == "":
         return ""
     if isinstance(value, str):
@@ -352,7 +366,7 @@ def _join_doc_texts(doc_texts: list[str]) -> str:
     return "\n\n".join(f"=== Document {i} ===\n{dt}" for i, dt in enumerate(doc_texts, 1))
 
 
-def _build_combined_context(data: dict, inputs: dict, sources: list[str]):
+def _build_combined_context(data: dict, inputs: dict, sources: list[str]) -> object:
     """Build the data payload to feed an LLM node.
 
     For a single source, returns the raw payload (str / dict / list) so the
@@ -398,7 +412,7 @@ def _build_combined_context(data: dict, inputs: dict, sources: list[str]):
     return "\n\n".join(f"=== {label} ===\n{content}" for label, content in sections)
 
 
-def _normalize_doc_meta(meta) -> dict:
+def _normalize_doc_meta(meta: object) -> dict:
     """A source-resolution metadata entry, whatever the caller had on hand.
 
     A text with no document behind it (a previous step's output) still gets an
@@ -463,9 +477,9 @@ def _build_extraction_inputs(
 # LLM helper functions (sync, for nodes)
 # ---------------------------------------------------------------------------
 
-def llm_chat_model(model: str, prompt: str, data=None, progress_callback=None,
+def llm_chat_model(model: str, prompt: str, data: object=None, progress_callback: Callable[[str], None] | None=None,
                    include_next_step: bool = True, system_config_doc: dict | None = None,
-                   usage_acc: UsageAccumulator | None = None):
+                   usage_acc: UsageAccumulator | None = None) -> str:
     """Run a chat prompt via LLM. Sync context."""
     if data is None or data == "":
         has_context = False
@@ -531,7 +545,7 @@ def data_extraction_model(model: str, keys: list[str], doc_texts: list[str] | No
                           field_metadata: list[dict] | None = None,
                           capture_sources: bool = False,
                           doc_metadata: list[dict] | None = None,
-                          require_complete: bool = False):
+                          require_complete: bool = False) -> dict:
     """Run extraction and return {raw, formatted}. Sync context.
 
     ``capture_sources`` attaches the verified supporting passage and page for
@@ -557,8 +571,8 @@ def data_extraction_model(model: str, keys: list[str], doc_texts: list[str] | No
     return {"raw": output, "formatted": formatted_output}
 
 
-def format_model(model: str, formatting_prompt: str, text, system_config_doc: dict | None = None,
-                 usage_acc: UsageAccumulator | None = None):
+def format_model(model: str, formatting_prompt: str, text: object, system_config_doc: dict | None = None,
+                 usage_acc: UsageAccumulator | None = None) -> tuple[str | None, str | None]:
     """Format text via LLM. Returns (prompt, formatted_text)."""
     system_prompt = (
         "You are a document formatter. You will receive a formatting instruction and "
@@ -592,7 +606,7 @@ def format_model(model: str, formatting_prompt: str, text, system_config_doc: di
 STEP_SIDE_EFFECTS_ATTR = "workflow_step_side_effects"
 
 
-def _process_tagged(node: "Node", inputs):
+def _process_tagged(node: "Node", inputs: dict) -> dict:
     """``node.process(inputs)``, tagging an escaping exception when the step
     may already have acted outside the run, so the Celery task does not retry
     it (re-running would repeat a POST, a browser action, a code run)."""
@@ -610,14 +624,23 @@ def _process_tagged(node: "Node", inputs):
 class Node:
     def __init__(self, name: str) -> None:
         self.name = name
-        self.inputs = {}
-        self.outputs = {}
-        self.tasks = []
-        self.progress_reporter = None
+        self.data: dict = {}
+        self.inputs: dict = {}
+        self.outputs: dict = {}
+        self.tasks: list[Node] = []
+        self.progress_reporter: Callable[[str | None, object], None] | None = None
         self._sys_cfg: dict | None = None
         self._usage_acc: UsageAccumulator | None = None
 
-    def process(self, inputs) -> NoReturn:
+    @property
+    def model(self) -> str:
+        # Read the live configuration: a fallback retry updates data["model"].
+        model = self.data.get("model")
+        if not isinstance(model, str) or not model.strip():
+            raise ValueError(f"{self.name} needs a configured model")
+        return model
+
+    def process(self, inputs: dict) -> dict:
         raise NotImplementedError
 
     def has_side_effects(self) -> bool:
@@ -629,7 +652,7 @@ class Node:
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(name={self.name})"
 
-    def report_progress(self, detail=None, preview=None) -> None:
+    def report_progress(self, detail: str | None=None, preview: object=None) -> None:
         if self.progress_reporter:
             self.progress_reporter(detail, preview)
 
@@ -640,7 +663,7 @@ class Node:
             return result
         self.report_progress("Post-processing output")
         processed = llm_chat_model(
-            model=getattr(self, "data", {}).get("model"),
+            model=self.model,
             prompt=post_prompt,
             data=result["output"],
             include_next_step=False,
@@ -664,16 +687,16 @@ class Node:
 class MultiTaskNode(Node):
     def __init__(self, name: str) -> None:
         super().__init__(name)
-        self.tasks = []
+        self.tasks: list[Node] = []
         self.max_workers = multiprocessing.cpu_count()
 
-    def add_task(self, task) -> None:
+    def add_task(self, task: Node) -> None:
         self.tasks.append(task)
 
-    def add_tasks(self, tasks) -> None:
+    def add_tasks(self, tasks: Iterable[Node]) -> None:
         self.tasks.extend(tasks)
 
-    def process_task(self, task):
+    def process_task(self, task: Node) -> dict:
         # Capture per task, not per step: each task runs in its own copied
         # context (see process below), so the sink only sees this task's LLM
         # calls — including the post-process pass and any nested sub-calls.
@@ -693,7 +716,7 @@ class MultiTaskNode(Node):
         # sibling failed.
         return any(task.has_side_effects() for task in self.tasks)
 
-    def process(self, inputs):
+    def process(self, inputs: dict) -> dict:
         import contextvars
         from copy import deepcopy
 
@@ -815,7 +838,7 @@ class DocumentNode(Node):
         super().__init__("Document")
         self.doc_uuids = data.get("doc_uuids", [])
 
-    def process(self, inputs=None):
+    def process(self, inputs: dict | None=None) -> dict:
         return {"step_name": self.name, "output": self.doc_uuids, "input": None}
 
 
@@ -823,9 +846,8 @@ class ExtractionNode(Node):
     def __init__(self, data: dict) -> None:
         super().__init__("Extraction")
         self.data = data
-        self.model = data.get("model")
 
-    def process(self, inputs):
+    def process(self, inputs: dict) -> dict:
         keys = self.data.get("searchphrases", [])
         if not keys:
             keys = self.data.get("keys", [])
@@ -933,7 +955,6 @@ class PromptNode(Node):
     def __init__(self, data: dict) -> None:
         super().__init__("Prompt")
         self.data = data
-        self.model = data.get("model")
 
     # What a Prompt step with no instructions says instead of running. Also the
     # message Test Step and the run's error banner show, so it names the fix.
@@ -942,7 +963,7 @@ class PromptNode(Node):
         "prompt from the Library) before running this step."
     )
 
-    def process(self, inputs):
+    def process(self, inputs: dict) -> dict:
         prompt = self.data.get("prompt")
         prompt = prompt.strip() if isinstance(prompt, str) else ""
         prev_step_name = inputs.get("step_name")
@@ -988,9 +1009,8 @@ class FormatNode(Node):
     def __init__(self, data: dict) -> None:
         super().__init__("Formatter")
         self.data = data
-        self.model = data.get("model")
 
-    def process(self, inputs):
+    def process(self, inputs: dict) -> dict:
         formatting_prompt = self.data.get("format_template") or self.data.get("prompt", "")
         from app.services.project_context import render_context
         brief = render_context((self.data.get("project_context") or {}).get("text", ""), workflow=True)
@@ -1012,7 +1032,8 @@ class WebsiteNode(Node):
         super().__init__("AddWebsite")
         self.data = data
 
-    def process(self, inputs):
+    def process(self, inputs: dict) -> dict:
+        error: str | None
         url = (self.data.get("url") or "").strip()
         if not url:
             # A step with nothing to fetch used to return "" and let the run
@@ -1052,7 +1073,7 @@ class AddDocumentNode(Node):
         super().__init__("AddDocument")
         self.data = data
 
-    def process(self, inputs):
+    def process(self, inputs: dict) -> dict:
         doc_texts = self.data.get("doc_texts", [])
         text = "\n".join(doc_texts) if doc_texts else ""
         if not text.strip():
@@ -1095,9 +1116,8 @@ class DescribeImageNode(Node):
     def __init__(self, data: dict) -> None:
         super().__init__("DescribeImage")
         self.data = data
-        self.model = data.get("model")
 
-    def _error_result(self, message: str, inputs) -> dict:
+    def _error_result(self, message: str, inputs: dict) -> dict:
         return {
             "output": message,
             "error": message,
@@ -1180,7 +1200,7 @@ class DescribeImageNode(Node):
 
         return content, media_type
 
-    def process(self, inputs):
+    def process(self, inputs: dict) -> dict:
         from pydantic_ai import BinaryContent
 
         image_url = (self.data.get("image_url") or "").strip()
@@ -1259,7 +1279,7 @@ class CodeExecutionNode(Node):
     def has_side_effects(self) -> bool:
         return True
 
-    def process(self, inputs):
+    def process(self, inputs: dict) -> dict:
         code = self.data.get("code", "")
         if not code:
             return {"output": "", "input": inputs.get("output"), "step_name": self.name}
@@ -1312,7 +1332,7 @@ class CrawlerNode(Node):
         super().__init__("CrawlerNode")
         self.data = data
 
-    def process(self, inputs):
+    def process(self, inputs: dict) -> dict:
         start_url = self.data.get("start_url", "")
         max_pages = int(self.data.get("max_pages", 5))
         allowed_domains = self.data.get("allowed_domains", "")
@@ -1340,7 +1360,7 @@ class CrawlerNode(Node):
 
         visited = set()
         to_visit = [start_url]
-        all_text = []
+        all_text: list[str] = []
         blocked = 0
         fetches = 0
         # Max Pages counts pages of real content; blocked/failed fetches don't
@@ -1405,7 +1425,7 @@ class CrawlerNode(Node):
 RESEARCH_NO_FINDINGS = "NO_RELEVANT_FINDINGS"
 
 
-def _research_no_findings_reason(findings) -> str | None:
+def _research_no_findings_reason(findings: object) -> str | None:
     """Return the model's reason (possibly "") if pass 1 declared no findings,
     else None. Only a leading token counts — the word appearing mid-analysis
     is not a declaration."""
@@ -1422,9 +1442,8 @@ class ResearchNode(Node):
     def __init__(self, data: dict) -> None:
         super().__init__("ResearchNode")
         self.data = data
-        self.model = data.get("model")
 
-    def process(self, inputs):
+    def process(self, inputs: dict) -> dict:
         question = self.data.get("question", "")
         prev_step_name = inputs.get("step_name")
 
@@ -1505,7 +1524,7 @@ class ResearchNode(Node):
         return {"output": report, "input": inputs.get("output"), "step_name": self.name}
 
 
-def _open_sync_db():
+def _open_sync_db() -> Database[dict]:
     """Open a pymongo handle for in-node credential lookups (sync context)."""
     from app.tasks import get_sync_db
 
@@ -1540,7 +1559,7 @@ def _redact_headers(headers: dict) -> dict:
     return redacted
 
 
-def _build_request_preview(method: str, url: str, headers: dict, body) -> dict:
+def _build_request_preview(method: str, url: str, headers: dict, body: object) -> dict:
     """A safe, structured snapshot of the request the API node is about to send.
 
     Used for debugging — surfaced in the step output and logged — so authors can
@@ -1586,7 +1605,7 @@ class APICallNode(Node):
         super().__init__("APINode")
         self.data = data
 
-    def _error_result(self, message: str, inputs, *, output=None, request=None) -> dict:
+    def _error_result(self, message: str, inputs: dict, *, output: object=None, request: dict | None=None) -> dict:
         """A failed-step result: ``error`` carries the concise failure message
         (becomes the run's error), ``output`` the full diagnostic text."""
         result = {
@@ -1602,7 +1621,7 @@ class APICallNode(Node):
     def has_side_effects(self) -> bool:
         return self.data.get("method", "GET").upper() not in ("GET", "HEAD", "OPTIONS")
 
-    def process(self, inputs):
+    def process(self, inputs: dict) -> dict:
         from app.utils import templating
 
         method = self.data.get("method", "GET").upper()
@@ -1790,7 +1809,7 @@ class DocumentRendererNode(Node):
     # dicts → table), so a step output and an export of it look the same.
     FORMATS = ("md", "txt", "pdf", "docx")
 
-    def process(self, inputs):
+    def process(self, inputs: dict) -> dict:
         fmt = (self.data.get("format") or "md").lower()
         if fmt not in self.FORMATS:
             fmt = "txt"
@@ -1912,7 +1931,7 @@ FORM_FILLER_FREEFORM_INSTRUCTIONS = (
 )
 
 
-def _context_block(input_data) -> str:
+def _context_block(input_data: object) -> str:
     if input_data is None or input_data == "":
         return ""
     if isinstance(input_data, str):
@@ -1933,9 +1952,9 @@ def _run_form_filler_model(
     from app.services.llm_service import build_thinking_model_settings, get_agent_model
 
     agent_model = get_agent_model(model, system_config_doc=system_config_doc)
-    settings = dict(build_thinking_model_settings(model, None, system_config_doc) or {})
+    settings: ModelSettings = {**(build_thinking_model_settings(model, None, system_config_doc) or {})}
     settings["temperature"] = 0.0
-    agent = Agent(agent_model, instructions=instructions, model_settings=settings)
+    agent: Agent[None, str] = Agent(agent_model, instructions=instructions, model_settings=settings)
     result = agent.run_sync(prompt)
     if usage_acc:
         usage_acc.record(result)
@@ -1983,11 +2002,10 @@ class FormFillerNode(Node):
     def __init__(self, data: dict) -> None:
         super().__init__("FormFiller")
         self.data = data
-        self.model = data.get("model")
 
     # -- inputs ------------------------------------------------------------
 
-    def _attribution_sources(self, inputs, sources: list[str]) -> list[dict]:
+    def _attribution_sources(self, inputs: dict, sources: list[str]) -> list[dict]:
         """The inputs the model saw, in order, each with the metadata needed to
         say which document and page a value came from (see form_fill)."""
         out: list[dict] = []
@@ -2049,7 +2067,7 @@ class FormFillerNode(Node):
 
     # -- fill --------------------------------------------------------------
 
-    def process(self, inputs):
+    def process(self, inputs: dict) -> dict:
         template = self.data.get("template", "")
         missing_token = (self.data.get("missing_value") or "").strip() or None
         prev_step_name = inputs.get("step_name")
@@ -2071,12 +2089,13 @@ class FormFillerNode(Node):
             # blanks itself. Still its own instructions and temperature 0.
             # Nothing to check field-by-field either — there are no fields.
             prompt = f"TEMPLATE:\n{template}\n\nCONTEXT:\n{context}"
-            result["output"] = _run_form_filler_model(
+            filled_text = _run_form_filler_model(
                 self.model, FORM_FILLER_FREEFORM_INSTRUCTIONS, prompt,
                 system_config_doc=self._sys_cfg, usage_acc=self._usage_acc,
             ).strip()
+            result["output"] = filled_text
             warnings = []
-            unfilled = count_unfilled_freeform(result["output"], missing_token)
+            unfilled = count_unfilled_freeform(filled_text, missing_token)
             if unfilled:
                 warnings.append(
                     f"{unfilled} blank{'s' if unfilled != 1 else ''} could not be filled "
@@ -2117,7 +2136,7 @@ class FormFillerNode(Node):
             result["warning"] = " | ".join(warnings)
         return result
 
-    def _fill_pdf_form(self, inputs, sources: list[str], context: str, result: dict) -> dict:
+    def _fill_pdf_form(self, inputs: dict, sources: list[str], context: str, result: dict) -> dict:
         """Write values into a real fillable PDF's form fields; output is the PDF."""
         from app.services.form_fill import (
             FILLABLE_PDF_FIELD_TYPES,
@@ -2200,7 +2219,7 @@ class FormFillerNode(Node):
         return result
 
 
-def _json_rows(value):
+def _json_rows(value: object) -> object:
     """A JSON object or list of objects carried as text, else the value unchanged.
 
     Formatter and Prompt steps return text, so a record they produce reaches
@@ -2228,7 +2247,7 @@ class DataExportNode(Node):
         super().__init__("DataExport")
         self.data = data
 
-    def process(self, inputs):
+    def process(self, inputs: dict) -> dict:
         fmt = self.data.get("format", "json")
         filename = self.data.get("filename", "export")
         input_data = inputs.get("output", "")
@@ -2292,7 +2311,7 @@ class PackageBuilderNode(Node):
         super().__init__("PackageBuilder")
         self.data = data
 
-    def process(self, inputs):
+    def process(self, inputs: dict) -> dict:
         package_name = self.data.get("package_name", "package")
         input_data = inputs.get("output", "")
         self.report_progress("Building package")
@@ -2334,7 +2353,7 @@ class ApprovalNode(Node):
         super().__init__("Approval")
         self.data = data
 
-    def process(self, inputs):
+    def process(self, inputs: dict) -> dict:
         review_instructions = self.data.get("review_instructions", "Please review the workflow output.")
         return {
             "output": inputs.get("output"),
@@ -2361,7 +2380,7 @@ class BrowserAutomationNode(Node):
     def has_side_effects(self) -> bool:
         return True
 
-    def process(self, inputs):
+    def process(self, inputs: dict) -> dict:
         from app.services.browser_automation import BrowserAutomationService
 
         service = BrowserAutomationService.get_instance()
@@ -2463,7 +2482,7 @@ class KnowledgeBaseQueryNode(Node):
         super().__init__("KnowledgeBaseQuery")
         self.data = data
 
-    def _result(self, output, inputs, *, warning=None, sources=None, error=None):
+    def _result(self, output: object, inputs: dict, *, warning: str | None=None, sources: list[dict] | None=None, error: str | None=None) -> dict:
         result = {"output": output, "input": inputs.get("output"), "step_name": self.name}
         if warning:
             result["warning"] = warning
@@ -2473,7 +2492,7 @@ class KnowledgeBaseQueryNode(Node):
             result["retrieved_sources"] = sources
         return result
 
-    def process(self, inputs):
+    def process(self, inputs: dict) -> dict:
         from app.services.document_manager import get_document_manager
         from app.utils import templating
 
@@ -2580,7 +2599,7 @@ class KnowledgeBaseQueryNode(Node):
 
         self.report_progress("Synthesizing answer from retrieved passages…")
         answer = llm_chat_model(
-            model=self.data.get("model"),
+            model=self.model,
             prompt=instruction + f"QUESTION:\n{query}",
             data=passages,
             include_next_step=False,
@@ -2616,7 +2635,7 @@ class WebSearchNode(Node):
         super().__init__("WebSearch")
         self.data = data
 
-    def _result(self, output, inputs, *, warning=None, sources=None, error=None):
+    def _result(self, output: object, inputs: dict, *, warning: str | None=None, sources: list[dict] | None=None, error: str | None=None) -> dict:
         result = {"output": output, "input": inputs.get("output"), "step_name": self.name}
         if warning:
             result["warning"] = warning
@@ -2626,7 +2645,7 @@ class WebSearchNode(Node):
             result["retrieved_sources"] = sources
         return result
 
-    def process(self, inputs):
+    def process(self, inputs: dict) -> dict:
         from app.services import web_search_service
         from app.utils import templating
 
@@ -2654,6 +2673,7 @@ class WebSearchNode(Node):
             )
 
         self.report_progress(f"Searching the web: {query[:80]}")
+        warning: str | None
         found = web_search_service.web_search_sync(query, sys_cfg, max_results=max_results)
         results = found.get("results") or []
         if found.get("error") and not results:
@@ -2725,8 +2745,8 @@ class WorkflowStepError(Exception):
 class WorkflowEngine:
     def __init__(self) -> None:
         self.nodes: list[Node] = []
-        self.connections = []
-        self.graph = graphlib.TopologicalSorter()
+        self.connections: list[tuple[Node, Node]] = []
+        self.graph: graphlib.TopologicalSorter[Node] = graphlib.TopologicalSorter()
         self.usage = UsageAccumulator()
         self._topological_order: list[Node] | None = None
         # Distinct models the build assigned to model-using tasks, in order.
@@ -2755,8 +2775,8 @@ class WorkflowEngine:
         :meth:`get_topological_order`. See :func:`build_step_output_keys`."""
         return build_step_output_keys(self.get_topological_order())
 
-    def execute(self, workflow_result_updater=None, start_index=0, initial_output=None,
-                should_cancel=None, check_budget=None, prior_steps=None):
+    def execute(self, workflow_result_updater: Callable[[dict], None] | None=None, start_index: int=0, initial_output: dict | None=None,
+                should_cancel: Callable[[], bool] | None=None, check_budget: Callable[[], None] | None=None, prior_steps: list[dict] | None=None) -> tuple[str | dict | None, list[dict]]:
         """Execute workflow. Returns (final_output, step_data_list).
 
         Args:
@@ -2775,7 +2795,7 @@ class WorkflowEngine:
                 between steps keeps the stop honest — no truncated step output
                 is ever presented as complete.
         """
-        data = []
+        data: list[dict] = []
         nodes = self.get_topological_order()
         output_keys = self.step_output_keys()
         # Every finished step, for the "earlier_steps" source. A resumed pass
@@ -2818,14 +2838,18 @@ class WorkflowEngine:
                     step_inputs = {**(latest_output or {}), EARLIER_STEPS_KEY: list(earlier)}
                     if isinstance(node, MultiTaskNode):
                         for task in node.tasks:
-                            task.progress_reporter = (
-                                lambda detail=None, preview=None, step=node.name:
+                            def report_progress(
+                                detail: str | None = None, preview: object = None,
+                                *, step: str = node.name,
+                            ) -> None:
+                                if workflow_result_updater:
                                     workflow_result_updater({
                                         "current_step_name": step,
                                         "current_step_detail": detail,
                                         "current_step_preview": preview,
-                                    }) if workflow_result_updater else None
-                            )
+                                    })
+
+                            task.progress_reporter = report_progress
                     output = _process_tagged(node, step_inputs)
 
                 # Retry-on-empty / fallback-model. Optimizer-set hook: if the
@@ -2834,9 +2858,11 @@ class WorkflowEngine:
                 # transient model failures (rate limits, partial outages) that
                 # would otherwise silently degrade the trial.
                 if _should_retry_with_fallback(node, output):
-                    output = _retry_node_with_fallback(
+                    retried = _retry_node_with_fallback(
                         node, {**(latest_output or {}), EARLIER_STEPS_KEY: list(earlier)},
                     )
+                    if retried is not None:
+                        output = retried
 
             models = step_models(current_scope(), idx)
             if models and isinstance(output, dict):
@@ -2889,7 +2915,7 @@ class WorkflowEngine:
         final_value = self._format_final_output(display_value)
         return final_value, data
 
-    def _format_final_output(self, value):
+    def _format_final_output(self, value: object) -> str | dict:
         if value is None:
             return ""
         if isinstance(value, list):
@@ -2960,7 +2986,7 @@ def _output_looks_empty_or_error(output: dict | None) -> bool:
     return False
 
 
-def _should_retry_with_fallback(node, output: dict | None) -> bool:
+def _should_retry_with_fallback(node: Node, output: dict | None) -> bool:
     """Decide whether to retry this node with its fallback model.
 
     Returns True only when:
@@ -3001,7 +3027,7 @@ def _should_retry_with_fallback(node, output: dict | None) -> bool:
     return _output_looks_empty_or_error(output)
 
 
-def _retry_node_with_fallback(node, prev_output: dict) -> dict:
+def _retry_node_with_fallback(node: Node, prev_output: dict) -> dict | None:
     """Mutate the node's task to use its fallback model and re-run process().
 
     The mutation is intentionally permanent on the task instance — re-running
@@ -3013,7 +3039,7 @@ def _retry_node_with_fallback(node, prev_output: dict) -> dict:
     data = getattr(task, "data", None) or {}
     fallback = data.get("_fallback_model")
     if not fallback:
-        return None  # type: ignore[return-value]
+        return None
     original_model = data.get("model")
     data["model"] = fallback
     logger.info(
@@ -3123,7 +3149,9 @@ def build_workflow_engine(
             an optimizer model swap. Set for a run started on a named model.
     """
     engine = WorkflowEngine()
-    nodes = []
+    nodes: list[Node] = []
+    node: Node
+    n: Node
 
     # Resolve overrides to a flat {step_name: override_dict} map. The optimizer
     # writes ``step_overrides`` as a dict keyed by sanitized OR human-readable
@@ -3143,7 +3171,7 @@ def build_workflow_engine(
             node = DocumentNode(step_data)
             nodes.append(node)
         else:
-            tasks = []
+            tasks: list[Node] = []
             for task in step.get("tasks", []):
                 task_name = task.get("name", "")
                 task_data = task.get("data", {})

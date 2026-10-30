@@ -16,7 +16,7 @@ from .catalog import CourseCatalogError
 from .enrollments import EnrollmentConflict
 from .lab_execution import LabExecutionRepository
 from .lab_inputs import LabInputRepository
-from .outcomes import package_outcomes
+from .outcomes import require_package_outcomes
 from .practical_evidence import EvidenceAssemblyUnavailable
 from .workflow_design_case import load_workflow_design_case
 from .workflow_design_submissions import WorkflowDesignSubmissionRepository
@@ -106,7 +106,7 @@ async def assemble_workflow_design(operation: CourseOperation, submission_id, *,
             'submitted_at': saved['submitted_at'], 'submission_channel': saved['submission_channel'],
             'question': question.model_dump(mode='json'), 'answer': saved['submission']['answers'][question.id]})
     try:
-        _, checked, _ = review_packet(package_outcomes(operation.package), case.module_id, evidence)
+        _, checked, _ = review_packet(require_package_outcomes(operation.package), case.module_id, evidence)
     except (ValueError, TypeError) as exc:
         raise EvidenceAssemblyUnavailable('The saved design cannot fit the review packet; nothing was truncated') from exc
     await LabInputRepository._check_lease(lease)

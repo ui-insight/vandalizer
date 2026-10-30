@@ -4,6 +4,13 @@ Only tool-free structured review is eligible. Execution, provisioning and earned
 credit operations cannot use this recovery. A late provider result loses its CAS;
 recovery does not claim the provider call was cancelled.
 """
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .review_attempts import ReviewAttemptRepository
+
 import datetime
 from uuid import NAMESPACE_URL, uuid5
 
@@ -28,7 +35,7 @@ def expired(value: object, now: datetime.datetime) -> bool:
     return value.replace(tzinfo=datetime.timezone.utc) <= now
 
 
-async def bind_review_worker(saved, lease):
+async def bind_review_worker(saved: dict, lease: WriteLease) -> dict:
     selections = CertificationEnrollmentSelection.get_motor_collection()
     current = await selections.find_one(lease.selection_filter())
     marker = (current or {}).get('active_write') or {}
@@ -53,7 +60,7 @@ class ReviewRecovery:
     def __init__(self, repository: EnrollmentRepository) -> None:
         self.repository = repository
 
-    async def reconcile(self, user_id: str, enrollment_id: str, attempt_id: str):
+    async def reconcile(self, user_id: str, enrollment_id: str, attempt_id: str) -> dict:
         from .review_attempts import ReviewAttemptRepository
         repo, reviews = self.repository, ReviewAttemptRepository()
         enrollment = await repo._enrollment(user_id, enrollment_id)
@@ -91,7 +98,7 @@ class ReviewRecovery:
                 {'$set': {'active_write': replacement}})
             if changed.modified_count != 1:
                 # Normal cleanup or another recovery won. Re-read, never erase a later writer.
-                return await reviews.get(user_id, attempt_id)
+                return await reviews.require_saved(user_id, attempt_id)
             marker, recovering = replacement, True
         if recovering:
             original = marker['original_write_id']
@@ -103,7 +110,7 @@ class ReviewRecovery:
             if fenced.matched_count != 1:
                 latest = await repo.selections.find_one({'user_id': user_id, 'active_enrollment_id': enrollment_id})
                 if ((latest or {}).get('last_automatic_review_recovery') or {}).get('recovery_id') == marker['id']:
-                    return await reviews.get(user_id, attempt_id)
+                    return await reviews.require_saved(user_id, attempt_id)
                 raise EnrollmentConflict('Progress ownership changed during automatic review recovery')
             await self._finish_interrupted(reviews, raw, now, original)
             receipt = {'attempt_id': attempt_id, 'original_write_id': original, 'recovery_id': marker['id'],
@@ -118,10 +125,10 @@ class ReviewRecovery:
             if marker.get('id') == raw.get('worker_id'):
                 raise EnrollmentConflict('This grading worker has no recognized recoverable boundary')
             await self._finish_interrupted(reviews, raw, now, raw['worker_id'])
-        return await reviews.get(user_id, attempt_id)
+        return await reviews.require_saved(user_id, attempt_id)
 
     @staticmethod
-    async def _finish_interrupted(reviews, raw, now, original_worker) -> None:
+    async def _finish_interrupted(reviews: ReviewAttemptRepository, raw: dict, now: datetime.datetime, original_worker: str) -> None:
         saved = reviews.decode(raw)
         if saved['state'] not in ('prepared', 'evaluating'):
             return  # A terminal result racing recovery always wins.

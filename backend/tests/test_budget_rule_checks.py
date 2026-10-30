@@ -167,7 +167,7 @@ def test_disabled_rules_and_no_rules_produce_no_checks():
 @patch("app.services.workflow_engine.data_extraction_model")
 def test_the_extraction_step_attaches_the_checks(mock_extract):
     mock_extract.return_value = {"raw": [dict(CORRECT)], "formatted": "…"}
-    node = ExtractionNode({"searchphrases": list(CORRECT), "cross_field_rules": _seed_rules()})
+    node = ExtractionNode({"model": "test-model", "searchphrases": list(CORRECT), "cross_field_rules": _seed_rules()})
     out = node.process({"output": ["doc-1"], "step_name": "Document"})
     (block,) = out["rule_checks"]
     assert {r["status"] for r in block["results"]} == {"pass"}
@@ -178,7 +178,7 @@ def test_the_extraction_step_attaches_the_checks(mock_extract):
 @patch("app.services.workflow_engine.data_extraction_model")
 def test_an_extraction_without_rules_keeps_its_output_shape(mock_extract):
     mock_extract.return_value = {"raw": [dict(CORRECT)], "formatted": "…"}
-    out = ExtractionNode({"searchphrases": list(CORRECT)}).process({"output": ["doc-1"], "step_name": "Document"})
+    out = ExtractionNode({"model": "test-model", "searchphrases": list(CORRECT)}).process({"output": ["doc-1"], "step_name": "Document"})
     assert "rule_checks" not in out
 
 

@@ -108,13 +108,13 @@ def test_worker_applies_snapshot_only_to_writing_steps_and_preserves_it_on_resum
 def test_writing_nodes_use_context_as_guidance_without_turning_it_into_source_text():
     brief = {'text': 'Use plain language for reviewers'}
     with patch('app.services.workflow_engine.llm_chat_model', return_value='Draft') as model:
-        node = PromptNode({'prompt': 'Summarize this source', 'project_context': brief})
+        node = PromptNode({'model': 'test-model', 'prompt': 'Summarize this source', 'project_context': brief})
         node.process({'output': 'Source fact', 'step_name': 'Previous'})
         assert 'Use plain language' in model.call_args.kwargs['prompt']
         assert 'explicit workflow step instructions' in model.call_args.kwargs['prompt']
         assert 'Use plain language' not in str(model.call_args.kwargs['data'])
     with patch('app.services.workflow_engine.format_model', return_value=('', 'Formatted')) as model:
-        FormatNode({'format_template': 'Use bullets', 'project_context': brief}).process({'output': 'Source fact', 'step_name': 'Previous'})
+        FormatNode({'model': 'test-model', 'format_template': 'Use bullets', 'project_context': brief}).process({'output': 'Source fact', 'step_name': 'Previous'})
         assert 'Use plain language' in model.call_args.args[1]
         assert 'Use plain language' not in str(model.call_args.args[2])
 

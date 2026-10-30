@@ -41,7 +41,7 @@ def validate_event(event, previous, run) -> None:
         data = plan['engine_steps'][index + 1]['tasks'][0]['data']
         sources = stage['effective_input_sources']
         if stage['task_type'] == 'Extraction':
-            expected = {'kind': 'extraction_documents', 'documents': [{'text': text, 'metadata': metadata}
+            expected: dict[str, object] = {'kind': 'extraction_documents', 'documents': [{'text': text, 'metadata': metadata}
                 for text, metadata in _build_extraction_inputs(data, upstream, sources)]}
         else:
             history = saved_history(plan, [item['receipt']['result'] for item in previous[1::2]])

@@ -1106,7 +1106,7 @@ def create_chat_agent(
     system_prompt: str | None = None,
     thinking_override: Optional[bool] = None,
     system_config_doc: dict | None = None,
-) -> Agent:
+) -> Agent[None, str]:
     # Always build fresh: cached Agents carry an httpx pool bound to whichever
     # event loop first used them, and Celery's sync wrapper creates a new loop
     # per pydantic-ai run_sync() call — causing silent retries on every call.
