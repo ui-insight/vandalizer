@@ -57,6 +57,7 @@ from app.services.kb_answer_grounding import (
     used_snippet_refs,
 )
 from app.services.silence_inference import inferences_from_silence
+from app.services.tool_call_markup import UNFINISHED_NOTE, MarkupHoldback
 from app.services.model_routing import (
     RoutingDecision,
     choose_document_model,
@@ -2426,7 +2427,8 @@ async def chat_stream(
         # A Stop that arrived after the previous turn already finished must
         # not label this one.
         await _consume_stop_request(conversation)
-        think_parser = _ThinkTagParser()
+        # A tool call the model wrote out as text never streams as the answer.
+        think_parser = MarkupHoldback(_ThinkTagParser())
 
         iter_kwargs: dict = {
             "message_history": previous_messages,
@@ -2602,6 +2604,11 @@ async def chat_stream(
                 # it never prepared; if the reply still does, say so instead of
                 # leaving the user hunting for the button.
                 note = unprepared_card_note("".join(full_response), deps)
+                # Still a tool call written as text once the run had no
+                # retry left: the markup was held back, so say why there
+                # is no answer.
+                if not note and think_parser.ended_in_markup:
+                    note = ("\n\n" if "".join(full_response).strip() else "") + UNFINISHED_NOTE
                 if note:
                     full_response.append(note)
                     if streamed_segments and streamed_segments[-1].get("kind") == "text":

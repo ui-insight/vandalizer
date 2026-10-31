@@ -1217,6 +1217,12 @@ def create_agentic_chat_agent(
                     or tool_fn.__name__ not in PARALLEL_SAFE_TOOLS
                 ),
             )
+        # A tool call written out as text (gpt-oss chat markup) ran nothing;
+        # send it back while the run has a retry left. First, so the checks
+        # below never spend that retry on markup.
+        from app.services.tool_call_markup import require_no_tool_call_markup
+
+        agent.output_validator(require_no_tool_call_markup)
         # "Click the Create workflow button" with no tool call leaves the user
         # hunting for a card that never rendered, and "Running a preview of…"
         # with no tool call leaves the chat stopped; send either reply back once.
