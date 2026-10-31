@@ -8,7 +8,7 @@ import io
 import logging
 import os
 import re
-from collections import Counter
+import unicodedata
 from collections.abc import Callable
 from datetime import date, datetime, time
 from typing import NoReturn
@@ -409,7 +409,7 @@ def _form_page_reading(page, lines=None) -> tuple[str, list[tuple[str, str]]] | 
     return "\n".join(out) + "\n", texts
 
 
-def _page_text_with_table_rows(page) -> str:
+def _page_text_with_table_rows(page, lines=None) -> str:
     """PyMuPDF's page text, with each table row kept on one line.
 
     ``get_text("text")`` emits a borderless table one cell per line, so the
@@ -433,7 +433,8 @@ def _page_text_with_table_rows(page) -> str:
     apart, which is read in visual order instead (``_form_page_reading``).
     """
     plain = page.get_text("text")
-    lines = _page_lines(page)
+    if lines is None:
+        lines = _page_lines(page)
     if not lines:
         return plain
     form = _form_page_reading(page, lines)
@@ -484,9 +485,10 @@ def _page_text_with_table_rows(page) -> str:
     return "\n".join(out) + "\n"
 
 
-def _pymupdf_page_text(page) -> str:
-    """One page's text layer via PyMuPDF, with any filled form fields."""
-    page_text = _page_text_with_table_rows(page)
+def _pymupdf_page_text(page, lines=None) -> str:
+    """One page's text layer via PyMuPDF, with any filled form fields.
+    ``lines``, when given, are the page's ``_page_lines``."""
+    page_text = _page_text_with_table_rows(page, lines)
     field_lines: list[str] = []
     for widget in page.widgets() or []:
         value = (widget.field_value or "").strip()
@@ -1707,25 +1709,128 @@ _LETTER_WORD_RE = re.compile(r"[^\W\d_]{3,}")
 
 
 def _reads_the_same_words(markdown: str, reading: str) -> bool:
-    """Whether PyMuPDF's reading of a page has nine in ten of the words
-    pdf-inspector's Markdown has. A font PyMuPDF decodes to glyph IDs — a
-    subaward's ")'3&RVW5HLPEXUVHPHQW" for "FDP Cost Reimbursement" — reads
-    as gibberish there, and the Markdown must stand."""
-    md = Counter(w.lower() for w in _LETTER_WORD_RE.findall(markdown))
-    rd = Counter(w.lower() for w in _LETTER_WORD_RE.findall(reading))
-    total = sum(md.values())
-    return total > 0 and sum((md & rd).values()) >= 0.9 * total
+    """Whether PyMuPDF's reading of a page has nine in ten of the distinct
+    words pdf-inspector's Markdown has. A font PyMuPDF decodes to glyph IDs —
+    a subaward's ")'3&RVW5HLPEXUVHPHQW" for "FDP Cost Reimbursement" — reads
+    as gibberish there, and the Markdown must stand. Distinct words, not
+    counts: Markdown that prints a block twice, as an NSF notice's personnel
+    rows came out once as prose and again as a table, holds more of each
+    word than the page does."""
+    md = {w.lower() for w in _LETTER_WORD_RE.findall(markdown)}
+    rd = {w.lower() for w in _LETTER_WORD_RE.findall(reading)}
+    return bool(md) and len(md & rd) >= 0.9 * len(md)
+
+
+# A Markdown table row, and a field name the way pdf-inspector writes a form's.
+_MD_TABLE_ROW_RE = re.compile(r"^\|", re.MULTILINE)
+_MD_BOLD_LABEL_RE = re.compile(r"\*\*[^*\n]{1,60}:\*\*")
+# Markup around the words of a fast-path page: a link's target, which repeats
+# its text, and HTML tags such as <u> (not an address in angle brackets).
+_MD_LINK_TARGET_RE = re.compile(r"\]\([^)]*\)")
+_HTML_TAG_RE = re.compile(r"</?[A-Za-z][A-Za-z0-9]*(?:\s[^<>]*)?/?>")
+# A page whose Markdown keeps at most _MARKDOWN_MAX_BONDS_KEPT of its layout
+# bonds (_layout_bonds), where PyMuPDF's reading keeps at least
+# _READING_MIN_BONDS_KEPT, is read by PyMuPDF. With fewer than
+# _MIN_LAYOUT_BONDS bonds the share says too little about the page.
+_MIN_LAYOUT_BONDS = 15
+_MARKDOWN_MAX_BONDS_KEPT = 0.75
+_READING_MIN_BONDS_KEPT = 0.95
+# Letters and digits a reading may hold between a label and its figure and
+# still keep them together: the last line of a wrapped label ("Count").
+_PAIR_GAP = 12
+
+
+def _may_read_across(markdown: str) -> bool:
+    """Whether a fast-path page's Markdown looks like a form's: a table, or
+    two or more bold "Label:" fields. pdf-inspector reads such a page in
+    rows, and where the page stacks its fields in columns instead the rows
+    it makes cut across them. Only such a page is checked against its layout
+    (see ``_may_be_scattered`` on the cost)."""
+    return bool(_MD_TABLE_ROW_RE.search(markdown)) or len(_MD_BOLD_LABEL_RE.findall(markdown)) >= 2
+
+
+def _letters_and_digits(text: str, *, markdown: bool = False) -> str:
+    """``text`` as its NFKC-folded letters and digits alone. Emphasis, table
+    pipes, line breaks, a hyphen at a line's end and a superscript footnote
+    mark (¹⁰ for 10) differ between Markdown and PyMuPDF's text without the
+    reading differing."""
+    if markdown:
+        text = _HTML_TAG_RE.sub(" ", _MD_LINK_TARGET_RE.sub("]", text))
+    return "".join(ch for ch in unicodedata.normalize("NFKC", text).casefold() if ch.isalnum())
+
+
+def _layout_bonds(lines: list[dict]) -> list[tuple[str, str, int]]:
+    """What a page shows together, as (first, second, gap): two lines the
+    content stream writes one after the other, one right under the other in
+    one column — a wrapped label, a contact's name over their email — and
+    each figure with the label beside it on its row (``_value_links``). A
+    reading keeps a bond when the second text follows the first with at
+    most ``gap`` letters and digits between. A column of figures is a
+    table's, read across its rows, so figures stacked on figures are not
+    bonds."""
+    bonds: list[tuple[str, str, int]] = []
+    for above, below in zip(lines, lines[1:]):
+        if _is_form_value(above["text"]) or _is_form_value(below["text"]):
+            continue
+        h = min(above["h"], below["h"])
+        if not above["y1"] - 0.3 * h <= below["y0"] <= above["y1"] + 0.8 * h:
+            continue
+        if min(above["x1"], below["x1"]) <= max(above["x0"], below["x0"]):
+            continue
+        bonds.append((above["text"], below["text"], 0))
+    bonds.extend(
+        (lines[lab]["text"], lines[val]["text"], _PAIR_GAP)
+        for lab, val, is_label in _value_links(lines) if is_label
+    )
+    return bonds
+
+
+def _bonds_kept(text: str, bonds: list[tuple[str, str, int]], *, markdown: bool = False) -> float | None:
+    """Share of ``bonds`` that ``text`` keeps; None for fewer than
+    _MIN_LAYOUT_BONDS of them with letters or digits in both texts."""
+    flat = _letters_and_digits(text, markdown=markdown)
+    counted = kept = 0
+    for first, second, gap in bonds:
+        a, b = _letters_and_digits(first), _letters_and_digits(second)
+        if not a or not b:
+            continue
+        counted += 1
+        at = flat.find(a)
+        while at != -1:
+            end = at + len(a)
+            if flat.find(b, end, end + gap + len(b)) != -1:
+                kept += 1
+                break
+            at = flat.find(a, at + 1)
+    if counted < _MIN_LAYOUT_BONDS:
+        return None
+    return kept / counted
 
 
 def _fast_path_page_texts(pdf_path: str, result, skip=()) -> dict[int, str]:
     """0-indexed page -> pdf-inspector's Markdown for it, but a form page
-    whose Markdown parts most of its labels from their values (see
-    ``_form_page_reading``) is read in visual order instead: on the BLM
-    Notice of Award the Markdown listed budget lines a–n with no figures.
+    whose Markdown parts what the page shows together is read by PyMuPDF
+    instead, when that reading has the Markdown's words:
+
+    - one whose Markdown parts most of its labels from their values while
+      the content stream does too (see ``_form_page_reading``) is read in
+      visual order: on the BLM Notice of Award the Markdown listed budget
+      lines a–n with no figures;
+    - one whose Markdown breaks a quarter or more of the bonds its layout
+      shows (``_layout_bonds``) while PyMuPDF's reading keeps them is read
+      as the stream writes it. On NSF award notices the Markdown printed the
+      contact table's phone numbers below it in reverse column order, listed
+      every budget label and then every figure, ran three budget lines and
+      their figures into one row, and split a collaborative table's names
+      from their institutions; the stream wrote each contact, each budget
+      line and each table row whole.
+
     Pages in ``skip`` are left out. Never raises; on any error the Markdown
     stands."""
     texts = {p.page: p.markdown or "" for p in result.pages if p.page not in skip}
-    suspects = [n for n, markdown in texts.items() if _may_be_scattered(markdown)]
+    suspects = [
+        n for n, markdown in texts.items() if _may_be_scattered(markdown) or _may_read_across(markdown)
+    ]
     if not suspects:
         return texts
     try:
@@ -1733,18 +1838,28 @@ def _fast_path_page_texts(pdf_path: str, result, skip=()) -> dict[int, str]:
 
         with pymupdf.open(pdf_path) as doc:
             for n in suspects:
-                markdown = texts[n]
-                form = _form_page_reading(doc[n])
-                if (
-                    form is not None
-                    and _pairs_kept(markdown, form[1]) < 0.5
-                    and _reads_the_same_words(markdown, form[0])
-                ):
+                markdown, page = texts[n], doc[n]
+                lines = _page_lines(page)
+                form = _form_page_reading(page, lines)
+                if form is not None:
+                    if _pairs_kept(markdown, form[1]) >= 0.5:
+                        continue
+                    reading, how = _pymupdf_page_text(page, lines), "separates labels from values"
+                else:
+                    bonds = _layout_bonds(lines)
+                    share = _bonds_kept(markdown, bonds, markdown=True)
+                    if share is None or share > _MARKDOWN_MAX_BONDS_KEPT:
+                        continue
+                    reading = _pymupdf_page_text(page, lines)
+                    if (_bonds_kept(reading, bonds) or 0.0) < _READING_MIN_BONDS_KEPT:
+                        continue
+                    how = f"keeps {share:.0%} of what its layout shows together"
+                if _reads_the_same_words(markdown, reading):
                     logger.info(
-                        "Page %d of %s is a form whose Markdown separates labels from "
-                        "values; reading it in visual order", n + 1, pdf_path,
+                        "Page %d of %s is a form whose Markdown %s; reading it with PyMuPDF",
+                        n + 1, pdf_path, how,
                     )
-                    texts[n] = _pymupdf_page_text(doc[n])
+                    texts[n] = reading
     except Exception as e:  # noqa: BLE001 — the fast path's own reading stands
         logger.warning("Could not check %s for scattered form pages: %s", pdf_path, e)
     return texts
