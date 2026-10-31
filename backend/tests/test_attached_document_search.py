@@ -382,6 +382,25 @@ class TestSearchAttachedDocuments:
         assert {d["title"] for d in result["documents_searched"]} == {"SETO_FOA.pdf", "CINR.pdf"}
 
 
+class TestDatabaseTimeouts:
+    """Both tools load documents with find_one; a Mongo timeout there must not end the turn."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("tool, args", [
+        (get_document_text, ("foa-1",)),
+        (search_attached_documents, ("Topic 3.4 award amount",)),
+    ])
+    async def test_a_timeout_comes_back_as_a_tool_error(self, tool, args):
+        from pymongo.errors import NetworkTimeout
+
+        with patch("app.services.chat_tools.SmartDocument") as MockDoc:
+            MockDoc.find_one = AsyncMock(side_effect=NetworkTimeout("mongo:27017: timed out"))
+            result = await tool(_ctx(), *args)
+
+        assert result["error"] == f"{tool.__name__} timed out waiting for the database."
+        assert "Do not repeat the same call" in result["hint"]
+
+
 class TestToolDescriptions:
     def test_the_search_tool_is_registered_as_a_read(self):
         names = {t.__name__ for t in chat_tools.TOOLS}

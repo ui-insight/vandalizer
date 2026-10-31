@@ -1929,6 +1929,7 @@ def read_document_range(
     return result
 
 
+@db_timeouts_as_tool_errors
 async def get_document_text(
     context: RunContext[AgenticChatDeps],
     document_uuid: str,
@@ -2108,6 +2109,7 @@ def _overlaps(a, b) -> bool:
     return a.start < b.end and b.start < a.end
 
 
+@db_timeouts_as_tool_errors
 async def search_attached_documents(
     context: RunContext[AgenticChatDeps],
     query: str,
