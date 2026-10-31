@@ -526,9 +526,9 @@ async def search_documents(
     """Find FILES in the user's whole workspace by title (fast) or full content (slow).
 
     This finds which files exist, not passages: it never searches inside the
-    documents attached to this chat. To find a fact, a figure or a section in
-    an attached document (or in pages a long one's cut note says were left
-    out), call search_attached_documents instead.
+    documents attached to this chat. An attached document with no cut note is
+    all in your context already; for pages a long one's cut note says were
+    left out, use the search that note names.
 
     Args:
         context: The call context.
@@ -1947,9 +1947,9 @@ async def get_document_text(
     context (an attached document's text, or an earlier read this turn) are
     skipped rather than sent again.
 
-    To find where something is in an attached document, call
-    search_attached_documents first and read around the pages it returns;
-    guessing page ranges is slow. For a long solicitation or award, read the
+    To find where something is in an attached document that was cut to fit,
+    search it first with the tool its cut note names and read around the
+    pages that returns; guessing page ranges is slow. For a long solicitation or award, read the
     pages that matter (budget, eligibility, required attachments, terms)
     before answering, and never describe pages you have not read.
 
@@ -7252,3 +7252,26 @@ PARALLEL_SAFE_TOOLS: frozenset[str] = COMPACTABLE_TOOLS | frozenset({
     "get_workflow_status",
     "get_optimization_run",
 })
+
+
+async def _only_when_an_attached_document_was_cut(context: RunContext[AgenticChatDeps], tool_def):
+    """Offer the in-document search only on a turn where an attached
+    document was cut to fit.
+
+    Full attached-document eval (2026-10-30): with every document sent whole,
+    the agent still searched them on 27% of turns, got back "already in your
+    context" pointers, and the slowest tenth of turns took twice as long.
+    """
+    held = getattr(context.deps, "documents_in_context", None)
+    if not isinstance(held, dict):
+        return None
+    attached = getattr(context.deps, "context_document_uuids", None) or []
+    cut = any(isinstance(held.get(uuid), DocumentContext) and not held[uuid].whole for uuid in attached)
+    return tool_def if cut else None
+
+
+# pydantic-ai ``prepare`` functions, by tool name: run before each model
+# request, they return the tool's definition to offer it or None to hide it.
+TOOL_PREPARE = {
+    "search_attached_documents": _only_when_an_attached_document_was_cut,
+}

@@ -4793,8 +4793,8 @@ def _build_open_documents_block(
         "",
         "For documents below, use their UUIDs directly for tools like "
         "run_extraction or get_document_text — do NOT call search_documents to "
-        "look them up. To find a passage, figure or section inside them, call "
-        "search_attached_documents: search_documents only finds other files by "
+        "look them up. To find a passage in one that was cut to fit, use the "
+        "search its cut note names: search_documents only finds other files by "
         "title.",
         "",
         "These documents are what the user is working on — usually the file "

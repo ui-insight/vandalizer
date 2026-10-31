@@ -1180,7 +1180,7 @@ def create_agentic_chat_agent(
     prefix between turns and defeating the provider prompt cache.
     """
     from app.services.chat_deps import AgenticChatDeps
-    from app.services.chat_tools import PARALLEL_SAFE_TOOLS, TOOLS
+    from app.services.chat_tools import PARALLEL_SAFE_TOOLS, TOOL_PREPARE, TOOLS
 
     # Parallel tool execution (uplift plan Phase 7). pydantic-ai runs a
     # response's tool calls concurrently by default; we make that fail-closed
@@ -1216,6 +1216,7 @@ def create_agentic_chat_agent(
                     not parallel_enabled
                     or tool_fn.__name__ not in PARALLEL_SAFE_TOOLS
                 ),
+                prepare=TOOL_PREPARE.get(tool_fn.__name__),
             )
         # A tool call written out as text (gpt-oss chat markup) ran nothing;
         # send it back while the run has a retry left. First, so the checks
@@ -1414,8 +1415,9 @@ AGENTIC_CHAT_SYSTEM_PROMPT = (
     "their documents ('NSF equipment threshold', not 'equipment on Smith award 2214553').\n\n"
     "## When to use tools\n"
     "- User asks about their documents or files → search_documents or list_documents\n"
-    "- A fact, figure or section inside a document attached to this chat, or in pages "
-    "a cut note says were left out → search_attached_documents, then get_document_text "
+    "- A fact, figure or section inside a document attached to this chat: a document "
+    "with no cut note is all in front of you, so answer from it without a tool. In pages "
+    "a cut note says were left out → the search that note names, then get_document_text "
     "around the pages it returns. Never search_documents for this: it matches file "
     "titles across the workspace, not text inside the attached documents.\n"
     "- User names a file ('run X on budget.pdf') → search_documents for that name, "
@@ -2089,14 +2091,15 @@ DOCUMENT_CHAT_RULES = (
     + _CUT_NOTE_RULE + "\n"
     "## Documents cut to fit\n"
     "- A document with a cut note was too long to send whole: the pages you see are "
-    "only part of it. Before answering a question about its content, call "
-    "search_attached_documents with the question's key terms (topic or section "
+    "only part of it. Before answering a question about its content, call the "
+    "search its cut note names with the question's key terms (topic or section "
     "numbers, defined terms), even when the pages you have seem to answer: a "
     "specific section in the left-out pages can override a general statement you "
     "can see. Never say such a document does not state something you have not "
     "searched for.\n"
-    "- To find anything inside the attached documents use search_attached_documents, "
-    "not search_documents, which only finds other files by title.\n"
+    "- A document with no cut note was sent whole: answer from it, without searching "
+    "it. Never use search_documents to look inside an attached document: it only finds "
+    "other files by title.\n"
     "## Check before answering\n"
     "Before answering, check whether this document actually states the specific "
     "thing being asked for.\n"

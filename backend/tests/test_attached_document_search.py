@@ -12,6 +12,7 @@ search inside the attached documents, and tool results never resend what the
 model holds and never outgrow the room the window has left.
 """
 
+import inspect
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -28,6 +29,7 @@ from app.services.context_budget import (
     CUT_NOTE_PREFIX,
     DocumentSegment,
     ToolResultBudget,
+    _pages_cut_note,
     plan_and_compact_context,
 )
 from app.services.doc_passages import (
@@ -401,6 +403,65 @@ class TestDatabaseTimeouts:
         assert "Do not repeat the same call" in result["hint"]
 
 
+class TestOfferedOnlyWhenCut:
+    """Full eval (2026-10-30): offered on every turn, the search ran on 27% of
+    turns whose documents were all sent whole, and found only what was there."""
+
+    PREPARE = staticmethod(chat_tools.TOOL_PREPARE["search_attached_documents"])
+
+    @pytest.mark.asyncio
+    async def test_hidden_when_every_attached_document_went_whole(self):
+        ctx = _ctx(attached=("a", "b"), held={"a": DocumentContext(whole=True), "b": DocumentContext(whole=True)})
+        assert await self.PREPARE(ctx, "tool-def") is None
+
+    @pytest.mark.asyncio
+    async def test_offered_when_one_attached_document_was_cut(self):
+        ctx = _ctx(attached=("a", "b"), held={"a": DocumentContext(whole=True), "b": DocumentContext(pages={1, 2})})
+        assert await self.PREPARE(ctx, "tool-def") == "tool-def"
+
+    @pytest.mark.asyncio
+    async def test_a_workspace_document_read_this_turn_does_not_count(self):
+        ctx = _ctx(attached=("a",), held={"a": DocumentContext(whole=True), "other": DocumentContext(pages={3})})
+        assert await self.PREPARE(ctx, "tool-def") is None
+
+    @pytest.mark.asyncio
+    async def test_hidden_outside_a_chat_turn(self):
+        ctx = SimpleNamespace(deps=SimpleNamespace(context_document_uuids=["a"]), messages=[])
+        assert await self.PREPARE(ctx, "tool-def") is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("held, offered", [
+        ({"foa-1": DocumentContext(whole=True)}, False),
+        ({"foa-1": DocumentContext(pages={1, 2, 3})}, True),
+    ])
+    async def test_the_model_sees_it_only_on_a_cut_turn(self, monkeypatch, held, offered):
+        from pydantic_ai.models.function import AgentInfo, FunctionModel
+
+        from app.services import llm_service
+
+        seen: set = set()
+
+        async def model(messages, info: AgentInfo):
+            seen.update(t.name for t in info.function_tools)
+            yield "ok"
+
+        monkeypatch.setattr(llm_service, "get_agent_model", lambda *a, **k: FunctionModel(stream_function=model))
+        llm_service._agentic_chat_agent_cache.clear()
+        try:
+            agent = llm_service.create_agentic_chat_agent("unit-test-model", system_config_doc={})
+            deps = SimpleNamespace(
+                conversation=SimpleNamespace(pending_confirmations=[]), turn_marker=1, queued_user_parts=[],
+                context_document_uuids=["foa-1"], documents_in_context=dict(held),
+            )
+            async with agent.run_stream("hi", deps=deps) as result:
+                await result.get_output()
+        finally:
+            llm_service._agentic_chat_agent_cache.clear()
+
+        assert ("search_attached_documents" in seen) is offered
+        assert "get_document_text" in seen
+
+
 class TestToolDescriptions:
     def test_the_search_tool_is_registered_as_a_read(self):
         names = {t.__name__ for t in chat_tools.TOOLS}
@@ -410,4 +471,17 @@ class TestToolDescriptions:
     def test_search_documents_says_it_finds_files_by_title_not_passages(self):
         doc = chat_tools.search_documents.__doc__
         assert "by title" in doc and "never searches inside" in doc
-        assert "search_attached_documents" in doc
+        assert "cut note" in doc
+
+    def test_only_cut_notes_name_the_search(self):
+        """Fix re-run (2026-10-30): with the tool hidden, text present on every
+        turn that named it led the model to call it 29 times ("Unknown tool")."""
+        from app.services import llm_service
+        from app.services.chat_service import _build_open_documents_block
+
+        always_there = [llm_service.DOCUMENT_CHAT_RULES, llm_service.AGENTIC_CHAT_SYSTEM_PROMPT,
+                        inspect.getsource(_build_open_documents_block)]
+        always_there += [t.__doc__ or "" for t in chat_tools.TOOLS if t.__name__ != "search_attached_documents"]
+        assert not [text[:80] for text in always_there if "search_attached_documents" in text]
+        assert "search_attached_documents" in _DOCUMENT_CUT_MARKER
+        assert "search_attached_documents" in _pages_cut_note(4, 9)
