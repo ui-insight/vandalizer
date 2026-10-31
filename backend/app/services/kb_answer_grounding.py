@@ -50,17 +50,16 @@ _PERCENT_RE = re.compile(
 )
 
 
+def _money_value(m: re.Match) -> float:
+    whole, frac, scale = m.group(1), m.group(2) or "", m.group(3)
+    value = float(whole.replace(",", "") + frac)
+    return value * _SCALES[scale.lower()] if scale else value
+
+
 def _money_values(text: str) -> dict[float, str]:
     out: dict[float, str] = {}
     for m in _MONEY_RE.finditer(text):
-        whole, frac, scale = m.group(1), m.group(2) or "", m.group(3)
-        try:
-            value = float(whole.replace(",", "") + frac)
-        except ValueError:
-            continue
-        if scale:
-            value *= _SCALES[scale.lower()]
-        out.setdefault(round(value, 2), m.group(0).strip())
+        out.setdefault(round(_money_value(m), 2), m.group(0).strip())
     return out
 
 
@@ -152,25 +151,95 @@ def _percent_values(text: str) -> dict[float, str]:
     return out
 
 
+# A number an answer divides or multiplies by, either side of the sign:
+# "$5,040 ÷ 48", "$210,000 / 30 participants", "12 × $500". A "/" counts only
+# with a space after it, so a date ("10/29") is not a division.
+_FACTOR_RE = re.compile(
+    r"(?:[÷×]|/(?=\s))[\s`*_]*\$?\s?(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?"
+    r"|(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?[\s`*_]*(?=[÷×]|/\s)"
+)
+
+
+def _tolerance(number: str) -> float:
+    """Half a unit in the last place *number* is written to ("43,956" → 0.5)."""
+    return 0.5 * 10 ** -len(number.partition(".")[2]) + 1e-9
+
+
+def _worked_figures(answer: str, supported: set[float]) -> set[tuple[str, float]]:
+    """The answer's figures that are arithmetic on figures the sources support.
+
+    "$2,100,000 − $525,000 = $1,575,000", "$5,040 ÷ 48 = $105 per library",
+    "$295,000 of the $1,180,000 award, 25%": not in any document, and not
+    recalled either. Attached-document eval (2026-10-29): of the figures still
+    flagged once documents were read as money, most were such arithmetic.
+
+    Kept narrow, so a recalled figure is not explained away by coincidence.
+    The operands are dollar amounts the answer states and the sources support.
+    A dollar figure may be the sum or difference of two of them, or one of
+    them divided or multiplied by a number the answer writes next to "÷", "×"
+    or "/". A percentage may be the ratio of two of them, one on its own line.
+    Each is matched to the precision the answer writes it in; a scaled
+    figure ("$1.6 million") is too coarse to match and stays unsupported.
+    Returned as ("$", value) and ("%", value) keys.
+    """
+    money = [(m, round(_money_value(m), 2)) for m in _MONEY_RE.finditer(answer)]
+    known = list(dict.fromkeys(value for _, value in money if value in supported))
+    if not known:
+        return set()
+    factors = [
+        float((g[0] or g[2]).replace(",", "") + (g[1] or g[3]))
+        for g in _FACTOR_RE.findall(answer)
+    ]
+    candidates = {a + b for i, a in enumerate(known) for b in known[i + 1:]}
+    candidates |= {abs(a - b) for i, a in enumerate(known) for b in known[i + 1:]}
+    candidates |= {a / n for a in known for n in factors if n}
+    candidates |= {a * n for a in known for n in factors}
+    worked: set[tuple[str, float]] = set()
+    for m, value in money:
+        if value in supported or m.group(3):
+            continue
+        tolerance = _tolerance(m.group(1) + (m.group(2) or ""))
+        if any(abs(c - value) <= tolerance for c in candidates):
+            worked.add(("$", value))
+    for m in _PERCENT_RE.finditer(answer):
+        start = answer.rfind("\n", 0, m.start()) + 1
+        end = answer.find("\n", m.end())
+        end = len(answer) if end == -1 else end
+        on_line = {value for mm, value in money if start <= mm.start() < end}
+        tolerance = _tolerance(m.group(1))
+        pct = float(m.group(1))
+        if any(
+            abs(100 * a / b - pct) <= tolerance
+            for a in known for b in known
+            if b and a != b and (a in on_line or b in on_line)
+        ):
+            worked.add(("%", round(pct, 4)))
+    return worked
+
+
 def unsupported_figures(answer: str, snippets: str) -> list[str]:
     """Dollar amounts and percentages in *answer* that *snippets* never state.
 
     Values are compared, not strings: "$1 million" in the answer is supported
     by "$1,000,000" in a snippet, and "15%" by "15 percent". A percentage is
     never supported by a dollar amount of the same number, or the reverse.
-    Returned in the answer's own wording, first occurrence, in order.
+    "$0" is how an answer says "none" (a budget writes it "0" or "-"), and
+    arithmetic the answer does on supported figures is supported too (see
+    ``_worked_figures``). Returned in the answer's own wording, first
+    occurrence, in order.
     """
     if not answer or not answer.strip():
         return []
     snippet_money = set(_money_values(snippets or ""))
     snippet_pct = set(_percent_values(snippets or ""))
+    worked = _worked_figures(answer, snippet_money)
     missing = [
         label for value, label in _money_values(answer).items()
-        if value not in snippet_money
+        if value not in snippet_money and value != 0 and ("$", value) not in worked
     ]
     missing += [
         label for value, label in _percent_values(answer).items()
-        if value not in snippet_pct
+        if value not in snippet_pct and ("%", value) not in worked
     ]
     order = {label: answer.find(label) for label in missing}
     return sorted(missing, key=lambda label: order[label])

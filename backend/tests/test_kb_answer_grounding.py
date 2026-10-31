@@ -3,7 +3,12 @@
 import json
 from pathlib import Path
 
-from app.services.kb_answer_grounding import tool_output_as_source, unsupported_citations, unsupported_figures
+from app.services.kb_answer_grounding import (
+    bare_amounts_as_money,
+    tool_output_as_source,
+    unsupported_citations,
+    unsupported_figures,
+)
 
 # The § 200.501 text the 2 CFR 200 KB actually holds (2024 revision).
 SNIPPETS = (
@@ -108,6 +113,91 @@ def test_figures_the_tool_did_not_return_are_still_flagged():
 
 def test_a_plain_text_tool_result_still_reads_bare_amounts_as_dollars():
     assert unsupported_figures("Budget: $1,250,000.", tool_output_as_source("budget 1250000")) == []
+
+
+# --- Attached documents (doc-chat eval, 2026-10-29): read as money, as chat_service passes them ---
+
+# A budget workbook as extraction renders it: cells carry no "$" or commas.
+WORKBOOK = bare_amounts_as_money(
+    "| A. Senior Personnel Salaries | 27000 | 27810 | 28644.3 | 29503.629 | 30388.7379 | 143346.6669 |\n"
+    "| D. Equipment | 60000 | 18000 | 0 | 0 | 0 | 78000 |\n"
+    "| F1. Stipends | 0 | 5000 | 5000 | 5000 | 0 | 15000 |"
+)
+
+
+def test_workbook_cells_support_the_amounts_an_answer_reports():
+    answer = "Year 3 senior personnel: $28,644.30; five-year total $143,346.67; equipment $78,000."
+    assert unsupported_figures(answer, WORKBOOK) == []
+
+
+def test_zero_is_how_an_answer_says_none():
+    answer = "Stipends are $5,000 in Years 2–4 and $0 in Years 1 and 5; Year 3 equipment: $0.00."
+    assert unsupported_figures(answer, WORKBOOK) == []
+
+
+def test_a_figure_no_document_states_is_still_flagged():
+    assert unsupported_figures("Total stipends: $16,500.", WORKBOOK) == ["$16,500"]
+
+
+NOTICE = (
+    "Total Intended Award Amount: $2,100,000\n"
+    "Amount Obligated to Date: $525,000\n"
+    "Participant Support Costs Stipends $210,000; 30 participants\n"
+    "Invoice total $5,040.00 (48 libraries)"
+)
+
+
+def test_a_difference_of_two_supported_figures_is_supported():
+    answer = "- Total: $2,100,000\n- Obligated: $525,000\n\n**Remaining:** **$1,575,000**."
+    assert unsupported_figures(answer, NOTICE) == []
+
+
+def test_a_quotient_by_a_number_the_answer_divides_by_is_supported():
+    assert unsupported_figures("Stipend per participant: $210,000 ÷ 30 = **$7,000**.", NOTICE) == []
+    assert unsupported_figures("$7,000 each (`$210,000` total ÷ `30` participants).", NOTICE) == []
+    assert unsupported_figures("Per library: $5,040 / 48 = $105.", NOTICE) == []
+
+
+def test_a_share_with_an_operand_on_its_line_is_supported():
+    answer = "Obligated so far: $525,000 of the $2,100,000 total, or 25%."
+    assert unsupported_figures(answer, NOTICE) == []
+
+
+def test_a_worked_figure_matches_to_the_precision_it_is_written_in():
+    notice = "Indirect costs $616,666\nWorkbook indirect $572,710.11"
+    assert unsupported_figures("$616,666 − $572,710.11 ≈ $43,956 more.", notice) == []
+    assert unsupported_figures("$616,666 − $572,710.11 ≈ $43,950 more.", notice) == ["$43,950"]
+
+
+def test_wrong_arithmetic_is_still_flagged():
+    answer = "Remaining: $2,100,000 − $525,000 = $1,525,000."
+    assert unsupported_figures(answer, NOTICE) == ["$1,525,000"]
+
+
+def test_arithmetic_on_unsupported_figures_is_still_flagged():
+    answer = "It was $750,000, then $500,000 before that: a $250,000 rise."
+    assert unsupported_figures(answer, SNIPPETS) == ["$750,000", "$500,000", "$250,000"]
+
+
+def test_a_recalled_rate_is_not_explained_away():
+    # The de minimis rate from memory, applied to a supported base: neither
+    # the rate nor the amount it gives is in the sources.
+    answer = "Up to $1,000,000 of MTDC at the 10% de minimis rate gives $100,000."
+    assert unsupported_figures(answer, SNIPPETS) == ["10%", "$100,000"]
+
+
+def test_a_share_needs_an_operand_on_its_own_line():
+    answer = "- Total: $2,100,000\n- Obligated: $525,000\n\nThat is 25%."
+    assert unsupported_figures(answer, NOTICE) == ["25%"]
+
+
+def test_a_scaled_figure_is_too_coarse_to_be_worked():
+    assert unsupported_figures("$2,100,000 − $525,000 is about $1.6 million.", NOTICE) == ["$1.6 million"]
+
+
+def test_a_date_is_not_a_division():
+    notice = "Application fee $300."
+    assert unsupported_figures("The $300 fee was due 10/30; late fee $10.", notice) == ["$10"]
 
 
 # --- Citations: the cited source must contain what the answer credits to it ---

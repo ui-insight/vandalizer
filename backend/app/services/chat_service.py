@@ -49,6 +49,7 @@ from app.services.citation_grounding import ground_citation, normalize_citation_
 from app.services.approval_claims import unprepared_card_note
 from app.services import kb_no_evidence
 from app.services.kb_answer_grounding import (
+    bare_amounts_as_money,
     expand_snippet_refs,
     tool_output_as_source,
     unsupported_citations,
@@ -2728,7 +2729,11 @@ async def chat_stream(
                 # The same holds for an answer about attached documents
                 # (#998), checked against their full text: the copy the
                 # model saw may have been trimmed, and a figure the
-                # document does state is not one to flag.
+                # document does state is not one to flag. Read as money, as
+                # tool outputs are: a workbook cell holds "28644.3" and an
+                # award's budget table "1250000", and the answer reports
+                # "$28,644.30" (90% of flags were these, attached-document
+                # eval 2026-10-29).
                 #
                 # Tool results count too, including earlier turns'. A
                 # conversation that runs extractions reports their values,
@@ -2744,7 +2749,7 @@ async def chat_stream(
                 unsupported = (
                     unsupported_figures(assistant_message, "\n".join(
                         [s.text for s in (*doc_segments, *attachment_segments)]
-                        + [getattr(d, "raw_text", None) or "" for d in documents or []]
+                        + [bare_amounts_as_money(getattr(d, "raw_text", None) or "") for d in documents or []]
                         + [message]
                         + [tool_output_as_source(t) for t in tool_outputs]
                     ))
