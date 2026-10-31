@@ -9,6 +9,7 @@ Tools are exported as the ``TOOLS`` list for bulk registration.
 import asyncio
 import datetime
 import difflib
+import functools
 import hashlib
 import json
 import logging
@@ -17,6 +18,7 @@ from typing import Optional
 
 from pydantic import BaseModel
 from pydantic_ai.tools import RunContext
+from pymongo.errors import PyMongoError
 
 from app.models.document import SmartDocument
 from app.models.extraction_test_case import ExtractionTestCase
@@ -262,6 +264,33 @@ def _err(message: str, hint: Optional[str] = None) -> dict:
     return {"error": message}
 
 
+def db_timeouts_as_tool_errors(function):
+    """Return a database timeout in *function* to the model as a tool error.
+
+    Attached-document eval (2026-10-29): a content search, a full scan of
+    every document's text, ran into Mongo's 30 s socket timeout under load.
+    The exception ended the whole turn with "Something went wrong"; as a tool
+    result, the model can still answer from what it already has.
+    """
+    @functools.wraps(function)
+    async def wrapped(context, *args, **kwargs):
+        try:
+            return await function(context, *args, **kwargs)
+        except PyMongoError as exc:
+            if not exc.timeout:
+                raise
+            logger.warning("%s timed out waiting for the database: %s", function.__name__, exc)
+            return _err(
+                f"{function.__name__} timed out waiting for the database.",
+                hint=(
+                    "Do not repeat the same call. Answer from what you already "
+                    "have, or tell the user the lookup timed out and to try "
+                    "again in a moment."
+                ),
+            )
+    return wrapped
+
+
 def _doc_text_unavailable_err(doc: "SmartDocument") -> dict:
     """Honest error for a document whose text is unavailable.
 
@@ -484,6 +513,7 @@ def _closest_titles(query: str, rows: list[_TitleRow], limit: int = 3) -> list[d
     return [{"uuid": r.uuid, "title": r.title} for _, r in scored[:limit]]
 
 
+@db_timeouts_as_tool_errors
 async def search_documents(
     context: RunContext[AgenticChatDeps],
     query: str,

@@ -270,6 +270,69 @@ class TestSearchDocuments:
         assert result["did_you_mean"] == []
         assert "nothing is close" in result["assistant_instruction"]
 
+    @pytest.mark.asyncio
+    async def test_a_database_timeout_comes_back_as_a_tool_error(self):
+        """Doc-chat eval (2026-10-29): a content search hit Mongo's socket
+        timeout and the whole turn ended with "Something went wrong"."""
+        from pymongo.errors import NetworkTimeout
+
+        from app.services.chat_tools import search_documents
+
+        ctx = _make_context()
+        timeout = NetworkTimeout(
+            "mongo:27017: timed out (configured timeouts: socketTimeoutMS: 30000.0ms, connectTimeoutMS: 5000.0ms)"
+        )
+        with patch("app.services.chat_tools.SmartDocument") as MockDoc:
+            MockDoc.find.return_value.sort.return_value.limit.return_value.to_list = AsyncMock(side_effect=timeout)
+            result = await search_documents(ctx, "Cost Sharing", search_content=True)
+
+        assert result["error"] == "search_documents timed out waiting for the database."
+        assert "Do not repeat the same call" in result["hint"]
+
+    @pytest.mark.asyncio
+    async def test_other_database_errors_still_raise(self):
+        from pymongo.errors import OperationFailure
+
+        from app.services.chat_tools import search_documents
+
+        ctx = _make_context()
+        with patch("app.services.chat_tools.SmartDocument") as MockDoc:
+            MockDoc.find.return_value.sort.return_value.limit.return_value.to_list = AsyncMock(
+                side_effect=OperationFailure("Regular expression is invalid", code=51091),
+            )
+            with pytest.raises(OperationFailure):
+                await search_documents(ctx, "Cost Sharing")
+
+    @pytest.mark.asyncio
+    async def test_the_model_still_sees_the_tools_own_parameters(self, monkeypatch):
+        from types import SimpleNamespace
+
+        from pydantic_ai.models.function import AgentInfo, FunctionModel
+
+        from app.services import llm_service
+
+        seen: dict = {}
+
+        async def model(messages, info: AgentInfo):
+            seen.update({t.name: t for t in info.function_tools})
+            yield "ok"
+
+        monkeypatch.setattr(llm_service, "get_agent_model", lambda *a, **k: FunctionModel(stream_function=model))
+        llm_service._agentic_chat_agent_cache.clear()
+        try:
+            agent = llm_service.create_agentic_chat_agent("unit-test-model", system_config_doc={})
+            deps = SimpleNamespace(
+                conversation=SimpleNamespace(pending_confirmations=[]), turn_marker=1, queued_user_parts=[],
+            )
+            async with agent.run_stream("hi", deps=deps) as result:
+                await result.get_output()
+        finally:
+            llm_service._agentic_chat_agent_cache.clear()
+
+        tool = seen["search_documents"]
+        assert set(tool.parameters_json_schema["properties"]) == {"query", "search_content"}
+        assert tool.description.startswith("Search the user's documents by title")
+
 
 class TestClosestTitles:
     def test_typo_in_one_word_of_a_short_query(self):
