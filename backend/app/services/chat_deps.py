@@ -102,3 +102,12 @@ class AgenticChatDeps:
     lesson_skip_retry_used: bool = False
     # Once-only flag for approval_claims.require_lesson_not_restated.
     lesson_restated_retry_used: bool = False
+
+    # What of each document the model already holds this turn
+    # (doc_passages.DocumentContext by uuid): the attached documents as the
+    # planner sent them, plus pages and passages tools have returned since.
+    # The document tools send none of it twice.
+    documents_in_context: dict = field(default_factory=dict)
+    # Room left in the model's window for tool results this turn
+    # (context_budget.ToolResultBudget). None leaves reads at their own caps.
+    tool_result_budget: Optional[object] = None

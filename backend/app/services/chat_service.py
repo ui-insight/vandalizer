@@ -36,8 +36,10 @@ from app.services import document_service
 from app.services.config_service import get_llm_model_by_name, get_user_model_name
 from app.services.context_budget import (
     build_context_meter,
+    count_tokens,
     DocumentSegment,
     NativeCount,
+    ToolResultBudget,
     effective_input_window,
     estimate_input_tokens,
     estimate_next_request_tokens,
@@ -481,6 +483,7 @@ def build_document_segments(
             segments.append(DocumentSegment(
                 label=f"doc:{doc.title or doc.uuid}",
                 text=f"\n\n## Document: {doc.title}\n{page_note}{body}",
+                source_uuid=doc.uuid,
             ))
             if document_service.is_extraction_low_quality(doc):
                 low_quality.append(doc.title or doc.uuid)
@@ -490,6 +493,25 @@ def build_document_segments(
             skipped_no_text.append(doc.title or doc.uuid)
 
     return segments, skipped_no_text, errored, low_quality
+
+
+def documents_in_context(built: list[DocumentSegment], sent: list[DocumentSegment]) -> dict:
+    """What of each attached document went with the question, by uuid.
+
+    ``built`` are the segments from ``build_document_segments``, ``sent`` the
+    planner's. The document tools read it (doc_passages.DocumentContext) so
+    they never send a page the model already has.
+    """
+    from app.services.context_budget import _DOCUMENT_CUT_MARKER, _TRUNCATED_MARKER
+    from app.services.doc_passages import context_after_compaction
+
+    sent_text = {s.source_uuid: s.text for s in sent if s.source_uuid}
+    return {
+        seg.source_uuid: context_after_compaction(
+            seg.text, sent_text.get(seg.source_uuid, ""), (_DOCUMENT_CUT_MARKER, _TRUNCATED_MARKER),
+        )
+        for seg in built if seg.source_uuid
+    }
 
 
 def partially_ingested_titles(documents: list) -> list[str]:
@@ -2359,6 +2381,15 @@ async def chat_stream(
             kb_snippet_ref=max(
                 (s["ref"] for s in kb_sources if isinstance(s.get("ref"), int)),
                 default=0,
+            ),
+            documents_in_context=documents_in_context(doc_segments, compacted.documents),
+            # The plan sized the first request only; tool results share
+            # what it left (see ToolResultBudget).
+            tool_result_budget=ToolResultBudget(
+                input_budget=compacted.plan.input_budget,
+                planned_tokens=compacted.plan.total_input_tokens,
+                planned_messages=len(compacted.history) + 1,
+                count=lambda text: count_tokens(text, model_name, model_config),
             ),
         )
         agent = create_agentic_chat_agent(
@@ -4762,7 +4793,9 @@ def _build_open_documents_block(
         "",
         "For documents below, use their UUIDs directly for tools like "
         "run_extraction or get_document_text — do NOT call search_documents to "
-        "look them up.",
+        "look them up. To find a passage, figure or section inside them, call "
+        "search_attached_documents: search_documents only finds other files by "
+        "title.",
         "",
         "These documents are what the user is working on — usually the file "
         "open in their viewer. When they ask to run a workflow or extraction, "

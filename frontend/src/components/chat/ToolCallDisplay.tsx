@@ -56,6 +56,7 @@ const TOOL_META: Record<string, { label: string; category: ToolCategory }> = {
   get_quality_info:      { label: 'Checking quality',         category: 'read' },
   search_library:        { label: 'Searching library',        category: 'read' },
   get_document_text:     { label: 'Reading document',         category: 'read' },
+  search_attached_documents: { label: 'Searching attached documents', category: 'read' },
   get_app_help:          { label: 'Looking up help',          category: 'read' },
   fetch_url:             { label: 'Reading web page',         category: 'read' },
   web_search:            { label: 'Searching the web',        category: 'read' },
@@ -147,6 +148,8 @@ function getActiveHint(toolName: string, args: Record<string, unknown>): string 
     }
     case 'get_document_text':
       return ''
+    case 'search_attached_documents':
+      return queryStr ? `for "${queryStr}"` : ''
     case 'save_to_folder':
       return queryStr ? `"${queryStr}"` : ''
     case 'get_certification_module':
@@ -286,6 +289,13 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
       const passages = kbPassages(content)
       if (passages.length === 0) return { text: 'No matching passages', qualityHint: '' }
       return { text: `Found ${passages.length} relevant passage${passages.length !== 1 ? 's' : ''}`, qualityHint }
+    }
+
+    case 'search_attached_documents': {
+      if (!Array.isArray(obj.passages)) break
+      const n = obj.passages.length
+      if (n === 0) return { text: 'No matching passages', qualityHint: '' }
+      return { text: `Found ${n} passage${n !== 1 ? 's' : ''}`, qualityHint }
     }
 
     case 'get_document_text': {

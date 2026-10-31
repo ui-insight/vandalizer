@@ -11,10 +11,10 @@ from __future__ import annotations
 
 import logging
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -623,6 +623,10 @@ class DocumentSegment:
     label: str
     text: str
     required: bool = False  # required segments are never trimmed
+    # The SmartDocument this segment holds, so chat can tell which of its
+    # pages went with the question after trimming. Labels are titles, which
+    # two attached files can share.
+    source_uuid: Optional[str] = None
 
 
 @dataclass
@@ -765,9 +769,108 @@ def _split_head_tail(ids, budget: int, decode) -> Optional[tuple[str, str]]:
 CUT_NOTE_PREFIX = "[Vandalizer note, not part of the file: "
 _DOCUMENT_CUT_MARKER = (
     f"\n\n…{CUT_NOTE_PREFIX}the middle of this document was left out to fit the "
-    "model's memory. Read the omitted part with get_document_text before "
-    "answering about it.]…\n\n"
+    "model's memory. Find what you need in it with search_attached_documents, "
+    "or read it with get_document_text, before answering about it.]…\n\n"
 )
+_TRUNCATED_MARKER = "\n\n…[truncated]…\n\n"
+
+
+def _pages_cut_note(first: int, last: int) -> str:
+    """Where a document trimmed by page skips pages, which ones and how to reach them."""
+    which = f"pp. {first}–{last} of this document were" if last != first else f"p. {first} of this document was"
+    return (
+        f"\n…{CUT_NOTE_PREFIX}{which} left out to fit the model's memory. "
+        "Search them with search_attached_documents, or read them with "
+        "get_document_text, before answering about them.]…\n\n"
+    )
+
+
+# A trimmed document keeps whole pages: the opening and closing pages, as the
+# head/tail cut does, plus the pages that best match the question. Picked
+# pages may take at most this share of the document's allowance, and at most
+# _PICKED_PAGES_MAX pages, so a loose match cannot crowd out the opening.
+_PICKED_PAGES_SHARE = 0.35
+_PICKED_PAGES_MAX = 12
+# Pages are the unit only where they are small next to the allowance; a
+# workbook stored as one "page" keeps the token-level head/tail cut.
+_MIN_PAGES_FOR_PAGE_TRIM = 4
+_MAX_PAGE_SHARE = 0.25
+
+
+def _trim_by_pages(
+    text: str, allowed: int, question: str, count,
+) -> Optional[str]:
+    """Trim a page-marked document to ``allowed`` tokens by whole pages.
+
+    The 75/25 head/tail cut drops a long solicitation's middle, which is where
+    its topic tables, cost-share rules and award ceilings sit: on the
+    2026-10-29 eval the answer page was in the dropped part for 4 of 5
+    single-FOA questions, and those turns were 1–3 of 14 correct. Here the
+    pages that best match the question are kept as well, and every gap says
+    which pages it skips, so the model knows what it has not seen and can
+    search for it.
+
+    Returns None when the text has too few page markers, or pages too large
+    for the allowance, and the caller keeps the token-level cut.
+    """
+    from app.services.doc_passages import annotated_pages, rank_texts, strong_matches
+
+    pages = annotated_pages(text)
+    if len(pages) < _MIN_PAGES_FOR_PAGE_TRIM:
+        return None
+    prefix = text[:pages[0].start]
+    bodies = [text[p.start:p.end] for p in pages]
+    costs = [count(b) for b in bodies]
+    note_cost = count(_pages_cut_note(10000, 10000))
+    budget = allowed - count(prefix) - 2 * note_cost - 16
+    if budget <= 0 or max(costs) > budget * _MAX_PAGE_SHARE:
+        return None
+
+    def fill(room: int, skip: set[int]) -> set[int]:
+        """Opening pages up to 75% of ``room``, then closing pages with the rest."""
+        kept: set[int] = set()
+        used, head_room = 0, int(room * 0.75)
+        for i in range(len(pages)):
+            if i in skip:
+                continue
+            if used + costs[i] > head_room:
+                break
+            kept.add(i)
+            used += costs[i]
+        for i in range(len(pages) - 1, -1, -1):
+            if i in skip or i in kept:
+                continue
+            if used + costs[i] > room:
+                break
+            kept.add(i)
+            used += costs[i]
+        return kept
+
+    # Each picked page can open one more gap, and so one more note.
+    picked: set[int] = set()
+    pick_room = int(budget * _PICKED_PAGES_SHARE)
+    ends = fill(budget - pick_room, set())
+    cut = [r for r in rank_texts(question, bodies) if r.index not in ends]
+    used = 0
+    for r in strong_matches(cut, question)[:_PICKED_PAGES_MAX]:
+        cost = costs[r.index] + note_cost
+        if used + cost <= pick_room:
+            picked.add(r.index)
+            used += cost
+    kept = picked | fill(budget - used, picked)
+    if len(kept) == len(pages):
+        return None
+
+    out = [prefix]
+    cursor = 0
+    for i in sorted(kept):
+        if i > cursor:
+            out.append(_pages_cut_note(pages[cursor].page, pages[i - 1].page))
+        out.append(bodies[i])
+        cursor = i + 1
+    if cursor < len(pages):
+        out.append(_pages_cut_note(pages[cursor].page, pages[-1].page))
+    return "".join(out)
 _FILE_CUT_MARKER = (
     f"\n\n…{CUT_NOTE_PREFIX}the middle of this file was left out to fit the "
     "model's memory. Say so if the answer may depend on it.]…\n\n"
@@ -1007,7 +1110,7 @@ def plan_and_compact_context(
     def _cmt(message: Any) -> int:
         return count_message_tokens(message, model_name, model_config, native=native)
 
-    def _trunc(text: str, max_tokens: int, marker: str = "\n\n…[truncated]…\n\n") -> tuple[str, int]:
+    def _trunc(text: str, max_tokens: int, marker: str = _TRUNCATED_MARKER) -> tuple[str, int]:
         return _truncate_text_to_tokens(
             text, max_tokens, model_name, marker=marker, model_config=model_config, native=native
         )
@@ -1089,9 +1192,7 @@ def plan_and_compact_context(
             new_text, loss = _trunc(a.text, allowed, _FILE_CUT_MARKER)
             dropped += loss
             kept_attachments.append((_segment_name(a.label), max(1, round(100 * (raw - loss) / max(1, raw)))))
-            attachments[i] = DocumentSegment(
-                label=a.label, text=new_text, required=a.required
-            )
+            attachments[i] = replace(a, text=new_text)
         plan.attachments_tokens = sum(
             _ct(a.text) for a in attachments
         )
@@ -1116,12 +1217,14 @@ def plan_and_compact_context(
             allowed = max(512, int(raw * scale))
             if allowed >= raw:
                 continue
-            new_text, loss = _trunc(d.text, allowed, _DOCUMENT_CUT_MARKER)
+            by_page = _trim_by_pages(d.text, allowed, user_message, _ct)
+            if by_page is not None and _ct(by_page) <= allowed:
+                new_text, loss = by_page, max(0, raw - _ct(by_page))
+            else:
+                new_text, loss = _trunc(d.text, allowed, _DOCUMENT_CUT_MARKER)
             dropped += loss
             kept_documents.append((_segment_name(d.label), max(1, round(100 * (raw - loss) / max(1, raw)))))
-            documents[i] = DocumentSegment(
-                label=d.label, text=new_text, required=d.required
-            )
+            documents[i] = replace(d, text=new_text)
         plan.documents_tokens = sum(
             _ct(d.text) for d in documents
         )
@@ -1192,7 +1295,9 @@ def plan_and_compact_context(
                     )
                 )
             else:
-                candidate.text = new_text
+                # A new segment, not an edit: the caller's list still holds
+                # this object, and chat compares it with what was sent.
+                container[container.index(candidate)] = replace(candidate, text=new_text)
                 actions.append(
                     CompactionAction(
                         kind=f"{bucket_name}_trimmed",
@@ -1217,6 +1322,77 @@ def plan_and_compact_context(
         plan=plan,
         actions=actions,
     )
+
+
+# ---------------------------------------------------------------------------
+# Room for tool results within a turn
+# ---------------------------------------------------------------------------
+
+# Kept free after a tool result for the model's next step: its next tool-call
+# arguments, the result wrappers, and counting error.
+TOOL_RESULT_SLACK_TOKENS = 3_000
+# A read smaller than this is refused rather than returned too short to use.
+TOOL_RESULT_MIN_TOKENS = 1_500
+
+
+@dataclass
+class ToolResultBudget:
+    """How much a tool may still return this turn without overflowing the window.
+
+    The planner sizes the first request only. A tool loop adds every result to
+    the requests after it: on 2026-10-29 three parallel re-reads of an
+    80k-character notice grew an 84k-token request to 141k against a 131k
+    window, and the user got "This conversation is too large for the selected
+    model" instead of an answer.
+
+    The conversation's size comes from the provider where it reports one: the
+    last response's input plus output tokens, which also covers the tool
+    definitions no local count sees. Without a report it is the planned first
+    request plus a count of what the run has added since. Calls made in the
+    same response share what is left (``spend``).
+    """
+
+    input_budget: int
+    planned_tokens: int
+    # Messages the plan counted: the history plus this turn's first request.
+    planned_messages: int
+    count: Callable[[str], int]
+    _anchor: int = -1
+    _spent: int = 0
+
+    def _message_tokens(self, message: Any) -> int:
+        total = 4
+        for part in getattr(message, "parts", ()) or ():
+            content = getattr(part, "content", None)
+            if content is None:
+                content = getattr(part, "args", None) or ""
+            total += self.count(content if isinstance(content, str) else str(content))
+        return total
+
+    def conversation_tokens(self, messages: list) -> int:
+        for i in range(len(messages) - 1, -1, -1):
+            usage = getattr(messages[i], "usage", None)
+            reported = (getattr(usage, "input_tokens", 0) or 0) + (getattr(usage, "output_tokens", 0) or 0)
+            if getattr(messages[i], "kind", None) == "response" and isinstance(reported, int) and reported > 0:
+                return reported + sum(self._message_tokens(m) for m in messages[i + 1:])
+        return self.planned_tokens + sum(
+            self._message_tokens(m) for m in messages[self.planned_messages:]
+        )
+
+    def available(self, messages: Optional[list]) -> int:
+        """Tokens a result may take now. Negative when the window is already full."""
+        messages = list(messages) if isinstance(messages, list) else []
+        if len(messages) != self._anchor:
+            # A new model response: what earlier calls returned is now inside
+            # its reported input.
+            self._anchor, self._spent = len(messages), 0
+        return (
+            self.input_budget - self.conversation_tokens(messages)
+            - self._spent - TOOL_RESULT_SLACK_TOKENS
+        )
+
+    def spend(self, tokens: int) -> None:
+        self._spent += max(0, tokens)
 
 
 # ---------------------------------------------------------------------------

@@ -331,7 +331,7 @@ class TestSearchDocuments:
 
         tool = seen["search_documents"]
         assert set(tool.parameters_json_schema["properties"]) == {"query", "search_content"}
-        assert tool.description.startswith("Search the user's documents by title")
+        assert tool.description.startswith("Find FILES in the user's whole workspace by title")
 
 
 class TestClosestTitles:

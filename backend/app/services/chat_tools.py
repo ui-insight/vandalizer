@@ -30,6 +30,10 @@ from app.models.validation_run import ValidationRun
 from app.models.verification_session import VerificationField, VerificationSession
 from app.models.workflow import Workflow
 from app.services.chat_deps import AgenticChatDeps
+from app.services.context_budget import TOOL_RESULT_MIN_TOKENS, ToolResultBudget
+from app.services.doc_passages import (
+    DocumentContext, document_windows, format_pages, rank_texts, snippet_around, strong_matches,
+)
 from app.services.certification_versions.runtime import course_operation
 from app.services.certification_versions.tool_results import (
     CheckResult, CompletionResult, LessonResult, ModuleResult, ProgressResult,
@@ -519,12 +523,17 @@ async def search_documents(
     query: str,
     search_content: bool = False,
 ) -> list[dict] | dict:
-    """Search the user's documents by title (fast) or full content (slow).
+    """Find FILES in the user's whole workspace by title (fast) or full content (slow).
+
+    This finds which files exist, not passages: it never searches inside the
+    documents attached to this chat. To find a fact, a figure or a section in
+    an attached document (or in pages a long one's cut note says were left
+    out), call search_attached_documents instead.
 
     Args:
         context: The call context.
-        query: A text query to match against document titles (or content if
-               search_content=True). Multi-word queries match each word
+        query: Words of a file's title (or, with search_content=True, words
+               anywhere in a file's text). Multi-word queries match each word
                independently (any order). Common filler words ("the",
                "what's in", "document") and file extensions (".pdf", ".docx")
                are stripped.
@@ -532,7 +541,8 @@ async def search_documents(
                text. Off by default because content search is a full
                collection scan (no text index) and can time out on large
                workspaces. Only set this when a title search returns nothing
-               and the user is describing content rather than a filename.
+               and the user is describing a file by its content rather than
+               its name. It returns files, not passages.
 
     Returns a list of matching documents. When a non-empty query matches
     nothing, returns ``{"documents": [], "did_you_mean": [...]}`` with the
@@ -1744,6 +1754,71 @@ async def web_search(
 
 
 _DOCUMENT_READ_MAX_CHARS = 30000
+# A read sized from the room left starts at this many characters per token of
+# room, then shrinks to what the recount says fits: digit-dense tables run
+# under 3 characters a token, and a margin-inflated count lower still.
+_CHARS_PER_ROOM_TOKEN = 2.5
+_MIN_READ_CHARS = 1500
+
+
+def _held_context(context: RunContext[AgenticChatDeps], document_uuid: str) -> Optional[DocumentContext]:
+    """What of this document the model already holds this turn, or None
+    outside a chat turn (nothing is tracked there)."""
+    store = getattr(context.deps, "documents_in_context", None)
+    if not isinstance(store, dict):
+        return None
+    held = store.get(document_uuid)
+    if not isinstance(held, DocumentContext):
+        held = store[document_uuid] = DocumentContext()
+    return held
+
+
+def _no_room_err(room: int) -> dict:
+    return _err(
+        "No room is left in this chat's context for more document text "
+        f"(about {max(0, room)} tokens free).",
+        hint=(
+            "Answer from what is already in your context, say plainly which pages "
+            "you could not read, and tell the user they can ask about those pages "
+            "in a follow-up message."
+        ),
+    )
+
+
+def _fit_to_room(context: RunContext[AgenticChatDeps], build, cap_chars: int) -> dict:
+    """A tool result no larger than the room left in the model's window.
+
+    ``build(max_chars)`` makes the result and must have no side effects. With
+    no budget (outside a chat turn) it is built at ``cap_chars``. Otherwise at
+    the cap or what the room allows, whichever is smaller, recounted, and
+    rebuilt smaller until it fits. What it takes is then reserved, so calls
+    made in parallel from one response share the room instead of each
+    assuming all of it.
+    """
+    budget = getattr(context.deps, "tool_result_budget", None)
+    if not isinstance(budget, ToolResultBudget):
+        return build(cap_chars)
+    room = budget.available(getattr(context, "messages", None))
+    if room < TOOL_RESULT_MIN_TOKENS:
+        return _no_room_err(room)
+    max_chars = min(cap_chars, int(room * _CHARS_PER_ROOM_TOKEN))
+    for _ in range(4):
+        if max_chars < _MIN_READ_CHARS:
+            break
+        result = build(max_chars)
+        used = budget.count(json.dumps(result, ensure_ascii=False, default=str))
+        if used <= room or "error" in result:
+            budget.spend(used)
+            return result
+        max_chars = int(max_chars * room / used * 0.9)
+    return _no_room_err(room)
+
+
+def _may_read(doc: "SmartDocument", deps: AgenticChatDeps) -> bool:
+    """The document belongs to the user's team or to the user."""
+    if deps.team_id:
+        return doc.team_id == deps.team_id or doc.user_id == deps.user_id
+    return doc.user_id == deps.user_id
 
 
 def read_document_range(
@@ -1864,12 +1939,18 @@ async def get_document_text(
     """Read a document's text, a page range at a time. Useful for reading before extracting.
 
     One call returns at most about 30,000 characters (roughly 20-25 pages),
-    ending at a page boundary. With no range it starts at page 1. The result
-    says which pages it holds (``pages_returned``) and, when there is more,
-    ``next_page``: call again with ``start_page=next_page`` to keep reading.
-    For a long solicitation or award, read the pages that matter (budget,
-    eligibility, required attachments, terms) before answering, and never
-    describe pages you have not read.
+    ending at a page boundary, and less when the chat's context is nearly
+    full. With no range it starts at page 1. The result says which pages it
+    holds (``pages_returned``) and, when there is more, ``next_page``: call
+    again with ``start_page=next_page`` to keep reading. Pages already in your
+    context (an attached document's text, or an earlier read this turn) are
+    skipped rather than sent again.
+
+    To find where something is in an attached document, call
+    search_attached_documents first and read around the pages it returns;
+    guessing page ranges is slow. For a long solicitation or award, read the
+    pages that matter (budget, eligibility, required attachments, terms)
+    before answering, and never describe pages you have not read.
 
     Args:
         context: The call context.
@@ -1890,58 +1971,301 @@ async def get_document_text(
         )
 
     # Authorization: must belong to user's team or the user directly
-    team_id = context.deps.team_id
-    if team_id:
-        if doc.team_id != team_id and doc.user_id != context.deps.user_id:
-            return {"error": "You do not have access to this document."}
-    else:
-        if doc.user_id != context.deps.user_id:
-            return {"error": "You do not have access to this document."}
+    if not _may_read(doc, context.deps):
+        return {"error": "You do not have access to this document."}
 
     # Same page treatment as the attach path: [p. N] boundaries from the
     # stored markers so an answer built on this tool has a page-citable
     # substrate, and a note on how to cite (with the approximate-page hedge
     # preserved). Local import — chat_service imports this module.
-    from app.services.chat_service import page_note_for
+    from app.services.chat_service import _page_positions, page_note_for
 
     raw = doc.raw_text or ""
     markers = getattr(doc, "text_markers", None)
-    read = read_document_range(
-        raw, markers, start_page=start_page, end_page=end_page, start_char=start_char,
-    )
-    if "error" in read:
-        return read
-    result = {
-        "uuid": doc.uuid,
-        "title": doc.title,
-        "extension": doc.extension,
-        "pages": doc.num_pages,
-        **read,
-        "truncated": not read["complete"],
-    }
-    citation_note = page_note_for(markers, annotated="page_count" in read)
-    if citation_note:
-        result["page_citation_note"] = citation_note.strip()
-    if not read["complete"]:
-        if "page_count" in read:
-            where = f"pp. {read['pages_returned']} of {read['page_count']}"
-            more = (
-                f" To keep reading, call get_document_text again with start_page={read['next_page']}."
-                if read.get("next_page") else
-                f" The rest of page {read['end_page']} starts at start_char={read['next_start_char']}."
-                if read.get("next_start_char") else ""
-            )
-        else:
-            where = f"characters {read['start_char']}–{read['end_char']} of {read['total_chars']}"
-            more = (
-                f" To keep reading, call again with start_char={read['next_start_char']}."
-                if read.get("next_start_char") else ""
-            )
-        result["note"] = (
-            f"This read covers {where}, not the whole document.{more} Say which "
-            "pages your answer is based on, and do not present conclusions as "
-            "covering pages you have not read."
+    base = {"uuid": doc.uuid, "title": doc.title, "extension": doc.extension, "pages": doc.num_pages}
+
+    # What the model already holds is pointed at, not sent again: re-reading
+    # an attached notice's inline pages is what overflowed the window on
+    # 2026-10-29.
+    held = _held_context(context, doc.uuid)
+    if held is not None and held.whole:
+        return {
+            **base,
+            "already_in_context": True,
+            "note": (
+                "This whole document is already in your context: it went with the "
+                "user's message, with its [p. N] page markers. Answer from that "
+                "text; reading it again only takes up room. To find a passage in "
+                "it, use search_attached_documents."
+            ),
+        }
+    positions = _page_positions(markers, len(raw))
+    in_range: list[int] = []
+    skipped: list[int] = []
+    read_start, read_end = start_page, end_page
+    if held is not None and positions and start_char is None:
+        pages = [p for _o, p, _a in positions]
+        want_start = pages[0] if start_page is None else start_page
+        want_end = pages[-1] if end_page is None else end_page
+        in_range = [p for p in pages if want_start <= p <= want_end]
+        skipped = [p for p in in_range if p in held.pages]
+        unread = [p for p in in_range if p not in held.pages]
+        if in_range and not unread:
+            return {
+                **base,
+                "already_in_context": True,
+                "pages_in_context": format_pages(in_range),
+                "note": (
+                    f"pp. {format_pages(in_range)} are already in your context (the "
+                    "document text sent with the message, or an earlier read this "
+                    "turn). Read them there instead of again."
+                ),
+            }
+        if skipped:
+            read_start = unread[0]
+            later = [p for p in in_range if p > read_start and p in held.pages]
+            if later:
+                read_end = in_range[in_range.index(later[0]) - 1]
+    elif held is not None and not positions and held.spans:
+        # A document without pages: start past text an earlier read returned.
+        begin = start_char or 0
+        for s, e in sorted(held.spans):
+            if s <= begin < e:
+                begin = e
+        if begin >= len(raw):
+            return {**base, "already_in_context": True, "note": (
+                "Everything from that position to the end was returned by an "
+                "earlier read this turn. Read it there instead of again."
+            )}
+        start_char = begin
+
+    def build(cap: int) -> dict:
+        read = read_document_range(
+            raw, markers, start_page=read_start, end_page=read_end,
+            start_char=start_char, max_chars=cap,
         )
+        if "error" in read:
+            return read
+        result = {**base, **read, "truncated": not read["complete"]}
+        if skipped and read_end is not None and read.get("next_page") is None \
+                and read.get("end_page") == read_end and not read.get("page_cut_mid"):
+            # The read stopped at a page already held; go on after it.
+            result["next_page"] = next(
+                (p for p in in_range if p > read_end and p not in held.pages), None,
+            )
+        if skipped:
+            result["pages_in_context_not_resent"] = format_pages(skipped)
+        citation_note = page_note_for(markers, annotated="page_count" in read)
+        if citation_note:
+            result["page_citation_note"] = citation_note.strip()
+        if not read["complete"]:
+            if "page_count" in read:
+                where = f"pp. {read['pages_returned']} of {read['page_count']}"
+                more = (
+                    f" To keep reading, call get_document_text again with start_page={result['next_page']}."
+                    if result.get("next_page") else
+                    f" The rest of page {read['end_page']} starts at start_char={read['next_start_char']}."
+                    if read.get("next_start_char") else ""
+                )
+            else:
+                where = f"characters {read['start_char']}–{read['end_char']} of {read['total_chars']}"
+                more = (
+                    f" To keep reading, call again with start_char={read['next_start_char']}."
+                    if read.get("next_start_char") else ""
+                )
+            held_note = (
+                f" pp. {format_pages(skipped)} were not sent again: they are already in your context."
+                if skipped else ""
+            )
+            result["note"] = (
+                f"This read covers {where}, not the whole document.{more}{held_note} "
+                "Say which pages your answer is based on, and do not present "
+                "conclusions as covering pages you have not read."
+            )
+        return result
+
+    result = _fit_to_room(context, build, _DOCUMENT_READ_MAX_CHARS)
+    if held is not None and "error" not in result:
+        if "page_count" in result:
+            whole = [
+                p for _o, p, _a in positions
+                if result["start_page"] <= p <= result["end_page"]
+                and not (result.get("page_cut_mid") and p == result["end_page"])
+            ]
+            held.pages.update(whole)
+        elif "end_char" in result:
+            held.spans.add((result["start_char"], result["end_char"]))
+    return result
+
+
+# Passages one search returns, and the most text it may carry.
+_SEARCH_DEFAULT_PASSAGES = 5
+_SEARCH_MAX_PASSAGES = 8
+_SEARCH_MAX_CHARS = 16000
+
+
+def _overlaps(a, b) -> bool:
+    return a.start < b.end and b.start < a.end
+
+
+async def search_attached_documents(
+    context: RunContext[AgenticChatDeps],
+    query: str,
+    document_uuid: Optional[str] = None,
+    max_passages: int = _SEARCH_DEFAULT_PASSAGES,
+) -> dict:
+    """Search INSIDE the documents attached to this chat and return the matching passages with their pages.
+
+    Use it to find a fact in an attached document (an amount, a limit, a
+    requirement, a deadline, a topic's terms), and always before answering
+    about pages that a long document's cut note says were left out. It
+    searches every page, including the left-out ones, by keyword, and returns
+    the best passages, each marked with its page ([p. N]). A passage on a page
+    already in your context comes back as a short pointer to that page
+    instead of its text.
+
+    It does not search other files in the workspace: search_documents finds
+    files by title.
+
+    Args:
+        context: The call context.
+        query: Words the passage itself would use: names, section or topic
+            numbers, defined terms, figures ("Topic 3.4 period of performance",
+            "cost share percentage", "indirect cost rate"). Passages holding
+            more of the words, and holding them side by side, rank higher.
+        document_uuid: Search only this document (an attached one, or one found
+            with search_documents). Omit to search every attached document.
+        max_passages: How many passages to return, 1-8 (default 5).
+    """
+    query = (query or "").strip()
+    if not query:
+        return _err(
+            "Give the words to search for.",
+            hint="Use the words the passage would contain, e.g. 'cost share' or 'Topic 3.4'.",
+        )
+    uuids = [document_uuid] if document_uuid else list(dict.fromkeys(context.deps.context_document_uuids or []))
+    if not uuids:
+        return _err(
+            "No documents are attached to this chat, so there is nothing to search inside.",
+            hint=(
+                "To find a file in the workspace by its title, use search_documents; "
+                "then search inside it by passing its uuid as document_uuid."
+            ),
+        )
+
+    from app.services.chat_service import _page_positions, page_note_for
+
+    docs, without_text = [], []
+    for uuid in uuids:
+        doc = await SmartDocument.find_one(SmartDocument.uuid == uuid)
+        if not doc or not _may_read(doc, context.deps):
+            if document_uuid:
+                return _err(
+                    f"Document '{uuid}' not found.",
+                    hint="Pass the uuid of an attached document, or omit document_uuid to search them all.",
+                )
+            continue
+        if not doc.raw_text:
+            without_text.append(doc.title or doc.uuid)
+            continue
+        docs.append(doc)
+    if not docs:
+        return _err(
+            "None of these documents has extracted text to search"
+            + (f": {', '.join(without_text)}." if without_text else "."),
+            hint="Tell the user the text is not available yet or could not be read.",
+        )
+
+    def rank() -> tuple[list, list]:
+        corpus = []
+        for doc in docs:
+            positions = _page_positions(getattr(doc, "text_markers", None), len(doc.raw_text))
+            corpus.extend((doc, w) for w in document_windows(doc.raw_text, positions))
+        ranked = rank_texts(query, [d.raw_text[w.start:w.end] for d, w in corpus])
+        return corpus, strong_matches(ranked, query, share=0.3)
+
+    # Tokenizing a few hundred pages takes a moment; keep it off the event loop.
+    corpus, ranked = await asyncio.to_thread(rank)
+    searched = [{"uuid": d.uuid, "title": d.title, "pages": d.num_pages} for d in docs]
+    if not ranked:
+        return {
+            "query": query,
+            "documents_searched": searched,
+            "passages": [],
+            "note": (
+                "No passage in these documents holds these words. Try the words the "
+                "document itself would use (a defined term, a section heading, a "
+                "number), or read pages with get_document_text. Do not answer as "
+                "though the document says nothing about it until you have tried."
+            ),
+        }
+
+    want = max(1, min(_SEARCH_MAX_PASSAGES, int(max_passages or _SEARCH_DEFAULT_PASSAGES)))
+    chosen: list[tuple] = []
+    for r in ranked:
+        doc, w = corpus[r.index]
+        if any(d is doc and _overlaps(w, c) for d, c in chosen):
+            continue
+        chosen.append((doc, w))
+        if len(chosen) >= want:
+            break
+    held_by_doc = {d.uuid: _held_context(context, d.uuid) for d, _w in chosen}
+
+    def passage(doc, w, held) -> dict:
+        out = {"document": doc.title, "document_uuid": doc.uuid, "page": w.page}
+        if w.page is not None and w.approximate:
+            out["page_approximate"] = True
+        if w.page is None and not getattr(doc, "text_markers", None):
+            out["chars"] = f"{w.start}–{w.end}"
+        body = doc.raw_text[w.start:w.end]
+        if held is not None and (held.holds_page(w.page) or held.holds_span(w.start, w.end)):
+            out["already_in_context"] = True
+            out["snippet"] = snippet_around(body, query)
+            return out
+        mark = "" if w.page is None else (f"[p. ~{w.page}]\n" if w.approximate else f"[p. {w.page}]\n")
+        out["text"] = (
+            mark + ("…" if w.start > w.page_start else "") + body.strip()
+            + ("…" if w.end < w.page_end else "")
+        )
+        return out
+
+    sent: list[tuple] = []  # windows whose text the last build carried
+
+    def build(cap: int) -> dict:
+        passages, size, left_out = [], 0, 0
+        sent.clear()
+        for doc, w in chosen:
+            p = passage(doc, w, held_by_doc[doc.uuid])
+            size += len(p.get("text") or p.get("snippet") or "")
+            if size > cap and passages:
+                left_out += 1
+                continue
+            passages.append(p)
+            if "text" in p:
+                sent.append((doc, w))
+        note = (
+            "The best keyword matches, best first; not the whole document. Cite the "
+            "page of each fact you take from a passage, and name the file when more "
+            "than one is attached. A passage marked already_in_context is on a page "
+            "you already have: read it there. If none of these answers the question, "
+            "search again with other words, or read the pages around a match with "
+            "get_document_text."
+        )
+        if left_out:
+            note += f" {left_out} more match(es) were left out for room; search with more specific words to reach them."
+        result = {"query": query, "documents_searched": searched, "passages": passages, "note": note}
+        notes = {page_note_for(getattr(d, "text_markers", None), annotated=True).strip() for d in docs}
+        notes.discard("")
+        if notes:
+            result["page_citation_note"] = " ".join(sorted(notes))
+        return result
+
+    result = _fit_to_room(context, build, _SEARCH_MAX_CHARS)
+    if "error" not in result:
+        for doc, w in sent:
+            held = held_by_doc[doc.uuid]
+            if held is not None:
+                held.spans.add((w.start, w.end))
     return result
 
 
@@ -6824,6 +7148,7 @@ TOOLS = [
     fetch_url,
     web_search,
     get_document_text,
+    search_attached_documents,
     analyze_documents,
     run_extraction,
     check_compliance,
@@ -6898,6 +7223,7 @@ COMPACTABLE_TOOLS: frozenset[str] = frozenset({
     "fetch_url",
     "web_search",
     "get_document_text",
+    "search_attached_documents",
     "analyze_documents",
     "run_extraction",
     "check_compliance",
