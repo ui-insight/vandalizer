@@ -14,6 +14,7 @@ model holds and never outgrow the room the window has left.
 
 import inspect
 from types import SimpleNamespace
+from typing import Optional
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -21,7 +22,7 @@ from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserProm
 from pydantic_ai.usage import RequestUsage
 
 from app.services import chat_tools
-from app.services.chat_service import annotate_pages, documents_in_context
+from app.services.chat_service import _page_positions, annotate_pages, documents_in_context
 from app.services.chat_tools import get_document_text, search_attached_documents
 from app.services.context_budget import (
     _DOCUMENT_CUT_MARKER,
@@ -36,6 +37,8 @@ from app.services.doc_passages import (
     DocumentContext,
     annotated_pages,
     context_after_compaction,
+    document_windows,
+    heading_matches,
     rank_texts,
     strong_matches,
     terms,
@@ -48,14 +51,24 @@ FILLER = (
 )
 
 
-def _foa(pages: int = 60):
+COST_SHARE_PAGE = 45
+COST_SHARE_SECTION = (
+    "# B. Cost Sharing\nThe cost share must be at least 20% of the total allowable costs for R&D "
+    "and 50% for demonstration.\n"
+)
+
+
+def _foa(pages: int = 60, sections: Optional[dict[int, str]] = None):
     """A long solicitation: a table of contents up front, filler pages, and one
     topic's award terms deep in the middle. Page lengths vary so the markers
-    read as measured, not interpolated (page_locator.with_marker_provenance)."""
+    read as measured, not interpolated (page_locator.with_marker_provenance).
+    ``sections`` puts more text at the top of the pages it names."""
     raw, markers = "", []
     for p in range(1, pages + 1):
         markers.append({"kind": "page", "value": p, "char_offset": len(raw)})
-        if p == 2:
+        if sections and p in sections:
+            body = sections[p]
+        elif p == 2:
             body = "Table of Contents. Topic Area 3.4 Rapid Solar Software Development ... 37\n"
         elif p == TOPIC_PAGE:
             body = (
@@ -108,6 +121,17 @@ class TestRanking:
         strong = strong_matches(rank_texts("Topic 3.4 award ceiling for our project", texts), "Topic 3.4 award ceiling for our project")
         assert [r.index for r in strong] == [1]
 
+    def test_a_heading_made_of_the_questions_words_names_its_subject(self):
+        texts = ["intro\n# B. Cost Sharing\nThe cost share must be", "## ix. Cost Sharing Waivers\n", "# Cost\n", "## Topic Area 3.4\n"]
+        assert heading_matches("Is the cost share just 20% for Topic 3.4?", texts) == [0]
+
+    def test_a_heading_in_running_text_is_not_a_heading(self):
+        assert heading_matches("cost share", ["see the Cost Sharing section"]) == []
+
+    def test_of_two_texts_holding_the_heading_the_one_it_opens_comes_first(self):
+        texts = ["|5.3|Controls|Up to 3 years|\n# i. Period of Performance\n", "# i. Period of Performance\nup to 60 months\n"]
+        assert heading_matches("Period of Performance", texts) == [1, 0]
+
 
 # ---------------------------------------------------------------------------
 # The planner keeps the pages that match the question
@@ -147,6 +171,17 @@ class TestTrimByPages:
         assert TOPIC_PAGE in held.pages and 1 in held.pages and 60 in held.pages
         assert len(held.pages) < 60
         assert sent.source_uuid == "foa-1"
+
+    def test_the_section_titled_with_the_questions_subject_goes_with_it(self):
+        """lng-002 (2026-10-30): the cost-share rule's page shares only "cost share 20"
+        with a question about a topic, so the topic's own pages outranked it."""
+        raw, markers = _foa(sections={COST_SHARE_PAGE: COST_SHARE_SECTION})
+        question = "We're proposing a Topic 3.4 Rapid Solar Software Development project. Is the cost share just 20%?"
+        text = _plan(_segment(raw, markers), question).documents[0].text
+        kept = [p.page for p in annotated_pages(text)]
+        assert "50% for demonstration" in text
+        assert COST_SHARE_PAGE + 1 in kept  # the section runs on to the next page
+        assert TOPIC_PAGE in kept
 
     def test_a_document_without_pages_keeps_the_head_tail_cut(self):
         seg = DocumentSegment(label="doc:sheet.xlsx", text="row value " * 12_000, source_uuid="x")
@@ -329,6 +364,39 @@ class TestSearchAttachedDocuments:
         assert top["text"].startswith(f"[p. {TOPIC_PAGE}]\n")
         assert "$750,000" in top["text"]
         assert top["document"] == "SETO_FOA.pdf"
+
+    @pytest.mark.asyncio
+    async def test_the_section_titled_with_the_querys_subject_comes_first(self):
+        raw, markers = _foa(sections={COST_SHARE_PAGE: COST_SHARE_SECTION})
+        p = _patched(_doc(raw, markers))
+        try:
+            result = await search_attached_documents(_ctx(held={"foa-1": DocumentContext(pages={1, 2, 3})}),
+                                                     "Topic 3.4 Rapid Solar Software Development cost share")
+        finally:
+            p.stop()
+        assert result["passages"][0]["page"] == COST_SHARE_PAGE
+        assert TOPIC_PAGE in [x["page"] for x in result["passages"]]
+
+    @pytest.mark.asyncio
+    async def test_a_heading_at_a_windows_end_comes_with_its_section(self):
+        """lng-010 (2026-10-31): the window ending at "Period of Performance" came first,
+        and the one holding its "up to 60 months" overlapped it and was left out."""
+        table = "".join(f"|5.{n}|Topic {n} title|$5 million maximum per award|Up to 3 years|\n" for n in range(24))
+        section = (
+            table + "# i. Period of Performance\n"
+            "EERE anticipates making awards that will run up to 60 months in length, comprised of "
+            "one or more budget periods, each ending in a go/no-go decision.\n"
+        )
+        raw, markers = _foa(sections={COST_SHARE_PAGE: section})
+        windows = [raw[w.start:w.end] for w in document_windows(raw, _page_positions(markers, len(raw)))]
+        assert any("Period of Performance" in t and "60 months" not in t for t in windows)  # the trap is set
+        p = _patched(_doc(raw, markers))
+        try:
+            result = await search_attached_documents(_ctx(held={"foa-1": DocumentContext(pages={1, 2, 3})}),
+                                                     "Period of Performance")
+        finally:
+            p.stop()
+        assert "up to 60 months" in result["passages"][0]["text"]
 
     @pytest.mark.asyncio
     async def test_a_match_on_a_page_already_held_is_a_pointer_with_a_snippet(self):

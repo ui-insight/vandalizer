@@ -32,7 +32,7 @@ from app.models.workflow import Workflow
 from app.services.chat_deps import AgenticChatDeps
 from app.services.context_budget import TOOL_RESULT_MIN_TOKENS, ToolResultBudget
 from app.services.doc_passages import (
-    DocumentContext, document_windows, format_pages, rank_texts, snippet_around, strong_matches,
+    DocumentContext, document_windows, format_pages, heading_matches, rank_texts, snippet_around, strong_matches,
 )
 from app.services.certification_versions.runtime import course_operation
 from app.services.certification_versions.tool_results import (
@@ -2178,13 +2178,17 @@ async def search_attached_documents(
             hint="Tell the user the text is not available yet or could not be read.",
         )
 
-    def rank() -> tuple[list, list]:
+    def rank() -> tuple[list, list[int]]:
         corpus = []
         for doc in docs:
             positions = _page_positions(getattr(doc, "text_markers", None), len(doc.raw_text))
             corpus.extend((doc, w) for w in document_windows(doc.raw_text, positions))
-        ranked = rank_texts(query, [d.raw_text[w.start:w.end] for d, w in corpus])
-        return corpus, strong_matches(ranked, query, share=0.3)
+        texts = [d.raw_text[w.start:w.end] for d, w in corpus]
+        # A section titled with the query's subject first ("Cost Sharing" for
+        # "Topic 5.1 cost share"), then the windows whose text matches best.
+        order = heading_matches(query, texts)
+        order += [r.index for r in strong_matches(rank_texts(query, texts), query, share=0.3)]
+        return corpus, list(dict.fromkeys(order))
 
     # Tokenizing a few hundred pages takes a moment; keep it off the event loop.
     corpus, ranked = await asyncio.to_thread(rank)
@@ -2204,8 +2208,8 @@ async def search_attached_documents(
 
     want = max(1, min(_SEARCH_MAX_PASSAGES, int(max_passages or _SEARCH_DEFAULT_PASSAGES)))
     chosen: list[tuple] = []
-    for r in ranked:
-        doc, w = corpus[r.index]
+    for i in ranked:
+        doc, w = corpus[i]
         if any(d is doc and _overlaps(w, c) for d, c in chosen):
             continue
         chosen.append((doc, w))

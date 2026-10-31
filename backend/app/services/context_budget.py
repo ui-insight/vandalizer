@@ -813,7 +813,7 @@ def _trim_by_pages(
     Returns None when the text has too few page markers, or pages too large
     for the allowance, and the caller keeps the token-level cut.
     """
-    from app.services.doc_passages import annotated_pages, rank_texts, strong_matches
+    from app.services.doc_passages import annotated_pages, heading_matches, rank_texts, strong_matches
 
     pages = annotated_pages(text)
     if len(pages) < _MIN_PAGES_FOR_PAGE_TRIM:
@@ -850,12 +850,19 @@ def _trim_by_pages(
     picked: set[int] = set()
     pick_room = int(budget * _PICKED_PAGES_SHARE)
     ends = fill(budget - pick_room, set())
+    # First a section titled with the question's subject, and the page it runs
+    # on to; then the pages whose text matches the question best.
+    wanted: list[int] = []
+    for i in heading_matches(question, bodies):
+        wanted += [i, i + 1] if i + 1 < len(pages) else [i]
     cut = [r for r in rank_texts(question, bodies) if r.index not in ends]
+    wanted += [r.index for r in strong_matches(cut, question)]
+    candidates = [i for i in dict.fromkeys(wanted) if i not in ends][:_PICKED_PAGES_MAX]
     used = 0
-    for r in strong_matches(cut, question)[:_PICKED_PAGES_MAX]:
-        cost = costs[r.index] + note_cost
+    for i in candidates:
+        cost = costs[i] + note_cost
         if used + cost <= pick_room:
-            picked.add(r.index)
+            picked.add(i)
             used += cost
     kept = picked | fill(budget - used, picked)
     if len(kept) == len(pages):

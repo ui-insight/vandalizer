@@ -161,6 +161,47 @@ def strong_matches(ranked: list[Ranked], query: str, *, share: float = 0.5) -> l
     return [r for r in ranked if r.matched >= need and r.score >= share * best]
 
 
+# A Markdown heading, as the document readers write them ("# B. Cost Sharing").
+_HEADING_RE = re.compile(r"^#{1,6}[ \t]+(.+?)[ \t]*$", re.M)
+# What numbers a heading rather than names it: "B.", "ix.", "III".
+_ENUMERATOR_RE = re.compile(r"[a-z]|[ivxlc]+")
+
+
+def _root(term: str) -> str:
+    """``share`` and ``sharing`` (stemmed ``shar``) as one word."""
+    return term[:-1] if len(term) > 4 and term.endswith("e") else term
+
+
+def heading_matches(query: str, texts: list[str], *, limit: int = 2) -> list[int]:
+    """Texts holding a heading that names the question's subject, best first.
+
+    A heading names it when it has two or more words and every one of them is
+    a word of the question: "Cost Sharing" for "Is the cost share just 20%?".
+    A solicitation states a rule in the section titled with it, and that page
+    can share little else with a question asked about a topic: on the
+    2026-10-30 eval the cost-share rule's page ranked 22nd of 151 on its text
+    for a Topic 5.1 question, below the topic's own pages.
+
+    Of texts holding the same heading, the one where it sits nearest the top
+    comes first: it carries the section's text, not what runs up to it. Two
+    overlapping windows of one FOA page both held "Period of Performance";
+    returned first, the one that ended at the heading hid "up to 60 months"
+    from every lng-010 search on the 2026-10-31 eval.
+    """
+    asked = {_root(t) for t in terms(query)}
+    hits: list[tuple[int, int, int]] = []
+    for i, text in enumerate(texts):
+        best: Optional[tuple[int, int]] = None
+        for m in _HEADING_RE.finditer(text or ""):
+            words = {_root(w) for w in terms(m.group(1)) if not _ENUMERATOR_RE.fullmatch(w)}
+            if len(words) >= 2 and words <= asked and (best is None or len(words) > best[0]):
+                best = (len(words), m.start())
+        if best:
+            hits.append((i, *best))
+    hits.sort(key=lambda h: (-h[1], h[2], h[0]))
+    return [i for i, _, _ in hits[:limit]]
+
+
 # ---------------------------------------------------------------------------
 # Pages of annotated segment text (what the planner trims)
 # ---------------------------------------------------------------------------
