@@ -33,7 +33,18 @@ describe('ChatMessage corrected answer', () => {
       .toHaveTextContent(/misstated them, and it was rewritten/)
   })
 
-  it.each(['no_flags', 'unchanged', 'second_check_late'])('shows nothing when the check ended %s', (outcome) => {
+  // An attached-document answer rewritten after the check found a value the
+  // documents give for something else (chat_doc_answer_check) says that.
+  it('says what the attached-document check corrected', () => {
+    render(<ChatMessage message={answer({
+      answer_check: { version: 1, outcome: 'repaired', kind: 'attached_documents' },
+    })} />)
+
+    expect(screen.getByRole('note', { name: 'Answer corrected after checking' }))
+      .toHaveTextContent(/attached documents found that the answer gave a value they do not state for what was asked/)
+  })
+
+  it.each(['no_flags', 'unchanged', 'second_check_late', 'kept', 'not_stated'])('shows nothing when the check ended %s', (outcome) => {
     render(<ChatMessage message={answer({ answer_check: { version: 1, outcome } })} />)
 
     expect(screen.queryByRole('note')).not.toBeInTheDocument()

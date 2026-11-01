@@ -245,6 +245,9 @@ export interface ClaimChecks {
 export interface AnswerCheck {
   version: number
   outcome: string
+  /** "attached_documents" for the attached-document check; absent for the
+   *  knowledge-base repair. */
+  kind?: string
   sentences?: string[]
   original_answer?: string
   repair?: { model: string; flagged: number[]; changed?: number[]; kept?: number[] }

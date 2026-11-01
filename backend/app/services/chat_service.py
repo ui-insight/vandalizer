@@ -2713,6 +2713,17 @@ async def chat_stream(
                     bool(documents or attachment_segments), previous_messages,
                     model_name, sys_config_doc,
                 )
+                # An answer from attached documents, checked for a value the
+                # documents give for something other than what was asked, and
+                # rewritten when they do (off unless chat_config turns it on).
+                # Never on a KB turn, so the two steps never both run.
+                if answer_check is None:
+                    assistant_message, answer_check = await _check_document_answer(
+                        assistant_message, message, documents,
+                        documents_in_context(doc_segments, compacted.documents),
+                        bool(active_kbs), bool(attachment_segments), bool(low_quality_docs),
+                        streamed_tool_results, previous_messages, model_name, sys_config_doc,
+                    )
                 if answer_check and answer_check.get("outcome") == "repaired":
                     streamed_segments[:] = [
                         s for s in streamed_segments if s.get("kind") != "text"
@@ -4535,6 +4546,56 @@ async def _repair_answer(
         )
     except Exception as e:  # noqa: BLE001
         logger.warning("Chat answer check failed: %s", e)
+        return answer, None
+
+
+async def _check_document_answer(
+    answer: str,
+    question: str,
+    documents: list,
+    held: dict,
+    knowledge_bases: bool,
+    other_attachments: bool,
+    low_quality: bool,
+    tool_results: list[dict],
+    history: list[ModelMessage],
+    model_name: str,
+    system_config_doc: Optional[dict],
+) -> tuple[str, Optional[dict]]:
+    """``answer`` checked for a value the attached documents give for
+    something other than what was asked, and rewritten when the check finds
+    one (``chat_doc_answer_check``): the answer to keep, and the record of
+    the check. ``held`` is ``documents_in_context`` for the turn. The record
+    is None when ``chat_config`` leaves the step off or the turn is not one
+    it was measured on. Never raises: a failure keeps the answer."""
+    from app.services import chat_answer_repair, chat_doc_answer_check
+    from app.services.doc_passages import DocumentContext
+
+    config = chat_doc_answer_check.check_config(system_config_doc)
+    if config is None or not answer.strip():
+        return answer, None
+    whole = [isinstance(held.get(d.uuid), DocumentContext) and held[d.uuid].whole for d in documents or []]
+    if not chat_doc_answer_check.in_scope(
+        documents_whole=whole,
+        document_chars=sum(len(d.raw_text or "") for d in documents or []),
+        knowledge_bases=knowledge_bases, other_attachments=other_attachments,
+        low_quality=low_quality, tool_results=tool_results,
+    ):
+        return answer, None
+    pages = []
+    for d in documents:
+        markers = getattr(d, "text_markers", None)
+        pages += chat_doc_answer_check.document_pages(
+            d.title or d.uuid, d.raw_text or "", _page_positions(markers, len(d.raw_text or "")), markers,
+        )
+    try:
+        return await chat_doc_answer_check.check_and_rewrite(
+            answer, question, pages, config,
+            chat_answer_repair.model_ask(model_name, system_config_doc),
+            prev_question=_previous_question(_recent_turns(history)),
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning("Attached-document answer check failed: %s", e)
         return answer, None
 
 

@@ -224,6 +224,11 @@ class SystemConfig(Document):
     #       (chat_answer_repair). With it: "answer_repair_checker_model",
     #       "answer_repair_second_checker_model" (empty for none),
     #       "answer_repair_model", "answer_repair_second_check_seconds".
+    #   "doc_answer_check_enabled": bool (default False) — check a finished
+    #       answer about attached documents for a value they give for
+    #       something other than what was asked, and rewrite it when they do
+    #       (chat_doc_answer_check). With it: "doc_answer_check_model",
+    #       "doc_answer_rewrite_model".
     #   "empty_pool_check_enabled": bool (default False) — when a KB question
     #       keeps no passage, even reworded, have a model read its best three
     #       candidates and keep those it finds answer it (kb_empty_check).
