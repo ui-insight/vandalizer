@@ -830,3 +830,25 @@ class TestNoDocumentChatRulesContent:
         assert "earlier messages" in rules
         assert "not attached now" in rules
         assert "do not invent a reason" in rules
+
+
+class TestDocumentChatRulesContent:
+    """Attached-document chat eval, 2026-10-31: asked for what the documents
+    don't state, answers led with a real value that belonged to something else
+    (a collaboration's total as one partner's award, the PI's months as the
+    co-PI's, a storage window as a checkpoint reading, a TBN placeholder as a
+    name) or divided a total by a head count."""
+
+    def _rules(self) -> str:
+        from app.services.llm_service import DOCUMENT_CHAT_RULES
+        return DOCUMENT_CHAT_RULES
+
+    def test_the_value_must_belong_to_what_was_asked(self):
+        rules = self._rules()
+        assert "same party, award, person, place and period" in rules
+        assert "an allowed range or limit is not a measured reading" in rules
+        assert "a placeholder" in rules and "is not a name" in rules
+        assert "say first that it doesn't state what was asked" in rules
+
+    def test_a_total_over_a_count_is_not_a_per_person_amount(self):
+        assert "A total and a count do not state a per-person or per-item amount" in self._rules()
