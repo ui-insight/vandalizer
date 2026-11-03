@@ -1467,6 +1467,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           const failed = contextNotices.filter(n => n.action === 'documents_extraction_failed')
           const lowQuality = contextNotices.filter(n => n.action === 'documents_low_quality')
           const kbFailed = contextNotices.filter(n => n.action === 'kb_retrieval_failed')
+          const builtin = contextNotices.filter(n => n.action === 'builtin_kbs_consulted')
           const routing = contextNotices.filter(
             n => n.action === 'model_routed' || n.action === 'model_not_routed',
           )
@@ -1480,7 +1481,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
             'documents_not_ready', 'documents_extraction_failed',
             'documents_low_quality', 'kb_retrieval_failed',
             'model_routed', 'model_not_routed',
-            'documents_trimmed', 'attachments_trimmed',
+            'documents_trimmed', 'attachments_trimmed', 'builtin_kbs_consulted',
           ])
           const compacted = contextNotices.filter(n => COMPACTION_ACTIONS.has(n.action))
           const other = contextNotices.filter(
@@ -1531,6 +1532,14 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                   <div className="font-medium mb-1">This answer is not grounded in your documents</div>
                   <ul className="list-disc pl-4 space-y-0.5">
                     {kbFailed.map((n, i) => <li key={i}>{n.detail}</li>)}
+                  </ul>
+                </div>
+              )}
+              {builtin.length > 0 && (
+                <div role="status" className="mt-2 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-800 border border-blue-200">
+                  <div className="font-medium mb-1">Searched a built-in knowledge base</div>
+                  <ul className="list-disc pl-4 space-y-0.5">
+                    {builtin.map((n, i) => <li key={i}>{n.detail}</li>)}
                   </ul>
                 </div>
               )}
