@@ -224,6 +224,13 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
       return { text: `Found ${passages.length} relevant passage${passages.length !== 1 ? 's' : ''}`, qualityHint }
     }
 
+    case 'find_pages': {
+      const pages = Array.isArray(obj.items) ? obj.items as Array<Record<string, unknown>> : []
+      if (pages.length === 0) return { text: 'No matching pages', qualityHint: '' }
+      if (pages.length === 1) return { text: `Found "${String(pages[0].title).slice(0, 60)}" (version ${pages[0].version})`, qualityHint: '' }
+      return { text: `Found ${pages.length} page${pages.length !== 1 ? 's' : ''}`, qualityHint: '' }
+    }
+
     case 'get_document_text': {
       const title = obj.title ? `"${String(obj.title).slice(0, 40)}"` : ''
       // Say which pages a read covered, so a partial read of a long

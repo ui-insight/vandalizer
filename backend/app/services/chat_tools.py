@@ -35,7 +35,7 @@ from app.models.verification_session import VerificationField, VerificationSessi
 from app.models.workflow import Workflow
 from app.services.chat_deps import AgenticChatDeps
 from app.services.chat_page_templates import find_page_templates, get_page_template
-from app.services.chat_artifact_tools import create_html_artifact, get_html_artifact, revise_html_artifact
+from app.services.chat_artifact_tools import create_html_artifact, find_pages, get_html_artifact, revise_html_artifact
 from app.services.chat_skill_tools import get_skill, list_skills, select_skill
 from app.services.chat_file_tools import list_projects, move_documents_to_project
 from app.services.certification_versions.runtime import course_operation
@@ -7081,6 +7081,7 @@ TOOLS: list[ToolFuncContext[AgenticChatDeps, ...]] = [
     find_page_templates,
     get_page_template,
     create_html_artifact,
+    find_pages,
     get_html_artifact,
     revise_html_artifact,
     # Phase 0 — Plan/progress tracking (sequential: mutates deps.plan_state)
