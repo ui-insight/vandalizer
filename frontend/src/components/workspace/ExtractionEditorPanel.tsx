@@ -1866,7 +1866,9 @@ export function DesignTab({
                       title="Edit field settings"
                       style={{
                         background: 'none', border: 'none', padding: 0, margin: 0,
-                        fontFamily: 'inherit', fontSize: 'var(--workspace-font-body)', color: '#202124', flex: 1,
+                        // With a result shown, the name is the label and the
+                        // value below is what people read, check and copy.
+                        fontFamily: 'inherit', fontSize: 'var(--workspace-font-body)', color: resultVal !== undefined ? '#4b5563' : '#202124', flex: 1,
                         minWidth: 0, cursor: 'pointer', textAlign: 'left',
                         display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
                       }}
@@ -1902,8 +1904,19 @@ export function DesignTab({
                       ? `${badge.title}${locator && support !== 'unverified' ? ` (${locator})` : ''}`
                       : 'Click to highlight in PDF'
                   return (
-                    <div className="extraction-field-value" style={{ marginTop: 4, marginLeft: 42, fontSize: 'var(--workspace-font-control)', color: '#202124', overflowWrap: 'anywhere' }}>
-                      <div style={{ fontWeight: 600 }}>{resultVal || 'No value returned'}</div>
+                    <div className="extraction-field-value" style={{ marginTop: 6, marginLeft: 42, fontSize: 'var(--workspace-font-control)', color: '#202124', overflowWrap: 'anywhere' }}>
+                      {/* Support ticket: values were smaller than their field
+                          names with nothing setting them apart, so in a list
+                          of 24 they read as the least prominent text. */}
+                      <div className="extraction-field-value-text" style={{
+                        fontSize: 'var(--workspace-font-body)', fontWeight: 600, lineHeight: 1.55, whiteSpace: 'pre-wrap',
+                        color: clickable ? '#0f172a' : '#4b5563',
+                        background: clickable ? '#eff6ff' : '#f9fafb',
+                        border: `1px solid ${clickable ? '#bfdbfe' : 'var(--workspace-border)'}`,
+                        borderLeft: `3px solid ${clickable ? '#2563eb' : '#9ca3af'}`,
+                        borderRadius: 'var(--workspace-radius-small)',
+                        padding: '8px 12px',
+                      }}>{resultVal || 'No value returned'}</div>
                       {(!resultVal || resultVal === 'N/A') && <p style={{ margin: '4px 0', color: '#92400e' }}>No confirmed value. Check the source; this does not establish that the information is absent.</p>}
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
                         {clickable && <button type="button"
