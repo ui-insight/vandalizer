@@ -9,7 +9,7 @@ from fastapi import HTTPException
 from pydantic_ai.tools import RunContext
 
 from app.services.chat_deps import AgenticChatDeps
-from app.services import artifacts, chat_page_previews
+from app.services import artifacts, chat_page_previews, page_sources
 from app.services.page_authoring import PAGE_INTERACTION_RULES, PAGE_LANGUAGE_RULES, PAGE_SOURCE_FIDELITY_RULES
 from app.tasks import get_sync_db
 from app.schemas.page_template import TemplateTable, TemplateValue
@@ -52,7 +52,11 @@ async def get_html_artifact(context: RunContext[AgenticChatDeps], artifact_uuid:
         if doc["user_id"] != context.deps.user_id:
             return {"error": "Page not found or you do not own it."}
         rev = artifacts.revision(doc)
+        sources = await _call(page_sources.freshness, page_sources.revision_sources(rev), changes=True)
         return {"artifact_uuid": doc["uuid"], "title": rev["title"], "revision": rev["uuid"], "html": rev["html"],
+                # status "updated" names the newer version (latest.uuid) and what
+                # changed; rebuild every affected value from that file.
+                "source_files": sources,
                 "version": next(i for i, entry in enumerate(doc["revisions"], 1) if entry["uuid"] == rev["uuid"]),
                 "warnings": rev["warnings"], "rendering_note": RENDERING_NOTE,
                 "source_fidelity_note": PAGE_SOURCE_FIDELITY_RULES, "language_note": PAGE_LANGUAGE_RULES}
@@ -98,7 +102,7 @@ async def create_html_artifact(context: RunContext[AgenticChatDeps], title: str,
             title = f"{template['name']} — {document.title}"[:200]
             return await _save(context, title, html, confirmed, template_source={
                 'template_uuid': template_uuid, 'template_check': check,
-            })
+            }, source_documents=[document.uuid])
         except HTTPException as exc:
             return {'error': exc.detail}
     if source_document_uuid or template_values or template_tables:
@@ -123,7 +127,21 @@ async def revise_html_artifact(context: RunContext[AgenticChatDeps], artifact_uu
     return await _save(context, title, html, confirmed, artifact_uuid, base_revision)
 
 
-async def _save(context: RunContext[AgenticChatDeps], title: str, html: str, confirmed: bool, artifact_uuid: str | None=None, base_revision: str | None=None, template_source: dict | None=None) -> dict:
+def _used_documents(context: RunContext[AgenticChatDeps]) -> list[str]:
+    """Files this turn's page was built from: attached files, then files read."""
+    used = list(getattr(context.deps, "context_document_uuids", None) or [])
+    used += [u for u in getattr(context.deps, "documents_read", None) or [] if u not in used]
+    return used
+
+
+def _source_documents(db: Database[dict], doc: dict | None, used: list[str]) -> list[dict]:
+    if doc is None:
+        return page_sources.resolve(db, used)
+    previous = page_sources.revision_sources(artifacts.revision(doc))
+    return page_sources.resolve(db, page_sources.carry_forward(db, previous, used))
+
+
+async def _save(context: RunContext[AgenticChatDeps], title: str, html: str, confirmed: bool, artifact_uuid: str | None=None, base_revision: str | None=None, template_source: dict | None=None, source_documents: list[str] | None=None) -> dict:
     from app.services.chat_tools import _confirm_gate
     conversation = context.deps.conversation
     if conversation is None:
@@ -139,8 +157,10 @@ async def _save(context: RunContext[AgenticChatDeps], title: str, html: str, con
             if doc["latest_revision"] != base_revision:
                 return {"error": "Page changed. Read the latest revision before proposing an edit."}
         name = "revise_html_artifact" if artifact_uuid else "create_html_artifact"
+        documents = await _call(_source_documents, doc, source_documents or _used_documents(context))
         snapshot = await _call(chat_page_previews.prepare, context.deps.user_id,
-            conversation.uuid, title, html, artifact_uuid, base_revision, {**_source(context), **(template_source or {})})
+            conversation.uuid, title, html, artifact_uuid, base_revision,
+            {**_source(context), **(template_source or {}), "documents": documents})
         digest = hashlib.sha256((title + snapshot["prepared_html"]).encode()).hexdigest()
         gate = await _confirm_gate(context, tool_name=name,
             key={"artifact": artifact_uuid, "base": base_revision, "sha256": digest}, confirmed=confirmed,

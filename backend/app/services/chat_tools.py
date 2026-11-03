@@ -1884,6 +1884,9 @@ async def get_document_text(
     # preserved). Local import — chat_service imports this module.
     from app.services.chat_service import page_note_for
 
+    documents_read = getattr(context.deps, "documents_read", None)
+    if isinstance(documents_read, list) and doc.uuid not in documents_read:
+        documents_read.append(doc.uuid)
     raw = doc.raw_text or ""
     markers = getattr(doc, "text_markers", None)
     read = read_document_range(

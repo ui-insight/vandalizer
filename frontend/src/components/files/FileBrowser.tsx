@@ -5,7 +5,7 @@ import { Plus, Folder as FolderIcon, Upload, Trash2, Download, FolderInput } fro
 import { useTeams } from '../../hooks/useTeams'
 import { useDocuments } from '../../hooks/useDocuments'
 import { useBreadcrumbs } from '../../hooks/useFolders'
-import { useUpload } from '../../hooks/useUpload'
+import { useUpload, fileToBase64 } from '../../hooks/useUpload'
 import { Breadcrumbs } from './Breadcrumbs'
 import { FileList } from './FileList'
 import { UploadZone } from './UploadZone'
@@ -18,7 +18,8 @@ import { MoveFileDialog } from './MoveFileDialog'
 import { ExistingFilesDialog } from './ExistingFilesDialog'
 import { useConfirm } from '../shared/useConfirm'
 import { useToast } from '../../contexts/ToastContext'
-import { deleteFile, renameFile, downloadFile, downloadFilesAsZip, moveFile, fetchDocumentUsage, type DeleteFileResult, type DocumentUsage } from '../../api/files'
+import { deleteFile, renameFile, downloadFile, downloadFilesAsZip, moveFile, fetchDocumentUsage, uploadFileVersion, type DeleteFileResult, type DocumentUsage } from '../../api/files'
+import { VersionHistoryDialog } from './VersionHistoryDialog'
 import { DocumentUsageDialog, UsageSummaryList, UsageCheckFailedNote, RemoveFromKnowledgeBasesOption, describeDeleteEffects, mergeUsage, summarizeUsage, type UsageGroups } from './DocumentUsageDialog'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { createFolder, renameFolder, deleteFolder, convertFolderToTeam, moveFolder, exportFolder } from '../../api/folders'
@@ -427,6 +428,25 @@ export function FileBrowser({ searchAction, searchField, selectedDocumentUuids, 
 
   // Context menu state
   const [usageTarget, setUsageTarget] = useState<{ uuid: string; title: string } | null>(null)
+  const [versionsTarget, setVersionsTarget] = useState<{ uuid: string; title: string } | null>(null)
+  const versionInput = useRef<HTMLInputElement>(null)
+  const versionTarget = useRef<Document | null>(null)
+  const uploadVersion = useCallback(async (file: File) => {
+    const doc = versionTarget.current
+    versionTarget.current = null
+    if (!doc) return
+    try {
+      const result = await uploadFileVersion(doc.uuid, {
+        contentAsBase64String: await fileToBase64(file),
+        fileName: file.name,
+        extension: file.name.split('.').pop() || '',
+      })
+      toast(`Uploaded version ${result.version_number} of ${doc.title}. Pages built from it will offer an update.`, 'success')
+      refresh()
+    } catch (err: unknown) {
+      toast(err instanceof Error ? err.message : 'Could not upload the new version', 'error')
+    }
+  }, [refresh, toast])
   const { openWorkflow, openExtraction, activateKB } = useWorkspace()
   const [contextMenu, setContextMenu] = useState<{
     x: number
@@ -821,6 +841,11 @@ export function FileBrowser({ searchAction, searchField, selectedDocumentUuids, 
         />}
       </div>
 
+      <input ref={versionInput} type="file" hidden accept={SUPPORTED_ACCEPT_ATTR} aria-hidden="true" tabIndex={-1}
+        onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void uploadVersion(file) }} />
+      {versionsTarget && (
+        <VersionHistoryDialog docUuid={versionsTarget.uuid} docTitle={versionsTarget.title} onClose={() => setVersionsTarget(null)} />
+      )}
       {usageTarget && (
         <DocumentUsageDialog
           docUuid={usageTarget.uuid}
@@ -900,6 +925,16 @@ export function FileBrowser({ searchAction, searchField, selectedDocumentUuids, 
           onShowUsage={
             contextMenu.type === 'doc'
               ? () => setUsageTarget({ uuid: contextMenu.item.uuid, title: contextMenu.item.title })
+              : undefined
+          }
+          onUploadVersion={
+            contextMenu.type === 'doc'
+              ? () => { versionTarget.current = contextMenu.item as Document; versionInput.current?.click() }
+              : undefined
+          }
+          onShowVersions={
+            contextMenu.type === 'doc'
+              ? () => setVersionsTarget({ uuid: contextMenu.item.uuid, title: contextMenu.item.title })
               : undefined
           }
           onConvertToTeam={

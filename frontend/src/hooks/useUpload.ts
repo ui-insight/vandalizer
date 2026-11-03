@@ -94,7 +94,7 @@ export function useUpload(folderId: string | null, onComplete: () => void) {
   return { uploads, upload, dismissUpload, lastUploadedUuid, clearLastUploaded }
 }
 
-function fileToBase64(file: File): Promise<string> {
+export function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => {

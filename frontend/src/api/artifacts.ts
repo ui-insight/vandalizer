@@ -1,6 +1,17 @@
 import { apiFetch } from './client'
 import type { ExportMessage } from './chat'
 
+/** A file a Page was built from, and whether a newer version exists. */
+export interface PageSourceDocument {
+  uuid: string
+  title: string
+  version_number: number
+  status: 'current' | 'updated' | 'missing'
+  /** The newest version; null when it exists but the viewer cannot open it. */
+  latest?: { uuid: string; title: string; version_number: number; created_at: string | null; ready: boolean } | null
+  changes?: { items: string[]; more: number; total: number }
+}
+
 export interface Artifact {
   uuid: string
   created_at?: string
@@ -16,9 +27,11 @@ export interface Artifact {
   can_manage: boolean
   public_sharing_enabled?: boolean
   revisions: { uuid: string; title: string; created_at: string; warnings: string[]; version?: number }[]
+  /** Owner only: the latest version's source files. */
+  source_documents?: PageSourceDocument[]
 }
 const path = (id: string) => `/api/pages/${encodeURIComponent(id)}`
-export interface PublicArtifact { title: string; revision: string; version: number; updated_at: string }
+export interface PublicArtifact { title: string; revision: string; version: number; updated_at: string; newer_data_available?: boolean }
 export interface ArtifactPageResult { items: Artifact[]; total: number; page: number; page_size: number }
 export const browseArtifacts = (params: { search?: string; sort?: string; page?: number; project_uuid?: string }) => {
   const query = new URLSearchParams()

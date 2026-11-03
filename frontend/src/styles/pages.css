@@ -60,6 +60,13 @@
 .page-source { font-size:12px; color:#5b6573; display:flex; align-items:center; flex-wrap:wrap; gap:16px; margin-top:16px; }
 .page-source a { display:inline-flex; align-items:center; gap:5px; text-decoration:none; }
 .page-source a:hover { text-decoration:underline; }
+.page-built-from { display:inline-flex; align-items:center; gap:5px; }
+.page-source-update { padding:14px 18px; background:#eef5ff; border:1px solid #c7dbf6; border-radius:10px; font-size:13px; color:#23405f; margin-bottom:16px; line-height:1.5; }
+.page-source-update h2 { display:flex; align-items:center; gap:7px; font-size:15px; font-weight:650; margin:0 0 6px; }
+.page-source-update p { margin:4px 0; }
+.page-source-update ul { margin:6px 0 8px; padding-left:20px; list-style:disc; font-variant-numeric:tabular-nums; }
+.page-source-update .page-actions { margin-top:10px; align-items:center; }
+.page-source-update .page-actions span { font-size:12px; color:#4b6280; }
 .page-editor { margin:20px 0; padding:24px; border:1px solid #dce1e7; border-radius:12px; background:white; }
 .page-editor h2 { font-size:17px; font-weight:650; }
 .page-editor p { font-size:13px; color:#5b6573; margin-top:6px; }

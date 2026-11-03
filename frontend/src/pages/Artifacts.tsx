@@ -9,6 +9,7 @@ import { PageBadge, PageDialog, PagePreview, pagesUrl } from '../components/arti
 import { listTeams } from '../api/teams'
 import { PagePrintLink, pageViewUrl } from '../components/artifacts/PagePrintLink'
 import { PublishedPageContent } from '../components/artifacts/PublishedPageContent'
+import { PageBuiltFrom, PageSourceUpdates, updateRequest } from '../components/artifacts/PageSourceUpdates'
 
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : 'Could not complete this action. Please try again.'
 
@@ -98,6 +99,17 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
   const chatUrl = uuid ? `/?editPage=${encodeURIComponent(uuid)}${artifact?.source?.conversation_uuid ? `&conversation=${encodeURIComponent(artifact.source.conversation_uuid)}` : ''}${artifact?.source?.project_uuid ? `&project=${encodeURIComponent(artifact.source.project_uuid)}` : ''}` : ''
   const closeSharing = () => { setSharing(false); if (window.location.hash === '#share') window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search) }
   const openSharing = () => { setPublicRevision(artifact?.latest_revision || ''); setSharing(true) }
+  const updateFromSources = (updated: api.PageSourceDocument[]) => {
+    if (!uuid) return
+    try {
+      sessionStorage.setItem(`pages:edit-request:${uuid}`, updateRequest(updated))
+      sessionStorage.setItem(`pages:edit-documents:${uuid}`, JSON.stringify({
+        uuids: updated.map(s => s.latest!.uuid), names: Object.fromEntries(updated.map(s => [s.latest!.uuid, s.latest!.title])),
+        detach: updated.map(s => s.uuid),
+      }))
+      window.location.assign(chatUrl)
+    } catch { setError('Could not open chat. Attach the new file in chat and ask it to update this page.') }
+  }
   const feedback = <>{error && <p role="alert" className="page-alert">{error}</p>}{notice && <p role="status" className="page-notice">{notice}</p>}</>
   return <main className="page-workspace"><div className="page-workspace-inner">
     {!publicToken && <nav className="page-breadcrumb" aria-label="Breadcrumb"><a href={backUrl}><ArrowLeft size={15} />Files</a><ChevronRight size={13} /><a href={backUrl}>Pages</a><ChevronRight size={13} /><span>{loading ? 'Loading…' : 'Page details'}</span></nav>}
@@ -124,11 +136,14 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
     {!loading && (artifact || publicInfo) && <>
       {artifact && <div className="page-revision-bar">{artifact.can_manage ? <label>Version<select aria-label="Page version" disabled={busy || !!editor} value={selected} onChange={e => setSelected(e.target.value)}>{artifact.revisions.map((r, index) => <option key={r.uuid} value={r.uuid}>Version {r.version ?? index + 1}{isPublished(r.uuid) ? ' · published' : ''}{r.uuid === artifact.latest_revision ? ' · latest' : ''}</option>)}</select></label> : <span>Shared version {version}</span>}<a className="page-text-button" href={pageViewUrl(contentUrl, 'full')} target="_blank" rel="noreferrer"><ArrowUpRight size={14} />Open full page</a></div>}
       {hasDraft && publishedVersion > 0 && !selectedIsPublished && <p className="page-revision-note">You’re previewing version {version}. The public link still shows version {publishedVersion}. Share → Publish updates when you’re ready.</p>}
+      {publicToken && publicInfo?.newer_data_available && <p className="page-revision-note" role="status">Newer source data is available. The page owner hasn’t published an updated version yet.</p>}
+      {artifact?.can_manage && artifact.source_documents && <PageSourceUpdates sources={artifact.source_documents} disabled={busy || !!editor} onUpdate={updateFromSources} />}
       {!!revision?.warnings.length && <div className="page-revision-note"><strong>Some content was removed to keep this page safe.</strong>{revision.warnings.map(w => <p key={w}>{w}</p>)}</div>}
       {publicToken ? <PublishedPageContent key={contentUrl} src={contentUrl} /> : <PagePreview key={contentUrl} src={contentUrl} title={title} />}
       {artifact?.source && <nav aria-label="Page source" className="page-source">
         {artifact.source.conversation_uuid && <a href={`/?conversation=${encodeURIComponent(artifact.source.conversation_uuid)}${artifact.source.project_uuid ? `&project=${encodeURIComponent(artifact.source.project_uuid)}` : ''}`}><MessageSquare size={14} />Open originating chat</a>}
         {artifact.source.workflow_id && <a href={`/?mode=files&workflow=${encodeURIComponent(artifact.source.workflow_id)}${artifact.source.session_id ? `&run=${encodeURIComponent(artifact.source.session_id)}` : ''}${artifact.source.project_uuid ? `&project=${encodeURIComponent(artifact.source.project_uuid)}` : ''}`}><Workflow size={14} />Open originating workflow run</a>}
+        {artifact.source_documents && <PageBuiltFrom sources={artifact.source_documents} />}
         <span>Saved in Files → Pages</span>
       </nav>}
       {artifact?.can_manage && uuid && <>

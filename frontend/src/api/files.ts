@@ -23,6 +23,29 @@ export function uploadFile(data: {
   )
 }
 
+export interface FileVersion {
+  uuid: string
+  title: string
+  extension: string
+  version_number: number
+  created_at: string | null
+  current: boolean
+  processing: boolean
+}
+
+/** Upload a revised file as the next version of `docUuid`. Pages built from
+ * the earlier version then offer an update. */
+export function uploadFileVersion(docUuid: string, data: { contentAsBase64String: string; fileName: string; extension: string }) {
+  return apiFetch<{ complete: boolean; uuid: string; version_number: number; replaces: string }>(
+    `/api/files/${encodeURIComponent(docUuid)}/versions`,
+    { method: 'POST', body: JSON.stringify(data) },
+  )
+}
+
+export function listFileVersions(docUuid: string) {
+  return apiFetch<{ versions: FileVersion[] }>(`/api/files/${encodeURIComponent(docUuid)}/versions`)
+}
+
 export interface DeleteFileResult {
   ok: boolean
   /** Present when `removeFromKnowledgeBases` was asked for. */

@@ -119,7 +119,7 @@ async def list_contents(
         if project:
             candidate_folders = await SmartFolder.find({"parent_id": current_folder.uuid}).to_list()
             folders = [f for f in candidate_folders if await access_control.get_authorized_folder(f.uuid, user, team_access=team_access)]
-            candidate_documents = await SmartDocument.find({"folder": current_folder.uuid, "soft_deleted": {"$ne": True}}).to_list()
+            candidate_documents = await SmartDocument.find({"folder": current_folder.uuid, "soft_deleted": {"$ne": True}, "superseded_by": None}).to_list()
             documents = [d for d in candidate_documents if await access_control.get_authorized_document(d.uuid, user, team_access=team_access)]
         elif current_folder.team_id:
             folders = await SmartFolder.find(
@@ -131,6 +131,7 @@ async def list_contents(
                     "folder": current_folder.uuid,
                     "team_id": current_folder.team_id,
                     "soft_deleted": {"$ne": True},
+                    "superseded_by": None,
                 }
             ).to_list()
         else:
@@ -143,6 +144,7 @@ async def list_contents(
                     "folder": current_folder.uuid,
                     "user_id": user.user_id,
                     "soft_deleted": {"$ne": True},
+                    "superseded_by": None,
                 }
             ).to_list()
     else:
@@ -201,6 +203,7 @@ async def list_contents(
                 "classified_by": d.classified_by,
                 "retention_hold": d.retention_hold,
                 "soft_deleted": d.soft_deleted,
+                "version_number": d.version_number,
                 "chromadb_ready": d.chromadb_ready,
                 "chunk_count": d.chunk_count,
                 "ingest_error": d.ingest_error,

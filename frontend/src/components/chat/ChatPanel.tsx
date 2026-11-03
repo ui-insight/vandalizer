@@ -363,6 +363,16 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     }
   }, [isStreaming, bumpActivitySignal])
 
+  // Files a draft attaches ("Update page" adds a file's new version and drops
+  // the old one). Merged into the scope, and re-applied if the conversation's
+  // own scope finishes loading afterwards, so neither overwrites the other.
+  const draftAttach = useRef<{ add: string[]; names: Record<string, string>; detach: string[] } | null>(null)
+  const applyDraftAttach = useCallback(() => {
+    const attach = draftAttach.current
+    if (!attach) return
+    setSelectedDocUuids(prev => [...prev.filter(u => !attach.detach.includes(u) && !attach.add.includes(u)), ...attach.add])
+    setSelectedDocNames(prev => ({ ...prev, ...attach.names }))
+  }, [setSelectedDocUuids, setSelectedDocNames])
   useEffect(() => {
     if (conversationToLoad && conversationToLoad !== lastLoadedConvo.current) {
       lastLoadedConvo.current = conversationToLoad
@@ -370,6 +380,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       // A later parent render must not reload that same live conversation and
       // detach its stream (for example when resizing or refreshing project data).
       if (conversationToLoad === conversationUuid) return
+      draftAttach.current = null
       loadHistory(conversationToLoad).then((data) => {
         if (data) {
           // Re-attach what the conversation was asked against (support
@@ -381,6 +392,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
             setSelectedDocUuids(scope.documents.map(d => d.uuid))
             setSelectedDocNames(Object.fromEntries(scope.documents.map(d => [d.uuid, d.title])))
           }
+          applyDraftAttach()
           if (scope?.folders) {
             setSelectedFolderUuids(scope.folders.map(f => f.uuid))
             setSelectedFolderNames(Object.fromEntries(scope.folders.map(f => [f.uuid, f.title])))
@@ -403,7 +415,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         // history fetch doesn't surface as an unhandled promise rejection.
       })
     }
-  }, [conversationToLoad, conversationUuid, loadHistory, setSelectedDocUuids, setSelectedDocNames, setSelectedFolderUuids, setSelectedFolderNames, replaceKBs, toast])
+  }, [conversationToLoad, conversationUuid, loadHistory, setSelectedDocUuids, setSelectedDocNames, setSelectedFolderUuids, setSelectedFolderNames, replaceKBs, toast, applyDraftAttach])
 
   const pendingHandled = useRef<PendingChatMessage | null>(null)
   useEffect(() => {
@@ -412,6 +424,10 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       const docs = pendingMessage.documentUuids ?? selectedDocUuids
       const folders = pendingMessage.folderUuids ?? selectedFolderUuids
       if (pendingMessage.draftOnly) {
+        if (pendingMessage.documentUuids?.length) {
+          draftAttach.current = { add: pendingMessage.documentUuids, names: pendingMessage.documentNames ?? {}, detach: pendingMessage.detachDocumentUuids ?? [] }
+          applyDraftAttach()
+        }
         setDraftInsertion(previous => ({ id: (previous?.id ?? 0) + 1, text: pendingMessage.message }))
         focusChat()
       } else if (pendingMessage.skillUuid && pendingMessage.skillSelectionOnly) {
@@ -427,7 +443,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       }
       onPendingMessageConsumed?.()
     }
-  }, [pendingMessage, projectSkillBlocked, isStreaming, isLoadingHistory, isSelectingSkill, focusChat, send, selectSkill, onPendingMessageConsumed, selectedDocUuids, selectedFolderUuids, selectedModel, activeKBs, activeProjectUuid])
+  }, [pendingMessage, projectSkillBlocked, isStreaming, isLoadingHistory, isSelectingSkill, focusChat, send, selectSkill, onPendingMessageConsumed, selectedDocUuids, selectedFolderUuids, selectedModel, activeKBs, activeProjectUuid, applyDraftAttach])
 
   const hasDocContext = fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0 || selectedFolderUuids.length > 0
 

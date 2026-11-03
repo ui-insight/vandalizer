@@ -349,8 +349,11 @@ def from_workflow(db: Database[dict], result: dict, user_id: str, step: str | No
         raise HTTPException(422, "This workflow has no output to save.")
     activity = db.activity_event.find_one({"workflow_session_id": session_id, "user_id": user_id}) or {}
     title, html = report_page(workflow_html(output, title), title, source)
+    from app.services import page_sources
+    run_documents = [str(d["uuid"]) for d in (result.get("run_config") or {}).get("documents", []) if isinstance(d, dict) and d.get("uuid")]
+    run_documents = run_documents or list((result.get("input_context") or {}).get("doc_uuids") or [])
     return create(db, user_id, title, html, request_id, {
-        **source,
+        **source, "documents": page_sources.resolve(db, run_documents),
         "kind": "workflow", "workflow_id": str(result.get("workflow", "")), "session_id": session_id, "step": step,
         "project_uuid": activity.get("project_uuid"),
     })

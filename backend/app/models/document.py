@@ -30,6 +30,16 @@ class SmartDocument(Document):
     updated_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
     folder: Optional[str] = None
     is_default: bool = False
+
+    # Version chain ("Upload new version"). Every version is its own document
+    # with its own text, so a Page built from version 1 can be compared with
+    # version 2. ``version_root`` is the first version's uuid (None on a file
+    # that was never revised); ``superseded_by`` is set once a newer version
+    # exists, which hides this one from the file list.
+    version_root: Optional[str] = None
+    version_number: int = 1
+    previous_version_uuid: Optional[str] = None
+    superseded_by: Optional[str] = None
     token_count: int = 0
     num_pages: int = 0
 
@@ -134,6 +144,7 @@ class SmartDocument(Document):
             "uuid",
             "user_id",
             "team_id",
+            "version_root",
             [("user_id", 1), ("folder", 1)],
             [("team_id", 1), ("folder", 1)],
             "created_at",

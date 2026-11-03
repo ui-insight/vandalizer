@@ -17,7 +17,7 @@ from app.models.user import User
 from app.rate_limit import limiter
 from app.schemas.artifact import ChatArtifactRequest, CreateArtifactRequest, DuplicateArtifactRequest, PublishArtifactRequest, RenameArtifactRequest, ReviseArtifactRequest, ShareArtifactRequest
 from app.services.page_links import prepare_page_links
-from app.services import access_control, artifacts
+from app.services import access_control, artifacts, page_sources
 from app.services import transcript_pages
 from app.services.page_printing import render_page
 from app.services.page_embedding import prepare_page_embed
@@ -166,9 +166,11 @@ async def get_public(token: str, response: Response, settings: Settings = Depend
     if updated_at.tzinfo is None:
         updated_at = updated_at.replace(tzinfo=timezone.utc)
     response.headers["Cache-Control"] = "no-store"
+    # Only a yes/no: which files, and what changed in them, stay private.
+    newer = await run(page_sources.newer_data_available, rev)
     return {"title": rev["title"], "revision": rev["uuid"],
             "version": next(i for i, item in enumerate(doc["revisions"], 1) if item["uuid"] == rev["uuid"]),
-            "updated_at": updated_at}
+            "updated_at": updated_at, "newer_data_available": newer}
 
 
 @router.get("/public/{token}/content", response_model=None)
@@ -186,7 +188,24 @@ async def public_content(token: str, download: bool = False, revision: str | Non
 @router.get("/{uuid}", response_model=None)
 async def get_artifact(uuid: str, user: User = Depends(get_current_user), settings: Settings = Depends(get_settings)) -> dict[str, object]:
     doc = await authorized(uuid, user)
-    return {**artifacts.metadata(doc, doc["user_id"] == user.user_id), "public_sharing_enabled": settings.artifact_public_sharing_enabled}
+    owner = doc["user_id"] == user.user_id
+    result = {**artifacts.metadata(doc, owner), "public_sharing_enabled": settings.artifact_public_sharing_enabled}
+    if owner:
+        result["source_documents"] = await source_documents(artifacts.revision(doc), user)
+    return result
+
+
+async def source_documents(rev: dict, user: User) -> list[dict]:
+    """The files this revision was built from, and any newer versions of them."""
+    sources = await run(page_sources.freshness, page_sources.revision_sources(rev), changes=True)
+    access = await access_control.get_team_access_context(user)
+    for item in sources:
+        latest = item.get("latest")
+        if latest and not await access_control.get_authorized_document(latest["uuid"], user, team_access=access):
+            # Someone else's newer version: say one exists, not what it holds.
+            item["latest"] = None
+            item.pop("changes", None)
+    return sources
 
 
 @router.get("/{uuid}/revisions/{revision}/content", response_model=None)

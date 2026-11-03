@@ -89,6 +89,10 @@ export interface PendingChatMessage {
   skillUuid?: string
   skillSelectionOnly?: boolean
   documentUuids?: string[]
+  /** Titles for documentUuids, so a draft can show the files it attaches. */
+  documentNames?: Record<string, string>
+  /** Draft only: detach these (e.g. the file version documentUuids replaces). */
+  detachDocumentUuids?: string[]
   folderUuids?: string[]
 }
 
@@ -110,7 +114,7 @@ interface ChatStateContextValue {
   pendingChatMessage: PendingChatMessage | null
   sendChatMessage: (
     message: string,
-    options?: { documentUuids?: string[]; folderUuids?: string[]; skillUuid?: string; skillSelectionOnly?: boolean; draftOnly?: boolean },
+    options?: { documentUuids?: string[]; documentNames?: Record<string, string>; detachDocumentUuids?: string[]; folderUuids?: string[]; skillUuid?: string; skillSelectionOnly?: boolean; draftOnly?: boolean },
   ) => void
   clearPendingChatMessage: () => void
   // Knowledge bases attached to the chat. Several can be attached at once;
@@ -563,7 +567,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const sendChatMessage = useCallback((
     message: string,
-    options?: { documentUuids?: string[]; folderUuids?: string[]; skillUuid?: string; skillSelectionOnly?: boolean; draftOnly?: boolean },
+    options?: { documentUuids?: string[]; documentNames?: Record<string, string>; detachDocumentUuids?: string[]; folderUuids?: string[]; skillUuid?: string; skillSelectionOnly?: boolean; draftOnly?: boolean },
   ) => {
     updateSearch((prev) => ({ ...prev, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined }))
     setPendingChatMessage({
@@ -572,6 +576,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       skillSelectionOnly: options?.skillSelectionOnly,
       draftOnly: options?.draftOnly,
       documentUuids: options?.documentUuids,
+      documentNames: options?.documentNames,
+      detachDocumentUuids: options?.detachDocumentUuids,
       folderUuids: options?.folderUuids,
     })
   }, [updateSearch])
@@ -903,7 +909,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     if (search.editPage) {
       let request = ''
       try { request = sessionStorage.getItem(`pages:edit-request:${search.editPage}`) || ''; sessionStorage.removeItem(`pages:edit-request:${search.editPage}`) } catch { /* A draft can still be prepared without stored details. */ }
-      sendChatMessage(`Update this page: ${window.location.origin}/pages/${search.editPage}\n\n${request.slice(0, 8000)}\n\nShow me the proposed update before saving.`, { draftOnly: true })
+      // "Update page" for a revised source also attaches the new file version.
+      let attach: { uuids?: string[]; names?: Record<string, string>; detach?: string[] } = {}
+      try { attach = JSON.parse(sessionStorage.getItem(`pages:edit-documents:${search.editPage}`) || '{}'); sessionStorage.removeItem(`pages:edit-documents:${search.editPage}`) } catch { /* Attach the file by hand if storage is unavailable. */ }
+      const documentUuids = Array.isArray(attach.uuids) ? attach.uuids.filter(u => typeof u === 'string').slice(0, 20) : []
+      sendChatMessage(`Update this page: ${window.location.origin}/pages/${search.editPage}\n\n${request.slice(0, 8000)}\n\nShow me the proposed update before saving.`,
+        { draftOnly: true, ...(documentUuids.length ? { documentUuids, documentNames: attach.names ?? {}, detachDocumentUuids: Array.isArray(attach.detach) ? attach.detach : [] } : {}) })
     }
     updateSearch(prev => ({ ...prev, mode: 'chat', tab: undefined, conversation: undefined, skill: undefined, editPage: undefined }))
   }, [search.project, search.conversation, search.skill, search.editPage, activeProjectUuid, sendChatMessage, updateSearch])
