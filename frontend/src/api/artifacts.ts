@@ -15,7 +15,21 @@ export interface Artifact {
   team_revision?: string | null
   can_manage: boolean
   public_sharing_enabled?: boolean
-  revisions: { uuid: string; title: string; created_at: string; warnings: string[]; version?: number }[]
+  /** change_summary: owner only, one line on what the version changed from the one before. */
+  revisions: { uuid: string; title: string; created_at: string; warnings: string[]; version?: number; change_summary?: string | null }[]
+}
+
+export interface PageComparison {
+  base: { revision: string; version: number }
+  target: { revision: string; version: number }
+  title: { old: string; new: string } | null
+  numbers: { label: string; old: string; new: string; section?: string }[]
+  sections_added: string[]
+  sections_removed: string[]
+  text: { label: string; old: string; new: string; section?: string }[]
+  design: string[]
+  truncated: boolean
+  summary: string
 }
 const path = (id: string) => `/api/pages/${encodeURIComponent(id)}`
 export interface PublicArtifact { title: string; revision: string; version: number; updated_at: string }
@@ -40,6 +54,7 @@ export const unpublishArtifact = (id: string) => apiFetch(`${path(id)}/publicati
 export const publishArtifactVersion = (id: string, revision: string) => apiFetch<Artifact>(`${path(id)}/publication`, { method: 'PUT', body: JSON.stringify({ revision, separate_link: true }) })
 export const unpublishArtifactVersion = (id: string, revision: string) => apiFetch(`${path(id)}/publication?revision=${encodeURIComponent(revision)}`, { method: 'DELETE' })
 export const shareArtifactTeam = (id: string, teamId: string | null, revision?: string) => apiFetch(`${path(id)}/team`, { method: 'PUT', body: JSON.stringify({ team_id: teamId, revision }) })
+export const compareArtifactVersions = (id: string, base: string, target: string) => apiFetch<PageComparison>(`${path(id)}/compare?base=${encodeURIComponent(base)}&target=${encodeURIComponent(target)}`)
 export const deleteArtifact = (id: string) => apiFetch(path(id), { method: 'DELETE' })
 export const renameArtifact = (id: string, title: string) => apiFetch<Artifact>(path(id), { method: 'PATCH', body: JSON.stringify({ title }) })
 export const duplicateArtifact = (id: string, requestId: string) => apiFetch<Artifact>(`${path(id)}/duplicate`, { method: 'POST', body: JSON.stringify({ request_id: requestId }) })

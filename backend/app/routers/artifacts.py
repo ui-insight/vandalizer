@@ -186,7 +186,23 @@ async def public_content(token: str, download: bool = False, revision: str | Non
 @router.get("/{uuid}", response_model=None)
 async def get_artifact(uuid: str, user: User = Depends(get_current_user), settings: Settings = Depends(get_settings)) -> dict[str, object]:
     doc = await authorized(uuid, user)
-    return {**artifacts.metadata(doc, doc["user_id"] == user.user_id), "public_sharing_enabled": settings.artifact_public_sharing_enabled}
+    owner = doc["user_id"] == user.user_id
+    if owner:
+        doc = await run(artifacts.fill_change_summaries, doc)
+    return {**artifacts.metadata(doc, owner), "public_sharing_enabled": settings.artifact_public_sharing_enabled}
+
+
+@router.get("/{uuid}/compare", response_model=None)
+async def compare_revisions(uuid: str, base: str = Query(min_length=1, max_length=64), target: str = Query(min_length=1, max_length=64),
+                            user: User = Depends(get_current_user)) -> dict[str, object]:
+    """What changed from version ``base`` to version ``target`` (owner only:
+    team members see a single shared version)."""
+    from app.services.page_diff import compare
+    doc = await authorized(uuid, user, manage=True)
+    old, new = artifacts.revision(doc, base), artifacts.revision(doc, target)
+    numbers = {r["uuid"]: r.get("version", i) for i, r in enumerate(doc["revisions"], 1)}
+    diff = await anyio.to_thread.run_sync(compare, old["html"], new["html"])
+    return {"base": {"revision": base, "version": numbers[base]}, "target": {"revision": target, "version": numbers[target]}, **diff}
 
 
 @router.get("/{uuid}/revisions/{revision}/content", response_model=None)

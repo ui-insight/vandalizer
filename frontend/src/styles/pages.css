@@ -60,6 +60,22 @@
 .page-source { font-size:12px; color:#5b6573; display:flex; align-items:center; flex-wrap:wrap; gap:16px; margin-top:16px; }
 .page-source a { display:inline-flex; align-items:center; gap:5px; text-decoration:none; }
 .page-source a:hover { text-decoration:underline; }
+.page-change-summary { font-size:13px; color:#4b5563; margin:-4px 0 12px; }
+.page-compare { border:1px solid #d9dee5; border-radius:10px; background:#fff; padding:14px 18px; margin-bottom:16px; font-size:13px; color:#303b49; }
+.page-compare h3 { display:flex; align-items:center; gap:6px; font-size:14px; font-weight:650; margin:14px 0 6px; }
+.page-compare ul { margin:0; padding-left:20px; list-style:disc; }
+.page-compare li { margin:3px 0; }
+.page-compare-pick { display:flex; flex-wrap:wrap; align-items:flex-end; gap:10px; }
+.page-compare-pick label { display:flex; flex-direction:column; gap:4px; font-weight:600; font-size:12px; }
+.page-compare-pick select { padding:7px 9px; border:1px solid #d9dee5; border-radius:8px; font-size:13px; min-height:38px; background:#fff; }
+.page-compare-summary { margin:12px 0 4px; }
+.page-compare-note { color:#5b6573; margin:8px 0; }
+.page-compare-table { border-collapse:collapse; width:100%; font-variant-numeric:tabular-nums; }
+.page-compare-table th, .page-compare-table td { border-bottom:1px solid #e5e7eb; padding:5px 8px; text-align:left; vertical-align:top; }
+.page-compare-table td { white-space:nowrap; }
+.page-compare-section, .page-compare-label { color:#5b6573; font-weight:400; }
+.page-compare del { color:#9b1c1c; background:#fdecec; text-decoration:line-through; padding:0 2px; border-radius:3px; }
+.page-compare ins { color:#14532d; background:#e7f6ec; text-decoration:none; padding:0 2px; border-radius:3px; }
 .page-editor { margin:20px 0; padding:24px; border:1px solid #dce1e7; border-radius:12px; background:white; }
 .page-editor h2 { font-size:17px; font-weight:650; }
 .page-editor p { font-size:13px; color:#5b6573; margin-top:6px; }

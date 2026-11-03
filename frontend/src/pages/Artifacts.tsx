@@ -1,7 +1,7 @@
 import { SavePageTemplate } from '../components/artifacts/SavePageTemplate'
 import { PageVersionLinks } from '../components/artifacts/PageVersionLinks'
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, ArrowUpRight, Check, ChevronRight, Code2, Copy, Download, FileText, Globe2, Link2, LockKeyhole, MessageSquare, Share2, Trash2, Workflow } from 'lucide-react'
+import { ArrowLeft, ArrowUpRight, Check, ChevronRight, Code2, Copy, Download, FileText, GitCompare, Globe2, Link2, LockKeyhole, MessageSquare, Share2, Trash2, Workflow } from 'lucide-react'
 import * as api from '../api/artifacts'
 import { PagesBrowser } from '../components/artifacts/PagesBrowser'
 import { PageDeleteDialog } from '../components/artifacts/PageDeleteDialog'
@@ -9,6 +9,7 @@ import { PageBadge, PageDialog, PagePreview, pagesUrl } from '../components/arti
 import { listTeams } from '../api/teams'
 import { PagePrintLink, pageViewUrl } from '../components/artifacts/PagePrintLink'
 import { PublishedPageContent } from '../components/artifacts/PublishedPageContent'
+import { PageCompare } from '../components/artifacts/PageCompare'
 
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : 'Could not complete this action. Please try again.'
 
@@ -37,6 +38,7 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [requestChanges, setRequestChanges] = useState(false)
   const [changes, setChanges] = useState('')
+  const [comparing, setComparing] = useState(false)
   useEffect(() => {
     let live = true
     setLoading(true); setError(''); setArtifact(null); setPublicInfo(null); setEditor(null); setTeamError(false)
@@ -122,7 +124,9 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
     {loading && <p role="status" className="pages-loading">Loading your page…</p>}
     {!loading && !artifact && !publicInfo && <div className="pages-empty"><FileText size={32} /><h2>Page unavailable</h2><p>{publicToken ? 'This link may have been removed. Ask the owner for a current link.' : 'The page may have been removed, or your access may have changed.'}</p><button className="page-button" onClick={() => setAttempt(n => n + 1)}>Try again</button></div>}
     {!loading && (artifact || publicInfo) && <>
-      {artifact && <div className="page-revision-bar">{artifact.can_manage ? <label>Version<select aria-label="Page version" disabled={busy || !!editor} value={selected} onChange={e => setSelected(e.target.value)}>{artifact.revisions.map((r, index) => <option key={r.uuid} value={r.uuid}>Version {r.version ?? index + 1}{isPublished(r.uuid) ? ' · published' : ''}{r.uuid === artifact.latest_revision ? ' · latest' : ''}</option>)}</select></label> : <span>Shared version {version}</span>}<a className="page-text-button" href={pageViewUrl(contentUrl, 'full')} target="_blank" rel="noreferrer"><ArrowUpRight size={14} />Open full page</a></div>}
+      {artifact && <div className="page-revision-bar">{artifact.can_manage ? <label>Version<select aria-label="Page version" disabled={busy || !!editor} value={selected} onChange={e => setSelected(e.target.value)}>{artifact.revisions.map((r, index) => <option key={r.uuid} value={r.uuid}>Version {r.version ?? index + 1}{isPublished(r.uuid) ? ' · published' : ''}{r.uuid === artifact.latest_revision ? ' · latest' : ''}</option>)}</select></label> : <span>Shared version {version}</span>}{artifact.can_manage && artifact.revisions.length > 1 && <button type="button" className="page-text-button" aria-expanded={comparing} onClick={() => setComparing(v => !v)}><GitCompare size={14} />{comparing ? 'Hide comparison' : 'Compare versions'}</button>}<a className="page-text-button" href={pageViewUrl(contentUrl, 'full')} target="_blank" rel="noreferrer"><ArrowUpRight size={14} />Open full page</a></div>}
+      {artifact?.can_manage && revision?.change_summary && <p className="page-change-summary"><strong>What changed in version {version}:</strong> {revision.change_summary}</p>}
+      {comparing && artifact?.can_manage && uuid && <PageCompare uuid={uuid} revisions={artifact.revisions} versionNumber={versionNumber} />}
       {hasDraft && publishedVersion > 0 && !selectedIsPublished && <p className="page-revision-note">You’re previewing version {version}. The public link still shows version {publishedVersion}. Share → Publish updates when you’re ready.</p>}
       {!!revision?.warnings.length && <div className="page-revision-note"><strong>Some content was removed to keep this page safe.</strong>{revision.warnings.map(w => <p key={w}>{w}</p>)}</div>}
       {publicToken ? <PublishedPageContent key={contentUrl} src={contentUrl} /> : <PagePreview key={contentUrl} src={contentUrl} title={title} />}
