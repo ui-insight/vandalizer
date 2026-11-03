@@ -2,6 +2,7 @@ import type { DocumentReadiness } from '../utils/documentReadiness'
 import { validPanelSplit } from '../utils/workspaceLayout'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode, type Dispatch, type SetStateAction } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
+import { getObligation, quoteSearchTerms } from '../api/obligations'
 import type { VerificationSession } from '../api/verificationSessions'
 import { useTeams } from '../hooks/useTeams'
 import { useToast } from './ToastContext'
@@ -75,6 +76,8 @@ interface NavigationContextValue {
   openAutomation: (id: string) => void
   closeAutomation: () => void
   resetToHome: () => void
+  // The inbox item a deadline reminder's link points at (?deadline=…).
+  focusedObligationUuid: string | null
 }
 
 const NavigationContext = createContext<NavigationContextValue | null>(null)
@@ -891,6 +894,22 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setViewDocumentRequest(null)
   }, [])
 
+  // A deadline reminder links to /?deadline=<uuid>: Home, with that item
+  // highlighted in the inbox and its source passage open (support ticket).
+  const [focusedObligationUuid, setFocusedObligationUuid] = useState<string | null>(null)
+  const handledDeadline = useRef('')
+  useEffect(() => {
+    const id = search.deadline
+    if (!id || handledDeadline.current === id) return
+    handledDeadline.current = id
+    resetToHome()
+    setFocusedObligationUuid(id)
+    void getObligation(id).then((item) => {
+      const source = item.sources[0]
+      if (source) viewDocument(source.document_uuid, source.document_title, { terms: [quoteSearchTerms(source.quote)], page: source.page })
+    }).catch(() => { /* The inbox says when the item is no longer open. */ })
+  }, [search.deadline, resetToHome, viewDocument])
+
   // Source links and project Skill links are navigation only; they never send a prompt.
   const handledResourceLink = useRef('')
   useEffect(() => {
@@ -920,6 +939,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     extractionOpenSignal,
     openAutomationId, openAutomation, closeAutomation,
     resetToHome,
+    focusedObligationUuid,
   }), [
     workspaceMode, setWorkspaceMode,
     activeRightTab, setActiveRightTab,
@@ -930,6 +950,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     extractionOpenSignal,
     openAutomationId, openAutomation, closeAutomation,
     resetToHome,
+    focusedObligationUuid,
   ])
 
   const chatValue = useMemo<ChatStateContextValue>(() => ({

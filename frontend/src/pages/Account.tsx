@@ -14,6 +14,7 @@ import {
 } from '../api/auth'
 import { getUserMemory, clearUserMemory, type UserMemoryResponse } from '../api/chat'
 import { HomeInboxSetting } from '../components/account/HomeInboxSetting'
+import { DeadlineReminderSettings } from '../components/account/DeadlineReminderSettings'
 
 export default function Account() {
   const { user, refreshUser } = useAuth()
@@ -407,6 +408,8 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
         </div>
 
         <HomeInboxSetting />
+
+        <DeadlineReminderSettings />
 
         {/* Email Preferences */}
         <div className="rounded-lg border border-gray-200 bg-white">

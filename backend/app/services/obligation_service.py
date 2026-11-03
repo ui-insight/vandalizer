@@ -547,6 +547,13 @@ async def set_done(ob: Obligation, user: User, done: bool) -> Obligation:
     ob.completed_at = _now() if done else None
     ob.updated_at = _now()
     await ob.save()
+    if done:
+        # A finished deadline stops asking for attention in anyone's bell.
+        from app.models.notification import Notification
+
+        await Notification.find(
+            {"item_kind": "obligation", "item_id": ob.uuid, "read": False},
+        ).update_many({"$set": {"read": True}})
     return ob
 
 

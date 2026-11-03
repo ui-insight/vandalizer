@@ -208,6 +208,8 @@ const indexRoute = createRoute({
     ...(typeof search.skill === 'string' && search.skill ? { skill: search.skill } : {}),
     ...(typeof search.conversation === 'string' && search.conversation ? { conversation: search.conversation } : {}),
     ...(typeof search.run === 'string' && search.run ? { run: search.run } : {}),
+    // A deadline reminder's link: Home, with that inbox item and its source open.
+    ...(typeof search.deadline === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(search.deadline) ? { deadline: search.deadline } : {}),
     ...(search.docs ? { docs: search.docs as string } : {}),
     ...(search.folders ? { folders: search.folders as string } : {}),
     ...((search.courseEditor === '1' || search.courseEditor === 1) ? { courseEditor: '1' as const } : {}),
