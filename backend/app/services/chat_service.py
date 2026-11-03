@@ -50,7 +50,8 @@ from app.services.context_budget import (
     token_safety_margin,
 )
 from app.services.citation_grounding import ground_citation, normalize_citation_markup
-from app.services.approval_claims import unprepared_card_note
+from app.services.approval_claims import announces_unfinished_action, unprepared_card_note
+from app.services.page_authoring import declares_page_too_large, requests_page
 from app.services.chat_output import public_chat_text
 from app.services.chat_budget_tables import reconcile_budget_tables
 from app.services.chat_source_claims import attachment_sources, ground_source_checks
@@ -589,15 +590,15 @@ def _stream_error_event(exc: BaseException, user_message: str) -> dict:
 
 
 class _OutputLimitExceeded(Exception):
-    """A response ended at the output cap, before tools may execute it."""
+    """Generation hit a size limit or explicitly refused an oversized Page."""
 
 
-def _check_response_size(response: ModelResponse) -> None:
+def _check_response_size(response: ModelResponse, *, preparing_page: bool = False) -> None:
     if response.finish_reason != "length":
         return
     from app.services.artifacts import PAGE_TOO_LARGE_MESSAGE
 
-    page = any(
+    page = preparing_page or any(
         isinstance(part, ToolCallPart)
         and part.tool_name in {"create_html_artifact", "revise_html_artifact"}
         for part in response.parts
@@ -606,6 +607,39 @@ def _check_response_size(response: ModelResponse) -> None:
         PAGE_TOO_LARGE_MESSAGE if page else
         "The response is too large for the model to finish. Ask for less content or split the request into parts."
     )
+
+
+def _size_failure_message(exc: BaseException, preparing_page: bool, seen=None) -> str | None:
+    """SDK/tool tasks may wrap size failures in exception groups or causes.
+
+    Only confirmed size failures qualify; a large request alone does not turn
+    a network failure or an unrelated programming error into a size error.
+    """
+    from openai import LengthFinishReasonError
+    from pydantic_ai.exceptions import IncompleteToolCall, UnexpectedModelBehavior
+    from app.services.artifacts import PAGE_TOO_LARGE_MESSAGE, PageTooLargeError
+
+    seen = set() if seen is None else seen
+    if id(exc) in seen:
+        return None
+    seen.add(id(exc))
+    if isinstance(exc, BaseExceptionGroup):
+        messages = [_size_failure_message(child, preparing_page, seen) for child in exc.exceptions]
+        if all(messages):
+            return PAGE_TOO_LARGE_MESSAGE if PAGE_TOO_LARGE_MESSAGE in messages else messages[0]
+        return None
+    if isinstance(exc, PageTooLargeError):
+        return PAGE_TOO_LARGE_MESSAGE
+    if isinstance(exc, _OutputLimitExceeded):
+        return str(exc)
+    if isinstance(exc, (IncompleteToolCall, LengthFinishReasonError)) or (
+        isinstance(exc, UnexpectedModelBehavior)
+        and re.match(r"Model token limit \(.+\) exceeded before any response was generated\.", str(exc))
+    ):
+        return (PAGE_TOO_LARGE_MESSAGE if preparing_page else
+                "The response is too large for the model to finish. Ask for less content or split the request into parts.")
+    cause = exc.__cause__ or (None if exc.__suppress_context__ else exc.__context__)
+    return _size_failure_message(cause, preparing_page, seen) if cause else None
 
 
 def _classify_stream_error(exc: BaseException, *, preparing_page: bool = False) -> tuple[str, str]:
@@ -618,16 +652,9 @@ def _classify_stream_error(exc: BaseException, *, preparing_page: bool = False) 
     text = str(exc)
     lower = text.lower()
 
-    from pydantic_ai.exceptions import IncompleteToolCall
-    from app.services.artifacts import PAGE_TOO_LARGE_MESSAGE
-
-    if isinstance(exc, _OutputLimitExceeded):
-        return "warning", str(exc)
-    if isinstance(exc, IncompleteToolCall):
-        return "warning", (
-            PAGE_TOO_LARGE_MESSAGE if preparing_page else
-            "The response is too large for the model to finish. Ask for less content or split the request into parts."
-        )
+    size_message = _size_failure_message(exc, preparing_page)
+    if size_message:
+        return "warning", size_message
 
     # Trial lifecycle events (out of tokens, unconfirmed address, fleet pause)
     # — expected states with actionable messages, not bugs.
@@ -2510,7 +2537,8 @@ async def chat_stream(
     # Citations accumulated this turn: pre-agent KB context (classic path)
     # plus any search_knowledge_base tool calls (agentic path).
     streamed_citations: list[dict] = list(kb_sources)
-    preparing_page = False
+    page_requested = requests_page(message)
+    preparing_page = page_requested
 
     def _completed_work() -> dict:
         """What a turn that ends early finished, for _save_failed_assistant_turn."""
@@ -2593,35 +2621,48 @@ async def chat_stream(
                             }) + "\n"
                     yield _activity_chunk("model")
                     tool_preparation = _ToolPreparationProgress()
-                    preparing_page = False
+                    preparing_page = page_requested
                     async with node.stream(agent_run.ctx) as stream:
-                        async for event in stream:
-                            preparation = tool_preparation.feed(event)
-                            preparing_page = any(
-                                name in {"create_html_artifact", "revise_html_artifact"}
-                                for name in tool_preparation.names.values()
-                            )
-                            if preparation:
-                                yield preparation
-                            content, is_api_thinking = _extract_event_content(event)
-                            if content is None:
-                                continue
+                        try:
+                            async for event in stream:
+                                preparation = tool_preparation.feed(event)
+                                preparing_page = preparing_page or any(
+                                    name in {"create_html_artifact", "revise_html_artifact"}
+                                    for name in tool_preparation.names.values()
+                                )
+                                page_requested = page_requested or preparing_page
+                                if preparation:
+                                    yield preparation
+                                content, is_api_thinking = _extract_event_content(event)
+                                if content is None:
+                                    continue
 
-                            if is_api_thinking:
-                                # Retain timing, never publish or persist raw reasoning.
-                                if thinking_started_at is None:
-                                    thinking_started_at = time.monotonic()
-                            elif thinking_started_at is not None:
-                                thinking_duration = round(time.monotonic() - thinking_started_at, 1)
-                                thinking_started_at = None
-                            # Text is not public yet. It can precede a tool call,
-                            # contain untagged deliberation, or fail an output
-                            # validator. Publish only the accepted final answer
-                            # below; tool activity continues streaming meanwhile.
+                                if is_api_thinking:
+                                    # Retain timing, never publish or persist raw reasoning.
+                                    if thinking_started_at is None:
+                                        thinking_started_at = time.monotonic()
+                                elif thinking_started_at is not None:
+                                    thinking_duration = round(time.monotonic() - thinking_started_at, 1)
+                                    thinking_started_at = None
+                                # Text is not public yet. It can precede a tool call,
+                                # contain untagged deliberation, or fail an output
+                                # validator. Publish only the accepted final answer
+                                # below; tool activity continues streaming meanwhile.
+                        except Exception:
+                            # Some providers/SDK paths fail while consuming the
+                            # final chunk, before the normal post-stream check.
+                            _check_response_size(stream.response, preparing_page=preparing_page)
+                            raise
 
-                    # Check before advancing to the tool node: even parseable
-                    # JSON can contain incomplete HTML at the output cap.
-                    _check_response_size(stream.response)
+                        # Check inside the context, before SDK finalization or
+                        # output validators can retry a truncated/refused Page.
+                        _check_response_size(stream.response, preparing_page=preparing_page)
+                        response_text = public_chat_text("\n".join(
+                            part.content for part in stream.response.parts if isinstance(part, TextPart)
+                        ))
+                        if preparing_page and declares_page_too_large(response_text):
+                            from app.services.artifacts import PAGE_TOO_LARGE_MESSAGE
+                            raise _OutputLimitExceeded(PAGE_TOO_LARGE_MESSAGE)
 
                 elif Agent.is_call_tools_node(node):
                     # Stream tool call / result events to the frontend
@@ -2702,6 +2743,15 @@ async def chat_stream(
                     attachment_sources(documents, file_attachments, compacted.documents, compacted.attachments),
                     streamed_tool_results,
                 ))
+                if page_requested and announces_unfinished_action(answer) and not any(
+                    result["tool_name"] in {"create_html_artifact", "revise_html_artifact"}
+                    and isinstance(result["content"], dict) and result["content"].get("preview_id")
+                    for result in streamed_tool_results
+                ):
+                    answer += (
+                        "\n\nI couldn't finish preparing the Page preview. No further work is running. "
+                        "Try fewer rows or tabs, or split the request into pages."
+                    )
                 if not answer:
                     # Never infer success from approval or repeat an action just
                     # because its prose was withheld. Receipts remain visible.

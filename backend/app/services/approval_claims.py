@@ -119,11 +119,11 @@ def require_approval_card(ctx: RunContext["AgenticChatDeps"], output: str) -> st
 # chat sits on "Prepare to run…" (support ticket). Only the last line counts;
 # an announcement mid-reply was followed by more text, so it isn't the stop.
 _ACTION_VERBS = (
-    r"(?:run|re-?run|prepare|start|create|extract|build|save|execute|launch|kick\s+off|apply|update)"
+    r"(?:run|re-?run|prepare|start|create|extract|build|save|execute|launch|kick\s+off|apply|update|verify)"
 )
 _ACTION_GERUNDS = (
     r"(?:running|re-?running|preparing|starting|creating|extracting|building|saving"
-    r"|executing|launching|kicking\s+off|applying|updating)"
+    r"|executing|launching|kicking\s+off|applying|updating|verifying)"
 )
 _ANNOUNCES = [
     # "Running a preview of NOA Budget & Profile Summary…", "Prepare to run:"

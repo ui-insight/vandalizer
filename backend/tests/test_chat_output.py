@@ -97,7 +97,7 @@ def chat_harness(monkeypatch):
     async def run(agent, **kwargs):
         monkeypatch.setattr(chat, "create_agentic_chat_agent", lambda *a, **k: agent)
         return [json.loads(chunk) async for chunk in chat.chat_stream(
-            "Yes, approve it.", [], "conversation", "user",
+            kwargs.pop("message", "Yes, approve it."), [], "conversation", "user",
             user=SimpleNamespace(current_team=None, organization_id=None),
             team_access=SimpleNamespace(),
             **kwargs,

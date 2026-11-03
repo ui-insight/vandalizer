@@ -93,6 +93,8 @@ async def create_html_artifact(context: RunContext[AgenticChatDeps], title: str,
             return await _save(context, title, html, confirmed, template_source={
                 'template_uuid': template_uuid, 'template_check': check,
             })
+        except artifacts.PageTooLargeError:
+            raise
         except HTTPException as exc:
             return {'error': exc.detail}
     if source_document_uuid or template_values or template_tables:
@@ -147,5 +149,9 @@ async def _save(context, title, html, confirmed, artifact_uuid=None, base_revisi
             context.deps.conversation.uuid, snapshot["_id"])
         return {**saved, "rendering_note": RENDERING_NOTE,
                 "source_fidelity_note": PAGE_SOURCE_FIDELITY_RULES, "language_note": PAGE_LANGUAGE_RULES}
+    except artifacts.PageTooLargeError:
+        # Do not ask the model to regenerate the same oversized Page this turn.
+        # Chat translates this into the actionable size message and stops.
+        raise
     except HTTPException as exc:
         return {"error": exc.detail}

@@ -20,6 +20,15 @@ from app.services.page_links import prepare_page_links
 MAX_HTML_BYTES = 262144
 PAGE_TOO_LARGE_MESSAGE = "This page is too large; try fewer rows or tabs, or split it into pages."
 MAX_REVISIONS = 25
+
+
+class PageTooLargeError(HTTPException):
+    """A terminal Page-size failure, also usable by HTTP save endpoints."""
+
+    def __init__(self, detail: str):
+        super().__init__(422, PAGE_TOO_LARGE_MESSAGE + " " + detail)
+
+
 CONTENT_CSP = (
     "sandbox; default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; "
     "img-src data:; font-src data:; connect-src 'none'; frame-src 'none'; "
@@ -38,7 +47,7 @@ def clean_html(html: str, title: str) -> tuple[str, list[str]]:
     except UnicodeError as exc:
         raise HTTPException(422, "Page text must be valid Unicode.") from exc
     if size > MAX_HTML_BYTES:
-        raise HTTPException(422, PAGE_TOO_LARGE_MESSAGE + " Pages support at most 256 KiB of self-contained HTML.")
+        raise PageTooLargeError("Pages support at most 256 KiB of self-contained HTML.")
     soup = BeautifulSoup(html, "html.parser")
     removed = False
     for comment in soup.find_all(string=lambda text: isinstance(text, Comment)):
@@ -81,7 +90,7 @@ def clean_html(html: str, title: str) -> tuple[str, list[str]]:
     result = f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="{CONTENT_CSP}"><title>{escape(title)}</title>{styles}</head><body>{body}</body></html>'
     result, _ = prepare_page_links(result, CONTENT_CSP)
     if len(result.encode("utf-8")) > MAX_HTML_BYTES:
-        raise HTTPException(422, PAGE_TOO_LARGE_MESSAGE + " Rendered page exceeds 256 KiB. Reduce content or inline images.")
+        raise PageTooLargeError("Rendered page exceeds 256 KiB. Reduce content or inline images.")
     return result, [
         "Unsupported HTML, scripts, or remote assets were removed. Review this preview before saving or sharing. "
         "Data rendered only by scripts will be missing. Use full HTML tables and static CSS charts; "
