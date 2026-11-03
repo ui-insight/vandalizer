@@ -69,6 +69,7 @@ from app.services.page_authoring import declares_page_too_large, requests_page
 from app.services.chat_output import public_chat_text
 from app.services.chat_budget_tables import reconcile_budget_tables
 from app.services.chat_source_claims import attachment_sources, ground_source_checks
+from app.services.compliance_claims import relabel_presence_checks, superseded_threshold_note
 from app.services.web_answer_grounding import (
     correction_note,
     missed_corrections,
@@ -2780,6 +2781,12 @@ async def chat_stream(
                     attachment_sources(documents, file_attachments, compacted.documents, compacted.attachments),
                     streamed_tool_results,
                 ))
+                # "Mentioned in the document" is not "compliant", and a
+                # threshold the 2024 Uniform Guidance replaced is not current.
+                answer = relabel_presence_checks(answer, streamed_tool_results)
+                threshold_note = superseded_threshold_note(answer)
+                if threshold_note:
+                    answer += "\n\n" + threshold_note
                 if page_requested and announces_unfinished_action(answer) and not any(
                     result["tool_name"] in {"create_html_artifact", "revise_html_artifact"}
                     and isinstance(result["content"], dict) and result["content"].get("preview_id")

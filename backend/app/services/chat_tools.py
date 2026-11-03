@@ -2359,6 +2359,11 @@ async def check_compliance(
                 "extraction set's Cross-field Rules section in the UI. Set them up "
                 "there, then I can check documents against them."
             ),
+            "instruction": (
+                "No rules were evaluated, so nothing here is a pass or a fail. If you review the "
+                "document against a regulation yourself, label each item 'Stated in document' or "
+                "'Not stated' (never Pass/Fail) and say it is not a compliance determination."
+            ),
         }
 
     # Run the extraction to get field values, then validate each document.
