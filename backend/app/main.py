@@ -75,6 +75,18 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
         from app.services.feedback_prompt_service import seed_default_prompts
         await seed_default_prompts()
 
+    # Documents OCR'd before raw OCR envelopes were decoded still hold the
+    # JSON wrapper as their text; repair them in place until a sweep finishes
+    # clean. Queued, never run here: it scans the documents collection.
+    try:
+        from app.models.system_config import SystemConfig
+        config = await SystemConfig.find_one()
+        if config is None or config.ocr_envelope_repair_completed_at is None:
+            from app.celery_app import celery_app
+            celery_app.send_task("tasks.document.repair_ocr_envelopes", queue="documents")
+    except Exception:
+        logger.warning("Could not queue the OCR envelope repair sweep", exc_info=True)
+
     # One-time bell notification to admins when the bundled catalog is newer
     # than what's applied. Best-effort — never block startup on it.
     try:

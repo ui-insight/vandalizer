@@ -174,8 +174,10 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
   const lastSendArgsRef = useRef<SendArgs | null>(null)
   const lastSendAcceptedRef = useRef(false)
   const unsupportedFiguresRef = useRef<string[]>([])
+  const calculatedFiguresRef = useRef<NonNullable<ChatMessage['calculated_figures']>>([])
   const silenceInferencesRef = useRef<string[]>([])
   const unsupportedCitationsRef = useRef<string[]>([])
+  const unconfirmedWebFactsRef = useRef<string[]>([])
 
   /** Drop the streaming turn's live display and release Stop's handle. */
   const clearLiveTurn = useCallback(() => {
@@ -268,8 +270,10 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
       segmentsRef.current = []
       citationsRef.current = []
       unsupportedFiguresRef.current = []
+      calculatedFiguresRef.current = []
       silenceInferencesRef.current = []
       unsupportedCitationsRef.current = []
+      unconfirmedWebFactsRef.current = []
 
       // Capture the invocation before tool results can change turnSkill.
       const invokedSkill = turnSkill
@@ -319,8 +323,14 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
         if (unsupportedFiguresRef.current.length) {
           assistantMsg.unsupported_figures = unsupportedFiguresRef.current
         }
+        if (calculatedFiguresRef.current.length) {
+          assistantMsg.calculated_figures = calculatedFiguresRef.current
+        }
         if (silenceInferencesRef.current.length) {
           assistantMsg.silence_inferences = silenceInferencesRef.current
+        }
+        if (unconfirmedWebFactsRef.current.length) {
+          assistantMsg.unconfirmed_web_facts = unconfirmedWebFactsRef.current
         }
         if (unsupportedCitationsRef.current.length) {
           assistantMsg.unsupported_citations = unsupportedCitationsRef.current
@@ -460,8 +470,10 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
               citationsRef.current = markUsed(citationsRef.current, chunk.used_refs ?? [])
             } else if (chunk.kind === 'grounding_warning') {
               unsupportedFiguresRef.current = chunk.unsupported_figures ?? []
+              calculatedFiguresRef.current = chunk.calculated_figures ?? []
               silenceInferencesRef.current = chunk.silence_inferences ?? []
               unsupportedCitationsRef.current = chunk.unsupported_citations ?? []
+              unconfirmedWebFactsRef.current = chunk.unconfirmed_web_facts ?? []
             } else if (chunk.kind === 'context_notice') {
               setContextNotices((prev) => [
                 ...prev,

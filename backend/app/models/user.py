@@ -62,6 +62,9 @@ class User(Document):
     email_preferences: dict = {}  # {"onboarding": True, "nudges": True, "announcements": True}
     # The RA inbox on Home (#999) can be turned off per user.
     home_inbox_hidden: bool = False
+    # Deadline reminders for RA inbox items. Missing keys take the defaults in
+    # app.services.deadline_reminders.DEFAULT_SETTINGS (bell on, email off).
+    deadline_reminders: dict = {}
 
     # v5.0 launch — one-time announcement send tracking
     v5_announcement_sent_at: Optional[datetime.datetime] = None

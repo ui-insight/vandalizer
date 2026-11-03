@@ -1227,6 +1227,24 @@ export function recoveredCallIds(order: string[], results: Map<string, ToolResul
   return recovered
 }
 
+/** Approval cards a later call to the same tool replaced. Support ticket: a
+ * retried "Add to inbox" left the first card (1 item) live above the second
+ * (6 items), both awaiting approval, and nothing said which one counted. A
+ * later call only replaces a card once it returns something that is not a
+ * failure: a new preview or the saved result. */
+export function supersededCallIds(order: string[], results: Map<string, ToolResultInfo>): Set<string> {
+  const superseded = new Set<string>()
+  order.forEach((id, i) => {
+    const r = results.get(id)
+    if (!r || (r.content as Record<string, unknown> | null)?.needs_confirmation !== true) return
+    if (order.slice(i + 1).some(later => {
+      const next = results.get(later)
+      return next?.tool_name === r.tool_name && !toolResultFailed(next.tool_name, next.content)
+    })) superseded.add(id)
+  })
+  return superseded
+}
+
 export function ToolStatusLine({
   call,
   result,
@@ -1234,6 +1252,7 @@ export function ToolStatusLine({
   onConfirm,
   approvalHistory,
   recovered = false,
+  superseded = false,
   names = {},
 }: {
   call?: ToolCallInfo
@@ -1243,6 +1262,8 @@ export function ToolStatusLine({
   approvalHistory?: ApprovalRecord
   /** This call failed, and a later call to the same tool succeeded. */
   recovered?: boolean
+  /** This call is awaiting approval, and a later call to the same tool replaced it. */
+  superseded?: boolean
   names?: Record<string, string>
 }) {
   const { viewDocument, setHighlightTerms, setWorkspaceMode, setVerificationSession, openWorkflow, openExtraction, openAutomation } = useWorkspace()
@@ -1292,9 +1313,13 @@ export function ToolStatusLine({
     : obj?.status === 'queued' || obj?.status === 'pending' ? 'Queued'
     : obj?.status === 'running' ? 'Running' : obj?.status === 'paused' ? 'Awaiting approval' : obj?.status && obj.status !== 'completed' ? 'Result received' : 'Completed'
 
-  const actionLabel = name === 'select_skill'
-    ? typeof obj?.approval_label === 'string' ? obj.approval_label : args.skill_uuid === null || obj?.skill_uuid === null ? 'Remove Skill' : 'Use Skill'
-    : ({ propose_obligations: 'Add to inbox', create_project: 'Create project', move_documents_to_project: 'Move files', create_workflow: 'Create workflow', update_workflow: 'Update workflow', create_automation: 'Create automation', create_extraction_from_document: 'Create extraction', run_workflow: 'Run workflow', run_validation: 'Run validation', approve_workflow_step: 'Approve step', complete_certification_module: 'Complete module' } as Record<string, string>)[name] ?? approveLabel(name)
+  // The preview names its own button (approval_label), so the card and the
+  // Assistant's "click X" agree. The map is for chats saved before previews
+  // carried one: the two used to drift, and a reject card read "Approve reject
+  // workflow step" (support ticket).
+  const actionLabel = typeof obj?.approval_label === 'string' && obj.approval_label ? obj.approval_label
+    : name === 'select_skill' ? args.skill_uuid === null || obj?.skill_uuid === null ? 'Remove Skill' : 'Use Skill'
+    : ({ propose_obligations: 'Add to inbox', create_project: 'Create project', move_documents_to_project: 'Move files', create_workflow: 'Create workflow', update_workflow: 'Update workflow', create_automation: 'Create automation', create_extraction_from_document: 'Create extraction', run_workflow: 'Run workflow', run_validation: 'Run validation', approve_workflow_step: 'Approve and continue', reject_workflow_step: 'Reject run', complete_certification_module: 'Complete module' } as Record<string, string>)[name] ?? approveLabel(name)
   const target = args.name ?? args.title ?? obj?.default_title
   const artifact = !isActive && !needsConfirmation && !isError && obj
     ? (name === 'create_workflow' || name === 'update_workflow') && typeof obj.workflow_id === 'string' ? { label: 'Open workflow', open: () => openWorkflow(obj.workflow_id as string) }
@@ -1346,6 +1371,17 @@ export function ToolStatusLine({
       <div className="agent-tool-result" data-tool-state="Retried">
         <p className="agent-tool-state" role="status" aria-atomic="true">{meta.label} · Retried</p>
         <span style={{ color: '#6b7280', fontSize: 'var(--workspace-font-control)' }}>Didn&apos;t work the first time; the Assistant tried again below.</span>
+      </div>
+    )
+  }
+
+  // Only the newest proposal can be approved; an older one is a record, not a
+  // second live button that would approve a different (smaller) change.
+  if (superseded && needsConfirmation) {
+    return (
+      <div className="agent-tool-result" data-tool-state="Replaced">
+        <p className="agent-tool-state" role="status" aria-atomic="true">{meta.label} · Replaced</p>
+        <span style={{ color: '#6b7280', fontSize: 'var(--workspace-font-control)' }}>The Assistant replaced this proposal with the one below. Review and approve that one instead.</span>
       </div>
     )
   }
@@ -1476,6 +1512,7 @@ export function ToolCallDisplay({ names = {}, toolCalls, toolResults, isStreamin
     ...toolCalls.map((c) => c.tool_call_id),
   ])
   const recovered = recoveredCallIds([...allCallIds], resultMap)
+  const superseded = supersededCallIds([...allCallIds], resultMap)
 
   const toggle = (id: string) => {
     setExpandedIds((prev) => {
@@ -1500,7 +1537,7 @@ export function ToolCallDisplay({ names = {}, toolCalls, toolResults, isStreamin
           <div key={callId}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-2)' }}>
               <div style={{ flex: 1 }}>
-                <ToolStatusLine names={names} call={call} result={result} isActive={isActive} onConfirm={onConfirm} approvalHistory={approvalHistory?.[call?.tool_call_id ?? result?.tool_call_id ?? '']} recovered={recovered.has(callId)} />
+                <ToolStatusLine names={names} call={call} result={result} isActive={isActive} onConfirm={onConfirm} approvalHistory={approvalHistory?.[call?.tool_call_id ?? result?.tool_call_id ?? '']} recovered={recovered.has(callId)} superseded={superseded.has(callId)} />
               </div>
               {expandable && (
                 <button

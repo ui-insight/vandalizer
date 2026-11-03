@@ -153,6 +153,10 @@ class SystemConfig(Document):
 
     ocr_endpoint: str = ""
     ocr_api_key: str = ""
+    # When the one-time repair of documents stored with a raw OCR JSON
+    # envelope finished (app.services.ocr_envelope_repair). Unset, every API
+    # startup queues the sweep; set, startup skips the collection scan.
+    ocr_envelope_repair_completed_at: Optional[datetime.datetime] = None
     # Web search (agentic chat tool). Provider is one of "tavily", "searxng",
     # or "brave"; the web_search_service parses each provider's response shape.
     # Endpoint is the search API URL (provider-specific); api_key is encrypted

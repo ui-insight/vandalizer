@@ -98,6 +98,78 @@ async def get_workflow_definition(
     }
 
 
+# Task types whose input comes from input_sources (doc-consuming step types).
+_SOURCE_READING_TASKS = {"Extraction", "Prompt", "Formatter", "ResearchNode"}
+
+
+def _task_sources(data: dict) -> list[str]:
+    raw = data.get("input_sources")
+    if isinstance(raw, list) and raw:
+        return [str(s) for s in raw]
+    return [str(data.get("input_source") or "step_input")]
+
+
+def _rewire_moved_steps(current_steps: list[dict], built: list[dict], kept: set[int]) -> dict[int, str]:
+    """Keep each kept step reading what it read before the edit.
+
+    "Previous step output" names a position, not a step. Support ticket: chat
+    inserted "Flag F&A rate above 50%" between an extraction and the PI
+    summary, kept the summary "unchanged", and the summary then saw only the
+    one-line flag. A kept step whose predecessor changed is rewired: one that
+    followed a step now reads all earlier steps (its old input is still among
+    them); one that was first, reading the workflow documents through the
+    trigger, now reads them directly. Returns a preview note per rewired index.
+    """
+    import copy
+
+    old_names = [s["name"] for s in current_steps]
+    old_prev = {name: (old_names[i - 1] if i else None) for i, name in enumerate(old_names)}
+    notes: dict[int, str] = {}
+    for idx in sorted(kept):
+        step = built[idx]
+        before = old_prev.get(step["name"])
+        after = built[idx - 1]["name"] if idx else None
+        if before == after:
+            continue
+        if after is None:
+            # Now first: "previous step output" is the trigger's documents,
+            # and there are no earlier steps to read instead.
+            if any(task.get("name") in _SOURCE_READING_TASKS and isinstance(task.get("data"), dict)
+                   and "step_input" in _task_sources(task["data"]) for task in step.get("tasks") or []):
+                notes[idx] = f'input changed: now first, it reads the workflow documents instead of "{before}"'
+            continue
+        rewired = copy.deepcopy(step)
+        changed = False
+        for task in rewired.get("tasks") or []:
+            data = task.get("data")
+            if task.get("name") not in _SOURCE_READING_TASKS or not isinstance(data, dict):
+                continue
+            sources = _task_sources(data)
+            if "step_input" not in sources:
+                continue
+            replacement = "workflow_documents" if before is None else "earlier_steps"
+            new_sources: list[str] = []
+            for source in sources:
+                source = replacement if source == "step_input" else source
+                if source not in new_sources:
+                    new_sources.append(source)
+            data["input_sources"] = new_sources
+            data.pop("input_source", None)
+            changed = True
+        if not changed:
+            continue
+        built[idx] = rewired
+        if before is None:
+            notes[idx] = "input rewired: still reads the workflow documents, now that a step comes before it"
+        elif before in {b["name"] for b in built}:
+            notes[idx] = (f'input rewired: now reads all earlier steps, so it still gets "{before}" '
+                          f'and not only "{after}"')
+        else:
+            notes[idx] = (f'input rewired: "{before}", the step it read, is removed; '
+                          "it now reads all earlier steps")
+    return notes
+
+
 async def update_workflow(
     context: RunContext[AgenticChatDeps],
     workflow_id: str,
@@ -122,7 +194,10 @@ async def update_workflow(
     entry is either:
       - {"keep": "<existing step name>"}: keep that step exactly as it is,
         including settings chat can't see. Prefer this for every step the
-        change doesn't touch.
+        change doesn't touch. A kept step that read the previous step's
+        output and gets a new step before it is rewired to read all earlier
+        steps, so it keeps its old input; the preview says so. To add a
+        check without touching what other steps read, put it at the end.
       - a new step spec, exactly as create_workflow takes it ("name", "type",
         "prompt" / "extractions" / "format_template" / …, "is_output").
     Omit ``steps`` to change only the name or description.
@@ -185,6 +260,7 @@ async def update_workflow(
         existing = {s["name"]: s for s in current["steps"]}
         model = context.deps.model_name or None
         built: list[dict] = []
+        kept_indexes: set[int] = set()
         first_doc_step_wired = False
         for idx, spec in enumerate(steps):
             if not isinstance(spec, dict):
@@ -198,6 +274,7 @@ async def update_workflow(
                     )}
                 if any("workflow_documents" in ((t.get("data") or {}).get("input_sources") or []) for t in kept["tasks"]):
                     first_doc_step_wired = True
+                kept_indexes.add(len(built))
                 built.append(kept)
                 preview_steps.append(f"{idx + 1}. {kept['name']} (unchanged)")
                 continue
@@ -228,6 +305,8 @@ async def update_workflow(
                 "tasks": [{"name": task_name, "data": data}],
             })
             preview_steps.append(f"{idx + 1}. {label} ({raw_type}, {'changed' if label in existing else 'new'})")
+        for idx, note in _rewire_moved_steps(current["steps"], built, kept_indexes).items():
+            preview_steps[idx] = f"{idx + 1}. {built[idx]['name']} ({note})"
         if not any(s["is_output"] for s in built):
             built[-1]["is_output"] = True
         new_def["steps"] = built

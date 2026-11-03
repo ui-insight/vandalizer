@@ -163,3 +163,79 @@ def test_chat_is_told_to_edit_rather_than_create():
     prompt = " ".join(v for v in vars(llm_service).values() if isinstance(v, str))
     assert "Never call create_workflow for an edit" in prompt
     assert chat_tools.approve_button_label("update_workflow") == "Update workflow"
+
+
+FLAG = {"name": "Flag F&A rate above 50%", "type": "prompt", "prompt": "Flag if the F&A rate is above 50%."}
+
+
+@pytest.mark.asyncio
+async def test_a_step_inserted_mid_chain_keeps_the_next_step_reading_its_old_input():
+    """Support ticket: the summary kept "unchanged" saw only the new flag step's line."""
+    import copy
+
+    before = copy.deepcopy(CURRENT)
+    ctx = _make_context(conversation=_Conversation(), turn_marker=5)
+    steps = [{"keep": "Extract terms"}, FLAG, {"keep": "Check NSF rules"}]
+    _, apply_edit, patches = _patches()
+    preview = await _run(ctx, "wf-1", "Flag a high F&A rate", steps=steps, patches=patches)
+    assert "3. Check NSF rules (unchanged)" not in preview["preview"]
+    assert ('3. Check NSF rules (input rewired: now reads all earlier steps, so it still gets '
+            '"Extract terms" and not only "Flag F&A rate above 50%")') in preview["preview"]
+
+    ctx.deps.turn_marker = 6
+    _, apply_edit, patches = _patches()
+    await _run(ctx, "wf-1", "Flag a high F&A rate", steps=steps, confirmed=True, patches=patches)
+    extract, flag, summary = apply_edit.await_args.args[1]["steps"]
+    assert extract == CURRENT["steps"][0]
+    assert flag["tasks"][0]["data"]["input_sources"] == ["step_input"]  # the flag reads the extraction
+    assert summary["tasks"][0]["data"]["input_sources"] == ["earlier_steps"]
+    assert summary["tasks"][0]["data"]["prompt"] == "Check against NSF PAPPG."
+    assert summary["is_output"] is True
+    assert CURRENT == before  # the stored definition isn't mutated
+
+
+@pytest.mark.asyncio
+async def test_a_check_added_at_the_end_leaves_kept_steps_unchanged():
+    ctx = _make_context(conversation=_Conversation(), turn_marker=5)
+    _, _, patches = _patches()
+    preview = await _run(ctx, "wf-1", "Flag a high F&A rate",
+                         steps=[{"keep": "Extract terms"}, {"keep": "Check NSF rules"}, FLAG], patches=patches)
+    assert "1. Extract terms (unchanged)" in preview["preview"]
+    assert "2. Check NSF rules (unchanged)" in preview["preview"]
+
+
+def test_a_first_step_moved_later_still_reads_the_documents():
+    from app.services.chat_workflow_tools import _rewire_moved_steps
+
+    legacy_first = {"name": "Summarize", "is_output": True, "data": {}, "tasks": [
+        {"name": "Prompt", "data": {"prompt": "Summarize."}},  # no input_sources: the trigger's documents
+    ]}
+    intro = {"name": "Intro", "is_output": False, "data": {}, "tasks": [{"name": "Prompt", "data": {"input_sources": ["workflow_documents"]}}]}
+    approval = {"name": "Sign off", "is_output": False, "data": {}, "tasks": [{"name": "Approval", "data": {}}]}
+    built = [intro, legacy_first, approval]
+    notes = _rewire_moved_steps([legacy_first, approval], built, {1, 2})
+    assert built[1]["tasks"][0]["data"]["input_sources"] == ["workflow_documents"]
+    assert "still reads the workflow documents" in notes[1]
+    assert 2 not in notes and built[2] is approval  # approvals don't read input_sources
+    assert "input_sources" not in legacy_first["tasks"][0]["data"]
+
+
+def test_removing_the_step_a_kept_step_read_is_named():
+    from app.services.chat_workflow_tools import _rewire_moved_steps
+
+    extract, summary = CURRENT["steps"]
+    flag = {"name": "Flag", "is_output": False, "data": {}, "tasks": [{"name": "Prompt", "data": {"input_sources": ["step_input"]}}]}
+    built = [extract, summary]
+    notes = _rewire_moved_steps([extract, flag, summary], built, {0, 1})
+    assert built[1]["tasks"][0]["data"]["input_sources"] == ["earlier_steps"]
+    assert notes == {1: 'input rewired: "Flag", the step it read, is removed; it now reads all earlier steps'}
+
+
+def test_a_step_that_becomes_first_reads_the_documents_and_says_so():
+    from app.services.chat_workflow_tools import _rewire_moved_steps
+
+    _, summary = CURRENT["steps"]
+    built = [summary]
+    notes = _rewire_moved_steps(CURRENT["steps"], built, {0})
+    assert built[0] is summary  # step_input on a first step already means the documents
+    assert notes == {0: 'input changed: now first, it reads the workflow documents instead of "Extract terms"'}

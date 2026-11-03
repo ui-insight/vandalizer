@@ -39,6 +39,7 @@ celery.conf.task_routes = {
     "tasks.retention.*": {"queue": "default"},
     "tasks.approvals.*": {"queue": "default"},
     "tasks.project.*": {"queue": "documents"},
+    "tasks.obligations.*": {"queue": "default"},
 }
 
 celery.conf.beat_schedule = {
@@ -154,6 +155,17 @@ celery.conf.beat_schedule = {
     # quiet regressions after Apply (KB content drifts, retrieval pipeline
     # shifts). Emits a QualityAlert when the current blended score has fallen
     # >10pts vs the originally applied run's optimized_score.
+    # RA inbox deadline reminders: 14/3 days before, on the day, overdue.
+    # Hourly so an item added today is reminded today; each stage is claimed
+    # once per user, so reruns send nothing twice.
+    "obligations-deadline-reminders": {
+        "task": "tasks.obligations.send_deadline_reminders",
+        "schedule": crontab(minute=5),
+    },
+    "obligations-weekly-summary": {
+        "task": "tasks.obligations.send_weekly_deadline_summaries",
+        "schedule": crontab(day_of_week=1, hour=7, minute=0),  # Mondays 7am
+    },
     "kb-revalidate-applied-monthly": {
         "task": "tasks.passive.kb_revalidate_applied",
         "schedule": crontab(day_of_month=1, hour=2, minute=0),  # 1st of month, 2am

@@ -7,15 +7,23 @@ import type { Obligation } from '../../api/obligations'
 
 const navigate = vi.fn()
 const viewDocument = vi.fn()
-vi.mock('@tanstack/react-router', () => ({ useNavigate: () => navigate }))
-vi.mock('../../contexts/WorkspaceContext', () => ({ useWorkspace: () => ({ viewDocument }) }))
+const workspace = vi.hoisted(() => ({ focusedObligationUuid: null as string | null }))
+vi.mock('@tanstack/react-router', () => ({
+  useNavigate: () => navigate,
+  Link: ({ children, to, hash, ...rest }: { children: React.ReactNode; to: string; hash?: string }) => <a href={`${to}${hash ? `#${hash}` : ''}`} {...rest}>{children}</a>,
+}))
+vi.mock('../../contexts/WorkspaceContext', () => ({ useWorkspace: () => ({ viewDocument, focusedObligationUuid: workspace.focusedObligationUuid }) }))
 const api = vi.hoisted(() => ({
   getInbox: vi.fn(),
   setObligationDone: vi.fn(),
   setObligationDismissed: vi.fn(),
   setInboxHidden: vi.fn(),
+  downloadDeadlineCalendar: vi.fn(),
 }))
-vi.mock('../../api/obligations', () => api)
+vi.mock('../../api/obligations', async (actual) => {
+  const real = await actual<typeof import('../../api/obligations')>()
+  return { ...api, plainQuote: real.plainQuote, quoteSearchTerms: real.quoteSearchTerms }
+})
 
 const source = { document_uuid: 'amend', document_title: 'sponsor-amendment.pdf', page: 1, quote: 'The new sponsor deadline is November 19, 2026 at 5:00 p.m. Pacific Time.', role: 'evidence' }
 const item = (over: Partial<Obligation>): Obligation => ({
@@ -30,10 +38,63 @@ const LETTER = item({ uuid: 'ob-3', kind: 'required_material', title: 'Signed co
 
 beforeEach(() => {
   vi.clearAllMocks()
+  workspace.focusedObligationUuid = null
+  api.downloadDeadlineCalendar.mockResolvedValue(undefined)
   api.getInbox.mockResolvedValue({ items: [DEADLINE, CAP, LETTER], inbox_hidden: false })
   api.setObligationDone.mockResolvedValue({})
   api.setObligationDismissed.mockResolvedValue({})
   api.setInboxHidden.mockResolvedValue({ inbox_hidden: true })
+})
+
+const daysFromNow = (n: number) => {
+  const d = new Date()
+  d.setDate(d.getDate() + n)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T00:00:00`
+}
+
+// Support ticket: deadlines were only a flat list on Home, with no calendar
+// file and nothing a reminder could link to.
+describe('RA inbox upcoming view and calendar', () => {
+  const OVERDUE = item({ uuid: 'qpcr', title: 'Validated qPCR assay protocol', due_at: daysFromNow(-121), due_text: null })
+  const WEEK = item({ uuid: 'invoice', title: 'Invoice', due_at: daysFromNow(2), due_text: null })
+  const MONTH = item({ uuid: 'results', title: 'Semi-annual results', due_at: daysFromNow(14), due_text: null })
+  const LATER = item({ uuid: 'final', title: 'Final report', due_at: daysFromNow(200), due_text: null })
+
+  it('groups deadlines as overdue, this week, next 30 days and later, then what is needed', async () => {
+    api.getInbox.mockResolvedValue({ items: [LATER, MONTH, LETTER, WEEK, OVERDUE, CAP], inbox_hidden: false })
+    render(<RAInbox />)
+    await screen.findByRole('region', { name: 'RA inbox' })
+    const groups = screen.getAllByRole('group').map(g => g.getAttribute('aria-label'))
+    expect(groups).toEqual(['Overdue', 'Due this week', 'Next 30 days', 'Later', 'Needed and limits'])
+    expect(screen.getByRole('group', { name: 'Overdue' })).toHaveTextContent('Validated qPCR assay protocol')
+    expect(screen.getByRole('group', { name: 'Overdue' })).toHaveTextContent('121 days past')
+    expect(screen.getByRole('group', { name: 'Needed and limits' })).toHaveTextContent('Direct-cost cap')
+  })
+
+  it('downloads a calendar file per deadline and for all deadlines', async () => {
+    api.getInbox.mockResolvedValue({ items: [WEEK, LETTER], inbox_hidden: false })
+    render(<RAInbox />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Add "Invoice" to your calendar' }))
+    expect(api.downloadDeadlineCalendar).toHaveBeenCalledWith({ obligation: 'invoice' })
+    expect(screen.queryByRole('button', { name: /Add "Signed community-partner letter"/ })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Download a calendar file with all your open deadlines' }))
+    expect(api.downloadDeadlineCalendar).toHaveBeenLastCalledWith('all')
+    expect(screen.getByRole('link', { name: 'Deadline reminder settings' })).toHaveAttribute('href', '/account#deadline-reminders')
+  })
+
+  it("highlights the item a reminder links to, or says it's no longer open", async () => {
+    workspace.focusedObligationUuid = 'results'
+    api.getInbox.mockResolvedValue({ items: [WEEK, MONTH], inbox_hidden: false })
+    const { unmount } = render(<RAInbox />)
+    const row = (await screen.findByText('Semi-annual results')).closest('li')
+    expect(row).toHaveAttribute('aria-current', 'true')
+    expect(screen.getByText('Invoice').closest('li')).not.toHaveAttribute('aria-current')
+    unmount()
+
+    workspace.focusedObligationUuid = 'gone'
+    render(<RAInbox />)
+    expect(await screen.findByText(/The deadline from that reminder is no longer open here/)).toBeInTheDocument()
+  })
 })
 
 describe('RA inbox', () => {

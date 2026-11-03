@@ -75,6 +75,12 @@ class AgenticChatDeps:
     # request as user parts and clears the list.
     queued_user_parts: list[str] = field(default_factory=list)
 
+    # RA inbox ticket: set when list_project_inbox ran this turn, so a Page or
+    # reply may say "from the RA inbox"; and the count of propose_obligations
+    # calls that verified nothing, so chat stops retrying and explains.
+    inbox_read: bool = False
+    obligation_failures: int = 0
+
     # Set once the reply was sent back for pointing at an approval button no
     # tool prepared (approval_claims.require_approval_card), so a second miss
     # is accepted instead of failing the turn.

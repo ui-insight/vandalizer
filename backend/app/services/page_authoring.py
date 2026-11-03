@@ -1,5 +1,45 @@
 """Source-fidelity guidance shared by Page generation and tool feedback."""
 
+import re
+
+
+PAGE_SIZE_RULES = (
+    "A Page must fit both the model's response limit and 256 KiB of self-contained HTML. "
+    "If the requested Page cannot fit, say: 'This page is too large; try fewer rows or tabs, "
+    "or split it into pages.' Then stop and wait for the user to choose a smaller scope. "
+    "Do not select a default, start another preview, or promise to continue in the same reply. "
+    "Never silently omit rows or tabs to make a full-spreadsheet request fit."
+)
+
+
+def requests_page(text: str) -> bool:
+    """Identify an explicit Page authoring request, including before a tool starts.
+
+    Used only to label confirmed output-limit errors, never to reject by input size.
+    """
+    # "page 3" / "pages 4-6" cite a document's pages, not a Page to build.
+    page = r"\bpages?\b(?!\s*\d)"
+    return bool(re.search(
+        r"\b(?:make|create|build|prepare|generate|revise|update|turn|convert)\b[^.!?\n]{0,100}" + page
+        + r"|" + page + r"[^.!?\n]{0,100}\b(?:summarizing|summarising|including|containing|with)\b",
+        text, re.IGNORECASE,
+    ))
+
+
+def declares_page_too_large(text: str) -> bool:
+    """Recognize an affirmative Page-size refusal, not hypothetical/negated advice.
+
+    Run on public response text only. A refusal must end the turn even if the
+    same response subsequently announces a default or includes a Page tool call.
+    """
+    plain = re.sub(r"[*_`#]", "", text)
+    return bool(re.search(
+        r"(?:^|[.!?\n])\s*(?:(?:this|the)(?: requested)?\s+)?page\s+"
+        r"(?:is|would be)\s+too\s+(?:large|big)\b",
+        plain, re.IGNORECASE,
+    ))
+
+
 PAGE_LANGUAGE_RULES = (
     "In replies, call this feature a Page (plural Pages), never an artifact or HTML artifact. "
     "Describe actions and outcomes, not tool calls: 'I prepared the Page preview' or 'Saved the Page'. "

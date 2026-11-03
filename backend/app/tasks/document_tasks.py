@@ -1462,6 +1462,39 @@ _EXTRACTION_ABANDONED_MESSAGE = (
 )
 
 
+@celery_app.task(bind=True, name="tasks.document.repair_ocr_envelopes")
+def repair_ocr_envelopes(self: Task) -> dict[str, int]:
+    """One-time repair of text stored with a raw OCR JSON envelope.
+
+    Queued at API startup until a sweep finishes clean; see
+    ``app.services.ocr_envelope_repair``. Marks the sweep complete only when
+    nothing is left that a later sweep could still repair: a document mid-
+    extraction or one that failed is retried at the next startup, while one
+    whose envelope does not decode is reported and left for Retry extraction.
+    """
+    from app.services.ocr_envelope_repair import repair_all
+
+    db = get_sync_db()
+    rows = repair_all(db)
+    counts: dict[str, int] = {}
+    for row in rows:
+        counts[row["status"]] = counts.get(row["status"], 0) + 1
+    for row in rows:
+        if row["status"] in ("undecodable", "empty"):
+            logger.warning(
+                "Document %s still holds an OCR envelope that could not be decoded "
+                "(%s) - Retry extraction will re-read it", row["uuid"], row["status"],
+            )
+    if not any(row["status"] in ("extracting", "failed", "changed") for row in rows):
+        db.system_config.update_one(
+            {},
+            {"$set": {"ocr_envelope_repair_completed_at": datetime.datetime.now(tz=datetime.timezone.utc)}},
+        )
+    if rows:
+        logger.info("OCR envelope repair sweep: %s", counts)
+    return counts
+
+
 @celery_app.task(bind=True, name="tasks.document.reap_stuck")
 def reap_stuck_documents(self: Task) -> None:
     """Self-heal documents whose task_status is stuck in an in-progress stage.

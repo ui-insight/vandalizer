@@ -22,6 +22,10 @@ the question or too common to check without drowning the real signal.
 
 import json
 import re
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.figure_derivation import Derivation
 
 _SCALES = {
     "k": 1_000,
@@ -158,22 +162,38 @@ def unsupported_figures(answer: str, snippets: str) -> list[str]:
     Values are compared, not strings: "$1 million" in the answer is supported
     by "$1,000,000" in a snippet, and "15%" by "15 percent". A percentage is
     never supported by a dollar amount of the same number, or the reverse.
-    Returned in the answer's own wording, first occurrence, in order.
+    A figure the answer calculated from stated ones is supported (see
+    ``check_figures``). Returned in the answer's own wording, first
+    occurrence, in order.
     """
+    return check_figures(answer, snippets)[0]
+
+
+def check_figures(answer: str, snippets: str) -> tuple[list[str], list["Derivation"]]:
+    """(figures no source states, figures calculated from ones they do).
+
+    Support ticket: correct sums and percentages worked out from an NIH budget
+    table were flagged as possibly "from the model's general knowledge". See
+    ``figure_derivation``.
+    """
+    from app.services.figure_derivation import derive_figures
+
     if not answer or not answer.strip():
-        return []
+        return [], []
     snippet_money = set(_money_values(snippets or ""))
     snippet_pct = set(_percent_values(snippets or ""))
+    calculated = derive_figures(answer, snippet_money, snippet_pct)
+    derived = {d.label for d in calculated}
     missing = [
         label for value, label in _money_values(answer).items()
-        if value not in snippet_money
+        if value not in snippet_money and label not in derived
     ]
     missing += [
         label for value, label in _percent_values(answer).items()
-        if value not in snippet_pct
+        if value not in snippet_pct and label not in derived
     ]
     order = {label: answer.find(label) for label in missing}
-    return sorted(missing, key=lambda label: order[label])
+    return sorted(missing, key=lambda label: order[label]), calculated
 
 
 # ---------------------------------------------------------------------------

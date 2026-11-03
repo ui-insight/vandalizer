@@ -10,7 +10,7 @@ import { ChatExportActions } from './ChatExportActions'
 import { useCertificationPanel } from '../../contexts/CertificationPanelContext'
 import { certificationChatEntry } from '../../lib/certificationChat'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
-import { ToolCallDisplay, ToolStatusLine, recoveredCallIds } from './ToolCallDisplay'
+import { ToolCallDisplay, ToolStatusLine, recoveredCallIds, supersededCallIds } from './ToolCallDisplay'
 import { renderMarkdown, THINK_BLOCK_RE, THINK_TRAILING_RE } from './markdown'
 import { routeActionClick } from './actionRoute'
 import type { ChatActivity, ChatMessage as ChatMessageType, Citation, StreamSegment, ToolCallInfo, ToolResultInfo } from '../../types/chat'
@@ -284,6 +284,16 @@ export function ChatMessage({
     return suppressed
   }, [segments, resultMap])
 
+  // Approval cards a later call to the same tool replaced. Hidden duplicates
+  // are left out so they can't retire the copy that is still shown.
+  const supersededIds = useMemo(
+    () => supersededCallIds(
+      (segments ?? []).flatMap(seg => (seg.kind === 'tool_call' && !suppressedConfirmCallIds.has(seg.call.tool_call_id) ? [seg.call.tool_call_id] : [])),
+      resultMap,
+    ),
+    [segments, resultMap, suppressedConfirmCallIds],
+  )
+
   return (
     <div
       className={isUser ? 'chat-user-message' : Array.from(resultMap.values()).some(result => result.tool_name.includes('certification')) ? 'cert-chat-message' : undefined}
@@ -352,7 +362,7 @@ export function ChatMessage({
                   const isActive = !result && (isStreamingProp || activeCallIds.has(seg.call.tool_call_id))
                   return (
                     <div key={i} style={{ margin: "var(--workspace-space-4) 0" }}>
-                      <ToolStatusLine names={exportNames} call={seg.call} result={result} isActive={isActive} onConfirm={onSendMessage} approvalHistory={approvalHistory?.[seg.call.tool_call_id]} recovered={recoveredIds.has(seg.call.tool_call_id)} />
+                      <ToolStatusLine names={exportNames} call={seg.call} result={result} isActive={isActive} onConfirm={onSendMessage} approvalHistory={approvalHistory?.[seg.call.tool_call_id]} recovered={recoveredIds.has(seg.call.tool_call_id)} superseded={supersededIds.has(seg.call.tool_call_id)} />
                     </div>
                   )
                 }
@@ -399,6 +409,26 @@ export function ChatMessage({
             </>
           )}
 
+          {/* Support ticket: correct sums and percentages from a budget table
+              were flagged as "general knowledge". A calculated figure is
+              labelled as one, with the formula that produced it. */}
+          {message.calculated_figures && message.calculated_figures.length > 0 && (
+            <details
+              className="chat-calculated-figures"
+              style={{
+                marginTop: 8, padding: '6px 10px', backgroundColor: '#f1f5f9', borderRadius: 6,
+                fontSize: 12, lineHeight: 1.5, color: '#334155',
+              }}
+            >
+              <summary style={{ cursor: 'pointer' }}>
+                Calculated from figures in the sources ({message.calculated_figures.length})
+              </summary>
+              <ul aria-label="Calculations" style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+                {message.calculated_figures.map((c, i) => <li key={i}>{c.formula}</li>)}
+              </ul>
+            </details>
+          )}
+
           {message.unsupported_figures && message.unsupported_figures.length > 0 && (
             <div
               role="note"
@@ -413,6 +443,25 @@ export function ChatMessage({
                 {' '}It may come from the model's general knowledge, which can be out of date.
                 Check it against the source before relying on it. With a knowledge base, naming the
                 section or document in your question usually retrieves the passage that states it.
+              </span>
+            </div>
+          )}
+
+          {message.unconfirmed_web_facts && message.unconfirmed_web_facts.length > 0 && (
+            <div
+              role="note"
+              aria-label="Details not confirmed on a page"
+              style={{
+                marginTop: 8, padding: '8px 10px', display: 'flex', gap: 8, alignItems: 'flex-start',
+                backgroundColor: '#fef3c7', borderRadius: 6, fontSize: 12, lineHeight: 1.5, color: '#92400e',
+              }}
+            >
+              <AlertTriangle aria-hidden style={{ width: 14, height: 14, flexShrink: 0, marginTop: 2, color: '#b45309' }} />
+              <span>
+                Not confirmed on a page: <strong>{message.unconfirmed_web_facts.join(', ')}</strong>.
+                {' '}This answer used web search results, which are short excerpts and can be out of
+                date, and no page read for it states these details. Open the official source to check
+                them, or ask the assistant to read that page.
               </span>
             </div>
           )}

@@ -81,6 +81,9 @@ class SmartDocument(Document):
     ingestion_warnings: list[str] = []
     # 1-indexed PDF pages behind the "unread_pages" warning.
     unread_pages: list[int] = []
+    # Set when ocr_envelope_repair decoded a stored raw OCR JSON envelope into
+    # this document's text in place (documents read before that fix).
+    ocr_envelope_repaired_at: Optional[datetime.datetime] = None
 
     # Per-location char-offset markers from text extraction, used to attach
     # page (PDF) or sheet (XLSX) metadata to chunks for citations. Empty for
