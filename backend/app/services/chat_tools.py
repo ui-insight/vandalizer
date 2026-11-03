@@ -7069,6 +7069,7 @@ async def submit_certification_assessment(
 
 
 from app.services.chat_workflow_tools import get_workflow_definition, update_workflow  # noqa: E402
+from app.services.chat_snapshot_tools import get_award_snapshot  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Tool registry — imported by llm_service.create_agentic_chat_agent()
@@ -7135,6 +7136,7 @@ TOOLS: list[ToolFuncContext[AgenticChatDeps, ...]] = [
     unpin_from_project,
     set_project_status,
     list_project_inbox,
+    get_award_snapshot,
     propose_obligations,
     # Phase 9 — Automations
     create_automation,
@@ -7186,6 +7188,7 @@ COMPACTABLE_TOOLS: frozenset[str] = frozenset({
     "list_optimization_recommendations",
     "list_project_documents",
     "list_project_inbox",
+    "get_award_snapshot",
     "list_projects",
     "get_certification_progress",
     "get_certification_module",

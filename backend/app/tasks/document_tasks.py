@@ -1442,6 +1442,11 @@ def perform_semantic_ingestion(self: Task, raw_text: str, document_uuid: str, us
             logger.exception(
                 "Project KB ingestion failed for %s", document_uuid
             )
+        # A project's award snapshot reads its documents: a new or re-read
+        # one rebuilds it (only once someone has built it). Never raises.
+        from app.services.award_snapshot import queue_rebuild_for_document_sync
+
+        queue_rebuild_for_document_sync(db, doc)
 
     return document_uuid
 
