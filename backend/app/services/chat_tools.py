@@ -337,9 +337,12 @@ def _doc_text_unavailable_err(doc: "SmartDocument") -> dict:
     )
 
 
-# Approve-button labels on the chat approval card. Mirrors ``actionLabel`` in
-# frontend/src/components/chat/ToolCallDisplay.tsx so the assistant can name
-# the button the user actually sees.
+# Approve-button labels on the chat approval card. Every preview carries its
+# label as ``approval_label`` and the card shows that, so the button and the
+# assistant's "click X" can't drift apart. They did: the card learned "Approve
+# step" while this table didn't, and the assistant told users to click
+# "Approve approve workflow step" (support ticket). Every gated tool has an
+# entry (tests/test_chat_approval_labels.py); the fallback is for none of them.
 _APPROVE_BUTTON_LABELS = {
     "create_html_artifact": "Save page",
     "revise_html_artifact": "Save new version",
@@ -354,6 +357,21 @@ _APPROVE_BUTTON_LABELS = {
     "run_validation": "Run validation",
     "complete_certification_module": "Complete module",
     "move_documents_to_project": "Move files",
+    "approve_workflow_step": "Approve and continue",
+    # Without an entry this was "Approve reject workflow step": the user had
+    # to click Approve to reject.
+    "reject_workflow_step": "Reject run",
+    "add_documents_to_kb": "Add to knowledge base",
+    "add_url_to_kb": "Add to knowledge base",
+    "create_knowledge_base": "Create knowledge base",
+    "apply_optimization": "Apply changes",
+    "start_optimization": "Start optimization",
+    "regenerate_validation_plan": "Regenerate plan",
+    "pin_to_project": "Pin to project",
+    "unpin_from_project": "Unpin from project",
+    "run_pin_on_project": "Run on project files",
+    "set_project_status": "Update status",
+    "save_to_folder": "Save to folder",
 }
 
 
@@ -466,6 +484,7 @@ async def _confirm_gate(
     # leaving the user thinking the write happened when it did not.
     out["status"] = "awaiting_user_confirmation"
     label = preview.get("approval_label") or approve_button_label(tool_name)
+    out["approval_label"] = label
     staged_action = "The Page" if tool_name in {"create_html_artifact", "revise_html_artifact"} else f"'{tool_name}'"
     out["assistant_instruction"] = (
         f"This action has NOT been performed. {staged_action} is only staged and "

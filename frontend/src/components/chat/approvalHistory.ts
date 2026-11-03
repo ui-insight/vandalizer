@@ -22,6 +22,21 @@ function actionKey(call: ToolCallInfo): string {
   return `${call.tool_name}:${canonical(args)}`
 }
 
+/** What a decided card says under its label, in plain words. The old text
+ * ("A matching confirmed action has a result below…") described the matching,
+ * not the outcome (support ticket). */
+function decidedDetail(label: string): string {
+  switch (label) {
+    case 'Approved': return 'The workflow continued from the approval step.'
+    case 'Rejected': return 'The run was stopped and marked failed. It will not continue.'
+    case 'Failed': return "This didn't complete. The error is shown below."
+    case 'Canceled': return 'This was canceled. Nothing further will run.'
+    case 'Queued':
+    case 'Running': return 'This has started. Its progress is shown below.'
+    default: return 'Done. The result is shown below.'
+  }
+}
+
 /** Associate an execution with a preview in the next turn by matching its
  * arguments, a stored Page preview ID, or a successful Skill receipt's target.
  * A later unrelated run must never make an old approval look completed.
@@ -69,8 +84,11 @@ export function approvalHistoryFor(message: ChatMessage, following: ChatMessage[
         const content = object(result.content)
         if (content.needs_confirmation) continue
         const status = content.status
+        const failed = Boolean(content.error) || status === 'failed' || status === 'error'
         const label = status === 'canceled' || status === 'cancelled' ? 'Canceled'
-          : content.error || status === 'failed' || status === 'error' ? 'Failed'
+          : failed ? 'Failed'
+          : result.tool_name === 'approve_workflow_step' && status === 'approved' ? 'Approved'
+          : result.tool_name === 'reject_workflow_step' && status === 'rejected' ? 'Rejected'
           : status === 'queued' || status === 'pending' ? 'Queued'
           : status === 'running' ? 'Running'
           : status === 'completed' ? 'Completed'
@@ -78,7 +96,7 @@ export function approvalHistoryFor(message: ChatMessage, following: ChatMessage[
           : result.tool_name === 'update_workflow' && content.workflow_id ? 'Workflow updated'
           : result.tool_name === 'run_workflow' && content.session_id ? 'Run accepted'
           : 'Result recorded'
-        record = { label, detail: 'A matching confirmed action has a result below. Inspect that result for details; this preview is retained as history.' }
+        record = { label, detail: decidedDetail(label) }
         // Retry reuses the user message; the last receipt in this turn wins.
         if (!storedPage) break
       }

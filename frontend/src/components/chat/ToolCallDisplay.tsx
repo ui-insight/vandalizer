@@ -1313,9 +1313,13 @@ export function ToolStatusLine({
     : obj?.status === 'queued' || obj?.status === 'pending' ? 'Queued'
     : obj?.status === 'running' ? 'Running' : obj?.status === 'paused' ? 'Awaiting approval' : obj?.status && obj.status !== 'completed' ? 'Result received' : 'Completed'
 
-  const actionLabel = name === 'select_skill'
-    ? typeof obj?.approval_label === 'string' ? obj.approval_label : args.skill_uuid === null || obj?.skill_uuid === null ? 'Remove Skill' : 'Use Skill'
-    : ({ propose_obligations: 'Add to inbox', create_project: 'Create project', move_documents_to_project: 'Move files', create_workflow: 'Create workflow', update_workflow: 'Update workflow', create_automation: 'Create automation', create_extraction_from_document: 'Create extraction', run_workflow: 'Run workflow', run_validation: 'Run validation', approve_workflow_step: 'Approve step', complete_certification_module: 'Complete module' } as Record<string, string>)[name] ?? approveLabel(name)
+  // The preview names its own button (approval_label), so the card and the
+  // Assistant's "click X" agree. The map is for chats saved before previews
+  // carried one: the two used to drift, and a reject card read "Approve reject
+  // workflow step" (support ticket).
+  const actionLabel = typeof obj?.approval_label === 'string' && obj.approval_label ? obj.approval_label
+    : name === 'select_skill' ? args.skill_uuid === null || obj?.skill_uuid === null ? 'Remove Skill' : 'Use Skill'
+    : ({ propose_obligations: 'Add to inbox', create_project: 'Create project', move_documents_to_project: 'Move files', create_workflow: 'Create workflow', update_workflow: 'Update workflow', create_automation: 'Create automation', create_extraction_from_document: 'Create extraction', run_workflow: 'Run workflow', run_validation: 'Run validation', approve_workflow_step: 'Approve and continue', reject_workflow_step: 'Reject run', complete_certification_module: 'Complete module' } as Record<string, string>)[name] ?? approveLabel(name)
   const target = args.name ?? args.title ?? obj?.default_title
   const artifact = !isActive && !needsConfirmation && !isError && obj
     ? (name === 'create_workflow' || name === 'update_workflow') && typeof obj.workflow_id === 'string' ? { label: 'Open workflow', open: () => openWorkflow(obj.workflow_id as string) }
