@@ -47,6 +47,8 @@ class WorkflowResponse(BaseModel):
     # Verified items are already shared; the editor's share callout hides.
     verified: bool = False
     created_by: Optional[AuthorRef] = None
+    # Current version number (the Versions tab's "Current" entry).
+    version: int = 1
 
 
 class WorkflowPageResponse(BaseModel):
@@ -134,6 +136,8 @@ class WorkflowStatusResponse(BaseModel):
     # Models used, the settings each call was sent with, and the run's
     # configuration snapshot; None for runs recorded before it existed.
     run_metadata: Optional[dict] = None
+    # The workflow version the run executed; None for older runs.
+    workflow_version: Optional[int] = None
 
 
 class BatchStatusItem(BaseModel):

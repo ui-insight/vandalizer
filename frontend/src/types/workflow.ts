@@ -74,6 +74,8 @@ export interface SaveOutputConfig {
 
 export interface Workflow {
   id: string;
+  /** The current entry in the Versions tab. */
+  version?: number;
   uuid: string;
   name: string;
   description: string | null;
@@ -147,6 +149,8 @@ export interface WorkflowStatus {
   /** The run's model, and the models its steps actually ran on. */
   model?: string | null;
   models_used?: string[];
+  /** The workflow version this run executed; null for older runs. */
+  workflow_version?: number | null;
 }
 
 export interface ModelInfo {

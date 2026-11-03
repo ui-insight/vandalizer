@@ -261,6 +261,10 @@ export function WorkflowEditorPanel() {
   const [showDownloadPopup, setShowDownloadPopup] = useState(false)
   const [editingTask, setEditingTask] = useState<WorkflowTask | null>(null)
   const runner = useWorkflowRunner()
+  // Set by a restore (which clears the Output box) until the next run starts.
+  const [restoredSinceRun, setRestoredSinceRun] = useState(false)
+  useEffect(() => { if (runner.sessionId || runner.batchId) setRestoredSinceRun(false) }, [runner.sessionId, runner.batchId])
+  useEffect(() => { setRestoredSinceRun(false) }, [openWorkflowId])
   const [batchMode, setBatchMode] = useState(false)
   const [useProjectContext, setUseProjectContext] = useState(false)
   useEffect(() => { setUseProjectContext(false) }, [activeProjectUuid, openWorkflowId])
@@ -311,12 +315,16 @@ export function WorkflowEditorPanel() {
 
   // Per-step output to show in the step editor: prefer a run started this session
   // (freshest); otherwise fall back to the lazily-fetched most-recent run.
-  const liveStepsOutput = (runner.status?.steps_output ?? null) as Record<string, unknown> | null
+  // A run of another version (before a restore or chat edit) ran different
+  // steps, so its per-step output isn't shown against this version's steps.
+  const ranThisVersion = (status: WorkflowStatus | null | undefined) =>
+    !status || status.workflow_version == null || workflow?.version == null || status.workflow_version === workflow.version
+  const liveStepsOutput = ranThisVersion(runner.status) ? (runner.status?.steps_output ?? null) as Record<string, unknown> | null : null
   const hasLiveStepsOutput = !!liveStepsOutput && Object.keys(liveStepsOutput).length > 0
-  const effectiveStepsOutput = hasLiveStepsOutput ? liveStepsOutput : lastRunStepsOutput
+  const effectiveStepsOutput = hasLiveStepsOutput ? liveStepsOutput : ranThisVersion(lastRun.status) ? lastRunStepsOutput : null
   const effectiveRunMeta = hasLiveStepsOutput
     ? { finishedAt: null, status: runner.status?.status ?? 'running' }
-    : lastRunMeta
+    : ranThisVersion(lastRun.status) ? lastRunMeta : null
 
   // --- data fetching ---
 
@@ -1026,6 +1034,7 @@ export function WorkflowEditorPanel() {
               runElapsed={runElapsed}
               showDownloadPopup={showDownloadPopup}
               setShowDownloadPopup={setShowDownloadPopup}
+              restoredSinceRun={restoredSinceRun && !runner.sessionId && !runner.batchId}
               onClickStep={setEditingStepId}
               onEditInput={() => setActiveTab('input')}
               onAddStep={() => { setNewStepName(''); setShowNewStepModal(true) }}
@@ -1157,6 +1166,12 @@ export function WorkflowEditorPanel() {
         {activeTab === 'versions' && (
           <WorkflowVersionsTab workflowId={workflow.id} onRestored={() => {
             void queryClient.invalidateQueries({ queryKey: ['workflows'] })
+            // The Output box showed the replaced version's run. Clear it so
+            // it can't pass for a result of the restored steps.
+            if (!runner.running) {
+              runner.reset()
+              setRestoredSinceRun(true)
+            }
             return refresh()
           }} />
         )}
@@ -1515,6 +1530,7 @@ function DesignCanvas({
   runElapsed,
   showDownloadPopup,
   setShowDownloadPopup,
+  restoredSinceRun,
   onClickStep,
   onEditInput,
   onAddStep,
@@ -1524,6 +1540,7 @@ function DesignCanvas({
   defaultModel,
   onSetDefaultModel,
 }: {
+  restoredSinceRun?: boolean
   workflow: Workflow
   selectedDocCount: number
   runnerStatus: WorkflowStatus | null
@@ -1689,11 +1706,25 @@ function DesignCanvas({
             status={runnerStatus}
             sessionId={runnerSessionId}
             workflowName={workflow?.name}
+            currentVersion={workflow?.version}
             running={runnerRunning}
             runElapsed={runElapsed}
             showDownloadPopup={showDownloadPopup}
             setShowDownloadPopup={setShowDownloadPopup}
           />
+        </div>
+      )}
+
+      {restoredSinceRun && !runnerRunning && !runnerStatus && !batchStatus && (
+        <div role="status" aria-label="Workflow run results">
+          <ConnectionLine />
+          <div style={{
+            backgroundColor: '#fff', borderRadius: 'var(--ui-radius, 8px)', border: '2px dashed #d1d5db',
+            padding: 'var(--workspace-space-20)', fontSize: 'var(--workspace-font-control)', color: '#4b5563',
+          }}>
+            <div style={{ fontWeight: 600, fontSize: 'var(--workspace-font-body)', color: '#202124', marginBottom: 'var(--workspace-space-4)' }}>Output</div>
+            Run the workflow to see results for {workflow.version ? `version ${workflow.version}` : 'this version'}. The earlier result came from the version you replaced; it's still in History.
+          </div>
         </div>
       )}
 
@@ -5241,10 +5272,12 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
 // Workflow output card (shown in design canvas during/after run)
 // ---------------------------------------------------------------------------
 
-function WorkflowOutputCard({ status, sessionId, workflowName, running, runElapsed, showDownloadPopup, setShowDownloadPopup }: {
+export function WorkflowOutputCard({ status, sessionId, workflowName, currentVersion, running, runElapsed, showDownloadPopup, setShowDownloadPopup }: {
   status: WorkflowStatus | null
   sessionId: string | null
   workflowName?: string
+  /** The workflow's current version; a result from another one is labelled and not offered for saving. */
+  currentVersion?: number
   running: boolean
   runElapsed: number
   showDownloadPopup: boolean
@@ -5258,6 +5291,8 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
   const isCanceled = status?.status === 'canceled'
   const isPendingApproval = status?.status === 'pending_approval'
   const isDone = isCompleted || isError || isCanceled
+  const runVersion = status?.workflow_version
+  const otherVersion = !running && runVersion != null && currentVersion != null && runVersion !== currentVersion
 
   const [approval, setApproval] = useState<ReviewDetail | null>(null)
   const [approvalComments, setApprovalComments] = useState('')
@@ -5467,7 +5502,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--workspace-space-8)', gap: 'var(--workspace-space-8)' }}>
         <div role="status" aria-live="polite" style={{ fontWeight: 600, fontSize: 'var(--workspace-font-body)', color: '#202124' }}>
-          {running ? 'Workflow Running' : isCompleted ? 'Output' : isCanceled ? 'Stopped' : isError ? 'Error' : isPendingApproval ? 'Awaiting Approval' : 'View Output'}
+          {running ? 'Workflow Running' : otherVersion ? `Result from version ${runVersion}` : isCompleted ? 'Output' : isCanceled ? 'Stopped' : isError ? 'Error' : isPendingApproval ? 'Awaiting Approval' : 'View Output'}
         </div>
         {isPendingApproval && status?.approval_request_id && (
           <a
@@ -5602,6 +5637,15 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
         </div>
       )}
 
+      {otherVersion && isDone && (
+        <p role="note" style={{
+          margin: '0 0 var(--workspace-space-8)', padding: 'var(--workspace-space-8) var(--workspace-space-12)',
+          backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: 'var(--workspace-radius-small)',
+          fontSize: 'var(--workspace-font-control)', color: '#92400e',
+        }}>
+          This result is from version {runVersion}, before the workflow changed to version {currentVersion}. Run the workflow to see results for the current version.
+        </p>
+      )}
       {/* Completed */}
       {isCompleted && (
         <div>
@@ -5643,6 +5687,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
           {stepWarningsPanel}
           {fillReportPanel}
           {apiRequestPanel}
+          {!otherVersion && <>
           <div style={{ marginTop: 'var(--workspace-space-12)', display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-8)', alignItems: 'flex-start' }}>
           {fileSummary ? (
             <a
@@ -5730,6 +5775,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
             </button>
           </div>
           {sessionId && <WorkflowArtifactAction key={sessionId} sessionId={sessionId} />}
+          </>}
           {showSaveToFolder && sessionId && (
             <SaveWorkflowOutputDialog
               sessionId={sessionId}
