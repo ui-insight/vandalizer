@@ -147,6 +147,8 @@ export interface WorkflowStatus {
   /** The run's model, and the models its steps actually ran on. */
   model?: string | null;
   models_used?: string[];
+  /** The run's configuration snapshot; documents names the run's input files. */
+  run_metadata?: { documents?: { uuid?: string; title?: string | null }[] } | null;
 }
 
 export interface ModelInfo {

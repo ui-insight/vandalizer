@@ -249,6 +249,17 @@
 .agent-workflow-progress { margin: 10px 0; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; background: #f9fafb; font-size: var(--workspace-font-control); line-height: 1.5; color: #374151; overflow-wrap: anywhere; }
 .agent-workflow-progress p { margin: 8px 0; }
 .agent-run-status { display: flex; align-items: center; gap: 6px; font-weight: 600; }
+.agent-step-results > [role="region"] { max-height: 480px; overflow: auto; margin-top: 8px; }
+.agent-step-results section { padding: 8px 12px; margin-bottom: 8px; background: #fff; border: 1px solid #e5e7eb; border-radius: 6px; }
+.agent-step-results h4 { margin: 0 0 6px; font-size: var(--workspace-font-control); font-weight: 600; color: #111827; }
+.agent-step-results ul { margin: 0; padding: 0; list-style: none; }
+.agent-step-results li { display: flex; align-items: center; gap: 6px; }
+.agent-step-results dl { margin: 0; display: grid; gap: 4px; }
+.agent-step-results dl > div { display: grid; grid-template-columns: minmax(96px, 35%) 1fr; gap: 8px; }
+.agent-step-results dt { font-weight: 600; color: #4b5563; }
+.agent-step-results dd { margin: 0; white-space: pre-wrap; }
+.agent-step-results pre { margin: 0; white-space: pre-wrap; font-size: var(--workspace-font-meta); }
+.agent-step-results-empty { color: #6b7280; }
 .agent-run-status svg { flex-shrink: 0; }
 .agent-run-error { color: #991b1b; margin: 8px 0; }
 .agent-workflow-progress summary { cursor: pointer; padding: 10px 0; }

@@ -12,6 +12,7 @@ import { AlertTriangle, Check, ChevronRight, ClipboardCopy, Download, ExternalLi
 import { runModelLabel } from '../../lib/runModel'
 import { QualityBadge } from './QualityBadge'
 import { renderMarkdown } from './markdown'
+import { describeStepResults, stepResultsText } from './workflowStepResults'
 import { ExpandableValue, formatExtractedValue } from './extractionValue'
 import {
   CertCheckCard,
@@ -1081,7 +1082,7 @@ export function WorkflowProgress({ sessionId, initialStatus, workflowId }: { ses
   const labels: Record<string, string> = { queued: 'Workflow queued', pending: 'Workflow queued', running: 'Workflow running', completed: 'Workflow complete', failed: 'Workflow failed', error: 'Workflow failed', canceled: 'Workflow canceled', paused: 'Awaiting workflow approval', pending_approval: 'Awaiting workflow approval' }
   const failed = effective === 'failed' || effective === 'error'
   const active = ['running', 'queued', 'pending'].includes(effective)
-  const partial = status?.steps_output && Object.keys(status.steps_output).length ? JSON.stringify(status.steps_output, null, 2) : null
+  const partial = status?.steps_output && Object.keys(status.steps_output).length ? status.steps_output : null
   return (
     <section className="agent-workflow-progress" aria-label="Workflow run progress">
       <div role="status" aria-atomic="true" className="agent-run-status">
@@ -1096,11 +1097,34 @@ export function WorkflowProgress({ sessionId, initialStatus, workflowId }: { ses
       {effective === 'paused' && <p>Review the proposed step in the workflow runner before continuing.</p>}
       {(fetchFailed || effective === 'paused') && <button type="button" className="chat-action-btn" disabled={checking} onClick={() => { setChecking(true); setAttempt(value => value + 1) }}>{checking ? 'Checking workflow status…' : 'Check workflow status'}</button>}
       {workflowId && <button type="button" className="chat-action-btn" onClick={() => openWorkflow(workflowId, sessionId)}>Open this workflow run</button>}
-      {partial && effective !== 'completed' && <details><summary>Completed step results</summary><pre tabIndex={0} aria-label="Completed workflow step results">{partial}</pre><CopyButton text={partial} label="Copy completed step results" /></details>}
+      {partial && effective !== 'completed' && <CompletedStepResults stepsOutput={partial} documents={status?.run_metadata?.documents} />}
       {effective === 'completed' && <WorkflowOutput content={{ status: 'completed', output: unwrapWorkflowOutput(status?.final_output) }} />}
       {effective === 'completed' && <WorkflowArtifactAction sessionId={sessionId} />}
       {effective === 'completed' && status && status.final_output == null && <p>No final output was returned for this run.</p>}
     </section>
+  )
+}
+
+/** Completed steps of a paused or canceled run, readable for whoever approves it. */
+export function CompletedStepResults({ stepsOutput, documents }: { stepsOutput: Record<string, unknown>; documents?: { uuid?: string; title?: string | null }[] }) {
+  const results = describeStepResults(stepsOutput, documents)
+  return (
+    <details className="agent-step-results">
+      <summary>Completed step results</summary>
+      <div role="region" aria-label="Completed workflow step results" tabIndex={0}>
+        {results.map((result, index) => (
+          <section key={`${result.name}-${index}`}>
+            <h4>{result.name}</h4>
+            {result.kind === 'documents' && <ul>{(result.items ?? []).map(item => <li key={item}><FileText size={12} aria-hidden="true" /> {item}</li>)}</ul>}
+            {result.kind === 'text' && <div className="chat-markdown select-text" dangerouslySetInnerHTML={{ __html: renderMarkdown(result.text ?? '') }} />}
+            {result.kind === 'fields' && <dl>{(result.fields ?? []).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>}
+            {result.kind === 'data' && <pre>{result.text}</pre>}
+            {result.kind === 'empty' && <p className="agent-step-results-empty">No output.</p>}
+          </section>
+        ))}
+      </div>
+      <CopyButton text={stepResultsText(results)} label="Copy completed step results" />
+    </details>
   )
 }
 
