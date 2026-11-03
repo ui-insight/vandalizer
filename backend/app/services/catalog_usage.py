@@ -1,8 +1,21 @@
 """Public usage summaries derived from published definitions, without private destinations."""
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, TypedDict
 
-def describe_catalog_usage(kind: str, item: object, steps: list | None = None) -> dict:
+if TYPE_CHECKING:
+    from app.models.workflow import WorkflowStep
+
+
+class CatalogUsage(TypedDict):
+    input: str
+    output: str
+    output_names: list[str]
+    notes: list[str]
+
+
+
+def describe_catalog_usage(kind: str, item: object, steps: list[WorkflowStep] | None = None) -> CatalogUsage:
     notes: list[str] = []
     outputs: list[str] = []
     if kind == "knowledge_base":

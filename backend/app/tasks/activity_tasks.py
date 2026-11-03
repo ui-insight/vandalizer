@@ -4,6 +4,17 @@ Ported from Flask app/utilities/activity_description.py.
 Uses pymongo (sync) for DB access.
 """
 
+from __future__ import annotations
+from bson import ObjectId
+
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from celery import Task
+
+from pymongo.database import Database
+
 import datetime
 import logging
 import re
@@ -48,10 +59,13 @@ def _pick_title_model(sys_cfg: dict, user_model_name: str | None) -> str | None:
     models = sys_cfg.get("available_models") or []
     for m in models:
         if m.get("thinking") is False and m.get("name"):
-            return m["name"]
+            name = m["name"]
+            if isinstance(name, str):
+                return name
     if user_model_name:
         return user_model_name
-    return models[0]["name"] if models and models[0].get("name") else None
+    first_name = models[0].get("name") if models else None
+    return first_name if isinstance(first_name, str) and first_name else None
 
 
 TITLE_SYSTEM_PROMPT = (
@@ -78,7 +92,7 @@ _REAPED_EXTRACTION_ERROR = (
 )
 
 
-def _bell_reaped_extraction(db, row: dict) -> None:
+def _bell_reaped_extraction(db: Database[dict], row: dict) -> None:
     """Tell an extraction's owner that the rail reaper failed its run."""
     from app.services.failure_notifications import notify_extraction_failed
 
@@ -115,7 +129,7 @@ REAP_BELL_OWNERS: dict = {
 }
 
 
-def _resolve_stale_threshold_minutes(db) -> int:
+def _resolve_stale_threshold_minutes(db: Database[dict]) -> int:
     """Read the stale-activity threshold from SystemConfig, falling back to default.
 
     Uses sync pymongo so it's safe to call from the Celery beat task.
@@ -131,7 +145,7 @@ def _resolve_stale_threshold_minutes(db) -> int:
     return STALE_ACTIVITY_THRESHOLD_MINUTES_DEFAULT
 
 
-def _get_db():
+def _get_db() -> Database[dict]:
     """Get sync pymongo database handle (shared per-process client)."""
     from app.tasks import get_sync_db
 
@@ -147,7 +161,7 @@ def _get_db():
     default_retry_delay=5,
 )
 def generate_activity_description_task(
-    self,
+    self: Task,
     activity_id: str,
     activity_type: str,
     document_uuids: list[str],
@@ -362,14 +376,14 @@ def generate_activity_description_task(
         _mark_done()
 
 
-def _as_utc(value):
+def _as_utc(value: datetime.datetime | None) -> datetime.datetime | None:
     """Sync pymongo hands back naive datetimes; compare them as UTC."""
     if value is not None and getattr(value, "tzinfo", None) is None:
         return value.replace(tzinfo=datetime.timezone.utc)
     return value
 
 
-def _workflow_rail_rows_without_live_run(db, rail_rows: list[dict], cutoff) -> list[dict]:
+def _workflow_rail_rows_without_live_run(db: Database[dict], rail_rows: list[dict], cutoff: datetime.datetime) -> list[dict]:
     """Return the workflow_run rail rows whose WorkflowResult is not alive.
 
     The run's ``last_progress_at`` is the one clock (see
@@ -418,7 +432,7 @@ def _workflow_rail_rows_without_live_run(db, rail_rows: list[dict], cutoff) -> l
 
 
 @celery_app.task(bind=True, name="tasks.activity.reap_stale_running")
-def reap_stale_running_task(self) -> None:
+def reap_stale_running_task(self: Task) -> None:
     """Mark activity events stuck in running/queued as failed.
 
     Catches orphans from crashed workers, dropped chat streams, and Celery soft
@@ -607,7 +621,7 @@ NEVER_STARTED_WORKFLOW_RUN_AGE_SECONDS = 86400
 
 
 @celery_app.task(bind=True, name="tasks.activity.reap_stale_workflow_runs")
-def reap_stale_workflow_runs_task(self) -> None:
+def reap_stale_workflow_runs_task(self: Task) -> None:
     """Mark WorkflowResult rows abandoned by a dead worker as failed.
 
     Three sweeps:
@@ -692,9 +706,9 @@ def reap_stale_workflow_runs_task(self) -> None:
     # workflow once, and only the two fields the notifier reads (a workflow
     # document drags validation plans and configs that can run to hundreds
     # of KB).
-    workflow_cache: dict = {}
+    workflow_cache: dict[str | ObjectId | None, dict] = {}
 
-    def _workflow_doc(raw_id) -> dict:
+    def _workflow_doc(raw_id: str | ObjectId | None) -> dict:
         if isinstance(raw_id, str):
             # Rows migrated from the Flask era stored the id as a string; an
             # unconverted lookup finds nothing and the failure notified nobody.
@@ -719,7 +733,7 @@ def reap_stale_workflow_runs_task(self) -> None:
     # in input_context (the trigger context has always been copied there),
     # so they resolve too; a passive run with neither keeps today's fallback
     # — the workflow owner's bell.
-    automation_cache: dict = {}
+    automation_cache: dict[str, dict] = {}
 
     def _automation_doc(run: dict) -> dict:
         if not (run.get("is_passive") or run.get("trigger_type")):

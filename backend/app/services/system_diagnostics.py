@@ -306,7 +306,7 @@ async def diagnose_model(cfg: SystemConfig, index: int) -> dict[str, Any]:
             )
             if ok else
             f"Connected, but structured output failed — chat will work, extraction "
-            f"and extraction-based workflow steps will not. {structured_error['title']}."
+            f"and extraction-based workflow steps will not. {structured_error['title'] if structured_error else 'No structured result was returned'}."
         ),
     }
 

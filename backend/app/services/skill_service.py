@@ -10,18 +10,20 @@ import json
 
 from fastapi import HTTPException
 
+from app.models.search_set import SearchSet
+from app.models.user import User
 from app.schemas.skills import SkillSnapshot
 from app.services import access_control
 
 
-async def authorize_skill(skill_uuid, user):
+async def authorize_skill(skill_uuid: str, user: User) -> SearchSet:
     skill = await access_control.get_authorized_search_set(skill_uuid, user)
     if not skill or skill.set_type != "prompt":
         raise HTTPException(status_code=404, detail="Skill not found or no longer accessible")
     return skill
 
 
-async def snapshot_skill(skill_uuid, user) -> SkillSnapshot:
+async def snapshot_skill(skill_uuid: str, user: User) -> SkillSnapshot:
     skill = await authorize_skill(skill_uuid, user)
     items = await skill.get_items()
     # Match LibraryTab's existing content precedence, including deliberately
@@ -43,11 +45,11 @@ async def snapshot_skill(skill_uuid, user) -> SkillSnapshot:
     )
 
 
-async def resolve_active_skill(user, current, requested_uuid=None, *, explicit=False):
+async def resolve_active_skill(user: User, current: SkillSnapshot | None, requested_uuid: str | None = None, *, explicit: bool = False) -> SkillSnapshot | None:
     """Omitted selection retains the pin; explicit null removes it."""
     if explicit and requested_uuid is None:
         return None
-    if explicit and (current is None or current.uuid != requested_uuid):
+    if explicit and requested_uuid is not None and (current is None or current.uuid != requested_uuid):
         return await snapshot_skill(requested_uuid, user)
     if current is not None:
         await authorize_skill(current.uuid, user)

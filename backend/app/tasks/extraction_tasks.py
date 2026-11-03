@@ -4,27 +4,39 @@ Ported from Flask app/utilities/extraction_tasks.py.
 Uses pymongo (sync) for DB access.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from celery import Task
+
+from pymongo.database import Database
+
 import datetime
 import logging
 from collections import defaultdict
 from copy import deepcopy
 from pathlib import Path
-from typing import Any
+from collections.abc import Coroutine
+from typing import Any, TypeVar
 
 from app.celery_app import celery_app
 from app.tasks import TRANSIENT_EXCEPTIONS, run_task_async
 
+T = TypeVar("T")
+
 logger = logging.getLogger(__name__)
 
 
-def _get_db():
+def _get_db() -> Database[dict]:
     """Get sync pymongo database handle (shared per-process client)."""
     from app.tasks import get_sync_db
 
     return get_sync_db()
 
 
-def normalize_results(results, expected_keys: list[str] | None = None) -> dict[str, Any]:
+def normalize_results(results: object, expected_keys: list[str] | None = None) -> dict[str, Any]:
     """Normalize a list of dicts into a single dict of unique values (comma-joined)."""
     normalized: dict[str, Any] = {}
 
@@ -80,7 +92,7 @@ def _build_extraction_ingestion_text(documents: list[dict], keys: list) -> str:
     return ingestion_text
 
 
-def _get_user_model_name(user_id: str | None, db=None) -> str:
+def _get_user_model_name(user_id: str | None, db: Database[dict] | None=None) -> str:
     """Resolve user's preferred model name (sync context)."""
     if db is None:
         db = _get_db()
@@ -90,8 +102,10 @@ def _get_user_model_name(user_id: str | None, db=None) -> str:
 
     def _default_model() -> str:
         for m in models:
-            if isinstance(m, dict) and m.get("name"):
-                return m["name"]
+            if isinstance(m, dict):
+                name = m.get("name")
+                if isinstance(name, str) and name:
+                    return name
         return ""
 
     if user_id:
@@ -101,7 +115,9 @@ def _get_user_model_name(user_id: str | None, db=None) -> str:
             # Verify stored name/tag still matches a configured model
             for m in models:
                 if isinstance(m, dict) and (m.get("name") == stored or m.get("tag") == stored):
-                    return m.get("name", stored)
+                    name = m.get("name", stored)
+                    if isinstance(name, str):
+                        return name
             # Stored value is stale — fall through to default
 
     return _default_model()
@@ -116,7 +132,7 @@ def _get_user_model_name(user_id: str | None, db=None) -> str:
     default_retry_delay=5,
 )
 def perform_extraction_task(
-    self,
+    self: Task,
     activity_id: str,
     searchset_uuid: str,
     document_uuids: list,
@@ -299,7 +315,7 @@ def perform_extraction_task(
     default_retry_delay=5,
 )
 def ingest_extraction_recommendation_task(
-    self,
+    self: Task,
     searchset_uuid: str,
     document_uuids: list,
     keys: list,
@@ -338,7 +354,7 @@ def ingest_extraction_recommendation_task(
 # ---------------------------------------------------------------------------
 
 
-def _run_async(coro):
+def _run_async(coro: Coroutine[Any, Any, T]) -> T:
     """Run an async coroutine from sync Celery task context, releasing the
     loop's pooled LLM HTTP client on teardown (see ``run_task_async``)."""
     return run_task_async(coro)
@@ -352,7 +368,7 @@ def _run_async(coro):
     time_limit=5460,
 )
 def optimize_extraction_task(
-    self,
+    self: Task,
     search_set_uuid: str,
     user_id: str,
     run_uuid: str,
@@ -361,7 +377,7 @@ def optimize_extraction_task(
     max_candidates: int = 8,
     include_judge: bool = False,
     test_case_uuids: list[str] | None = None,
-):
+) -> dict[str, object]:
     """Drive an ExtractionOptimizationRun. The pre-allocated run doc is passed
     in so the API route can return its UUID immediately.
     """
@@ -380,7 +396,7 @@ async def _optimize_extraction_async(
     max_candidates: int,
     include_judge: bool,
     test_case_uuids: list[str] | None = None,
-):
+) -> dict[str, object]:
     from app.config import Settings
     from app.database import init_db
     await init_db(Settings())

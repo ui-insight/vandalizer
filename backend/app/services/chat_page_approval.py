@@ -1,4 +1,6 @@
 """Execute an authenticated Save-button decision without another model call."""
+from collections.abc import AsyncIterator
+from app.models.chat import ChatConversation
 import asyncio
 import hashlib
 import json
@@ -14,7 +16,7 @@ from app.services.chat_artifact_tools import _call
 logger = logging.getLogger(__name__)
 
 
-async def stream_save(conversation, preview, activity_id, user_id):
+async def stream_save(conversation: ChatConversation, preview: dict, activity_id: str | None, user_id: str) -> AsyncIterator[str]:
     name = "revise_html_artifact" if preview["artifact_uuid"] else "create_html_artifact"
     call = {"tool_name": name, "tool_call_id": str(uuid.uuid4()),
             "args": {"preview_id": preview["_id"], "title": preview["title"], "confirmed": True}}
@@ -33,7 +35,7 @@ async def stream_save(conversation, preview, activity_id, user_id):
     yield json.dumps({"kind": "error" if result["content"].get("error") else "text", "content": message}) + "\n"
 
 
-async def _save_and_record(conversation, preview, activity_id, user_id, call):
+async def _save_and_record(conversation: ChatConversation, preview: dict, activity_id: str | None, user_id: str, call: dict) -> tuple[dict, str]:
     from app.services.chat_service import _finalize, _save_failed_assistant_turn
     from app.services.chat_tools import _confirm_fingerprint
 

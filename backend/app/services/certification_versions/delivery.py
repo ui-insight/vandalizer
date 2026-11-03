@@ -3,6 +3,13 @@
 This explicit-enrollment library supports the disabled-by-default rollout.
 Chat/API request pinning lives in runtime; server position UI wiring is separate.
 """
+from __future__ import annotations
+from app.models.certification import CertificationEnrollment
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.catalog import CoursePackage
+
 import datetime
 import hashlib
 
@@ -14,7 +21,7 @@ from .writes import progress_filter
 from .editorial_corrections import module_notices_for, notices_for
 
 
-def public_modules(package):
+def public_modules(package: CoursePackage) -> list[dict]:
     """Deliver pinned teaching and recognition prompts without answer keys."""
     from .scenario_submissions import module_bank
     lessons = package.json('lessons.json')
@@ -72,16 +79,19 @@ def public_modules(package):
                 item['practicalPreparation'] = True
             if module['id'] == 'extraction_engine' and 'repair-cases/extraction_engine.json' in package.manifest.artifacts:
                 from .repair_case import load_repair_case
-                item['repairAssignment'] = load_repair_case(package, module['id']).public_definition()
+                repair = load_repair_case(package, module['id'])
+                if repair is None:
+                    raise CourseCatalogError('The declared repair assignment is unavailable')
+                item['repairAssignment'] = repair.public_definition()
         modules.append(item)
     return modules
 
 
 class CourseDelivery:
-    def __init__(self, repository: EnrollmentRepository | None = None):
+    def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         self.repository = repository or EnrollmentRepository()
 
-    async def _resolve(self, user_id: str, enrollment_id: str):
+    async def _resolve(self, user_id: str, enrollment_id: str) -> tuple[CertificationEnrollment, CoursePackage, CertificationProgress]:
         enrollment = await self.repository._enrollment(user_id, enrollment_id)
         package = self.repository.catalog.load(enrollment.course_version)
         progress = await self.repository.read_progress(user_id, enrollment_id)
@@ -106,7 +116,7 @@ class CourseDelivery:
         }
 
     @staticmethod
-    def _lesson(package, module_id: str, lesson_id: str) -> tuple[dict, int, int]:
+    def _lesson(package: CoursePackage, module_id: str, lesson_id: str) -> tuple[dict, int, int]:
         if module_id not in {module.id for module in package.manifest.modules}:
             raise CourseCatalogError('Module is not part of this enrollment')
         lessons = package.json('lessons.json')[module_id]['lessons']
@@ -126,7 +136,7 @@ class CourseDelivery:
         }
 
     @staticmethod
-    async def store_position(progress, package, module_id: str, lesson_id: str, expected_revision: int) -> dict:
+    async def store_position(progress: CertificationProgress, package: CoursePackage, module_id: str, lesson_id: str, expected_revision: int) -> dict:
         """Called only inside a pinned write boundary; stale devices fail closed."""
         if progress.position_revision != expected_revision:
             raise EnrollmentConflict('Your saved place changed in another session; reload before saving it again')
@@ -159,6 +169,8 @@ class CourseDelivery:
 
     async def save_position(self, user_id: str, enrollment_id: str, module_id: str, lesson_id: str, *, expected_revision: int | None = None) -> dict:
         async with self.repository.write_boundary(user_id, enrollment_id, operation='save_lesson_position') as progress:
+            if progress.course_version is None:
+                raise EnrollmentConflict('This operation requires a bound course version')
             package = self.repository.catalog.load(progress.course_version)
             return await self.store_position(
                 progress, package, module_id, lesson_id,
@@ -169,5 +181,7 @@ class CourseDelivery:
         # Grading may await workspace reads. Keep activation out until it ends;
         # the rubric and progress stay pinned for the entire async operation.
         async with self.repository.write_boundary(user_id, enrollment_id, operation='validate:' + module_id) as progress:
+            if progress.course_version is None:
+                raise EnrollmentConflict('This operation requires a bound course version')
             package = self.repository.catalog.load(progress.course_version)
             return {'enrollment_id': enrollment_id, **await grade(package, progress, module_id)}

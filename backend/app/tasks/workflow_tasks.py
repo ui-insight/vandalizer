@@ -4,6 +4,18 @@ Uses pymongo (sync) for DB access  - same pattern as Flask Celery workers.
 Task names use 'tasks.workflow_next.*' to coexist with Flask's 'tasks.workflow.*'.
 """
 
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from celery import Task
+    from bson import ObjectId
+    from app.services.workflow_engine import Node, WorkflowEngine
+
+from pymongo.database import Database
+
 import logging
 
 from app.celery_app import celery_app
@@ -23,7 +35,7 @@ logger = logging.getLogger(__name__)
 MAX_DELIVERY_ATTEMPTS = 8
 
 
-def _preload_form_filler_template(db, task_data: dict) -> None:
+def _preload_form_filler_template(db: Database[dict], task_data: dict) -> None:
     """Attach a Form Filler task's fillable-PDF template bytes (see form_fill)."""
     from app.config import Settings
     from app.services.form_fill import load_form_filler_assets
@@ -43,7 +55,7 @@ def _wants_selected_document(task_data: dict) -> bool:
     return task_data.get("input_source") == "select_document"
 
 
-def _resolve_saved_prompt_formatter(db, task_name: str, task_data: dict) -> None:
+def _resolve_saved_prompt_formatter(db: Database[dict], task_name: str | None, task_data: dict) -> None:
     """Resolve a linked saved Prompt/Formatter into the inline body in-place.
 
     Prompt and Formatter steps may link a standalone Library prompt/formatter
@@ -78,7 +90,7 @@ def _resolve_saved_prompt_formatter(db, task_name: str, task_data: dict) -> None
 
 
 def _notify_approval_reviewers_sync(
-    db, assigned_user_ids: list[str], workflow_name: str,
+    db: Database[dict], assigned_user_ids: list[str], workflow_name: str,
     step_name: str, instructions: str, approval_uuid: str,
 ) -> None:
     """Create in-app notifications and send emails to assigned reviewers (sync context)."""
@@ -147,7 +159,7 @@ def _notify_approval_reviewers_sync(
         logger.exception("Failed to send approval emails for %s", approval_uuid)
 
 
-def _bson_safe(value):
+def _bson_safe(value: object) -> object:
     """Coerce arbitrary step output into a MongoDB-storable shape.
 
     `data_for_review` is whatever the previous step emitted, which can include
@@ -180,17 +192,19 @@ def _default_model_from_config(sys_config: dict) -> str:
     """
     models = [m for m in (sys_config.get("available_models") or []) if isinstance(m, dict)]
 
-    configured_default = (sys_config.get("default_model") or "").strip()
+    raw_default = sys_config.get("default_model")
+    configured_default = raw_default.strip() if isinstance(raw_default, str) else ""
     if configured_default and any(m.get("name") == configured_default for m in models):
         return configured_default
 
     for m in models:
-        if m.get("name"):
-            return m["name"]
+        name = m.get("name")
+        if isinstance(name, str) and name:
+            return name
     return ""
 
 
-def default_model_for_owner(db, sys_config: dict, user_id: str | None) -> str:
+def default_model_for_owner(db: Database[dict], sys_config: dict, user_id: str | None) -> str:
     """Resolve the model a run should use when the workflow names none.
 
     The sync mirror of :func:`app.services.config_service.get_user_model_name`:
@@ -206,12 +220,13 @@ def default_model_for_owner(db, sys_config: dict, user_id: str | None) -> str:
         chosen = (user_cfg.get("name") or "").strip()
         if chosen:
             for m in models:
-                if chosen in (m.get("name"), m.get("tag")) and m.get("name"):
-                    return m["name"]
+                name = m.get("name")
+                if chosen in (name, m.get("tag")) and isinstance(name, str) and name:
+                    return name
     return _default_model_from_config(sys_config)
 
 
-def build_steps_data(db, workflow_doc, workflow_id, trigger_step_data):
+def build_steps_data(db: Database[dict], workflow_doc: dict, workflow_id: str, trigger_step_data: dict) -> tuple[list[dict], list[str]]:
     """Materialize a workflow's steps into engine-ready ``steps_data``.
 
     Returns ``(steps_data, output_step_names)``.
@@ -375,7 +390,7 @@ def build_steps_data(db, workflow_doc, workflow_id, trigger_step_data):
     return steps_data, output_step_names
 
 
-def _record_models_used(db, workflow_result_id: str, engine) -> None:
+def _record_models_used(db: Database[dict], workflow_result_id: str, engine: WorkflowEngine) -> None:
     """Store which models the run's steps run on, for the run views.
 
     Best-effort: a failed write must not stop the run it describes.
@@ -391,7 +406,7 @@ def _record_models_used(db, workflow_result_id: str, engine) -> None:
         logger.warning("Could not record models used for %s", workflow_result_id, exc_info=True)
 
 
-def _resume_point(engine, result_doc: dict) -> tuple[int, dict | None]:
+def _resume_point(engine: WorkflowEngine, result_doc: dict) -> tuple[int, dict | None]:
     """Where a retried run should pick up, and what to feed the first step.
 
     ``execute_workflow_task`` carries ``autoretry_for=TRANSIENT_EXCEPTIONS,
@@ -429,7 +444,7 @@ def _resume_point(engine, result_doc: dict) -> tuple[int, dict | None]:
     return completed + 1, last_output
 
 
-def _replay_step_entries(engine, steps_output: dict, upto_index: int) -> list[dict]:
+def _replay_step_entries(engine: WorkflowEngine, steps_output: dict, upto_index: int) -> list[dict]:
     """Rebuild the engine's per-step ``data`` entries for earlier passes.
 
     ``engine.execute()`` returns only the steps *it* ran, so a resumed pass
@@ -505,7 +520,7 @@ def _document_context_groups(steps_data: list[dict]) -> list[set[str]]:
     return groups
 
 
-def _document_token_counts(db, uuids: set[str]) -> dict[str, dict]:
+def _document_token_counts(db: Database[dict], uuids: set[str]) -> dict[str, dict]:
     """Fetch {uuid: {uuid, title, token_count}} for the given documents."""
     if not uuids:
         return {}
@@ -524,7 +539,7 @@ def _document_token_counts(db, uuids: set[str]) -> dict[str, dict]:
     }
 
 
-def _accumulate_activity_usage(db, workflow_result_id, engine, activity_id=None) -> None:
+def _accumulate_activity_usage(db: Database[dict], workflow_result_id: str, engine: WorkflowEngine, activity_id: str | ObjectId | None=None) -> None:
     """Fold one execution pass's token usage into the run's ActivityEvent.
 
     Each pass builds its own engine with its own ``UsageAccumulator``, so usage
@@ -563,7 +578,7 @@ def _accumulate_activity_usage(db, workflow_result_id, engine, activity_id=None)
         )
 
 
-def _make_progress_updater(db, workflow_result_id):
+def _make_progress_updater(db: Database[dict], workflow_result_id: str) -> Callable[[dict], None]:
     """Build the engine's ``workflow_result_updater`` callback.
 
     Values pass through :func:`_bson_safe`: the biggest writes here are whole
@@ -575,7 +590,7 @@ def _make_progress_updater(db, workflow_result_id):
 
     from bson import ObjectId
 
-    def update_progress(updates: dict):
+    def update_progress(updates: dict) -> None:
         set_ops = {k: _bson_safe(v) for k, v in updates.items()}
         if set_ops:
             # Heartbeat for tasks.activity.reap_stale_workflow_runs: a run
@@ -590,7 +605,7 @@ def _make_progress_updater(db, workflow_result_id):
     return update_progress
 
 
-def _clear_pause_marker(db, activity_id) -> None:
+def _clear_pause_marker(db: Database[dict], activity_id: str | ObjectId | None) -> None:
     """Drop the ``meta_summary.pending_review_uuid`` marker from an activity.
 
     Set by :func:`_pause_for_approval` while a run waits on a reviewer. Every
@@ -609,8 +624,8 @@ def _clear_pause_marker(db, activity_id) -> None:
     )
 
 
-def _pause_for_approval(db, final_output, engine, workflow_id, workflow_result_id,
-                        search_from=0, activity_id=None):
+def _pause_for_approval(db: Database[dict], final_output: dict, engine: WorkflowEngine, workflow_id: str, workflow_result_id: str,
+                        search_from: int=0, activity_id: str | ObjectId | None=None) -> dict[str, str]:
     """Persist the approval request and flip the run to ``pending_approval``.
 
     Extracted from :func:`execute_workflow_task` so the whole sequence runs
@@ -755,7 +770,7 @@ def _pause_for_approval(db, final_output, engine, workflow_id, workflow_result_i
     }
 
 
-def _get_db():
+def _get_db() -> Database[dict]:
     """Get sync pymongo database handle (shared per-process client)."""
     from app.tasks import get_sync_db
 
@@ -779,7 +794,7 @@ def _resolve_input_doc_uuids(workflow_doc: dict, trigger_step_data: dict) -> lis
     return doc_uuids
 
 
-def _missing_fixed_documents(db, workflow_doc: dict) -> list[str]:
+def _missing_fixed_documents(db: Database[dict], workflow_doc: dict) -> list[str]:
     """Titles of fixed documents (Input tab) that no longer exist.
 
     A fixed document is configuration, not a per-run input: if it has been
@@ -814,7 +829,7 @@ def fixed_documents_missing_message(titles: list[str]) -> str:
     )
 
 
-def _classify_input_documents(db, workflow_doc: dict, doc_uuids: list[str]):
+def _classify_input_documents(db: Database[dict], workflow_doc: dict, doc_uuids: list[str]) -> tuple[int, list[str], list[str]]:
     """Split a run's input documents by text-extraction readiness.
 
     Returns ``(ready, processing, failed)`` where ``processing``/``failed`` are
@@ -858,7 +873,7 @@ def _spend_block_code(exc: BaseException) -> str:
     return "email_unverified" if isinstance(exc, TrialUnverifiedError) else "budget_exhausted"
 
 
-def _notify_run_completed(db, activity_id, workflow_doc: dict, workflow_result_id) -> None:
+def _notify_run_completed(db: Database[dict], activity_id: str | ObjectId | None, workflow_doc: dict, workflow_result_id: str) -> None:
     """Bell the person who started a long run that just completed (#994).
 
     Called from inside a finalize claim, so a retried task never bells twice.
@@ -881,7 +896,7 @@ def _notify_run_completed(db, activity_id, workflow_doc: dict, workflow_result_i
         logger.exception("Could not send completion notice for run %s", workflow_result_id)
 
 
-def _activity_owner(db, activity_id) -> str | None:
+def _activity_owner(db: Database[dict], activity_id: str | ObjectId | None) -> str | None:
     """The user who launched the run, from its activity-rail entry.
 
     The rail row carries the launcher, who may differ from the workflow's
@@ -899,7 +914,7 @@ def _activity_owner(db, activity_id) -> str | None:
         return None
 
 
-def _retry_if_transient(task, exc: BaseException, what: str, workflow_id) -> None:
+def _retry_if_transient(task: Task, exc: BaseException, what: str, workflow_id: str) -> None:
     """Retry ``task`` for a transient failure that has attempts left.
 
     Must run *before* the run is marked failed. Both workflow tasks skip a run
@@ -938,8 +953,8 @@ def _retry_if_transient(task, exc: BaseException, what: str, workflow_id) -> Non
 
 
 def _mark_workflow_failed(
-    db, workflow_result_id, activity_id, error_msg, error_payload=None, notify=True,
-):
+    db: Database[dict], workflow_result_id: str, activity_id: str | ObjectId | None, error_msg: str, error_payload: dict | None=None, notify: bool=True,
+) -> None:
     """Flip a WorkflowResult (and its activity rail entry) to a failed state
     with a user-facing message, matching the pre-flight oversize handler.
 
@@ -948,7 +963,7 @@ def _mark_workflow_failed(
     """
     from bson import ObjectId
 
-    update = {"status": "error", "error": error_msg}
+    update: dict[str, object] = {"status": "error", "error": error_msg}
     if error_payload is not None:
         update["error_payload"] = error_payload
     db.workflow_result.update_one(
@@ -1018,7 +1033,7 @@ def _mark_workflow_failed(
     acks_late=True,
     reject_on_worker_lost=True,
 )
-def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_data, model, activity_id=None):
+def execute_workflow_task(self: Task, workflow_result_id: str, workflow_id: str, trigger_step_data: dict, model: str, activity_id: str | None=None) -> dict | None:
     """Execute a full workflow.
 
     Args:
@@ -1105,7 +1120,7 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
                 "missing_documents": missing_fixed[:20],
             },
         )
-        return
+        return None
 
     input_doc_uuids = _resolve_input_doc_uuids(workflow_doc, trigger_step_data)
     if input_doc_uuids:
@@ -1163,7 +1178,7 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
                     "unready_documents": (processing + failed)[:20],
                 },
             )
-            return
+            return None
 
     # Build steps data from workflow steps
     steps_data, output_step_names = build_steps_data(
@@ -1315,7 +1330,7 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
                 workflow_id, overflow.kind, [o.uuid for o in docs],
                 overflow.total_tokens, overflow.budget, model,
             )
-            return
+            return None
     except Exception:
         # The pre-flight is best-effort; don't let it block a valid run.
         logger.exception("Pre-flight oversize check failed for workflow %s", workflow_id)
@@ -1635,7 +1650,7 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
     max_retries=2,
     default_retry_delay=5,
 )
-def execute_task_step_test(self, task_name, task_data, doc_uuids):
+def execute_task_step_test(self: Task, task_name: str, task_data: dict, doc_uuids: list[str]) -> str | dict | None:
     """Test a single workflow step.
 
     Args:
@@ -1697,14 +1712,14 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
     _resolve_saved_prompt_formatter(db, task_name, task_data)
 
     engine = WorkflowEngine()
-    nodes = []
+    nodes: list[Node] = []
 
     doc_node = DocumentNode({"doc_uuids": doc_uuids})
     nodes.append(doc_node)
     engine.add_node(doc_node)
 
     if task_name == "Extraction":
-        process_node = ExtractionNode(data=task_data)
+        process_node: Node = ExtractionNode(data=task_data)
     elif task_name == "Prompt":
         process_node = PromptNode(data=task_data)
     elif task_name == "Formatter":
@@ -1779,7 +1794,7 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
     return final_output
 
 
-def _approved_artifact(approval_doc: dict):
+def _approved_artifact(approval_doc: dict) -> object:
     """What the steps after an approval gate receive: the reviewer's edit if
     there is one, otherwise the snapshot taken at the gate.
 
@@ -1812,7 +1827,7 @@ def _approved_artifact(approval_doc: dict):
     acks_late=True,
     reject_on_worker_lost=True,
 )
-def resume_workflow_after_approval(self, approval_uuid):
+def resume_workflow_after_approval(self: Task, approval_uuid: str) -> dict | None:
     """Resume a workflow after an approval request has been approved."""
     from bson import ObjectId
 

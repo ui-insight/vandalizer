@@ -1,4 +1,13 @@
 """Authored connected-run assignment, never a learner run or completion receipt."""
+from __future__ import annotations
+from collections.abc import Sequence
+from .outcomes import OutcomeContract
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.catalog import CoursePackage
+
+from typing import Self
 import hashlib
 from typing import Literal
 
@@ -82,7 +91,7 @@ class MultiStepCase(ContractModel):
     controlled_failure_practice: ControlledFailurePractice | None = None
 
     @model_validator(mode='after')
-    def identities(self):
+    def identities(self) -> Self:
         if self.revision >= 3 and self.controlled_failure_practice is None:
             raise ValueError('This revision requires the disclosed actual stopped-run practice')
         if (len(self.required_stages) != 3 or set(self.required_stages) != {'extract', 'reason', 'format'}
@@ -99,13 +108,15 @@ class MultiStepCase(ContractModel):
         return self
 
     @property
-    def digest(self):
+    def digest(self) -> str:
         return encode(self.model_dump(mode='json', exclude_none=True))[1]
 
-    def public_definition(self):
+    def public_definition(self) -> dict:
         return {**self.model_dump(mode='json', exclude={'review_guidance', 'source_expectations'}, exclude_none=True), 'case_sha256': self.digest}
 
-    def verify_contract(self, contract):
+    def verify_contract(self, contract: OutcomeContract | None) -> None:
+        if contract is None:
+            raise ValueError('The course outcome contract is unavailable')
         module = next((module for module in contract.modules if module.module_id == self.module_id), None)
         if module is None or {outcome.id for outcome in module.outcomes} != OUTCOMES:
             raise ValueError('The case must bind every declared Multi-Step Workflows outcome')
@@ -117,7 +128,7 @@ class MultiStepCase(ContractModel):
                     or guides[outcome.id].critical_failures != outcome.critical_failures):
                 raise ValueError('The case cannot replace run evidence with prose or weaken the declared rubric')
 
-    def verify_source(self, source_bytes, page_texts):
+    def verify_source(self, source_bytes: bytes, page_texts: Sequence[str]) -> None:
         if hashlib.sha256(source_bytes).hexdigest() != self.source_sha256:
             raise ValueError('The assigned subaward source changed')
         for expectation in self.source_expectations:
@@ -126,7 +137,7 @@ class MultiStepCase(ContractModel):
                         or ' '.join(anchor.quote.split()) not in ' '.join(page_texts[anchor.page - 1].split())):
                     raise ValueError('A private source expectation has no matching assigned-source anchor')
 
-    def verify_exercise(self, exercise):
+    def verify_exercise(self, exercise: dict) -> None:
         if (exercise.get('documents') != [self.source_filename] or exercise.get('expected_fields') != []
                 or exercise.get('expected_values') != {} or exercise.get('star_criteria') != {}
                 or exercise.get('assessment_case_id') != self.id or exercise.get('connected_case_sha256') != self.digest
@@ -134,7 +145,7 @@ class MultiStepCase(ContractModel):
             raise ValueError('The exercise must bind the connected case without count-based or aggregate credit')
 
 
-def load_multi_step_case(package):
+def load_multi_step_case(package: CoursePackage) -> MultiStepCase:
     from .catalog import CourseCatalogError
     from .outcomes import package_outcomes
     path = 'connected-cases/multi_step.json'

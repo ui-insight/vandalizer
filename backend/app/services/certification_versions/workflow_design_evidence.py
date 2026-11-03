@@ -1,4 +1,10 @@
 """Collect approved configuration evidence; do not imply a tested execution."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
 import hashlib
 from pathlib import Path
 
@@ -10,13 +16,13 @@ from .catalog import CourseCatalogError
 from .enrollments import EnrollmentConflict
 from .lab_execution import LabExecutionRepository
 from .lab_inputs import LabInputRepository
-from .outcomes import package_outcomes
+from .outcomes import require_package_outcomes
 from .practical_evidence import EvidenceAssemblyUnavailable
 from .workflow_design_case import load_workflow_design_case
 from .workflow_design_submissions import WorkflowDesignSubmissionRepository
 
 
-def require_resolved_configuration(artifact):
+def require_resolved_configuration(artifact: dict) -> None:
     """This staged collector supports inline design and captured extractions.
 
     Unsupported resource dependencies are a technical gap, never a learner
@@ -53,7 +59,7 @@ def require_resolved_configuration(artifact):
         raise EvidenceAssemblyUnavailable('Referenced extraction definitions are missing or do not match the saved tasks')
 
 
-async def assemble_workflow_design(operation, submission_id, *, actor_user_id):
+async def assemble_workflow_design(operation: CourseOperation, submission_id: str, *, actor_user_id: str) -> dict:
     if actor_user_id != operation.user_id:
         raise EnrollmentConflict('Workflow Design assessment requires the authenticated learner')
     saved = await WorkflowDesignSubmissionRepository().get(actor_user_id, submission_id)
@@ -70,7 +76,7 @@ async def assemble_workflow_design(operation, submission_id, *, actor_user_id):
         raise EvidenceAssemblyUnavailable('The saved configuration cannot be resolved for assessment') from exc
     evidence = []
 
-    def add(kind, identity, value):
+    def add(kind: str, identity: str, value: object) -> None:
         try:
             evidence.append(ReviewEvidence(id=identity, kind=kind, text=encode(value)[0]).model_dump(mode='json'))
         except ValidationError as exc:
@@ -100,7 +106,7 @@ async def assemble_workflow_design(operation, submission_id, *, actor_user_id):
             'submitted_at': saved['submitted_at'], 'submission_channel': saved['submission_channel'],
             'question': question.model_dump(mode='json'), 'answer': saved['submission']['answers'][question.id]})
     try:
-        _, checked, _ = review_packet(package_outcomes(operation.package), case.module_id, evidence)
+        _, checked, _ = review_packet(require_package_outcomes(operation.package), case.module_id, evidence)
     except (ValueError, TypeError) as exc:
         raise EvidenceAssemblyUnavailable('The saved design cannot fit the review packet; nothing was truncated') from exc
     await LabInputRepository._check_lease(lease)

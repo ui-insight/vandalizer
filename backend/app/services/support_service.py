@@ -139,6 +139,7 @@ async def _hydrate_watchers(user_ids: list[str]) -> list[dict]:
 
 
 async def _ticket_to_dict(t: SupportTicket) -> dict:
+    classification = getattr(t, "classification", None)
     watcher_ids = list(getattr(t, "watchers", []) or [])
     return {
         "uuid": t.uuid,
@@ -147,8 +148,8 @@ async def _ticket_to_dict(t: SupportTicket) -> dict:
         "status": t.status.value,
         "priority": t.priority.value,
         "classification": (
-            getattr(t, "classification", None).value
-            if getattr(t, "classification", None)
+            classification.value
+            if classification is not None
             else None
         ),
         "user_id": t.user_id,
@@ -191,6 +192,7 @@ async def _ticket_to_dict(t: SupportTicket) -> dict:
 
 
 def _ticket_summary(t: SupportTicket) -> dict:
+    classification = getattr(t, "classification", None)
     """Lightweight dict for list views (no messages/attachments)."""
     last_message = t.messages[-1] if t.messages else None
     # Non-support callers should never see "activity" derived from an internal
@@ -207,8 +209,8 @@ def _ticket_summary(t: SupportTicket) -> dict:
         "status": t.status.value,
         "priority": t.priority.value,
         "classification": (
-            getattr(t, "classification", None).value
-            if getattr(t, "classification", None)
+            classification.value
+            if classification is not None
             else None
         ),
         "user_id": t.user_id,

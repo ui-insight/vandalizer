@@ -1,4 +1,5 @@
 """Reserve a manual run before dispatch; recover its original result on retry."""
+from app.schemas.automations import RunNowDocument
 from fastapi import HTTPException
 from pymongo.errors import DuplicateKeyError
 
@@ -11,7 +12,7 @@ def identity(automation_id: str, user_id: str, request_id: str) -> dict:
     return {"automation_id": automation_id, "user_id": user_id, "request_id": request_id}
 
 
-async def recover(automation_id: str, user_id: str, request_id: str, documents: list[str]):
+async def recover(automation_id: str, user_id: str, request_id: str, documents: list[str]) -> RunNowResponse | None:
     receipt = await AutomationLaunch.find_one(identity(automation_id, user_id, request_id))
     if receipt is None:
         return None
@@ -21,6 +22,7 @@ async def recover(automation_id: str, user_id: str, request_id: str, documents: 
         return RunNowResponse.model_validate(receipt.response)
     # The response may have been lost after event creation (or broker acceptance).
     # Never enqueue again, including when broker delivery is uncertain.
+    event: WorkflowTriggerEvent | ExtractionTriggerEvent | None
     if receipt.action_type in ("workflow", "task"):
         event = await WorkflowTriggerEvent.find_one({
             "trigger_context.automation_id": automation_id,
@@ -37,16 +39,16 @@ async def recover(automation_id: str, user_id: str, request_id: str, documents: 
     raise HTTPException(status_code=409, detail="Launch outcome is not yet confirmed. Retry this request to check again; it will not start a duplicate run.")
 
 
-def response_for(receipt, event_id: str, status: str = "queued") -> RunNowResponse:
+def response_for(receipt: AutomationLaunch, event_id: str, status: str = "queued") -> RunNowResponse:
     selection = receipt.selection
     return RunNowResponse(
         status=status, trigger_event_id=event_id, action_type=receipt.action_type,
-        documents=[{"uuid": d["uuid"], "title": d["title"]} for d in selection["documents"]],
+        documents=[RunNowDocument(uuid=d["uuid"], title=d["title"]) for d in selection["documents"]],
         document_source=selection["source"], documents_matched=selection["matched"],
     )
 
 
-async def reserve(automation_id: str, user_id: str, request_id: str, documents: list[str], selection: dict, action_type: str):
+async def reserve(automation_id: str, user_id: str, request_id: str, documents: list[str], selection: dict, action_type: str) -> tuple[AutomationLaunch | None, RunNowResponse | None]:
     receipt = AutomationLaunch(
         **identity(automation_id, user_id, request_id), document_uuids=documents,
         selection=selection, action_type=action_type,

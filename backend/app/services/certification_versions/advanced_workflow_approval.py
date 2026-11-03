@@ -2,10 +2,10 @@
 from typing import Literal
 
 from .advanced_workflow_preparation import AdvancedWorkflowPreparation
-from .connected_workflow_approval import ConnectedScopeRepository, ConnectedScopeRequest
+from .connected_workflow_approval import ConnectedScopeRepository, ScopeRequestFields
 
 
-class AdvancedScopeRequest(ConnectedScopeRequest):
+class AdvancedScopeRequest(ScopeRequestFields):
     consent: Literal['save_budget_workflow_scope_decision']
 
 

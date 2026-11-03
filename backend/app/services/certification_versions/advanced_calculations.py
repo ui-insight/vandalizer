@@ -3,6 +3,8 @@
 This pure checker does not authenticate, save a receipt, run a workflow, call a
 model or award credit. A trusted collector must bind its result to owned work.
 """
+from collections.abc import Iterable
+from typing import Self
 from decimal import Decimal
 import hashlib
 from typing import Literal
@@ -23,7 +25,7 @@ class CalculationOperand(ContractModel):
     explanation: str = Field(min_length=10, max_length=2000)
 
     @model_validator(mode='after')
-    def explicit_source_check(self):
+    def explicit_source_check(self) -> Self:
         if len(self.explanation.strip()) < 10:
             raise ValueError('Explain the source check or unresolved input')
         if self.status == 'supported' and (self.value is None or not self.source_quote.strip()):
@@ -41,7 +43,7 @@ class CalculationRecord(ContractModel):
     interpretation: str = Field(min_length=20, max_length=4000)
 
     @model_validator(mode='after')
-    def exact_named_inputs(self):
+    def exact_named_inputs(self) -> Self:
         if tuple(item.id for item in self.inputs) != CALCULATIONS[self.id]:
             raise ValueError('Preserve every named calculation input once in its source order')
         if len(self.interpretation.strip()) < 20:
@@ -49,21 +51,21 @@ class CalculationRecord(ContractModel):
         return self
 
 
-def check_budget_calculations(case: AdvancedNodesCase, records, *, source_bytes: bytes):
+def check_budget_calculations(case: AdvancedNodesCase, records: Iterable[object], *, source_bytes: bytes) -> dict:
     import fitz
-    records = tuple(CalculationRecord.model_validate(record) for record in records)
-    if len(records) != 3 or {record.id for record in records} != set(CALCULATIONS):
+    validated_records = tuple(CalculationRecord.model_validate(record) for record in records)
+    if len(validated_records) != 3 or {record.id for record in validated_records} != set(CALCULATIONS):
         raise ValueError('Preserve all three distinct checks, including unresolved inputs')
     if hashlib.sha256(source_bytes).hexdigest() != case.source_sha256:
         raise ValueError('Calculations must use the exact assigned budget PDF')
     with fitz.open(stream=source_bytes, filetype='pdf') as pdf:
         pages = [page.get_text() for page in pdf]
     case.verify_source(source_bytes, pages)
-    def normalize(text):
+    def normalize(text: str) -> str:
         return ' '.join(text.split())
     expected = {amount.id: amount for amount in case.amounts}
     checks = []
-    for record in records:
+    for record in validated_records:
         input_checks = []
         for operand in record.inputs:
             source = expected[operand.id]
@@ -74,7 +76,13 @@ def check_budget_calculations(case: AdvancedNodesCase, records, *, source_bytes:
                                  'source_matches': operand.value == source.value
                                      and operand.source_page == source.anchor.page and quoted_row})
         resolved = all(item['resolved'] for item in input_checks)
-        computed = format(sum((Decimal(item.value) for item in record.inputs), Decimal(0)), '.2f') if resolved else None
+        computed = None
+        if resolved:
+            amounts = []
+            for item in record.inputs:
+                assert item.value is not None  # Supported operands are validated above.
+                amounts.append(Decimal(item.value))
+            computed = format(sum(amounts, Decimal(0)), '.2f')
         arithmetic_matches = record.result == computed if computed is not None and record.result is not None else None
         source_matches = all(item['source_matches'] for item in input_checks)
         state = ('unresolved' if not resolved or record.result is None else

@@ -5,11 +5,14 @@ import logging
 import math
 import re
 import uuid
-from typing import Literal, Optional
+from typing import Literal, Optional, TypedDict, TypeVar
+
+from beanie import Document
 
 from bson import ObjectId as BsonObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
+from fastapi.responses import FileResponse
 
 from app.schemas.admin_config import validate_extraction_config, validate_quality_config, validate_retention_config, validate_compliance_config, validate_compliance_patch
 
@@ -35,6 +38,8 @@ from app.models.document import SmartDocument
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+DocumentT = TypeVar("DocumentT", bound=Document)
 
 # Maximum lookback window for analytics endpoints. ~2 years covers any
 # realistic ad-hoc reporting need without letting callers ask for wildly
@@ -501,7 +506,7 @@ class UserDetailResponse(BaseModel):
 async def usage_stats(
     days: int = Query(default=30, ge=1, le=MAX_ANALYTICS_DAYS),
     user: User = Depends(get_current_user),
-):
+) -> UsageStatsResponse:
     _, team_scope = await _require_admin_or_team_admin(user)
 
     period_end = datetime.datetime.now(datetime.timezone.utc)
@@ -559,11 +564,26 @@ async def usage_stats(
 # 1b. GET /usage/timeseries  - Daily breakdown for charts + previous period
 # ---------------------------------------------------------------------------
 
+class _DailyUsage(TypedDict):
+    conversations: int
+    search_runs: int
+    workflows_started: int
+    workflows_completed: int
+    workflows_failed: int
+    tokens_in: int
+    tokens_out: int
+    user_ids: set[str]
+
+
+class _PreviousUsage(_DailyUsage):
+    team_ids: set[str]
+
+
 @router.get("/usage/timeseries", response_model=TimeseriesResponse)
 async def usage_timeseries(
     days: int = Query(default=30, ge=1, le=MAX_ANALYTICS_DAYS),
     user: User = Depends(get_current_user),
-):
+) -> TimeseriesResponse:
     _, team_scope = await _require_admin_or_team_admin(user)
 
     now = datetime.datetime.utcnow()
@@ -577,7 +597,7 @@ async def usage_timeseries(
     events = await ActivityEvent.find(query_filter).to_list()
 
     # Build daily buckets for current period
-    daily: dict[str, dict] = {}
+    daily: dict[str, _DailyUsage] = {}
     for i in range(days):
         d = (cutoff + datetime.timedelta(days=i + 1)).strftime("%Y-%m-%d")
         daily[d] = {
@@ -587,7 +607,7 @@ async def usage_timeseries(
         }
 
     # Previous period aggregates
-    prev = {
+    prev: _PreviousUsage = {
         "conversations": 0, "search_runs": 0,
         "workflows_started": 0, "workflows_completed": 0, "workflows_failed": 0,
         "tokens_in": 0, "tokens_out": 0, "user_ids": set(), "team_ids": set(),
@@ -673,7 +693,7 @@ async def user_leaderboard(
     limit: int = Query(default=500, ge=1, le=MAX_LIST_LIMIT),
     offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
-):
+) -> UserLeaderboardResponse:
     _, team_scope = await _require_admin_or_team_admin(user)
     show_platform_role_flags = _can_view_platform_role_flags(team_scope)
 
@@ -784,7 +804,7 @@ async def team_leaderboard(
     limit: int = Query(default=500, ge=1, le=MAX_LIST_LIMIT),
     offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
-):
+) -> TeamLeaderboardResponse:
     _, team_scope = await _require_admin_or_team_admin(user)
 
     query_filter: dict = {}
@@ -809,15 +829,15 @@ async def team_leaderboard(
         raw_tid = ev.team_id
         if not raw_tid:
             continue
-        team = team_lookup.get(raw_tid)
-        tid = str(team.id) if team else raw_tid
+        matched_team = team_lookup.get(raw_tid)
+        tid = str(matched_team.id) if matched_team else raw_tid
         if tid not in team_agg:
             team_agg[tid] = {
                 "tokens_total": 0,
                 "workflows_completed": 0,
                 "user_ids": set(),
                 "latencies": [],
-                "team": team,
+                "team": matched_team,
             }
         agg = team_agg[tid]
         if team and not agg.get("team"):
@@ -871,7 +891,7 @@ async def team_detail(
     team_id: str,
     days: int = Query(default=30, ge=1, le=MAX_ANALYTICS_DAYS),
     user: User = Depends(get_current_user),
-):
+) -> TeamDetailResponse:
     _, team_scope = await _require_admin_or_team_admin(user)
 
     # Fetch team record
@@ -928,7 +948,7 @@ async def team_detail(
     )
 
     # Timeseries
-    daily: dict[str, dict] = {}
+    daily: dict[str, _DailyUsage] = {}
     for i in range(days):
         d = (cutoff + datetime.timedelta(days=i + 1)).strftime("%Y-%m-%d")
         daily[d] = {
@@ -1016,7 +1036,7 @@ async def team_detail(
     # Recent workflows
     recent_wf_events = await ActivityEvent.find(
         {"team_id": {"$in": team_scope_ids}, "type": "workflow_run"}
-    ).sort(-ActivityEvent.started_at).limit(20).to_list()
+    ).sort("-started_at").limit(20).to_list()
 
     recent_workflows = []
     for ev in recent_wf_events:
@@ -1061,7 +1081,7 @@ async def user_detail(
     user_id: str,
     days: int = Query(default=30, ge=1, le=MAX_ANALYTICS_DAYS),
     user: User = Depends(get_current_user),
-):
+) -> UserDetailResponse:
     _, team_scope = await _require_admin_or_team_admin(user)
     show_platform_role_flags = _can_view_platform_role_flags(team_scope)
     scoped_team: Team | None = None
@@ -1122,7 +1142,7 @@ async def user_detail(
     )
 
     # Timeseries
-    daily: dict[str, dict] = {}
+    daily: dict[str, _DailyUsage] = {}
     for i in range(days):
         d = (cutoff + datetime.timedelta(days=i + 1)).strftime("%Y-%m-%d")
         daily[d] = {
@@ -1171,7 +1191,7 @@ async def user_detail(
     if team_scope:
         wf_filter["team_id"] = {"$in": team_scope_ids}
     recent_wf_events = await ActivityEvent.find(wf_filter).sort(
-        -ActivityEvent.started_at
+        "-started_at"
     ).limit(20).to_list()
 
     recent_workflows = []
@@ -1251,7 +1271,7 @@ async def user_history(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
     user: User = Depends(get_current_user),
-):
+) -> UserHistoryResponse:
     """Full chronological activity history for a single user.
 
     Merges the immutable audit trail (``AuditLog``, who-did-what) with feature
@@ -1279,7 +1299,7 @@ async def user_history(
         await ActivityEvent.find(
             {"user_id": user_id, "started_at": {"$gte": cutoff}}
         )
-        .sort(-ActivityEvent.started_at)
+        .sort("-started_at")
         .limit(HISTORY_FETCH_CAP)
         .to_list()
     )
@@ -1355,12 +1375,12 @@ class UpdateRolesRequest(BaseModel):
     is_examiner: Optional[bool] = None
 
 
-@router.put("/users/{user_id}/roles")
+@router.put("/users/{user_id}/roles", response_model=None)
 async def update_user_roles(
     user_id: str,
     body: UpdateRolesRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     await _require_superadmin(user)
 
     target = await User.find_one(User.user_id == user_id)
@@ -1396,10 +1416,10 @@ async def workflow_events(
     user: User = Depends(get_current_user),
     started_after: Optional[datetime.datetime] = None,
     started_before: Optional[datetime.datetime] = None,
-):
+) -> PaginatedWorkflowResponse:
     _, team_scope = await _require_admin_or_team_admin(user)
 
-    def utc(value):
+    def utc(value: datetime.datetime) -> datetime.datetime:
         return value.replace(tzinfo=datetime.timezone.utc) if value.tzinfo is None else value.astimezone(datetime.timezone.utc)
     if started_after is not None:
         started_after = utc(started_after)
@@ -1440,7 +1460,7 @@ async def workflow_events(
     uuid_team_ids = [t for t in team_ids if len(t) != 24]
     team_map: dict[str, Team] = {}
     if object_id_team_ids or uuid_team_ids:
-        team_query: dict[str, dict[str, list]] = {"$or": []}
+        team_query: dict[str, list[dict]] = {"$or": []}
         if object_id_team_ids:
             team_query["$or"].append({"_id": {"$in": object_id_team_ids}})
         if uuid_team_ids:
@@ -1525,10 +1545,10 @@ async def workflow_events(
 # 5. GET /config  - Full system config
 # ---------------------------------------------------------------------------
 
-@router.get("/config")
+@router.get("/config", response_model=None)
 async def get_config(
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     await _require_superadmin(user)
 
     cfg = await SystemConfig.get_config()
@@ -1569,11 +1589,11 @@ async def get_config(
 # 6. PUT /config  - Update system config
 # ---------------------------------------------------------------------------
 
-@router.put("/config")
+@router.put("/config", response_model=None)
 async def update_config(
     body: ConfigUpdateRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     await _require_superadmin(user)
 
     cfg = await SystemConfig.get_config()
@@ -1711,22 +1731,22 @@ def _telemetry_status(cfg: SystemConfig, settings: Settings) -> dict:
     }
 
 
-@router.get("/telemetry/optin")
+@router.get("/telemetry/optin", response_model=None)
 async def get_telemetry_optin(
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-):
+) -> dict[str, object]:
     await _require_superadmin(user)
     cfg = await SystemConfig.get_config()
     return _telemetry_status(cfg, settings)
 
 
-@router.post("/telemetry/optin")
+@router.post("/telemetry/optin", response_model=None)
 async def set_telemetry_optin(
     body: TelemetryOptInRequest,
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-):
+) -> dict[str, object]:
     await _require_superadmin(user)
     cfg = await SystemConfig.get_config()
     tele = cfg.get_telemetry_config()
@@ -1752,11 +1772,11 @@ async def set_telemetry_optin(
 # 7. POST /config/models  - Add a model
 # ---------------------------------------------------------------------------
 
-@router.post("/config/models")
+@router.post("/config/models", response_model=None)
 async def add_model(
     body: ModelAddRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     await _require_superadmin(user)
 
     cfg = await SystemConfig.get_config()
@@ -1821,11 +1841,11 @@ class DefaultModelRequest(BaseModel):
     name: str = ""
 
 
-@router.put("/config/models/long-document")
+@router.put("/config/models/long-document", response_model=None)
 async def set_long_document_model(
     body: DefaultModelRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Nominate the model to use when a request won't fit the chosen one.
 
     Explicit rather than "pick the biggest window": this is the only place the
@@ -1856,11 +1876,11 @@ async def set_long_document_model(
     return {"status": "ok", "long_document_model": cfg.long_document_model or ""}
 
 
-@router.put("/config/models/validation-judge")
+@router.put("/config/models/validation-judge", response_model=None)
 async def set_validation_judge_model(
     body: DefaultModelRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Choose the model that grades every validation run. Empty = the default.
 
     One grader for everyone, so a score is comparable with the last one; it
@@ -1889,11 +1909,11 @@ async def set_validation_judge_model(
     return {"status": "ok", "validation_judge_model": cfg.validation_judge_model or ""}
 
 
-@router.put("/config/models/default")
+@router.put("/config/models/default", response_model=None)
 async def set_default_model(
     body: DefaultModelRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     await _require_superadmin(user)
 
     cfg = await SystemConfig.get_config()
@@ -1921,12 +1941,12 @@ async def set_default_model(
 # 7c. PUT /config/models/{model_id}  - Update an existing model
 # ---------------------------------------------------------------------------
 
-@router.put("/config/models/{model_id}")
+@router.put("/config/models/{model_id}", response_model=None)
 async def update_model(
     model_id: str,
     body: ModelAddRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     await _require_superadmin(user)
 
     cfg = await SystemConfig.get_config()
@@ -2012,11 +2032,11 @@ async def update_model(
 # 8. DELETE /config/models/{model_id}  - Remove a model by id
 # ---------------------------------------------------------------------------
 
-@router.delete("/config/models/{model_id}")
+@router.delete("/config/models/{model_id}", response_model=None)
 async def delete_model(
     model_id: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     await _require_superadmin(user)
 
     cfg = await SystemConfig.get_config()
@@ -2061,11 +2081,11 @@ def _validate_provider_request(body: OAuthProviderRequest) -> None:
         raise HTTPException(status_code=400, detail="client_id is required")
 
 
-@router.post("/config/auth/providers")
+@router.post("/config/auth/providers", response_model=None)
 async def add_oauth_provider(
     body: OAuthProviderRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     await _require_superadmin(user)
     _validate_provider_request(body)
 
@@ -2090,11 +2110,11 @@ class SamlMetadataRequest(BaseModel):
     metadata_xml: Optional[str] = None
 
 
-@router.post("/config/auth/saml/parse-metadata")
+@router.post("/config/auth/saml/parse-metadata", response_model=None)
 async def parse_saml_metadata(
     body: SamlMetadataRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Extract idp_entity_id / idp_sso_url / idp_x509_cert from an IdP's SAML
     metadata (fetched from a URL or pasted XML) so the admin can auto-fill the
     SAML provider form instead of copying each field by hand.
@@ -2161,12 +2181,12 @@ async def parse_saml_metadata(
 # 10. PUT /config/auth/providers/{provider_id}  - Update OAuth provider
 # ---------------------------------------------------------------------------
 
-@router.put("/config/auth/providers/{provider_id}")
+@router.put("/config/auth/providers/{provider_id}", response_model=None)
 async def update_oauth_provider(
     provider_id: str,
     body: OAuthProviderRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     await _require_superadmin(user)
     _validate_provider_request(body)
 
@@ -2196,11 +2216,11 @@ async def update_oauth_provider(
 # 11. DELETE /config/auth/providers/{provider_id}  - Remove OAuth provider
 # ---------------------------------------------------------------------------
 
-@router.delete("/config/auth/providers/{provider_id}")
+@router.delete("/config/auth/providers/{provider_id}", response_model=None)
 async def delete_oauth_provider(
     provider_id: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     await _require_superadmin(user)
 
     cfg = await SystemConfig.get_config()
@@ -2222,11 +2242,11 @@ async def delete_oauth_provider(
 # 12. PUT /config/auth/methods  - Update auth methods
 # ---------------------------------------------------------------------------
 
-@router.put("/config/auth/methods")
+@router.put("/config/auth/methods", response_model=None)
 async def update_auth_methods(
     body: AuthMethodsRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     await _require_superadmin(user)
 
     if not body.methods:
@@ -2236,7 +2256,7 @@ async def update_auth_methods(
         )
 
     cfg = await SystemConfig.get_config()
-    cfg.auth_methods = body.methods
+    cfg.auth_methods = list(body.methods)
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
     cfg.updated_by = user.user_id
     await cfg.save()
@@ -2250,20 +2270,20 @@ async def update_auth_methods(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/config/compliance")
+@router.get("/config/compliance", response_model=None)
 async def get_compliance_config(
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     await _require_superadmin(user)
     cfg = await SystemConfig.get_config()
     return cfg.get_compliance_config()
 
 
-@router.put("/config/compliance")
+@router.put("/config/compliance", response_model=None)
 async def update_compliance_config(
     body: dict,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     await _require_superadmin(user)
     cfg = await SystemConfig.get_config()
     current = cfg.get_compliance_config()
@@ -2298,8 +2318,8 @@ async def update_compliance_config(
 # 13. GET /quality/summary  - Quality dashboard summary
 # ---------------------------------------------------------------------------
 
-@router.get("/quality/summary")
-async def quality_summary(user: User = Depends(get_current_user)):
+@router.get("/quality/summary", response_model=None)
+async def quality_summary(user: User = Depends(get_current_user)) -> dict[str, object]:
     await _require_admin(user)
     from app.services.quality_service import get_quality_summary
     return await get_quality_summary()
@@ -2309,12 +2329,12 @@ async def quality_summary(user: User = Depends(get_current_user)):
 # 14. GET /quality/timeline  - Quality timeline for charts
 # ---------------------------------------------------------------------------
 
-@router.get("/quality/timeline")
+@router.get("/quality/timeline", response_model=None)
 async def quality_timeline(
     days: int = Query(default=90, ge=1, le=MAX_ANALYTICS_DAYS),
     item_kind: str | None = None,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     await _require_admin(user)
     from app.services.quality_service import get_quality_timeline
     return {"timeline": await get_quality_timeline(days, item_kind)}
@@ -2324,22 +2344,22 @@ async def quality_timeline(
 # 15. POST /quality/regression-suite  - Run regression on all verified items
 # ---------------------------------------------------------------------------
 
-@router.get("/quality/by-model")
+@router.get("/quality/by-model", response_model=None)
 async def quality_by_model(
     days: int = Query(default=90, ge=1, le=MAX_ANALYTICS_DAYS),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Validation quality grouped by the model that executed each run."""
     await _require_admin(user)
     from app.services.quality_service import get_quality_by_model
     return {"models": await get_quality_by_model(days)}
 
 
-@router.post("/quality/regression-suite")
+@router.post("/quality/regression-suite", response_model=None)
 async def regression_suite(
     model: str | None = None,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Start a regression sweep over all verified items as a background job.
 
     A catalog-wide sweep makes one or more LLM calls per test case per item —
@@ -2358,11 +2378,11 @@ async def regression_suite(
     return {"run_uuid": suite.uuid, "status": suite.status}
 
 
-@router.get("/quality/regression-suite/runs")
+@router.get("/quality/regression-suite/runs", response_model=None)
 async def list_regression_suite_runs(
     limit: int = Query(default=20, ge=1, le=100),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     await _require_admin(user)
     from app.models.regression_suite_run import RegressionSuiteRun
 
@@ -2370,11 +2390,11 @@ async def list_regression_suite_runs(
     return {"runs": [r.summary_dict() for r in runs]}
 
 
-@router.get("/quality/regression-suite/runs/{run_uuid}")
+@router.get("/quality/regression-suite/runs/{run_uuid}", response_model=None)
 async def get_regression_suite_run(
     run_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     await _require_admin(user)
     from app.models.regression_suite_run import RegressionSuiteRun
 
@@ -2388,12 +2408,12 @@ async def get_regression_suite_run(
 # 16. Quality Alerts (Phase 3)
 # ---------------------------------------------------------------------------
 
-@router.get("/quality/alerts")
+@router.get("/quality/alerts", response_model=None)
 async def get_quality_alerts(
     limit: int = Query(default=50, ge=1, le=200),
     acknowledged: bool = Query(default=False),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     await _require_admin(user)
     from app.models.quality_alert import QualityAlert
 
@@ -2421,8 +2441,8 @@ async def get_quality_alerts(
     }
 
 
-@router.get("/quality/judge-calibration")
-async def get_judge_calibration(user: User = Depends(get_current_user)):
+@router.get("/quality/judge-calibration", response_model=None)
+async def get_judge_calibration(user: User = Depends(get_current_user)) -> dict[str, object]:
     """Per-surface judge agreement, honest about what this deployment measured.
 
     The published κ floors were established against the model the project's
@@ -2442,8 +2462,8 @@ async def get_judge_calibration(user: User = Depends(get_current_user)):
 
     sys_cfg = await SystemConfig.get_config()
     available = [
-        m.get("name") for m in ((sys_cfg.available_models if sys_cfg else None) or [])
-        if isinstance(m, dict) and m.get("name")
+        name for m in ((sys_cfg.available_models if sys_cfg else None) or [])
+        if isinstance(m, dict) and isinstance(name := m.get("name"), str) and name
     ]
 
     surfaces = []
@@ -2461,11 +2481,11 @@ async def get_judge_calibration(user: User = Depends(get_current_user)):
     return {"surfaces": surfaces, "available_models": available}
 
 
-@router.post("/quality/alerts/{uuid}/acknowledge")
+@router.post("/quality/alerts/{uuid}/acknowledge", response_model=None)
 async def acknowledge_alert(
     uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     await _require_admin(user)
     from app.models.quality_alert import QualityAlert
 
@@ -2508,24 +2528,24 @@ async def acknowledge_alert(
 # 17. Per-Item Quality (Phase 4)
 # ---------------------------------------------------------------------------
 
-@router.get("/quality/items")
+@router.get("/quality/items", response_model=None)
 async def quality_items(
     sort: str = Query(default="score"),
     order: str = Query(default="asc"),
     limit: int = Query(default=100, ge=1, le=500),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     await _require_admin(user)
     from app.services.quality_service import get_quality_items
     return {"items": await get_quality_items(sort, order, limit)}
 
 
-@router.get("/quality/items/{item_kind}/{item_id}")
+@router.get("/quality/items/{item_kind}/{item_id}", response_model=None)
 async def quality_item_detail(
     item_kind: str,
     item_id: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     await _require_admin(user)
     from app.services.quality_service import get_quality_item_detail
     return await get_quality_item_detail(item_kind, item_id)
@@ -2535,12 +2555,12 @@ async def quality_item_detail(
 # 18. Quality Contract (Phase 6)
 # ---------------------------------------------------------------------------
 
-@router.get("/quality/contract/{item_kind}/{item_id}")
+@router.get("/quality/contract/{item_kind}/{item_id}", response_model=None)
 async def quality_contract(
     item_kind: str,
     item_id: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     await _require_admin(user)
     from app.services.quality_service import get_quality_contract_status
     return await get_quality_contract_status(item_kind, item_id)
@@ -2560,7 +2580,7 @@ async def quality_contract(
 OPTIMIZER_SURFACES = ("kb", "extraction", "workflow")
 
 
-def _failure_reason(run) -> str:
+def _failure_reason(run: object) -> str:
     """Group key for the failure rollup.
 
     Prefers the structured ``error_code`` (KB runs set one); otherwise uses a
@@ -2576,7 +2596,7 @@ def _failure_reason(run) -> str:
     return message[:120]
 
 
-@router.get("/optimizer/activity")
+@router.get("/optimizer/activity", response_model=None)
 async def optimizer_activity(
     days: int = Query(default=14, ge=1, le=MAX_ANALYTICS_DAYS),
     surface: Optional[str] = Query(default=None, description="kb | extraction | workflow"),
@@ -2588,7 +2608,7 @@ async def optimizer_activity(
     ),
     limit: int = Query(default=100, ge=1, le=500),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Every optimizer run in the window, newest first, with a health summary."""
     await _require_admin(user)
 
@@ -2619,7 +2639,7 @@ async def optimizer_activity(
     elif trigger == "user":
         query["options.shadow_trigger"] = {"$exists": False}
 
-    async def _fetch(model):
+    async def _fetch(model: type[DocumentT]) -> list[DocumentT]:
         return await model.find(query).sort("-started_at").limit(limit).to_list()
 
     kb_runs = [] if surface not in (None, "kb") else await _fetch(KBOptimizationRun)
@@ -2654,7 +2674,7 @@ async def optimizer_activity(
             workflows = await Workflow.find({"_id": {"$in": object_ids}}).to_list()
             wf_by_id = {str(w.id): w for w in workflows}
 
-    all_runs = [
+    all_runs: list[tuple[str, KBOptimizationRun | ExtractionOptimizationRun | WorkflowOptimizationRun, str, KnowledgeBase | SearchSet | Workflow | None, bool]] = [
         ("kb", r, r.kb_uuid, kb_by_uuid.get(r.kb_uuid), kb_run_is_live(r))
         for r in kb_runs
     ] + [
@@ -2715,7 +2735,7 @@ async def optimizer_activity(
             "item_name": item_name,
             "item_deleted": item_doc is None,
             "user_id": getattr(run, "user_id", None),
-            "user_email": email_by_user.get(getattr(run, "user_id", None)),
+            "user_email": email_by_user.get(getattr(run, "user_id", None) or ""),
             "status": run.status,
             "trigger": shadow_trigger,
             "trigger_detail": options.get("shadow_trigger_detail") or {},
@@ -2736,7 +2756,7 @@ async def optimizer_activity(
             "dismissed_at": dismissed_at.isoformat() if dismissed_at else None,
         })
 
-    rows.sort(key=lambda r: r.get("started_at") or "", reverse=True)
+    rows.sort(key=lambda r: str(r.get("started_at") or ""), reverse=True)
 
     return {
         "runs": rows[:limit],
@@ -2779,7 +2799,7 @@ async def admin_list_all_teams(
     offset: int = Query(default=0, ge=0),
     q: str = Query(default="", max_length=200),
     user: User = Depends(get_current_user),
-):
+) -> AdminTeamListResponse:
     await _require_admin(user)
 
     cfg = await SystemConfig.get_config()
@@ -2817,7 +2837,7 @@ async def admin_list_all_teams(
 async def admin_create_team(
     body: AdminCreateTeamRequest,
     user: User = Depends(get_current_user),
-):
+) -> AdminTeamItem:
     await _require_admin(user)
 
     from app.services import team_service
@@ -2839,12 +2859,12 @@ async def admin_create_team(
 # 21. POST /admin/teams/{team_uuid}/members  - Add user to team (no invite)
 # ---------------------------------------------------------------------------
 
-@router.post("/teams/{team_uuid}/members")
+@router.post("/teams/{team_uuid}/members", response_model=None)
 async def admin_add_user_to_team(
     team_uuid: str,
     body: AdminAddUserRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     await _require_admin(user)
 
     team = await Team.find_one(Team.uuid == team_uuid)
@@ -2875,12 +2895,12 @@ async def admin_add_user_to_team(
 # 22. DELETE /admin/teams/{team_uuid}/members/{user_id}  - Remove user
 # ---------------------------------------------------------------------------
 
-@router.delete("/teams/{team_uuid}/members/{user_id}")
+@router.delete("/teams/{team_uuid}/members/{user_id}", response_model=None)
 async def admin_remove_user_from_team(
     team_uuid: str,
     user_id: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     await _require_admin(user)
 
     team = await Team.find_one(Team.uuid == team_uuid)
@@ -2915,7 +2935,7 @@ async def isolated_users(
     limit: int = Query(default=500, ge=1, le=MAX_LIST_LIMIT),
     offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
-):
+) -> IsolatedUsersResponse:
     await _require_admin(user)
 
     all_memberships = await TeamMembership.find().to_list()
@@ -2952,8 +2972,8 @@ async def isolated_users(
 # 24. Retention Dashboard
 # ---------------------------------------------------------------------------
 
-@router.get("/retention/dashboard")
-async def retention_dashboard(user: User = Depends(get_current_user)):
+@router.get("/retention/dashboard", response_model=None)
+async def retention_dashboard(user: User = Depends(get_current_user)) -> dict[str, object]:
     """Get retention policy status and document counts by classification."""
     await _require_admin(user)
 
@@ -2991,8 +3011,8 @@ async def retention_dashboard(user: User = Depends(get_current_user)):
     }
 
 
-@router.put("/retention/config")
-async def update_retention_config(user: User = Depends(get_current_user)):
+@router.put("/retention/config", response_model=None)
+async def update_retention_config(user: User = Depends(get_current_user)) -> dict[str, object]:
     """Update retention configuration."""
     await _require_admin(user)
     # This endpoint is defined but config updates go through the existing config endpoints
@@ -3003,8 +3023,8 @@ async def update_retention_config(user: User = Depends(get_current_user)):
 # 25. Classification Dashboard
 # ---------------------------------------------------------------------------
 
-@router.get("/classification/dashboard")
-async def classification_dashboard(user: User = Depends(get_current_user)):
+@router.get("/classification/dashboard", response_model=None)
+async def classification_dashboard(user: User = Depends(get_current_user)) -> dict[str, object]:
     """Get classification status overview."""
     await _require_admin(user)
 
@@ -3021,7 +3041,7 @@ async def classification_dashboard(user: User = Depends(get_current_user)):
     # Recent classifications
     recent = await SmartDocument.find(
         SmartDocument.classified_at != None,  # noqa: E711
-    ).sort(-SmartDocument.classified_at).limit(10).to_list()
+    ).sort("-classified_at").limit(10).to_list()
 
     recent_list = [
         {
@@ -3053,8 +3073,8 @@ class TestOcrRequest(BaseModel):
     ocr_provider: Optional[str] = None
 
 
-@router.post("/config/test-ocr")
-async def test_ocr(body: Optional[TestOcrRequest] = None, user: User = Depends(get_current_user)):
+@router.post("/config/test-ocr", response_model=None)
+async def test_ocr(body: Optional[TestOcrRequest] = None, user: User = Depends(get_current_user)) -> dict[str, object]:
     """Convert a generated one-page PDF through the OCR service and report it
     step by step — the same structured diagnostic shape as the model Test button.
 
@@ -3095,8 +3115,8 @@ class TestWebSearchRequest(BaseModel):
     web_search_api_key: Optional[str] = None
 
 
-@router.post("/config/test-web-search")
-async def test_web_search(body: Optional[TestWebSearchRequest] = None, user: User = Depends(get_current_user)):
+@router.post("/config/test-web-search", response_model=None)
+async def test_web_search(body: Optional[TestWebSearchRequest] = None, user: User = Depends(get_current_user)) -> dict[str, object]:
     """Test web search by running a real sample query.
 
     Accepts the admin form's current values so unsaved edits are what gets
@@ -3148,8 +3168,8 @@ async def test_web_search(body: Optional[TestWebSearchRequest] = None, user: Use
     }
 
 
-@router.post("/config/test-model/{model_id}")
-async def test_model(model_id: str, user: User = Depends(get_current_user)):
+@router.post("/config/test-model/{model_id}", response_model=None)
+async def test_model(model_id: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     """Run a real round-trip against a model and return full diagnostics.
 
     Returns HTTP 200 with ``ok`` true/false (in-band, like the Prompt
@@ -3227,8 +3247,8 @@ class TestPromptRequest(BaseModel):
     user_prompt: str
 
 
-@router.post("/config/test-prompt")
-async def test_prompt(body: TestPromptRequest, user: User = Depends(get_current_user)):
+@router.post("/config/test-prompt", response_model=None)
+async def test_prompt(body: TestPromptRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
     """Send an ad-hoc prompt to a configured model and return the raw round-trip.
 
     Powers the admin "Prompt Playground" — admins paste a system/user prompt,
@@ -3305,11 +3325,11 @@ class ModelProbeRequest(BaseModel):
     existing_model_id: Optional[str] = None
 
 
-@router.post("/config/probe-model")
+@router.post("/config/probe-model", response_model=None)
 async def probe_model(
     body: ModelProbeRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Ask the endpoint what context window it actually serves.
 
     Used by the admin model form to pre-fill `context_window` from the
@@ -3345,12 +3365,12 @@ class SavedModelProbeRequest(BaseModel):
     force: bool = False
 
 
-@router.post("/config/models/{model_id}/context-window/probe")
+@router.post("/config/models/{model_id}/context-window/probe", response_model=None)
 async def probe_saved_model_context_window(
     model_id: str,
     body: SavedModelProbeRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Ask a saved model's endpoint for its context window and record it.
 
     The one-click fix for models the Config page flags as unconfirmed or
@@ -3600,7 +3620,7 @@ async def email_analytics(
     failures = await EmailLog.find(
         EmailLog.created_at >= cutoff,
         EmailLog.status == "failed",
-    ).sort(-EmailLog.created_at).limit(25).to_list()
+    ).sort("-created_at").limit(25).to_list()
 
     recent_failures = [
         EmailFailureRow(
@@ -3651,7 +3671,7 @@ class V5AnnouncementTriggerResponse(BaseModel):
 async def trigger_v5_launch_announcement(
     body: V5AnnouncementTriggerRequest,
     user: User = Depends(get_current_user),
-):
+) -> V5AnnouncementTriggerResponse:
     """Admin-only: blast the v5.0 announcement to eligible users.
 
     Idempotent — only users without `v5_announcement_sent_at` receive it.
@@ -3693,7 +3713,7 @@ class AgenticDripBackfillResponse(BaseModel):
 async def backfill_agentic_drip(
     body: AgenticDripBackfillRequest,
     user: User = Depends(get_current_user),
-):
+) -> AgenticDripBackfillResponse:
     """Admin-only: enroll existing users into the agentic-chat tutorial drip.
 
     New-user drip enrollment happens automatically at registration; this
@@ -3764,7 +3784,7 @@ async def list_certification_progress(
     offset: int = Query(default=0, ge=0),
     q: str = Query(default="", max_length=200),
     user: User = Depends(get_current_user),
-):
+) -> CertificationProgressListResponse:
     """List all users who have started the certification program with progress summary."""
     await _require_admin(user)
 
@@ -3814,8 +3834,8 @@ async def list_certification_progress(
     return CertificationProgressListResponse(items=items[offset:offset + limit], total=total, capped=capped)
 
 
-@router.get("/certifications/health")
-async def get_certification_health(user: User = Depends(get_current_user)):
+@router.get("/certifications/health", response_model=None)
+async def get_certification_health(user: User = Depends(get_current_user)) -> dict[str, object]:
     """Global admin metadata census; no course or assessment writes."""
     await _require_admin(user)
     from app.services.certification_versions.course_health import course_health, HealthUnavailable
@@ -3832,7 +3852,7 @@ async def get_certification_progress_detail(
     user_id: str,
     enrollment_id: Optional[str] = None,
     user: User = Depends(get_current_user),
-):
+) -> CertificationProgressDetail:
     """Get a single user's full certification progress including per-module state."""
     await _require_admin(user)
 
@@ -3881,8 +3901,8 @@ class CertificationRecoveryRequest(BaseModel):
     reason: str = Field(min_length=5, max_length=1000)
 
 
-@router.get("/certifications/{user_id}/recovery")
-async def review_certification_recovery(user_id: str, enrollment_id: str, user: User = Depends(get_current_user)):
+@router.get("/certifications/{user_id}/recovery", response_model=None)
+async def review_certification_recovery(user_id: str, enrollment_id: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     """Read-only review of one explicitly selected enrollment; never enroll."""
     await _require_admin(user)
     from app.services.certification_versions.recovery_workflow import RecoveryWorkflow
@@ -3897,9 +3917,9 @@ async def review_certification_recovery(user_id: str, enrollment_id: str, user: 
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
-@router.post("/certifications/{user_id}/recovery")
+@router.post("/certifications/{user_id}/recovery", response_model=None)
 async def recover_certification_completion(user_id: str, enrollment_id: str, payload: CertificationRecoveryRequest,
-                                         user: User = Depends(get_current_user)):
+                                         user: User = Depends(get_current_user)) -> dict[str, object]:
     """Full admins only; persist the reviewed intent before revoking a worker."""
     await _require_superadmin(user)
     from app.services.certification_versions.recovery_workflow import RecoveryWorkflow
@@ -3920,9 +3940,9 @@ class CertificationGradingCorrectionRequest(BaseModel):
     reference: str = Field(min_length=3, max_length=200)
 
 
-@router.get("/certifications/{user_id}/grading-corrections")
+@router.get("/certifications/{user_id}/grading-corrections", response_model=None)
 async def review_certification_grading_correction(user_id: str, enrollment_id: str, attempt_id: str,
-                                                  user: User = Depends(get_current_user)):
+                                                  user: User = Depends(get_current_user)) -> dict[str, object]:
     """Read-only: the exact graded result a correction would re-examine."""
     await _require_admin(user)
     from app.services.certification_versions.grading_corrections import GradingCorrections
@@ -3934,9 +3954,9 @@ async def review_certification_grading_correction(user_id: str, enrollment_id: s
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
-@router.post("/certifications/{user_id}/grading-corrections")
+@router.post("/certifications/{user_id}/grading-corrections", response_model=None)
 async def apply_certification_grading_correction(user_id: str, enrollment_id: str, payload: CertificationGradingCorrectionRequest,
-                                                 user: User = Depends(get_current_user)):
+                                                 user: User = Depends(get_current_user)) -> dict[str, object]:
     """Full admins only: rerun the automatic review as a linked, recorded regrade."""
     await _require_superadmin(user)
     from app.services.certification_versions import practical_preparation
@@ -3960,13 +3980,13 @@ class CertificationUnlockRequest(AccessChangeRequest):
     pass
 
 
-@router.put("/certifications/{user_id}/unlock")
+@router.put("/certifications/{user_id}/unlock", response_model=None)
 async def set_certification_unlock(
     user_id: str,
     payload: CertificationUnlockRequest,
     enrollment_id: Optional[str] = None,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Legacy prerequisite access control; assessed outcome requirements remain enforced."""
     await _require_admin(user)
 
@@ -4029,7 +4049,7 @@ class ApiKeyListItem(BaseModel):
 async def create_api_key(
     body: CreateApiKeyRequest,
     user: User = Depends(get_current_user),
-):
+) -> CreateApiKeyResponse:
     """Issue a new management API key. Returns the full token once."""
     await _require_admin(user)
 
@@ -4077,13 +4097,13 @@ async def create_api_key(
 async def list_api_keys(
     include_revoked: bool = False,
     user: User = Depends(get_current_user),
-):
+) -> list[ApiKeyListItem]:
     await _require_admin(user)
 
     from app.models.api_key import ApiKey
 
     query = ApiKey.find_all()
-    keys = await query.sort(-ApiKey.created_at).to_list()
+    keys = await query.sort("-created_at").to_list()
     if not include_revoked:
         keys = [k for k in keys if k.revoked_at is None]
     return [
@@ -4104,11 +4124,11 @@ async def list_api_keys(
     ]
 
 
-@router.delete("/api-keys/{key_id}")
+@router.delete("/api-keys/{key_id}", response_model=None)
 async def revoke_api_key(
     key_id: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     await _require_admin(user)
 
     from app.models.api_key import ApiKey
@@ -4136,8 +4156,8 @@ async def revoke_api_key(
     return {"id": key_id, "revoked": True}
 
 
-@router.get("/api-keys/docs")
-async def get_api_key_docs(user: User = Depends(get_current_user)):
+@router.get("/api-keys/docs", response_model=None)
+async def get_api_key_docs(user: User = Depends(get_current_user)) -> dict[str, object]:
     """Return the management-API documentation as markdown."""
     await _require_admin(user)
 
@@ -4149,8 +4169,8 @@ async def get_api_key_docs(user: User = Depends(get_current_user)):
     return {"markdown": docs_path.read_text(encoding="utf-8")}
 
 
-@router.get("/api-keys/skill")
-async def get_api_key_skill(user: User = Depends(get_current_user)):
+@router.get("/api-keys/skill", response_model=None)
+async def get_api_key_skill(user: User = Depends(get_current_user)) -> FileResponse:
     """Download the Claude Code skill file for the Management API."""
     from pathlib import Path
 
@@ -4201,7 +4221,7 @@ async def admin_list_knowledge_bases(
     limit: int = Query(1000, ge=1, le=5000),
     offset: int = Query(0, ge=0),
     user: User = Depends(get_current_user),
-):
+) -> AdminKBListResponse:
     """List every knowledge base across all users and teams (admin-only).
 
     Read-only inventory for reviewing KB names/versions org-wide. Owner email
@@ -4221,7 +4241,7 @@ async def admin_list_knowledge_bases(
     team_name: dict[str, str] = {}
     if owner_ids:
         for u in await User.find({"user_id": {"$in": list(owner_ids)}}).to_list():
-            if getattr(u, "email", None):
+            if u.email:
                 owner_email[u.user_id] = u.email
     if team_ids:
         for t in await Team.find({"uuid": {"$in": list(team_ids)}}).to_list():

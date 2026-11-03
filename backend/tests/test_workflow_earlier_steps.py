@@ -39,7 +39,7 @@ def _memo_chain(format_sources):
         _Fixed("Extract NOA fields", [EXTRACTED]),
         _Fixed("Summarize", "A three-year USGS cooperative agreement."),
         _Fixed("Compliance check", "F&A certification is required."),
-        FormatNode({"format_template": "NOA Summary – {{FAIN Award Number}}", "input_sources": format_sources}),
+        FormatNode({"model": "test-model", "format_template": "NOA Summary – {{FAIN Award Number}}", "input_sources": format_sources}),
     ]
     for node in nodes:
         engine.add_node(node)

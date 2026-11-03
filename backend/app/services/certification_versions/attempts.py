@@ -4,6 +4,15 @@ The preserved grader still examines mutable workspace artifacts. This journal
 pins its requirements and returned judgment; it does not invent immutable lab
 evidence or claim the new 5.0 outcomes have been assessed.
 """
+from __future__ import annotations
+from app.models.certification import CertificationProgress
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    from motor.motor_asyncio import AsyncIOMotorCollection
+    from app.services.certification_versions.runtime import CourseOperation
+    from app.services.certification_versions.catalog import CoursePackage
+
 import hashlib
 import json
 import re
@@ -17,12 +26,12 @@ from .enrollments import EnrollmentConflict
 from .writes import require_lease
 
 
-def encode(value):
+def encode(value: object) -> tuple[str, str]:
     payload = json.dumps(value, sort_keys=True, separators=(',', ':'), allow_nan=False)
     return payload, hashlib.sha256(payload.encode()).hexdigest()
 
 
-def progress_snapshot(progress):
+def progress_snapshot(progress: CertificationProgress) -> tuple[str, str]:
     # Navigation is not assessed credit. Exclude its module-local cursor too.
     values = progress.model_dump(mode='json', include={
         'user_id', 'enrollment_id', 'course_version', 'modules', 'total_xp',
@@ -36,11 +45,11 @@ def progress_snapshot(progress):
     return encode(values)
 
 
-def progress_digest(progress):
+def progress_digest(progress: CertificationProgress) -> str:
     return progress_snapshot(progress)[1]
 
 
-def normalize_assessment_selection(value):
+def normalize_assessment_selection(value: object) -> None | dict:
     """An explicit choice of original receipts, never an assessment verdict."""
     if value is None:
         return None
@@ -52,13 +61,29 @@ def normalize_assessment_selection(value):
     return dict(value)
 
 
+class PendingProgress(Protocol):
+    @property
+    def enrollment_id(self) -> str | None: ...
+
+
+class PendingCourse(Protocol):
+    @property
+    def user_id(self) -> str: ...
+
+    @property
+    def progress(self) -> PendingProgress: ...
+
+    @property
+    def package(self) -> CoursePackage: ...
+
+
 class AttemptRepository:
     @property
-    def records(self):
+    def records(self) -> AsyncIOMotorCollection:
         return CertificationAttempt.get_motor_collection()
 
     @staticmethod
-    def payload(record, field):
+    def payload(record: dict, field: str) -> dict:
         serialized, digest = record.get(field + '_json'), record.get(field + '_sha256')
         if not isinstance(serialized, str) or hashlib.sha256(serialized.encode()).hexdigest() != digest:
             raise CourseCatalogError('The saved assessment receipt failed its integrity check')
@@ -70,7 +95,7 @@ class AttemptRepository:
             raise CourseCatalogError('The saved assessment receipt must be an object')
         return value
 
-    async def pending(self, operation):
+    async def pending(self, operation: PendingCourse) -> list[dict]:
         """Read-only resume hints; never grade, recover or clear a worker here."""
         identity = {'user_id': operation.user_id, 'enrollment_id': operation.progress.enrollment_id}
         records = await self.records.find({**identity, 'state': {'$in': ['evaluating', 'graded']}}).limit(2).to_list(2)
@@ -89,7 +114,7 @@ class AttemptRepository:
         return result
 
     @classmethod
-    def assessment_selection(cls, record):
+    def assessment_selection(cls, record: dict) -> dict | None:
         if record.get('assessment_selection_json') is None and record.get('assessment_selection_sha256') is None:
             return None
         value = cls.payload(record, 'assessment_selection')
@@ -98,7 +123,7 @@ class AttemptRepository:
         except EnrollmentConflict as exc:
             raise CourseCatalogError('The saved assessment selection is invalid') from exc
 
-    async def begin(self, operation, module_id, request_id=None, *, assessment_selection=None, transfer_request=None):
+    async def begin(self, operation: CourseOperation, module_id: str, request_id: str | None=None, *, assessment_selection: object=None, transfer_request: dict | None=None) -> tuple[dict, bool]:
         """Caller holds the enrollment write boundary for the entire attempt."""
         progress, package = operation.progress, operation.package
         if not operation.writable or module_id not in {module.id for module in package.manifest.modules}:
@@ -164,7 +189,7 @@ class AttemptRepository:
             raise EnrollmentConflict('Assessment request identity was already claimed; reload its receipt') from exc
         return record, True
 
-    async def bind_write(self, record):
+    async def bind_write(self, record: dict) -> None:
         lease = require_lease(record['user_id'], record['enrollment_id'])
         seed = {key: value for key, value in record.items() if key != '_id'}
         changed = await CertificationEnrollmentSelection.get_motor_collection().update_one(
@@ -175,7 +200,7 @@ class AttemptRepository:
         if changed.matched_count != 1:
             raise EnrollmentConflict('The assessment no longer holds its enrollment write boundary')
 
-    async def graded(self, record, validation):
+    async def graded(self, record: dict, validation: dict) -> dict:
         payload, digest = encode(validation)
         changed = await self.records.update_one(
             {'uuid': record['uuid'], 'state': 'evaluating',
@@ -186,7 +211,7 @@ class AttemptRepository:
             raise EnrollmentConflict('Assessment grading state changed; reconcile its saved receipt')
         return {**record, 'state': 'graded', 'validation_json': payload, 'validation_sha256': digest}
 
-    async def finish(self, record, result, *, failed=False):
+    async def finish(self, record: dict, result: dict, *, failed: bool=False) -> dict:
         if failed:
             result = {**result, 'failure_kind': 'execution'}
         payload, digest = encode(result)

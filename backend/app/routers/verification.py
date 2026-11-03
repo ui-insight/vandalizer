@@ -1,4 +1,7 @@
 """Verification queue API routes."""
+from app.models.workflow import Workflow
+from app.models.search_set import SearchSet
+from app.models.knowledge import KnowledgeBase
 
 import io
 import json
@@ -44,7 +47,7 @@ async def _authorize_submission_target(item_kind: str, item_id: str, user: User)
         raise HTTPException(status_code=404, detail="Item not found")
 
 
-async def _authorize_visible_verified_item(item_kind: str, item_id: str, user: User):
+async def _authorize_visible_verified_item(item_kind: str, item_id: str, user: User) -> Workflow | SearchSet | KnowledgeBase:
     if item_kind == "workflow":
         obj = await access_control.get_authorized_workflow(item_id, user)
     elif item_kind == "search_set":
@@ -135,11 +138,11 @@ class SetExaminerRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-@router.post("/submit")
+@router.post("/submit", response_model=None)
 async def submit_for_verification(
     req: SubmitRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     await _authorize_submission_target(req.item_kind, req.item_id, user)
     try:
         result = await svc.submit_for_verification(
@@ -168,22 +171,22 @@ async def submit_for_verification(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/queue")
+@router.get("/queue", response_model=None)
 async def list_queue(
     status: Optional[str] = Query(None),
     limit: int = Query(50, ge=1, le=200),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     _require_examiner_access(user)
     requests = await svc.list_queue(status_filter=status, limit=limit)
     return {"requests": requests}
 
 
-@router.get("/mine")
+@router.get("/mine", response_model=None)
 async def my_requests(
     limit: int = Query(50, ge=1, le=200),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     requests = await svc.my_requests(user.user_id, limit=limit)
     return {"requests": requests}
 
@@ -193,7 +196,7 @@ async def my_requests(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/verified")
+@router.get("/verified", response_model=None)
 async def list_verified_items(
     kind: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
@@ -204,7 +207,7 @@ async def list_verified_items(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     user: User = Depends(get_current_user),
-):
+) -> dict:
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
     result = await svc.list_verified_items(
         kind_filter=kind, search=search, user_org_ancestry=user_org_ancestry,
@@ -214,24 +217,24 @@ async def list_verified_items(
     return result
 
 
-@router.get("/verified/{item_kind}/{item_id}/metadata")
+@router.get("/verified/{item_kind}/{item_id}/metadata", response_model=None)
 async def get_item_metadata(
     item_kind: str,
     item_id: str,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     await _authorize_visible_verified_item(item_kind, item_id, user)
     meta = await svc.get_item_metadata(item_kind, item_id)
     return meta or {}
 
 
-@router.put("/verified/{item_kind}/{item_id}/metadata")
+@router.put("/verified/{item_kind}/{item_id}/metadata", response_model=None)
 async def update_item_metadata(
     item_kind: str,
     item_id: str,
     req: MetadataUpdateRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     _require_examiner_access(user)
     result = await svc.update_item_metadata(
         item_kind=item_kind,
@@ -250,11 +253,11 @@ async def update_item_metadata(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/upload-test-file")
+@router.post("/upload-test-file", response_model=None)
 async def upload_test_file(
     file: UploadFile = File(...),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Upload a test file for a verification submission. Returns metadata."""
     import os
     import uuid
@@ -280,11 +283,11 @@ async def upload_test_file(
     }
 
 
-@router.get("/download-test-file/{stored_name}")
+@router.get("/download-test-file/{stored_name}", response_model=None)
 async def download_test_file(
     stored_name: str,
     user: User = Depends(get_current_user),
-):
+) -> StreamingResponse:
     """Download a test file by stored name."""
     import os
 
@@ -318,12 +321,12 @@ async def download_test_file(
 # ---------------------------------------------------------------------------
 
 
-@router.delete("/verified/{item_kind}/{item_id}")
+@router.delete("/verified/{item_kind}/{item_id}", response_model=None)
 async def unverify_item(
     item_kind: str,
     item_id: str,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     _require_examiner_access(user)
     result = await svc.unverify_item(item_id, item_kind)
     return result
@@ -334,11 +337,11 @@ async def unverify_item(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/collections/featured")
+@router.get("/collections/featured", response_model=None)
 async def list_featured_collections(
     kind: Optional[str] = Query(None),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """List featured collections (available to all users, not just examiners).
 
     ``kind`` restricts badge counts to one item kind, for single-kind views
@@ -362,11 +365,11 @@ async def list_featured_collections(
     return {"collections": result}
 
 
-@router.get("/collections/browse")
+@router.get("/collections/browse", response_model=None)
 async def browse_collections(
     kind: Optional[str] = Query(None),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """List collections for catalog browsing (available to all users).
 
     A collection's badge count reflects only items the caller can actually
@@ -390,17 +393,17 @@ async def browse_collections(
     return {"collections": result}
 
 
-@router.get("/collections")
-async def list_collections(user: User = Depends(get_current_user)):
+@router.get("/collections", response_model=None)
+async def list_collections(user: User = Depends(get_current_user)) -> dict[str, object]:
     _require_examiner_access(user)
     return {"collections": await svc.list_collections()}
 
 
-@router.post("/collections")
+@router.post("/collections", response_model=None)
 async def create_collection(
     req: CreateCollectionRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     _require_examiner_access(user)
     result = await svc.create_collection(
         title=req.title, user_id=user.user_id,
@@ -409,12 +412,12 @@ async def create_collection(
     return result
 
 
-@router.patch("/collections/{collection_id}")
+@router.patch("/collections/{collection_id}", response_model=None)
 async def update_collection(
     collection_id: str,
     req: UpdateCollectionRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     _require_examiner_access(user)
     result = await svc.update_collection(
         collection_id, title=req.title, description=req.description, featured=req.featured,
@@ -424,11 +427,11 @@ async def update_collection(
     return result
 
 
-@router.delete("/collections/{collection_id}")
+@router.delete("/collections/{collection_id}", response_model=None)
 async def delete_collection(
     collection_id: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     _require_examiner_access(user)
     ok = await svc.delete_collection(collection_id)
     if not ok:
@@ -436,12 +439,12 @@ async def delete_collection(
     return {"ok": True}
 
 
-@router.post("/collections/{collection_id}/items")
+@router.post("/collections/{collection_id}/items", response_model=None)
 async def add_to_collection(
     collection_id: str,
     req: AddToCollectionRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     _require_examiner_access(user)
     result = await svc.add_to_collection(collection_id, req.item_id)
     if not result:
@@ -449,12 +452,12 @@ async def add_to_collection(
     return result
 
 
-@router.delete("/collections/{collection_id}/items/{item_id}")
+@router.delete("/collections/{collection_id}/items/{item_id}", response_model=None)
 async def remove_from_collection(
     collection_id: str,
     item_id: str,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     _require_examiner_access(user)
     result = await svc.remove_from_collection(collection_id, item_id)
     if not result:
@@ -467,8 +470,8 @@ async def remove_from_collection(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/catalog/export")
-async def export_catalog(user: User = Depends(get_current_user)):
+@router.get("/catalog/export", response_model=None)
+async def export_catalog(user: User = Depends(get_current_user)) -> StreamingResponse:
     _require_examiner_access(user)
 
     from app.services import export_import_service as eis
@@ -482,11 +485,11 @@ async def export_catalog(user: User = Depends(get_current_user)):
     )
 
 
-@router.post("/catalog/preview-import")
+@router.post("/catalog/preview-import", response_model=None)
 async def preview_catalog_import(
     file: UploadFile = File(...),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     _require_examiner_access(user)
 
     from app.services import export_import_service as eis
@@ -505,13 +508,13 @@ async def preview_catalog_import(
     return {"items": items}
 
 
-@router.post("/catalog/import")
+@router.post("/catalog/import", response_model=None)
 async def import_catalog_items(
     file: UploadFile = File(...),
     selected_indices: str = Form(...),
     space: Optional[str] = Form(None),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     _require_examiner_access(user)
 
     from app.services import export_import_service as eis
@@ -549,32 +552,32 @@ async def import_catalog_items(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/examiners")
+@router.get("/examiners", response_model=None)
 async def list_examiners(
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     if not user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
     examiners = await svc.list_examiners()
     return {"examiners": examiners}
 
 
-@router.get("/examiners/search")
+@router.get("/examiners/search", response_model=None)
 async def search_users_for_examiner(
     q: str = Query(..., min_length=1),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     if not user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
     users = await svc.search_users(q)
     return {"users": users}
 
 
-@router.post("/examiners")
+@router.post("/examiners", response_model=None)
 async def set_examiner(
     req: SetExaminerRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     if not user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
     try:
@@ -589,14 +592,14 @@ async def set_examiner(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/try/{item_kind}/{item_id}")
+@router.post("/try/{item_kind}/{item_id}", response_model=None)
 @limiter.limit("10/minute")
 async def try_verified_item(
     request: Request,
     item_kind: str,
     item_id: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Run a trial extraction using a verified search set against user's own document.
 
     Lets users 'try before adopting' from the verified catalog.
@@ -728,24 +731,24 @@ async def try_verified_item(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/catalog/coverage")
+@router.get("/catalog/coverage", response_model=None)
 async def list_catalog_coverage(
     kind: Optional[str] = Query(None),
     coverage: Optional[str] = Query(None, description="none | snapshot_only | pinned_baseline | drift_checked"),
     limit: int = Query(200, ge=1, le=500),
     user: User = Depends(get_current_user),
-):
+) -> dict:
     _require_examiner_access(user)
     return await svc.list_catalog_coverage(kind_filter=kind, coverage_filter=coverage, limit=limit)
 
 
-@router.post("/catalog/{item_kind}/{item_id}/pin-baseline")
+@router.post("/catalog/{item_kind}/{item_id}/pin-baseline", response_model=None)
 async def pin_retroactive_baseline(
     item_kind: str,
     item_id: str,
     req: PinRetroactiveBaselineRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     _require_examiner_access(user)
     try:
         result = await svc.pin_retroactive_baseline(
@@ -766,11 +769,11 @@ async def pin_retroactive_baseline(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/{request_uuid}")
+@router.get("/{request_uuid}", response_model=None)
 async def get_request(
     request_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     result = await svc.get_request(request_uuid)
     if not result:
         raise HTTPException(status_code=404, detail="Request not found")
@@ -779,12 +782,12 @@ async def get_request(
     return result
 
 
-@router.patch("/{request_uuid}/status")
+@router.patch("/{request_uuid}/status", response_model=None)
 async def update_status(
     request_uuid: str,
     req: UpdateStatusRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     _require_examiner_access(user)
 
     result = await svc.update_status(
@@ -805,11 +808,11 @@ async def update_status(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/{request_uuid}/claim")
+@router.post("/{request_uuid}/claim", response_model=None)
 async def claim_request(
     request_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     _require_examiner_access(user)
     try:
         return await svc.claim_request(request_uuid, user.user_id)
@@ -817,11 +820,11 @@ async def claim_request(
         raise HTTPException(status_code=409, detail=str(e))
 
 
-@router.post("/{request_uuid}/release")
+@router.post("/{request_uuid}/release", response_model=None)
 async def release_claim(
     request_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     _require_examiner_access(user)
     try:
         return await svc.release_claim(request_uuid, user.user_id)
@@ -829,12 +832,12 @@ async def release_claim(
         raise HTTPException(status_code=409, detail=str(e))
 
 
-@router.put("/{request_uuid}/examiner-additions")
+@router.put("/{request_uuid}/examiner-additions", response_model=None)
 async def set_examiner_additions(
     request_uuid: str,
     req: ExaminerAdditionsRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     _require_examiner_access(user)
     try:
         return await svc.set_examiner_additions(request_uuid, user.user_id, req.additions)

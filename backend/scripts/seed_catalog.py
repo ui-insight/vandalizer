@@ -33,6 +33,8 @@ VerifiedItemMetadata, collection membership) while preserving the underlying
 row so the change is reversible. Items without a seed_id are never touched.
 Pair with --dry-run to preview the retirement list before applying it.
 """
+from typing import TypedDict
+from app.services.library_service import _persisted_id
 
 import argparse
 import asyncio
@@ -60,7 +62,7 @@ from app.services.verification_service import normalize_tier  # noqa: F401 — r
 logger = logging.getLogger(__name__)
 
 
-def _reinstate_verified(doc) -> bool:
+def _reinstate_verified(doc: Workflow | SearchSet | KnowledgeBase) -> bool:
     """Restore ``verified=True`` on an existing catalog row the seed is re-attaching.
 
     A prune (``_retire_item``) or the admin retire toggle flips the row to
@@ -188,7 +190,7 @@ async def ensure_collection(title: str, description: str, featured: bool = False
     return col
 
 
-async def add_to_collection(collection: VerifiedCollection, item_id: str):
+async def add_to_collection(collection: VerifiedCollection, item_id: str) -> None:
     """Add an item ID to a collection if not already present."""
     if item_id not in collection.item_ids:
         collection.item_ids.append(item_id)
@@ -208,7 +210,7 @@ async def upsert_verified_metadata(
     official_baseline: dict | None = None,
     official_baseline_score: float | None = None,
     retract_unmeasured_tier: bool = False,
-):
+) -> VerifiedItemMetadata:
     """Create or refresh VerifiedItemMetadata.
 
     If quality_score/grade are provided (e.g. from a previous validation export),
@@ -294,7 +296,7 @@ create_verified_metadata = upsert_verified_metadata
 
 async def ensure_library_item(
     verified_lib: Library, item_id: PydanticObjectId, kind: LibraryItemKind,
-):
+) -> LibraryItem:
     """Create a LibraryItem if one doesn't already exist for (item_id, kind),
     and make sure the verified library references it."""
     existing = await LibraryItem.find_one(
@@ -303,7 +305,7 @@ async def ensure_library_item(
     )
     if existing:
         if existing.id not in verified_lib.items:
-            verified_lib.items.append(existing.id)
+            verified_lib.items.append(_persisted_id(existing))
         return existing
     now = datetime.datetime.now(datetime.timezone.utc)
     lib_item = LibraryItem(
@@ -315,7 +317,7 @@ async def ensure_library_item(
     )
     await lib_item.insert()
     if lib_item.id not in verified_lib.items:
-        verified_lib.items.append(lib_item.id)
+        verified_lib.items.append(_persisted_id(lib_item))
     return lib_item
 
 
@@ -570,7 +572,7 @@ async def attach_catalog_kb_queries(wf_dir: pathlib.Path) -> int:
                 continue
             task = WorkflowStepTask(name="KnowledgeBaseQuery", data={**seed_data, "kb_uuid": kb.uuid})
             await task.insert()
-            step.tasks.append(task.id)
+            step.tasks.append(_persisted_id(task))
             await step.save()
             changed += 1
             print(f"    + {meta['seed_id']}: {step_name} now reads {kb_seed_id}")
@@ -628,7 +630,7 @@ async def seed_workflow(
             existing.updated_at = datetime.datetime.now(datetime.timezone.utc)
             await existing.save()
 
-        await ensure_library_item(verified_lib, existing.id, LibraryItemKind.WORKFLOW)
+        await ensure_library_item(verified_lib, _persisted_id(existing), LibraryItemKind.WORKFLOW)
         await upsert_verified_metadata(
             "workflow", str(existing.id),
             meta.get("display_name", item["name"]),
@@ -692,7 +694,7 @@ async def seed_workflow(
 
             task = WorkflowStepTask(name=task_data["name"], data=td)
             await task.insert()
-            task_ids.append(task.id)
+            task_ids.append(_persisted_id(task))
 
         step = WorkflowStep(
             name=step_data["name"],
@@ -701,7 +703,7 @@ async def seed_workflow(
             is_output=step_data.get("is_output", False),
         )
         await step.insert()
-        step_ids.append(step.id)
+        step_ids.append(_persisted_id(step))
 
     # Create workflow
     wf = Workflow(
@@ -723,7 +725,7 @@ async def seed_workflow(
     await wf.insert()
 
     # Library item + metadata
-    await create_library_item(verified_lib, wf.id, LibraryItemKind.WORKFLOW)
+    await create_library_item(verified_lib, _persisted_id(wf), LibraryItemKind.WORKFLOW)
     await create_verified_metadata(
         "workflow", str(wf.id),
         meta.get("display_name", item["name"]),
@@ -828,7 +830,7 @@ async def _refresh_search_set(
     if tc_count:
         print(f"    + {tc_count} test case(s)")
 
-    await ensure_library_item(verified_lib, ss.id, LibraryItemKind.SEARCH_SET)
+    await ensure_library_item(verified_lib, _persisted_id(ss), LibraryItemKind.SEARCH_SET)
     await upsert_verified_metadata(
         "search_set", str(ss.id),
         meta.get("display_name", item["title"]),
@@ -906,7 +908,7 @@ async def seed_search_set(
         print(f"    + {tc_count} test case(s)")
 
     # Library item + metadata
-    await create_library_item(verified_lib, ss.id, LibraryItemKind.SEARCH_SET)
+    await create_library_item(verified_lib, _persisted_id(ss), LibraryItemKind.SEARCH_SET)
     await create_verified_metadata(
         "search_set", str(ss.id),
         meta.get("display_name", item["title"]),
@@ -1134,7 +1136,7 @@ async def seed_knowledge_base(
         if new_sources_ingested or repaired or refreshed or kept or retired:
             await _recalc_kb_stats(existing)
 
-        await ensure_library_item(verified_lib, existing.id, LibraryItemKind.KNOWLEDGE_BASE)
+        await ensure_library_item(verified_lib, _persisted_id(existing), LibraryItemKind.KNOWLEDGE_BASE)
         await upsert_verified_metadata(
             "knowledge_base", str(existing.id),
             meta.get("display_name", item["title"]),
@@ -1196,7 +1198,7 @@ async def seed_knowledge_base(
     await _recalc_kb_stats(kb)
 
     # Library item + metadata
-    await ensure_library_item(verified_lib, kb.id, LibraryItemKind.KNOWLEDGE_BASE)
+    await ensure_library_item(verified_lib, _persisted_id(kb), LibraryItemKind.KNOWLEDGE_BASE)
     await upsert_verified_metadata(
         "knowledge_base", str(kb.id),
         meta.get("display_name", item["title"]),
@@ -1224,7 +1226,18 @@ async def seed_knowledge_base(
 
 # Per-type wiring for prune: how to find the seed_id on a live document, the
 # seed directory to scan, the LibraryItemKind, and the metadata item_kind string.
-_PRUNE_SPEC = {
+class PruneSpec(TypedDict):
+    model: type[Workflow] | type[SearchSet] | type[KnowledgeBase]
+    dir: str
+    cfg_field: str
+    title_key: str
+    library_kind: LibraryItemKind
+    meta_kind: str
+    label: str
+    title_fallback: bool
+
+
+_PRUNE_SPEC: dict[str, PruneSpec] = {
     TYPE_WORKFLOWS: {
         "model": Workflow,
         "dir": "workflows",
@@ -1288,7 +1301,7 @@ def _collect_live_manifest(selected: set[str]) -> dict[str, dict[str, set[str]]]
     return live
 
 
-async def _retire_item(type_name: str, doc, verified_lib: Library, dry_run: bool) -> None:
+async def _retire_item(type_name: str, doc: Workflow | SearchSet | KnowledgeBase, verified_lib: Library, dry_run: bool) -> None:
     """Soft-archive a single seeded item: flip the underlying row to
     verified=False and strip every catalog attachment (verified LibraryItem,
     VerifiedItemMetadata, collection membership). The underlying
@@ -1436,7 +1449,7 @@ def _version_newer(candidate: str | None, current: str | None) -> bool:
     if not current:
         return True
 
-    def _parts(v: str):
+    def _parts(v: str) -> tuple[int, ...] | None:
         try:
             return tuple(int(x) for x in v.strip().split("."))
         except ValueError:
@@ -1545,7 +1558,7 @@ async def compute_catalog_diff(types: set[str] | None = None) -> dict:
 # Main
 # ---------------------------------------------------------------------------
 
-async def seed_catalog(types: set[str] | None = None, refresh_urls: bool = False):
+async def seed_catalog(types: set[str] | None = None, refresh_urls: bool = False) -> dict:
     """Seed the verified catalog. Expects Beanie to be already initialized.
 
     Args:
@@ -1577,7 +1590,7 @@ async def seed_catalog(types: set[str] | None = None, refresh_urls: bool = False
         slug_to_collection[coll["slug"]] = col
         print(f"  {coll['title']}{' [featured]' if coll.get('featured') else ''}")
 
-    def _tally(counts: dict[str, int], result: SeedResult, label: str, name: str):
+    def _tally(counts: dict[str, int], result: SeedResult, label: str, name: str) -> None:
         counts[result] = counts.get(result, 0) + 1
         if result == "created":
             print(f"  + {name}")
@@ -1687,7 +1700,7 @@ async def seed_catalog(types: set[str] | None = None, refresh_urls: bool = False
     }
 
 
-async def main():
+async def main() -> None:
     parser = argparse.ArgumentParser(
         description="Seed the verified catalog with research admin templates.",
         formatter_class=argparse.RawDescriptionHelpFormatter,

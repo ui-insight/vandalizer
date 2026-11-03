@@ -950,6 +950,8 @@ async def topup_signed_in_trial(
     if reason:
         return {"ok": False, "reason": reason}
     app = await DemoApplication.find_one(DemoApplication.user_id == user.user_id)
+    if app is None:
+        return {"ok": False, "reason": "no_application"}
     return await _grant_topup(app, notes, settings, signed_in=True)
 
 
@@ -1042,7 +1044,6 @@ _CREDENTIAL_EMAIL_TYPES = (
 
 async def admin_list_applications(status_filter: Optional[str] = None) -> list[dict]:
     """List all demo applications, optionally filtered by status."""
-    query = {}
     if status_filter:
         query = DemoApplication.find(DemoApplication.status == status_filter)
     else:
@@ -1180,7 +1181,7 @@ async def process_recapture_drips(settings: Settings | None = None) -> int:
     apps = await DemoApplication.find(
         DemoApplication.status == "active",
         DemoApplication.recapture_step < _RECAPTURE_STEPS,
-        DemoApplication.recapture_next_at <= now,
+        {"recapture_next_at": {"$lte": now}},
     ).to_list()
 
     for app in apps:

@@ -32,11 +32,11 @@ class ChatPracticeCheck(ContractModel):
     unanswerable_judgment: Literal['supported_by_source', 'not_stated_in_source']
 
 
-def _spaced(text):
+def _spaced(text: str) -> str:
     return ' '.join(text.split()).casefold()
 
 
-def _amount(value):
+def _amount(value: str) -> str | None:
     digits = re.sub(r'[^0-9.]', '', value)
     try:
         return str(int(float(digits))) if digits else None

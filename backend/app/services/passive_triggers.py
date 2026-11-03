@@ -76,10 +76,14 @@ def create_folder_watch_trigger(
     ))
     event["_id"] = ObjectId(hashlib.sha256(identity.encode()).digest()[:12])
     from pymongo import ReturnDocument
-    return db.workflow_trigger_event.find_one_and_update(
+    saved = db.workflow_trigger_event.find_one_and_update(
         {"_id": event["_id"]}, {"$setOnInsert": event},
         upsert=True, return_document=ReturnDocument.AFTER,
     )
+
+    if saved is None:
+        raise RuntimeError("The folder-watch trigger save could not be confirmed")
+    return saved
 
 
 def create_m365_trigger(workflow_doc: dict, work_item_doc: dict) -> dict:
@@ -159,7 +163,7 @@ def create_api_trigger(
 
 def create_chain_trigger(
     source_event: dict,
-    target_workflow_id,
+    target_workflow_id: str | ObjectId,
     document_oids: list,
     *,
     automation_id: str | None = None,

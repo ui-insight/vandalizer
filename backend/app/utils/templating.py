@@ -35,6 +35,7 @@ Two render modes, because a placeholder lands in two different kinds of text:
 
 import json
 import re
+from typing import overload
 
 # Matches {{ anything }} with optional surrounding whitespace; the inner
 # expression is captured non-greedily so adjacent placeholders don't merge.
@@ -123,6 +124,14 @@ def _as_raw_string(value: object) -> str:
         return str(value)
     # Dicts/lists are unusual in a URL, but emit compact JSON rather than Python repr.
     return json.dumps(value)
+
+
+@overload
+def render(text: str, context: dict, *, json_encode: bool) -> str: ...
+
+
+@overload
+def render(text: object, context: dict, *, json_encode: bool) -> object: ...
 
 
 def render(text: object, context: dict, *, json_encode: bool) -> object:

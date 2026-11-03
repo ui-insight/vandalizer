@@ -272,7 +272,7 @@ def _assumed_zero_note(fields: list[str]) -> str:
     return f"; counted as 0 because not stated: {', '.join(fields)}"
 
 
-def _result(rule: dict, status: str, message: str, **extra) -> dict:
+def _result(rule: dict, status: str, message: str, **extra: object) -> dict:
     """Build a result dict. Includes `passed` for backward compatibility.
 
     ``extra`` carries optional detail: ``assumed_zero`` (fields counted as 0
@@ -379,6 +379,7 @@ class CrossFieldValidator:
         parsed, assumed_zero, error = self._read_amounts(data, rule, source_fields, "Source")
         if error:
             return error
+        assert parsed is not None
         target_val = _get_field_value(data, target_field)
         if _is_empty(target_val):
             return _result(rule, "unparseable", f"Target field '{target_field}' is empty")
@@ -421,6 +422,7 @@ class CrossFieldValidator:
         )
         if error:
             return error
+        assert amounts is not None
         base, rate, target = amounts
         if rate.unit == "currency":
             return _result(rule, "unparseable", f"'{rate_field}' is a dollar amount, not a rate")
@@ -464,9 +466,11 @@ class CrossFieldValidator:
         )
         if error:
             return error
+        assert head is not None
         minus, assumed_zero, error = self._read_amounts(data, rule, subtrahends, "Subtracted")
         if error:
             return error
+        assert minus is not None
         value, minuend = head
         error = self._mixed_units(rule, [value, minuend, *minus])
         if error:

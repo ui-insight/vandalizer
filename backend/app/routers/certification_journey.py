@@ -9,9 +9,9 @@ from app.services.certification_versions.journey_events import JourneyEventReque
 router = APIRouter()
 
 
-@router.post('/journey-events')
+@router.post('/journey-events', response_model=None)
 @limiter.limit('120/minute')
-async def record_journey_event(request: Request, payload: JourneyEventRequest, user: User = Depends(get_current_user)):
+async def record_journey_event(request: Request, payload: JourneyEventRequest, user: User = Depends(get_current_user)) -> dict:
     try:
         return await record(user.user_id, payload)
     except JourneyEventConflict:

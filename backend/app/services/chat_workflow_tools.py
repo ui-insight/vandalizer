@@ -209,7 +209,7 @@ async def update_workflow(
                 )}
             task_name, doc_consuming = _WORKFLOW_STEP_TYPES[raw_type]
             data, err = await _build_workflow_step_data(context, spec, raw_type, model)
-            if err:
+            if err or data is None:
                 return {"error": f"Step {idx + 1} ({spec.get('name') or raw_type}): {err}."}
             # Same linear wiring as create_workflow.
             if doc_consuming:

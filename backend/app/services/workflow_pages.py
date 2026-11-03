@@ -1,4 +1,5 @@
 """Static report presentation and provenance for saved workflow output."""
+from pymongo.database import Database
 from datetime import datetime, timezone
 from html import escape
 
@@ -10,7 +11,7 @@ from app.utils.timestamps import utc_iso
 
 def render_report_markdown(content: str) -> str:
     md = MarkdownIt("commonmark", {"html": False}).enable("table")
-    md.renderer.rules["image"] = lambda tokens, idx, *_: escape(tokens[idx].content)
+    md.add_render_rule("image", lambda _renderer, tokens, idx, *_: escape(tokens[idx].content))
     return f'''<!doctype html><html><head><style>
 body{{font:16px/1.6 system-ui,sans-serif;color:#1e293b;max-width:900px;margin:auto;padding:24px}}
 table{{display:block;overflow-x:auto;border-collapse:collapse;max-width:100%}}
@@ -21,7 +22,7 @@ h1,h2,h3{{line-height:1.3}}body{{overflow-wrap:anywhere}}
 </style></head><body>{md.render(content)}</body></html>'''
 
 
-def workflow_source(db, result: dict, workflow: dict) -> dict:
+def workflow_source(db: Database[dict], result: dict, workflow: dict) -> dict:
     """Prefer names snapshotted at execution, not today's renamed sources."""
     config = result.get("run_config") or {}
     name = (config.get("workflow") or {}).get("name") or workflow.get("name") or "Workflow output"

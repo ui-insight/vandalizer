@@ -1,4 +1,11 @@
 """Preserve authenticated budget interpretations with the actual completed run."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
+from typing import Self
 import datetime
 from typing import Annotated, Literal
 
@@ -12,7 +19,7 @@ from .catalog import CourseCatalogError
 from .enrollments import EnrollmentConflict
 from .lab_execution import LabExecutionRepository
 from .lab_inputs import LabInputRepository
-from .learner_decisions import LearnerDecisionRepository
+from .learner_decisions import LearnerDecisionRepository, LearnerDecisionJournal
 from .outcomes import ContractModel
 
 MAX_REVIEW_BYTES = 8 * 1024 * 1024
@@ -30,14 +37,14 @@ class AdvancedReviewRequest(ContractModel):
     consent: Literal['save_budget_calculation_and_dependency_review']
 
     @model_validator(mode='after')
-    def complete_answers(self):
+    def complete_answers(self) -> Self:
         if (set(self.answers) != {'calculation_review', 'dependency_review'}
                 or any(not value.strip() for value in self.answers.values()) or self.previous_submission_id == self.request_id):
             raise ValueError('Answer both actual-result questions; revised answers require a new request identity')
         return self
 
 
-def embedded_execution(run):
+def embedded_execution(run: dict) -> dict:
     plan = run['plan']
     raw = {key: plan[key] for key in ('uuid', 'user_id', 'enrollment_id', 'module_id', 'course_version',
                                     'manifest_sha256', 'input_snapshot_id')}
@@ -50,9 +57,9 @@ def embedded_execution(run):
     return raw
 
 
-class AdvancedReviewRepository(LearnerDecisionRepository):
+class AdvancedReviewRepository(LearnerDecisionJournal):
     @staticmethod
-    def decode(raw):
+    def decode(raw: dict) -> dict:
         saved = LearnerDecisionRepository.decode(raw)
         try:
             body = AdvancedReviewRequest.model_validate(saved['submission'])
@@ -72,11 +79,11 @@ class AdvancedReviewRepository(LearnerDecisionRepository):
         except (KeyError, TypeError, ValueError) as exc:
             raise CourseCatalogError('The saved budget result review failed integrity verification') from exc
 
-    async def get(self, user_id, submission_id):
+    async def get(self, user_id: str, submission_id: str | None) -> dict | None:
         raw = await self.records.find_one({'uuid': submission_id, 'user_id': user_id, 'module_id': 'advanced_nodes', 'prompt_id': PROMPT_ID})
         return self.decode(raw) if raw else None
 
-    async def submit(self, operation, body, *, actor_user_id):
+    async def submit(self, operation: CourseOperation, body: object, *, actor_user_id: str) -> dict | None:
         body = AdvancedReviewRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Budget result review requires the authenticated learner')
@@ -87,7 +94,7 @@ class AdvancedReviewRepository(LearnerDecisionRepository):
         request = body.model_dump(mode='json')
         request_hash = encode(request)[1]
 
-        def replay(raw):
+        def replay(raw: dict) -> dict:
             if any(raw.get(key) != value for key, value in identity.items()) or raw.get('request_sha256') != request_hash:
                 raise EnrollmentConflict('This review reference belongs to different answers or another learner')
             return self.decode(raw)

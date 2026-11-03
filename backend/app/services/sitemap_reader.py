@@ -194,14 +194,14 @@ async def read_sitemap(url: str) -> SitemapResult:
         visited: set[str] = set()
         seen_pages: set[str] = set()
         while queue and result.sitemaps_read < MAX_SITEMAP_FILES:
-            sitemap_url, body = queue.pop(0)
+            sitemap_url, queued_body = queue.pop(0)
             if sitemap_url in visited:
                 continue
             visited.add(sitemap_url)
             try:
-                if body is None:
-                    sitemap_url, body = await _get(client, sitemap_url, allowed_hosts)
-                _, pages, children = parse_sitemap(body)
+                if queued_body is None:
+                    sitemap_url, queued_body = await _get(client, sitemap_url, allowed_hosts)
+                _, pages, children = parse_sitemap(queued_body)
             except SitemapError as e:
                 # One unreadable child sitemap leaves the rest worth showing.
                 result.errors.append(str(e))

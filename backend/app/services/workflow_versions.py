@@ -130,6 +130,8 @@ async def replace_definition(wf: Workflow, definition: dict) -> None:
         for task_data in step_data.get("tasks", []):
             task = WorkflowStepTask(name=task_data["name"], data=dict(task_data.get("data") or {}))
             await task.insert()
+            if task.id is None:
+                raise ValueError("The new workflow task was not persisted")
             task_ids.append(task.id)
         step = WorkflowStep(
             name=step_data["name"],
@@ -138,6 +140,8 @@ async def replace_definition(wf: Workflow, definition: dict) -> None:
             is_output=bool(step_data.get("is_output")),
         )
         await step.insert()
+        if step.id is None:
+            raise ValueError("The new workflow step was not persisted")
         new_step_ids.append(step.id)
 
     wf.steps = new_step_ids
@@ -150,14 +154,14 @@ async def replace_definition(wf: Workflow, definition: dict) -> None:
     await wf.save()
 
     for step_id in old_step_ids:
-        step = await WorkflowStep.get(step_id)
-        if not step:
+        old_step = await WorkflowStep.get(step_id)
+        if not old_step:
             continue
-        for task_id in step.tasks:
-            task = await WorkflowStepTask.get(task_id)
-            if task:
-                await task.delete()
-        await step.delete()
+        for task_id in old_step.tasks:
+            old_task = await WorkflowStepTask.get(task_id)
+            if old_task:
+                await old_task.delete()
+        await old_step.delete()
 
 
 async def apply_edit(

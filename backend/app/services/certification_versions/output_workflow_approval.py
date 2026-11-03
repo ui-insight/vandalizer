@@ -2,10 +2,10 @@
 from typing import Literal
 
 from .output_workflow_preparation import OutputWorkflowPreparation
-from .connected_workflow_approval import ConnectedScopeRepository, ConnectedScopeRequest
+from .connected_workflow_approval import ConnectedScopeRepository, ScopeRequestFields
 
 
-class OutputScopeRequest(ConnectedScopeRequest):
+class OutputScopeRequest(ScopeRequestFields):
     consent: Literal['save_output_workflow_scope_decision']
 
 

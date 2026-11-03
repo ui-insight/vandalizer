@@ -7,15 +7,26 @@ for short runs; these tasks are used when the request body sets ``async=true``.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from celery import Task
+
+from collections.abc import Coroutine
+from typing import Any, TypeVar
+from datetime import datetime
+
 import logging
 
 from app.celery_app import celery
 from app.tasks import TRANSIENT_EXCEPTIONS, run_task_async
 
+T = TypeVar("T")
+
 logger = logging.getLogger(__name__)
 
 
-def _run_async(coro):
+def _run_async(coro: Coroutine[Any, Any, T]) -> T:
     """Run an async coroutine from sync Celery task context, releasing the
     loop's pooled LLM HTTP client on teardown (see ``run_task_async``)."""
     return run_task_async(coro)
@@ -31,13 +42,13 @@ def _run_async(coro):
     default_retry_delay=10,
 )
 def validate_kb_task(
-    self,
+    self: Task,
     kb_uuid: str,
     user_id: str,
     mode: str = "judge",
     skip_judge: bool = False,
     query_uuids: list[str] | None = None,
-):
+) -> dict[str, object]:
     """Run a KB validation in the background and persist a ValidationRun.
 
     ``query_uuids`` restricts the run to those test queries (a smoke test).
@@ -49,7 +60,7 @@ async def _validate_kb_async(
     kb_uuid: str, user_id: str, mode: str, skip_judge: bool,
     query_uuids: list[str] | None = None,
     task_id: str | None = None,
-):
+) -> dict[str, object]:
     from app.config import Settings
     from app.database import init_db
 
@@ -83,7 +94,7 @@ async def _validate_kb_async(
     max_retries=2,
     default_retry_delay=10,
 )
-def generate_test_queries_task(self, kb_uuid: str, user_id: str, coverage: str = "standard"):
+def generate_test_queries_task(self: Task, kb_uuid: str, user_id: str, coverage: str = "standard") -> dict[str, object]:
     """Auto-generate KBTestQuery records via LLM in the background.
 
     Retries transient connection blips on a fresh attempt with backoff — this
@@ -94,7 +105,7 @@ def generate_test_queries_task(self, kb_uuid: str, user_id: str, coverage: str =
     a 4xx won't improve on retry — so it's caught and re-raised first.
     """
     from pydantic_ai.exceptions import ModelAPIError, ModelHTTPError
-    retry_on = (ModelAPIError, *TRANSIENT_EXCEPTIONS)
+    retry_on: tuple[type[BaseException], ...] = (ModelAPIError, *TRANSIENT_EXCEPTIONS)
     try:
         return _run_async(_generate_test_queries_async(kb_uuid, user_id, coverage))
     except ModelHTTPError:
@@ -103,7 +114,7 @@ def generate_test_queries_task(self, kb_uuid: str, user_id: str, coverage: str =
         raise self.retry(exc=exc)
 
 
-async def _generate_test_queries_async(kb_uuid: str, user_id: str, coverage: str):
+async def _generate_test_queries_async(kb_uuid: str, user_id: str, coverage: str) -> dict[str, object]:
     from app.config import Settings
     from app.database import init_db
 
@@ -139,13 +150,13 @@ async def _generate_test_queries_async(kb_uuid: str, user_id: str, coverage: str
     time_limit=1860,
 )
 def add_urls_task(
-    self,
+    self: Task,
     kb_uuid: str,
     urls: list[str],
     crawl_enabled: bool = False,
     max_crawl_pages: int = 5,
     allowed_domains: str = "",
-):
+) -> dict[str, object]:
     """Fetch, crawl, chunk and embed URLs into a KB in the background."""
     return _run_async(_add_urls_async(
         kb_uuid, urls, crawl_enabled, max_crawl_pages, allowed_domains,
@@ -158,7 +169,7 @@ async def _add_urls_async(
     crawl_enabled: bool,
     max_crawl_pages: int,
     allowed_domains: str,
-):
+) -> dict[str, object]:
     from app.config import Settings
     from app.database import init_db
 
@@ -193,13 +204,13 @@ async def _add_urls_async(
     time_limit=1860,
 )
 def ingest_url_sources_task(
-    self,
+    self: Task,
     kb_uuid: str,
     source_uuids: list[str],
     crawl_enabled: bool = False,
     max_crawl_pages: int = 5,
     allowed_domains: str = "",
-):
+) -> dict[str, object]:
     """Fetch, crawl, chunk and embed one batch of pre-registered URL sources.
     See knowledge_service.register_url_sources."""
     return _run_async(_ingest_url_sources_async(
@@ -213,7 +224,7 @@ async def _ingest_url_sources_async(
     crawl_enabled: bool,
     max_crawl_pages: int,
     allowed_domains: str,
-):
+) -> dict[str, object]:
     from app.config import Settings
     from app.database import init_db
 
@@ -246,12 +257,12 @@ async def _ingest_url_sources_async(
     soft_time_limit=1800,  # same budget as add_urls: a preview runs the same crawl
     time_limit=1860,
 )
-def preview_urls_task(self, preview_uuid: str):
+def preview_urls_task(self: Task, preview_uuid: str) -> dict[str, object]:
     """Fetch (and crawl) URLs for review, writing nothing to the KB."""
     return _run_async(_preview_urls_async(preview_uuid))
 
 
-async def _preview_urls_async(preview_uuid: str):
+async def _preview_urls_async(preview_uuid: str) -> dict[str, object]:
     from app.config import Settings
     from app.database import init_db
 
@@ -269,7 +280,7 @@ async def _preview_urls_async(preview_uuid: str):
     soft_time_limit=1800,
     time_limit=1860,
 )
-def commit_url_preview_task(self, preview_uuid: str, page_ids: list[str]):
+def commit_url_preview_task(self: Task, preview_uuid: str, page_ids: list[str]) -> dict[str, object]:
     """Index the pages a user kept from a URL preview.
 
     Not auto-retried: a retry after some pages were indexed would skip them
@@ -278,7 +289,7 @@ def commit_url_preview_task(self, preview_uuid: str, page_ids: list[str]):
     return _run_async(_commit_url_preview_async(preview_uuid, page_ids))
 
 
-async def _commit_url_preview_async(preview_uuid: str, page_ids: list[str]):
+async def _commit_url_preview_async(preview_uuid: str, page_ids: list[str]) -> dict[str, object]:
     from app.config import Settings
     from app.database import init_db
 
@@ -303,13 +314,13 @@ async def _commit_url_preview_async(preview_uuid: str, page_ids: list[str]):
     time_limit=3660,
 )
 def refresh_url_source_task(
-    self, kb_uuid: str, source_uuid: str, queued_at: str | None = None, scheduled: bool = False,
-):
+    self: Task, kb_uuid: str, source_uuid: str, queued_at: str | None = None, scheduled: bool = False,
+) -> dict[str, object]:
     """Re-fetch one URL source in place. See knowledge_service.refresh_url_source."""
     return _run_async(_refresh_url_source_async(kb_uuid, source_uuid, queued_at, scheduled))
 
 
-def _same_stamp(stored, queued_at: str | None) -> bool:
+def _same_stamp(stored: datetime | None, queued_at: str | None) -> bool:
     """Whether this task is the latest queueing of the source's refresh."""
     if queued_at is None or stored is None:
         return True  # a task queued before stamps were passed along
@@ -334,7 +345,7 @@ def _same_stamp(stored, queued_at: str | None) -> bool:
 
 async def _refresh_url_source_async(
     kb_uuid: str, source_uuid: str, queued_at: str | None = None, scheduled: bool = False,
-):
+) -> dict[str, object]:
     from app.config import Settings
     from app.database import init_db
 
@@ -416,13 +427,13 @@ async def _refresh_url_source_async(
     retry_backoff=True,
     max_retries=2,
 )
-def refresh_due_url_sources_task(self):
+def refresh_due_url_sources_task(self: Task) -> dict[str, object]:
     """Beat: queue a refresh for every web source due under its KB's
     ``url_refresh_interval``. See services/kb_url_refresh.py."""
     return _run_async(_refresh_due_url_sources_async())
 
 
-async def _refresh_due_url_sources_async():
+async def _refresh_due_url_sources_async() -> dict[str, object]:
     from app.config import Settings
     from app.database import init_db
 
@@ -453,14 +464,14 @@ async def _refresh_due_url_sources_async():
     time_limit=5460,
 )
 def optimize_kb_task(
-    self,
+    self: Task,
     kb_uuid: str,
     user_id: str,
     run_uuid: str,
     token_budget: int,
     include_indexing_track: bool = False,
     apply_on_finish: bool = False,
-):
+) -> dict[str, object]:
     """Drive a KBOptimizationRun. The pre-allocated run document is passed in
     so the API route can return its UUID before the worker picks up the job.
     """
@@ -477,7 +488,7 @@ async def _optimize_kb_async(
     token_budget: int,
     include_indexing_track: bool,
     apply_on_finish: bool,
-):
+) -> dict[str, object]:
     from app.config import Settings
     from app.database import init_db
 
@@ -534,7 +545,7 @@ ORPHAN_RUN_AGE_SECONDS = 5400 * 2  # 3 hours
     retry_backoff=True,
     max_retries=2,
 )
-def optimization_janitor(self):
+def optimization_janitor(self: Task) -> dict[str, object]:
     """Hourly: mark abandoned KB/workflow/extraction optimization runs failed."""
     return _run_async(_optimization_janitor_async())
 
@@ -590,8 +601,8 @@ async def _optimization_janitor_async() -> dict:
         scanned += len(candidates)
         for run in candidates:
             try:
-                updated = await reap_one(run)
-                if updated is not None and updated.status not in ("queued", "running"):
+                candidate_updated = await reap_one(run)
+                if candidate_updated is not None and candidate_updated.status not in ("queued", "running"):
                     reaped += 1
             except Exception as e:  # pragma: no cover — defensive
                 logger.warning("Janitor could not reap run %s: %s", run.uuid, e)
@@ -626,7 +637,7 @@ REGRESSION_MIN_QUERIES = 5          # require at least this many judged queries
     retry_backoff=True,
     max_retries=1,
 )
-def kb_revalidate_applied(self):
+def kb_revalidate_applied(self: Task) -> dict[str, object]:
     """Monthly: re-judge KBs with live ``rag_config_override`` and alert on regressions."""
     return _run_async(_kb_revalidate_applied_async())
 

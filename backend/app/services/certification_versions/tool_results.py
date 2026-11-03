@@ -3,6 +3,8 @@
 These validate response shape, not learner competence. A bad write response is
 uncertain: inspect existing state rather than invoking the operation again.
 """
+from typing import ParamSpec, Self
+from collections.abc import Awaitable, Callable
 from functools import wraps
 import logging
 from typing import Annotated, Literal
@@ -27,7 +29,7 @@ class Result(BaseModel):
     optional_update_available: bool | None = None
 
     @model_validator(mode='after')
-    def identity(self):
+    def identity(self) -> Self:
         if self.enrollment_id and not all((self.course_version, self.course_title, self.manifest_sha256)):
             raise ValueError('An enrolled result requires its complete course identity')
         if (self.maximum_stars is None) != (self.credit_basis is None):
@@ -35,7 +37,7 @@ class Result(BaseModel):
         if self.credit_basis == 'required_outcomes' and self.maximum_stars != 1:
             raise ValueError('Required-outcome credit has one completion threshold')
         if (self.maximum_stars is not None and 'stars' in type(self).model_fields
-                and self.stars > self.maximum_stars):
+                and getattr(self, 'stars') > self.maximum_stars):
             raise ValueError('Stars cannot exceed the pinned course scale')
         return self
 
@@ -56,7 +58,7 @@ class SavedAssessment(BaseModel):
     credit_awarded: Literal[False]
 
     @model_validator(mode='after')
-    def readable(self):
+    def readable(self) -> Self:
         if (self.status == 'unavailable') != (not self.outcomes):
             raise ValueError('Only an unreadable saved assessment omits its outcomes')
         return self
@@ -76,7 +78,7 @@ class ModuleRow(BaseModel):
     saved_assessment: SavedAssessment | None = None
 
     @model_validator(mode='after')
-    def reward_range(self):
+    def reward_range(self) -> Self:
         if self.max_xp is not None and self.max_xp < self.xp:
             raise ValueError('A module cannot award less than its base XP')
         return self
@@ -103,7 +105,7 @@ class ProgressResult(Result):
     progression_policy: ProgressionSummary | None = None
 
     @model_validator(mode='after')
-    def counts(self):
+    def counts(self) -> Self:
         ids = [row.module_id for row in self.modules]
         completed = sum(row.completed for row in self.modules)
         if len(set(ids)) != len(ids) or self.modules_total != len(ids) or self.modules_completed != completed:
@@ -157,7 +159,7 @@ class ModuleResult(Result):
     saved_assessment: SavedAssessment | None = None
 
     @model_validator(mode='after')
-    def criteria(self):
+    def criteria(self) -> Self:
         if not set(self.star_criteria) <= {'1', '2', '3'}:
             raise ValueError('Star criteria must name supported star counts')
         ids = [outcome.outcome_id for outcome in self.required_outcomes]
@@ -183,7 +185,7 @@ class KnowledgeCheck(BaseModel):
     options: list[KnowledgeOption] = Field(min_length=2)
 
     @model_validator(mode='after')
-    def one_answer(self):
+    def one_answer(self) -> Self:
         if sum(option.correct for option in self.options) != 1:
             raise ValueError('Practice requires exactly one correct answer')
         return self
@@ -210,7 +212,7 @@ class LessonResult(Result):
     diagram: str | None = None
 
     @model_validator(mode='after')
-    def position(self):
+    def position(self) -> Self:
         if self.lesson_number > self.lesson_count or self.is_last != (self.lesson_number == self.lesson_count):
             raise ValueError('Lesson position must agree with the course sequence')
         return self
@@ -235,7 +237,7 @@ class CheckResult(Result):
     expected_attempts: Count | None = None
 
     @model_validator(mode='after')
-    def required_summary(self):
+    def required_summary(self) -> Self:
         if any(check.role is not None for check in self.checks):
             required = [check for check in self.checks if check.role == 'required']
             if (any(check.role is None for check in self.checks) or not required
@@ -261,7 +263,7 @@ class CompletionResult(Result):
     star_bonus_xp: Count | None = None
 
     @model_validator(mode='after')
-    def reward(self):
+    def reward(self) -> Self:
         if self.xp_earned > self.total_xp:
             raise ValueError('Awarded XP cannot exceed the resulting total')
         if self.credit_origin == 'transferred':
@@ -286,17 +288,20 @@ class ReflectionResult(Result):
     message: Text
 
     @model_validator(mode='after')
-    def saved(self):
+    def saved(self) -> Self:
         if self.stored is not True:
             raise ValueError('A saved-answer response must confirm storage')
         return self
 
 
-def certification_result(schema: type[Result]):
+P = ParamSpec('P')
+
+
+def certification_result(schema: type[Result]) -> Callable[[Callable[P, Awaitable[dict]]], Callable[P, Awaitable[dict]]]:
     """Keep the original payload and signature; never coerce or repeat work."""
-    def decorate(function):
+    def decorate(function: Callable[P, Awaitable[dict]]) -> Callable[P, Awaitable[dict]]:
         @wraps(function)
-        async def wrapped(*args, **kwargs):
+        async def wrapped(*args: P.args, **kwargs: P.kwargs) -> dict:
             try:
                 result = await function(*args, **kwargs)
                 if isinstance(result, dict) and isinstance(result.get('error'), str) and result['error'].strip():

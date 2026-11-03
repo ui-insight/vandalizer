@@ -100,7 +100,7 @@ async def analyze_one_document(
             )
             result = await agent.run(prompt)
 
-        analysis = result.output if hasattr(result, "output") else str(result.data)
+        analysis = result.output
         analysis = (analysis or "").strip()
         capped = len(analysis) > SUBAGENT_RESULT_MAX_CHARS
         return {

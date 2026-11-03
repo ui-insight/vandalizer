@@ -15,10 +15,10 @@ the success half, under the same rules:
 * Never raises: a run that completed must not fail because the bell entry
   could not be written.
 """
+from pymongo.database import Database
 
 import datetime
 import logging
-from typing import Any
 
 from app.services.notification_service import create_notification_sync
 
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 MIN_SECONDS = 30
 
 
-def _elapsed_seconds(started_at: Any) -> float | None:
+def _elapsed_seconds(started_at: object) -> float | None:
     if not isinstance(started_at, datetime.datetime):
         return None
     if started_at.tzinfo is None:
@@ -35,13 +35,13 @@ def _elapsed_seconds(started_at: Any) -> float | None:
     return (datetime.datetime.now(datetime.timezone.utc) - started_at).total_seconds()
 
 
-def _long_enough(started_at: Any) -> bool:
+def _long_enough(started_at: object) -> bool:
     elapsed = _elapsed_seconds(started_at)
     return elapsed is not None and elapsed >= MIN_SECONDS
 
 
 def notify_workflow_completed(
-    db,
+    db: Database[dict],
     *,
     user_id: str | None,
     workflow_doc: dict | None,
@@ -82,7 +82,7 @@ def notify_workflow_completed(
 
 
 def notify_extraction_completed(
-    db,
+    db: Database[dict],
     *,
     user_id: str | None,
     activity: dict | None,

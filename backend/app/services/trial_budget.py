@@ -17,6 +17,8 @@ budget-exceeded signal itself always propagates.
 """
 
 from __future__ import annotations
+from app.config import Settings
+from app.models.user import User
 
 import datetime
 import logging
@@ -138,7 +140,7 @@ async def fleet_tokens_this_month() -> int:
     return int(rows[0]["total"]) if rows else 0
 
 
-async def refresh_fleet_pause(settings=None) -> dict:
+async def refresh_fleet_pause(settings: Settings | None=None) -> dict:
     """Recompute the fleet ceiling and set/clear the Redis pause flag.
 
     Called by the hourly trial sweep. The flag is what the hot path reads, so
@@ -228,7 +230,7 @@ async def tokens_used_async(user_id: str) -> int:
     return int(rows[0]["total"]) if rows else 0
 
 
-async def get_trial_usage(user) -> dict:
+async def get_trial_usage(user: User) -> dict:
     """Budget/usage snapshot for one trial user — the shape the meter, the
     lifecycle emails, and the trial-end screen all read.
 

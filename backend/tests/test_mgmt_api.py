@@ -550,3 +550,24 @@ class TestRunEndpoints:
             )
         assert resp.status_code == 403
         assert "issuer" in resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_system_config_redacts_current_secret_fields_without_mutating_storage():
+    from app.models.system_config import SystemConfig
+    from app.routers.mgmt import get_system_config
+
+    config = SystemConfig.model_construct(
+        ocr_api_key='encrypted-ocr-key', web_search_api_key='encrypted-search-key',
+        available_models=[{'name': 'local-model', 'api_key': 'encrypted-model-key'}],
+        oauth_providers=[{'name': 'login', 'client_secret': 'encrypted-oauth-key'}],
+    )
+    with patch.object(SystemConfig, 'get_config', new=AsyncMock(return_value=config)):
+        result = await get_system_config(_=MagicMock())
+    assert result['ocr_api_key'] == '***'
+    assert result['web_search_api_key'] == '***'
+    assert result['available_models'] == [{'name': 'local-model', 'api_key': '***'}]
+    assert result['oauth_providers'][0]['client_secret'] == '***'
+    assert config.ocr_api_key == 'encrypted-ocr-key'
+    assert config.available_models[0]['api_key'] == 'encrypted-model-key'
+    assert config.oauth_providers[0]['client_secret'] == 'encrypted-oauth-key'

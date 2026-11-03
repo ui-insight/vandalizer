@@ -541,6 +541,20 @@ mongorestore --uri="$MONGO_HOST" --db=vandalizer --gzip "$BACKUP_DIR/$TIMESTAMP/
 
 ### ChromaDB
 
+Chroma is an application-private datastore. Compose connects it only to the
+internal `chroma-private` network shared with the API and Celery; the frontend
+has no route to it. Production publishes no Chroma port. Development publishes
+only a loopback port. Helm's default NetworkPolicies restrict datastore ingress
+to backend pods and deny Chroma egress; the cluster CNI must enforce those
+policies. Do not expose Chroma as a tenant-facing service or rely on its legacy
+RBAC provider for application authorization.
+
+Run `python3 scripts/check_chroma_isolation.py --pull` to exercise the pinned
+server in disposable local containers. This checks backend access, denied
+frontend access, isolation from a separate network, and rejection of remote
+embedding configuration. It does not inspect a deployed cluster or waive the
+unpatched advisories recorded in [release readiness](docs/v5-release-readiness.md).
+
 ChromaDB runs as its own service and persists to the `chroma-data` volume at
 `/chroma/chroma` inside the `chromadb` container. It is not readable from a
 path on the host or in the `api` container, so archive it from that container:

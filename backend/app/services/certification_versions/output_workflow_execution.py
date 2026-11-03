@@ -1,4 +1,11 @@
 """Claim one approved internal run and retain its bounded task evidence."""
+from __future__ import annotations
+from .writes import WriteLease
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
 import asyncio
 from copy import deepcopy
 import datetime
@@ -31,7 +38,7 @@ class OutputExecutionRequest(ContractModel):
 
 
 class OutputWorkflowExecution(OutputWorkflowPreparation):
-    async def execute(self, operation, body, system_config_doc, *, actor_user_id):
+    async def execute(self, operation: CourseOperation, body: object, system_config_doc: dict, *, actor_user_id: str) -> dict | None:
         body = OutputExecutionRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Only the authenticated learner can dispatch this approved run')
@@ -63,12 +70,14 @@ class OutputWorkflowExecution(OutputWorkflowPreparation):
                 raise EnrollmentConflict('The saved scope choice changed before this run was claimed')
             return latest
         run = await self.get(operation.user_id, body.run_id)
+        if run is None:
+            raise EnrollmentConflict('The original execution receipt is no longer available')
         started_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
         stop = threading.Event()
         loop = asyncio.get_running_loop()
         checkpoints = OutputWorkflowCheckpoints()
 
-        def checkpoint(event, digest):
+        def checkpoint(event: dict, digest: str) -> dict:
             # The worker waits for durable acknowledgement. The event loop stays
             # available for writes and cancellation while providers run in threads.
             if stop.is_set():
@@ -85,6 +94,8 @@ class OutputWorkflowExecution(OutputWorkflowPreparation):
             output = await asyncio.wait_for(asyncio.to_thread(execute_approved_generation, run, case, config,
                 checkpoint=checkpoint, should_stop=stop.is_set), timeout=RUN_TIMEOUT_SECONDS)
             saved = await self.get(operation.user_id, body.run_id)
+            if saved is None:
+                raise EnrollmentConflict('The original execution receipt is no longer available')
             completed = [item for item in saved['stage_events'] if item['receipt']['kind'] == 'stage_completed']
             if completed != output['stage_receipts']:
                 raise EnrollmentConflict('The final output does not match every durable completed stage')
@@ -108,7 +119,7 @@ class OutputWorkflowExecution(OutputWorkflowPreparation):
         await self._finish_output(run, lease, result, started_at)
         return await self.get(operation.user_id, body.run_id)
 
-    async def _finish_output(self, run, lease, result, started_at):
+    async def _finish_output(self, run: dict, lease: WriteLease, result: dict, started_at: str) -> None:
         # Close the log atomically before reading the terminal prefix. A sibling
         # checkpoint may already be queued when the caller cancels; it must
         # either land before this fence or fail without changing the prefix.

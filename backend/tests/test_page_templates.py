@@ -254,3 +254,21 @@ def test_template_tool_schema_exposes_source_checked_values_and_table_rows():
     from pydantic_ai import Tool
     schema = Tool(create_html_artifact).tool_def.parameters_json_schema
     assert {'template_uuid', 'source_document_uuid', 'template_values', 'template_tables'} <= set(schema['properties'])
+
+
+def test_unconfirmed_template_save_can_retry_the_same_identity(db):
+    draft = page_templates.prepare(db, 'testuser', ORIGINAL)
+    body = SaveTemplate(draft_id=draft['draft_id'], name='Retryable template')
+    save = db.page_templates.find_one_and_update
+
+    def saved_but_unconfirmed(*args, **kwargs):
+        save(*args, **kwargs)
+        return None
+
+    with patch.object(db.page_templates, 'find_one_and_update', side_effect=saved_but_unconfirmed):
+        with pytest.raises(HTTPException) as exc:
+            page_templates.save(db, 'testuser', 'Owner', body)
+    assert exc.value.status_code == 503
+    recovered = page_templates.save(db, 'testuser', 'Owner', body)
+    assert recovered['name'] == body.name
+    assert len(db.page_templates.docs) == 1

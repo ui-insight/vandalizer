@@ -4,6 +4,8 @@ This runner never dispatches a model or writes credit. Installing it does not
 publish a course: a supported package must pin these bytes, verified outcomes
 and a single completion threshold with no legacy star enrichment.
 """
+from ..catalog import CoursePackage
+from ..outcomes import OutcomeContract
 from pathlib import Path
 import re
 
@@ -14,7 +16,7 @@ from ..outcomes import package_outcomes
 RUBRIC_ID = 'v5.0-competency-draft.1'
 
 
-def verify_package(package):
+def verify_package(package: CoursePackage) -> OutcomeContract:
     from ..progression_policy import package_progression_policy
     try:
         package_progression_policy(package)
@@ -30,7 +32,7 @@ def verify_package(package):
     return contract
 
 
-async def validate_module(user_id, module_id, *, assessment_selection=None):
+async def validate_module(user_id: str, module_id: str, *, assessment_selection: object=None) -> dict:
     from ..grading import pinned_package, pinned_progress
     from ..module_readiness import ModuleReadiness
     from ..review_delivery import SavedReviewUnavailable

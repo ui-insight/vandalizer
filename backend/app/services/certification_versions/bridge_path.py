@@ -1,9 +1,10 @@
 """An optional study path through the same pinned course and assessments."""
+from typing import Self
 from typing import Literal
 
 from pydantic import Field, model_validator
 
-from .catalog import CourseCatalogError
+from .catalog import CourseCatalogError, CoursePackage
 from .outcomes import ContractModel, package_outcomes
 from .progression_policy import package_progression_policy
 
@@ -31,13 +32,13 @@ class BridgePath(ContractModel):
     stages: tuple[BridgeStage, ...] = Field(min_length=1)
 
     @model_validator(mode='after')
-    def ordered_stages(self):
+    def ordered_stages(self) -> Self:
         if tuple(stage.id for stage in self.stages) != STAGE_ORDER or len(self.stages[-1].module_ids) != 1:
             raise ValueError('The bridge must cover scope, verification, recovery/delivery and end with one capstone module')
         return self
 
 
-def public_bridge_path(package):
+def public_bridge_path(package: CoursePackage) -> dict | None:
     if 'bridge-path.json' not in package.manifest.artifacts:
         return None
     path = BridgePath.model_validate_json(package.read('bridge-path.json'))

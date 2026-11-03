@@ -23,21 +23,23 @@ from app.services.certification_versions.review_delivery import SavedReviewUnava
 router = APIRouter()
 
 
-async def action(user, enrollment_id, *, payload=None, reference=None, kind='list'):
+async def action(user: User, enrollment_id: str, *, payload: object | None=None, reference: str | None=None, kind: str='list') -> dict:
     enabled = runtime.versioning_enabled()
     if payload is not None and not enabled:
         raise HTTPException(status_code=404, detail='Batch assessment is not available')
     try:
         if kind in ('assess', 'retry'):
+            if reference is None or not isinstance(payload, (AssessmentSubmission, AssessmentRetrySubmission)):
+                raise HTTPException(status_code=422, detail='A saved record and assessment request are required')
             service = BatchAssessment()
             method = service.request if kind == 'assess' else service.retry
             return await method(user.user_id, enrollment_id, reference, payload)
-        service = BatchDelivery()
+        delivery = BatchDelivery()
         if payload is not None:
-            return await service.save(user.user_id, enrollment_id, payload, action=kind)
+            return await delivery.save(user.user_id, enrollment_id, payload, action=kind)
         if reference is not None:
-            return await service.get(user.user_id, enrollment_id, reference, kind=kind, delivery_enabled=enabled)
-        return await service.list(user.user_id, enrollment_id, delivery_enabled=enabled)
+            return await delivery.get(user.user_id, enrollment_id, reference, kind=kind, delivery_enabled=enabled)
+        return await delivery.list(user.user_id, enrollment_id, delivery_enabled=enabled)
     except (BatchUnavailable, SavedReviewUnavailable) as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except (EnrollmentConflict, EvidenceAssemblyUnavailable) as exc:
@@ -46,74 +48,74 @@ async def action(user, enrollment_id, *, payload=None, reference=None, kind='lis
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
-@router.get('/modules/batch_processing/batch-work')
-async def list_batch_work(user: User = Depends(get_current_user), *, enrollment_id: str):
+@router.get('/modules/batch_processing/batch-work', response_model=None)
+async def list_batch_work(user: User = Depends(get_current_user), *, enrollment_id: str) -> dict:
     return await action(user, enrollment_id)
 
 
-@router.post('/modules/batch_processing/batch-captures')
-async def save_batch_capture(payload: BatchCaptureRequest, enrollment_id: str, user: User = Depends(get_current_user)):
+@router.post('/modules/batch_processing/batch-captures', response_model=None)
+async def save_batch_capture(payload: BatchCaptureRequest, enrollment_id: str, user: User = Depends(get_current_user)) -> dict:
     return await action(user, enrollment_id, payload=payload, kind='capture')
 
 
-@router.post('/modules/batch_processing/batch-runs')
-async def save_batch_prepare(payload: BatchPlanRequest, enrollment_id: str, user: User = Depends(get_current_user)):
+@router.post('/modules/batch_processing/batch-runs', response_model=None)
+async def save_batch_prepare(payload: BatchPlanRequest, enrollment_id: str, user: User = Depends(get_current_user)) -> dict:
     return await action(user, enrollment_id, payload=payload, kind='prepare')
 
 
-@router.post('/batch-runs/scope')
-async def save_batch_scope(payload: BatchScopeRequest, enrollment_id: str, user: User = Depends(get_current_user)):
+@router.post('/batch-runs/scope', response_model=None)
+async def save_batch_scope(payload: BatchScopeRequest, enrollment_id: str, user: User = Depends(get_current_user)) -> dict:
     return await action(user, enrollment_id, payload=payload, kind='scope')
 
 
-@router.post('/batch-runs/execute')
-async def save_batch_execute(payload: BatchExecutionRequest, enrollment_id: str, user: User = Depends(get_current_user)):
+@router.post('/batch-runs/execute', response_model=None)
+async def save_batch_execute(payload: BatchExecutionRequest, enrollment_id: str, user: User = Depends(get_current_user)) -> dict:
     return await action(user, enrollment_id, payload=payload, kind='execute')
 
 
-@router.post('/batch-runs/finalize')
-async def save_batch_finalize(payload: BatchFinalizationRequest, enrollment_id: str, user: User = Depends(get_current_user)):
+@router.post('/batch-runs/finalize', response_model=None)
+async def save_batch_finalize(payload: BatchFinalizationRequest, enrollment_id: str, user: User = Depends(get_current_user)) -> dict:
     return await action(user, enrollment_id, payload=payload, kind='finalize')
 
 
-@router.post('/modules/batch_processing/batch-reviews')
-async def save_batch_review(payload: BatchReviewRequest, enrollment_id: str, user: User = Depends(get_current_user)):
+@router.post('/modules/batch_processing/batch-reviews', response_model=None)
+async def save_batch_review(payload: BatchReviewRequest, enrollment_id: str, user: User = Depends(get_current_user)) -> dict:
     return await action(user, enrollment_id, payload=payload, kind='review')
 
 
-@router.get('/batch-captures/{reference}')
-async def read_batch_capture(reference: str, enrollment_id: str, user: User = Depends(get_current_user)):
+@router.get('/batch-captures/{reference}', response_model=None)
+async def read_batch_capture(reference: str, enrollment_id: str, user: User = Depends(get_current_user)) -> dict:
     return await action(user, enrollment_id, reference=reference, kind='capture')
 
 
-@router.get('/batch-runs/{reference}')
-async def read_batch_run(reference: str, enrollment_id: str, user: User = Depends(get_current_user)):
+@router.get('/batch-runs/{reference}', response_model=None)
+async def read_batch_run(reference: str, enrollment_id: str, user: User = Depends(get_current_user)) -> dict:
     return await action(user, enrollment_id, reference=reference, kind='run')
 
 
-@router.get('/batch-scope-decisions/{reference}')
-async def read_batch_scope(reference: str, enrollment_id: str, user: User = Depends(get_current_user)):
+@router.get('/batch-scope-decisions/{reference}', response_model=None)
+async def read_batch_scope(reference: str, enrollment_id: str, user: User = Depends(get_current_user)) -> dict:
     return await action(user, enrollment_id, reference=reference, kind='scope')
 
 
-@router.get('/batch-reviews/{reference}')
-async def read_batch_review(reference: str, enrollment_id: str, user: User = Depends(get_current_user)):
+@router.get('/batch-reviews/{reference}', response_model=None)
+async def read_batch_review(reference: str, enrollment_id: str, user: User = Depends(get_current_user)) -> dict:
     return await action(user, enrollment_id, reference=reference, kind='review')
 
 
-@router.post('/batch-reviews/{reference}/automatic-reviews')
-async def assess_batch_review(reference: str, payload: AssessmentSubmission, enrollment_id: str, user: User = Depends(get_current_user)):
+@router.post('/batch-reviews/{reference}/automatic-reviews', response_model=None)
+async def assess_batch_review(reference: str, payload: AssessmentSubmission, enrollment_id: str, user: User = Depends(get_current_user)) -> dict:
     return await action(user, enrollment_id, payload=payload, reference=reference, kind='assess')
 
 
-@router.post('/batch-automatic-reviews/{reference}/retry')
-async def retry_batch_review(reference: str, payload: AssessmentRetrySubmission, enrollment_id: str, user: User = Depends(get_current_user)):
+@router.post('/batch-automatic-reviews/{reference}/retry', response_model=None)
+async def retry_batch_review(reference: str, payload: AssessmentRetrySubmission, enrollment_id: str, user: User = Depends(get_current_user)) -> dict:
     return await action(user, enrollment_id, payload=payload, reference=reference, kind='retry')
 
 
-@router.get('/batch-sources/{origin}/{reference}/{source_id}')
+@router.get('/batch-sources/{origin}/{reference}/{source_id}', response_model=None)
 async def read_saved_batch_source(origin: Literal['capture', 'run', 'review'], reference: str,
-        source_id: Literal['proposal_1', 'proposal_2', 'proposal_3'], enrollment_id: str, user: User = Depends(get_current_user)):
+        source_id: Literal['proposal_1', 'proposal_2', 'proposal_3'], enrollment_id: str, user: User = Depends(get_current_user)) -> Response:
     try:
         data, filename = await BatchDelivery().download(user.user_id, enrollment_id, reference,
             origin=origin, source_id=source_id)

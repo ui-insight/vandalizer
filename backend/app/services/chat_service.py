@@ -1,4 +1,18 @@
 """Chat service  - streaming chat with full document context."""
+from __future__ import annotations
+from typing import TYPE_CHECKING, Protocol, TypeVar
+from collections.abc import AsyncIterator
+from pydantic_ai.messages import ModelResponseStreamEvent
+from pydantic_ai.run import AgentRunResult
+from pydantic_ai.usage import RunUsage
+
+if TYPE_CHECKING:
+    from app.config import Settings
+    from app.schemas.skills import SkillSnapshot
+    from app.services.chat_deps import AgenticChatDeps
+    from app.services.context_budget import CompactedContext
+    from app.services.metering import MeterScope
+    from app.services.onboarding_service import OnboardingContext
 
 import asyncio
 import datetime
@@ -93,6 +107,14 @@ from app.services.llm_service import (
 )
 
 logger = logging.getLogger(__name__)
+DocumentT = TypeVar('DocumentT')
+
+
+class ChatResponseStream(Protocol):
+    def __aiter__(self) -> AsyncIterator[ModelResponseStreamEvent]: ...
+
+    @property
+    def response(self) -> ModelResponse: ...
 
 
 _THINK_OPEN_RE = re.compile(r"<think(?:ing)?>")
@@ -248,7 +270,7 @@ def _title_variants(title: str) -> list[str]:
     return [v for v in dict.fromkeys([name, stem]) if len(v) >= 4]
 
 
-def _cited_document(text: str, ref: tuple[int, int], named: list[tuple[list[str], object]]):
+def _cited_document(text: str, ref: tuple[int, int], named: list[tuple[list[str], DocumentT]]) -> DocumentT | None:
     """The attached document a page reference names, or None.
 
     Looks inside the brackets around the reference — "(sponsor-notice.pdf,
@@ -293,7 +315,8 @@ def _cited_document(text: str, ref: tuple[int, int], named: list[tuple[list[str]
         semi = right.find(";")
         right = right[:semi] if semi >= 0 else right
     left_n, right_n = left.translate(_DASHES).lower(), right.translate(_DASHES).lower()
-    best, best_distance = None, None
+    best: DocumentT | None = None
+    best_distance: int | None = None
     for variants, doc in named:
         for v in variants:
             i = left_n.rfind(v)
@@ -609,7 +632,9 @@ def _check_response_size(response: ModelResponse, *, preparing_page: bool = Fals
     )
 
 
-def _size_failure_message(exc: BaseException, preparing_page: bool, seen=None) -> str | None:
+def _size_failure_message(
+    exc: BaseException, preparing_page: bool, seen: set[int] | None = None,
+) -> str | None:
     """SDK/tool tasks may wrap size failures in exception groups or causes.
 
     Only confirmed size failures qualify; a large request alone does not turn
@@ -715,7 +740,7 @@ def _classify_stream_error(exc: BaseException, *, preparing_page: bool = False) 
     )
 
 
-def _activity_chunk(phase: str, content: str = "", **fields) -> str:
+def _activity_chunk(phase: str, content: str = "", **fields: object) -> str:
     """Transient progress only: never store this as assistant text or reasoning."""
     return json.dumps({"kind": "activity", "content": "", "activity": {"phase": phase, "content": content, **fields}}) + "\n"
 
@@ -728,10 +753,11 @@ class _ToolPreparationProgress:
     One instance belongs to one model response, where part indices are unique.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.names: dict[int, str] = {}
 
-    def feed(self, event) -> str | None:
+    def feed(self, event: ModelResponseStreamEvent) -> str | None:
+        call_id: str | None
         if isinstance(event, PartStartEvent) and isinstance(event.part, ToolCallPart):
             name = event.part.tool_name
             call_id = event.part.tool_call_id
@@ -746,7 +772,7 @@ class _ToolPreparationProgress:
         return _activity_chunk("tool_preparing", tool_name=name, tool_call_id=call_id)
 
 
-def _extract_event_content(event) -> tuple[str | None, bool]:
+def _extract_event_content(event: ModelResponseStreamEvent) -> tuple[str | None, bool]:
     """Extract content from a pydantic-ai stream event.
 
     Returns (content, is_api_thinking).  content is None for unrecognised events.
@@ -811,7 +837,7 @@ _CACHE_READ_BASELINE: dict[str, int] = {}
 _CACHE_BASELINE_MAX = 1024
 
 
-def _note_cache_usage(conversation_uuid: str, usage, model_name: str) -> tuple[int, int]:
+def _note_cache_usage(conversation_uuid: str, usage: RunUsage, model_name: str) -> tuple[int, int]:
     """Record per-turn cache token usage; warn on an unexpected cache break.
 
     Returns ``(cache_read_tokens, cache_write_tokens)`` run totals for the
@@ -985,7 +1011,7 @@ async def _drain_queued_messages(conversation_uuid: str) -> list[str]:
     ]
 
 
-def _final_request_context_tokens(result) -> int:
+def _final_request_context_tokens(result: AgentRunResult[str] | None) -> int:
     """Context size of the run's FINAL model request, provider-reported.
 
     input + cache read/write + output of the last response — the output
@@ -996,6 +1022,8 @@ def _final_request_context_tokens(result) -> int:
     which would overcount by ~N×. Returns 0 when the provider reported
     nothing (caller falls back to token counting).
     """
+    if result is None:
+        return 0
     try:
         messages = result.new_messages()
     except Exception:
@@ -1025,9 +1053,9 @@ def _brand_org_json_chunk(chunk: str, org: str | None) -> str:
 
 
 async def _run_scripted_demo(
-    onboarding_context,
+    onboarding_context: OnboardingContext,
     conversation: ChatConversation,
-    user,
+    user: User,
     user_id: str,
     activity_id: Optional[str],
     sys_config_doc: dict,
@@ -1053,18 +1081,18 @@ async def _run_scripted_demo(
     all_tool_results: list[dict] = []
     demo_segments: list[dict] = []
 
-    def _text(content: str):
+    def _text(content: str) -> str:
         full_text_parts.append(content)
         demo_segments.append({"kind": "text", "content": content})
         return json.dumps({"kind": "text", "content": content}) + "\n"
 
-    def _tool_call(name: str, call_id: str, args: dict):
+    def _tool_call(name: str, call_id: str, args: dict) -> str:
         data = {"tool_name": name, "tool_call_id": call_id, "args": args}
         all_tool_calls.append(data)
         demo_segments.append({"kind": "tool_call", "call": data})
         return json.dumps({"kind": "tool_call", **data}) + "\n"
 
-    def _tool_result(name: str, call_id: str, content, quality=None):
+    def _tool_result(name: str, call_id: str, content: object, quality: dict | None=None) -> str:
         data = {"tool_name": name, "tool_call_id": call_id, "content": content, "quality": quality}
         all_tool_results.append(data)
         demo_segments.append({"kind": "tool_result", "result": data})
@@ -1150,7 +1178,7 @@ async def _run_scripted_demo(
                 "text_markers": (doc.text_markers if doc else None) or [],
             }]
 
-            def _extract():
+            def _extract() -> list[dict]:
                 engine = ExtractionEngine(system_config_doc=sys_config_doc, domain=ss.domain if ss else None)
                 results = engine.extract(
                     extract_keys=keys,
@@ -1533,7 +1561,7 @@ def _margin_for(
 
 
 def _suggest_model_for_overflow(
-    compacted,
+    compacted: CompactedContext,
     model_name: str,
     model_config: Optional[dict],
     sys_config_doc: dict,
@@ -1583,7 +1611,7 @@ async def chat_stream(
     conversation_uuid: str,
     user_id: str,
     activity_id: Optional[str] = None,
-    settings=None,
+    settings: Settings | None=None,
     model_override: Optional[str] = None,
     kb_uuid: Optional[str] = None,
     # Several knowledge bases attached to one turn, as [(uuid, title)]. Takes
@@ -1595,8 +1623,8 @@ async def chat_stream(
     run_demo: bool = False,
     user: Optional[User] = None,
     team_access: Optional[TeamAccessContext] = None,
-    onboarding_context=None,
-    active_skill=None,
+    onboarding_context: OnboardingContext | None=None,
+    active_skill: SkillSnapshot | None=None,
     retry: bool = False,
     client_timezone: str | None = None,
 ) -> AsyncGenerator[str, None]:
@@ -1629,6 +1657,9 @@ async def chat_stream(
     # Bypasses the LLM agent entirely so the demo is 100% reliable.
     # ---------------------------------------------------------------------------
     if run_demo and onboarding_context and onboarding_context.extraction_set_uuid:
+        if user is None:
+            yield json.dumps({'kind': 'error', 'content': 'Sign in before starting the guided demo.'}) + '\n'
+            return
         _demo_org = (sys_config_doc or {}).get("org_name") or ""
         async for chunk in _run_scripted_demo(
             onboarding_context=onboarding_context,
@@ -2513,7 +2544,7 @@ async def chat_stream(
                 default=0,
             ),
         )
-        agent = create_agentic_chat_agent(
+        agent: Agent[AgenticChatDeps, str] | Agent[None, str] = create_agentic_chat_agent(
             model_name, system_config_doc=sys_config_doc,
         )
     else:
@@ -2622,6 +2653,7 @@ async def chat_stream(
                     yield _activity_chunk("model")
                     tool_preparation = _ToolPreparationProgress()
                     preparing_page = page_requested
+                    stream: ChatResponseStream
                     async with node.stream(agent_run.ctx) as stream:
                         try:
                             async for event in stream:
@@ -2633,8 +2665,8 @@ async def chat_stream(
                                 page_requested = page_requested or preparing_page
                                 if preparation:
                                     yield preparation
-                                content, is_api_thinking = _extract_event_content(event)
-                                if content is None:
+                                event_content, is_api_thinking = _extract_event_content(event)
+                                if event_content is None:
                                     continue
 
                                 if is_api_thinking:
@@ -2667,37 +2699,37 @@ async def chat_stream(
                 elif Agent.is_call_tools_node(node):
                     # Stream tool call / result events to the frontend
                     async with node.stream(agent_run.ctx) as tool_stream:
-                        async for event in tool_stream:
-                            if isinstance(event, FunctionToolCallEvent):
+                        async for tool_event in tool_stream:
+                            if isinstance(tool_event, FunctionToolCallEvent):
                                 try:
-                                    args = event.part.args_as_dict()
+                                    args = tool_event.part.args_as_dict()
                                 except Exception:
                                     args = {}
                                 call_data = {
-                                    "tool_name": event.part.tool_name,
-                                    "tool_call_id": event.part.tool_call_id,
+                                    "tool_name": tool_event.part.tool_name,
+                                    "tool_call_id": tool_event.part.tool_call_id,
                                     "args": args,
                                 }
                                 streamed_tool_calls.append(call_data)
                                 streamed_segments.append({"kind": "tool_call", "call": call_data})
                                 yield json.dumps({"kind": "tool_call", **call_data}) + "\n"
-                            elif isinstance(event, FunctionToolResultEvent):
+                            elif isinstance(tool_event, FunctionToolResultEvent):
                                 # Extract quality sidecar from tool result.
                                 # Tools embed a "quality" key in their return dict;
                                 # we strip it here so it goes to the frontend but
                                 # NOT back into the LLM context.
                                 quality = None
-                                result_content = event.result.content
+                                result_content = tool_event.result.content
                                 if isinstance(result_content, dict) and "quality" in result_content:
                                     quality = result_content.pop("quality")
                                 # Also check the deps annotations dict (future-proof)
-                                if quality is None and deps and event.tool_call_id in deps.quality_annotations:
-                                    quality = deps.quality_annotations.pop(event.tool_call_id)
+                                if quality is None and deps and tool_event.tool_call_id in deps.quality_annotations:
+                                    quality = deps.quality_annotations.pop(tool_event.tool_call_id)
                                 if not isinstance(result_content, (str, dict, list)):
                                     result_content = str(result_content)
                                 result_data = {
-                                    "tool_name": event.result.tool_name,
-                                    "tool_call_id": event.result.tool_call_id,
+                                    "tool_name": tool_event.result.tool_name,
+                                    "tool_call_id": tool_event.result.tool_call_id,
                                     "content": result_content,
                                     "quality": quality,
                                 }
@@ -2709,7 +2741,7 @@ async def chat_stream(
                                 # successful update_plan refreshes the pinned
                                 # checklist in the UI.
                                 if (
-                                    event.result.tool_name == "update_plan"
+                                    tool_event.result.tool_name == "update_plan"
                                     and deps is not None
                                     and deps.plan_state is not None
                                 ):
@@ -2727,8 +2759,8 @@ async def chat_stream(
                                 # 'sources' chunk so the frontend renders citation
                                 # chips for agent-driven KB lookups, same as the
                                 # classic pre-agent KB path.
-                                if deps and event.tool_call_id in deps.citation_annotations:
-                                    tool_citations = deps.citation_annotations.pop(event.tool_call_id)
+                                if deps and tool_event.tool_call_id in deps.citation_annotations:
+                                    tool_citations = deps.citation_annotations.pop(tool_event.tool_call_id)
                                     streamed_citations.extend(tool_citations)
                                     yield json.dumps({
                                         "kind": "sources",
@@ -3043,7 +3075,7 @@ def _is_certification_tool(tool_name: str) -> bool:
     return "certification" in (tool_name or "")
 
 
-async def _mark_certification_turn(conversation, scope, tool_calls: list[dict]) -> None:
+async def _mark_certification_turn(conversation: ChatConversation, scope: MeterScope, tool_calls: list[dict]) -> None:
     """Meter a turn that ran a certification tool as certification, and mark its chat.
 
     Certification runs through ordinary chat turns: there is no mode on the
@@ -4265,7 +4297,7 @@ def _miscited_sources(
     turn or earlier.
     """
     kb_tool_texts = _kb_tool_source_texts(
-        [(r.get("tool_name"), r.get("content")) for r in tool_results]
+        [(name, r.get("content")) for r in tool_results if isinstance(name := r.get("tool_name"), str)]
         + _replayed_tool_results(history)
     )
     if not (kbs_attached or kb_tool_texts):
@@ -4650,9 +4682,9 @@ async def _build_workspace_inventory(
             "soft_deleted": {"$ne": True},
             "$or": [{"team_id": team_id}, {"user_id": user_id}],
         }
-        ss_filter = {"$or": [{"team_id": team_id}, {"user_id": user_id}]}
-        wf_filter = {"$or": [{"team_id": team_id}, {"user_id": user_id}]}
-        kb_filter = {"$or": [{"team_id": team_id}, {"user_id": user_id}]}
+        ss_filter: dict = {"$or": [{"team_id": team_id}, {"user_id": user_id}]}
+        wf_filter: dict = {"$or": [{"team_id": team_id}, {"user_id": user_id}]}
+        kb_filter: dict = {"$or": [{"team_id": team_id}, {"user_id": user_id}]}
     else:
         doc_filter = {"user_id": user_id, "soft_deleted": {"$ne": True}}
         ss_filter = {"user_id": user_id}
@@ -4665,33 +4697,32 @@ async def _build_workspace_inventory(
     ss_filter = {**ss_filter, "set_type": {"$in": ["extraction", None]}}
 
     # Parallel queries — lightweight counts + limited name lists
-    (
-        doc_count,
-        recent_docs,
-        search_sets,
-        workflows,
-        knowledge_bases,
-        recent_activity,
-        ss_count,
-        wf_count,
-    ) = await asyncio.gather(
-        SmartDocument.find(doc_filter).count(),
-        SmartDocument.find(doc_filter)
-        .sort("-created_at")
-        .limit(3)
-        .to_list(),
-        SearchSet.find(ss_filter).sort("-created_at").limit(5).to_list(),
-        Workflow.find(wf_filter).sort("-created_at").limit(5).to_list(),
-        KnowledgeBase.find(kb_filter).sort("-created_at").limit(5).to_list(),
-        ActivityEvent.find(
-            {"user_id": user_id, "status": "completed"}
-        )
-        .sort("-last_updated_at")
-        .limit(3)
-        .to_list(),
-        SearchSet.find(ss_filter).count(),
-        Workflow.find(wf_filter).count(),
+    doc_count_task = asyncio.create_task(SmartDocument.find(doc_filter).count())
+    recent_docs_task = asyncio.create_task(SmartDocument.find(doc_filter).sort('-created_at').limit(3).to_list())
+    search_sets_task = asyncio.create_task(SearchSet.find(ss_filter).sort('-created_at').limit(5).to_list())
+    workflows_task = asyncio.create_task(Workflow.find(wf_filter).sort('-created_at').limit(5).to_list())
+    knowledge_bases_task = asyncio.create_task(KnowledgeBase.find(kb_filter).sort('-created_at').limit(5).to_list())
+    recent_activity_task = asyncio.create_task(ActivityEvent.find({'user_id': user_id, 'status': 'completed'}).sort('-last_updated_at').limit(3).to_list())
+    ss_count_task = asyncio.create_task(SearchSet.find(ss_filter).count())
+    wf_count_task = asyncio.create_task(Workflow.find(wf_filter).count())
+    await asyncio.gather(
+        doc_count_task,
+        recent_docs_task,
+        search_sets_task,
+        workflows_task,
+        knowledge_bases_task,
+        recent_activity_task,
+        ss_count_task,
+        wf_count_task,
     )
+    doc_count = doc_count_task.result()
+    recent_docs = recent_docs_task.result()
+    search_sets = search_sets_task.result()
+    workflows = workflows_task.result()
+    knowledge_bases = knowledge_bases_task.result()
+    recent_activity = recent_activity_task.result()
+    ss_count = ss_count_task.result()
+    wf_count = wf_count_task.result()
 
     # Quick check: if the user has nothing, return empty
     total_items = (
@@ -4893,7 +4924,7 @@ async def _finalize(
     conversation: ChatConversation,
     assistant_message: str,
     documents: list[SmartDocument],
-    usage,
+    usage: RunUsage | None,
     activity_id: Optional[str],
     user_id: str,
     thinking: Optional[str] = None,
@@ -4949,8 +4980,8 @@ async def _finalize(
         ev = await ActivityEvent.get(activity_id)
         if ev:
             # Reload conversation to get updated message count
-            conversation = await ChatConversation.get(conversation.id)
-            ev.message_count = len(conversation.messages) if conversation else 0
+            saved_conversation = await ChatConversation.get(conversation.id)
+            ev.message_count = len(saved_conversation.messages) if saved_conversation else 0
             ev.status = ActivityStatus.COMPLETED.value
             if usage:
                 ev.tokens_input = usage.input_tokens or 0

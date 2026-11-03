@@ -1,7 +1,7 @@
 """Bounded, visible transcript input shared by all downloadable chat formats."""
 
 import re
-from typing import Literal
+from typing import Literal, Self
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -18,7 +18,7 @@ class ChatExportRequest(BaseModel):
     messages: list[ExportMessage] = Field(min_length=1, max_length=1000)
 
     @model_validator(mode="after")
-    def bounded_content(self):
+    def bounded_content(self) -> Self:
         texts = [text for m in self.messages for text in [m.content, m.evidence, *m.tools]]
         if sum(map(len, texts)) > 500_000:
             raise ValueError("Export is too large. Export fewer messages (maximum 500,000 characters).")

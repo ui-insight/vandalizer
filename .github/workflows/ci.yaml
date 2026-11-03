@@ -72,7 +72,7 @@ jobs:
           if-no-files-found: warn
 
   backend-typecheck:
-    name: Backend Mypy (advisory)
+    name: Backend Mypy
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -88,10 +88,7 @@ jobs:
       - name: Install backend dependencies
         run: make backend-install
 
-      # Advisory until the mypy error count reaches zero — flip continue-on-error
-      # to false once the codebase is fully typed.
       - name: Run mypy
-        continue-on-error: true
         run: make backend-typecheck
 
   backend-audit:
@@ -205,6 +202,9 @@ jobs:
 
       - name: Run Tier 4 (ChromaDB)
         run: make backend-test-integration-t4
+
+      - name: Verify Chroma API security and network isolation
+        run: python scripts/check_chroma_isolation.py --pull
 
   backend-test-t2:
     name: Backend Tier 2 (MongoDB)

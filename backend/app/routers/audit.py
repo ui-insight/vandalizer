@@ -1,4 +1,6 @@
 """Audit log query endpoints."""
+from fastapi.responses import StreamingResponse
+from app.models.web_search_usage import WebSearchUsage
 
 import datetime
 from typing import Optional
@@ -12,7 +14,7 @@ from app.services import audit_service
 router = APIRouter()
 
 
-@router.get("/")
+@router.get("/", response_model=None)
 async def query_audit_log(
     action: Optional[str] = None,
     actor_user_id: Optional[str] = None,
@@ -24,7 +26,7 @@ async def query_audit_log(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Query audit log. Admin or staff (analytics role)."""
     if not (user.is_admin or user.is_staff):
         raise HTTPException(status_code=403, detail="Admin access required")
@@ -78,7 +80,7 @@ async def query_audit_log(
     }
 
 
-@router.get("/export")
+@router.get("/export", response_model=None)
 async def export_audit_log(
     action: Optional[str] = None,
     actor_user_id: Optional[str] = None,
@@ -86,7 +88,7 @@ async def export_audit_log(
     start_time: Optional[str] = None,
     end_time: Optional[str] = None,
     user: User = Depends(get_current_user),
-):
+) -> StreamingResponse:
     """Export audit log as CSV. Admin or staff (analytics role).
 
     Pass ``actor_user_id`` to scope the export to a single user's trail (used by
@@ -176,7 +178,7 @@ def _web_search_filter(
     return query
 
 
-def _web_search_row(e) -> dict:
+def _web_search_row(e: WebSearchUsage) -> dict:
     return {
         "id": str(e.id),
         "timestamp": e.timestamp.isoformat() if e.timestamp else None,
@@ -192,7 +194,7 @@ def _web_search_row(e) -> dict:
     }
 
 
-@router.get("/web-searches")
+@router.get("/web-searches", response_model=None)
 async def query_web_searches(
     feature: Optional[str] = None,
     status: Optional[str] = None,
@@ -203,7 +205,7 @@ async def query_web_searches(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Web searches sent to the provider, newest first, with counts by
     feature and status over the same filter. Admin or staff (analytics role)."""
     from app.models.web_search_usage import WebSearchUsage
@@ -230,7 +232,7 @@ async def query_web_searches(
     }
 
 
-@router.get("/web-searches/export")
+@router.get("/web-searches/export", response_model=None)
 async def export_web_searches(
     feature: Optional[str] = None,
     status: Optional[str] = None,
@@ -239,7 +241,7 @@ async def export_web_searches(
     start_time: Optional[str] = None,
     end_time: Optional[str] = None,
     user: User = Depends(get_current_user),
-):
+) -> StreamingResponse:
     """Web searches as CSV (up to 10,000, newest first). Admin or staff."""
     import csv
     import io

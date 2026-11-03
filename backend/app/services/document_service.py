@@ -271,12 +271,12 @@ async def collect_folder_document_uuids(
         queue = [root.uuid]
         seen = {root.uuid}
         while queue:
-            current = queue.pop()
-            for child in children_by_parent.get(current, []):
-                if child not in seen:
-                    seen.add(child)
-                    folder_uuids.append(child)
-                    queue.append(child)
+            pending_folder_uuid = queue.pop()
+            for descendant_uuid in children_by_parent.get(pending_folder_uuid, []):
+                if descendant_uuid not in seen:
+                    seen.add(descendant_uuid)
+                    folder_uuids.append(descendant_uuid)
+                    queue.append(descendant_uuid)
 
     scope = (
         {"team_id": root.team_id}

@@ -3,6 +3,9 @@
 No enrollment initialization, decisions, transfers or activation occur here.
 Internal draft planning stays separate from this published-course boundary.
 """
+from app.models.certification import CertificationEnrollment
+from .catalog import CoursePackage
+from .outcomes import OutcomeContract
 from .enrollments import EnrollmentConflict, EnrollmentRepository
 from .outcomes import package_outcomes
 from .transition_preview import TransitionPreview
@@ -13,16 +16,16 @@ class UpgradeUnavailable(ValueError):
 
 
 class UpgradeComparison:
-    def __init__(self, repository=None):
+    def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         self.repository = repository or EnrollmentRepository()
 
-    async def source(self, user_id, enrollment_id):
+    async def source(self, user_id: str, enrollment_id: str) -> CertificationEnrollment:
         enrollment = await self.repository.current(user_id)
         if enrollment is None or enrollment.uuid != enrollment_id:
             raise EnrollmentConflict('The selected course changed; refresh your course before comparing versions')
         return enrollment
 
-    def target(self, source_version, target_version):
+    def target(self, source_version: str, target_version: str) -> tuple[CoursePackage, OutcomeContract]:
         catalog = self.repository.catalog
         registry = catalog.registry()
         if (target_version not in registry.get('optional_upgrade_offers', {}).get(source_version, [])
@@ -34,7 +37,7 @@ class UpgradeComparison:
             raise UpgradeUnavailable('This course comparison is not available')
         return package, contract
 
-    async def options(self, user_id, enrollment_id):
+    async def options(self, user_id: str, enrollment_id: str) -> dict:
         source = await self.source(user_id, enrollment_id)
         versions = self.repository.catalog.registry().get('optional_upgrade_offers', {}).get(source.course_version, [])
         offered = []
@@ -48,7 +51,7 @@ class UpgradeComparison:
         await self.source(user_id, enrollment_id)
         return {'enrollment_id': enrollment_id, 'policy': 'optional', 'can_activate': False, 'courses': offered}
 
-    async def inspect(self, user_id, enrollment_id, target_version):
+    async def inspect(self, user_id: str, enrollment_id: str, target_version: str) -> dict:
         source = await self.source(user_id, enrollment_id)
         target, _ = self.target(source.course_version, target_version)
         preview = await TransitionPreview(self.repository).inspect(user_id, enrollment_id, target_version)

@@ -1,4 +1,13 @@
 """Authored representative validation assignment, never observed test evidence."""
+from __future__ import annotations
+from collections.abc import Sequence
+from .outcomes import OutcomeContract
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.catalog import CoursePackage
+
+from typing import Self
 import hashlib
 from typing import Literal
 
@@ -40,7 +49,7 @@ class ValidationExpectation(ContractModel):
     anchors: tuple[SourceAnchor, ...] = Field(min_length=1, max_length=5)
 
     @model_validator(mode='after')
-    def absence_is_explicit(self):
+    def absence_is_explicit(self) -> Self:
         if ((self.expected_value is None) != (self.absence_policy == 'absent_when_role_not_explicitly_named')
                 or (self.expected_value is not None and not self.expected_value.strip())
                 or (self.expected_value is None and (self.source_id, self.field) != ('nih', 'Named Co-PI'))):
@@ -91,7 +100,7 @@ class ValidationCase(ContractModel):
     assessment_policy: Literal['automatic_structured_review_with_source_bound_checks_no_staff_queue_or_presence_credit']
 
     @model_validator(mode='after')
-    def coherent(self):
+    def coherent(self) -> Self:
         comparisons = ('person_name', 'usd_amount', 'person_name_or_explicit_absence')
         if tuple(field.title for field in self.fields) != FIELDS or tuple(field.comparison for field in self.fields) != comparisons:
             raise ValueError('The three distinct field meanings and comparisons must be preserved')
@@ -117,13 +126,15 @@ class ValidationCase(ContractModel):
         return self
 
     @property
-    def digest(self):
+    def digest(self) -> str:
         return encode(self.model_dump(mode='json'))[1]
 
-    def public_definition(self):
+    def public_definition(self) -> dict:
         return {**self.model_dump(mode='json', exclude={'expectations', 'review_guidance'}), 'case_sha256': self.digest}
 
-    def verify_contract(self, contract):
+    def verify_contract(self, contract: OutcomeContract | None) -> None:
+        if contract is None:
+            raise ValueError('The course outcome contract is unavailable')
         module = next((m for m in contract.modules if m.module_id == self.module_id), None)
         practical = [o for o in module.outcomes if o.method == 'structured_review'] if module else []
         if {o.id for o in practical} != set(EVIDENCE):
@@ -135,7 +146,7 @@ class ValidationCase(ContractModel):
                     or guidance[outcome.id].critical_failures != outcome.critical_failures):
                 raise ValueError('Validation guidance cannot weaken required evidence or passing conditions')
 
-    def verify_source(self, source_id, source_bytes, page_texts):
+    def verify_source(self, source_id: str, source_bytes: bytes, page_texts: Sequence[str]) -> None:
         source = next((s for s in self.sources if s.id == source_id), None)
         if source is None or hashlib.sha256(source_bytes).hexdigest() != source.sha256:
             raise ValueError('The assigned validation source changed')
@@ -155,7 +166,7 @@ class ValidationCase(ContractModel):
                 if anchor.page > len(page_texts) or ' '.join(anchor.quote.split()) not in ' '.join(page_texts[anchor.page - 1].split()):
                     raise ValueError('An agent-drafted expectation quotes text not on its source page')
 
-    def verify_exercise(self, exercise):
+    def verify_exercise(self, exercise: dict) -> None:
         if (exercise.get('documents') != [s.filename for s in self.sources]
                 or exercise.get('assessment_case_id') != self.id or exercise.get('validation_case_sha256') != self.digest
                 or exercise.get('assessment_method') != 'authenticated_representative_suite_repair_retest'
@@ -164,7 +175,7 @@ class ValidationCase(ContractModel):
             raise ValueError('The exercise must bind the full case without test-count credit or private answer keys')
 
 
-def load_validation_case(package):
+def load_validation_case(package: CoursePackage) -> ValidationCase:
     from .catalog import CourseCatalogError
     from .outcomes import package_outcomes
     path = 'validation-cases/validation_qa.json'

@@ -1,4 +1,10 @@
 """Collect owned process-design evidence; never manufacture executed work."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
 import hashlib
 from pathlib import Path
 
@@ -10,13 +16,13 @@ from .catalog import CourseCatalogError
 from .enrollments import EnrollmentConflict
 from .lab_execution import LabExecutionRepository
 from .lab_inputs import LabInputRepository
-from .outcomes import package_outcomes
+from .outcomes import require_package_outcomes
 from .practical_evidence import EvidenceAssemblyUnavailable
 from .process_case import load_process_case
 from .process_submissions import ProcessSubmissionRepository
 
 
-async def assemble_process(operation, submission_id, *, actor_user_id):
+async def assemble_process(operation: CourseOperation, submission_id: str, *, actor_user_id: str) -> dict:
     if actor_user_id != operation.user_id:
         raise EnrollmentConflict('Process assessment requires the authenticated learner')
     saved = await ProcessSubmissionRepository().get(actor_user_id, submission_id)
@@ -24,13 +30,13 @@ async def assemble_process(operation, submission_id, *, actor_user_id):
         raise EvidenceAssemblyUnavailable('Select your saved process design before requesting assessment')
     lease = LabExecutionRepository.check_operation(operation, saved)
     case = load_process_case(operation.package)
-    contract = package_outcomes(operation.package)
+    contract = require_package_outcomes(operation.package)
     if (saved['module_id'] != case.module_id or saved['case'] != case.public_definition()
             or saved['submission']['case_sha256'] != case.digest):
         raise CourseCatalogError('The saved process design does not match its original assigned case')
     evidence = []
 
-    def add(kind, identity, value):
+    def add(kind: str, identity: str, value: object) -> None:
         try:
             evidence.append(ReviewEvidence(id=identity, kind=kind, text=encode(value)[0]).model_dump(mode='json'))
         except ValidationError as exc:

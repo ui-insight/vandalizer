@@ -156,3 +156,22 @@ async def test_disconnect_during_save_finishes_the_version_and_records_its_recei
     receipt = finalized.await_args.kwargs['tool_results'][0]['content']
     assert previews.save(db, 'owner', 'chat', preview['_id']) == receipt
     assert len(db.html_artifacts.docs) == 1
+
+
+def test_unconfirmed_preview_upsert_reports_retryable_failure_and_reuses_identity(db, monkeypatch):
+    original = db.chat_page_previews.find_one_and_update
+
+    def lost_reply(*args, **kwargs):
+        original(*args, **kwargs)
+        return None
+
+    with monkeypatch.context() as patcher:
+        patcher.setattr(db.chat_page_previews, 'find_one_and_update', lost_reply)
+        with pytest.raises(HTTPException) as error:
+            proposal(db, '<p>Exact reviewed content</p>')
+    assert error.value.status_code == 503
+    assert len(db.chat_page_previews.docs) == 1
+    retried = proposal(db, '<p>Exact reviewed content</p>')
+    assert retried['_id'] == db.chat_page_previews.docs[0]['_id']
+    assert len(db.chat_page_previews.docs) == 1
+    assert not db.html_artifacts.docs

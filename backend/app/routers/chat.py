@@ -1,4 +1,5 @@
 """Chat API routes."""
+from collections.abc import AsyncGenerator
 
 import io
 import logging
@@ -69,14 +70,14 @@ async def _get_authorized_activity(activity_id: str, user: User) -> ActivityEven
     return activity
 
 
-@router.post("")
+@router.post("", response_model=None)
 @limiter.limit("30/minute")
 async def chat(
     request: Request,
     body: ChatRequest,
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-):
+) -> StreamingResponse:
     """Streaming chat endpoint. Returns newline-delimited JSON chunks."""
     user_id = user.user_id
     message = body.message
@@ -243,7 +244,7 @@ async def chat(
         onboarding_ctx = await provision_onboarding_sample(user)
 
     team_id = str(user.current_team) if user.current_team else None
-    if not activity_id or len(str(activity_id).strip()) < 10:
+    if activity is None:
         # New conversation
         conversation = ChatConversation(
             title=message.strip(),
@@ -330,7 +331,7 @@ async def chat(
             ChatRole.USER, message, source_documents=source_documents or None,
         )
 
-    async def generate():
+    async def generate() -> AsyncGenerator[str, None]:
         try:
             if page_preview is not None:
                 from app.services.chat_page_approval import stream_save
@@ -396,13 +397,13 @@ async def chat(
     )
 
 
-@router.post("/add-link")
+@router.post("/add-link", response_model=None)
 @limiter.limit("20/minute")
 async def add_link(
     request: Request,
     body: AddLinkRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Add a URL attachment to a chat conversation."""
     user_id = user.user_id
     activity: Optional[ActivityEvent] = None
@@ -433,7 +434,7 @@ async def add_link(
             ChatConversation.user_id == user_id,
         )
 
-    if not conversation or not activity:
+    if not conversation or not activity or activity.id is None:
         raise HTTPException(status_code=500, detail="Failed to create conversation")
 
     # Fetch URL content — uses trafilatura for main-content extraction and
@@ -470,6 +471,8 @@ async def add_link(
         url=body.link, title=title, content=content, user_id=user_id
     )
     await url_attachment.insert()
+    if url_attachment.id is None:
+        raise HTTPException(status_code=503, detail="The link attachment save could not be confirmed")
 
     conversation.url_attachments.append(url_attachment.id)
     conversation.updated_at = datetime.now()
@@ -490,14 +493,14 @@ async def add_link(
     }
 
 
-@router.post("/add-document")
+@router.post("/add-document", response_model=None)
 @limiter.limit("10/minute")
 async def add_document(
     request: Request,
     files: list[UploadFile] = File(...),
     current_activity_id: Optional[str] = Form(None),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Add file attachments to a chat conversation."""
     user_id = user.user_id
     activity: Optional[ActivityEvent] = None
@@ -528,7 +531,7 @@ async def add_document(
             ChatConversation.user_id == user_id,
         )
 
-    if not conversation or not activity:
+    if not conversation or not activity or activity.id is None:
         raise HTTPException(status_code=500, detail="Failed to create conversation")
 
     uploaded_attachments = []
@@ -587,6 +590,8 @@ async def add_document(
                 user_id=user_id,
             )
             await file_attachment.insert()
+            if file_attachment.id is None:
+                raise HTTPException(status_code=503, detail="The file attachment save could not be confirmed")
 
             conversation.file_attachments.append(file_attachment.id)
             await conversation.add_message(
@@ -623,6 +628,8 @@ async def add_document(
                 user_id=user_id,
             )
             await file_attachment.insert()
+            if file_attachment.id is None:
+                raise HTTPException(status_code=503, detail="The file attachment save could not be confirmed")
             conversation.file_attachments.append(file_attachment.id)
 
     conversation.updated_at = datetime.now()
@@ -637,11 +644,11 @@ async def add_document(
     }
 
 
-@router.delete("/remove-document/{attachment_id}")
+@router.delete("/remove-document/{attachment_id}", response_model=None)
 async def remove_document(
     attachment_id: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Remove a file attachment from chat."""
     from beanie import PydanticObjectId
 
@@ -667,11 +674,11 @@ async def remove_document(
     return {"success": True}
 
 
-@router.delete("/remove-link/{attachment_id}")
+@router.delete("/remove-link/{attachment_id}", response_model=None)
 async def remove_link(
     attachment_id: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Remove a URL attachment from chat."""
     from beanie import PydanticObjectId
 
@@ -696,15 +703,15 @@ async def remove_link(
     return {"success": True}
 
 
-@router.get("/conversations")
+@router.get("/conversations", response_model=None)
 async def list_conversations(
     limit: int = 50,
     user: User = Depends(get_current_user),
-):
+) -> list[dict]:
     """List the user's chat conversations, most recent first."""
     conversations = await ChatConversation.find(
         ChatConversation.user_id == user.user_id,
-    ).sort(-ChatConversation.updated_at).limit(limit).to_list()
+    ).sort('-updated_at').limit(limit).to_list()
 
     return [
         {
@@ -842,17 +849,17 @@ async def _restore_scope(
     }
 
 
-@router.get("/skills/{skill_uuid}")
-async def preview_skill(skill_uuid: str, user: User = Depends(get_current_user)):
+@router.get("/skills/{skill_uuid}", response_model=None)
+async def preview_skill(skill_uuid: str, user: User = Depends(get_current_user)) -> SkillSnapshot:
     return await skill_service.snapshot_skill(skill_uuid, user)
 
 
-@router.put("/history/{conversation_uuid}/skill")
+@router.put("/history/{conversation_uuid}/skill", response_model=None)
 async def select_conversation_skill(
     conversation_uuid: str,
     body: SelectSkillRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     conversation = await ChatConversation.find_one({"uuid": conversation_uuid, "user_id": user.user_id})
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
@@ -873,11 +880,11 @@ async def select_conversation_skill(
     return {"active_skill": selected}
 
 
-@router.get("/history/{conversation_uuid}")
+@router.get("/history/{conversation_uuid}", response_model=None)
 async def get_chat_history(
     conversation_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Get chat conversation history."""
     conversation = await ChatConversation.find_one(
         ChatConversation.uuid == conversation_uuid,
@@ -930,11 +937,11 @@ async def get_chat_history(
     }
 
 
-@router.delete("/history/{conversation_uuid}")
+@router.delete("/history/{conversation_uuid}", response_model=None)
 async def delete_chat_history(
     conversation_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Delete a chat conversation and all related records."""
     conversation = await ChatConversation.find_one(
         ChatConversation.uuid == conversation_uuid,
@@ -972,13 +979,13 @@ async def delete_chat_history(
     return {"success": True, "message": "Conversation deleted successfully"}
 
 
-@router.post("/export")
+@router.post("/export", response_model=None)
 @limiter.limit("10/minute")
 async def export_chat(
     request: Request,
     body: ChatExportRequest,
     user: User = Depends(get_current_user),
-):
+) -> StreamingResponse:
     """Download the supplied visible transcript; does not publish or fetch content."""
     try:
         data = await anyio.to_thread.run_sync(render_chat_export, body)
@@ -994,11 +1001,11 @@ async def export_chat(
     )
 
 
-@router.post("/download")
+@router.post("/download", response_model=None)
 async def download_chat(
     body: ChatDownloadRequest,
     user: User = Depends(get_current_user),
-):
+) -> StreamingResponse:
     """Export chat content as TXT or CSV."""
     fmt = body.format.lower()
     content = body.content
@@ -1025,11 +1032,11 @@ async def download_chat(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/queue")
+@router.post("/queue", response_model=None)
 async def queue_message(
     body: QueueMessageRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Queue a message typed while a turn is streaming (uplift plan Phase 10).
 
     chat_stream drains the queue atomically before each model request and
@@ -1065,11 +1072,11 @@ async def queue_message(
     return {"success": True}
 
 
-@router.post("/stop")
+@router.post("/stop", response_model=None)
 async def stop_turn(
     body: StopTurnRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Mark the streaming turn as stopped by the user.
 
     The client calls this just before it aborts the stream. The abort cancels
@@ -1086,11 +1093,11 @@ async def stop_turn(
     return {"success": True}
 
 
-@router.post("/truncate")
+@router.post("/truncate", response_model=None)
 async def truncate_context(
     body: TruncateContextRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Truncate conversation context — older messages remain visible but are excluded from LLM context."""
     conversation = await ChatConversation.find_one(
         ChatConversation.uuid == body.conversation_uuid,
@@ -1119,11 +1126,11 @@ async def truncate_context(
     }
 
 
-@router.post("/compact")
+@router.post("/compact", response_model=None)
 async def compact_context(
     body: CompactContextRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Compact conversation context — summarize history with an LLM, keeping old messages visible."""
     conversation = await ChatConversation.find_one(
         ChatConversation.uuid == body.conversation_uuid,
@@ -1167,11 +1174,11 @@ async def compact_context(
     }
 
 
-@router.post("/clear-context")
+@router.post("/clear-context", response_model=None)
 async def clear_context(
     body: ClearContextRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Clear conversation context — all existing messages become display-only."""
     conversation = await ChatConversation.find_one(
         ChatConversation.uuid == body.conversation_uuid,
@@ -1196,10 +1203,10 @@ async def clear_context(
     }
 
 
-@router.get("/memory")
+@router.get("/memory", response_model=None)
 async def get_user_memory(
     user: User = Depends(get_current_user),
-):
+) -> dict:
     """Return what the assistant remembers about this user's habits.
 
     Shows the same items that feed the "Your patterns" block in the
@@ -1211,11 +1218,11 @@ async def get_user_memory(
     return await user_memory_service.get_patterns(user.user_id, team_id)
 
 
-@router.put("/memory/paused")
+@router.put("/memory/paused", response_model=None)
 async def set_user_memory_paused(
     req: MemoryPauseRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Turn assistant memory off or on for the current team scope.
 
     While paused nothing new is recorded and the system prompt gets no
@@ -1228,10 +1235,10 @@ async def set_user_memory_paused(
     return {"paused": paused}
 
 
-@router.delete("/memory")
+@router.delete("/memory", response_model=None)
 async def clear_user_memory(
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Wipe the user's behavioral memory for the current team scope.
 
     Research admins can use this if the patterns the assistant references

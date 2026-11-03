@@ -3,6 +3,14 @@
 Uses the existing immutable lab-input collection and enrollment write boundary.
 This is not workflow configuration, execution authority, a grade or earned credit.
 """
+from __future__ import annotations
+from app.services.storage import StorageBackend
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
+from typing import Self
 import base64
 import binascii
 import datetime
@@ -32,7 +40,7 @@ class AdvancedCalculationSubmission(ContractModel):
     consent: Literal['save_source_bound_budget_calculations']
 
     @model_validator(mode='after')
-    def complete_checks(self):
+    def complete_checks(self) -> Self:
         if {record.id for record in self.records} != set(CALCULATIONS):
             raise ValueError('Include every distinct required calculation')
         if self.previous_snapshot_id == self.request_id:
@@ -42,7 +50,7 @@ class AdvancedCalculationSubmission(ContractModel):
 
 class AdvancedCalculationRepository(LabInputRepository):
     @staticmethod
-    def decode(raw):
+    def decode(raw: dict) -> dict:
         saved = LabInputRepository.decode(raw)
         try:
             body = AdvancedCalculationSubmission.model_validate(saved['request'])
@@ -66,7 +74,7 @@ class AdvancedCalculationRepository(LabInputRepository):
         except (KeyError, TypeError, ValueError, AttributeError, binascii.Error) as exc:
             raise CourseCatalogError('The saved calculation evidence failed integrity verification') from exc
 
-    async def submit(self, operation, body, *, actor_user_id, storage):
+    async def submit(self, operation: CourseOperation, body: object, *, actor_user_id: str, storage: StorageBackend) -> dict:
         body = AdvancedCalculationSubmission.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Calculation evidence requires the authenticated learner')
@@ -81,7 +89,7 @@ class AdvancedCalculationRepository(LabInputRepository):
         request = body.model_dump(mode='json')
         request_hash = encode(request)[1]
 
-        def replay(raw):
+        def replay(raw: dict) -> dict:
             saved = self.decode(raw)
             if any(saved[key] != value for key, value in identity.items()) or saved['request_sha256'] != request_hash:
                 raise EnrollmentConflict('This calculation request belongs to different work or another learner')

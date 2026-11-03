@@ -1,4 +1,11 @@
 """Save complete-suite plans for a separate authenticated approve/hold choice."""
+from __future__ import annotations
+from typing import Any
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
 from copy import deepcopy
 import datetime
 from typing import Literal
@@ -8,7 +15,7 @@ from pymongo.errors import DuplicateKeyError
 from .attempts import encode
 from .catalog import CourseCatalogError
 from .enrollments import EnrollmentConflict
-from .lab_execution import LabExecutionRepository
+from .lab_execution import LabExecutionRepository, LabExecutionJournal
 from .lab_inputs import LabInputRepository
 from .outcomes import ContractModel
 from .validation_case import ValidationCase, load_validation_case
@@ -33,9 +40,9 @@ class ValidationPlanRequest(ContractModel):
     consent: Literal['prepare_complete_validation_suite']
 
 
-class ValidationPreparation(LabExecutionRepository):
+class ValidationPreparation(LabExecutionJournal):
     @staticmethod
-    def decode(raw):
+    def decode(raw: dict) -> dict:
         saved = LabExecutionRepository.decode(raw)
         try:
             plan = saved['plan']
@@ -120,7 +127,7 @@ class ValidationPreparation(LabExecutionRepository):
         except (KeyError, TypeError, ValueError, AttributeError) as exc:
             raise CourseCatalogError('The saved representative validation plan failed integrity verification') from exc
 
-    async def prepare(self, operation, body, system_config_doc, *, actor_user_id):
+    async def prepare(self, operation: CourseOperation, body: object, system_config_doc: dict, *, actor_user_id: str) -> dict | None:
         body = ValidationPlanRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Only the authenticated learner can prepare this suite')
@@ -133,7 +140,7 @@ class ValidationPreparation(LabExecutionRepository):
         request = body.model_dump(mode='json')
         request_hash = encode(request)[1]
 
-        def replay(raw):
+        def replay(raw: dict) -> dict:
             saved = self.decode(raw)
             if any(saved['plan'][key] != value for key, value in identity.items()) or saved['plan']['request_sha256'] != request_hash:
                 raise EnrollmentConflict('This plan request already belongs to different saved work')
@@ -181,5 +188,5 @@ class ValidationPreparation(LabExecutionRepository):
         await LabInputRepository._check_lease(lease)
         return await self.get(actor_user_id, body.request_id)
 
-    async def execute(self, *args, **kwargs):
+    async def execute(self, *args: Any, **kwargs: Any) -> dict | None:
         raise EnrollmentConflict('Validation dispatch requires the separately approved bounded suite executor')

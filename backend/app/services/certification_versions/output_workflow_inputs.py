@@ -1,4 +1,11 @@
 """Freeze an owned workflow and assigned progress report; this grants no run authority."""
+from __future__ import annotations
+from app.services.storage import StorageBackend
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
 import base64
 import datetime
 import hashlib
@@ -14,7 +21,7 @@ from .enrollments import EnrollmentConflict
 from .lab_inputs import LabInputRepository, MAX_SNAPSHOT_BYTES
 from .output_case import OutputDeliveryCase, load_output_case
 from .outcomes import ContractModel
-from .workflow_design_inputs import WorkflowDesignInputRepository
+from .workflow_design_inputs import WorkflowDesignInputJournal
 from .writes import require_lease
 
 
@@ -25,11 +32,11 @@ class OutputCaptureRequest(ContractModel):
     consent: Literal['capture_output_workflow_inputs']
 
 
-class OutputWorkflowInputRepository(WorkflowDesignInputRepository):
+class OutputWorkflowInputRepository(WorkflowDesignInputJournal):
     """Reuse only the owned configuration reader; capture has its own contract."""
 
     @staticmethod
-    def decode(record):
+    def decode(record: dict) -> dict:
         saved = LabInputRepository.decode(record)
         try:
             body = OutputCaptureRequest.model_validate(saved['request'])
@@ -59,7 +66,7 @@ class OutputWorkflowInputRepository(WorkflowDesignInputRepository):
         except (KeyError, TypeError, ValueError, IndexError, AttributeError) as exc:
             raise CourseCatalogError('Saved output-workflow inputs failed integrity verification') from exc
 
-    async def capture(self, operation, body, *, actor_user_id, storage):
+    async def capture(self, operation: CourseOperation, body: object, *, actor_user_id: str, storage: StorageBackend) -> dict:
         body = OutputCaptureRequest.model_validate(body)
         progress, package = operation.progress, operation.package
         if (not operation.writable or actor_user_id != operation.user_id or progress.user_id != operation.user_id
@@ -77,7 +84,7 @@ class OutputWorkflowInputRepository(WorkflowDesignInputRepository):
                     'module_id': 'output_delivery', 'course_version': package.manifest.release_id,
                     'manifest_sha256': package.manifest_sha256, 'artifact_id': body.workflow_id}
 
-        def replay(raw):
+        def replay(raw: dict) -> dict:
             saved = self.decode(raw)
             if any(saved[key] != value for key, value in identity.items()) or saved['request_sha256'] != request_hash:
                 raise EnrollmentConflict('This capture reference belongs to another output-workflow request')

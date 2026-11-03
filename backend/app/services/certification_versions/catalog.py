@@ -3,6 +3,7 @@
 Lifecycle metadata is separate from content: retiring a release for new learners
 must not modify the package existing learners use. Drafts are never enrollable.
 """
+from typing import Any, Self
 from dataclasses import dataclass
 import hashlib
 import json
@@ -50,7 +51,7 @@ class PublicationRecord(BaseModel):
     actor: str = Field(default='', max_length=200)
 
     @model_validator(mode='after')
-    def validate_authorization(self):
+    def validate_authorization(self) -> Self:
         if self.mode == 'qa_staging':
             if (self.production_authorized or not self.impact_report_sha256 or len(self.reason.strip()) < 5
                     or not self.actor.strip() or not set(self.waived_findings) <= set(QA_STAGING_WAIVABLE)):
@@ -68,7 +69,7 @@ class ReleaseEntry(BaseModel):
     publication: PublicationRecord | None = None
 
     @model_validator(mode='after')
-    def validate_support(self):
+    def validate_support(self) -> Self:
         if self.state == 'published' and not self.supported_for_existing:
             raise ValueError('A course accepting new learners must support their enrollment')
         if self.state == 'draft' and self.publication is not None:
@@ -105,14 +106,14 @@ class CourseManifest(BaseModel):
     artifacts: dict[str, str]
 
     @model_validator(mode='after')
-    def validate_structure(self):
+    def validate_structure(self) -> Self:
         if not RELEASE_ID.fullmatch(self.release_id):
             raise ValueError('Invalid release identity')
         ids = [module.id for module in self.modules]
         lessons = [lesson for module in self.modules for lesson in module.lesson_ids]
         if not ids or len(ids) != len(set(ids)) or len(lessons) != len(set(lessons)) or any(not lesson.strip() for lesson in lessons):
             raise ValueError('Module and lesson identities must be nonempty and unique')
-        preceding = set()
+        preceding: set[str] = set()
         for module in self.modules:
             if not module.lesson_ids or not set(module.prerequisites) <= preceding:
                 raise ValueError(f'Invalid lessons or prerequisites for {module.id}')
@@ -149,7 +150,7 @@ class CoursePackage:
                 return data
         raise CourseCatalogError(f'Course asset is unavailable: {name}')
 
-    def json(self, name: str):
+    def json(self, name: str) -> Any:
         return json.loads(self.read(name))
 
     def summary(self) -> dict:
@@ -169,7 +170,7 @@ class CoursePackage:
 
 
 class CourseCatalog:
-    def __init__(self, root: Path | None = None):
+    def __init__(self, root: Path | None = None) -> None:
         self.root = Path(root) if root is not None else configured_root()
 
     def registry(self) -> dict:

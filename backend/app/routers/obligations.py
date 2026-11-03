@@ -1,4 +1,5 @@
 """The RA inbox: deadlines, required material and sponsor limits per project (#999)."""
+from app.models.project import Project
 
 from typing import Optional
 
@@ -13,7 +14,7 @@ from app.services import obligation_service, project_service
 router = APIRouter()
 
 
-async def _project_for(project_uuid: str, user: User, *, manage: bool):
+async def _project_for(project_uuid: str, user: User, *, manage: bool) -> Project:
     project = await project_service.get_authorized_project(project_uuid, user)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -22,7 +23,7 @@ async def _project_for(project_uuid: str, user: User, *, manage: bool):
     return project
 
 
-async def _obligation_for(obligation_uuid: str, user: User, *, manage: bool):
+async def _obligation_for(obligation_uuid: str, user: User, *, manage: bool) -> tuple[Obligation, Project]:
     ob = await Obligation.find_one(Obligation.uuid == obligation_uuid)
     if not ob:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -30,12 +31,12 @@ async def _obligation_for(obligation_uuid: str, user: User, *, manage: bool):
     return ob, project
 
 
-@router.get("")
+@router.get("", response_model=None)
 async def list_obligations(
     project_uuid: Optional[str] = None,
     include_dismissed: bool = False,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Home: open items across your projects. With ``project_uuid``: that project's items."""
     if project_uuid:
         project = await _project_for(project_uuid, user, manage=False)
@@ -57,8 +58,8 @@ class CreateObligationsRequest(BaseModel):
     items: list[dict]
 
 
-@router.post("")
-async def create_obligations(body: CreateObligationsRequest, user: User = Depends(get_current_user)):
+@router.post("", response_model=None)
+async def create_obligations(body: CreateObligationsRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
     """Add items by hand. Each is checked against the document it cites; rejected ones say why."""
     project = await _project_for(body.project_uuid, user, manage=True)
     checked = await obligation_service.propose(project, user, body.items)
@@ -82,8 +83,8 @@ class DoneRequest(BaseModel):
     done: bool
 
 
-@router.post("/{obligation_uuid}/done")
-async def mark_done(obligation_uuid: str, body: DoneRequest, user: User = Depends(get_current_user)):
+@router.post("/{obligation_uuid}/done", response_model=None)
+async def mark_done(obligation_uuid: str, body: DoneRequest, user: User = Depends(get_current_user)) -> dict:
     """Done (or reopened) for everyone on the project."""
     ob, project = await _obligation_for(obligation_uuid, user, manage=True)
     if ob.status == "superseded":
@@ -96,8 +97,8 @@ class DismissRequest(BaseModel):
     dismissed: bool
 
 
-@router.post("/{obligation_uuid}/dismiss")
-async def dismiss(obligation_uuid: str, body: DismissRequest, user: User = Depends(get_current_user)):
+@router.post("/{obligation_uuid}/dismiss", response_model=None)
+async def dismiss(obligation_uuid: str, body: DismissRequest, user: User = Depends(get_current_user)) -> dict:
     """Hide (or restore) an item on your own Home. Teammates still see it."""
     ob, project = await _obligation_for(obligation_uuid, user, manage=False)
     ob = await obligation_service.set_dismissed(ob, user, body.dismissed)
@@ -108,8 +109,8 @@ class InboxSettingsRequest(BaseModel):
     inbox_hidden: bool
 
 
-@router.put("/home-settings")
-async def update_home_settings(body: InboxSettingsRequest, user: User = Depends(get_current_user)):
+@router.put("/home-settings", response_model=None)
+async def update_home_settings(body: InboxSettingsRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
     """Turn the whole RA inbox on Home off or back on, for this account."""
     user.home_inbox_hidden = body.inbox_hidden
     await user.save()

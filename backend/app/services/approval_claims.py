@@ -13,6 +13,9 @@ the model to call the tool so the card appears.
 """
 
 from __future__ import annotations
+from collections.abc import Sequence
+from pydantic_ai.messages import ModelMessage, ToolReturnPart
+
 
 import re
 from typing import TYPE_CHECKING
@@ -216,11 +219,11 @@ def claims_validated(text: str, subjects: list[str] | None = None) -> bool:
     return False
 
 
-def _tools_called_this_turn(messages) -> set[str]:
+def _tools_called_this_turn(messages: Sequence[ModelMessage] | None) -> set[str]:
     """Names of the tools called since the user's latest message."""
     from pydantic_ai.messages import ModelRequest, ModelResponse, ToolCallPart, UserPromptPart
 
-    since_prompt = []
+    since_prompt: list[ModelMessage] = []
     for message in messages or []:
         if isinstance(message, ModelRequest) and any(isinstance(p, UserPromptPart) for p in message.parts):
             since_prompt = []
@@ -233,7 +236,7 @@ def _tools_called_this_turn(messages) -> set[str]:
     }
 
 
-def _validation_ran_this_turn(messages) -> bool:
+def _validation_ran_this_turn(messages: Sequence[ModelMessage] | None) -> bool:
     """Whether a validation tool was called since the user's latest message."""
     return "run_validation" in _tools_called_this_turn(messages)
 
@@ -462,11 +465,11 @@ _ASSESSMENT_TOOLS = {
 }
 
 
-def _this_turn_tool_returns(messages) -> list:
+def _this_turn_tool_returns(messages: Sequence[ModelMessage] | None) -> list:
     """Tool results since the user's latest message, in order."""
     from pydantic_ai.messages import ModelRequest, ToolReturnPart, UserPromptPart
 
-    returns: list = []
+    returns: list[ToolReturnPart] = []
     for message in messages or []:
         if isinstance(message, ModelRequest):
             if any(isinstance(p, UserPromptPart) for p in message.parts):
@@ -475,7 +478,7 @@ def _this_turn_tool_returns(messages) -> list:
     return returns
 
 
-def unread_lessons_this_turn(messages) -> tuple[str, list[int]] | None:
+def unread_lessons_this_turn(messages: Sequence[ModelMessage] | None) -> tuple[str, list[int]] | None:
     """The module and unread lesson numbers the latest course result reported."""
     for part in reversed(_this_turn_tool_returns(messages)):
         content = part.content
@@ -578,14 +581,16 @@ def restates_lesson(reply: str, lesson_text: str) -> bool:
     return restating >= _RESTATING_SENTENCES
 
 
-def lesson_shown_this_turn(messages) -> str | None:
+def lesson_shown_this_turn(messages: Sequence[ModelMessage] | None) -> str | None:
     """The text of the latest lesson card returned since the learner's message."""
     for part in reversed(_this_turn_tool_returns(messages)):
         if getattr(part, "tool_name", None) != "get_certification_lesson":
             continue
         content = part.content
         if isinstance(content, dict) and isinstance(content.get("content"), str):
-            return content["content"]
+            text = content["content"]
+            if isinstance(text, str):
+                return text
     return None
 
 

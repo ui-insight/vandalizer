@@ -77,7 +77,7 @@ class ValidationRun(Document):
             [("model", 1), ("created_at", -1)],
         ]
 
-    def __init__(self, **data):
+    def __init__(self, **data: object) -> None:
         super().__init__(**data)
         if not self.uuid:
             self.uuid = uuid4().hex

@@ -1,7 +1,8 @@
 """The same authored credential scope for course reading and future issuance."""
 from pydantic import BaseModel, ConfigDict, Field
 
-from .outcomes import package_outcomes
+from .catalog import CoursePackage
+from .outcomes import OutcomeContract, package_outcomes
 
 
 class CredentialScope(BaseModel):
@@ -13,14 +14,14 @@ class CredentialScope(BaseModel):
     exclusions: tuple[str, ...] = Field(min_length=1)
 
 
-def scope_from_contract(package, contract):
+def scope_from_contract(package: CoursePackage, contract: OutcomeContract) -> CredentialScope:
     return CredentialScope(contract_id=contract.contract_id,
         contract_sha256=package.manifest.artifacts['outcomes.json'],
         promise=contract.credential_promise, agent_assistance=contract.agent_assistance,
         exclusions=contract.exclusions)
 
 
-def public_credential_scope(package):
+def public_credential_scope(package: CoursePackage) -> dict | None:
     contract = package_outcomes(package)
     if contract is None:
         return None  # Never infer newer competencies from a legacy course.

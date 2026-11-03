@@ -1,4 +1,7 @@
 """Authenticated artifact drafts and explicitly published revision links."""
+from collections.abc import Callable
+from typing import Concatenate, ParamSpec, TypeVar
+from pymongo.database import Database
 import functools
 import re
 from datetime import timezone
@@ -24,13 +27,13 @@ from app.utils.content_disposition import content_disposition
 router = APIRouter()
 
 
-async def authorized_project(uuid, user):
+async def authorized_project(uuid: str | None, user: User) -> None:
     from app.services.project_service import get_authorized_project
     if uuid and not await get_authorized_project(uuid, user):
         raise HTTPException(404, "Project not found")
 
 
-@router.get("/browse")
+@router.get("/browse", response_model=None)
 async def browse_artifacts(
     search: str = Query(default="", max_length=200),
     sort: Literal["updated", "newest", "title"] = "updated",
@@ -38,7 +41,7 @@ async def browse_artifacts(
     page_size: int = Query(default=20, ge=1, le=50),
     project_uuid: str | None = None,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     await authorized_project(project_uuid, user)
     access = await access_control.get_team_access_context(user)
     conditions = [{"deleted_at": None}, {"$or": [
@@ -50,7 +53,7 @@ async def browse_artifacts(
         conditions.append({"$or": [{"project_uuid": project_uuid}, {"uuid": {"$in": [p.target_id for p in pins]}}]})
     order = {"updated": ("updated_at", -1), "newest": ("created_at", -1), "title": ("title", 1)}[sort]
 
-    def query(db):
+    def query(db: Database[dict]) -> dict:
         # Match access first and remove HTML before sorting. Early pages without
         # a denormalized title remain searchable without a data migration.
         pipeline = [{"$match": {"$and": conditions}}, *artifacts.visible_metadata_stages(user.user_id)]
@@ -66,11 +69,15 @@ async def browse_artifacts(
     return await run(query)
 
 
-async def run(fn, *args, **kwargs):
+P = ParamSpec('P')
+R = TypeVar('R')
+
+
+async def run(fn: Callable[Concatenate[Database[dict], P], R], *args: P.args, **kwargs: P.kwargs) -> R:
     return await anyio.to_thread.run_sync(functools.partial(fn, get_sync_db(), *args, **kwargs))
 
 
-async def authorized(uuid, user, manage=False):
+async def authorized(uuid: str, user: User, manage: bool=False) -> dict:
     doc = await run(artifacts.get, uuid)
     if doc["user_id"] == user.user_id:
         return doc
@@ -79,7 +86,7 @@ async def authorized(uuid, user, manage=False):
     raise HTTPException(404, "Page not found")
 
 
-def content_response(rev, download=False, *, version=1, view="content"):
+def content_response(rev: dict, download: bool=False, *, version: int=1, view: Literal["content", "full", "print", "embed"]="content") -> HTMLResponse:
     title = rev["title"].strip() or "Page"
     filename = title if title.lower().endswith(".html") else f"{title}.html"
     html, csp = render_page(rev, version, "content" if download else view)
@@ -93,23 +100,24 @@ def content_response(rev, download=False, *, version=1, view="content"):
     })
 
 
-@router.get("")
-async def list_artifacts(user: User = Depends(get_current_user)):
+@router.get("", response_model=None)
+async def list_artifacts(user: User = Depends(get_current_user)) -> list[dict]:
     result = await browse_artifacts(search="", sort="updated", page=1, page_size=100, project_uuid=None, user=user)
-    return result["items"]
+    items: list[dict] = result["items"]
+    return items
 
 
-@router.post("")
+@router.post("", response_model=None)
 @limiter.limit("20/minute")
-async def create_artifact(request: Request, body: CreateArtifactRequest, user: User = Depends(get_current_user)):
+async def create_artifact(request: Request, body: CreateArtifactRequest, user: User = Depends(get_current_user)) -> dict:
     await authorized_project(body.project_uuid, user)
     return artifacts.metadata(await run(artifacts.create, user.user_id, body.title, body.html, body.request_id,
                                         {"kind": "editor", "project_uuid": body.project_uuid}), True)
 
 
-@router.post("/from-chat")
+@router.post("/from-chat", response_model=None)
 @limiter.limit("20/minute")
-async def chat_artifact(request: Request, body: ChatArtifactRequest, user: User = Depends(get_current_user)):
+async def chat_artifact(request: Request, body: ChatArtifactRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
     await authorized_project(body.project_uuid, user)
     conversation = None
     if body.conversation_uuid:
@@ -124,9 +132,9 @@ async def chat_artifact(request: Request, body: ChatArtifactRequest, user: User 
     return {**artifacts.metadata(saved, True), 'reused': reused}
 
 
-@router.post("/from-workflow/{session_id}")
+@router.post("/from-workflow/{session_id}", response_model=None)
 @limiter.limit("20/minute")
-async def workflow_artifact(request: Request, session_id: str, step: str | None = None, user: User = Depends(get_current_user)):
+async def workflow_artifact(request: Request, session_id: str, step: str | None = None, user: User = Depends(get_current_user)) -> dict:
     from app.services.workflow_service import _get_authorized_workflow_result
     result = await _get_authorized_workflow_result(session_id, user)
     if not result:
@@ -134,7 +142,7 @@ async def workflow_artifact(request: Request, session_id: str, step: str | None 
     return artifacts.metadata(await run(artifacts.from_workflow, result.model_dump(), user.user_id, step, recreate_deleted=True), True)
 
 
-async def public_doc(token, settings):
+async def public_doc(token: str, settings: Settings) -> tuple[dict, dict]:
     if not settings.artifact_public_sharing_enabled:
         raise HTTPException(404, "Page not found")
     doc = await run(lambda db: db.html_artifacts.find_one({
@@ -149,8 +157,8 @@ async def public_doc(token, settings):
     return doc, artifacts.revision(doc, selected)
 
 
-@router.get("/public/{token}")
-async def get_public(token: str, response: Response, settings: Settings = Depends(get_settings)):
+@router.get("/public/{token}", response_model=None)
+async def get_public(token: str, response: Response, settings: Settings = Depends(get_settings)) -> dict[str, object]:
     doc, rev = await public_doc(token, settings)
     # Mongo may return naive UTC datetimes. Never use the page's updated_at:
     # it advances when an owner saves a private draft.
@@ -163,9 +171,9 @@ async def get_public(token: str, response: Response, settings: Settings = Depend
             "updated_at": updated_at}
 
 
-@router.get("/public/{token}/content")
+@router.get("/public/{token}/content", response_model=None)
 async def public_content(token: str, download: bool = False, revision: str | None = None,
-                         view: Literal["content", "full", "print", "embed"] = "content", settings: Settings = Depends(get_settings)):
+                         view: Literal["content", "full", "print", "embed"] = "content", settings: Settings = Depends(get_settings)) -> HTMLResponse:
     doc, rev = await public_doc(token, settings)
     # Keep a viewer's version/date label matched to the HTML even if the owner
     # publishes again between the metadata request and the iframe request.
@@ -175,50 +183,50 @@ async def public_content(token: str, download: bool = False, revision: str | Non
     return content_response(rev, download, version=version, view=view)
 
 
-@router.get("/{uuid}")
-async def get_artifact(uuid: str, user: User = Depends(get_current_user), settings: Settings = Depends(get_settings)):
+@router.get("/{uuid}", response_model=None)
+async def get_artifact(uuid: str, user: User = Depends(get_current_user), settings: Settings = Depends(get_settings)) -> dict[str, object]:
     doc = await authorized(uuid, user)
     return {**artifacts.metadata(doc, doc["user_id"] == user.user_id), "public_sharing_enabled": settings.artifact_public_sharing_enabled}
 
 
-@router.get("/{uuid}/revisions/{revision}/content")
+@router.get("/{uuid}/revisions/{revision}/content", response_model=None)
 async def private_content(uuid: str, revision: str, download: bool = False,
-                          view: Literal["content", "full", "print", "embed"] = "content", user: User = Depends(get_current_user)):
+                          view: Literal["content", "full", "print", "embed"] = "content", user: User = Depends(get_current_user)) -> HTMLResponse:
     doc = await authorized(uuid, user)
     rev = artifacts.revision(doc, revision)
     version = rev.get("version") or next(i for i, item in enumerate(doc["revisions"], 1) if item["uuid"] == revision)
     return content_response(rev, download, version=version, view=view)
 
 
-@router.get("/{uuid}/revisions/{revision}/source")
-async def revision_source(uuid: str, revision: str, user: User = Depends(get_current_user)):
+@router.get("/{uuid}/revisions/{revision}/source", response_model=None)
+async def revision_source(uuid: str, revision: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     doc = await authorized(uuid, user, manage=True)
     rev = artifacts.revision(doc, revision)
     return {"title": (doc.get("title") or rev["title"]) if revision == doc["latest_revision"] else rev["title"], "html": rev["html"]}
 
 
-@router.patch("/{uuid}")
-async def rename_artifact(uuid: str, body: RenameArtifactRequest, user: User = Depends(get_current_user)):
+@router.patch("/{uuid}", response_model=None)
+async def rename_artifact(uuid: str, body: RenameArtifactRequest, user: User = Depends(get_current_user)) -> dict:
     doc = await authorized(uuid, user, manage=True)
     return artifacts.metadata(await run(artifacts.rename, doc, body.title), True)
 
 
-@router.post("/{uuid}/duplicate")
+@router.post("/{uuid}/duplicate", response_model=None)
 @limiter.limit("20/minute")
-async def duplicate_artifact(request: Request, uuid: str, body: DuplicateArtifactRequest, user: User = Depends(get_current_user)):
+async def duplicate_artifact(request: Request, uuid: str, body: DuplicateArtifactRequest, user: User = Depends(get_current_user)) -> dict:
     doc = await authorized(uuid, user)
     return artifacts.metadata(await run(artifacts.duplicate, doc, user.user_id, body.request_id), True)
 
 
-@router.post("/{uuid}/revisions")
+@router.post("/{uuid}/revisions", response_model=None)
 @limiter.limit("20/minute")
-async def revise_artifact(request: Request, uuid: str, body: ReviseArtifactRequest, user: User = Depends(get_current_user)):
+async def revise_artifact(request: Request, uuid: str, body: ReviseArtifactRequest, user: User = Depends(get_current_user)) -> dict:
     doc = await authorized(uuid, user, manage=True)
     return artifacts.metadata(await run(artifacts.revise, doc, body.title, body.html, body.base_revision), True)
 
 
-@router.put("/{uuid}/team")
-async def share_team(uuid: str, body: ShareArtifactRequest, user: User = Depends(get_current_user)):
+@router.put("/{uuid}/team", response_model=None)
+async def share_team(uuid: str, body: ShareArtifactRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
     doc = await authorized(uuid, user, manage=True)
     if body.team_id and not access_control.can_view_team(body.team_id, await access_control.get_team_access_context(user)):
         raise HTTPException(404, "Team not found")
@@ -226,8 +234,8 @@ async def share_team(uuid: str, body: ShareArtifactRequest, user: User = Depends
     return {"ok": True}
 
 
-@router.put("/{uuid}/publication")
-async def publish(uuid: str, body: PublishArtifactRequest, user: User = Depends(get_current_user), settings: Settings = Depends(get_settings)):
+@router.put("/{uuid}/publication", response_model=None)
+async def publish(uuid: str, body: PublishArtifactRequest, user: User = Depends(get_current_user), settings: Settings = Depends(get_settings)) -> dict:
     if not settings.artifact_public_sharing_enabled:
         raise HTTPException(403, "Public page sharing is disabled on this deployment.")
     doc = await authorized(uuid, user, manage=True)
@@ -237,8 +245,8 @@ async def publish(uuid: str, body: PublishArtifactRequest, user: User = Depends(
     return artifacts.metadata(saved, True)
 
 
-@router.delete("/{uuid}/publication")
-async def unpublish(uuid: str, revision: str | None = Query(default=None, min_length=1, max_length=64), user: User = Depends(get_current_user)):
+@router.delete("/{uuid}/publication", response_model=None)
+async def unpublish(uuid: str, revision: str | None = Query(default=None, min_length=1, max_length=64), user: User = Depends(get_current_user)) -> dict[str, object]:
     doc = await authorized(uuid, user, manage=True)
     if revision is not None:
         await run(artifacts.unpublish_separate, doc, revision)
@@ -247,8 +255,8 @@ async def unpublish(uuid: str, revision: str | None = Query(default=None, min_le
     return {"ok": True}
 
 
-@router.delete("/{uuid}")
-async def delete_artifact(uuid: str, user: User = Depends(get_current_user)):
+@router.delete("/{uuid}", response_model=None)
+async def delete_artifact(uuid: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     from datetime import datetime, timezone
     await authorized(uuid, user, manage=True)
     await run(lambda db: db.html_artifacts.update_one({"uuid": uuid, "user_id": user.user_id}, {"$set": {

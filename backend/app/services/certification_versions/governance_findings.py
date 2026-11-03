@@ -1,4 +1,11 @@
 """Preserve the learner's source finding after actual failure and before repair capture."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
+from typing import Self
 import datetime
 from typing import Literal
 
@@ -13,7 +20,7 @@ from .governance_checks import canonical, check_result
 from .governance_scope import Digest, Identity
 from .lab_execution import LabExecutionRepository
 from .lab_inputs import LabInputRepository
-from .learner_decisions import LearnerDecisionRepository
+from .learner_decisions import LearnerDecisionRepository, LearnerDecisionJournal
 from .outcomes import ContractModel
 
 PROMPT_ID = 'governance_original_source_finding'
@@ -38,14 +45,14 @@ class GovernanceFindingRequest(ContractModel):
     consent: Literal['save_my_original_source_finding_before_repair']
 
     @model_validator(mode='after')
-    def original_sources(self):
+    def original_sources(self) -> Self:
         if (len(self.explanation.strip()) < 40 or {q.source_id for q in self.source_references} != {'award', 'amendment'}
                 or len({(q.source_id, q.page, q.quote) for q in self.source_references}) != len(self.source_references)):
             raise ValueError('Explain the observed funding failure with distinct quotes from both original records')
         return self
 
 
-def embedded_execution(run):
+def embedded_execution(run: dict) -> dict:
     from .governance_preparation import GovernancePreparation
     plan = run['plan']
     raw = {key: plan[key] for key in ('uuid', 'user_id', 'enrollment_id', 'module_id', 'course_version', 'manifest_sha256', 'input_snapshot_id')}
@@ -59,7 +66,7 @@ def embedded_execution(run):
     return raw
 
 
-def validate_finding(body, run):
+def validate_finding(body: GovernanceFindingRequest, run: dict) -> dict:
     if (run['state'] != 'completed' or run['plan']['phase'] != 'original' or body.run_id != run['run_id']
             or body.result_sha256 != encode(run['result'])[1] or body.case_sha256 != run['plan']['case_sha256']):
         raise EnrollmentConflict('Inspect the exact owned original completed extraction before recording its finding')
@@ -78,9 +85,9 @@ def validate_finding(body, run):
     return checks
 
 
-class GovernanceFindingRepository(LearnerDecisionRepository):
+class GovernanceFindingRepository(LearnerDecisionJournal):
     @staticmethod
-    def decode(raw):
+    def decode(raw: dict) -> dict:
         from .governance_preparation import GovernancePreparation
         saved = LearnerDecisionRepository.decode(raw)
         try:
@@ -105,11 +112,13 @@ class GovernanceFindingRepository(LearnerDecisionRepository):
         except (KeyError, TypeError, ValueError, StopIteration) as exc:
             raise CourseCatalogError('The saved Governance source finding failed integrity verification') from exc
 
-    async def get(self, user_id, reference):
+    async def get(self, user_id: str, reference: str | None) -> dict | None:
+        if reference is None:
+            return None
         raw = await self.records.find_one({'uuid': reference, 'user_id': user_id, 'module_id': 'governance', 'prompt_id': PROMPT_ID})
         return self.decode(raw) if raw else None
 
-    async def submit(self, operation, body, *, actor_user_id):
+    async def submit(self, operation: CourseOperation, body: object, *, actor_user_id: str) -> dict:
         from .governance_preparation import GovernancePreparation
         body = GovernanceFindingRequest.model_validate(body)
         if actor_user_id != operation.user_id:
@@ -121,7 +130,7 @@ class GovernanceFindingRepository(LearnerDecisionRepository):
         request = body.model_dump(mode='json')
         request_hash = encode(request)[1]
 
-        def replay(raw):
+        def replay(raw: dict) -> dict:
             if any(raw.get(k) != v for k, v in identity.items()) or raw.get('request_sha256') != request_hash:
                 raise EnrollmentConflict('This finding identity belongs to a different learner, answer or original result')
             return self.decode(raw)

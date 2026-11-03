@@ -1,13 +1,34 @@
 """Freeze validated original outcomes for a module's earned-credit record."""
+from __future__ import annotations
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.catalog import CoursePackage
+
 import re
 
 from .attempts import AttemptRepository, encode, normalize_assessment_selection
 from .catalog import CourseCatalogError
 from .enrollments import EnrollmentConflict
-from .outcomes import package_outcomes
+from .outcomes import require_package_outcomes
 
 
-def verified_credit_snapshot(package, progress, module_id, credit, *, expected_attempt_id, _transfer_depth=0):
+class CreditProgress(Protocol):
+    """Read-only credit identity, shared by live progress and preserved snapshots."""
+    @property
+    def user_id(self) -> str: ...
+
+    @property
+    def enrollment_id(self) -> str | None: ...
+
+    @property
+    def course_version(self) -> str | None: ...
+
+    @property
+    def modules(self) -> dict: ...
+
+
+def verified_credit_snapshot(package: CoursePackage, progress: CreditProgress, module_id: str, credit: object, *, expected_attempt_id: str | None, _transfer_depth: int=0) -> dict:
     """Validate an internal journal snapshot, never a client-supplied verdict."""
     try:
         if (not isinstance(credit, dict) or credit['attempt_id'] != expected_attempt_id
@@ -17,10 +38,12 @@ def verified_credit_snapshot(package, progress, module_id, credit, *, expected_a
         if validation.get('assessment_kind') == 'transferred_outcome_validation':
             from .credit_transfer import verify_transfer_credit
             return verify_transfer_credit(package, progress, module_id, credit, depth=_transfer_depth)
-        contract = package_outcomes(package)
+        contract = require_package_outcomes(package)
         required = next(module for module in contract.modules if module.module_id == module_id)
         authored = {item.id: item for item in required.outcomes}
         snapshot = validation['assessment_snapshot']
+        if not isinstance(snapshot, dict):
+            raise ValueError('Invalid original outcome snapshot')
         selected = normalize_assessment_selection(validation['assessment_selection'])
         if (not selected or AttemptRepository.assessment_selection(credit) != selected
                 or validation['passed'] is not True or validation['stars'] != 1
@@ -71,7 +94,7 @@ def verified_credit_snapshot(package, progress, module_id, credit, *, expected_a
         raise CourseCatalogError('Competency credit requires complete original outcome evidence') from exc
 
 
-def freeze_credit(package, progress, module_id, attempt):
+def freeze_credit(package: CoursePackage, progress: CreditProgress, module_id: str, attempt: dict) -> dict:
     credit = {'attempt_id': attempt['uuid'], 'validation_json': attempt['validation_json'],
               'validation_sha256': attempt['validation_sha256'],
               'assessment_selection_json': attempt.get('assessment_selection_json'),
@@ -82,7 +105,7 @@ def freeze_credit(package, progress, module_id, attempt):
     return credit
 
 
-def repeats_earned_outcomes(package, progress, module_id, credit):
+def repeats_earned_outcomes(package: CoursePackage, progress: CreditProgress, module_id: str, credit: dict) -> bool:
     """A new request receipt need not replace credit for the same saved work."""
     module = progress.modules.get(module_id, {})
     previous = module.get('outcome_credit')
@@ -94,7 +117,7 @@ def repeats_earned_outcomes(package, progress, module_id, credit):
                                        expected_attempt_id=credit['attempt_id'])
     if AttemptRepository.assessment_selection(previous) != AttemptRepository.assessment_selection(credit):
         return False
-    def receipts(snapshot):
+    def receipts(snapshot: dict) -> list[tuple[str, str, str, str]]:
         return sorted((row['kind'], row['attempt_id'], row['record_sha256'], row['result_sha256'])
                       for row in snapshot['selected_receipts'])
     if receipts(original) != receipts(current):

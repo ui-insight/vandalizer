@@ -15,7 +15,7 @@ def prepare_page_links(html: str, csp: str) -> tuple[str, str]:
     does not inherit the Page sandbox, and cannot access the opener or referrer.
     Keep other sandbox restrictions (including any trusted print permissions).
     """
-    def permissions(match):
+    def permissions(match: re.Match[str]) -> str:
         tokens = match[0].split()
         return " ".join(dict.fromkeys([*tokens, *PAGE_LINK_SANDBOX.split()]))
 

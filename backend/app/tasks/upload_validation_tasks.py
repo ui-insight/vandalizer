@@ -4,6 +4,16 @@ Ported from Flask app/utilities/upload_manager.py.
 Uses pymongo (sync) for DB access.
 """
 
+from __future__ import annotations
+from pydantic_ai import Agent
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from celery import Task
+
+from pymongo.database import Database
+
 import datetime
 import logging
 import os
@@ -22,7 +32,7 @@ BUDGET_SKIPPED_FEEDBACK = (
 )
 
 
-def _get_db():
+def _get_db() -> Database[dict]:
     """Get sync pymongo database handle (shared per-process client)."""
     from app.tasks import get_sync_db
 
@@ -68,10 +78,11 @@ def _get_compliance_settings() -> dict:
 
 def _get_compliance_rules() -> str:
     """Return the compliance rule prompt (used by chunk validation)."""
-    return _get_compliance_settings()["rules"]
+    rules: str = _get_compliance_settings()["rules"]
+    return rules
 
 
-def _get_secure_agent():
+def _get_secure_agent() -> Agent[None, str]:
     """Get a validation agent (uses default model)."""
     from app.services.llm_service import create_chat_agent
 
@@ -101,7 +112,7 @@ def _get_secure_agent():
     rate_limit="1/s",
 )
 def validate_chunk(
-    self,
+    self: Task,
     document_path: str,
     compliance: str,
     chunk_text: str,
@@ -156,7 +167,7 @@ def validate_chunk(
         output = result.output
 
         # Parse structured output or treat as text
-        if hasattr(output, "valid"):
+        if hasattr(output, "valid") and hasattr(output, "feedback"):
             return {"valid": output.valid, "feedback": output.feedback, "index": index}
 
         # Try JSON parsing from string output
@@ -189,7 +200,7 @@ def validate_chunk(
     rate_limit="1/s",
 )
 def summarize_results(
-    self,
+    self: Task,
     results: list,
     document_uuid: str,
     background: bool = False,
@@ -251,7 +262,7 @@ def summarize_results(
         output = summary_result.output
 
         if hasattr(output, "model_dump"):
-            summary = output.model_dump()
+            summary: dict = output.model_dump()
         else:
             summary = {"valid": all_valid, "feedback": str(output)}
 
@@ -299,10 +310,10 @@ def summarize_results(
     rate_limit="1/s",
 )
 def perform_document_validation(
-    self,
+    self: Task,
     document_uuid: str,
     document_path: str,
-    document_text: str = None,
+    document_text: str | None = None,
     chunk_size: int = 8000,
     chunk_overlap: int = 200,
     background: bool = False,

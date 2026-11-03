@@ -410,7 +410,7 @@ class TestKnowledgeBaseQueryNodeApproximatePages:
         monkeypatch.setattr(we, "llm_chat_model", fake_llm_chat_model)
 
         node = we.KnowledgeBaseQueryNode({
-            "kb_uuid": "kb-1", "query": "indirect rate?", "mode": "answer",
+            "kb_uuid": "kb-1", "query": "indirect rate?", "mode": "answer", "model": "test-model",
         })
         result = node.process({"output": None})
         return captured, result

@@ -1,4 +1,5 @@
 """User-authored project defaults, separate from documents and tool authority."""
+from app.models.user import User
 import json
 
 from fastapi import HTTPException
@@ -6,7 +7,7 @@ from fastapi import HTTPException
 from app.models.project import PROJECT_CONTEXT_MAX_LENGTH
 
 
-def context_text(project) -> str:
+def context_text(project: object) -> str:
     value = getattr(project, "context", None)
     return value.strip()[:PROJECT_CONTEXT_MAX_LENGTH] if isinstance(value, str) else ""
 
@@ -27,7 +28,7 @@ def render_context(text: str, *, workflow: bool = False) -> str:
     )
 
 
-async def snapshot_project_context(project_uuid: str, user) -> dict:
+async def snapshot_project_context(project_uuid: str, user: User) -> dict:
     from app.services.project_service import get_authorized_project
 
     project = await get_authorized_project(project_uuid, user)

@@ -7,10 +7,11 @@ from contextvars import ContextVar
 from types import ModuleType
 from pathlib import Path
 
+from app.models.certification import CertificationProgress
 from .catalog import CourseCatalogError, CoursePackage
 
 _package: ContextVar[CoursePackage | None] = ContextVar('certification_grading_package', default=None)
-_progress: ContextVar[object | None] = ContextVar('certification_grading_progress', default=None)
+_progress: ContextVar[CertificationProgress | None] = ContextVar('certification_grading_progress', default=None)
 
 
 def selected_outcome_completion_available(package: CoursePackage) -> bool:
@@ -25,7 +26,7 @@ def selected_outcome_completion_available(package: CoursePackage) -> bool:
     return True
 
 
-def pinned_progress(user_id: str):
+def pinned_progress(user_id: str) -> CertificationProgress:
     progress = _progress.get()
     if progress is None or progress.user_id != user_id:
         raise CourseCatalogError('Grading requires an explicitly pinned enrollment')
@@ -67,7 +68,7 @@ def load_rubric(package: CoursePackage) -> ModuleType:
     return legacy_20261002
 
 
-async def grade(package: CoursePackage, progress, module_id: str, *, preview: bool = False, assessment_selection=None) -> dict:
+async def grade(package: CoursePackage, progress: CertificationProgress, module_id: str, *, preview: bool = False, assessment_selection: dict[str, str] | None = None) -> dict:
     manifest = package.manifest
     if not preview and (package.entry.state == 'draft' or not package.entry.supported_for_existing):
         raise CourseCatalogError('Only supported published requirements can grade an enrollment')

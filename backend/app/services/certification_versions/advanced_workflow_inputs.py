@@ -3,6 +3,13 @@
 This capture preserves evidence only. A separate approved plan is required for
 execution; neither the learner's method claim nor source addition earns credit.
 """
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
+from typing import Self
 import datetime
 from typing import Literal
 
@@ -17,7 +24,7 @@ from .enrollments import EnrollmentConflict
 from .lab_execution import LabExecutionRepository
 from .lab_inputs import LabInputRepository, MAX_SNAPSHOT_BYTES
 from .outcomes import ContractModel
-from .workflow_design_inputs import WorkflowDesignInputRepository
+from .workflow_design_inputs import WorkflowDesignInputJournal
 
 
 class AdvancedWorkflowCapture(ContractModel):
@@ -30,15 +37,15 @@ class AdvancedWorkflowCapture(ContractModel):
     consent: Literal['capture_budget_workflow_and_method']
 
     @model_validator(mode='after')
-    def explained_choice(self):
+    def explained_choice(self) -> Self:
         if len(self.method_choice.strip()) < 30:
             raise ValueError('Explain the interpretation method, arithmetic evidence and available alternative')
         return self
 
 
-class AdvancedWorkflowInputRepository(WorkflowDesignInputRepository):
+class AdvancedWorkflowInputRepository(WorkflowDesignInputJournal):
     @staticmethod
-    def decode(raw):
+    def decode(raw: dict) -> dict:
         saved = LabInputRepository.decode(raw)
         try:
             body = AdvancedWorkflowCapture.model_validate(saved['request'])
@@ -66,7 +73,7 @@ class AdvancedWorkflowInputRepository(WorkflowDesignInputRepository):
         except (KeyError, TypeError, ValueError, AttributeError) as exc:
             raise CourseCatalogError('Saved budget workflow evidence failed integrity verification') from exc
 
-    async def capture(self, operation, body, *, actor_user_id):
+    async def capture(self, operation: CourseOperation, body: object, *, actor_user_id: str) -> dict:
         body = AdvancedWorkflowCapture.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Budget workflow capture requires the authenticated learner')
@@ -81,7 +88,7 @@ class AdvancedWorkflowInputRepository(WorkflowDesignInputRepository):
         request = body.model_dump(mode='json')
         request_hash = encode(request)[1]
 
-        def replay(raw):
+        def replay(raw: dict) -> dict:
             saved = self.decode(raw)
             if any(saved[key] != value for key, value in identity.items()) or saved['request_sha256'] != request_hash:
                 raise EnrollmentConflict('This capture request belongs to another workflow or method decision')
@@ -102,7 +109,7 @@ class AdvancedWorkflowInputRepository(WorkflowDesignInputRepository):
         artifact = await self._read_artifact(actor_user_id, body.workflow_id)
         if await self._read_artifact(actor_user_id, body.workflow_id) != artifact:
             raise EnrollmentConflict('The workflow changed during capture; inspect its current revision')
-        saved = {**identity, 'schema_version': 1, 'record_kind': 'advanced_workflow_input',
+        saved: dict = {**identity, 'schema_version': 1, 'record_kind': 'advanced_workflow_input',
                  'rubric_id': package.manifest.rubric_id, 'exercise_sha256': package.manifest.artifacts['exercises.json'],
                  'request': request, 'request_sha256': request_hash, 'case': case.public_definition(),
                  'artifact': artifact, 'artifact_sha256': encode(artifact)[1], 'calculation_snapshot': calculation,

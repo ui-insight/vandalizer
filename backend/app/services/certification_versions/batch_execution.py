@@ -1,4 +1,12 @@
 """Claim an explicitly approved batch action once and preserve its durable item prefix."""
+from __future__ import annotations
+from .writes import WriteLease
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.certification_versions.runtime import CourseOperation
+
 import asyncio
 from copy import deepcopy
 import datetime
@@ -30,7 +38,7 @@ class BatchExecutionRequest(ContractModel):
 
 
 class BatchExecution(BatchPreparation):
-    async def reserve_retry(self, operation, run):
+    async def reserve_retry(self, operation: CourseOperation, run: dict) -> dict:
         """One active retry identity per failed original input, even across plans.
 
         A crash after reservation is resumed only by the same request. Scope
@@ -59,7 +67,7 @@ class BatchExecution(BatchPreparation):
         return {'batch_id': plan['batch_id'], 'source_id': plan['failed_source_id'],
                 'run_id': run['run_id'], 'previous_retry_id': plan['previous_retry_id']}
 
-    async def execute(self, operation, body, system_config_doc, *, actor_user_id):
+    async def execute(self, operation: CourseOperation, body: object, system_config_doc: dict, *, actor_user_id: str) -> dict | None:
         body = BatchExecutionRequest.model_validate(body)
         if actor_user_id != operation.user_id:
             raise EnrollmentConflict('Only the authenticated learner can execute the approved batch action')
@@ -94,11 +102,13 @@ class BatchExecution(BatchPreparation):
                 raise EnrollmentConflict('The approval changed before this batch action was claimed')
             return latest
         run = await self.get(actor_user_id, body.run_id)
+        if run is None:
+            raise EnrollmentConflict('The original execution receipt is no longer available')
         started_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
         stop, loop = threading.Event(), asyncio.get_running_loop()
         checkpoints = BatchCheckpoints()
 
-        def checkpoint(event, event_hash):
+        def checkpoint(event: dict, event_hash: str) -> dict:
             if stop.is_set():
                 raise EnrollmentConflict('A stopped worker cannot append another item')
             future = asyncio.run_coroutine_threadsafe(checkpoints.append(operation, run, event, event_hash), loop)
@@ -113,6 +123,8 @@ class BatchExecution(BatchPreparation):
             result = await asyncio.wait_for(asyncio.to_thread(execute_approved_batch, run, config,
                 checkpoint=checkpoint, should_stop=stop.is_set), timeout=RUN_TIMEOUT_SECONDS)
             latest = await self.get(actor_user_id, body.run_id)
+            if latest is None:
+                raise EnrollmentConflict('The original execution receipt is no longer available')
             if [e['receipt']['result'] for e in latest['item_events'][1::2]] != result['item_results']:
                 raise EnrollmentConflict('The complete result differs from its durable item receipts')
             if len(encode(result)[0].encode()) > MAX_TERMINAL_BYTES:
@@ -130,7 +142,7 @@ class BatchExecution(BatchPreparation):
         await self._finish(run, lease, result, started_at)
         return await self.get(actor_user_id, body.run_id)
 
-    async def _finish(self, run, lease, result, started_at):
+    async def _finish(self, run: dict, lease: WriteLease, result: dict, started_at: str) -> None:
         fenced = await self.records.update_one({'uuid': run['run_id'], 'plan_sha256': run['plan_sha256'],
             'state': 'executing', 'worker_id': lease.write_id, 'authorization_sha256': encode(run['authorization'])[1]},
             {'$set': {'checkpoint_closed': True}})

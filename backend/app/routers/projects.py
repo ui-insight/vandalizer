@@ -22,11 +22,11 @@ class UpdateProjectRequest(BaseModel):
     context: str | None = Field(default=None, max_length=PROJECT_CONTEXT_MAX_LENGTH)
 
 
-@router.post("")
+@router.post("", response_model=None)
 async def create_project(
     body: CreateProjectRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     title = body.title.strip()
     if not title:
         raise HTTPException(status_code=400, detail="Project title is required")
@@ -34,11 +34,11 @@ async def create_project(
     return project_service.serialize_project(project)
 
 
-@router.post("/{project_uuid}/duplicate")
+@router.post("/{project_uuid}/duplicate", response_model=None)
 async def duplicate_project(
     project_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     """Create a copy of a project the user can view.
 
     The new project (its folder, implicit KB, record, and pin references) is
@@ -57,17 +57,17 @@ async def duplicate_project(
     return await project_service.summarize_project(new_project, user)
 
 
-@router.get("")
-async def list_projects(user: User = Depends(get_current_user)):
+@router.get("", response_model=None)
+async def list_projects(user: User = Depends(get_current_user)) -> list[dict]:
     projects = await project_service.list_projects(user)
     return [await project_service.summarize_project(p, user) for p in projects]
 
 
-@router.get("/{project_uuid}")
+@router.get("/{project_uuid}", response_model=None)
 async def get_project(
     project_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     project = await project_service.get_authorized_project(project_uuid, user)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -79,8 +79,8 @@ class PinRequest(BaseModel):
     target_id: str
 
 
-@router.get("/{project_uuid}/pins")
-async def list_pins(project_uuid: str, user: User = Depends(get_current_user)):
+@router.get("/{project_uuid}/pins", response_model=None)
+async def list_pins(project_uuid: str, user: User = Depends(get_current_user)) -> list[dict]:
     project = await project_service.get_authorized_project(project_uuid, user)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -91,8 +91,8 @@ class DefaultSkillRequest(BaseModel):
     skill_uuid: str | None = None
 
 
-@router.get("/{project_uuid}/default-skill")
-async def get_default_skill(project_uuid: str, user: User = Depends(get_current_user)):
+@router.get("/{project_uuid}/default-skill", response_model=None)
+async def get_default_skill(project_uuid: str, user: User = Depends(get_current_user)) -> dict:
     from app.services.skill_service import snapshot_skill
     project = await project_service.get_authorized_project(project_uuid, user)
     if not project:
@@ -101,8 +101,8 @@ async def get_default_skill(project_uuid: str, user: User = Depends(get_current_
     return {"active_skill": await snapshot_skill(uuid, user) if uuid else None}
 
 
-@router.put("/{project_uuid}/default-skill")
-async def set_default_skill(project_uuid: str, body: DefaultSkillRequest, user: User = Depends(get_current_user)):
+@router.put("/{project_uuid}/default-skill", response_model=None)
+async def set_default_skill(project_uuid: str, body: DefaultSkillRequest, user: User = Depends(get_current_user)) -> dict:
     from app.services.skill_service import snapshot_skill
     project = await project_service.get_authorized_project(project_uuid, user)
     if not project:
@@ -116,12 +116,12 @@ async def set_default_skill(project_uuid: str, body: DefaultSkillRequest, user: 
     return {"default_skill_uuid": body.skill_uuid}
 
 
-@router.post("/{project_uuid}/pins")
+@router.post("/{project_uuid}/pins", response_model=None)
 async def add_pin(
     project_uuid: str,
     body: PinRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     project = await project_service.get_authorized_project(project_uuid, user)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -132,13 +132,13 @@ async def add_pin(
     return {"ok": True}
 
 
-@router.delete("/{project_uuid}/pins")
+@router.delete("/{project_uuid}/pins", response_model=None)
 async def remove_pin(
     project_uuid: str,
     pin_type: str,
     target_id: str,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     project = await project_service.get_authorized_project(project_uuid, user)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -149,23 +149,23 @@ async def remove_pin(
     return {"ok": True}
 
 
-@router.get("/{project_uuid}/documents")
+@router.get("/{project_uuid}/documents", response_model=None)
 async def get_project_documents(
     project_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     project = await project_service.get_authorized_project(project_uuid, user)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     return {"document_uuids": await project_service.get_project_document_uuids(project)}
 
 
-@router.patch("/{project_uuid}")
+@router.patch("/{project_uuid}", response_model=None)
 async def update_project(
     project_uuid: str,
     body: UpdateProjectRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     project = await project_service.get_authorized_project(project_uuid, user)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -188,11 +188,11 @@ async def update_project(
     return project_service.serialize_project(project)
 
 
-@router.post("/{project_uuid}/share-with-team")
+@router.post("/{project_uuid}/share-with-team", response_model=None)
 async def share_with_team(
     project_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     project = await project_service.get_authorized_project(project_uuid, user)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -203,11 +203,11 @@ async def share_with_team(
     return project_service.serialize_project(project)
 
 
-@router.post("/{project_uuid}/make-personal")
+@router.post("/{project_uuid}/make-personal", response_model=None)
 async def make_personal(
     project_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     project = await project_service.get_authorized_project(project_uuid, user)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -218,11 +218,11 @@ async def make_personal(
     return project_service.serialize_project(project)
 
 
-@router.post("/{project_uuid}/leave")
+@router.post("/{project_uuid}/leave", response_model=None)
 async def leave_project(
     project_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     project = await project_service.get_authorized_project(project_uuid, user)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -233,11 +233,11 @@ async def leave_project(
     return {"ok": True}
 
 
-@router.delete("/{project_uuid}")
+@router.delete("/{project_uuid}", response_model=None)
 async def delete_project(
     project_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     project = await project_service.get_authorized_project(project_uuid, user)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -260,12 +260,12 @@ class CreateInviteRequest(BaseModel):
     max_uses: int | None = None
 
 
-@router.post("/{project_uuid}/invite-link")
+@router.post("/{project_uuid}/invite-link", response_model=None)
 async def create_invite_link(
     project_uuid: str,
     body: CreateInviteRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     project = await project_service.get_authorized_project(project_uuid, user)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -283,19 +283,19 @@ async def create_invite_link(
     return project_service.serialize_invite_link(link)
 
 
-@router.get("/{project_uuid}/invite-links")
+@router.get("/{project_uuid}/invite-links", response_model=None)
 async def list_invite_links(
     project_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> list[dict]:
     project = await project_service.get_authorized_project(project_uuid, user)
     if not project or not await project_service.can_manage_project(project, user):
         raise HTTPException(status_code=404, detail="Project not found")
     return await project_service.list_project_invite_links(project)
 
 
-@router.delete("/invite-link/{token}")
-async def revoke_invite_link(token: str, user: User = Depends(get_current_user)):
+@router.delete("/invite-link/{token}", response_model=None)
+async def revoke_invite_link(token: str, user: User = Depends(get_current_user)) -> dict:
     try:
         await project_service.revoke_project_invite(token, user)
     except ValueError as e:
@@ -303,8 +303,8 @@ async def revoke_invite_link(token: str, user: User = Depends(get_current_user))
     return {"ok": True}
 
 
-@router.get("/join/info/{token}")
-async def join_link_info(token: str):
+@router.get("/join/info/{token}", response_model=None)
+async def join_link_info(token: str) -> dict:
     """Public — preview a project invite before logging in."""
     info = await project_service.get_project_invite_info(token)
     if not info:
@@ -312,8 +312,8 @@ async def join_link_info(token: str):
     return info
 
 
-@router.post("/join/accept/{token}")
-async def accept_invite_link(token: str, user: User = Depends(get_current_user)):
+@router.post("/join/accept/{token}", response_model=None)
+async def accept_invite_link(token: str, user: User = Depends(get_current_user)) -> dict:
     try:
         project = await project_service.accept_project_invite(token, user)
     except ValueError as e:
@@ -321,23 +321,23 @@ async def accept_invite_link(token: str, user: User = Depends(get_current_user))
     return project_service.serialize_project(project)
 
 
-@router.get("/{project_uuid}/members")
+@router.get("/{project_uuid}/members", response_model=None)
 async def list_members(
     project_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> list[dict]:
     project = await project_service.get_authorized_project(project_uuid, user)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     return await project_service.list_project_members(project)
 
 
-@router.delete("/{project_uuid}/members/{member_user_id}")
+@router.delete("/{project_uuid}/members/{member_user_id}", response_model=None)
 async def remove_member(
     project_uuid: str,
     member_user_id: str,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     project = await project_service.get_authorized_project(project_uuid, user)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")

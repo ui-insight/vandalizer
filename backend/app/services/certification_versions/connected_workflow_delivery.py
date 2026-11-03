@@ -1,9 +1,16 @@
 """Authenticated learner delivery for explicit connected work and saved history."""
+from app.models.certification import CertificationEnrollment
+from .catalog import CoursePackage
+from .multi_step_case import MultiStepCase
+from .connected_workflow_preparation import ConnectedPlanRequest
+from .connected_workflow_execution import ConnectedExecutionRequest
+from .connected_workflow_approval import ConnectedScopeRequest
 from app.models.workflow import Workflow
 from app.services.storage import get_storage
 
 from . import practical_preparation
 from .attempts import encode
+from .repository_protocols import RecordReader
 from .catalog import CourseCatalogError
 from .connected_workflow_approval import ConnectedScopeRepository
 from .connected_workflow_execution import ConnectedWorkflowExecution
@@ -23,7 +30,7 @@ class ConnectedWorkflowUnavailable(ValueError):
 
 
 class ConnectedWorkflowDelivery:
-    def __init__(self, repository=None):
+    def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         self.repository = repository or EnrollmentRepository()
         self.inputs = ConnectedWorkflowInputRepository()
         self.runs = ConnectedWorkflowExecution()
@@ -31,7 +38,7 @@ class ConnectedWorkflowDelivery:
         self.scopes = ConnectedScopeRepository()
         self.recovery_decisions = ConnectedRecoveryDecisionRepository()
 
-    async def course(self, user_id, enrollment_id):
+    async def course(self, user_id: str, enrollment_id: str) -> tuple[CertificationEnrollment, CoursePackage, MultiStepCase]:
         enrollment = await self.repository._enrollment(user_id, enrollment_id)
         package = self.repository.catalog.load(enrollment.course_version)
         if 'connected-cases/multi_step.json' not in package.manifest.artifacts:
@@ -39,7 +46,7 @@ class ConnectedWorkflowDelivery:
         return enrollment, package, load_multi_step_case(package)
 
     @staticmethod
-    def verify(record, enrollment, case):
+    def verify(record: dict, enrollment: CertificationEnrollment, case: MultiStepCase) -> dict:
         if (any(record[key] != value for key, value in {'user_id': enrollment.user_id,
                 'enrollment_id': enrollment.uuid, 'course_version': enrollment.course_version,
                 'manifest_sha256': enrollment.manifest_sha256, 'module_id': 'multi_step'}.items())
@@ -47,18 +54,18 @@ class ConnectedWorkflowDelivery:
             raise CourseCatalogError('This saved connected work does not match its original course')
         return record
 
-    async def writable(self, enrollment, delivery_enabled):
+    async def writable(self, enrollment: CertificationEnrollment, delivery_enabled: bool) -> bool:
         selection = await self.repository.selections.find_one({'user_id': enrollment.user_id})
         return bool(delivery_enabled and enrollment.state in ('active', 'completed')
                     and selection and selection.get('active_enrollment_id') == enrollment.uuid)
 
     @staticmethod
-    def capture_view(snapshot):
+    def capture_view(snapshot: dict) -> dict:
         return {key: snapshot[key] for key in ('uuid', 'enrollment_id', 'module_id', 'course_version', 'manifest_sha256',
             'case', 'artifact_id', 'artifact_sha256', 'artifact', 'documents', 'captured_at')} | {
             'input_snapshot_sha256': encode(snapshot)[1], 'execution_authorized': False, 'credit_awarded': False}
 
-    async def run_view(self, run, *, writable=False):
+    async def run_view(self, run: dict, *, writable: bool=False) -> dict:
         plan = run['plan']
         scope = run['authorization']['decision'] if run['authorization'] else None
         if scope is None and run['scope_decision_id']:
@@ -82,10 +89,11 @@ class ConnectedWorkflowDelivery:
                     and all(item['receipt'].get('status') == 'completed' for item in run['stage_events'] if item['receipt']['kind'] == 'stage_completed'),
                 'credit_awarded': False, 'module_completion_eligible': False}
 
-    async def get(self, user_id, enrollment_id, reference, *, kind='review', delivery_enabled=False):
+    async def get(self, user_id: str, enrollment_id: str, reference: str, *, kind: str='review', delivery_enabled: bool=False) -> dict:
         enrollment, _, case = await self.course(user_id, enrollment_id)
-        repository = {'capture': self.inputs, 'run': self.runs, 'review': self.reviews, 'scope': self.scopes,
-                      'recovery': self.recovery_decisions}[kind]
+        repositories: dict[str, RecordReader] = {'capture': self.inputs, 'run': self.runs, 'review': self.reviews, 'scope': self.scopes,
+                      'recovery': self.recovery_decisions}
+        repository = repositories[kind]
         saved = await repository.get(user_id, reference)
         if saved is None:
             raise ConnectedWorkflowUnavailable('This saved connected-workflow record is unavailable')
@@ -109,10 +117,10 @@ class ConnectedWorkflowDelivery:
             name + '_run': await self.run_view(ConnectedWorkflowPreparation.decode(saved[name + '_execution']))
             for name in ('original', 'corrected')}
 
-    async def list(self, user_id, enrollment_id, *, delivery_enabled=False):
+    async def list(self, user_id: str, enrollment_id: str, *, delivery_enabled: bool=False) -> dict:
         enrollment, _, case = await self.course(user_id, enrollment_id)
         query = {'user_id': user_id, 'enrollment_id': enrollment_id, 'module_id': 'multi_step'}
-        result = {'enrollment_id': enrollment_id, 'module_id': 'multi_step', 'course_version': enrollment.course_version,
+        result: dict[str, object] = {'enrollment_id': enrollment_id, 'module_id': 'multi_step', 'course_version': enrollment.course_version,
                   'manifest_sha256': enrollment.manifest_sha256, 'case': case.public_definition()}
         for kind, repository in (('captures', self.inputs), ('runs', self.runs), ('submissions', self.reviews), ('recovery_submissions', self.recovery_decisions)):
             prompt_filter = {'prompt_id': PROMPT_ID if kind == 'submissions' else RECOVERY_PROMPT_ID} if kind.endswith('submissions') else {}
@@ -143,40 +151,50 @@ class ConnectedWorkflowDelivery:
                 'older_workflows_available': len(owned) > 50, 'can_submit': writable,
                 'read_only_reason': None if writable else 'This is preserved course history. Select an available current course before saving new work.'}
 
-    async def save(self, user_id, enrollment_id, payload, *, action):
+    async def save(self, user_id: str, enrollment_id: str, payload: object, *, action: str) -> dict:
         current = await self.repository.current(user_id)
         if current is None or current.uuid != enrollment_id:
             raise EnrollmentConflict('Select your existing course before saving or executing connected work')
         _, package, _ = await self.course(user_id, enrollment_id)
         async with self.repository.write_boundary(user_id, enrollment_id, operation='connected_' + action) as progress:
+            saved: dict | None
             operation = CourseOperation(user_id, package, progress, True)
             if action == 'capture':
                 saved = await self.inputs.capture(operation, payload, actor_user_id=user_id, storage=get_storage())
                 return self.capture_view(saved)
             if action == 'prepare':
                 # Replaying a prepared receipt must not depend on live settings.
-                existing = await self.runs.records.find_one({'uuid': payload.request_id})
+                prepare_request = ConnectedPlanRequest.model_validate(payload)
+                existing = await self.runs.records.find_one({'uuid': prepare_request.request_id})
                 config = {} if existing else await practical_preparation.configured_runtime()
                 models = config.get('available_models') or []
                 default = config.get('default_model') or (models[0].get('name') if models else '')
-                saved = await self.runs.prepare(operation, payload, config, actor_user_id=user_id, default_model=default)
+                saved = await self.runs.prepare(operation, prepare_request, config, actor_user_id=user_id, default_model=default)
             elif action == 'scope':
-                await self.scopes.submit(operation, payload, actor_user_id=user_id)
-                saved = await self.runs.get(user_id, payload.run_id)
+                scope_request = ConnectedScopeRequest.model_validate(payload)
+                await self.scopes.submit(operation, scope_request, actor_user_id=user_id)
+                saved = await self.runs.get(user_id, scope_request.run_id)
             elif action == 'execute':
-                existing = await self.runs.get(user_id, payload.run_id)
+                execute_request = ConnectedExecutionRequest.model_validate(payload)
+                existing = await self.runs.get(user_id, execute_request.run_id)
                 config = await practical_preparation.configured_runtime() if existing and existing['state'] == 'prepared' else {}
-                saved = await self.runs.execute(operation, payload, config, actor_user_id=user_id)
+                saved = await self.runs.execute(operation, execute_request, config, actor_user_id=user_id)
             elif action == 'finalize':
                 saved = await ConnectedWorkflowRecovery().finalize(operation, payload, actor_user_id=user_id)
             elif action == 'review':
                 saved = await self.reviews.submit(operation, payload, actor_user_id=user_id)
+                if saved is None:
+                    raise EnrollmentConflict('The saved review is no longer available')
                 return await self.get(user_id, enrollment_id, saved['uuid'])
             elif action == 'recovery':
                 saved = await self.recovery_decisions.submit(operation, payload, actor_user_id=user_id)
+                if saved is None:
+                    raise EnrollmentConflict('The saved review is no longer available')
                 return await self.get(user_id, enrollment_id, saved['uuid'], kind='recovery')
             else:
                 raise ValueError('Unsupported connected action')
+            if saved is None:
+                raise EnrollmentConflict('The saved execution is no longer available')
             return await self.run_view(saved, writable=True)
 
 
@@ -188,5 +206,5 @@ class ConnectedWorkflowAssessment(ProcessAssessment):
     delivery_class = ConnectedWorkflowDelivery
     prepare_method = 'prepare_from_connected_review'
 
-    def __init__(self, repository=None):
+    def __init__(self, repository: EnrollmentRepository | None = None) -> None:
         super().__init__(repository or EnrollmentRepository())

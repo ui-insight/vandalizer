@@ -27,7 +27,8 @@ class PageTemplate(Document):
 
 
 class PageTemplateDraft(Document):
-    id: str
+    # Beanie supports custom _id types, although Document's annotation is ObjectId.
+    id: str  # type: ignore[assignment]
     user_id: str
     html: str
     fields: list[dict] = Field(default_factory=list)

@@ -1,10 +1,18 @@
 """Quality service  - persist validation runs, compute tiers, history, regression."""
 
+from __future__ import annotations
+
 import datetime
 import hashlib
 import json
 import logging
-from typing import Optional
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Optional, TypedDict
+
+if TYPE_CHECKING:
+    from app.models.regression_suite_run import RegressionSuiteRun
+    from app.models.search_set import SearchSet
+    from app.models.workflow import Workflow
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +33,37 @@ from app.models.verification import VerifiedItemMetadata  # noqa: E402
 _GRADE_SCORES = {"A": 95, "B": 85, "C": 75, "D": 55, "F": 30}
 
 
+class _ValidationDrift(TypedDict):
+    model_changed: bool
+    validated_model: str | None
+    current_model: str | None
+    test_cases_changed: bool
+    drift_reasons: list[str]
+
+
+class _RegressionResult(TypedDict):
+    item_id: str
+    kind: str
+    name: str
+    score: float | None
+    grade: str | None
+    prev_score: float | None
+    delta: float | None
+    status: str
+
+
+class _QualityItem(TypedDict):
+    item_kind: str
+    item_id: str
+    display_name: str
+    quality_score: float | None
+    quality_tier: str | None
+    last_validated_at: str | None
+    validation_run_count: int
+    trend: str
+    stale: bool
+
+
 def _sample_size_factor(num_test_cases: int, num_runs: int) -> float:
     """Discount factor based on sample size. Returns 0.0-1.0.
 
@@ -41,9 +80,7 @@ def compute_config_hash(config: dict) -> str:
     return hashlib.sha256(json.dumps(config or {}, sort_keys=True).encode()).hexdigest()
 
 
-def _as_utc(dt: Optional[datetime.datetime]) -> Optional[datetime.datetime]:
-    if dt is None:
-        return None
+def _as_utc(dt: datetime.datetime) -> datetime.datetime:
     return dt if dt.tzinfo is not None else dt.replace(tzinfo=datetime.timezone.utc)
 
 
@@ -52,7 +89,7 @@ def validation_drift(
     *,
     current_model: Optional[str],
     configured_models: set[str],
-    test_cases: Optional[list[tuple[str, Optional[datetime.datetime]]]] = None,
+    test_cases: Optional[Sequence[tuple[str, Optional[datetime.datetime]]]] = None,
 ) -> dict:
     """What has changed under a score since the run that produced it (#1013 §5).
 
@@ -69,7 +106,7 @@ def validation_drift(
     no single model (legacy rows, workflows graded across several models)
     report no model drift rather than guessing.
     """
-    out = {
+    out: _ValidationDrift = {
         "model_changed": False,
         "validated_model": None,
         "current_model": current_model or None,
@@ -77,7 +114,7 @@ def validation_drift(
         "drift_reasons": [],
     }
     if not latest:
-        return out
+        return dict(out)
     reasons: list[str] = out["drift_reasons"]
 
     validated_model = latest.get("model") or None
@@ -113,7 +150,7 @@ def validation_drift(
                 if removed:
                     parts.append(f"{len(removed)} deleted")
                 reasons.append(f"test cases changed since the run ({', '.join(parts)})")
-    return out
+    return dict(out)
 
 
 async def item_validation_drift(
@@ -121,7 +158,7 @@ async def item_validation_drift(
     latest: Optional[dict],
     *,
     user_id: str,
-    item,
+    item: Workflow | SearchSet,
 ) -> dict:
     """``validation_drift`` for a workflow or extraction set, resolving the
     model the viewer's next run would use. Exception-safe: drift detection
@@ -135,19 +172,23 @@ async def item_validation_drift(
         sys_cfg = await SystemConfig.get_config()
         sys_cfg_doc = sys_cfg.model_dump() if sys_cfg else {}
         configured = {
-            m.get("name") for m in sys_cfg_doc.get("available_models") or []
-            if isinstance(m, dict) and m.get("name")
+            name for m in sys_cfg_doc.get("available_models") or []
+            if isinstance(m, dict) and isinstance(name := m.get("name"), str) and name
         }
-        test_cases = None
+        test_cases: list[tuple[str, datetime.datetime | None]] | None = None
+        current_model: str | None
         if item_kind == "workflow":
             from app.services.workflow_service import resolve_run_model
 
-            current_model = await resolve_run_model(item.input_config, user_id)
+            current_model = await resolve_run_model(getattr(item, "input_config", None), user_id)
         else:
             from app.models.extraction_test_case import ExtractionTestCase
+            from app.models.search_set import SearchSet
             from app.services.extraction_engine import ExtractionEngine
             from app.services.search_set_service import effective_extraction_config
 
+            if not isinstance(item, SearchSet):
+                raise TypeError("Extraction drift requires a search set")
             current_model = ExtractionEngine(system_config_doc=sys_cfg_doc).effective_model_info(
                 effective_extraction_config(item) or None, await get_user_model_name(user_id),
             ).get("model")
@@ -706,7 +747,7 @@ async def get_latest_validations(pairs: list[tuple[str, str]]) -> dict[tuple[str
     by_kind: dict[str, list[str]] = {}
     for kind, item_id in wanted:
         by_kind.setdefault(kind, []).append(item_id)
-    pipeline = [
+    pipeline: list[dict] = [
         {"$match": {
             "$and": [
                 NOT_SMOKE_TEST,
@@ -730,7 +771,7 @@ async def get_latest_validations(pairs: list[tuple[str, str]]) -> dict[tuple[str
 async def get_quality_summary() -> dict:
     """Aggregate stats: avg score, total runs, validated vs unvalidated items."""
     # Use aggregation to avoid loading all runs into memory
-    pipeline = [
+    pipeline: list[dict] = [
         {"$match": NOT_FLEET_NOISE},
         {"$group": {
             "_id": {"item_kind": "$item_kind", "item_id": "$item_id"},
@@ -785,7 +826,7 @@ async def get_quality_timeline(
     """Aggregate ValidationRun by date for timeline charts."""
     cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=days)
 
-    query_filters = [ValidationRun.created_at >= cutoff, NOT_FLEET_NOISE]
+    query_filters: list[dict | bool] = [ValidationRun.created_at >= cutoff, NOT_FLEET_NOISE]
     if item_kind:
         query_filters.append(ValidationRun.item_kind == item_kind)
     if item_id:
@@ -813,7 +854,7 @@ async def get_quality_timeline(
     ]
 
 
-async def reexecute_official_baseline(meta) -> Optional[dict]:
+async def reexecute_official_baseline(meta: VerifiedItemMetadata) -> Optional[dict]:
     """Run the pinned official_baseline's test cases against the current config.
 
     Extraction (search_set) only — the one kind whose frozen baseline can be
@@ -926,7 +967,7 @@ async def get_quality_by_model(days: int = 90) -> list[dict]:
 async def run_regression_suite(
     user_id: str,
     model: Optional[str] = None,
-    suite_run=None,
+    suite_run: RegressionSuiteRun | None = None,
 ) -> dict:
     """Run validation on all verified items and return summary.
 
@@ -960,7 +1001,7 @@ async def run_regression_suite(
         suite_run.total_items = len(unique_items)
         await suite_run.save()
 
-    results = []
+    results: list[_RegressionResult] = []
     for item, kind in unique_items:
         item_id_str = str(item.item_id)
 
@@ -1040,7 +1081,7 @@ async def run_regression_suite(
             suite_run.completed_items = len(results)
             suite_run.succeeded = sum(1 for r in results if r["status"] == "ok")
             suite_run.failed = sum(1 for r in results if r["status"] != "ok")
-            suite_run.results = results
+            suite_run.results = [dict(row) for row in results]
             await suite_run.save()
 
     scores = [r["score"] for r in results if r["status"] == "ok" and r["score"] is not None]
@@ -1213,7 +1254,7 @@ def _build_kb_suggestion_prompt(result: dict) -> str:
     return "\n".join(lines)
 
 
-def _fmt_pct(val) -> str:
+def _fmt_pct(val: float | None) -> str:
     if val is None:
         return "N/A"
     return f"{round(val * 100)}%"
@@ -1228,7 +1269,7 @@ async def detect_stale_items(max_age_days: int = 14) -> list[dict]:
     """Find verified items whose last validation is older than max_age_days."""
     cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=max_age_days)
     stale = await VerifiedItemMetadata.find(
-        VerifiedItemMetadata.last_validated_at < cutoff,
+        {"last_validated_at": {"$lt": cutoff}},
     ).to_list()
     return [
         {
@@ -1464,7 +1505,7 @@ async def get_quality_items(
     stale_days = qc.get("monitoring", {}).get("stale_threshold_days", 14)
     now = datetime.datetime.now(datetime.timezone.utc)
 
-    items = []
+    items: list[_QualityItem] = []
     for m in all_meta:
         # Determine trend from last 2 runs
         runs = await (
@@ -1512,7 +1553,7 @@ async def get_quality_items(
     elif sort == "last_validated":
         items.sort(key=lambda x: x.get("last_validated_at") or "", reverse=reverse)
 
-    return items[:limit]
+    return [dict(item) for item in items[:limit]]
 
 
 async def get_quality_item_detail(item_kind: str, item_id: str) -> dict:
@@ -1626,7 +1667,7 @@ def _run_to_dict(r: ValidationRun) -> dict:
     }
 
 
-def _question_set_summary(snapshot) -> Optional[dict]:
+def _question_set_summary(snapshot: object) -> Optional[dict]:
     qs = snapshot.get("question_set") if isinstance(snapshot, dict) else None
     if not isinstance(qs, dict) or not qs.get("fingerprint"):
         return None

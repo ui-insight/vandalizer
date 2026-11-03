@@ -1,11 +1,13 @@
 """Read current assigned sample readiness without uploading or retrying work."""
+from app.models.document import SmartDocument
+from app.models.user import User
 from app.models.folder import SmartFolder
 from app.services.access_control import get_authorized_folder
 from .runtime import course_operation, current_operation
 from .source_access import owned_source
 
 
-def document_state(document):
+def document_state(document: SmartDocument) -> str:
     if document.task_status == 'error':
         return 'failed'
     if document.processing or document.validating or document.task_status in ('layout', 'extracting', 'ocr', 'security', 'readying', 'pending', 'processing'):
@@ -18,7 +20,7 @@ def document_state(document):
 
 
 @course_operation()
-async def read_lab_status(user, module_id: str, enrollment_id: str | None = None):
+async def read_lab_status(user: User, module_id: str, enrollment_id: str | None = None) -> dict:
     from app.services import certification_service as service
     from .enrollments import EnrollmentConflict
 
