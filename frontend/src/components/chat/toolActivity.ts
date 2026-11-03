@@ -52,6 +52,7 @@ export const TOOL_META: Record<string, { label: string; category: ToolCategory }
   unpin_from_project:    { label: 'Removing project pin',     category: 'write' },
   set_project_status:    { label: 'Updating project status',  category: 'write' },
   propose_obligations: { label: 'Updating the RA inbox', category: 'write' },
+  list_project_inbox: { label: 'Reading the RA inbox', category: 'read' },
   create_automation:     { label: 'Creating automation',      category: 'write' },
   create_workflow:       { label: 'Building workflow',         category: 'write' },
   get_workflow_definition: { label: 'Reading workflow steps',  category: 'read' },

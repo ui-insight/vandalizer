@@ -70,6 +70,7 @@ from app.services.chat_output import public_chat_text
 from app.services.chat_budget_tables import reconcile_budget_tables
 from app.services.chat_source_claims import attachment_sources, ground_source_checks
 from app.services.compliance_claims import relabel_presence_checks, superseded_threshold_note
+from app.services.inbox_provenance import REPLY_NOTE as INBOX_REPLY_NOTE, credits_inbox
 from app.services.web_answer_grounding import (
     correction_note,
     missed_corrections,
@@ -2784,6 +2785,8 @@ async def chat_stream(
                 # "Mentioned in the document" is not "compliant", and a
                 # threshold the 2024 Uniform Guidance replaced is not current.
                 answer = relabel_presence_checks(answer, streamed_tool_results)
+                if not getattr(deps, "inbox_read", False) and credits_inbox(answer):
+                    answer += "\n\n" + INBOX_REPLY_NOTE
                 threshold_note = superseded_threshold_note(answer)
                 if threshold_note:
                     answer += "\n\n" + threshold_note
