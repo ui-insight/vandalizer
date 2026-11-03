@@ -427,6 +427,25 @@ export function ChatMessage({
             </div>
           )}
 
+          {message.unconfirmed_web_facts && message.unconfirmed_web_facts.length > 0 && (
+            <div
+              role="note"
+              aria-label="Details not confirmed on a page"
+              style={{
+                marginTop: 8, padding: '8px 10px', display: 'flex', gap: 8, alignItems: 'flex-start',
+                backgroundColor: '#fef3c7', borderRadius: 6, fontSize: 12, lineHeight: 1.5, color: '#92400e',
+              }}
+            >
+              <AlertTriangle aria-hidden style={{ width: 14, height: 14, flexShrink: 0, marginTop: 2, color: '#b45309' }} />
+              <span>
+                Not confirmed on a page: <strong>{message.unconfirmed_web_facts.join(', ')}</strong>.
+                {' '}This answer used web search results, which are short excerpts and can be out of
+                date, and no page read for it states these details. Open the official source to check
+                them, or ask the assistant to read that page.
+              </span>
+            </div>
+          )}
+
           {message.silence_inferences && message.silence_inferences.length > 0 && (
             <div
               role="note"

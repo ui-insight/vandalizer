@@ -1625,6 +1625,11 @@ async def fetch_url(
             "source_reference": None,
             "url": page["url"],
         }]
+    page["consistency_note"] = (
+        "If this page contradicts anything you told the user earlier in this "
+        "conversation, say so before anything else, e.g. \"Correction: Supplement 1 "
+        "is effective Dec. 8, 2025, not Oct. 8, 2025 as I said earlier.\""
+    )
     if removed:
         page["page_screen"] = removed
         page["untrusted_content_note"] = (
@@ -1717,6 +1722,17 @@ async def web_search(
             context.deps.citation_annotations[context.tool_call_id] = citations
 
     response: dict = {"query": result.get("query", query), "results": results}
+    if results:
+        # Support ticket: an effective date taken from a snippet was wrong
+        # beside the official link it came with.
+        response["snippet_note"] = (
+            "Snippets are the search provider's excerpts: they can be outdated, "
+            "cut off, or from a different page than the title. Before you state an "
+            "exact date, deadline, dollar amount, percentage or rule as fact, read "
+            "the official page with fetch_url and take it from the page. If you "
+            "can't read it, say the detail comes from a search result and is "
+            "unconfirmed."
+        )
     if result.get("screened"):
         response["screened"] = result["screened"]
         response["untrusted_content_note"] = result["untrusted_content_note"]

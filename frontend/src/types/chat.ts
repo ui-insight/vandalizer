@@ -25,6 +25,9 @@ export interface ChatMessage {
   /** KB answers only: sources the answer cites for text they don't contain —
    *  e.g. a scraped page holding only its title. */
   unsupported_citations?: string[]
+  /** Answers that searched the web: dates, amounts and percentages no page
+   *  read for the answer states (from a search snippet or the model's memory). */
+  unconfirmed_web_facts?: string[]
   /** Documents in scope when this turn was asked — `{uuid, title}` each, with
    *  a final `{truncated: n}` when the selection was larger than is recorded.
    *  Present on user turns; assistant turns carry `citations` instead. */
@@ -292,6 +295,8 @@ export interface StreamChunk {
   silence_inferences?: string[]
   // grounding_warning only: cited sources that don't contain the cited text.
   unsupported_citations?: string[]
+  // grounding_warning only: web-answer facts no page read states.
+  unconfirmed_web_facts?: string[]
 }
 
 export interface SuggestedModel {

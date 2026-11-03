@@ -39,6 +39,27 @@ describe('ChatMessage unsupported figures', () => {
   })
 })
 
+// A web answer's exact dates taken from search snippets read like facts beside
+// official links (NSF PAPPG ticket: Supplement 1 "effective Oct. 8, 2025").
+describe('ChatMessage unconfirmed web details', () => {
+  it('names the details no page read for the answer states', () => {
+    render(<ChatMessage message={answer({
+      content: 'Supplement 1 (effective Oct. 8, 2025).',
+      unconfirmed_web_facts: ['Oct. 8, 2025'],
+    })} />)
+
+    const note = screen.getByRole('note', { name: 'Details not confirmed on a page' })
+    expect(note).toHaveTextContent('Not confirmed on a page: Oct. 8, 2025')
+    expect(note).toHaveTextContent(/web search results/)
+  })
+
+  it('shows nothing for an answer without unconfirmed web details', () => {
+    render(<ChatMessage message={answer({ unconfirmed_web_facts: [] })} />)
+
+    expect(screen.queryByRole('note')).not.toBeInTheDocument()
+  })
+})
+
 // A chip made from a page number the model wrote about an attached document is
 // only shown as an ordinary source when the cited sentence was found on that
 // page (#998). Otherwise it still opens the page, but says what it is.
