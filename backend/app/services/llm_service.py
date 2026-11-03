@@ -1269,6 +1269,10 @@ def create_agentic_chat_agent(
         agent.output_validator(require_lessons_in_order)
         # A summary of the lesson card it sits under, which can reverse it.
         agent.output_validator(require_lesson_not_restated)
+        # Totals and differences about a document worked out in the model's
+        # head (budget ticket): redo them with the calculate tool.
+        from app.services.calculation_claims import require_calculated_figures
+        agent.output_validator(require_calculated_figures)
         _agentic_chat_agent_cache[cache_key] = agent
 
     return _agentic_chat_agent_cache[cache_key]
@@ -1496,6 +1500,14 @@ AGENTIC_CHAT_SYSTEM_PROMPT = (
     "- User asks about quality, accuracy, or validation → get_quality_info\n"
     "- User asks what's available in their library → search_library\n"
     "- User wants to read or preview a document → get_document_text\n"
+    "- Any arithmetic on figures (does a budget add up, totals, subtotals, differences, "
+    "indirect = total − direct, rates, percentages, whether values fall in a range) → "
+    "calculate, for every number you state. Never add, subtract or compare in your head. "
+    "First read the whole table and list every row that belongs in each sum (every "
+    "category, e.g. Other, and every year); then show the working step by step (the terms, "
+    "the result) and state conclusions from the tool's results and checks, e.g. 'Indirect "
+    "for Y1–Y4 ($51k–$57k) matches the stated range; Y5 works out to $49k, below it.' "
+    "Say calculated figures were calculated from the document.\n"
     "- User wants reporting deadlines or obligations added to a project → read the documents, "
     "then propose_obligations. For relative deadlines, pass the quoted timing rule and dated "
     "performance/budget periods with relative_deadline=true; let the server compute the dates. "

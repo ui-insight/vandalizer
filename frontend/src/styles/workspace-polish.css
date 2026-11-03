@@ -249,6 +249,12 @@
 .agent-workflow-progress { margin: 10px 0; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; background: #f9fafb; font-size: var(--workspace-font-control); line-height: 1.5; color: #374151; overflow-wrap: anywhere; }
 .agent-workflow-progress p { margin: 8px 0; }
 .agent-run-status { display: flex; align-items: center; gap: 6px; font-weight: 600; }
+.agent-calculation { margin: 6px 0 0 20px; font-size: var(--workspace-font-meta); }
+.agent-calculation table { margin-top: 6px; border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+.agent-calculation th, .agent-calculation td { border-bottom: 1px solid #e5e7eb; padding: 4px 6px; text-align: left; vertical-align: top; }
+.agent-calculation td:last-child { text-align: right; white-space: nowrap; font-weight: 600; }
+.agent-calculation code { white-space: pre-wrap; word-break: break-word; }
+.agent-calculation-error { color: #b45309; font-weight: 400; white-space: normal; }
 .agent-run-status svg { flex-shrink: 0; }
 .agent-run-error { color: #991b1b; margin: 8px 0; }
 .agent-workflow-progress summary { cursor: pointer; padding: 10px 0; }

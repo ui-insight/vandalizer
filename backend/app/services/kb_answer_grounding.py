@@ -176,6 +176,67 @@ def unsupported_figures(answer: str, snippets: str) -> list[str]:
     return sorted(missing, key=lambda label: order[label])
 
 
+def _figure_value_and_unit(label: str) -> tuple[float, float] | None:
+    """A stated figure's value and the precision it was written to.
+
+    "$51k" is 51,000 to the nearest 1,000; "$1.255M" is 1,255,000 to the
+    nearest 1,000; "20.2%" is 20.2 to the nearest 0.1.
+    """
+    money = _MONEY_RE.search(label)
+    if money:
+        whole, frac, scale = money.group(1), money.group(2) or "", money.group(3)
+        factor = _SCALES[scale.lower()] if scale else 1
+        decimals = len(frac) - 1 if frac else 0
+        return float(whole.replace(",", "") + frac) * factor, factor / 10 ** decimals
+    pct = _PERCENT_RE.search(label)
+    if pct:
+        number = pct.group(1)
+        decimals = len(number.split(".")[1]) if "." in number else 0
+        return float(number), 1 / 10 ** decimals
+    return None
+
+
+def _calculated_values(outputs: list[str]) -> list[float]:
+    values: list[float] = []
+    for text in outputs:
+        try:
+            parsed = json.loads(text)
+        except ValueError:
+            continue
+        for step in (parsed.get("steps") or []) if isinstance(parsed, dict) else []:
+            result = step.get("result") if isinstance(step, dict) and "check" not in step else None
+            if isinstance(result, str):
+                try:
+                    values.append(float(result.replace(",", "")))
+                except ValueError:
+                    continue
+    return values
+
+
+def calculated_only(figures: list[str], answer: str, calculate_outputs: list[str]) -> list[str]:
+    """The *figures* (labels from ``unsupported_figures``) that a calculate
+    step produced, allowing for the rounding the answer wrote them with.
+
+    Support ticket (NIH R01 budget): yearly direct costs the model worked out
+    were shown as "Not in the retrieved sources … may come from the model's
+    general knowledge". A calculated figure is neither: it is labelled as a
+    calculation to check against the document instead.
+    """
+    values = _calculated_values(calculate_outputs)
+    if not values:
+        return []
+    out = []
+    for label in figures:
+        parsed = _figure_value_and_unit(label)
+        if parsed is None:
+            continue
+        value, unit = parsed
+        tolerance = unit / 2 + 1e-9
+        if any(abs(candidate - value) <= tolerance for candidate in values):
+            out.append(label)
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Citations whose source doesn't say what the answer attributes to it.
 #

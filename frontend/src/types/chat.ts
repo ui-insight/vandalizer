@@ -20,6 +20,8 @@ export interface ChatMessage {
   /** KB and attached-document answers: dollar amounts / percentages in the
    *  answer that no source states — likely recalled from the model's memory. */
   unsupported_figures?: string[]
+  /** Figures only a calculate step produced: worked out from the sources, to verify. */
+  calculated_figures?: string[]
   /** Sentences that read a gap in the sources as a rule, e.g. "may be any length" (#1012). */
   silence_inferences?: string[]
   /** KB answers only: sources the answer cites for text they don't contain —
@@ -291,6 +293,8 @@ export interface StreamChunk {
   used_refs?: number[]
   // grounding_warning only: figures in the finished answer no snippet states.
   unsupported_figures?: string[]
+  /** Figures only a calculate step produced: worked out from the sources, to verify. */
+  calculated_figures?: string[]
   /** Sentences that read a gap in the sources as a rule, e.g. "may be any length" (#1012). */
   silence_inferences?: string[]
   // grounding_warning only: cited sources that don't contain the cited text.

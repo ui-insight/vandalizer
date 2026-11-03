@@ -73,6 +73,10 @@ class ChatMessage(Document):
     # states — likely recalled from the model's memory, which can predate the
     # current regulation. Chat shows them under the answer.
     unsupported_figures: Optional[list[str]] = None
+    # Figures the answer states that only a calculate step produced: worked
+    # out from the sources, not found in them. Labelled "calculated", not
+    # "may come from general knowledge".
+    calculated_figures: Optional[list[str]] = None
     # Sentences that conclude a rule from the sources' silence (#1012).
     silence_inferences: Optional[list[str]] = None
     # Set on a turn that ended early: "stopped" when the user pressed Stop,
@@ -121,6 +125,8 @@ class ChatMessage(Document):
             d["citations"] = self.citations
         if self.unsupported_figures:
             d["unsupported_figures"] = self.unsupported_figures
+        if self.calculated_figures:
+            d["calculated_figures"] = self.calculated_figures
         if self.silence_inferences:
             d["silence_inferences"] = self.silence_inferences
         if self.interruption:
@@ -377,6 +383,7 @@ class ChatConversation(Document):
         unsupported_figures: Optional[list[str]] = None,
         silence_inferences: Optional[list[str]] = None,
         interruption: Optional[str] = None,
+        calculated_figures: Optional[list[str]] = None,
         unsupported_citations: Optional[list[str]] = None,
         unconfirmed_web_facts: Optional[list[str]] = None,
     ) -> ChatMessage:
@@ -391,6 +398,7 @@ class ChatConversation(Document):
             segments=segments or None,
             citations=citations or None,
             unsupported_figures=unsupported_figures or None,
+            calculated_figures=calculated_figures or None,
             silence_inferences=silence_inferences or None,
             interruption=interruption or None,
             unsupported_citations=unsupported_citations or None,

@@ -38,6 +38,7 @@ from app.services.chat_page_templates import find_page_templates, get_page_templ
 from app.services.chat_artifact_tools import create_html_artifact, get_html_artifact, revise_html_artifact
 from app.services.chat_skill_tools import get_skill, list_skills, select_skill
 from app.services.chat_file_tools import list_projects, move_documents_to_project
+from app.services.chat_calculator import calculate
 from app.services.certification_versions.runtime import course_operation
 from app.services.certification_versions.tool_results import (
     CheckResult, CompletionResult, LessonResult, ModuleResult, ProgressResult,
@@ -7000,6 +7001,7 @@ TOOLS: list[ToolFuncContext[AgenticChatDeps, ...]] = [
     fetch_url,
     web_search,
     get_document_text,
+    calculate,
     analyze_documents,
     run_extraction,
     check_compliance,
@@ -7078,6 +7080,7 @@ COMPACTABLE_TOOLS: frozenset[str] = frozenset({
     "fetch_url",
     "web_search",
     "get_document_text",
+    "calculate",
     "analyze_documents",
     "run_extraction",
     "check_compliance",

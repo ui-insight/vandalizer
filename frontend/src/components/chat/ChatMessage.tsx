@@ -5,7 +5,7 @@ import { ThinkingTrace } from './ThinkingTrace'
 import type { ApprovalRecord } from './approvalHistory'
 import { usePanelEffect } from '../shared/usePanelEffect'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronRight, Eye, FileText, AlertTriangle } from 'lucide-react'
+import { ChevronRight, Eye, FileText, AlertTriangle, Calculator } from 'lucide-react'
 import { ChatExportActions } from './ChatExportActions'
 import { useCertificationPanel } from '../../contexts/CertificationPanelContext'
 import { certificationChatEntry } from '../../lib/certificationChat'
@@ -423,6 +423,22 @@ export function ChatMessage({
                 {' '}It may come from the model's general knowledge, which can be out of date.
                 Check it against the source before relying on it. With a knowledge base, naming the
                 section or document in your question usually retrieves the passage that states it.
+              </span>
+            </div>
+          )}
+
+          {message.calculated_figures && message.calculated_figures.length > 0 && (
+            <div
+              role="note"
+              style={{
+                marginTop: 8, padding: '8px 10px', display: 'flex', gap: 8, alignItems: 'flex-start',
+                backgroundColor: '#eff6ff', borderRadius: 6, fontSize: 12, lineHeight: 1.5, color: '#1e3a5f',
+              }}
+            >
+              <Calculator aria-hidden style={{ width: 14, height: 14, flexShrink: 0, marginTop: 2, color: '#1d4ed8' }} />
+              <span>
+                Calculated from the document: <strong>{message.calculated_figures.join(', ')}</strong>.
+                {' '}The arithmetic was done exactly; verify that each term was read from the right row and year.
               </span>
             </div>
           )}

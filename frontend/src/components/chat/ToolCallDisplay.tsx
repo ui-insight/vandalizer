@@ -224,6 +224,12 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
       return { text: `Found ${passages.length} relevant passage${passages.length !== 1 ? 's' : ''}`, qualityHint }
     }
 
+    case 'calculate': {
+      const steps = Array.isArray(obj.steps) ? obj.steps as Array<Record<string, unknown>> : []
+      const failed = steps.filter(step => step.error).length
+      return { text: `${steps.length} calculation${steps.length === 1 ? '' : 's'}${failed ? `, ${failed} not computed` : ''}`, qualityHint: '' }
+    }
+
     case 'get_document_text': {
       const title = obj.title ? `"${String(obj.title).slice(0, 40)}"` : ''
       // Say which pages a read covered, so a partial read of a long
@@ -996,6 +1002,31 @@ function KBPassages({ content, actions }: { content: unknown; actions?: KBSource
   )
 }
 
+interface CalculationStep { label: string; expression: string; result?: string; check?: boolean; error?: string }
+
+/** The calculate tool's working: each step's terms and exact result. */
+export function CalculationSteps({ steps }: { steps: CalculationStep[] }) {
+  const text = steps.map(step => `${step.label}: ${step.expression} = ${step.error ? `not computed (${step.error})` : step.result}`).join('\n')
+  return (
+    <details className="agent-calculation">
+      <summary>Show the working</summary>
+      <table>
+        <thead><tr><th scope="col">Step</th><th scope="col">Calculation</th><th scope="col">Result</th></tr></thead>
+        <tbody>
+          {steps.map((step, index) => (
+            <tr key={`${step.label}-${index}`}>
+              <th scope="row">{step.label}</th>
+              <td><code>{step.expression}</code></td>
+              <td>{step.error ? <span className="agent-calculation-error">Not computed: {step.error}</span> : step.check === undefined ? step.result : step.check ? 'Yes' : 'No'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <CopyButton text={text} label="Copy the working" />
+    </details>
+  )
+}
+
 /** Render completed workflow output as structured content. */
 function WorkflowOutput({ content }: { content: Record<string, unknown> }) {
   const status = content.status as string | undefined
@@ -1421,6 +1452,9 @@ export function ToolStatusLine({
       )}
       {result && name === 'search_knowledge_base' && !isError && (
         <KBPassages content={result.content} actions={kbActions} />
+      )}
+      {result && name === 'calculate' && Array.isArray(obj?.steps) && (
+        <CalculationSteps steps={obj.steps as CalculationStep[]} />
       )}
       {result && name === 'get_workflow_status' && obj?.status === 'completed' && obj?.output != null && (
         <WorkflowOutput content={obj} />

@@ -174,6 +174,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
   const lastSendArgsRef = useRef<SendArgs | null>(null)
   const lastSendAcceptedRef = useRef(false)
   const unsupportedFiguresRef = useRef<string[]>([])
+  const calculatedFiguresRef = useRef<string[]>([])
   const silenceInferencesRef = useRef<string[]>([])
   const unsupportedCitationsRef = useRef<string[]>([])
   const unconfirmedWebFactsRef = useRef<string[]>([])
@@ -269,6 +270,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
       segmentsRef.current = []
       citationsRef.current = []
       unsupportedFiguresRef.current = []
+      calculatedFiguresRef.current = []
       silenceInferencesRef.current = []
       unsupportedCitationsRef.current = []
       unconfirmedWebFactsRef.current = []
@@ -320,6 +322,9 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
         }
         if (unsupportedFiguresRef.current.length) {
           assistantMsg.unsupported_figures = unsupportedFiguresRef.current
+        }
+        if (calculatedFiguresRef.current.length) {
+          assistantMsg.calculated_figures = calculatedFiguresRef.current
         }
         if (silenceInferencesRef.current.length) {
           assistantMsg.silence_inferences = silenceInferencesRef.current
@@ -465,6 +470,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
               citationsRef.current = markUsed(citationsRef.current, chunk.used_refs ?? [])
             } else if (chunk.kind === 'grounding_warning') {
               unsupportedFiguresRef.current = chunk.unsupported_figures ?? []
+              calculatedFiguresRef.current = chunk.calculated_figures ?? []
               silenceInferencesRef.current = chunk.silence_inferences ?? []
               unsupportedCitationsRef.current = chunk.unsupported_citations ?? []
               unconfirmedWebFactsRef.current = chunk.unconfirmed_web_facts ?? []
