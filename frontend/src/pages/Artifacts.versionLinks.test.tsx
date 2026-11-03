@@ -36,7 +36,7 @@ it('publishes old and revised versions at separate links without moving the main
   fireEvent.click(screen.getByRole('button', { name: 'Publish as separate link' }))
   const original = await screen.findByLabelText('Public link for version 1')
   expect(original).toHaveValue(`${window.location.origin}/a/public-v1`)
-  expect(api.publishArtifactVersion).toHaveBeenCalledWith('page', 'v1')
+  expect(api.publishArtifactVersion).toHaveBeenCalledWith('page', 'v1', { expires_at: null, audience: 'anyone', emails: [] })
   expect(screen.getByRole('button', { name: 'Separate link published' })).toBeDisabled()
 
   fireEvent.change(screen.getByLabelText('Version to publish'), { target: { value: 'v3' } })

@@ -5,7 +5,7 @@ from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
 from app.config import Settings
 from app.models.user import User
-from app.models.artifact import Artifact
+from app.models.artifact import Artifact, PageLinkViewer
 from app.models.page_template import PageTemplate, PageTemplateDraft
 from app.models.team import Team, TeamMembership, TeamInvite, TeamJoinLink
 from app.models.document import SmartDocument
@@ -77,6 +77,7 @@ ALL_MODELS: list[type[Document]] = [
     AwardSnapshot,
     User,
     Artifact,
+    PageLinkViewer,
     PageTemplate,
     PageTemplateDraft,
     Team,

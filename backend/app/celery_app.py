@@ -162,6 +162,11 @@ celery.conf.beat_schedule = {
         "task": "tasks.obligations.send_deadline_reminders",
         "schedule": crontab(minute=5),
     },
+    # Public Page links about to expire: one bell per link, three days ahead.
+    "pages-expiring-link-reminders": {
+        "task": "tasks.obligations.remind_expiring_page_links",
+        "schedule": crontab(minute=20),
+    },
     "obligations-weekly-summary": {
         "task": "tasks.obligations.send_weekly_deadline_summaries",
         "schedule": crontab(day_of_week=1, hour=7, minute=0),  # Mondays 7am

@@ -15,10 +15,29 @@ export interface Artifact {
   team_revision?: string | null
   can_manage: boolean
   public_sharing_enabled?: boolean
+  /** Owner only: each public link's expiry, audience and view record. */
+  public_links?: { main: PublicLinkInfo | null; versions: Record<string, PublicLinkInfo | null> }
   revisions: { uuid: string; title: string; created_at: string; warnings: string[]; version?: number }[]
 }
 const path = (id: string) => `/api/pages/${encodeURIComponent(id)}`
-export interface PublicArtifact { title: string; revision: string; version: number; updated_at: string }
+export interface PublicArtifact { title: string; revision: string; version: number; updated_at: string; expires_at?: string | null; audience?: LinkAudience }
+
+export type LinkAudience = 'anyone' | 'signed_in'
+/** Settings sent when publishing or changing a public link. */
+export interface LinkSettings { expires_at: string | null; audience: LinkAudience; emails: string[] }
+export interface PublicLinkInfo {
+  expires_at: string | null
+  expired: boolean
+  audience: LinkAudience
+  emails: string[]
+  views: { count: number; last_at: string | null }
+  viewers: { name: string; email: string; count: number; last_at: string | null }[]
+}
+export interface LivePublicLink {
+  artifact_uuid: string; title: string; kind: 'main' | 'version'; version: number | null; url: string
+  expires_at: string | null; expired: boolean; audience: LinkAudience; restricted_to: number
+  views: { count: number; last_at: string | null }
+}
 export interface ArtifactPageResult { items: Artifact[]; total: number; page: number; page_size: number }
 export const browseArtifacts = (params: { search?: string; sort?: string; page?: number; project_uuid?: string }) => {
   const query = new URLSearchParams()
@@ -35,9 +54,12 @@ export const artifactContentUrl = (id: string, revision: string) => `${path(id)}
 export const publicArtifactContentUrl = (token: string, revision?: string) => `${path('public')}/${encodeURIComponent(token)}/content${revision ? `?revision=${encodeURIComponent(revision)}` : ''}`
 export const artifactSource = (id: string, revision: string) => apiFetch<{ title: string; html: string }>(`${path(id)}/revisions/${encodeURIComponent(revision)}/source`)
 export const reviseArtifact = (id: string, title: string, html: string, baseRevision: string) => apiFetch<Artifact>(`${path(id)}/revisions`, { method: 'POST', body: JSON.stringify({ title, html, base_revision: baseRevision }) })
-export const publishArtifact = (id: string, revision: string) => apiFetch<Artifact>(`${path(id)}/publication`, { method: 'PUT', body: JSON.stringify({ revision }) })
+export const publishArtifact = (id: string, revision: string, settings?: LinkSettings) => apiFetch<Artifact>(`${path(id)}/publication`, { method: 'PUT', body: JSON.stringify({ revision, ...settings }) })
 export const unpublishArtifact = (id: string) => apiFetch(`${path(id)}/publication`, { method: 'DELETE' })
-export const publishArtifactVersion = (id: string, revision: string) => apiFetch<Artifact>(`${path(id)}/publication`, { method: 'PUT', body: JSON.stringify({ revision, separate_link: true }) })
+export const publishArtifactVersion = (id: string, revision: string, settings?: LinkSettings) => apiFetch<Artifact>(`${path(id)}/publication`, { method: 'PUT', body: JSON.stringify({ revision, separate_link: true, ...settings }) })
+/** Change an existing link: the main link, or `revision`'s version link. */
+export const updatePublicLink = (id: string, settings: LinkSettings, revision?: string) => apiFetch<Artifact>(`${path(id)}/publication/settings`, { method: 'PUT', body: JSON.stringify({ ...settings, revision }) })
+export const listPublicLinks = () => apiFetch<{ links: LivePublicLink[] }>('/api/pages/public-links')
 export const unpublishArtifactVersion = (id: string, revision: string) => apiFetch(`${path(id)}/publication?revision=${encodeURIComponent(revision)}`, { method: 'DELETE' })
 export const shareArtifactTeam = (id: string, teamId: string | null, revision?: string) => apiFetch(`${path(id)}/team`, { method: 'PUT', body: JSON.stringify({ team_id: teamId, revision }) })
 export const deleteArtifact = (id: string) => apiFetch(path(id), { method: 'DELETE' })

@@ -15,7 +15,8 @@ from app.config import Settings
 from app.dependencies import get_current_user, get_settings
 from app.models.user import User
 from app.rate_limit import limiter
-from app.schemas.artifact import ChatArtifactRequest, CreateArtifactRequest, DuplicateArtifactRequest, PublishArtifactRequest, RenameArtifactRequest, ReviseArtifactRequest, ShareArtifactRequest
+from app.schemas.artifact import ChatArtifactRequest, CreateArtifactRequest, DuplicateArtifactRequest, PublicLinkSettingsRequest, PublishArtifactRequest, RenameArtifactRequest, ReviseArtifactRequest, ShareArtifactRequest
+from app.services import public_page_access
 from app.services.page_links import prepare_page_links
 from app.services import access_control, artifacts
 from app.services import transcript_pages
@@ -100,6 +101,12 @@ def content_response(rev: dict, download: bool=False, *, version: int=1, view: L
     })
 
 
+@router.get("/public-links", response_model=None)
+async def list_public_links(user: User = Depends(get_current_user)) -> dict[str, object]:
+    """All of the caller's live public links, expired and soonest-to-expire first."""
+    return {"links": await run(public_page_access.live_links, user.user_id)}
+
+
 @router.get("", response_model=None)
 async def list_artifacts(user: User = Depends(get_current_user)) -> list[dict]:
     result = await browse_artifacts(search="", sort="updated", page=1, page_size=100, project_uuid=None, user=user)
@@ -142,7 +149,18 @@ async def workflow_artifact(request: Request, session_id: str, step: str | None 
     return artifacts.metadata(await run(artifacts.from_workflow, result.model_dump(), user.user_id, step, recreate_deleted=True), True)
 
 
-async def public_doc(token: str, settings: Settings) -> tuple[dict, dict]:
+async def optional_user(request: Request, settings: Settings) -> User | None:
+    """The signed-in viewer of a public link, or None; never an error."""
+    token = request.cookies.get("access_token")
+    if not token:
+        return None
+    try:
+        return await get_current_user(access_token=token, settings=settings)
+    except HTTPException:
+        return None
+
+
+async def public_doc(token: str, settings: Settings, request: Request | None = None, *, count_view: bool = False) -> tuple[dict, dict]:
     if not settings.artifact_public_sharing_enabled:
         raise HTTPException(404, "Page not found")
     doc = await run(lambda db: db.html_artifacts.find_one({
@@ -150,16 +168,29 @@ async def public_doc(token: str, settings: Settings) -> tuple[dict, dict]:
     }))
     if not doc:
         raise HTTPException(404, "Page not found")
-    selected = doc.get("published_revision") if doc.get("public_token") == token else next(
-        (p["revision"] for p in doc.get("publications", []) if p["token"] == token), None)
-    if not selected:
+    found = public_page_access.link_for_token(doc, token)
+    if not found:
         raise HTTPException(404, "Page not found")
+    selected, link, kind = found
+    # Expiry and audience apply to the HTML as well as the metadata, so the
+    # content URL can't be opened around them.
+    viewer = await optional_user(request, settings) if request is not None and link["audience"] == "signed_in" else None
+    public_page_access.check(link, viewer)
+    if count_view:
+        # Who opened it is recorded only for links that require signing in:
+        # a visitor to an anyone-with-the-link page is anonymous to its owner.
+        await run(public_page_access.record_view, doc, token, kind, viewer)
     return doc, artifacts.revision(doc, selected)
 
 
 @router.get("/public/{token}", response_model=None)
-async def get_public(token: str, response: Response, settings: Settings = Depends(get_settings)) -> dict[str, object]:
-    doc, rev = await public_doc(token, settings)
+async def get_public(token: str, request: Request, response: Response, settings: Settings = Depends(get_settings)) -> dict[str, object]:
+    # One opening of the link = one metadata request (the viewer then loads
+    # the HTML once per view mode, which is not counted again).
+    doc, rev = await public_doc(token, settings, request, count_view=True)
+    found = public_page_access.link_for_token(doc, token)
+    expires = found[1]["expires_at"] if found else None
+    audience = found[1]["audience"] if found else "anyone"
     # Mongo may return naive UTC datetimes. Never use the page's updated_at:
     # it advances when an owner saves a private draft.
     updated_at = rev["created_at"]
@@ -168,13 +199,13 @@ async def get_public(token: str, response: Response, settings: Settings = Depend
     response.headers["Cache-Control"] = "no-store"
     return {"title": rev["title"], "revision": rev["uuid"],
             "version": next(i for i, item in enumerate(doc["revisions"], 1) if item["uuid"] == rev["uuid"]),
-            "updated_at": updated_at}
+            "updated_at": updated_at, "expires_at": expires, "audience": audience}
 
 
 @router.get("/public/{token}/content", response_model=None)
-async def public_content(token: str, download: bool = False, revision: str | None = None,
+async def public_content(token: str, request: Request, download: bool = False, revision: str | None = None,
                          view: Literal["content", "full", "print", "embed"] = "content", settings: Settings = Depends(get_settings)) -> HTMLResponse:
-    doc, rev = await public_doc(token, settings)
+    doc, rev = await public_doc(token, settings, request)
     # Keep a viewer's version/date label matched to the HTML even if the owner
     # publishes again between the metadata request and the iframe request.
     if revision is not None and revision != rev["uuid"]:
@@ -186,7 +217,27 @@ async def public_content(token: str, download: bool = False, revision: str | Non
 @router.get("/{uuid}", response_model=None)
 async def get_artifact(uuid: str, user: User = Depends(get_current_user), settings: Settings = Depends(get_settings)) -> dict[str, object]:
     doc = await authorized(uuid, user)
-    return {**artifacts.metadata(doc, doc["user_id"] == user.user_id), "public_sharing_enabled": settings.artifact_public_sharing_enabled}
+    owner = doc["user_id"] == user.user_id
+    result = {**artifacts.metadata(doc, owner), "public_sharing_enabled": settings.artifact_public_sharing_enabled}
+    if owner:
+        result["public_links"] = await run(public_page_access.describe, doc)
+    return result
+
+
+@router.put("/{uuid}/publication/settings", response_model=None)
+async def public_link_settings(uuid: str, body: PublicLinkSettingsRequest, user: User = Depends(get_current_user)) -> dict:
+    """Extend, shorten or restrict an existing public link."""
+    doc = await authorized(uuid, user, manage=True)
+    link = public_page_access.normalize(body.expires_at, body.audience, body.emails)
+    if body.revision is None:
+        if not doc.get("public_token") or not doc.get("published_revision"):
+            raise HTTPException(404, "This page has no main public link.")
+        await run(public_page_access.apply_main, doc, link)
+    else:
+        if not any(p["revision"] == body.revision for p in doc.get("publications") or []):
+            raise HTTPException(404, "That version has no public link.")
+        await run(public_page_access.apply_version, doc, body.revision, link)
+    return artifacts.metadata(await run(artifacts.get, uuid), True)
 
 
 @router.get("/{uuid}/revisions/{revision}/content", response_model=None)
@@ -239,9 +290,17 @@ async def publish(uuid: str, body: PublishArtifactRequest, user: User = Depends(
     if not settings.artifact_public_sharing_enabled:
         raise HTTPException(403, "Public page sharing is disabled on this deployment.")
     doc = await authorized(uuid, user, manage=True)
+    chosen = body.model_fields_set & {"expires_at", "audience", "emails"}
+    link = public_page_access.normalize(body.expires_at, body.audience, body.emails) if chosen else None
     saved = await run(artifacts.publish_separate if body.separate_link else artifacts.publish, doc, body.revision)
     if not saved:
         raise HTTPException(404, "Page not found")
+    if link is not None:
+        if body.separate_link:
+            await run(public_page_access.apply_version, saved, body.revision, link)
+        else:
+            await run(public_page_access.apply_main, saved, link)
+        saved = await run(artifacts.get, uuid)
     return artifacts.metadata(saved, True)
 
 
@@ -252,6 +311,7 @@ async def unpublish(uuid: str, revision: str | None = Query(default=None, min_le
         await run(artifacts.unpublish_separate, doc, revision)
     else:
         await run(artifacts.unpublish, doc)
+        await run(public_page_access.clear_main, doc)
     return {"ok": True}
 
 

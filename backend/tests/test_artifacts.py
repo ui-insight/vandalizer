@@ -313,7 +313,7 @@ async def test_public_revision_no_private_metadata_revocation_rotation_and_opera
     response = await client.get(f"/api/pages/public/{token}")
     from fastapi.encoders import jsonable_encoder
     assert response.json() == jsonable_encoder({"title": "Review", "revision": rev,
-        "version": 1, "updated_at": doc["revisions"][0]["created_at"]})
+        "version": 1, "updated_at": doc["revisions"][0]["created_at"], "expires_at": None, "audience": "anyone"})
     content = await client.get(f"/api/pages/public/{token}/content")
     assert "Original" in content.text and "Not published" not in content.text
     assert "private-chat" not in content.text

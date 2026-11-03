@@ -9,6 +9,8 @@ import { PageBadge, PageDialog, PagePreview, pagesUrl } from '../components/arti
 import { listTeams } from '../api/teams'
 import { PagePrintLink, pageViewUrl } from '../components/artifacts/PagePrintLink'
 import { PublishedPageContent } from '../components/artifacts/PublishedPageContent'
+import { DEFAULT_LINK, LinkAccessFields, LinkStatus, draftFrom, formatDate, settingsFrom, type LinkDraft } from '../components/artifacts/PublicLinkControls'
+import { ApiError } from '../api/client'
 
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : 'Could not complete this action. Please try again.'
 
@@ -37,12 +39,22 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [requestChanges, setRequestChanges] = useState(false)
   const [changes, setChanges] = useState('')
+  const [mainLink, setMainLink] = useState<LinkDraft>(DEFAULT_LINK)
+  const [versionLink, setVersionLink] = useState<LinkDraft>(DEFAULT_LINK)
+  // A public link that refused this viewer: expired, sign-in, not invited.
+  const [publicRefusal, setPublicRefusal] = useState<{ status: number; message: string } | null>(null)
   useEffect(() => {
     let live = true
-    setLoading(true); setError(''); setArtifact(null); setPublicInfo(null); setEditor(null); setTeamError(false)
+    setLoading(true); setError(''); setArtifact(null); setPublicInfo(null); setEditor(null); setTeamError(false); setPublicRefusal(null)
     const load = async () => {
       try {
-        if (publicToken) { const info = await api.getPublicArtifact(publicToken); if (live) setPublicInfo(info) }
+        if (publicToken) {
+          try { const info = await api.getPublicArtifact(publicToken); if (live) setPublicInfo(info) }
+          catch (e) {
+            if (e instanceof ApiError && [401, 403, 410].includes(e.status)) { if (live) setPublicRefusal({ status: e.status, message: e.message }); return }
+            throw e
+          }
+        }
         else if (uuid) {
           const item = await api.getArtifact(uuid)
           if (live) { setArtifact(item); setSelected(item.latest_revision); setTeam(item.team_id || ''); setTeamRevision(item.team_revision || item.published_revision || item.latest_revision); setPublicRevision(item.latest_revision) }
@@ -97,13 +109,24 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
   const copy = (value: string, success: string) => void action(async () => { await navigator.clipboard.writeText(value); setNotice(success) })
   const chatUrl = uuid ? `/?editPage=${encodeURIComponent(uuid)}${artifact?.source?.conversation_uuid ? `&conversation=${encodeURIComponent(artifact.source.conversation_uuid)}` : ''}${artifact?.source?.project_uuid ? `&project=${encodeURIComponent(artifact.source.project_uuid)}` : ''}` : ''
   const closeSharing = () => { setSharing(false); if (window.location.hash === '#share') window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search) }
-  const openSharing = () => { setPublicRevision(artifact?.latest_revision || ''); setSharing(true) }
+  const openSharing = () => { setPublicRevision(artifact?.latest_revision || ''); setMainLink(draftFrom(artifact?.public_links?.main)); setSharing(true) }
+  const linkSettings = (draft: LinkDraft) => {
+    const settings = settingsFrom(draft)
+    if (typeof settings === 'string') throw new Error(settings)
+    return settings
+  }
+  const audienceNote = (draft: LinkDraft) => draft.audience === 'signed_in' ? 'Signed-in people you allowed can view it.' : 'Anyone with the link can view it.'
+  useEffect(() => {
+    // #share opens the dialog on load (bell reminders link here): seed the
+    // link form from the saved settings once they arrive.
+    if (sharing && artifact?.public_links?.main) setMainLink(draftFrom(artifact.public_links.main))
+  }, [artifact?.public_links?.main, sharing])
   const feedback = <>{error && <p role="alert" className="page-alert">{error}</p>}{notice && <p role="status" className="page-notice">{notice}</p>}</>
   return <main className="page-workspace"><div className="page-workspace-inner">
     {!publicToken && <nav className="page-breadcrumb" aria-label="Breadcrumb"><a href={backUrl}><ArrowLeft size={15} />Files</a><ChevronRight size={13} /><a href={backUrl}>Pages</a><ChevronRight size={13} /><span>{loading ? 'Loading…' : 'Page details'}</span></nav>}
     <header className="page-heading"><div className="page-heading-copy"><p className="page-eyebrow">{publicToken ? 'SHARED PAGE' : 'SAVED PAGE'}</p><h1>{title}</h1>
       {(artifact || publicInfo) && <div className="page-meta">
-        {publicToken ? <><PageBadge published>Published · version {publicInfo?.version}</PageBadge><span>Anyone with the link</span>{publicUpdatedLabel ? <span>Last updated <time dateTime={publicInfo!.updated_at}>{publicUpdatedLabel}</time></span> : <span>Last updated date unavailable</span>}</> : artifact && !artifact.can_manage ? <PageBadge>Team access · version {version}</PageBadge> : <>
+        {publicToken ? <><PageBadge published>Published · version {publicInfo?.version}</PageBadge><span>{publicInfo?.audience === 'signed_in' ? 'Signed-in access' : 'Anyone with the link'}</span>{publicInfo?.expires_at && <span>Link expires {formatDate(publicInfo.expires_at)}</span>}{publicUpdatedLabel ? <span>Last updated <time dateTime={publicInfo!.updated_at}>{publicUpdatedLabel}</time></span> : <span>Last updated date unavailable</span>}</> : artifact && !artifact.can_manage ? <PageBadge>Team access · version {version}</PageBadge> : <>
           {artifact?.published_revision ? <PageBadge published>Published · version {publishedVersion}</PageBadge> : hasSeparateLinks ? <PageBadge published>Published version links</PageBadge> : <PageBadge>{artifact?.team_id ? 'Team access' : 'Private · only you'}</PageBadge>}
           {hasDraft && <PageBadge>Unpublished changes</PageBadge>}
           {hasPublicLinks && <span>Workspace access: {artifact?.team_id ? 'you and your team' : 'only you'}</span>}
@@ -120,7 +143,11 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
     </div>}</header>
     {!sharing && !requestChanges && !confirmDelete && !editor && feedback}
     {loading && <p role="status" className="pages-loading">Loading your page…</p>}
-    {!loading && !artifact && !publicInfo && <div className="pages-empty"><FileText size={32} /><h2>Page unavailable</h2><p>{publicToken ? 'This link may have been removed. Ask the owner for a current link.' : 'The page may have been removed, or your access may have changed.'}</p><button className="page-button" onClick={() => setAttempt(n => n + 1)}>Try again</button></div>}
+    {!loading && publicRefusal && <div className="pages-empty" role="alert"><LockKeyhole size={32} /><h2>{publicRefusal.status === 410 ? 'This link has expired' : publicRefusal.status === 401 ? 'Sign in to view this page' : 'You can’t open this page'}</h2>
+      <p>{publicRefusal.status === 401 ? 'The owner shared this page with people who have a verified Vandalizer account.' : publicRefusal.message}</p>
+      {publicRefusal.status === 401 && <a className="page-button page-button-primary" href={`/landing?next=${encodeURIComponent(window.location.pathname)}`}>Sign in</a>}
+    </div>}
+    {!loading && !artifact && !publicInfo && !publicRefusal && <div className="pages-empty"><FileText size={32} /><h2>Page unavailable</h2><p>{publicToken ? 'This link may have been removed. Ask the owner for a current link.' : 'The page may have been removed, or your access may have changed.'}</p><button className="page-button" onClick={() => setAttempt(n => n + 1)}>Try again</button></div>}
     {!loading && (artifact || publicInfo) && <>
       {artifact && <div className="page-revision-bar">{artifact.can_manage ? <label>Version<select aria-label="Page version" disabled={busy || !!editor} value={selected} onChange={e => setSelected(e.target.value)}>{artifact.revisions.map((r, index) => <option key={r.uuid} value={r.uuid}>Version {r.version ?? index + 1}{isPublished(r.uuid) ? ' · published' : ''}{r.uuid === artifact.latest_revision ? ' · latest' : ''}</option>)}</select></label> : <span>Shared version {version}</span>}<a className="page-text-button" href={pageViewUrl(contentUrl, 'full')} target="_blank" rel="noreferrer"><ArrowUpRight size={14} />Open full page</a></div>}
       {hasDraft && publishedVersion > 0 && !selectedIsPublished && <p className="page-revision-note">You’re previewing version {version}. The public link still shows version {publishedVersion}. Share → Publish updates when you’re ready.</p>}
@@ -158,16 +185,25 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
         <label>Version to publish<select aria-label="Version to publish" value={publicRevision} disabled={busy || !!editor || !artifact.public_sharing_enabled} onChange={e => setPublicRevision(e.target.value)}>{artifact.revisions.map((r, index) => <option key={r.uuid} value={r.uuid}>Version {r.version ?? index + 1}{r.uuid === artifact.published_revision ? ' · public now' : ''}{r.uuid === artifact.latest_revision ? ' · latest saved' : ''}</option>)}</select></label>
         <p>Publishing updates changes what everyone sees at the main public link. To keep a version available at its own fixed link, choose Publish as separate link below. Team access stays unchanged.</p>
         <a className="page-text-button" href={api.artifactContentUrl(uuid, publicRevision)} target="_blank" rel="noreferrer"><ArrowUpRight size={14} />Preview version {publicVersion}</a>
+        <LinkStatus link={artifact.public_links?.main} />
+        <LinkAccessFields idPrefix="main-link" name="Main link" draft={mainLink} onChange={setMainLink} disabled={busy || !artifact.public_sharing_enabled} />
         {publicLink && <div className="page-share-link"><label>Published page link<input aria-label="Published page link" readOnly value={publicLink} onFocus={e => e.target.select()} /></label><button className="page-icon-button" aria-label="Copy public link" disabled={busy} onClick={() => copy(publicLink, 'Public link copied.')}><Copy size={17} /></button></div>}
-        <div className="page-actions"><button className="page-button page-button-primary" disabled={busy || !!editor || !artifact.public_sharing_enabled || publicSelectionIsPublished || accessDirty} aria-describedby={accessDirty ? 'page-unsaved-access' : undefined} onClick={() => void action(async () => { await api.publishArtifact(uuid, publicRevision); await reload(); setNotice(`Version ${publicVersion} published. Anyone with the link can view it.`) })}>{publicSelectionIsPublished ? <><Check size={16} />Published</> : publishedVersion ? `Publish updates · version ${publicVersion}` : `Publish version ${publicVersion}`}</button>{publicLink && <a className="page-button" href={`/a/${artifact.public_token}`} target="_blank" rel="noreferrer"><ArrowUpRight size={16} />Open published page</a>}</div>
+        <div className="page-actions"><button className="page-button page-button-primary" disabled={busy || !!editor || !artifact.public_sharing_enabled || publicSelectionIsPublished || accessDirty} aria-describedby={accessDirty ? 'page-unsaved-access' : undefined} onClick={() => void action(async () => { await api.publishArtifact(uuid, publicRevision, linkSettings(mainLink)); await reload(); setNotice(`Version ${publicVersion} published. ${audienceNote(mainLink)}`) })}>{publicSelectionIsPublished ? <><Check size={16} />Published</> : publishedVersion ? `Publish updates · version ${publicVersion}` : `Publish version ${publicVersion}`}</button>{publicLink && <a className="page-button" href={`/a/${artifact.public_token}`} target="_blank" rel="noreferrer"><ArrowUpRight size={16} />Open published page</a>}</div>
         {artifact.public_sharing_enabled === false && <p>Public sharing is disabled on this deployment.</p>}
         {editor && <p>Save or cancel your HTML edits before publishing.</p>}
+        {publicLink && <button className="page-button" disabled={busy || !artifact.public_sharing_enabled} onClick={() => void action(async () => { await api.updatePublicLink(uuid, linkSettings(mainLink)); await reload(); setNotice(`Link settings saved. ${audienceNote(mainLink)}`) })}>Save link settings</button>}
         {publicLink && <button className="page-text-button mt-3" disabled={busy} onClick={() => void action(async () => { await api.unpublishArtifact(uuid); await reload(); setNotice('Public link removed. Downloaded copies cannot be recalled.') })}><Link2 size={14} />Remove public link</button>}
       </section>
       <PageVersionLinks artifact={artifact} revision={publicRevision} busy={busy}
+        draft={versionLink} onDraft={setVersionLink}
+        onUpdate={revision => void action(async () => {
+          await api.updatePublicLink(uuid, linkSettings(versionLink), revision)
+          await reload()
+          setNotice(`Version ${versionNumber(revision)} link settings saved.`)
+        })}
         publishDisabled={!!editor || !artifact.public_sharing_enabled || accessDirty}
         onPublish={() => void action(async () => {
-          await api.publishArtifactVersion(uuid, publicRevision)
+          await api.publishArtifactVersion(uuid, publicRevision, linkSettings(versionLink))
           await reload()
           setNotice(`Version ${publicVersion} has its own public link. Other public links are unchanged.`)
         })}

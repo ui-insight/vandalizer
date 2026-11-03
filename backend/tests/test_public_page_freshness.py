@@ -27,7 +27,8 @@ async def test_logged_out_freshness_tracks_published_revision(client, db, naive_
         assert response.status_code == 200
         assert response.headers["cache-control"] == "no-store"
         metadata = response.json()
-        assert set(metadata) == {"title", "revision", "version", "updated_at"}
+        assert set(metadata) == {"title", "revision", "version", "updated_at", "expires_at", "audience"}
+        assert metadata["expires_at"] is None
         assert metadata["title"] == "Public budget"
         assert metadata["version"] == 2
         assert metadata["revision"] == second["latest_revision"]

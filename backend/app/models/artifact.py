@@ -26,4 +26,22 @@ class Artifact(Document):
 
     class Settings:
         name = "html_artifacts"
-        indexes = [IndexModel("uuid", unique=True), "user_id", "team_id", "public_token", "publications.token", "project_uuid", "updated_at"]
+        indexes = [IndexModel("uuid", unique=True), "user_id", "team_id", "public_token", "publications.token", "project_uuid", "updated_at",
+                   "public_expires_at", "publications.expires_at"]
+
+
+class PageLinkViewer(Document):
+    """A signed-in person who opened a Page's sign-in-only public link."""
+    artifact_uuid: str
+    token: str
+    user_id: str
+    name: str = ""
+    email: str = ""
+    views: int = 0
+    first_at: Optional[datetime] = None
+    last_at: Optional[datetime] = None
+
+    class Settings:
+        name = "page_link_viewers"
+        indexes = [IndexModel([("artifact_uuid", 1), ("token", 1), ("user_id", 1)], unique=True),
+                   IndexModel([("artifact_uuid", 1), ("token", 1), ("last_at", -1)])]

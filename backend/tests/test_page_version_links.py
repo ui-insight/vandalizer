@@ -46,7 +46,7 @@ async def test_original_and_revised_budgets_remain_public_side_by_side(client, d
         url = f'/api/pages/public/{token}'
         metadata = await client.get(url)
         assert metadata.status_code == 200
-        assert set(metadata.json()) == {'title', 'revision', 'version', 'updated_at'}
+        assert set(metadata.json()) == {'title', 'revision', 'version', 'updated_at', 'expires_at', 'audience'}
         assert metadata.json()['revision'] == selected and metadata.json()['version'] == number
         assert datetime.fromisoformat(metadata.json()['updated_at'].replace('Z', '+00:00')) == doc['revisions'][number-1]['created_at']
         assert metadata.headers['cache-control'] == 'no-store'
