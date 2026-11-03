@@ -409,6 +409,26 @@ export function ChatMessage({
             </>
           )}
 
+          {/* Support ticket: correct sums and percentages from a budget table
+              were flagged as "general knowledge". A calculated figure is
+              labelled as one, with the formula that produced it. */}
+          {message.calculated_figures && message.calculated_figures.length > 0 && (
+            <details
+              className="chat-calculated-figures"
+              style={{
+                marginTop: 8, padding: '6px 10px', backgroundColor: '#f1f5f9', borderRadius: 6,
+                fontSize: 12, lineHeight: 1.5, color: '#334155',
+              }}
+            >
+              <summary style={{ cursor: 'pointer' }}>
+                Calculated from figures in the sources ({message.calculated_figures.length})
+              </summary>
+              <ul aria-label="Calculations" style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+                {message.calculated_figures.map((c, i) => <li key={i}>{c.formula}</li>)}
+              </ul>
+            </details>
+          )}
+
           {message.unsupported_figures && message.unsupported_figures.length > 0 && (
             <div
               role="note"

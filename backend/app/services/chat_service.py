@@ -79,7 +79,7 @@ from app.services.kb_answer_grounding import (
     expand_snippet_refs,
     tool_output_as_source,
     unsupported_citations,
-    unsupported_figures,
+    check_figures,
     used_snippet_refs,
 )
 from app.services.silence_inference import inferences_from_silence
@@ -2913,15 +2913,23 @@ async def chat_stream(
                 workspace_sources = (
                     [s.text for s in (*doc_segments, *attachment_segments)]
                     + [getattr(d, "raw_text", None) or "" for d in documents or []]
+                    # Whole attached files: the prompt carries only an excerpt
+                    # (see attachment_segments), and a figure from a later page
+                    # was checked only when a tool had happened to read it.
+                    + [a.content or "" for a in file_attachments]
                     + [message]
                 )
-                unsupported = (
-                    unsupported_figures(assistant_message, "\n".join(
+                # Same sources every turn, so the same calculation gets the
+                # same label (support ticket: flagged once, then all 16
+                # figures, then none).
+                unsupported, calculated = (
+                    check_figures(assistant_message, "\n".join(
                         workspace_sources
                         + [tool_output_as_source(t) for t in tool_outputs]
                     ))
-                    if active_kbs or documents or tool_outputs else []
+                    if active_kbs or documents or file_attachments or tool_outputs else ([], [])
                 )
+                calculated_figures = [{"figure": d.label, "formula": d.formula} for d in calculated]
                 # An answer from a web search: its exact dates and figures
                 # must be on a page it read, not only in a search snippet.
                 unconfirmed_web = (
@@ -2977,12 +2985,14 @@ async def chat_stream(
                     silence_inferences=silent or None,
                     unsupported_citations=miscited or None,
                     unconfirmed_web_facts=unconfirmed_web or None,
+                    calculated_figures=calculated_figures or None,
                 )
-                if unsupported or silent or miscited or unconfirmed_web:
+                if unsupported or silent or miscited or unconfirmed_web or calculated_figures:
                     yield json.dumps({
                         "kind": "grounding_warning",
                         "content": "",
                         "unsupported_figures": unsupported,
+                        "calculated_figures": calculated_figures,
                         "silence_inferences": silent,
                         "unsupported_citations": miscited,
                         "unconfirmed_web_facts": unconfirmed_web,
@@ -5044,6 +5054,7 @@ async def _finalize(
     silence_inferences: Optional[list[str]] = None,
     unsupported_citations: Optional[list[str]] = None,
     unconfirmed_web_facts: Optional[list[str]] = None,
+    calculated_figures: Optional[list[dict]] = None,
 ) -> None:
     """Save assistant message and update activity metrics."""
     await conversation.add_message(
@@ -5059,6 +5070,7 @@ async def _finalize(
         silence_inferences=silence_inferences,
         unsupported_citations=unsupported_citations,
         unconfirmed_web_facts=unconfirmed_web_facts,
+        calculated_figures=calculated_figures,
     )
 
     # Stamp the usage anchor for next turn's cheap context estimate (uplift
