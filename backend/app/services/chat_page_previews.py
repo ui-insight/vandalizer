@@ -17,6 +17,12 @@ def prepare(db: Database[dict], user_id: str, conversation_uuid: str, title: str
     if source.get('template_uuid'):
         identity.append([source['template_uuid'], source.get('template_check')])
     preview_id = hashlib.sha256(json.dumps(identity, ensure_ascii=False).encode()).hexdigest()[:32]
+    # The built-in figure check: every dollar amount and percentage on the Page
+    # against the files it was built from, whatever the model says about them.
+    from app.services import page_figures
+    figure_check = page_figures.check(prepared, page_figures.load_sources(db, source.get("documents") or []))
+    if figure_check is not None:
+        source = {**source, "figure_check": figure_check}
     preview = db.chat_page_previews.find_one_and_update({"_id": preview_id}, {"$setOnInsert": {
         "user_id": user_id, "conversation_uuid": conversation_uuid,
         "title": title, "html": html, "prepared_html": prepared, "warnings": warnings,
@@ -58,4 +64,11 @@ def save(db: Database[dict], user_id: str, conversation_uuid: str, preview_id: s
             "title": revision["title"], "revision": revision["uuid"],
             "version": version, "message": f'Saved "{revision["title"]}" as Page version {version}.',
             "url": f'/pages/{saved["uuid"]}', "visibility": "private",
-            "warnings": revision["warnings"], "template_check": preview["source"].get("template_check")}
+            "warnings": revision["warnings"], "template_check": preview["source"].get("template_check"),
+            "figure_check": artifacts_figure_summary(preview["source"].get("figure_check"))}
+
+
+def artifacts_figure_summary(result: dict | None) -> str:
+    from app.services import page_figures
+
+    return page_figures.summary(result)

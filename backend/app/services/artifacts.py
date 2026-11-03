@@ -36,7 +36,9 @@ CONTENT_CSP = (
     "object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'"
 )
 ALLOWED_TAGS = set("html head body title style main section article header footer aside nav div span p h1 h2 h3 h4 h5 h6 ul ol li dl dt dd table thead tbody tfoot tr th td caption colgroup col pre code blockquote strong b em i u s del small sub sup mark br hr a img details summary figure figcaption time address".split())
-ALLOWED_ATTRS = {"class", "id", "style", "title", "lang", "dir", "role", "aria-label", "colspan", "rowspan", "scope", "width", "height", "alt", "open", "start", "value"}
+ALLOWED_ATTRS = {"class", "id", "style", "title", "lang", "dir", "role", "aria-label", "colspan", "rowspan", "scope", "width", "height", "alt", "open", "start", "value",
+                 # A figure the user changed by hand carries what the source says (page_figures).
+                 "data-source-value"}
 
 
 def clean_html(html: str, title: str) -> tuple[str, list[str]]:
@@ -261,6 +263,13 @@ def metadata(doc: dict, owner: bool=False) -> dict:
     source = doc.get("source") or doc["revisions"][0].get("source", {})
     # The origin label is shared; source identifiers and provenance are private.
     result["source"] = source if owner else {"kind": source.get("kind", "editor")}
+    from app.services import page_figures
+    # The built-in figure check per revision, so the Share dialog can show it
+    # for whichever version is about to be published.
+    result["figure_check"] = {
+        r["uuid"]: page_figures.summary((r.get("source") or {}).get("figure_check"))
+        for r in doc["revisions"]
+    }
     if owner:
         result["public_token"] = doc.get("public_token")
         result["publications"] = doc.get("publications", [])

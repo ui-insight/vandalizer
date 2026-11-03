@@ -29,6 +29,8 @@ export interface Artifact {
   revisions: { uuid: string; title: string; created_at: string; warnings: string[]; version?: number }[]
   /** Owner only: the latest version's source files. */
   source_documents?: PageSourceDocument[]
+  /** Built-in figure check summary per revision uuid. */
+  figure_check?: Record<string, string>
 }
 const path = (id: string) => `/api/pages/${encodeURIComponent(id)}`
 export interface PublicArtifact { title: string; revision: string; version: number; updated_at: string; newer_data_available?: boolean }

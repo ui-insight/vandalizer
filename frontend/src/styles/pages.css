@@ -168,3 +168,6 @@
  .page-editor textarea { height:300px; }
 }
 @media (prefers-reduced-motion:reduce) { .page-building,.page-mark svg { animation:none; } }
+/* Built-in figure check (page_figures): green when every figure matched, amber when one needs review. */
+.page-figure-check { margin: 8px 12px; padding: 8px 12px; border-radius: 8px; font-size: 13px; line-height: 1.5; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; }
+.page-figure-check--review { background: #fff8e5; border-color: #eee0b1; color: #745411; }

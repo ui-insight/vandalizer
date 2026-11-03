@@ -143,6 +143,39 @@ def _source_documents(db: Database[dict], doc: dict | None, used: list[str]) -> 
     return page_sources.resolve(db, page_sources.carry_forward(db, previous, used))
 
 
+def _figure_check_view(result: dict | None) -> dict:
+    """The figure check as the preview card and chat see it: the summary, and
+    the figures that need attention (manual edits, figures not found)."""
+    from app.services import page_figures
+
+    figures = (result or {}).get("figures") or []
+    return {
+        "summary": page_figures.summary(result),
+        "checked": result is not None,
+        "manual": [f for f in figures if f["status"] == "manual"][:20],
+        "unmatched": [f["figure"] for f in figures if f["status"] == "unmatched"][:20],
+        "instruction": (
+            "Tell the user this summary. For each figure not found in the source, check it against the "
+            "source and fix it, or mark a requested change with data-source-value; never call an "
+            "unmatched figure verified."
+        ) if result and (result.get("unmatched") or result.get("manual")) else None,
+    }
+
+
+def _annotated(snapshot: dict) -> str:
+    """The preview HTML with each figure's origin as hover text (display only)."""
+    from bs4 import BeautifulSoup
+
+    from app.services import page_figures
+
+    result = (snapshot.get("source") or {}).get("figure_check")
+    if not result:
+        return str(snapshot["prepared_html"])
+    soup = BeautifulSoup(snapshot["prepared_html"], "html.parser")
+    page_figures.annotate(soup, result)
+    return str(soup)
+
+
 async def _save(context: RunContext[AgenticChatDeps], title: str, html: str, confirmed: bool, artifact_uuid: str | None=None, base_revision: str | None=None, template_source: dict | None=None, source_documents: list[str] | None=None) -> dict:
     from app.services.chat_tools import _confirm_gate
     conversation = context.deps.conversation
@@ -173,7 +206,8 @@ async def _save(context: RunContext[AgenticChatDeps], title: str, html: str, con
                      "preview": f'Save a private Page: {title}. This does not publish it.',
                      "preview_id": snapshot["_id"], "title": snapshot["title"],
                      "template_check": snapshot["source"].get("template_check"),
-                     "artifact_preview_html": snapshot["prepared_html"], "warnings": snapshot["warnings"], "rendering_note": RENDERING_NOTE,
+                     "figure_check": _figure_check_view(snapshot["source"].get("figure_check")),
+                     "artifact_preview_html": _annotated(snapshot), "warnings": snapshot["warnings"], "rendering_note": RENDERING_NOTE,
                      "source_fidelity_note": PAGE_SOURCE_FIDELITY_RULES, "language_note": PAGE_LANGUAGE_RULES})
         if gate is not None:
             return gate
