@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { Inbox } from 'lucide-react'
 import { getInbox, setInboxHidden } from '../../api/obligations'
 
-/** Account setting for the RA inbox on Home (#999): the way back after "Hide inbox". */
+/** Account setting for the RA inbox on Home (#999): turns it off for good.
+ * Home's own "Hide inbox" only collapses it to a "Show inbox" line. */
 export function HomeInboxSetting() {
   const [hidden, setHidden] = useState<boolean | null>(null)
   const [saving, setSaving] = useState(false)

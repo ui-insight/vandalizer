@@ -30,6 +30,7 @@ const LETTER = item({ uuid: 'ob-3', kind: 'required_material', title: 'Signed co
 
 beforeEach(() => {
   vi.clearAllMocks()
+  localStorage.clear()
   api.getInbox.mockResolvedValue({ items: [DEADLINE, CAP, LETTER], inbox_hidden: false })
   api.setObligationDone.mockResolvedValue({})
   api.setObligationDismissed.mockResolvedValue({})
@@ -88,11 +89,35 @@ describe('RA inbox', () => {
     await waitFor(() => expect(api.setObligationDismissed).toHaveBeenCalledWith('ob-2', false))
   })
 
-  it('hides the whole inbox for this account', async () => {
+  it('Hide inbox collapses to a Show inbox line in the same place, and Show brings it back', async () => {
+    const { unmount } = render(<RAInbox />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Hide inbox' }))
+    expect(screen.queryByRole('region', { name: 'RA inbox' })).not.toBeInTheDocument()
+    const collapsed = screen.getByRole('group', { name: 'RA inbox (hidden)' })
+    expect(collapsed).toHaveTextContent('Due and needed (3)')
+    const show = screen.getByRole('button', { name: 'Show inbox' })
+    expect(show).toHaveFocus()
+    // Collapsing is not the account setting: nothing is turned off for good.
+    expect(api.setInboxHidden).not.toHaveBeenCalled()
+
+    // Remembered on this browser across visits.
+    unmount()
     render(<RAInbox />)
-    fireEvent.click(await screen.findByRole('button', { name: /Hide this inbox from your Home/ }))
-    await waitFor(() => expect(screen.queryByRole('region', { name: 'RA inbox' })).not.toBeInTheDocument())
-    expect(api.setInboxHidden).toHaveBeenCalledWith(true)
+    fireEvent.click(await screen.findByRole('button', { name: 'Show inbox' }))
+    expect(screen.getByRole('region', { name: 'RA inbox' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Hide inbox' })).toHaveFocus()
+    expect(screen.getByText('Sponsor deadline')).toBeInTheDocument()
+  })
+
+  it('collapses even when browser storage is unavailable', async () => {
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked') })
+    try {
+      render(<RAInbox />)
+      fireEvent.click(await screen.findByRole('button', { name: 'Hide inbox' }))
+      expect(screen.getByRole('button', { name: 'Show inbox' })).toBeInTheDocument()
+    } finally {
+      setItem.mockRestore()
+    }
   })
 
   it('shows nothing when the inbox is hidden or there are no projects to cover', async () => {
