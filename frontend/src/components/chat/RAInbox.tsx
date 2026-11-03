@@ -50,6 +50,14 @@ function urgency(item: Obligation): string | null {
   return null
 }
 
+/** A source quote as people read it: quotes match the document's extracted
+ * text, which can keep table markup (`<td>Period of Performance</td>…`). */
+function plainQuote(quote: string): string {
+  const text = quote.replace(/<[^>]+>/g, ' ')
+  const decoded = new DOMParser().parseFromString(text, 'text/html').documentElement.textContent ?? text
+  return decoded.split(/\s+/).filter(Boolean).join(' ')
+}
+
 const SOURCE_ROLES: Record<string, string> = {
   limit: 'Limit', observed: 'Observed value', timing: 'Timing rule',
   period_of_performance: 'Period of Performance', budget_period: 'Budget period',
@@ -122,10 +130,10 @@ function InboxRow({ item, onChanged, onError }: {
             const role = SOURCE_ROLES[source.role]
             const where = `${source.document_title}${source.page ? ` at page ${source.page}` : ''}`
             return (
-              <button key={`${source.document_uuid}-${source.page}-${i}`} type="button" title={source.quote} style={BUTTON}
+              <button key={`${source.document_uuid}-${source.page}-${i}`} type="button" title={plainQuote(source.quote)} style={BUTTON}
                 aria-label={role ? `Open the ${role.toLowerCase()} in ${where}` : `Open ${where}`}
                 onClick={() => viewDocument(source.document_uuid, source.document_title, {
-                  terms: [source.quote.split(/\s+/).slice(0, 8).join(' ')],
+                  terms: [plainQuote(source.quote).split(' ').slice(0, 8).join(' ')],
                   page: source.page,
                 })}>
                 {role && <span style={{ fontWeight: 600 }}>{role}:</span>}

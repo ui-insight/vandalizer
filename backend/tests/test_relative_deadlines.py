@@ -226,3 +226,15 @@ async def test_manual_endpoint_cannot_skip_calculation_review(project_env):
     assert response["created"] == []
     assert "Review and approve" in response["rejected"][0]["reason"]
     write.assert_not_called()
+
+
+def test_approval_card_evidence_drops_table_markup_but_keeps_the_stored_quote():
+    """Support ticket: card evidence read "<td>Period of Performance</td><td>January 1, ..."."""
+    quote = "<td>Period of Performance</td><td>January 1, 2026 through December 31, 2027</td>"
+    period = source(quote, "period_of_performance")
+    (row,) = calculate_deadlines([FINAL, period])
+    line = chat_tools._describe_obligation({"kind": "deadline", "title": "Final report", **row, "sources": [FINAL, period]})
+    assert 'period of performance: "Period of Performance January 1, 2026 through December 31, 2027"' in line
+    assert "<td>" not in line
+    assert period.quote == quote
+    assert service.plain_quote("Costs &amp; fees<br/>\n  apply") == "Costs & fees apply"

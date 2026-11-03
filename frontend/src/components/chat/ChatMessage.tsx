@@ -10,7 +10,7 @@ import { ChatExportActions } from './ChatExportActions'
 import { useCertificationPanel } from '../../contexts/CertificationPanelContext'
 import { certificationChatEntry } from '../../lib/certificationChat'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
-import { ToolCallDisplay, ToolStatusLine, recoveredCallIds } from './ToolCallDisplay'
+import { ToolCallDisplay, ToolStatusLine, recoveredCallIds, supersededCallIds } from './ToolCallDisplay'
 import { renderMarkdown, THINK_BLOCK_RE, THINK_TRAILING_RE } from './markdown'
 import { routeActionClick } from './actionRoute'
 import type { ChatActivity, ChatMessage as ChatMessageType, Citation, StreamSegment, ToolCallInfo, ToolResultInfo } from '../../types/chat'
@@ -284,6 +284,16 @@ export function ChatMessage({
     return suppressed
   }, [segments, resultMap])
 
+  // Approval cards a later call to the same tool replaced. Hidden duplicates
+  // are left out so they can't retire the copy that is still shown.
+  const supersededIds = useMemo(
+    () => supersededCallIds(
+      (segments ?? []).flatMap(seg => (seg.kind === 'tool_call' && !suppressedConfirmCallIds.has(seg.call.tool_call_id) ? [seg.call.tool_call_id] : [])),
+      resultMap,
+    ),
+    [segments, resultMap, suppressedConfirmCallIds],
+  )
+
   return (
     <div
       className={isUser ? 'chat-user-message' : Array.from(resultMap.values()).some(result => result.tool_name.includes('certification')) ? 'cert-chat-message' : undefined}
@@ -352,7 +362,7 @@ export function ChatMessage({
                   const isActive = !result && (isStreamingProp || activeCallIds.has(seg.call.tool_call_id))
                   return (
                     <div key={i} style={{ margin: "var(--workspace-space-4) 0" }}>
-                      <ToolStatusLine names={exportNames} call={seg.call} result={result} isActive={isActive} onConfirm={onSendMessage} approvalHistory={approvalHistory?.[seg.call.tool_call_id]} recovered={recoveredIds.has(seg.call.tool_call_id)} />
+                      <ToolStatusLine names={exportNames} call={seg.call} result={result} isActive={isActive} onConfirm={onSendMessage} approvalHistory={approvalHistory?.[seg.call.tool_call_id]} recovered={recoveredIds.has(seg.call.tool_call_id)} superseded={supersededIds.has(seg.call.tool_call_id)} />
                     </div>
                   )
                 }

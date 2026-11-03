@@ -5150,6 +5150,8 @@ async def set_project_status(
 
 
 def _describe_obligation(clean: dict) -> str:
+    from app.services import obligation_service
+
     src = clean["sources"][0]
     where = f'{src.document_title}, p. {src.page}' if src.page else src.document_title
     if clean["kind"] == "deadline":
@@ -5159,7 +5161,7 @@ def _describe_obligation(clean: dict) -> str:
         if clean.get("deadline_calculation"):
             calculation = clean["deadline_calculation"]
             evidence = "; ".join(
-                f'{s.role.replace("_", " ")}: "{s.quote}" ({s.document_title}'
+                f'{s.role.replace("_", " ")}: "{obligation_service.plain_quote(s.quote)}" ({s.document_title}'
                 + (f', p. {s.page}' if s.page else '') + ')'
                 for s in clean["sources"]
             )

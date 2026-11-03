@@ -9,6 +9,7 @@ the documents don't state.
 """
 
 import datetime
+import html
 import re
 import uuid as uuid_mod
 from typing import Any, Optional
@@ -22,6 +23,20 @@ from app.models.obligation import (
 )
 from app.models.project import Project
 from app.models.user import User
+
+_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def plain_quote(quote: str) -> str:
+    """A source quote as people read it.
+
+    Quotes must match the document's extracted text, which keeps table markup
+    (``<td>Period of Performance</td><td>January 1, 2026 ...</td>``). The stored
+    quote stays exact for verification; anything shown to a person drops the
+    tags, decodes entities and collapses whitespace.
+    """
+    return " ".join(html.unescape(_TAG_RE.sub(" ", quote or "")).split())
+
 
 _MONTHS = {
     m: i for i, names in enumerate(
