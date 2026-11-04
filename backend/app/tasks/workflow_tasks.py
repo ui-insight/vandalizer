@@ -1226,6 +1226,8 @@ def execute_workflow_task(self: Task, workflow_result_id: str, workflow_id: str,
             allow_code_execution=is_admin,
             config_override=workflow_doc.get("config_override"),
             force_model=bool(result_doc.get("model_forced")),
+            # A real run: workspace steps (Create project, …) act.
+            workspace_actions=True,
         )
     except WorkflowStepError as e:
         _mark_workflow_failed(db, workflow_result_id, activity_id, str(e))
@@ -1753,6 +1755,12 @@ def execute_task_step_test(self: Task, task_name: str, task_data: dict, doc_uuid
         process_node = KnowledgeBaseQueryNode(data=task_data)
     elif task_name == "WebSearch":
         process_node = WebSearchNode(data=task_data)
+    elif task_name in ("CreateProject", "InboxDeadlines", "AwardSnapshotPage"):
+        # Test Step never changes the workspace: these describe what a real
+        # run would do (no _workspace_actions).
+        from app.services.workflow_engine import WORKSPACE_NODES
+        task_data.pop("_workspace_actions", None)
+        process_node = WORKSPACE_NODES[task_name](data=task_data)  # type: ignore[call-arg]
     else:
         raise ValueError(f"Unknown task type: {task_name}")
 
@@ -1923,6 +1931,8 @@ def resume_workflow_after_approval(self: Task, approval_uuid: str) -> dict | Non
             allow_code_execution=is_admin,
             config_override=workflow_doc.get("config_override"),
             force_model=bool(result_doc.get("model_forced")),
+            # A real run: workspace steps (Create project, …) act.
+            workspace_actions=True,
         )
     except WorkflowStepError as e:
         _mark_workflow_failed(

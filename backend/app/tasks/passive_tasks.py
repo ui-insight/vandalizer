@@ -561,6 +561,8 @@ def execute_workflow_passive(self: Task, trigger_event_id: str) -> dict:
             system_config_doc=sys_config,
             allow_code_execution=wf_is_admin,
             config_override=workflow.get("config_override"),
+            # An automation run is a real run: workspace steps act.
+            workspace_actions=True,
         )
 
         from app.services.run_metadata import record_pass_usage, snapshot_run_config

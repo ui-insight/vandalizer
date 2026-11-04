@@ -15,7 +15,7 @@ import {
   Circle, MinusCircle, Hand, Keyboard, Sparkles, ShieldCheck, Type,
   ArrowRight, Pause, TrendingUp, RefreshCw,
   Clock, Copy, Check, FolderInput, Link2, Info, AlertTriangle,
-  Cpu, GitBranch, ScanSearch,
+  Cpu, GitBranch, ScanSearch, FolderPlus, CalendarClock, LayoutDashboard,
 } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
@@ -99,7 +99,7 @@ import { assertedTierNote } from '../../lib/qualityLabels'
 // ---------------------------------------------------------------------------
 
 type Tab = 'design' | 'input' | 'validate' | 'advanced' | 'versions' | 'history'
-type TaskCategory = 'all' | 'text' | 'files' | 'web' | 'output'
+type TaskCategory = 'all' | 'text' | 'files' | 'web' | 'output' | 'workspace'
 
 interface TaskTypeDef {
   name: string
@@ -148,6 +148,15 @@ const TASK_TYPES: TaskTypeDef[] = [
     description: 'Bundles multiple workflow outputs together into a single zip package.' },
   { name: 'Approval', label: 'Approval Gate', icon: Hand, color: '#a855f7', categories: ['all', 'output'], enabled: true,
     description: 'Pauses the workflow until a designated reviewer approves or rejects the result so far.' },
+  // Workspace steps: an RA routine ("New subaward intake") in one run. They
+  // change the workspace only in real runs; put an Approval Gate before them
+  // to review once first.
+  { name: 'CreateProject', label: 'Create Project', icon: FolderPlus, color: '#0f766e', categories: ['all', 'workspace'], enabled: true,
+    description: 'Creates a project named from the document and moves the run\'s files into it. A file already in a project reuses that project.' },
+  { name: 'InboxDeadlines', label: 'Add Deadlines to RA Inbox', icon: CalendarClock, color: '#b45309', categories: ['all', 'workspace'], enabled: true,
+    description: 'Reads the files for reporting deadlines, required material and sponsor limits, checks each against its quoted page, and adds the ones that pass to the project\'s RA inbox. Put it after Create Project.' },
+  { name: 'AwardSnapshotPage', label: 'Award Snapshot Page', icon: LayoutDashboard, color: '#4338ca', categories: ['all', 'workspace'], enabled: true,
+    description: 'Builds the project\'s award snapshot (key facts with sources, deadlines, status) and saves it as a project Page. Put it after Create Project.' },
 ]
 
 const CATEGORIES: { key: TaskCategory; label: string }[] = [
@@ -156,6 +165,7 @@ const CATEGORIES: { key: TaskCategory; label: string }[] = [
   { key: 'files', label: 'Files' },
   { key: 'web', label: 'Web & Code' },
   { key: 'output', label: 'Output' },
+  { key: 'workspace', label: 'Workspace' },
 ]
 
 const TABS: { key: Tab; label: string; icon: typeof PenTool }[] = [
@@ -204,6 +214,8 @@ const TEST_STEP_SUPPORTED_TYPES = new Set([
   'Extraction', 'Prompt', 'Formatter', 'Format', 'AddWebsite', 'AddDocument',
   'DescribeImage', 'CrawlerNode', 'ResearchNode', 'DocumentRenderer',
   'FormFiller', 'DataExport', 'PackageBuilder', 'KnowledgeBaseQuery', 'APINode', 'WebSearch',
+  // Tested as a preview: Test Step never changes the workspace.
+  'CreateProject', 'InboxDeadlines', 'AwardSnapshotPage',
 ])
 
 // Steps whose test input is their own configuration — a URL, an endpoint, a
@@ -2495,6 +2507,9 @@ function describeTaskType(name: string): string {
     case 'DataExport': return 'Export data'
     case 'PackageBuilder': return 'Build zip package'
     case 'Approval': return 'Approval gate'
+    case 'CreateProject': return 'Create project'
+    case 'InboxDeadlines': return 'Add deadlines to RA inbox'
+    case 'AwardSnapshotPage': return 'Award snapshot page'
     default: return name
   }
 }
@@ -3516,6 +3531,9 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                   : task.name === 'DataExport' ? 'Export structured data as a file'
                   : task.name === 'PackageBuilder' ? 'Bundle outputs into a zip'
                   : task.name === 'Approval' ? 'Pause for human review before continuing'
+                  : task.name === 'CreateProject' ? 'Create a project and move the run\'s files into it'
+                  : task.name === 'InboxDeadlines' ? 'Add checked deadlines and required material to the project\'s RA inbox'
+                  : task.name === 'AwardSnapshotPage' ? 'Save the project\'s award snapshot as a Page'
                   : 'Configure this task'}
               </div>
             </div>
@@ -4022,6 +4040,40 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                     outline: 'none', boxSizing: 'border-box',
                   }}
                 />
+              </div>
+            )}
+
+            {(task.name === 'CreateProject' || task.name === 'InboxDeadlines' || task.name === 'AwardSnapshotPage') && (
+              <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
+                <div role="note" style={{
+                  padding: 'var(--workspace-space-12)', marginBottom: 'var(--workspace-space-16)', backgroundColor: '#f0fdfa',
+                  border: '1px solid #99f6e4', borderRadius: 'var(--workspace-radius-small)',
+                  fontSize: 'var(--workspace-font-control)', color: '#134e4a', lineHeight: 1.5,
+                }}>
+                  This step changes your workspace when the workflow runs: it {task.name === 'CreateProject' ? 'creates a project and moves the files into it'
+                    : task.name === 'InboxDeadlines' ? 'adds items to the project\'s RA inbox' : 'saves a project Page'}. Test Step and validation
+                  only describe what it would do. Put an Approval Gate before the workspace steps to review the run once first.
+                  {task.name !== 'CreateProject' && ' It works in the project an earlier Create Project step made.'}
+                </div>
+                {task.name === 'CreateProject' && <>
+                  <label htmlFor="create-project-name" style={{ display: 'block', fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151', marginBottom: 'var(--workspace-space-6)' }}>
+                    Project name
+                  </label>
+                  <input
+                    id="create-project-name"
+                    value={getTextValue('name_template') || '{document}'}
+                    onChange={e => setTextValue('name_template', e.target.value)}
+                    maxLength={120}
+                    style={{
+                      width: '100%', padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-control)',
+                      fontFamily: 'inherit', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)',
+                      outline: 'none', boxSizing: 'border-box',
+                    }}
+                  />
+                  <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-4)' }}>
+                    {'{document}'} is the file's name without its extension, e.g. “Intake — {'{document}'}”.
+                  </div>
+                </>}
               </div>
             )}
 

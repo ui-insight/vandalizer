@@ -29,6 +29,9 @@ _TASK_TYPES = {
     "AddWebsite": "website",
     "WebSearch": "web_search",
     "Approval": "approval",
+    "CreateProject": "create_project",
+    "InboxDeadlines": "inbox_deadlines",
+    "AwardSnapshotPage": "award_snapshot_page",
 }
 _INSTRUCTION_KEYS = ("prompt", "format_template", "question", "query", "review_instructions", "url")
 
