@@ -437,6 +437,12 @@ def _same_rule(a: str, b: str) -> bool:
 def _same_deadline(ob: Obligation, clean: dict) -> bool:
     if not (ob.due_at and clean.get("due_at")) or ob.due_at.date() != clean["due_at"].date():
         return False
+    # Same date, same title (ignoring case, punctuation and "due"/"deadline")
+    # is the same deadline, however each request typed or sourced it. Support
+    # ticket: "Validated qPCR assay protocol", Jun 30 2026, was added twice,
+    # once from a stated date and once from a timing rule.
+    if _title_words(ob.title) and _title_words(ob.title) == _title_words(clean["title"]):
+        return True
     old_calc, new_calc = ob.deadline_calculation, clean.get("deadline_calculation")
     if old_calc or new_calc:
         # Occurrences of a recurring rule. Support ticket: the 4 semi-annual

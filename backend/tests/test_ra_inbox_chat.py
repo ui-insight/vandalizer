@@ -172,3 +172,29 @@ async def test_inside_a_project_due_and_needed_lists_only_that_projects_open_ite
     result = await routes.list_obligations(project_uuid="nifa", include_dismissed=False, user=user)
     assert result == {"items": [{"uuid": "greenhouse", "project_uuid": "nifa"}], "inbox_hidden": False, "project_count": 1}
     assert inbox.await_args.kwargs == {"include_dismissed": False, "projects": {"nifa": nifa}}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("change", [
+    {"deadline_type": "other", "deadline_calculation": None},  # both stated, typed differently
+    {"deadline_calculation": None},  # stated date vs timing rule
+    {"title": "Validated qPCR assay protocol due."},  # wording around the same title
+])
+async def test_the_same_deadline_proposed_again_is_already_in_the_inbox(project_env, monkeypatch, change):
+    """Support ticket: qPCR protocol, Jun 30 2026, appeared twice ("Limit" and "Timing rule" chips)."""
+    project, user, _ = project_env
+    row = (await service.propose(project, user, [proposal(title="Validated qPCR assay protocol")]))["accepted"][0]["clean"]
+    stated = {**row, "deadline_calculation": None, "deadline_type": "report_due"}
+    old = Obligation.model_construct(uuid="old", project_uuid=project.uuid, created_by=user.user_id, status="open", **stated)
+    monkeypatch.setattr(service, "Obligation", fake_model([old]))
+    assert await service.is_duplicate(project.uuid, {**row, **change})
+
+
+@pytest.mark.asyncio
+async def test_a_different_deliverable_on_the_same_date_is_not_a_duplicate(project_env, monkeypatch):
+    project, user, _ = project_env
+    row = (await service.propose(project, user, [proposal(title="Validated qPCR assay protocol")]))["accepted"][0]["clean"]
+    old = Obligation.model_construct(uuid="old", project_uuid=project.uuid, created_by=user.user_id, status="open",
+                                     **{**row, "deadline_calculation": None, "deadline_type": "report_due"})
+    monkeypatch.setattr(service, "Obligation", fake_model([old]))
+    assert not await service.is_duplicate(project.uuid, {**row, "title": "Invention disclosure", "deadline_type": "other"})
