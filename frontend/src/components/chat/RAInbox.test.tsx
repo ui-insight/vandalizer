@@ -217,3 +217,30 @@ describe('RA inbox', () => {
     expect(screen.getByText('Sponsor deadline')).toBeInTheDocument()
   })
 })
+
+// Support ticket: inside the NIFA project, "Due and needed" listed the NIH
+// project's qPCR protocol and semi-annual results above NIFA's own item.
+describe('RA inbox inside a project', () => {
+  it("asks for only that project's items and says so", async () => {
+    render(<RAInbox projectUuid="nifa" />)
+    await screen.findByText('Sponsor deadline')
+    expect(api.getInbox).toHaveBeenCalledWith(false, 'nifa')
+    expect(screen.getByText('This project')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Hide this inbox/ })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: "Download a calendar file with this project's open deadlines" }))
+    expect(api.downloadDeadlineCalendar).toHaveBeenCalledWith({ project: 'nifa' })
+  })
+
+  it('says an empty project has nothing due, instead of showing other projects', async () => {
+    api.getInbox.mockResolvedValue({ items: [], inbox_hidden: false, project_count: 1 })
+    render(<RAInbox projectUuid="empty" />)
+    expect(await screen.findByText('Nothing due or missing in this project. Only deadlines and materials saved to it appear here.')).toBeInTheDocument()
+  })
+
+  it('labels the Home list as covering all your projects', async () => {
+    render(<RAInbox />)
+    await screen.findByText('Sponsor deadline')
+    expect(api.getInbox).toHaveBeenCalledWith(false, undefined)
+    expect(screen.getByText('All your projects')).toBeInTheDocument()
+  })
+})

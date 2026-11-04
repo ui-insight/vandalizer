@@ -157,3 +157,18 @@ async def test_a_reply_crediting_an_unread_inbox_gets_a_source_note(chat_harness
 
     await chat_harness.run(Agent(FunctionModel(stream_function=respond)), message="Use the RA inbox deadlines.")
     assert chat_harness.finalize.call_args.args[1].endswith(REPLY_NOTE)
+
+
+@pytest.mark.asyncio
+async def test_inside_a_project_due_and_needed_lists_only_that_projects_open_items(monkeypatch):
+    """Support ticket: the NIFA project's panel listed the NIH project's deadlines."""
+    from app.routers import obligations as routes
+
+    nifa = SimpleNamespace(uuid="nifa", title="NIFA Subaward")
+    user = SimpleNamespace(user_id="ra", home_inbox_hidden=True)
+    inbox = AsyncMock(return_value=[{"uuid": "greenhouse", "project_uuid": "nifa"}])
+    monkeypatch.setattr(routes, "_project_for", AsyncMock(return_value=nifa))
+    monkeypatch.setattr(service, "inbox", inbox)
+    result = await routes.list_obligations(project_uuid="nifa", include_dismissed=False, user=user)
+    assert result == {"items": [{"uuid": "greenhouse", "project_uuid": "nifa"}], "inbox_hidden": False, "project_count": 1}
+    assert inbox.await_args.kwargs == {"include_dismissed": False, "projects": {"nifa": nifa}}

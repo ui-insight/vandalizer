@@ -1114,7 +1114,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
             </div>
 
             {/* What each proposal or award needs, from its documents (#999). */}
-            <RAInbox />
+            <RAInbox projectUuid={activeProjectUuid} />
 
             <div style={{ marginTop: 'var(--workspace-space-16)', display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-8)' }}>
               {/* Inside a project, surface project-specific actions (run pinned

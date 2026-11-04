@@ -37,10 +37,22 @@ async def list_obligations(
     include_dismissed: bool = False,
     user: User = Depends(get_current_user),
 ) -> dict[str, object]:
-    """Home: open items across your projects. With ``project_uuid``: that project's items."""
+    """Home: open items across your projects. With ``project_uuid``: that project's.
+
+    Support ticket: inside a project, "Due and needed" listed deadlines from
+    other projects, because the panel always asked for the Home list. Both
+    answers have the same shape, so the panel shows either.
+    """
     if project_uuid:
         project = await _project_for(project_uuid, user, manage=False)
-        return {"items": await obligation_service.project_obligations(project, user)}
+        return {
+            "items": await obligation_service.inbox(
+                user, include_dismissed=include_dismissed, projects={project.uuid: project},
+            ),
+            # Hiding is a Home preference; a project always shows its own list.
+            "inbox_hidden": False,
+            "project_count": 1,
+        }
     projects = await obligation_service.inbox_projects(user)
     return {
         "items": await obligation_service.inbox(
