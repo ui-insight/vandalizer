@@ -224,6 +224,10 @@ class SystemConfig(Document):
     #       (chat_answer_repair). With it: "answer_repair_checker_model",
     #       "answer_repair_second_checker_model" (empty for none),
     #       "answer_repair_model", "answer_repair_second_check_seconds".
+    #       "answer_repair_completeness_enabled" (default False): the checks
+    #       also list what the passages state about the question that the
+    #       answer leaves out, and the repair adds the points both name from
+    #       the same passage.
     #   "doc_answer_check_enabled": bool (default False) — check a finished
     #       answer about attached documents for a value they give for
     #       something other than what was asked, and rewrite it when they do

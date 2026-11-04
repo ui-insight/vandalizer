@@ -23,6 +23,19 @@ default):
    cannot be read keeps the answer as it was. A checker's unreadable reply
    is asked for once more first, within the same cap.
 
+When ``chat_config["answer_repair_completeness_enabled"]`` is also on (off
+by default), the same two checks also list what the passages state about
+the question that the answer leaves out: a part of the question, an item
+of a list it asks for, a condition, limit, exception or deadline a passage
+attaches to a rule the answer gives. Of the answers the production
+configuration got wrong or incomplete with every gold passage in front of
+the model (the A/B of 2026-11-03), three in four were graded partial for
+such omissions, which the labelling above is told to ignore. The repair
+then adds, in the passage's words and with its citation, the points both
+checkers name from the same passage, at most ``MAX_MISSING``. An answer
+with nothing contradicted and nothing missing is kept without waiting for
+the slow checker, as before.
+
 A checker or repairer named here but not configured in System Config is
 called on the answering model's endpoint, with its key, as the study called
 them. Every step is recorded on the message (``answer_check``), with the
@@ -51,37 +64,67 @@ REPAIR_SECONDS = 30.0         # check and repair on a flagged turn: 5.0 s median
 CHECK_MAX_TOKENS = 6000
 REPAIR_MAX_TOKENS = 8000
 PASSAGE_CHARS = 3000          # of a passage shown to the checker and the repairer
+MAX_MISSING = 3               # points the completeness repair adds to one answer at most
 
 # The tools a measured KB turn ran. A turn that read attached documents, the
 # web or anything else answers from text the checkers are not shown.
 KB_TOOLS = frozenset({"search_knowledge_base", "list_knowledge_bases"})
 
-# The study's checker prompt (probe.py), word for word.
-CHECK_INSTRUCTIONS = """You check an assistant's answer against the knowledge-base passages it was given. Research administrators act on these answers, so a sentence that misstates a passage is a serious error.
+# The study's checker prompt (probe.py), word for word: the labelling task,
+# then the reply's shape; CHECK_INSTRUCTIONS is the two joined.
+_CHECK_TASK = """You check an assistant's answer against the knowledge-base passages it was given. Research administrators act on these answers, so a sentence that misstates a passage is a serious error.
 
 For each numbered answer sentence, compare it with ALL the passages, not only the ones it cites, and label it:
 - "contradicted": a passage says something incompatible with the sentence. For example: must / shall / should / may changed into another; a condition, limit or exception the passage attaches is dropped, so the rule reads broader or narrower than the passage; an exception, approval route, condition or option is added that the passages do not give; the rule is reversed (yes / no, is / is not, required / not required); a wrong number, date or threshold; two separate rules (for example different lettered paragraphs or list items) merged, so the terms of one are applied to the other; the wrong subject or scope.
 - "unsupported": no passage states it, and no passage contradicts it.
 - "ok": a passage states it, or the sentence makes no claim (a heading, transition or offer to help).
 
-Judge only against the passages; do not use your own knowledge of the regulations. Do not mark a sentence for wording, style or brevity, or because it leaves out details the question did not ask about.
+Judge only against the passages; do not use your own knowledge of the regulations. Do not mark a sentence for wording, style or brevity, or because it leaves out details the question did not ask about."""
+_CHECK_RETURN = """
 
 Return ONLY a JSON object:
 {"sentences": [{"n": 1, "label": "ok" | "contradicted" | "unsupported", "passage": <P number or null>, "why": "<short reason; for contradicted, quote the conflicting passage words>"}]}"""
+CHECK_INSTRUCTIONS = _CHECK_TASK + _CHECK_RETURN
+
+# The completeness extension: the same labelling, then what the answer
+# leaves out, in the same reply.
+_MISSING_TASK = """
+
+Then list what the passages state about the question that the answer leaves out, so that a reader acting on the answer would miss it: a part of the question not answered; an item of a list the question asks for; a condition, limit, exception, deadline, approval or who-must-act that a passage attaches to a rule the answer gives. Only points a passage states and the question asks about, each in the passage's own words; not details the question did not ask about, not wording, order or brevity, not points the answer already makes. At most three, the most consequential first; an empty list when nothing is missing."""
+COMPLETENESS_INSTRUCTIONS = _CHECK_TASK + _MISSING_TASK + """
+
+Return ONLY a JSON object:
+{"sentences": [{"n": 1, "label": "ok" | "contradicted" | "unsupported", "passage": <P number or null>, "why": "<short reason; for contradicted, quote the conflicting passage words>"}],
+ "missing": [{"passage": <P number>, "what": "<the point left out, in the passage's words>"}]}"""
 
 # The study's v1 repair prompt (repair.py), word for word. The tighter v2 did
-# not help.
-REPAIR_INSTRUCTIONS = """You correct an assistant's answer for research administrators, who act on it. A checker compared each numbered sentence of the answer with the knowledge-base passages the assistant was given, and flagged some sentences as contradicting a passage. The checker can be wrong.
+# not help. REPAIR_INSTRUCTIONS is the task and the reply's shape joined.
+_REPAIR_TASK = """You correct an assistant's answer for research administrators, who act on it. A checker compared each numbered sentence of the answer with the knowledge-base passages the assistant was given, and flagged some sentences as contradicting a passage. The checker can be wrong.
 
 For each flagged sentence, read the passage the checker names, and the other passages:
 - If a passage does contradict the sentence, rewrite the sentence so it says what the passage says: keep the passage's must / shall / should / may, its conditions, limits and exceptions, its numbers and its scope. Do not add an exception, approval route or option the passages do not give. Do not merge separate rules (for example different lettered paragraphs or list items).
 - If the passages support the sentence as written, keep it unchanged.
 
-If a correction changes the answer's conclusion, also correct the opening or summary sentences that state it, so the answer does not contradict itself. If, once corrected, the passages do not settle the question, say so plainly. Keep every other sentence as written unless it repeats a point you corrected. Keep the answer's format (markdown, bullets) and its [Source: <label>] citations; cite with the passage labels given. Judge only against the passages; do not use your own knowledge of the regulations.
+If a correction changes the answer's conclusion, also correct the opening or summary sentences that state it, so the answer does not contradict itself. If, once corrected, the passages do not settle the question, say so plainly. Keep every other sentence as written unless it repeats a point you corrected. Keep the answer's format (markdown, bullets) and its [Source: <label>] citations; cite with the passage labels given. Judge only against the passages; do not use your own knowledge of the regulations."""
+_REPAIR_REPLY = """
 
 Reply in exactly this format:
 CHANGED: <numbers of the sentences you rewrote, comma-separated, or none>
 KEPT: <numbers of flagged sentences you kept because the checker was wrong, or none>
+ANSWER:
+<the full corrected answer>"""
+REPAIR_INSTRUCTIONS = _REPAIR_TASK + _REPAIR_REPLY
+
+# With the completeness extension: the flagged sentences as above, then the
+# points the checkers found missing, added in the passage's words.
+REPAIR_COMPLETENESS_INSTRUCTIONS = _REPAIR_TASK + """
+
+The checkers also listed points the passages state about the question that the answer leaves out (MISSING, each with the passage that states it). For each, read that passage: if it does state the point and the question asks about it, add one sentence that says it as the passage says it, with its [Source: <label>] citation, where it belongs: in the list it extends, or right after the sentence it qualifies. If the passage does not state it, or the answer already says it, add nothing for it. Add nothing else.
+
+Reply in exactly this format:
+CHANGED: <numbers of the sentences you rewrote, comma-separated, or none>
+KEPT: <numbers of flagged sentences you kept because the checker was wrong, or none>
+ADDED: <numbers of the missing points you added, comma-separated, or none>
 ANSWER:
 <the full corrected answer>"""
 
@@ -92,6 +135,7 @@ class RepairConfig:
     second_checker: Optional[str]   # None: repair on the first checker's flags alone
     repairer: str
     second_check_seconds: float = SECOND_CHECK_SECONDS
+    completeness: bool = False      # also add what the answer leaves out
 
 
 def repair_config(sys_config_doc: Optional[dict]) -> Optional[RepairConfig]:
@@ -100,8 +144,9 @@ def repair_config(sys_config_doc: Optional[dict]) -> Optional[RepairConfig]:
     Keys: ``answer_repair_enabled`` (default False),
     ``answer_repair_checker_model`` (default qwen3.5-122b),
     ``answer_repair_second_checker_model`` (default kimi-k3; empty for none),
-    ``answer_repair_model`` (default: the first checker) and
-    ``answer_repair_second_check_seconds`` (default 15)."""
+    ``answer_repair_model`` (default: the first checker),
+    ``answer_repair_second_check_seconds`` (default 15) and
+    ``answer_repair_completeness_enabled`` (default False)."""
     cfg = (sys_config_doc or {}).get("chat_config") or {}
     if not bool(cfg.get("answer_repair_enabled", False)):
         return None
@@ -116,6 +161,7 @@ def repair_config(sys_config_doc: Optional[dict]) -> Optional[RepairConfig]:
         second_checker=str(second) if second else None,
         repairer=str(cfg.get("answer_repair_model") or checker),
         second_check_seconds=cap if cap > 0 else SECOND_CHECK_SECONDS,
+        completeness=bool(cfg.get("answer_repair_completeness_enabled", False)),
     )
 
 
@@ -239,12 +285,23 @@ def check_prompt(question: str, prev_question: Optional[str], passages: list[dic
 
 
 def repair_prompt(question: str, prev_question: Optional[str], passages: list[dict], answer: str,
-                  sents: list[tuple[str, list[int]]], flags: list[dict]) -> str:
+                  sents: list[tuple[str, list[int]]], flags: list[dict],
+                  missing: Optional[list[dict]] = None) -> str:
+    """``missing`` (the completeness extension) lists the points to add; None
+    leaves the study's prompt as it was."""
     lines = [*_heading(question, prev_question, passages, label_prefix="label: "),
              f"ANSWER:\n{answer}\n", "ANSWER SENTENCES:", *_numbered(sents), "\nCHECKER FLAGS:"]
     for f in flags:
         lines.append(f"S{f['n']} contradicted" + (f" by P{f['passage']}" if f.get("passage") else "")
                      + f": {f.get('why') or ''}")
+    if missing is not None:
+        if not flags:
+            lines.append("none")
+        lines.append("\nMISSING FROM THE ANSWER:")
+        for i, m in enumerate(missing, 1):
+            lines.append(f"M{i} (stated by P{m['passage']}): {m.get('what') or ''}")
+        if not missing:
+            lines.append("none")
     return "\n".join(lines)
 
 
@@ -279,8 +336,11 @@ def _passage_number(v) -> Optional[int]:
     return int(m.group(1)) if m else None
 
 
-def parse_check(text: str) -> list[dict]:
-    """A checker's labels, one per sentence it read: ``{n, label, passage, why}``."""
+def parse_reply(text: str) -> tuple[list[dict], list[dict]]:
+    """A checker's labels, one per sentence it read (``{n, label, passage,
+    why}``), and the points it listed as missing from the answer
+    (``{passage, what}``, those naming a passage; empty when it was not asked
+    for them)."""
     obj = parse_json(text)
     if not isinstance(obj, dict):
         raise ValueError("checker reply is not a JSON object")
@@ -298,7 +358,20 @@ def parse_check(text: str) -> list[dict]:
             "passage": _passage_number(s.get("passage")),
             "why": str(s.get("why") or "")[:1000],
         })
-    return out
+    missing = []
+    listed = obj.get("missing")
+    for m in listed if isinstance(listed, list) else []:
+        if not isinstance(m, dict):
+            continue
+        p, what = _passage_number(m.get("passage")), str(m.get("what") or "").strip()
+        if p is not None and what:
+            missing.append({"passage": p, "what": what[:600]})
+    return out, missing
+
+
+def parse_check(text: str) -> list[dict]:
+    """A checker's labels, one per sentence it read: ``{n, label, passage, why}``."""
+    return parse_reply(text)[0]
 
 
 def contradicted(labels: list[dict], n_sentences: int) -> list[dict]:
@@ -306,7 +379,28 @@ def contradicted(labels: list[dict], n_sentences: int) -> list[dict]:
     return [s for s in labels if s["label"] == "contradicted" and s["n"] is not None and 1 <= s["n"] <= n_sentences]
 
 
+def missing_points(missing: list[dict], n_passages: int) -> list[dict]:
+    """The missing points a checker listed that name one of the passages."""
+    return [m for m in missing if 1 <= m["passage"] <= n_passages]
+
+
+def confirmed_missing(first: list[dict], second: Optional[list[dict]]) -> list[dict]:
+    """The first checker's missing points the second also found something
+    missing from the same passage (all of them without a second checker), at
+    most ``MAX_MISSING``."""
+    if second is None:
+        return first[:MAX_MISSING]
+    named = {m["passage"] for m in second}
+    return [m for m in first if m["passage"] in named][:MAX_MISSING]
+
+
 _ANSWER_RE = re.compile(r"^\s*ANSWER:\s*\n?(.*)\Z", re.S | re.M)
+
+
+def _numbers(text: str, tag: str) -> list[int]:
+    """The numbers on the reply's ``TAG:`` line, none when it is missing."""
+    line = re.search(rf"^\s*{tag}:(.*)$", text, re.M)
+    return [int(x) for x in re.findall(r"\d+", line.group(1))] if line else []
 
 
 def parse_repair(text: str, passages: list[dict]) -> tuple[str, list[int], list[int]]:
@@ -315,12 +409,12 @@ def parse_repair(text: str, passages: list[dict]) -> tuple[str, list[int], list[
     m = _ANSWER_RE.search(t)
     if not m or not m.group(1).strip():
         raise ValueError(f"no ANSWER block: {t[:200]!r}")
+    return clean(m.group(1).strip(), passages), _numbers(t, "CHANGED"), _numbers(t, "KEPT")
 
-    def nums(tag: str) -> list[int]:
-        line = re.search(rf"^\s*{tag}:(.*)$", t, re.M)
-        return [int(x) for x in re.findall(r"\d+", line.group(1))] if line else []
 
-    return clean(m.group(1).strip(), passages), nums("CHANGED"), nums("KEPT")
+def parse_added(text: str) -> list[int]:
+    """The missing points a completeness repair says it added (``ADDED:``)."""
+    return _numbers(_THINK_RE.sub("", text or ""), "ADDED")
 
 
 _HYPHENS_RE = re.compile("[‐‑‒–]")
@@ -356,23 +450,30 @@ def clean(answer: str, passages: list[dict]) -> str:
 Ask = Callable[[str, str, str, int], Awaitable[str]]
 
 
-async def _check(ask: Ask, model: str, prompt: str, n_sentences: int, timeout: float) -> dict:
+async def _check(ask: Ask, model: str, prompt: str, n_sentences: int, timeout: float,
+                 *, instructions: str = CHECK_INSTRUCTIONS, n_passages: int = 0) -> dict:
+    """One checker's record. With the completeness instructions it also
+    carries ``missing``: the points the checker found left out, those naming
+    one of the ``n_passages`` passages."""
     started = time.monotonic()
     rec: dict = {"model": model}
+    completeness = instructions is COMPLETENESS_INSTRUCTIONS
 
-    async def read() -> list[dict]:
+    async def read() -> tuple[list[dict], list[dict]]:
         # A reply that cannot be read is asked for once more, inside the same
         # cap, as the study's probe did; ``retried`` keeps why.
-        reply = await ask(model, CHECK_INSTRUCTIONS, prompt, CHECK_MAX_TOKENS)
+        reply = await ask(model, instructions, prompt, CHECK_MAX_TOKENS)
         try:
-            return parse_check(reply)
+            return parse_reply(reply)
         except ValueError as e:
             rec["retried"] = f"{type(e).__name__}: {e}"[:300]
-        return parse_check(await ask(model, CHECK_INSTRUCTIONS, prompt, CHECK_MAX_TOKENS))
+        return parse_reply(await ask(model, instructions, prompt, CHECK_MAX_TOKENS))
 
     try:
-        labels = await asyncio.wait_for(read(), timeout)
+        labels, missing = await asyncio.wait_for(read(), timeout)
         rec.update(labels=labels, flagged=[s["n"] for s in contradicted(labels, n_sentences)])
+        if completeness:
+            rec["missing"] = missing_points(missing, n_passages)
     except asyncio.TimeoutError:
         rec["error"] = "timed_out"
     except Exception as e:  # noqa: BLE001 — a failed check repairs nothing
@@ -387,11 +488,15 @@ async def check_and_repair(
     *, prev_question: Optional[str] = None,
 ) -> tuple[str, dict]:
     """``(answer to keep, record)``. The answer is the repaired one only when
-    both checkers flagged it and the repair changed it; ``record["outcome"]``
-    says which step settled it."""
+    both checkers flagged it (a contradicted sentence each, or, with the
+    completeness extension, a missing point from the same passage) and the
+    repair changed it; ``record["outcome"]`` says which step settled it."""
     started = time.monotonic()
     sents = [(s, cited_ids(s, passages)) for s in split_answer(answer)]
     record: dict = {"version": VERSION, "sentences": [s for s, _ in sents], "passages": len(passages), "checks": []}
+    completeness = config.completeness
+    if completeness:
+        record["completeness"] = True
 
     def done(outcome: str, final: str = answer) -> tuple[str, dict]:
         record["outcome"] = outcome
@@ -401,41 +506,55 @@ async def check_and_repair(
     if not sents or not passages:
         return done("not_checked")
     prompt = check_prompt(question, prev_question, passages, sents)
-    first = asyncio.create_task(_check(ask, config.checker, prompt, len(sents), CHECK_SECONDS))
-    second = (asyncio.create_task(_check(ask, config.second_checker, prompt, len(sents), config.second_check_seconds))
+    instructions = COMPLETENESS_INSTRUCTIONS if completeness else CHECK_INSTRUCTIONS
+    first = asyncio.create_task(_check(ask, config.checker, prompt, len(sents), CHECK_SECONDS,
+                                       instructions=instructions, n_passages=len(passages)))
+    second = (asyncio.create_task(_check(ask, config.second_checker, prompt, len(sents), config.second_check_seconds,
+                                         instructions=instructions, n_passages=len(passages)))
               if config.second_checker else None)
     try:
         r1 = await first
         record["checks"].append(r1)
-        if r1.get("error") or not r1["flagged"]:
+        missing = r1.get("missing") or []
+        if r1.get("error") or not (r1["flagged"] or missing):
             if second is not None:
                 record["checks"].append(
                     second.result() if second.done() else {"model": config.second_checker, "cancelled": True}
                 )
             return done("check_failed" if r1.get("error") else "no_flags")
+        both_flagged = bool(r1["flagged"])
+        missing = confirmed_missing(missing, None)
         if second is not None:
             r2 = await second
             record["checks"].append(r2)
             if r2.get("error"):
                 return done("second_check_late" if r2["error"] == "timed_out" else "second_check_failed")
-            if not r2["flagged"]:
+            both_flagged = both_flagged and bool(r2["flagged"])
+            missing = confirmed_missing(missing, r2.get("missing") or [])
+            if not (both_flagged or missing):
                 return done("second_check_no_flags")
     finally:
         for task in (first, second):
             if task is not None and not task.done():
                 task.cancel()
 
-    flags = contradicted(r1["labels"], len(sents))
+    flags = contradicted(r1["labels"], len(sents)) if both_flagged else []
     repair: dict = {"model": config.repairer, "flagged": [f["n"] for f in flags]}
+    if completeness:
+        repair["missing"] = missing
     record["repair"] = repair
     at = time.monotonic()
     try:
         reply = await asyncio.wait_for(
-            ask(config.repairer, REPAIR_INSTRUCTIONS,
-                repair_prompt(question, prev_question, passages, answer, sents, flags), REPAIR_MAX_TOKENS),
+            ask(config.repairer,
+                REPAIR_COMPLETENESS_INSTRUCTIONS if completeness else REPAIR_INSTRUCTIONS,
+                repair_prompt(question, prev_question, passages, answer, sents, flags,
+                              missing if completeness else None),
+                REPAIR_MAX_TOKENS),
             REPAIR_SECONDS,
         )
         fixed, changed, kept = parse_repair(reply, passages)
+        added = parse_added(reply) if completeness else []
     except asyncio.TimeoutError:
         repair.update(error="timed_out", seconds=round(time.monotonic() - at, 2))
         return done("repair_failed")
@@ -443,8 +562,10 @@ async def check_and_repair(
         logger.warning("Answer repair by %s failed: %s", config.repairer, e)
         repair.update(error=f"{type(e).__name__}: {e}"[:300], seconds=round(time.monotonic() - at, 2))
         return done("repair_failed")
-    unchanged = not changed or fixed.strip() == answer.strip()
+    unchanged = not (changed or added) or fixed.strip() == answer.strip()
     repair.update(changed=changed, kept=kept, unchanged=unchanged, seconds=round(time.monotonic() - at, 2))
+    if completeness:
+        repair["added"] = added
     if unchanged:
         return done("unchanged")
     record["original_answer"] = answer
