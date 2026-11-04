@@ -42,3 +42,28 @@ class ChatArtifactRequest(BaseModel):
     messages: list[ExportMessage] = Field(min_length=1, max_length=1000)
     project_uuid: Optional[str] = Field(default=None, max_length=200)
     conversation_uuid: Optional[str] = Field(default=None, max_length=200)
+
+
+class PageQuestionRequest(BaseModel):
+    """A viewer's question or flag about a Page (or one spot on it)."""
+    message: str = Field(min_length=1, max_length=2000)
+    anchor_id: Optional[str] = Field(default=None, max_length=40)
+    revision: Optional[str] = Field(default=None, max_length=64)
+
+
+class PublicPageQuestionRequest(PageQuestionRequest):
+    email: str = Field(min_length=3, max_length=320)
+    name: Optional[str] = Field(default=None, max_length=120)
+    # Left empty by people; filled by form-filling bots.
+    website: Optional[str] = Field(default=None, max_length=200)
+
+
+class PageAnswerRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=4000)
+    show_on_page: bool = False
+
+
+class PageFeedbackSettingsRequest(BaseModel):
+    public_questions: Optional[bool] = None
+    hide_owner_name: Optional[bool] = None
+    contact_label: Optional[str] = Field(default=None, max_length=120)

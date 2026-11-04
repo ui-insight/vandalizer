@@ -15,9 +15,10 @@ from app.config import Settings
 from app.dependencies import get_current_user, get_settings
 from app.models.user import User
 from app.rate_limit import limiter
+from app.schemas.artifact import PageAnswerRequest, PageFeedbackSettingsRequest, PageQuestionRequest, PublicPageQuestionRequest
 from app.schemas.artifact import ChatArtifactRequest, CreateArtifactRequest, DuplicateArtifactRequest, PublishArtifactRequest, RenameArtifactRequest, ReviseArtifactRequest, ShareArtifactRequest
 from app.services.page_links import prepare_page_links
-from app.services import access_control, artifacts
+from app.services import access_control, artifacts, page_feedback
 from app.services import transcript_pages
 from app.services.page_printing import render_page
 from app.services.page_embedding import prepare_page_embed
@@ -86,8 +87,14 @@ async def authorized(uuid: str, user: User, manage: bool=False) -> dict:
     raise HTTPException(404, "Page not found")
 
 
-def content_response(rev: dict, download: bool=False, *, version: int=1, view: Literal["content", "full", "print", "embed"]="content") -> HTMLResponse:
+def content_response(rev: dict, download: bool=False, *, version: int=1, view: Literal["content", "full", "print", "embed"]="content", mark: str | None=None) -> HTMLResponse:
     title = rev["title"].strip() or "Page"
+    if mark and not download:
+        # A viewer's question points here: highlight it for the owner (rendering only).
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(rev["html"], "html.parser")
+        page_feedback.mark(soup, mark)
+        rev = {**rev, "html": str(soup)}
     filename = title if title.lower().endswith(".html") else f"{title}.html"
     html, csp = render_page(rev, version, "content" if download else view)
     html, csp = prepare_page_links(html, csp)
@@ -168,7 +175,10 @@ async def get_public(token: str, response: Response, settings: Settings = Depend
     response.headers["Cache-Control"] = "no-store"
     return {"title": rev["title"], "revision": rev["uuid"],
             "version": next(i for i, item in enumerate(doc["revisions"], 1) if item["uuid"] == rev["uuid"]),
-            "updated_at": updated_at}
+            "updated_at": updated_at,
+            "shared_by": await run(page_feedback.shared_by, doc),
+            "questions_enabled": bool(doc.get("public_questions")),
+            "notes": await run(page_feedback.page_notes, doc["uuid"], rev["uuid"])}
 
 
 @router.get("/public/{token}/content", response_model=None)
@@ -186,16 +196,28 @@ async def public_content(token: str, download: bool = False, revision: str | Non
 @router.get("/{uuid}", response_model=None)
 async def get_artifact(uuid: str, user: User = Depends(get_current_user), settings: Settings = Depends(get_settings)) -> dict[str, object]:
     doc = await authorized(uuid, user)
-    return {**artifacts.metadata(doc, doc["user_id"] == user.user_id), "public_sharing_enabled": settings.artifact_public_sharing_enabled}
+    owner = doc["user_id"] == user.user_id
+    result = {**artifacts.metadata(doc, owner), "public_sharing_enabled": settings.artifact_public_sharing_enabled}
+    if owner:
+        result["public_questions"] = bool(doc.get("public_questions"))
+        result["sharing_contact"] = doc.get("sharing_contact") or {}
+        result["open_questions"] = await run(lambda db: db.page_feedback.count_documents(
+            {"artifact_uuid": doc["uuid"], "status": "open"}))
+    else:
+        result["shared_by"] = await run(page_feedback.shared_by, doc)
+    result["notes"] = await run(page_feedback.page_notes, doc["uuid"], artifacts.revision(doc)["uuid"])
+    return result
 
 
 @router.get("/{uuid}/revisions/{revision}/content", response_model=None)
 async def private_content(uuid: str, revision: str, download: bool = False,
-                          view: Literal["content", "full", "print", "embed"] = "content", user: User = Depends(get_current_user)) -> HTMLResponse:
+                          view: Literal["content", "full", "print", "embed"] = "content",
+                          mark: str | None = Query(default=None, max_length=40),
+                          user: User = Depends(get_current_user)) -> HTMLResponse:
     doc = await authorized(uuid, user)
     rev = artifacts.revision(doc, revision)
     version = rev.get("version") or next(i for i, item in enumerate(doc["revisions"], 1) if item["uuid"] == revision)
-    return content_response(rev, download, version=version, view=view)
+    return content_response(rev, download, version=version, view=view, mark=mark)
 
 
 @router.get("/{uuid}/revisions/{revision}/source", response_model=None)
@@ -262,4 +284,135 @@ async def delete_artifact(uuid: str, user: User = Depends(get_current_user)) -> 
     await run(lambda db: db.html_artifacts.update_one({"uuid": uuid, "user_id": user.user_id}, {"$set": {
         "deleted_at": datetime.now(timezone.utc), "public_token": None, "published_revision": None, "publications": [], "revisions": [],
     }}))
+    return {"ok": True}
+
+
+
+# ---------------------------------------------------------------------------
+# Questions and flags from viewers (support ticket: viewers couldn't ask the
+# owner anything). See services/page_feedback.py.
+# ---------------------------------------------------------------------------
+
+
+def _question_link(uuid: str, question: str) -> str:
+    return f"/pages/{uuid}?question={question}"
+
+
+async def _notify_owner(doc: dict, item: dict, asker_label: str) -> None:
+    from app.services.notification_service import create_notification
+
+    about = f" · about {item['anchor_label']}" if item.get("anchor_label") else ""
+    await create_notification(
+        doc["user_id"], "page_question",
+        f"Question on {item['page_title']}"[:200],
+        body=f"{asker_label}{about}: {item['message'][:300]}",
+        link=_question_link(doc["uuid"], item["uuid"]),
+        item_kind="page", item_id=doc["uuid"], item_name=item["page_title"],
+    )
+
+
+@router.get("/{uuid}/questions/anchors", response_model=None)
+async def question_anchors(uuid: str, revision: str | None = Query(default=None, max_length=64),
+                           user: User = Depends(get_current_user)) -> dict:
+    doc = await authorized(uuid, user)
+    return {"anchors": page_feedback.anchors(artifacts.revision(doc, revision)["html"])}
+
+
+@router.post("/{uuid}/questions", response_model=None)
+@limiter.limit("20/minute")
+async def ask_question(request: Request, uuid: str, body: PageQuestionRequest,
+                       user: User = Depends(get_current_user)) -> dict:
+    doc = await authorized(uuid, user)
+    if doc["user_id"] == user.user_id:
+        raise HTTPException(422, "This is your page. Use Request changes to change it.")
+    # The version the viewer can see (team view), never one they can't.
+    rev = artifacts.revision(doc, body.revision)
+    name = (user.name or user.email or "A team member").strip()
+    full = await run(artifacts.get, uuid)
+    item = await run(page_feedback.create, full, rev, message=body.message, anchor_id=body.anchor_id,
+                     asker={"kind": "user", "user_id": user.user_id, "name": name})
+    await _notify_owner(full, item, name)
+    return page_feedback.serialize(item)
+
+
+@router.get("/{uuid}/questions/mine", response_model=None)
+async def my_questions(uuid: str, user: User = Depends(get_current_user)) -> list[dict]:
+    doc = await authorized(uuid, user)
+    rows = await run(lambda db: list(db.page_feedback.find(
+        {"artifact_uuid": doc["uuid"], "asker.user_id": user.user_id}).sort("created_at", -1).limit(50)))
+    return [page_feedback.serialize(r) for r in rows]
+
+
+@router.get("/{uuid}/questions", response_model=None)
+async def list_questions(uuid: str, user: User = Depends(get_current_user)) -> list[dict]:
+    doc = await authorized(uuid, user, manage=True)
+    return await run(page_feedback.list_for_owner, doc["uuid"])
+
+
+@router.post("/{uuid}/questions/{question}/answer", response_model=None)
+async def answer_question(uuid: str, question: str, body: PageAnswerRequest,
+                          user: User = Depends(get_current_user), settings: Settings = Depends(get_settings)) -> dict:
+    doc = await authorized(uuid, user, manage=True)
+    item = await run(page_feedback.answer, doc, question, body.text, body.show_on_page)
+    asker = item.get("asker") or {}
+    title = item.get("page_title") or doc.get("title") or "your page"
+    if asker.get("kind") == "user" and asker.get("user_id"):
+        from app.services.notification_service import create_notification
+        await create_notification(
+            asker["user_id"], "page_question_answered", f"Answer about {title}"[:200],
+            body=body.text[:300], link=_question_link(doc["uuid"], item["uuid"]),
+            item_kind="page", item_id=doc["uuid"], item_name=title,
+        )
+    elif asker.get("kind") == "public" and asker.get("email"):
+        from app.services.email_service import page_question_answered_email, send_email
+        token = asker.get("token")
+        url = f"{settings.frontend_url.rstrip('/')}/a/{token}" if token else None
+        subject, html = page_question_answered_email(title, item["message"], body.text, url, item.get("anchor_label"))
+        await send_email(asker["email"], subject, html, settings=settings, email_type="page_question")
+    return page_feedback.serialize(item, owner=True)
+
+
+@router.post("/{uuid}/questions/{question}/close", response_model=None)
+async def close_question(uuid: str, question: str, user: User = Depends(get_current_user)) -> dict:
+    doc = await authorized(uuid, user, manage=True)
+    await run(page_feedback.close, doc, question)
+    return {"ok": True}
+
+
+@router.patch("/{uuid}/question-settings", response_model=None)
+async def question_settings(uuid: str, body: PageFeedbackSettingsRequest,
+                            user: User = Depends(get_current_user)) -> dict:
+    doc = await authorized(uuid, user, manage=True)
+    fresh = await run(page_feedback.update_settings, doc, body.public_questions, body.hide_owner_name, body.contact_label)
+    return {"public_questions": bool(fresh.get("public_questions")), "sharing_contact": fresh.get("sharing_contact") or {},
+            "shared_by": await run(page_feedback.shared_by, fresh)}
+
+
+@router.get("/public/{token}/questions/anchors", response_model=None)
+async def public_question_anchors(token: str, settings: Settings = Depends(get_settings)) -> dict:
+    doc, rev = await public_doc(token, settings)
+    if not doc.get("public_questions"):
+        raise HTTPException(404, "Questions aren't open for this page.")
+    return {"anchors": page_feedback.anchors(rev["html"])}
+
+
+@router.post("/public/{token}/questions", response_model=None)
+@limiter.limit("5/hour")
+async def public_ask_question(request: Request, token: str, body: PublicPageQuestionRequest,
+                              settings: Settings = Depends(get_settings)) -> dict:
+    doc, rev = await public_doc(token, settings)
+    if not doc.get("public_questions"):
+        raise HTTPException(404, "Questions aren't open for this page.")
+    if body.website:
+        # A filled honeypot is a bot: look accepted, store nothing.
+        return {"ok": True}
+    if not page_feedback.valid_email(body.email):
+        raise HTTPException(422, "Enter an email address so the owner can answer you.")
+    from slowapi.util import get_remote_address
+    name = (body.name or "").strip()[:120] or None
+    email = body.email.strip()
+    item = await run(page_feedback.create, doc, rev, message=body.message, anchor_id=body.anchor_id,
+                     asker={"kind": "public", "email": email, "name": name, "token": token,
+                            "ip": page_feedback.ip_key(get_remote_address(request))})
+    await _notify_owner(doc, item, f"{name} <{email}>" if name else email)
     return {"ok": True}

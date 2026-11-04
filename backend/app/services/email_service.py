@@ -1309,3 +1309,32 @@ def deadline_summary_email(
       {_deadline_footer(frontend_url)}
     </div></div></body></html>"""
     return subject, html
+
+
+def page_question_answered_email(
+    page_title: str, question: str, answer: str, page_url: str | None, about: str | None = None,
+) -> tuple[str, str]:
+    """Returns (subject, html_body) when a Page's owner answers a link viewer's question.
+
+    Everything here can come from the public, so all of it is escaped.
+    """
+    from html import escape
+
+    subject = f"Answer to your question about {page_title}"[:200]
+    about_html = f'<p style="margin:0 0 8px;color:#9ca3af;font-size:13px;">About: {escape(about)}</p>' if about else ""
+    link = f'<p style="margin-top:24px"><a class="btn" href="{escape(page_url, quote=True)}">Open the page</a></p>' if page_url else ""
+    html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
+    <div class="container"><div class="card">
+      <div class="logo">Vandalizer</div>
+      <h1>Your question about {escape(page_title)} was answered</h1>
+      {about_html}
+      <div style="margin:16px 0;padding:12px 16px;background:rgba(255,255,255,0.05);border-left:3px solid #6b7280;border-radius:4px;">
+        <p style="margin:0;font-size:14px;color:#d1d5db;">{escape(question[:1000])}</p>
+      </div>
+      <div style="margin:16px 0;padding:12px 16px;background:rgba(255,255,255,0.05);border-left:3px solid #f1b300;border-radius:4px;">
+        <p style="margin:0;font-size:14px;color:#f9fafb;white-space:pre-wrap;">{escape(answer[:4000])}</p>
+      </div>
+      {link}
+      <div class="footer">You asked this question on a page shared with you through Vandalizer.</div>
+    </div></div></body></html>"""
+    return subject, html

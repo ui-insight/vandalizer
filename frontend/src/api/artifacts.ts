@@ -16,9 +16,30 @@ export interface Artifact {
   can_manage: boolean
   public_sharing_enabled?: boolean
   revisions: { uuid: string; title: string; created_at: string; warnings: string[]; version?: number }[]
+  /** Owner only: whether public-link viewers may ask questions, and how the owner is named. */
+  public_questions?: boolean
+  sharing_contact?: { hide_owner_name?: boolean; contact_label?: string }
+  open_questions?: number
+  /** Viewers only: "Shared by Jane Doe, University of Idaho Office of Sponsored Programs". */
+  shared_by?: string | null
+  /** Answers the owner chose to show under this version. */
+  notes?: PageNote[]
 }
 const path = (id: string) => `/api/pages/${encodeURIComponent(id)}`
-export interface PublicArtifact { title: string; revision: string; version: number; updated_at: string }
+export interface PublicArtifact {
+  title: string; revision: string; version: number; updated_at: string
+  shared_by?: string | null; questions_enabled?: boolean; notes?: PageNote[]
+}
+export interface PageNote { about: string | null; question: string; answer: string; answered_at: string }
+export interface PageAnchor { id: string; label: string }
+export interface PageQuestion {
+  uuid: string; artifact_uuid: string; revision: string; version: number | null
+  anchor_id: string | null; anchor_label: string | null; message: string
+  status: 'open' | 'answered' | 'closed'; created_at: string
+  answer: { text: string; answered_at: string; show_on_page: boolean } | null
+  /** Owner view only. */
+  asker?: { kind: 'user' | 'public'; name: string | null; email: string | null }
+}
 export interface ArtifactPageResult { items: Artifact[]; total: number; page: number; page_size: number }
 export const browseArtifacts = (params: { search?: string; sort?: string; page?: number; project_uuid?: string }) => {
   const query = new URLSearchParams()
@@ -43,3 +64,14 @@ export const shareArtifactTeam = (id: string, teamId: string | null, revision?: 
 export const deleteArtifact = (id: string) => apiFetch(path(id), { method: 'DELETE' })
 export const renameArtifact = (id: string, title: string) => apiFetch<Artifact>(path(id), { method: 'PATCH', body: JSON.stringify({ title }) })
 export const duplicateArtifact = (id: string, requestId: string) => apiFetch<Artifact>(`${path(id)}/duplicate`, { method: 'POST', body: JSON.stringify({ request_id: requestId }) })
+
+// Questions and flags from viewers to the owner (services/page_feedback.py).
+export const questionAnchors = (id: string, revision?: string) => apiFetch<{ anchors: PageAnchor[] }>(`${path(id)}/questions/anchors${revision ? `?revision=${encodeURIComponent(revision)}` : ''}`)
+export const publicQuestionAnchors = (token: string) => apiFetch<{ anchors: PageAnchor[] }>(`${path('public')}/${encodeURIComponent(token)}/questions/anchors`)
+export const askQuestion = (id: string, body: { message: string; anchor_id?: string | null; revision?: string }) => apiFetch<PageQuestion>(`${path(id)}/questions`, { method: 'POST', body: JSON.stringify(body) })
+export const askPublicQuestion = (token: string, body: { message: string; anchor_id?: string | null; email: string; name?: string; website?: string }) => apiFetch<{ ok: boolean }>(`${path('public')}/${encodeURIComponent(token)}/questions`, { method: 'POST', body: JSON.stringify(body) })
+export const myQuestions = (id: string) => apiFetch<PageQuestion[]>(`${path(id)}/questions/mine`)
+export const listQuestions = (id: string) => apiFetch<PageQuestion[]>(`${path(id)}/questions`)
+export const answerQuestion = (id: string, question: string, text: string, showOnPage: boolean) => apiFetch<PageQuestion>(`${path(id)}/questions/${encodeURIComponent(question)}/answer`, { method: 'POST', body: JSON.stringify({ text, show_on_page: showOnPage }) })
+export const closeQuestion = (id: string, question: string) => apiFetch(`${path(id)}/questions/${encodeURIComponent(question)}/close`, { method: 'POST' })
+export const updateQuestionSettings = (id: string, body: { public_questions?: boolean; hide_owner_name?: boolean; contact_label?: string }) => apiFetch<{ public_questions: boolean; sharing_contact: { hide_owner_name?: boolean; contact_label?: string }; shared_by: string | null }>(`${path(id)}/question-settings`, { method: 'PATCH', body: JSON.stringify(body) })

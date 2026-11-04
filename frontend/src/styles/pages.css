@@ -161,3 +161,19 @@
  .page-editor textarea { height:300px; }
 }
 @media (prefers-reduced-motion:reduce) { .page-building,.page-mark svg { animation:none; } }
+/* Viewer questions (PageQuestions.tsx). */
+.page-shared-by { color: #475569; }
+.page-question-trap { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+.page-notes { margin: 20px 0; padding: 14px 16px; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; }
+.page-notes h2 { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
+.page-notes article { padding: 8px 0; border-top: 1px solid #e2e8f0; }
+.page-notes article:first-of-type { border-top: 0; }
+.page-note-about { font-size: 12px; color: #64748b; margin: 0 0 2px; }
+.page-note-question { margin: 0 0 4px; font-size: 14px; color: #1e293b; }
+.page-note-answer { margin: 0; font-size: 14px; color: #0f172a; padding-left: 10px; border-left: 3px solid #f1b300; white-space: pre-wrap; }
+.page-questions { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.page-question { padding: 12px; border: 1px solid #e2e8f0; border-radius: 10px; }
+.page-question--focus { border-color: #f1b300; box-shadow: 0 0 0 2px #fff1c2; }
+.page-question header { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; color: #475569; margin-bottom: 6px; }
+.page-question-tag { padding: 1px 6px; border-radius: 999px; background: #f1f5f9; font-size: 12px; }
+.page-question-settings { margin: 12px 0; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; }

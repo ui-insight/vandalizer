@@ -1,7 +1,7 @@
 import { SavePageTemplate } from '../components/artifacts/SavePageTemplate'
 import { PageVersionLinks } from '../components/artifacts/PageVersionLinks'
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, ArrowUpRight, Check, ChevronRight, Code2, Copy, Download, FileText, Globe2, Link2, LockKeyhole, MessageSquare, Share2, Trash2, Workflow } from 'lucide-react'
+import { ArrowLeft, ArrowUpRight, Check, ChevronRight, Code2, Copy, Download, FileText, Globe2, Link2, LockKeyhole, MessageCircleQuestion, MessageSquare, Share2, Trash2, Workflow } from 'lucide-react'
 import * as api from '../api/artifacts'
 import { PagesBrowser } from '../components/artifacts/PagesBrowser'
 import { PageDeleteDialog } from '../components/artifacts/PageDeleteDialog'
@@ -9,6 +9,7 @@ import { PageBadge, PageDialog, PagePreview, pagesUrl } from '../components/arti
 import { listTeams } from '../api/teams'
 import { PagePrintLink, pageViewUrl } from '../components/artifacts/PagePrintLink'
 import { PublishedPageContent } from '../components/artifacts/PublishedPageContent'
+import { AskOwnerDialog, MyQuestions, OwnerQuestions, PageNotes, QuestionSettings } from '../components/artifacts/PageQuestions'
 
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : 'Could not complete this action. Please try again.'
 
@@ -37,6 +38,12 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [requestChanges, setRequestChanges] = useState(false)
   const [changes, setChanges] = useState('')
+  // Viewer questions (support ticket): asking, the owner's list, the spot to highlight.
+  const [asking, setAsking] = useState(false)
+  const [askedCount, setAskedCount] = useState(0)
+  const [focusQuestion] = useState(() => new URLSearchParams(window.location.search).get('question'))
+  const [questionsOpen, setQuestionsOpen] = useState(() => !!new URLSearchParams(window.location.search).get('question'))
+  const [mark, setMark] = useState<{ revision: string; anchor: string } | null>(null)
   useEffect(() => {
     let live = true
     setLoading(true); setError(''); setArtifact(null); setPublicInfo(null); setEditor(null); setTeamError(false)
@@ -87,7 +94,10 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
   const isPublished = (id: string) => id === artifact?.published_revision || !!artifact?.publications?.some(link => link.revision === id)
   const selectedIsPublished = isPublished(selected)
   const hasDraft = !!artifact?.can_manage && hasPublicLinks && !isPublished(artifact.latest_revision)
-  const contentUrl = publicToken ? api.publicArtifactContentUrl(publicToken, publicInfo?.revision) : uuid && selected ? api.artifactContentUrl(uuid, selected) : ''
+  const markQuery = mark && mark.revision === selected ? `?mark=${encodeURIComponent(mark.anchor)}` : ''
+  const contentUrl = publicToken ? api.publicArtifactContentUrl(publicToken, publicInfo?.revision) : uuid && selected ? `${api.artifactContentUrl(uuid, selected)}${markQuery}` : ''
+  const sharedBy = publicInfo?.shared_by || (artifact && !artifact.can_manage ? artifact.shared_by : null)
+  const canAsk = (!!artifact && !artifact.can_manage) || (!!publicToken && !!publicInfo?.questions_enabled)
   const publicUpdated = publicInfo?.updated_at ? new Date(publicInfo.updated_at) : null
   const publicUpdatedLabel = publicUpdated && !Number.isNaN(publicUpdated.getTime())
     ? publicUpdated.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC', timeZoneName: 'short' }) : null
@@ -109,6 +119,7 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
           {hasPublicLinks && <span>Workspace access: {artifact?.team_id ? 'you and your team' : 'only you'}</span>}
           {!hasPublicLinks && <span>Share only when you’re ready</span>}
         </>}
+        {sharedBy && <span className="page-shared-by">{sharedBy}</span>}
       </div>}
     </div>
     {!loading && (artifact || publicInfo) && <div className="page-actions">
@@ -116,6 +127,8 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
       {artifact && <button className="page-button" disabled={busy || !!editor} onClick={() => setSaveTemplate(true)}>Save as template</button>}
       <a className="page-button" href={`${contentUrl}${contentUrl.includes('?') ? '&' : '?'}download=true`}><Download size={16} />Download HTML</a>
       {artifact?.can_manage && <><button className="page-button" disabled={busy || !!editor} onClick={() => { setNotice(''); setError(''); setRequestChanges(true) }}><MessageSquare size={16} />Request changes</button><button className="page-button page-button-primary" disabled={busy} onClick={openSharing}><Share2 size={16} />Share</button></>}
+      {canAsk && <button className="page-button" onClick={() => { setNotice(''); setAsking(true) }}><MessageCircleQuestion size={16} />Ask the owner</button>}
+      {artifact?.can_manage && <button className="page-button" disabled={busy || !!editor} onClick={() => setQuestionsOpen(true)}><MessageCircleQuestion size={16} />Questions{artifact.open_questions ? ` (${artifact.open_questions})` : ''}</button>}
       {publicToken && <a className="page-button page-button-primary" href={pageViewUrl(contentUrl, 'full')} target="_blank" rel="noreferrer"><ArrowUpRight size={16} />Open full page</a>}
     </div>}</header>
     {!sharing && !requestChanges && !confirmDelete && !editor && feedback}
@@ -126,6 +139,8 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
       {hasDraft && publishedVersion > 0 && !selectedIsPublished && <p className="page-revision-note">You’re previewing version {version}. The public link still shows version {publishedVersion}. Share → Publish updates when you’re ready.</p>}
       {!!revision?.warnings.length && <div className="page-revision-note"><strong>Some content was removed to keep this page safe.</strong>{revision.warnings.map(w => <p key={w}>{w}</p>)}</div>}
       {publicToken ? <PublishedPageContent key={contentUrl} src={contentUrl} /> : <PagePreview key={contentUrl} src={contentUrl} title={title} />}
+      <PageNotes notes={publicInfo?.notes ?? artifact?.notes} />
+      {artifact && !artifact.can_manage && uuid && <MyQuestions uuid={uuid} refresh={askedCount} />}
       {artifact?.source && <nav aria-label="Page source" className="page-source">
         {artifact.source.conversation_uuid && <a href={`/?conversation=${encodeURIComponent(artifact.source.conversation_uuid)}${artifact.source.project_uuid ? `&project=${encodeURIComponent(artifact.source.project_uuid)}` : ''}`}><MessageSquare size={14} />Open originating chat</a>}
         {artifact.source.workflow_id && <a href={`/?mode=files&workflow=${encodeURIComponent(artifact.source.workflow_id)}${artifact.source.session_id ? `&run=${encodeURIComponent(artifact.source.session_id)}` : ''}${artifact.source.project_uuid ? `&project=${encodeURIComponent(artifact.source.project_uuid)}` : ''}`}><Workflow size={14} />Open originating workflow run</a>}
@@ -153,6 +168,7 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
       </section>
       <section className="page-share-section"><h3><Globe2 size={17} />Main public link {publishedVersion > 0 && <PageBadge published>Version {publishedVersion} is live</PageBadge>}</h3>
         <p>Before publishing, compare figures and source notes with the original documents. Saving a page does not verify its accuracy.</p>
+        <QuestionSettings artifact={artifact} onSaved={() => void reload()} />
         <p>{publishedVersion ? `Anyone with this link can view version ${publishedVersion}. Saving edits does not change this link.` : `Publish version ${publicVersion} so anyone with its link can view it. Check the page for private information before publishing.`}</p>
         {hasDraft && publishedVersion > 0 && <p className="page-revision-note">Version {latestVersion} is newer than the published version.</p>}
         <label>Version to publish<select aria-label="Version to publish" value={publicRevision} disabled={busy || !!editor || !artifact.public_sharing_enabled} onChange={e => setPublicRevision(e.target.value)}>{artifact.revisions.map((r, index) => <option key={r.uuid} value={r.uuid}>Version {r.version ?? index + 1}{r.uuid === artifact.published_revision ? ' · public now' : ''}{r.uuid === artifact.latest_revision ? ' · latest saved' : ''}</option>)}</select></label>
@@ -181,6 +197,11 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
     {requestChanges && uuid && artifact?.can_manage && <PageDialog title="Request changes" onClose={() => setRequestChanges(false)}>
       <p>Describe what you’d like to change in <strong>{title}</strong>. You’ll review the message in chat before sending it.</p>{feedback}<label className="block text-sm font-medium">What would you like to change?<textarea className="mt-2 min-h-36 w-full rounded-lg border border-slate-300 p-3 text-sm" value={changes} maxLength={8000} onChange={e => setChanges(e.target.value)} placeholder="Make the funding summary easier to scan, add a next-steps section…" autoFocus /></label><div className="page-actions"><button className="page-button page-button-primary" disabled={!changes.trim()} onClick={() => { try { sessionStorage.setItem(`pages:edit-request:${uuid}`, changes.trim()); window.location.assign(chatUrl) } catch { setError('Could not open chat. Copy your request and return to the originating chat.') } }}><MessageSquare size={16} />Continue in chat</button><button className="page-button" onClick={() => setRequestChanges(false)}>Cancel</button></div>
     </PageDialog>}
+    {asking && <AskOwnerDialog uuid={publicToken ? undefined : uuid} token={publicToken} revision={publicToken ? undefined : selected} onClose={() => setAsking(false)}
+      onSent={() => { setAsking(false); setAskedCount(n => n + 1); setNotice(publicToken ? 'Sent. The owner will answer by email.' : 'Sent. The answer will appear in your notifications and below the page.') }} />}
+    {questionsOpen && uuid && artifact?.can_manage && <OwnerQuestions uuid={uuid} focus={focusQuestion} onClose={() => setQuestionsOpen(false)} onChanged={() => void reload()}
+      onShow={q => { if (artifact.revisions.some(r => r.uuid === q.revision)) setSelected(q.revision); setMark(q.anchor_id ? { revision: q.revision, anchor: q.anchor_id } : null); setQuestionsOpen(false) }}
+      onRequestChanges={text => { setChanges(text); setQuestionsOpen(false); setRequestChanges(true) }} />}
     {confirmDelete && uuid && artifact?.can_manage && <PageDeleteDialog title={title} busy={busy} feedback={feedback} onClose={() => setConfirmDelete(false)} onConfirm={() => void action(async () => { await api.deleteArtifact(uuid); window.location.assign(backUrl) })} />}
   </div></main>
 }

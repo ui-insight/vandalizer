@@ -65,9 +65,48 @@ class Collection:
         return self.find_one_and_update(query, update)
 
 
+class Cursor(list):
+    def sort(self, key, direction=1):
+        return Cursor(sorted(self, key=lambda d: d.get(key), reverse=direction == -1))
+
+    def limit(self, n):
+        return Cursor(self[:n])
+
+
+class QueryCollection(Collection):
+    """Collection plus the reads and writes page_feedback uses."""
+
+    def insert_one(self, doc):
+        self.docs.append(deepcopy(doc))
+
+    def find_one(self, query, projection=None):
+        return deepcopy(next((d for d in self.docs if self.matches(d, query)), None))
+
+    def find(self, query, projection=None):
+        return Cursor(deepcopy(d) for d in self.docs if self.matches(d, query))
+
+    def count_documents(self, query):
+        return len(self.find(query))
+
+    def update_one(self, query, update):
+        matched = 0
+        for doc in self.docs:
+            if self.matches(doc, query):
+                for key, value in update.get("$set", {}).items():
+                    target = doc
+                    *parents, last = key.split(".")
+                    for part in parents:
+                        target = target.setdefault(part, {})
+                    target[last] = value
+                matched = 1
+                break
+        return SimpleNamespace(matched_count=matched)
+
+
 @pytest.fixture
 def db():
-    return SimpleNamespace(html_artifacts=Collection(), chat_page_previews=Collection(), workflow=Collection(), workflow_result=Collection(), activity_event=Collection())
+    return SimpleNamespace(html_artifacts=Collection(), chat_page_previews=Collection(), workflow=Collection(), workflow_result=Collection(), activity_event=Collection(),
+                           page_feedback=QueryCollection(), user=QueryCollection(), organization=QueryCollection())
 
 
 def make(db, key="one", owner="testuser", html="<main><h1>Original</h1></main>"):
