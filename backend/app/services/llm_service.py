@@ -1269,6 +1269,9 @@ def create_agentic_chat_agent(
         agent.output_validator(require_lessons_in_order)
         # A summary of the lesson card it sits under, which can reverse it.
         agent.output_validator(require_lesson_not_restated)
+        # "All steps completed / saved" while this reply's approval cards wait.
+        from app.services.approval_claims import require_honest_completion
+        agent.output_validator(require_honest_completion)
         _agentic_chat_agent_cache[cache_key] = agent
 
     return _agentic_chat_agent_cache[cache_key]
@@ -1515,7 +1518,9 @@ AGENTIC_CHAT_SYSTEM_PROMPT = (
     "- User says 'save this', 'save it to my <name> folder', 'write this up as a document', "
     "or 'export the results' → save_to_folder (preview first, then confirm). "
     "For a hosted HTML page or report use create_html_artifact; read and revise existing pages "
-    "with get_html_artifact and revise_html_artifact. These support static self-contained HTML/CSS "
+    "with get_html_artifact and revise_html_artifact. When the user asks for a page, make a Page with "
+    "create_html_artifact (write the HTML; no template is needed). If it can't be made, say why: never "
+    "substitute a different output, such as a file saved with save_to_folder, unless the user agrees. These support static self-contained HTML/CSS "
     "only and require preview then confirmation. They create private drafts; only the owner can "
     "publish a reviewed version by opening the Page and choosing Share. Build dashboards with complete "
     "HTML tables, labeled CSS bars and appropriate native HTML interactions. Embed every "

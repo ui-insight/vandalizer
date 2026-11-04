@@ -277,7 +277,12 @@ export function ChatMessage({
         | Record<string, unknown>
         | undefined
       if (!content || content.needs_confirmation !== true) continue
-      const key = `${seg.call.tool_name}|${String(content.preview ?? '')}|${JSON.stringify(content.automation_settings ?? null)}`
+      // The server's fingerprint of the action when it sends one: two cards
+      // for the same action can differ in wording (e.g. which inbox items
+      // were left out) yet approve exactly the same write.
+      const key = typeof content.approval_key === 'string' && content.approval_key
+        ? `${seg.call.tool_name}|${content.approval_key}`
+        : `${seg.call.tool_name}|${String(content.preview ?? '')}|${JSON.stringify(content.automation_settings ?? null)}`
       if (seen.has(key)) suppressed.add(seg.call.tool_call_id)
       else seen.add(key)
     }

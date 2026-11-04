@@ -89,6 +89,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     contextMeter,
     compactionStatus,
     planTasks,
+    planWaiting,
     queuedMessages,
     awaitingPageApproval,
     queueMessage,
@@ -1449,7 +1450,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         )}
 
         {/* Live task checklist for multi-step agent work (Phase 8). */}
-        {planTasks && planTasks.length > 0 && <PlanChecklist tasks={planTasks} isStreaming={isStreaming} />}
+        {planTasks && planTasks.length > 0 && <PlanChecklist tasks={planTasks} isStreaming={isStreaming} waitingApprovals={planWaiting} />}
 
         {/* Auto-compaction can take a while — show progress instead of dead
             air; the context_notice that follows reports the outcome. */}

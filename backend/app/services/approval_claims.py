@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING
 
 from pydantic_ai import ModelRetry, RunContext
 
-from app.services.chat_tools import _APPROVE_BUTTON_LABELS
+from app.services.chat_tools import _APPROVE_BUTTON_LABELS, approve_button_label
 
 if TYPE_CHECKING:
     from app.services.chat_deps import AgenticChatDeps
@@ -618,3 +618,61 @@ def require_lesson_not_restated(ctx: RunContext["AgenticChatDeps"], output: str)
         return output
     deps.lesson_restated_retry_used = True
     raise ModelRetry(LESSON_RESTATED_RETRY_INSTRUCTION)
+
+
+# ---------------------------------------------------------------------------
+# Done, while the approval cards are still waiting
+# ---------------------------------------------------------------------------
+# Support ticket: "All four steps are prepared … Award snapshot saved", with a
+# green "All 4 steps completed", while Move files, Add to inbox and Save to
+# folder were still waiting for approval and nothing had been saved. A reply
+# that says something was saved, added, created or finished while this
+# reply's cards wait is sent back once.
+
+_DONE_CLAIMS = [
+    re.compile(r"\ball\s+(?:\w+\s+)?(?:steps|tasks|parts|items)\s+(?:are\s+|were\s+|have\s+been\s+)?"
+               r"(?:done|complete|completed|finished|prepared|set\s+up|in\s+place)\b", re.IGNORECASE),
+    re.compile(r"\b(?:has|have|was|were)\s+(?:now\s+|successfully\s+)?(?:been\s+)?(?:saved|added|created|moved|set\s+up)\b", re.IGNORECASE),
+    re.compile(r"\b(?:saved|added|created|moved)\s+(?:it\s+|them\s+)?(?:to|in|into)\s+(?:the\s+|your\s+)?(?:ra\s+)?"
+               r"(?:inbox|folder|project|pages?)\b", re.IGNORECASE),
+    # A heading-like line: "Award snapshot saved", "✅ Project created".
+    re.compile(r"^[^\n.?!]{0,80}\b(?:saved|created|added)\s*[.!:]?\s*$", re.IGNORECASE | re.MULTILINE),
+]
+_HEDGED = re.compile(
+    r"\b(?:once|after|when|until|if)\s+you\b|\bwait(?:s|ing)?\b|\bpending\b|\bapprov(?:e|al|ed)\b|\bconfirm"
+    r"|\bnot\s+(?:yet\s+)?(?:been\s+)?(?:saved|added|created|moved|done)\b|\bwill\s+(?:be|save|add|create|move)\b|\bready\s+to\b",
+    re.IGNORECASE,
+)
+_SENTENCE = re.compile(r"[^.!?\n]+[.!?]?", re.MULTILINE)
+
+COMPLETION_RETRY_INSTRUCTION = (
+    "Your reply says work is saved, added, created or finished, but these approval cards from this "
+    "reply are still waiting for the user: {cards}. Nothing they cover has happened yet. Rewrite the "
+    "reply: say what is done, list what is waiting for their approval (by the card's button), and "
+    "what will happen after they approve. Do not repeat your previous reply."
+)
+
+
+def claims_done(text: str) -> bool:
+    """A sentence that reports a write as done, without saying it waits for approval."""
+    for sentence in _SENTENCE.findall(text or ""):
+        if _HEDGED.search(sentence):
+            continue
+        if any(p.search(sentence.strip()) for p in _DONE_CLAIMS):
+            return True
+    return False
+
+
+def require_honest_completion(ctx: RunContext["AgenticChatDeps"], output: str) -> str:
+    """Output validator: send back, once per turn, "done" while this turn's cards wait."""
+    from app.services.chat_tools import _cards_waiting_this_turn
+
+    deps = ctx.deps
+    if ctx.partial_output or deps is None or getattr(deps, "completion_claim_retry_used", False):
+        return output
+    waiting = _cards_waiting_this_turn(deps)
+    if not waiting or not claims_done(output):
+        return output
+    deps.completion_claim_retry_used = True
+    labels = sorted({approve_button_label(tool) for tool in waiting})
+    raise ModelRetry(COMPLETION_RETRY_INSTRUCTION.format(cards=", ".join(f"“{label}”" for label in labels)))

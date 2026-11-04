@@ -2971,6 +2971,15 @@ async def chat_stream(
                     streamed_tool_results, previous_messages,
                     kbs_attached=bool(active_kbs),
                 )
+                # The checklist says how many of this reply's approval cards
+                # are still waiting, so it never reads "All steps completed"
+                # while nothing has been saved yet.
+                if deps is not None and deps.plan_state:
+                    from app.services.chat_tools import _cards_waiting_this_turn
+                    waiting_cards = _cards_waiting_this_turn(deps)
+                    if waiting_cards:
+                        yield json.dumps({"kind": "plan_update", "content": "", "plan_tasks": deps.plan_state,
+                                          "waiting_approvals": len(waiting_cards)}) + "\n"
                 await _finalize(
                     conversation, assistant_message, documents,
                     usage, activity_id, user_id,

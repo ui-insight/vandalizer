@@ -235,7 +235,8 @@ export interface Citation {
 export interface PlanTask {
   content: string
   active_form: string
-  status: 'pending' | 'in_progress' | 'completed'
+  /** awaiting_approval: its approval card is shown, nothing is saved yet. */
+  status: 'pending' | 'in_progress' | 'awaiting_approval' | 'completed'
 }
 
 /** Transient UI status, never model reasoning or persisted transcript content. */
@@ -289,6 +290,8 @@ export interface StreamChunk {
   // plan_update kind only: the full current checklist. Named plan_tasks
   // because `plan` is already the context_budget chunk's ContextBudgetPlan.
   plan_tasks?: PlanTask[]
+  // plan_update at the end of a reply: approval cards still waiting.
+  waiting_approvals?: number
   // Error-only: machine-readable failure code + optional suggested recovery.
   code?: string
   suggested_action?: 'convert_to_kb' | 'continue'

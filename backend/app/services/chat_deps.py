@@ -87,6 +87,10 @@ class AgenticChatDeps:
     # never took (approval_claims.require_announced_action).
     announced_action_retry_used: bool = False
 
+    # Once-only flag for approval_claims.require_honest_completion: a reply
+    # calling work saved/finished while this turn's approval cards wait.
+    completion_claim_retry_used: bool = False
+
     # Attached knowledge bases that have never been validated, and the
     # once-only flag for sending back a reply that calls one validated
     # (approval_claims.require_honest_validation).
