@@ -1086,6 +1086,11 @@ def process_extraction_outputs(
 
     # Mark extraction event as running
     ext_started_at = datetime.now(timezone.utc)
+    started_event = (
+        db.extraction_trigger_event.find_one({"_id": ObjectId(extraction_event_id)}, {"trigger_context": 1})
+        if extraction_event_id else None
+    )
+    started_by = ((started_event or {}).get("trigger_context") or {}).get("trigger_type")
     if extraction_event_id:
         db.extraction_trigger_event.update_one(
             {"_id": ObjectId(extraction_event_id)},
@@ -1205,6 +1210,7 @@ def process_extraction_outputs(
                     "completed_at": datetime.now(timezone.utc),
                 }},
             )
+        _notify_automatic_run_finished(db, auto, run_status, started_by, extraction_event_id, document_uuids)
         return {"status": run_status, "results": results}
 
     automation_dict = {
@@ -1262,6 +1268,32 @@ def process_extraction_outputs(
                 "error": str(e),
             })
 
+    # Outputs that failed are disclosed, not swallowed (#810): the extraction
+    # ran, but a library save, notification or webhook never left the building.
+    delivery_failures: list[str] = []
+    if outputs["storage"] and outputs["storage"].get("status") == "failed":
+        delivery_failures.append(f"library save failed: {str(outputs['storage'].get('error'))[:200]}")
+    for n in outputs["notifications"]:
+        if n.get("status") == "failed":
+            delivery_failures.append(f"notification ({n.get('channel') or 'configured'}) failed: {str(n.get('error'))[:200]}")
+    for w in outputs["webhooks"]:
+        if w.get("status") == "failed":
+            delivery_failures.append(f"webhook ({w.get('url') or 'configured'}) failed: {str(w.get('error'))[:200]}")
+    if delivery_failures:
+        # delivery_failed, not automation_failed: the extraction RAN and its
+        # results exist; coalescing onto automation_failed would overwrite an
+        # unread genuine dispatch failure's detail.
+        from app.services.failure_notifications import notify_delivery_failed
+
+        notify_delivery_failed(
+            db, automation=auto,
+            detail=(
+                "The extraction ran, but "
+                f"{len(delivery_failures)} configured output(s) failed to "
+                "deliver: " + "; ".join(delivery_failures)
+            ),
+        )
+
     # Persist results and close out the extraction event
     if extraction_event_id:
         now = datetime.now(timezone.utc)
@@ -1307,7 +1339,32 @@ def process_extraction_outputs(
                 user_id=user_id,
             )
 
+    _notify_automatic_run_finished(db, auto, run_status, started_by, extraction_event_id, document_uuids)
     return {"status": run_status, "outputs": outputs}
+
+
+# Runs nobody clicked: a file arriving in a watched folder, or a schedule.
+AUTOMATIC_TRIGGERS = frozenset({"folder_watch", "schedule"})
+
+
+def _notify_automatic_run_finished(
+    db: Database[dict], auto: dict, run_status: str, started_by: str | None,
+    extraction_event_id: str | None, document_uuids: list[str],
+) -> None:
+    """Bell the owner when an automatic extraction run completes.
+
+    Failures already bell (notify_automation_failed). A run someone clicked
+    Run now on is watched in the editor and needs no bell.
+    """
+    if run_status != "completed" or started_by not in AUTOMATIC_TRIGGERS:
+        return
+    from app.services.run_notifications import notify_automation_run_completed
+
+    title = None
+    if len(document_uuids) == 1:
+        doc = db.smart_document.find_one({"uuid": document_uuids[0]}, {"title": 1})
+        title = (doc or {}).get("title")
+    notify_automation_run_completed(db, automation=auto, run_id=extraction_event_id, document_title=title)
 
 
 # ---------------------------------------------------------------------------

@@ -7,6 +7,12 @@ const ACTIVE = new Set(['pending', 'queued', 'running'])
 const buttonStyle = { border: '1px solid #9ca3af', borderRadius: 'var(--workspace-radius-small)', padding: "var(--workspace-space-6) var(--workspace-space-12)", font: 'inherit', fontSize: 'var(--workspace-font-control)', background: '#fff', color: '#374151', cursor: 'pointer' }
 
 interface Props { automationId: string; open: boolean; canRun: boolean; onPrepareRun: () => void }
+// What started a run, as the history shows it (support ticket: a run a new
+// file started read the same as a Run now).
+const TRIGGER_LABELS: Record<string, string> = {
+  manual: 'Run now', folder_watch: 'New file', schedule: 'Scheduled', api: 'API', chain: 'Chained', m365_intake: 'Email intake',
+}
+
 export function AutomationRunHistory(props: Props) {
   return <HistorySession key={props.automationId} {...props} />
 }
@@ -60,6 +66,7 @@ function HistorySession({ automationId, open, canRun, onPrepareRun }: Props) {
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-8)' }}>
           <strong style={{ textTransform: 'capitalize', color: row.status === 'failed' || row.status === 'error' ? '#b91c1c' : '#374151' }}>{row.status}</strong>
           <span>{row.action_type === 'extraction' ? 'Extraction' : 'Workflow'}</span>
+          {TRIGGER_LABELS[row.trigger_type ?? ''] && <span>{TRIGGER_LABELS[row.trigger_type ?? '']}{row.document_title ? ` · ${row.document_title}` : ''}</span>}
           {runDuration(row.started_at, row.completed_at) && <span className="automation-run-duration">{runDuration(row.started_at, row.completed_at)}</span>}
           <time dateTime={row.created_at ?? undefined}>{timestamp(row.created_at)}</time>
         </div>
