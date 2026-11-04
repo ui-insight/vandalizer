@@ -1,7 +1,7 @@
 import { isPagePreparation } from '../../lib/chatProgress'
 import { ChatActivityIndicator } from './ChatActivityIndicator'
 import { conversationNearMemoryLimit } from '../../lib/contextNudge'
-import { approvalHistoryFor } from './approvalHistory'
+import { approvalHistoryFor, hasWaitingCard } from './approvalHistory'
 import { useEffect, useLayoutEffect, useRef, useState, useCallback, type DragEvent } from 'react'
 import { Loader2, BookOpen, X, ArrowDown, Upload, Zap, Sparkles, FolderKanban } from 'lucide-react'
 import { useQueryClient, useQueries } from '@tanstack/react-query'
@@ -44,7 +44,7 @@ import { useChatUploads } from '../../hooks/useChatUploads'
 import { pollStatus } from '../../api/documents'
 import { convertDocumentsToKB, getKnowledgeBase } from '../../api/knowledge'
 import { markFirstSessionComplete } from '../../api/config'
-import type { FileAttachment, UrlAttachment } from '../../types/chat'
+import type { CardDecision, FileAttachment, UrlAttachment } from '../../types/chat'
 import { useChatModelPreference } from '../../hooks/useChatModelPreference'
 import { stageCopy, isDocReady } from '../../utils/processingStatus'
 import { partitionNewFiles } from './attachmentDedup'
@@ -91,6 +91,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     planTasks,
     queuedMessages,
     awaitingPageApproval,
+    pendingApprovals,
     queueMessage,
     resumeQueuedMessages,
     suggestedModel,
@@ -532,7 +533,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     return () => { cancelled = true; clearInterval(id) }
   }, [justDroppedUuids])
 
-  const handleSend = (message: string, includeOnboardingContext?: boolean, pageApproval?: string) => {
+  const handleSend = (message: string, includeOnboardingContext?: boolean, pageApproval?: string, cardDecision?: CardDecision) => {
     if (isLoadingHistory || isStreaming || isSelectingSkill || projectSkillBlocked) return false
     if (conversationUuid && !activityId) {
       toast('Reopen this conversation from Activity before sending.', 'info')
@@ -551,7 +552,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     }
     // Use the locked ref so remounts / refetches can't flip this mid-conversation.
     const firstSession = effectiveFirstSession && !hasDocContext && !activeKBUuid && !activeProjectUuid
-    send(message, selectedDocUuids, selectedModel || undefined, activeKBs.map(kb => kb.uuid), includeOnboardingContext, selectedFolderUuids, firstSession || undefined, undefined, activeProjectUuid || undefined, undefined, pageApproval)
+    send(message, selectedDocUuids, selectedModel || undefined, activeKBs.map(kb => kb.uuid), includeOnboardingContext, selectedFolderUuids, firstSession || undefined, undefined, activeProjectUuid || undefined, undefined, pageApproval, cardDecision)
     // Defer markFirstSessionComplete until the user has had enough exchanges
     // to experience the value discovery (at least 3 user messages).
     // messages.length counts both user + assistant; 4 = 2 full exchanges done.
@@ -1265,8 +1266,12 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                 artifactSource={{ conversation_uuid: conversationUuid ?? undefined, project_uuid: activeProjectUuid ?? undefined }}
                     message={msg}
                     exportNames={scopeNamesRef.current}
-                    approvalHistory={approvalHistoryFor(msg, messages.slice(i + 1), isStreaming)}
-                    onSendMessage={msg.role === 'assistant' && i === messages.length - 1 && !isStreaming ? (m, pageApproval) => handleSend(m, undefined, pageApproval) : undefined}
+                    approvalHistory={approvalHistoryFor(msg, messages.slice(i + 1), isStreaming, pendingApprovals)}
+                    // The latest answer, and any earlier one with an approval
+                    // card the server still has waiting: one click decides
+                    // one card, so the others must stay clickable.
+                    onSendMessage={msg.role === 'assistant' && !isStreaming && (i === messages.length - 1 || hasWaitingCard(msg, pendingApprovals))
+                      ? (m, pageApproval, cardDecision) => handleSend(m, undefined, pageApproval, cardDecision) : undefined}
                   />
                 </div>
               </div>

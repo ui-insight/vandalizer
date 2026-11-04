@@ -329,6 +329,7 @@ async def chat(
     else:
         await conversation.add_message(
             ChatRole.USER, message, source_documents=source_documents or None,
+            approval_for=body.approval_for, decline_for=body.decline_for,
         )
 
     async def generate() -> AsyncGenerator[str, None]:
@@ -357,6 +358,8 @@ async def chat(
                 active_skill=active_skill,
                 retry=body.retry,
                 client_timezone=body.client_timezone,
+                approval_for=body.approval_for,
+                decline_for=body.decline_for,
             ):
                 yield chunk
         finally:
@@ -905,9 +908,13 @@ async def get_chat_history(
     })
     url_attachments = await conversation.get_url_attachments()
     file_attachments = await conversation.get_file_attachments()
+    from app.services.approval_scope import pending_call_ids
+
     return {
         "activity_id": str(activity.id) if activity else None,
         "messages": messages,
+        # Approval cards still waiting (their previews' tool call ids).
+        "pending_approvals": pending_call_ids(conversation.pending_confirmations),
         "url_attachments": [
             {
                 "id": str(a.id),

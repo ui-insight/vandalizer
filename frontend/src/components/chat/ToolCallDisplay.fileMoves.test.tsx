@@ -15,7 +15,7 @@ it('shows the move destination and files before requesting approval', () => {
   expect(screen.getByRole('region', { name: 'Review proposed action' })).toHaveTextContent('Move Subaward.pdf into Subaward project. It leaves its current folder.')
   expect(onConfirm).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: 'Move files' }))
-  expect(onConfirm).toHaveBeenCalledWith('Yes, go ahead')
+  expect(onConfirm).toHaveBeenCalledWith('Yes, go ahead', undefined, { approve: expect.any(String) })
   expect(screen.getByRole('status')).toHaveTextContent('Approval requested')
 })
 
