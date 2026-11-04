@@ -187,3 +187,6 @@
 .page-feedback-settings { margin-top:12px; font-size:13px; }
 .page-feedback-settings summary { cursor:pointer; color:#334155; font-weight:600; }
 .page-feedback-settings form { display:flex; flex-direction:column; gap:8px; margin-top:8px; }
+/* Edit text mode (owner fixes text in place). */
+.page-text-edit-bar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin: 12px 0; padding: 10px 14px; border: 1px solid #bfdbfe; border-radius: 10px; background: #eff6ff; color: #1e3a8a; font-size: 13px; }
+.page-text-edit-bar p { margin: 0; flex: 1 1 320px; }

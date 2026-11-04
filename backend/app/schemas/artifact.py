@@ -42,3 +42,17 @@ class ChatArtifactRequest(BaseModel):
     messages: list[ExportMessage] = Field(min_length=1, max_length=1000)
     project_uuid: Optional[str] = Field(default=None, max_length=200)
     conversation_uuid: Optional[str] = Field(default=None, max_length=200)
+
+
+
+class PageTextEdit(BaseModel):
+    tag: str = Field(min_length=1, max_length=12)
+    index: int = Field(ge=0, le=100000)
+    original: str = Field(max_length=20000)
+    text: str = Field(max_length=20000)
+
+
+class PageTextEditsRequest(BaseModel):
+    """Text the owner typed into the page in Edit text mode (page_text_edits)."""
+    base_revision: str = Field(min_length=1, max_length=64)
+    edits: list[PageTextEdit] = Field(min_length=1, max_length=200)

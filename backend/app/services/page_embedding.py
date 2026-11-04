@@ -11,6 +11,10 @@ html, body { height: auto !important; min-height: 0 !important; max-height: none
 .vandalizer-table-scroll:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
 html.vandalizer-picking :is(td, th, li, p, h1, h2, h3, h4, h5, h6, dt, dd, figcaption, caption, blockquote, pre):hover { outline: 2px dashed #b45309; outline-offset: 2px; cursor: crosshair; }
 .vandalizer-feedback-spot { outline: 3px solid #f1b300 !important; outline-offset: 2px; background: #fffbeb !important; }
+html.vandalizer-editing .vandalizer-editable { outline: 1px dashed #93c5fd; outline-offset: 2px; cursor: text; }
+html.vandalizer-editing .vandalizer-editable:hover { outline: 2px solid #3b82f6; }
+html.vandalizer-editing .vandalizer-editable:focus { outline: 2px solid #1d4ed8; background: #eff6ff; }
+html.vandalizer-editing .vandalizer-edited { background: #fef9c3; }
 """
 EMBED_SCRIPT = """(() => {
   // Page-authored JavaScript remains blocked by CSP. Only this nonce-bearing
@@ -60,7 +64,7 @@ EMBED_SCRIPT = """(() => {
     }
     return el === document.body ? parts.join('/') : '';
   };
-  const textOf = (el) => (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 300);
+  const textOf = (el) => (el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 300);
   const resolve = (path, text) => {
     let el = document.body;
     for (const i of (path || '').split('/').filter(Boolean)) { el = el && el.children[Number(i)]; }
@@ -86,6 +90,69 @@ EMBED_SCRIPT = """(() => {
       } else {
         window.parent.postMessage({ type: 'vandalizer:spot-shown', found: false }, '*');
       }
+    }
+  });
+  // Edit text (owner only; the app asks for it). Each innermost text block
+  // becomes editable as plain text. On collect, the changed blocks are sent
+  // back as {tag, index, original, text}: index counts earlier blocks with
+  // the same tag and original text, which is how the server finds the block
+  // in the saved HTML (positions differ: tables are wrapped here, and the
+  // browser adds <tbody>). Nothing is saved from here.
+  const EDITABLE = 'td, th, li, p, h1, h2, h3, h4, h5, h6, dt, dd, figcaption, caption, blockquote, pre';
+  const editState = new Map();
+  const editedCount = () => Array.from(editState.entries()).filter(([el, s]) => el.textContent !== s.original).length;
+  const startEditing = () => {
+    if (editState.size) return;
+    const seen = new Map();
+    Array.from(document.querySelectorAll(EDITABLE)).forEach(el => {
+      const original = el.textContent || '';
+      const key = el.tagName.toLowerCase() + '\u0000' + original;
+      const index = seen.get(key) || 0;
+      seen.set(key, index + 1);
+      if (el.querySelector(EDITABLE) || !original.trim()) return;
+      editState.set(el, { tag: el.tagName.toLowerCase(), index, original });
+      try { el.contentEditable = 'plaintext-only'; } catch (e) { el.contentEditable = 'true'; }
+      if (el.contentEditable !== 'plaintext-only') el.contentEditable = 'true';
+      el.classList.add('vandalizer-editable');
+      el.spellcheck = true;
+    });
+    document.documentElement.classList.add('vandalizer-editing');
+  };
+  const stopEditing = () => {
+    editState.forEach((_s, el) => { el.removeAttribute('contenteditable'); el.classList.remove('vandalizer-editable', 'vandalizer-edited'); });
+    editState.clear();
+    document.documentElement.classList.remove('vandalizer-editing');
+  };
+  document.addEventListener('keydown', (event) => {
+    if (!editState.size || event.key !== 'Enter') return;
+    const el = event.target instanceof Element ? event.target.closest('.vandalizer-editable') : null;
+    if (el && el.tagName !== 'PRE') event.preventDefault();
+  }, true);
+  document.addEventListener('paste', (event) => {
+    const el = event.target instanceof Element ? event.target.closest('.vandalizer-editable') : null;
+    if (!el || el.contentEditable === 'plaintext-only') return;
+    event.preventDefault();
+    document.execCommand('insertText', false, (event.clipboardData && event.clipboardData.getData('text/plain')) || '');
+  }, true);
+  document.addEventListener('input', (event) => {
+    const el = event.target instanceof Element ? event.target.closest('.vandalizer-editable') : null;
+    if (!el) return;
+    const state = editState.get(el);
+    el.classList.toggle('vandalizer-edited', !!state && el.textContent !== state.original);
+    window.parent.postMessage({ type: 'vandalizer:edit-count', count: editedCount() }, '*');
+    schedule();
+  }, true);
+  window.addEventListener('message', (event) => {
+    if (event.source !== window.parent || !event.data || typeof event.data !== 'object') return;
+    if (event.data.type === 'vandalizer:edit-mode') {
+      if (event.data.on === true) startEditing(); else stopEditing();
+    } else if (event.data.type === 'vandalizer:edit-collect') {
+      const edits = [];
+      editState.forEach((s, el) => {
+        const text = el.textContent || '';
+        if (text !== s.original) edits.push({ tag: s.tag, index: s.index, original: s.original, text });
+      });
+      window.parent.postMessage({ type: 'vandalizer:edits', edits }, '*');
     }
   });
   document.addEventListener('click', (event) => {

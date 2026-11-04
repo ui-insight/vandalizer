@@ -43,3 +43,7 @@ export const shareArtifactTeam = (id: string, teamId: string | null, revision?: 
 export const deleteArtifact = (id: string) => apiFetch(path(id), { method: 'DELETE' })
 export const renameArtifact = (id: string, title: string) => apiFetch<Artifact>(path(id), { method: 'PATCH', body: JSON.stringify({ title }) })
 export const duplicateArtifact = (id: string, requestId: string) => apiFetch<Artifact>(`${path(id)}/duplicate`, { method: 'POST', body: JSON.stringify({ request_id: requestId }) })
+
+/** A block the owner changed in Edit text mode: found again by tag, original text and occurrence. */
+export interface PageTextEdit { tag: string; index: number; original: string; text: string }
+export const saveTextEdits = (id: string, baseRevision: string, edits: PageTextEdit[]) => apiFetch<Artifact & { version: number; notes: string[] }>(`${path(id)}/text-edits`, { method: 'POST', body: JSON.stringify({ base_revision: baseRevision, edits }) })
