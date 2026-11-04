@@ -65,6 +65,7 @@ from app.models.email_log import EmailLog
 from app.models.api_key import ApiKey
 from app.models.obligation import Obligation, ObligationReminder
 from app.models.award_snapshot import AwardSnapshot
+from app.models.page_feedback import PageFeedback
 from app.models.credential import Credential
 from app.models.llm_usage import LlmUsageRecord
 from app.models.project import Project, ProjectMembership, ProjectPin, ProjectJoinLink
@@ -75,6 +76,7 @@ ALL_MODELS: list[type[Document]] = [
     Obligation,
     ObligationReminder,
     AwardSnapshot,
+    PageFeedback,
     User,
     Artifact,
     PageTemplate,

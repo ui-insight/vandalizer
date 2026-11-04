@@ -17,7 +17,7 @@ from app.middleware.csrf import CSRFMiddleware
 from app.observability import init_sentry
 from app.routers import artifacts, page_templates
 from app.rate_limit import limiter
-from app.routers import award_snapshots
+from app.routers import award_snapshots, page_feedback
 from app.routers import activity, admin, audit, auth, automations, browser_automation, certification, chat, config, contact, credentials, demo, documents, extractions, feedback, feedback_admin, feedback_prompt, files, folders, graph_webhooks, knowledge, library, mgmt, notifications, obligations, office, optimizer_inbox, organizations, projects, reviews, spaces, support, teams, telemetry, verification, verification_sessions, workflows
 
 
@@ -243,6 +243,7 @@ app.include_router(extractions.router, prefix="/api/extractions", tags=["extract
 app.include_router(workflows.router, prefix="/api/workflows", tags=["workflows"])
 app.include_router(config.router, prefix="/api/config", tags=["config"])
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
+app.include_router(page_feedback.router, prefix="/api/pages", tags=["pages"])
 app.include_router(artifacts.router, prefix="/api/pages", tags=["pages"])
 app.include_router(page_templates.router, prefix="/api/page-templates", tags=["page-templates"])
 app.include_router(activity.router, prefix="/api/activity", tags=["activity"])
