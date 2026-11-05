@@ -935,6 +935,112 @@ def with_adjacent(dm, passages: list[dict], *, n: Optional[int] = None) -> list[
     return [x for at, r in enumerate(passages) for x in (r, *beside.get(at, ()))]
 
 
+def section_completion(sys_config_doc: Optional[dict]) -> Optional[dict]:
+    """The section-completion settings of ``chat_config`` when it is on, else
+    None: ``kb_section_completion_enabled`` (default False) turns it on;
+    ``kb_section_completion_max_chars`` and ``kb_section_completion_turn_chars``
+    override :data:`kb_retrieval.SECTION_COMPLETE_MAX_CHARS` and
+    :data:`kb_retrieval.SECTION_COMPLETE_TURN_CHARS`."""
+    from app.services import kb_retrieval as kr
+
+    cfg = (sys_config_doc or {}).get("chat_config") or {}
+    if not bool(cfg.get("kb_section_completion_enabled", False)):
+        return None
+
+    def num(key: str, default: int) -> int:
+        try:
+            return max(0, int(cfg.get(key) or default))
+        except (TypeError, ValueError):
+            return default
+
+    return {"max_chars": num("kb_section_completion_max_chars", kr.SECTION_COMPLETE_MAX_CHARS),
+            "turn_chars": num("kb_section_completion_turn_chars", kr.SECTION_COMPLETE_TURN_CHARS)}
+
+
+def complete_sections(dm, passages: list[dict], *, max_chars: Optional[int] = None,
+                      turn_chars: Optional[int] = None) -> list[dict]:
+    """``passages`` (a turn's final snippets, each tagged with its
+    ``kb_uuid``) with the rest of every numbered section they come from,
+    when the section's chunks together are at most ``max_chars``
+    (``kb_retrieval.SECTION_COMPLETE_MAX_CHARS``): the missing chunks, in
+    document order, right after the section's last passage, until the turn
+    has gained ``turn_chars`` (``SECTION_COMPLETE_TURN_CHARS``). Sections
+    are taken in the order their first passage appears, so the best ones
+    are completed first when the budget runs out. A source without section
+    numbers (``source:`` keys) and a chunk in a section that does not apply
+    (``index.excluded``) are left alone. These are not scored, and the caps
+    the pools were cut to have already been applied; each added chunk
+    carries ``_completed`` (its section key).
+
+    :func:`with_adjacent` reaches the chunk either side of the best
+    passages; the part of a section that answers often sits further than
+    that, in a section the pool already holds."""
+    from app.services import kb_retrieval as kr
+    from app.services.kb_paraphrase import RESCUED
+
+    max_chars = kr.SECTION_COMPLETE_MAX_CHARS if max_chars is None else max_chars
+    turn_chars = kr.SECTION_COMPLETE_TURN_CHARS if turn_chars is None else turn_chars
+    if not passages or max_chars <= 0 or turn_chars <= 0 or not kr.ready():
+        return passages
+    by_kb: dict[str, list[int]] = {}
+    for at, r in enumerate(passages):
+        if r.get("kb_uuid"):
+            by_kb.setdefault(r["kb_uuid"], []).append(at)
+    after: dict[int, list[dict]] = {}
+    gained = 0
+    for kb_uuid, ats in by_kb.items():
+        index = kr.index_for(dm, kb_uuid)
+        if index is None:
+            continue
+        held: set[int] = set()
+        last_at: dict[str, int] = {}      # section key -> the position of its last passage
+        order: list[str] = []
+        for at in ats:
+            r = passages[at]
+            for cid in (str(r.get("chunk_id")), *(r.get("_covers") or ())):
+                i = index.position.get(cid)
+                if i is None:
+                    continue
+                held.add(i)
+                key = index.keys[i]
+                if not key or key.startswith("source:"):
+                    continue
+                if key not in last_at:
+                    order.append(key)
+                last_at[key] = at
+        members: dict[str, list[int]] = {}
+        for j, key in enumerate(index.keys):
+            if key in last_at and j not in index.excluded:
+                members.setdefault(key, []).append(j)
+        added: list[dict] = []
+        for key in order:
+            js = members.get(key) or []
+            missing = [j for j in js if j not in held]
+            if not missing:
+                continue
+            size = sum(len(index.chunks[j].get("content") or "") for j in js)
+            if size > max_chars:
+                continue
+            more = sum(len(index.chunks[j].get("content") or "") for j in missing)
+            if gained + more > turn_chars:
+                continue
+            gained += more
+            at = last_at[key]
+            r = passages[at]
+            for j in missing:
+                held.add(j)
+                nb = kr._chunk_result(index, j)
+                nb.update({k: r[k] for k in ("kb_uuid", "kb_title", RESCUED) if k in r})
+                nb["_completed"] = key
+                after.setdefault(at, []).append(nb)
+                added.append(nb)
+        if added:
+            attach_lead_ins(dm, kb_uuid, added)
+    if not after:
+        return passages
+    return [x for at, r in enumerate(passages) for x in (r, *after.get(at, ()))]
+
+
 def with_section(dm, passages: list[dict], picked: tuple[str, str], query: str, *,
                  kb_title: Optional[str] = None) -> list[dict]:
     """``passages`` (a turn's final snippets, each tagged with its

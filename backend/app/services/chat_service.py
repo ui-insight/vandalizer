@@ -3821,6 +3821,7 @@ async def _build_multi_kb_segment(
         for r in results:
             r["kb_uuid"] = kb_uuid
         results = await _with_section(await _with_adjacent(results), picking, message)
+        results = await _with_complete_sections(results)
         return await _render_kb_segment(results, message, user_id=user_id)
 
     pools = await asyncio.gather(*[
@@ -3859,6 +3860,7 @@ async def _build_multi_kb_segment(
         )
         return None, []
     merged = await _with_section(await _with_adjacent(merged), picking, message, titles=dict(kbs))
+    merged = await _with_complete_sections(merged)
     return await _render_kb_segment(merged, message, user_id=user_id)
 
 
@@ -3964,6 +3966,28 @@ async def _with_adjacent(results: list[dict]) -> list[dict]:
         return await asyncio.to_thread(kb_grounding.with_adjacent, get_document_manager(), results)
     except Exception as e:  # noqa: BLE001 — the snippets stand without them
         logger.warning("Adjacent KB chunks not added: %s", e)
+        return results
+
+
+async def _with_complete_sections(results: list[dict]) -> list[dict]:
+    """The turn's snippets with the rest of each short section they come
+    from (kb_grounding.complete_sections), added after every cap, when
+    ``chat_config.kb_section_completion_enabled`` is on; the snippets as
+    they are otherwise."""
+    from app.services import kb_grounding
+    from app.services.document_manager import get_document_manager
+    from app.services.kb_empty_check import _system_config_doc
+
+    try:
+        cfg = kb_grounding.section_completion(_system_config_doc())
+        if not cfg or not results:
+            return results
+        return await asyncio.to_thread(
+            kb_grounding.complete_sections, get_document_manager(), results,
+            max_chars=cfg["max_chars"], turn_chars=cfg["turn_chars"],
+        )
+    except Exception as e:  # noqa: BLE001 — the snippets stand without them
+        logger.warning("KB sections not completed: %s", e)
         return results
 
 

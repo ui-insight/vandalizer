@@ -237,6 +237,12 @@ class SystemConfig(Document):
     #       keeps no passage, even reworded, have a model read its best three
     #       candidates and keep those it finds answer it (kb_empty_check).
     #       With it: "empty_pool_check_model".
+    #   "kb_section_completion_enabled": bool (default False) — hand a KB
+    #       question the rest of every short section its passages come from
+    #       (kb_grounding.complete_sections). With it:
+    #       "kb_section_completion_max_chars" (a section at most this long is
+    #       completed; default 12000) and "kb_section_completion_turn_chars"
+    #       (what a turn gains at most; default 24000).
     # Missing keys mean "use the default" so deployments never need a
     # migration to pick up new phases.
     chat_config: dict = {}

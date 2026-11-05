@@ -133,6 +133,19 @@ NEIGHBOUR_MIN_SCORE = -5.0
 # more such turns for 1.2 more passages per turn; beside every passage, 16 for
 # 2.7.
 ADJACENT_PASSAGES = 2
+# A section a turn's passages come from is handed over whole, after every cap,
+# when its chunks together are at most SECTION_COMPLETE_MAX_CHARS, and the
+# turn gains at most SECTION_COMPLETE_TURN_CHARS this way
+# (kb_grounding.complete_sections, behind
+# chat_config.kb_section_completion_enabled). On the KB accuracy eval's live
+# configuration (2026-11-04) 78 of the 120 answers graded incorrect with their
+# gold text out of the pool held passages from the gold's own section, one or
+# two chunks from the part that answers, and the neighbour cut, the adjacent
+# chunk and the picked section's cap kept that part out; with the whole
+# section injected, 18 of those 38 items turned correct under both graders,
+# 24 of the 32 that turned needing at most 12,000 characters.
+SECTION_COMPLETE_MAX_CHARS = 12000
+SECTION_COMPLETE_TURN_CHARS = 24000
 # The section the chat model names first from the bases' table of contents
 # (kb_sections) joins a turn's passages after every cap through its best
 # chunks, at most SECTION_PICK_CHUNKS, each scoring at least SECTION_MIN_SCORE
