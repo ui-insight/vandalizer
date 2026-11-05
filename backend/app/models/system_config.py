@@ -233,6 +233,11 @@ class SystemConfig(Document):
     #       something other than what was asked, and rewrite it when they do
     #       (chat_doc_answer_check). With it: "doc_answer_check_model",
     #       "doc_answer_rewrite_model".
+    #   "doc_page_citation_repair_enabled": bool (default False) — point a
+    #       finished answer's page references at the pages of the attached
+    #       documents that hold what they cite (doc_page_citations). With it:
+    #       "doc_page_citation_attach_enabled" (default True): also give a
+    #       sentence that cites no page the one page that holds it.
     #   "empty_pool_check_enabled": bool (default False) — when a KB question
     #       keeps no passage, even reworded, have a model read its best three
     #       candidates and keep those it finds answer it (kb_empty_check).

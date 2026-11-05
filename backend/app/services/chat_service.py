@@ -2740,6 +2740,26 @@ async def chat_stream(
                             "content": "",
                             "used_refs": used_refs,
                         }) + "\n"
+                # An attached-document answer's page references pointed at
+                # the pages that hold what they cite, and its uncited claims
+                # given theirs (off unless chat_config turns it on). Only
+                # where the chips below would be derived: with KB or web
+                # sources in play an inline "p. 3" may be one of theirs.
+                page_citations = None
+                if not streamed_citations and documents:
+                    assistant_message, page_citations = _repair_page_citations(
+                        assistant_message, documents, sys_config_doc,
+                    )
+                    if page_citations and page_citations.get("changed"):
+                        streamed_segments[:] = [
+                            s for s in streamed_segments if s.get("kind") != "text"
+                        ] + [{"kind": "text", "content": assistant_message}]
+                        yield json.dumps({
+                            "kind": "answer_revised",
+                            "content": assistant_message,
+                            "answer_check": answer_check,
+                            "page_citations": page_citations,
+                        }) + "\n"
 
                 # Clean think tags from text segments before persisting
                 cleaned_segments: list[dict] = []
@@ -2855,6 +2875,7 @@ async def chat_stream(
                     unsupported_citations=miscited or None,
                     claim_checks=claim_checks,
                     answer_check=answer_check,
+                    page_citations=page_citations,
                 )
                 if unsupported or silent or miscited:
                     yield json.dumps({
@@ -4623,6 +4644,28 @@ async def _check_document_answer(
         return answer, None
 
 
+def _repair_page_citations(
+    answer: str,
+    documents: list,
+    system_config_doc: Optional[dict],
+) -> tuple[str, Optional[dict]]:
+    """``answer`` with its page references pointed at the pages that hold
+    what they cite and its uncited claims given theirs
+    (``doc_page_citations``): the answer to keep, and the record of what was
+    done. The record is None when ``chat_config`` leaves the step off. Never
+    raises: a failure keeps the answer."""
+    from app.services import doc_page_citations
+
+    config = doc_page_citations.repair_config(system_config_doc)
+    if config is None or not answer.strip():
+        return answer, None
+    try:
+        return doc_page_citations.repair_page_citations(answer, documents, attach=config["attach"])
+    except Exception as e:  # noqa: BLE001
+        logger.warning("Page citations not repaired: %s", e)
+        return answer, None
+
+
 def _miscited_sources(
     answer: str,
     question: str,
@@ -5269,6 +5312,7 @@ async def _finalize(
     unsupported_citations: Optional[list[str]] = None,
     claim_checks: Optional[dict] = None,
     answer_check: Optional[dict] = None,
+    page_citations: Optional[dict] = None,
 ) -> None:
     """Save assistant message and update activity metrics."""
     await conversation.add_message(
@@ -5285,6 +5329,7 @@ async def _finalize(
         unsupported_citations=unsupported_citations,
         claim_checks=claim_checks,
         answer_check=answer_check,
+        page_citations=page_citations,
     )
 
     # Stamp the usage anchor for next turn's cheap context estimate (uplift

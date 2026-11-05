@@ -92,6 +92,12 @@ class ChatMessage(Document):
     # original_answer?}``. ``message`` is the repaired answer when outcome is
     # "repaired".
     answer_check: Optional[dict] = None
+    # An attached-document answer's page references pointed at the pages
+    # that hold what they cite, and its uncited claims given theirs (see
+    # doc_page_citations): ``{version, kind, refs, checked, kept, repointed,
+    # unresolved, attached, changed, seconds, ...}``. ``message`` is the
+    # answer after the step.
+    page_citations: Optional[dict] = None
     # The documents in scope when this turn was asked: ``{uuid, title}`` each,
     # plus ``{"truncated": n}`` as a final entry if the selection was larger
     # than we record.
@@ -133,6 +139,8 @@ class ChatMessage(Document):
             d["claim_checks"] = self.claim_checks
         if self.answer_check:
             d["answer_check"] = self.answer_check
+        if self.page_citations:
+            d["page_citations"] = self.page_citations
         if self.source_documents:
             d["source_documents"] = self.source_documents
         return d
@@ -383,6 +391,7 @@ class ChatConversation(Document):
         unsupported_citations: Optional[list[str]] = None,
         claim_checks: Optional[dict] = None,
         answer_check: Optional[dict] = None,
+        page_citations: Optional[dict] = None,
     ) -> ChatMessage:
         msg = ChatMessage(
             role=role,
@@ -399,6 +408,7 @@ class ChatConversation(Document):
             unsupported_citations=unsupported_citations or None,
             claim_checks=claim_checks or None,
             answer_check=answer_check or None,
+            page_citations=page_citations or None,
             source_documents=_cap_source_documents(source_documents),
         )
         await msg.insert()
