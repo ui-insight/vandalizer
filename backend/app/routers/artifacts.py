@@ -198,14 +198,7 @@ async def get_artifact(uuid: str, user: User = Depends(get_current_user), settin
 async def source_documents(rev: dict, user: User) -> list[dict]:
     """The files this revision was built from, and any newer versions of them."""
     sources = await run(page_sources.freshness, page_sources.revision_sources(rev), changes=True)
-    access = await access_control.get_team_access_context(user)
-    for item in sources:
-        latest = item.get("latest")
-        if latest and not await access_control.get_authorized_document(latest["uuid"], user, team_access=access):
-            # Someone else's newer version: say one exists, not what it holds.
-            item["latest"] = None
-            item.pop("changes", None)
-    return sources
+    return await page_sources.hide_unreadable_versions(sources, user)
 
 
 @router.get("/{uuid}/revisions/{revision}/content", response_model=None)
@@ -241,7 +234,10 @@ async def duplicate_artifact(request: Request, uuid: str, body: DuplicateArtifac
 @limiter.limit("20/minute")
 async def revise_artifact(request: Request, uuid: str, body: ReviseArtifactRequest, user: User = Depends(get_current_user)) -> dict:
     doc = await authorized(uuid, user, manage=True)
-    return artifacts.metadata(await run(artifacts.revise, doc, body.title, body.html, body.base_revision), True)
+    # A hand edit is still built from the same files: keep them, so the Page
+    # still notices when one of them gets a new version.
+    source = page_sources.editor_source(artifacts.revision(doc))
+    return artifacts.metadata(await run(artifacts.revise, doc, body.title, body.html, body.base_revision, source), True)
 
 
 @router.put("/{uuid}/team", response_model=None)

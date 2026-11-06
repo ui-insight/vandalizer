@@ -248,3 +248,66 @@ def test_chat_page_records_used_files_and_update_turn_moves_to_new_version():
     revised = _source_documents(db, page, ["V2"])
     assert [(d["uuid"], d["version_number"]) for d in revised] == [("V2", 2), ("OTHER", 1)]
     assert page_sources.freshness(db, revised)[0]["status"] == "current"
+
+
+# ── Review fixes ────────────────────────────────────────────────────────────
+
+def _page(documents):
+    return {"uuid": "p1", "user_id": "testuser", "title": "Dashboard", "latest_revision": "r1", "deleted_at": None,
+            "revisions": [{"uuid": "r1", "title": "Dashboard", "html": "<p>$1.25M</p>", "warnings": [], "created_at": None,
+                           "source": {"kind": "chat", "documents": documents}}]}
+
+
+@pytest.mark.asyncio
+async def test_chat_read_hides_a_newer_version_the_owner_cannot_open():
+    """The Page screen hid an unreadable newer version's title and changes;
+    chat's get_html_artifact returned both."""
+    from app.services.chat_artifact_tools import get_html_artifact
+
+    db = chain_db()
+    db.html_artifacts = Docs(_page(page_sources.resolve(db, ["V1"])))
+    context = SimpleNamespace(deps=SimpleNamespace(user_id="testuser", user=SimpleNamespace(user_id="testuser")))
+    with patch("app.services.chat_artifact_tools.get_sync_db", return_value=db), \
+         patch("app.services.access_control.get_team_access_context", new=AsyncMock(return_value=None)), \
+         patch("app.services.access_control.get_authorized_document", new=AsyncMock(return_value=None)):
+        read = await get_html_artifact(context, "p1")
+    [source] = read["source_files"]
+    assert source["status"] == "updated"
+    assert source["latest"] is None and "changes" not in source
+
+    with patch("app.services.chat_artifact_tools.get_sync_db", return_value=db), \
+         patch("app.services.access_control.get_team_access_context", new=AsyncMock(return_value=None)), \
+         patch("app.services.access_control.get_authorized_document", new=AsyncMock(return_value=object())):
+        read = await get_html_artifact(context, "p1")
+    [source] = read["source_files"]
+    assert source["latest"]["uuid"] == "V2" and source["changes"]["items"]
+
+
+@pytest.mark.asyncio
+async def test_editor_revision_keeps_the_page_linked_to_its_source_files(client):
+    """A hand edit in the Page editor saved source {"kind": "editor"} only, so
+    the Page forgot its files: no banner, no notification, no public flag."""
+    from app.dependencies import get_current_user
+    from app.main import app
+    from app.services.access_control import TeamAccessContext
+    from tests.test_artifacts import Collection
+    from tests.test_chat_routes import _auth, _make_user
+
+    db = chain_db()
+    db.html_artifacts = Collection()
+    db.html_artifacts.docs.append(_page(page_sources.resolve(db, ["V1"])))
+    user = _make_user()
+    app.dependency_overrides[get_current_user] = lambda: user
+    cookies, headers = _auth()
+    try:
+        with patch("app.routers.artifacts.get_sync_db", return_value=db), \
+             patch("app.routers.artifacts.access_control.get_team_access_context", new=AsyncMock(return_value=TeamAccessContext())):
+            response = await client.post("/api/pages/p1/revisions", cookies=cookies, headers=headers,
+                                         json={"title": "Dashboard", "html": "<p>$1.26M</p>", "base_revision": "r1"})
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+    assert response.status_code == 200, response.text
+    [_, edited] = db.html_artifacts.docs[0]["revisions"]
+    assert edited["source"]["kind"] == "editor"
+    assert [d["uuid"] for d in edited["source"]["documents"]] == ["V1"]
+    assert page_sources.newer_data_available(db, edited) is True

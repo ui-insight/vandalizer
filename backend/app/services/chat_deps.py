@@ -61,6 +61,12 @@ class AgenticChatDeps:
     # confirmed=true within a single turn. See chat_tools._confirm_gate.
     conversation: Optional["ChatConversation"] = None
     turn_marker: int = 0
+    # Which armed actions this turn may execute (approval_scope.decide). None
+    # keeps the older rule — any action armed on an earlier turn — for callers
+    # that don't come through chat_stream.
+    approved_confirmations: Optional[frozenset[str]] = None
+    approval_mode: str = "none"
+    approval_waiting: int = 0
 
     # Live task plan for this turn (uplift plan Phase 8). update_plan writes
     # the full validated list here; the streaming layer emits it as a

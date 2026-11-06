@@ -11,7 +11,7 @@ it('sends the stored revision preview ID when Save new version is clicked', () =
   render(<ToolStatusLine call={{ ...call, tool_name: toolName, args: { title: 'NIH dashboard', html: '<table>large content</table>' } }}
     result={{ ...result, tool_name: toolName, content: { ...result.content, preview_id: previewId } }} onConfirm={confirm} />)
   fireEvent.click(screen.getByRole('button', { name: 'Save new version' }))
-  expect(confirm).toHaveBeenCalledExactlyOnceWith('Yes, go ahead', previewId)
+  expect(confirm).toHaveBeenCalledExactlyOnceWith('Yes, go ahead', previewId, { approve: expect.any(String) })
   expect(screen.queryByRole('button', { name: 'Save new version' })).not.toBeInTheDocument()
 })
 it('lets a user inspect an isolated preview and approve exactly once', () => {
@@ -24,7 +24,7 @@ it('lets a user inspect an isolated preview and approve exactly once', () => {
   fireEvent.keyDown(dialog, { key: 'Escape' })
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Save page' }))
-  expect(confirm).toHaveBeenCalledWith('Yes, go ahead')
+  expect(confirm).toHaveBeenCalledWith('Yes, go ahead', undefined, { approve: expect.any(String) })
   expect(confirm).toHaveBeenCalledTimes(1)
   expect(screen.queryByRole('button', { name: 'Save page' })).not.toBeInTheDocument()
   expect(screen.getByText('Approval sent. Waiting for the saved page…')).toBeInTheDocument()

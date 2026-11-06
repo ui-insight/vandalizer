@@ -49,7 +49,7 @@ describe('automation approval options', () => {
     }
     expect(approve).not.toHaveBeenCalled()
     fireEvent.click(within(review).getByRole('button', { name: 'Create automation' }))
-    expect(approve).toHaveBeenCalledWith('Yes, go ahead')
+    expect(approve).toHaveBeenCalledWith('Yes, go ahead', undefined, { approve: expect.any(String) })
   })
 
   it('uses Paused on the created receipt and retains the approved settings', () => {

@@ -167,6 +167,7 @@ async def list_contents(
                 "folder": "0",
                 "user_id": user.user_id,
                 "soft_deleted": {"$ne": True},
+                "superseded_by": None,
             }
         ).to_list()
 
@@ -254,7 +255,7 @@ async def collect_folder_document_uuids(
                     seen.add(child.uuid)
                     folder_uuids.append(child.uuid)
                     frontier.append(child.uuid)
-        documents = await SmartDocument.find({"folder": {"$in": folder_uuids}, "soft_deleted": {"$ne": True}}).to_list()
+        documents = await SmartDocument.find({"folder": {"$in": folder_uuids}, "soft_deleted": {"$ne": True}, "superseded_by": None}).to_list()
         return [d.uuid for d in documents if await access_control.get_authorized_document(d.uuid, user, team_access=team_access)]
 
     # Resolve the set of folder uuids to scan (root + descendants).
@@ -290,6 +291,8 @@ async def collect_folder_document_uuids(
         {
             "folder": {"$in": folder_uuids},
             "soft_deleted": {"$ne": True},
+            # A revised file's older versions stay in its version history only.
+            "superseded_by": None,
             **scope,
         }
     ).to_list()

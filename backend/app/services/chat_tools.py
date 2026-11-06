@@ -444,7 +444,26 @@ async def _confirm_gate(
         (p for p in armed if isinstance(p, dict) and p.get("fp") == fp), None
     )
 
-    # Execute only when a prior-turn preview armed this exact action.
+    # Execute only when a prior-turn preview armed this exact action, and this
+    # turn approved it: a card's button approves that card only, and a typed
+    # "yes" only when one action is waiting (approval_scope).
+    approved = getattr(deps, "approved_confirmations", None)
+    if (
+        confirmed and match is not None and int(match.get("turn", marker)) < marker
+        and approved is not None and fp not in approved
+    ):
+        from app.services.approval_scope import blocked_instruction
+
+        # Not a new card: the action is still waiting on its own card, whose
+        # id the client already has. A card here would carry this call's id,
+        # which nothing armed, so its button could never work.
+        out = {k: v for k, v in preview.items() if k != "needs_confirmation"}
+        out["status"] = "awaiting_user_confirmation"
+        out["still_waiting"] = True
+        out["assistant_instruction"] = blocked_instruction(
+            getattr(deps, "approval_mode", "none"), int(getattr(deps, "approval_waiting", 0) or 0),
+        )
+        return out
     if confirmed and match is not None and int(match.get("turn", marker)) < marker:
         if conv is not None:
             conv.pending_confirmations = [
@@ -466,6 +485,10 @@ async def _confirm_gate(
             if not (isinstance(p, dict) and p.get("fp") == fp)
         ]
         entry = {"fp": fp, "turn": marker, "tool": tool_name}
+        # The preview's tool call id: the id its card's button sends back.
+        call_id = getattr(context, "tool_call_id", None)
+        if isinstance(call_id, str) and call_id:
+            entry["call_id"] = call_id
         if stash is not None:
             entry["stash"] = stash
         new_pending.append(entry)
@@ -7072,6 +7095,7 @@ async def submit_certification_assessment(
 
 
 from app.services.chat_workflow_tools import get_workflow_definition, update_workflow  # noqa: E402
+from app.services.chat_snapshot_tools import get_award_snapshot  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Tool registry — imported by llm_service.create_agentic_chat_agent()
@@ -7138,6 +7162,7 @@ TOOLS: list[ToolFuncContext[AgenticChatDeps, ...]] = [
     unpin_from_project,
     set_project_status,
     list_project_inbox,
+    get_award_snapshot,
     propose_obligations,
     # Phase 9 — Automations
     create_automation,
@@ -7189,6 +7214,7 @@ COMPACTABLE_TOOLS: frozenset[str] = frozenset({
     "list_optimization_recommendations",
     "list_project_documents",
     "list_project_inbox",
+    "get_award_snapshot",
     "list_projects",
     "get_certification_progress",
     "get_certification_module",

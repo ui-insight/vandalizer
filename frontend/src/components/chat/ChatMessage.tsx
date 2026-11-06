@@ -13,7 +13,7 @@ import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { ToolCallDisplay, ToolStatusLine, recoveredCallIds, supersededCallIds } from './ToolCallDisplay'
 import { renderMarkdown, THINK_BLOCK_RE, THINK_TRAILING_RE } from './markdown'
 import { routeActionClick } from './actionRoute'
-import type { ChatActivity, ChatMessage as ChatMessageType, Citation, StreamSegment, ToolCallInfo, ToolResultInfo } from '../../types/chat'
+import type { CardDecision, ChatActivity, ChatMessage as ChatMessageType, Citation, StreamSegment, ToolCallInfo, ToolResultInfo } from '../../types/chat'
 import type { ReactNode } from 'react'
 import { formatPageLocator } from '../../utils/pageLocator'
 import { citationAnchor } from '../../utils/textMatch'
@@ -60,7 +60,7 @@ interface Props {
   /** Ordered stream segments for interleaved rendering */
   streamSegments?: StreamSegment[]
   /** Callback to inject a message into the chat (used for confirmation buttons) */
-  onSendMessage?: (message: string, pageApproval?: string) => boolean | void
+  onSendMessage?: (message: string, pageApproval?: string, cardDecision?: CardDecision) => boolean | void
   approvalHistory?: Record<string, ApprovalRecord>
 }
 

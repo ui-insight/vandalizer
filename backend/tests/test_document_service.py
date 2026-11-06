@@ -145,6 +145,8 @@ class TestListContents:
         assert filters["soft_deleted"] == {"$ne": True}
         assert filters["user_id"] == "user1"
         assert filters["folder"] == "0"
+        # A revised file's older versions live in Version history only.
+        assert filters["superseded_by"] is None
 
         assert len(result["documents"]) == 1
         assert result["documents"][0]["soft_deleted"] is False
