@@ -1,6 +1,6 @@
 import { SavePageTemplate } from '../components/artifacts/SavePageTemplate'
 import { PageVersionLinks } from '../components/artifacts/PageVersionLinks'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowLeft, ArrowUpRight, Check, ChevronRight, Code2, Copy, Download, FileText, Globe2, Link2, LockKeyhole, MessageSquare, Share2, Trash2, Workflow } from 'lucide-react'
 import * as api from '../api/artifacts'
 import { PagesBrowser } from '../components/artifacts/PagesBrowser'
@@ -11,6 +11,9 @@ import { PagePrintLink, pageViewUrl } from '../components/artifacts/PagePrintLin
 import { PublishedPageContent } from '../components/artifacts/PublishedPageContent'
 import { DEFAULT_LINK, LinkAccessFields, LinkStatus, draftFrom, formatDate, settingsFrom, type LinkDraft } from '../components/artifacts/PublicLinkControls'
 import { ApiError } from '../api/client'
+import type { PageSpot } from '../components/artifacts/PublishedPageContent'
+import { AskOwnerPanel, OwnerFeedbackPanel, type FrameControl } from '../components/artifacts/PageFeedbackPanel'
+import * as feedbackApi from '../api/pageFeedback'
 
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : 'Could not complete this action. Please try again.'
 
@@ -43,6 +46,13 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
   const [versionLink, setVersionLink] = useState<LinkDraft>(DEFAULT_LINK)
   // A public link that refused this viewer: expired, sign-in, not invited.
   const [publicRefusal, setPublicRefusal] = useState<{ status: number; message: string } | null>(null)
+  // Page feedback: what the frame is doing (picking a spot, showing one), the
+  // spot a viewer picked, and the question a notification linked to.
+  const [frame, setFrame] = useState<FrameControl>({ picking: false, spot: null })
+  const [picked, setPicked] = useState<PageSpot | null>(null)
+  const [focusFeedback] = useState(() => new URLSearchParams(window.location.search).get('feedback'))
+  const [viewerFeedback, setViewerFeedback] = useState<{ sharedBy: string; publicQuestions: boolean; items: feedbackApi.PageFeedbackItem[] } | null>(null)
+  const [feedbackAttempt, setFeedbackAttempt] = useState(0)
   useEffect(() => {
     let live = true
     setLoading(true); setError(''); setArtifact(null); setPublicInfo(null); setEditor(null); setTeamError(false); setPublicRefusal(null)
@@ -67,6 +77,22 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
     }
     void load(); return () => { live = false }
   }, [uuid, publicToken, attempt])
+  useEffect(() => {
+    let live = true
+    const load = async () => {
+      try {
+        if (publicToken && publicInfo) {
+          const info = await feedbackApi.getPublicPageFeedback(publicToken)
+          if (live) setViewerFeedback({ sharedBy: info.shared_by, publicQuestions: info.public_questions, items: info.items })
+        } else if (uuid && artifact && !artifact.can_manage && selected) {
+          const list = await feedbackApi.listPageFeedback(uuid, selected)
+          if (live) setViewerFeedback({ sharedBy: list.shared_by, publicQuestions: false, items: list.items })
+        }
+      } catch { if (live) setViewerFeedback(null) }
+    }
+    void load(); return () => { live = false }
+  }, [publicToken, publicInfo, uuid, artifact, selected, feedbackAttempt])
+  const showFrame = useCallback((control: FrameControl) => { setFrame(control); if (control.picking) setPicked(null) }, [])
   const action = async (fn: () => Promise<void>) => {
     if (pending.current) return
     pending.current = true; setBusy(true); setError(''); setNotice('')
@@ -126,6 +152,7 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
     {!publicToken && <nav className="page-breadcrumb" aria-label="Breadcrumb"><a href={backUrl}><ArrowLeft size={15} />Files</a><ChevronRight size={13} /><a href={backUrl}>Pages</a><ChevronRight size={13} /><span>{loading ? 'Loading…' : 'Page details'}</span></nav>}
     <header className="page-heading"><div className="page-heading-copy"><p className="page-eyebrow">{publicToken ? 'SHARED PAGE' : 'SAVED PAGE'}</p><h1>{title}</h1>
       {(artifact || publicInfo) && <div className="page-meta">
+        {viewerFeedback?.sharedBy && <span className="page-shared-by">{viewerFeedback.sharedBy}</span>}
         {publicToken ? <><PageBadge published>Published · version {publicInfo?.version}</PageBadge><span>{publicInfo?.audience === 'signed_in' ? 'Signed-in access' : 'Anyone with the link'}</span>{publicInfo?.expires_at && <span>Link expires {formatDate(publicInfo.expires_at)}</span>}{publicUpdatedLabel ? <span>Last updated <time dateTime={publicInfo!.updated_at}>{publicUpdatedLabel}</time></span> : <span>Last updated date unavailable</span>}</> : artifact && !artifact.can_manage ? <PageBadge>Team access · version {version}</PageBadge> : <>
           {artifact?.published_revision ? <PageBadge published>Published · version {publishedVersion}</PageBadge> : hasSeparateLinks ? <PageBadge published>Published version links</PageBadge> : <PageBadge>{artifact?.team_id ? 'Team access' : 'Private · only you'}</PageBadge>}
           {hasDraft && <PageBadge>Unpublished changes</PageBadge>}
@@ -152,7 +179,18 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
       {artifact && <div className="page-revision-bar">{artifact.can_manage ? <label>Version<select aria-label="Page version" disabled={busy || !!editor} value={selected} onChange={e => setSelected(e.target.value)}>{artifact.revisions.map((r, index) => <option key={r.uuid} value={r.uuid}>Version {r.version ?? index + 1}{isPublished(r.uuid) ? ' · published' : ''}{r.uuid === artifact.latest_revision ? ' · latest' : ''}</option>)}</select></label> : <span>Shared version {version}</span>}<a className="page-text-button" href={pageViewUrl(contentUrl, 'full')} target="_blank" rel="noreferrer"><ArrowUpRight size={14} />Open full page</a></div>}
       {hasDraft && publishedVersion > 0 && !selectedIsPublished && <p className="page-revision-note">You’re previewing version {version}. The public link still shows version {publishedVersion}. Share → Publish updates when you’re ready.</p>}
       {!!revision?.warnings.length && <div className="page-revision-note"><strong>Some content was removed to keep this page safe.</strong>{revision.warnings.map(w => <p key={w}>{w}</p>)}</div>}
-      {publicToken ? <PublishedPageContent key={contentUrl} src={contentUrl} /> : <PagePreview key={contentUrl} src={contentUrl} title={title} />}
+      {publicToken || frame.picking || frame.spot
+        ? <PublishedPageContent key={contentUrl} src={contentUrl} picking={frame.picking} onPick={setPicked} spot={frame.spot}
+            onSpotShown={found => { if (!found) setNotice('That spot isn’t on this version of the page. The question shows the text it was about.') }} />
+        : <PagePreview key={contentUrl} src={contentUrl} title={title} />}
+      {artifact?.can_manage && uuid && <OwnerFeedbackPanel uuid={uuid} onFrame={showFrame} focus={focusFeedback}
+        onRequestChanges={text => { setNotice(''); setError(''); setChanges(text); setRequestChanges(true) }} />}
+      {viewerFeedback && (publicToken ? <AskOwnerPanel audience={{ kind: 'public', token: publicToken }} picked={picked} onFrame={showFrame}
+          focus={focusFeedback} sharedBy={viewerFeedback.sharedBy} publicQuestions={viewerFeedback.publicQuestions}
+          answers={viewerFeedback.items} onAsked={() => setFeedbackAttempt(n => n + 1)} />
+        : uuid && artifact && !artifact.can_manage && <AskOwnerPanel audience={{ kind: 'member', uuid, revision: selected }} picked={picked} onFrame={showFrame}
+          focus={focusFeedback} sharedBy={viewerFeedback.sharedBy} publicQuestions={false}
+          answers={viewerFeedback.items} onAsked={() => setFeedbackAttempt(n => n + 1)} />)}
       {artifact?.source && <nav aria-label="Page source" className="page-source">
         {artifact.source.conversation_uuid && <a href={`/?conversation=${encodeURIComponent(artifact.source.conversation_uuid)}${artifact.source.project_uuid ? `&project=${encodeURIComponent(artifact.source.project_uuid)}` : ''}`}><MessageSquare size={14} />Open originating chat</a>}
         {artifact.source.workflow_id && <a href={`/?mode=files&workflow=${encodeURIComponent(artifact.source.workflow_id)}${artifact.source.session_id ? `&run=${encodeURIComponent(artifact.source.session_id)}` : ''}${artifact.source.project_uuid ? `&project=${encodeURIComponent(artifact.source.project_uuid)}` : ''}`}><Workflow size={14} />Open originating workflow run</a>}
