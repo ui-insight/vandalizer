@@ -27,6 +27,9 @@ class AgenticChatDeps:
     system_config_doc: dict
     model_name: str
     context_document_uuids: list[str] = field(default_factory=list)
+    # Files read with get_document_text this turn. With the attached files,
+    # these are what a Page saved this turn records as its sources.
+    documents_read: list[str] = field(default_factory=list)
     active_kb_uuid: Optional[str] = None
     # The project the user is chatting "inside", if any. Project tools
     # (run_pin_on_project, list_project_documents, pin/unpin, set_status) resolve

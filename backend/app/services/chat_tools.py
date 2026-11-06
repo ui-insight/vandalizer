@@ -35,7 +35,7 @@ from app.models.verification_session import VerificationField, VerificationSessi
 from app.models.workflow import Workflow
 from app.services.chat_deps import AgenticChatDeps
 from app.services.chat_page_templates import find_page_templates, get_page_template
-from app.services.chat_artifact_tools import create_html_artifact, find_pages, get_html_artifact, revise_html_artifact
+from app.services.chat_artifact_tools import compare_page_versions, create_html_artifact, find_pages, get_html_artifact, revise_html_artifact
 from app.services.chat_skill_tools import get_skill, list_skills, select_skill
 from app.services.chat_file_tools import list_projects, move_documents_to_project
 from app.services.chat_calculator import calculate
@@ -1981,6 +1981,9 @@ async def get_document_text(
     # preserved). Local import — chat_service imports this module.
     from app.services.chat_service import page_note_for
 
+    documents_read = getattr(context.deps, "documents_read", None)
+    if isinstance(documents_read, list) and doc.uuid not in documents_read:
+        documents_read.append(doc.uuid)
     raw = doc.raw_text or ""
     markers = getattr(doc, "text_markers", None)
     read = read_document_range(
@@ -7193,6 +7196,7 @@ TOOLS: list[ToolFuncContext[AgenticChatDeps, ...]] = [
     create_html_artifact,
     find_pages,
     get_html_artifact,
+    compare_page_versions,
     revise_html_artifact,
     # Phase 0 — Plan/progress tracking (sequential: mutates deps.plan_state)
     update_plan,

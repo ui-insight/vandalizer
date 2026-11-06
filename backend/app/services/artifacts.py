@@ -36,7 +36,9 @@ CONTENT_CSP = (
     "object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'"
 )
 ALLOWED_TAGS = set("html head body title style main section article header footer aside nav div span p h1 h2 h3 h4 h5 h6 ul ol li dl dt dd table thead tbody tfoot tr th td caption colgroup col pre code blockquote strong b em i u s del small sub sup mark br hr a img details summary figure figcaption time address".split())
-ALLOWED_ATTRS = {"class", "id", "style", "title", "lang", "dir", "role", "aria-label", "colspan", "rowspan", "scope", "width", "height", "alt", "open", "start", "value"}
+ALLOWED_ATTRS = {"class", "id", "style", "title", "lang", "dir", "role", "aria-label", "colspan", "rowspan", "scope", "width", "height", "alt", "open", "start", "value",
+                 # A figure the user changed by hand carries what the source says (page_figures).
+                 "data-source-value"}
 
 
 def clean_html(html: str, title: str) -> tuple[str, list[str]]:
@@ -174,6 +176,7 @@ def revise(db: Database[dict], doc: dict, title: str, html: str, base_revision: 
         return doc  # a retried save must not append again
     if len(doc["revisions"]) >= MAX_REVISIONS:
         raise HTTPException(422, "This page has 25 revisions. Create a new page to continue.")
+    new["change_summary"] = _change_summary(doc, base_revision, new)
     _pin_legacy_team_revision(db, doc)
     saved = db.html_artifacts.find_one_and_update({
         "uuid": doc["uuid"], "user_id": doc["user_id"], "deleted_at": None,
@@ -187,6 +190,33 @@ def revise(db: Database[dict], doc: dict, title: str, html: str, base_revision: 
             return latest
         raise HTTPException(409, "This page changed. Reload before saving another revision.")
     return saved
+
+
+def _change_summary(doc: dict, base: str, new: dict) -> str | None:
+    """One line on what this version changed from the one it was saved over."""
+    from app.services.page_diff import compare
+    previous = next((r for r in doc["revisions"] if r["uuid"] == base), None)
+    if previous is None:
+        return None
+    try:
+        summary: str = compare(previous["html"], new["html"])["summary"]
+        return summary
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception("Could not summarize page changes for %s", doc.get("uuid"))
+        return None
+
+
+def fill_change_summaries(db: Database[dict], doc: dict) -> dict:
+    """Summaries for versions saved before they were recorded, stored once."""
+    revisions = doc.get("revisions") or []
+    for previous, current in zip(revisions, revisions[1:]):
+        if "change_summary" in current or "html" not in current or "html" not in previous:
+            continue
+        current["change_summary"] = _change_summary(doc, previous["uuid"], current)
+        db.html_artifacts.update_one({"uuid": doc["uuid"]}, {"$set": {"revisions.$[r].change_summary": current["change_summary"]}},
+                                     array_filters=[{"r.uuid": current["uuid"]}])
+    return doc
 
 
 def team_revision(doc: dict) -> str | None:
@@ -255,12 +285,22 @@ def metadata(doc: dict, owner: bool=False) -> dict:
               "team_id": doc.get("team_id"), "can_manage": owner, "published_revision": doc.get("published_revision"),
               "team_revision": team_revision(doc),
               "revisions": [{**{k: r[k] for k in ("uuid", "title", "created_at", "warnings")},
-                             "version": r.get("version", i)} for i, r in enumerate(doc["revisions"], 1)]}
+                             "version": r.get("version", i),
+                             **({"change_summary": r["change_summary"]} if owner and r.get("change_summary") else {})}
+                            for i, r in enumerate(doc["revisions"], 1)]}
     result["created_at"] = doc.get("created_at")
     result["updated_at"] = doc.get("updated_at")
     source = doc.get("source") or doc["revisions"][0].get("source", {})
     # The origin label is shared; source identifiers and provenance are private.
     result["source"] = source if owner else {"kind": source.get("kind", "editor")}
+    from app.services import page_figures
+    # The built-in figure check per revision, so the Share dialog can show it
+    # for whichever version is about to be published.
+    # Unchecked versions are left out, so the dialog keeps its generic warning.
+    result["figure_check"] = {
+        r["uuid"]: page_figures.summary((r.get("source") or {}).get("figure_check"))
+        for r in doc["revisions"] if (r.get("source") or {}).get("figure_check")
+    }
     if owner:
         result["public_token"] = doc.get("public_token")
         result["publications"] = doc.get("publications", [])
@@ -358,8 +398,11 @@ def from_workflow(db: Database[dict], result: dict, user_id: str, step: str | No
         raise HTTPException(422, "This workflow has no output to save.")
     activity = db.activity_event.find_one({"workflow_session_id": session_id, "user_id": user_id}) or {}
     title, html = report_page(workflow_html(output, title), title, source)
+    from app.services import page_sources
+    run_documents = [str(d["uuid"]) for d in (result.get("run_config") or {}).get("documents", []) if isinstance(d, dict) and d.get("uuid")]
+    run_documents = run_documents or list((result.get("input_context") or {}).get("doc_uuids") or [])
     return create(db, user_id, title, html, request_id, {
-        **source,
+        **source, "documents": page_sources.resolve(db, run_documents),
         "kind": "workflow", "workflow_id": str(result.get("workflow", "")), "session_id": session_id, "step": step,
         "project_uuid": activity.get("project_uuid"),
     })

@@ -7,9 +7,9 @@ import { artifactContentUrl } from '../../api/artifacts'
 import { PageActions, PagePreview } from './PagePrimitives'
 import type { ApprovalRecord } from '../chat/approvalHistory'
 
-export function ChatPageCard({ title, html, uuid, revision, warnings = [], running, saving, error, unconfirmed, canceled, needsApproval, history, decision, decisionError, onDecide, revising, previewId, templateCheck }: {
+export function ChatPageCard({ title, html, uuid, revision, warnings = [], running, saving, error, unconfirmed, canceled, needsApproval, history, decision, decisionError, onDecide, revising, previewId, templateCheck, figureCheck }: {
   title: string; html?: string; uuid?: string; revision?: string; running?: boolean; saving?: boolean; error?: string; unconfirmed?: boolean; canceled?: boolean
-  warnings?: string[]; previewId?: string; templateCheck?: unknown
+  warnings?: string[]; previewId?: string; templateCheck?: unknown; figureCheck?: unknown
   needsApproval?: boolean; history?: ApprovalRecord; decision: 'approved' | 'canceled' | null; decisionError: string | null
   onDecide?: (decision: 'approved' | 'canceled') => void; revising: boolean
 }) {
@@ -22,6 +22,7 @@ export function ChatPageCard({ title, html, uuid, revision, warnings = [], runni
   return <section className="chat-page-card" aria-label={`Page: ${title}`}>
     <header className="chat-page-header"><span className="page-mark"><Icon size={20} className={running ? 'animate-spin' : undefined} aria-hidden="true" /></span><div><p role="status" className="page-eyebrow">{status}</p><h3>{title}</h3></div></header>
     {check && <TemplateFillCheck check={check} />}
+    <FigureCheck value={figureCheck} />
     {running && <div className="page-building"><div /><div /><div /><p>{saving ? 'Saving the approved page to your private Pages library.' : 'Preparing a preview for you to review before saving.'}</p></div>}
     {!running && !error && !canceled && (html || saved) && <div className="chat-page-footer">
       <p>Pages support jump links, expandable sections, and web or email links without scripts. JavaScript charts, filters and table sorting are not supported.</p>
@@ -41,4 +42,18 @@ export function ChatPageCard({ title, html, uuid, revision, warnings = [], runni
     {saveTemplate && templateSource && <SavePageTemplate source={templateSource} onClose={() => setSaveTemplate(false)} />}
     {(error || unconfirmed || canceled) && <p className="chat-page-footer" role={error ? 'alert' : undefined}>{error || (canceled ? 'This action was canceled. No successful save was reported.' : 'No saved page was returned. Ask the assistant to check its status before trying again.')}</p>}
   </section>
+}
+
+/** The built-in figure check (support ticket): every dollar amount and
+ * percentage on the Page compared with its source files, whatever the
+ * Assistant says. A preview carries an object, a saved result a summary. */
+function FigureCheck({ value }: { value: unknown }) {
+  const summary = typeof value === 'string' ? value
+    : value && typeof value === 'object' && typeof (value as { summary?: unknown }).summary === 'string' ? (value as { summary: string }).summary
+    : null
+  if (!summary) return null
+  const needsReview = /manual edit|not found|not checked/.test(summary)
+  return <p className={`page-figure-check${needsReview ? ' page-figure-check--review' : ''}`} role="note">
+    <strong>Figure check:</strong> {summary}
+  </p>
 }

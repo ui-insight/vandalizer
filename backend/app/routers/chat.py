@@ -177,6 +177,8 @@ async def chat(
             selected_folder_uuids.append(folder.uuid)
             folder_docs = await SmartDocument.find(
                 SmartDocument.folder == folder_uuid,
+                # Only the current version of a revised file.
+                SmartDocument.superseded_by == None,  # noqa: E711
             ).limit(500).to_list()
             for doc in folder_docs:
                 if (

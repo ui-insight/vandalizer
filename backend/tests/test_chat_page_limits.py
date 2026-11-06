@@ -142,6 +142,8 @@ async def test_server_page_limit_ends_turn_without_model_regeneration(chat_harne
     prepare = AsyncMock()
 
     async def validate(fn, *args):
+        if fn is not chat_artifact_tools.chat_page_previews.prepare:
+            return []  # the Page's source files (Living Pages); none here
         # Run real sanitization (including its rendered-size check) before storage.
         artifacts.clean_html(args[3], args[2])
         await prepare()

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useLayoutEffect } from 'react'
-import { Download, Edit2, Trash2, Copy, Users, FolderInput, FolderDown, MessageSquareText, Play, Library, Link2 } from 'lucide-react'
+import { Download, Edit2, Trash2, Copy, Users, FolderInput, FolderDown, MessageSquareText, Play, Library, Link2, Upload, History } from 'lucide-react'
 
 interface ContextMenuProps {
   x: number
@@ -16,6 +16,8 @@ interface ContextMenuProps {
   onCopyUuid?: () => void
   onConvertToTeam?: () => void
   onShowUsage?: () => void
+  onUploadVersion?: () => void
+  onShowVersions?: () => void
 }
 
 export function ContextMenu({
@@ -33,6 +35,8 @@ export function ContextMenu({
   onCopyUuid,
   onConvertToTeam,
   onShowUsage,
+  onUploadVersion,
+  onShowVersions,
 }: ContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState({ top: y, left: x })
@@ -64,6 +68,8 @@ export function ContextMenu({
     onMove && { label: 'Move to…', icon: FolderInput, action: onMove },
     onExport && { label: 'Export contents', icon: FolderDown, action: onExport },
     onDownload && { label: 'Download', icon: Download, action: onDownload },
+    onUploadVersion && { label: 'Upload new version', icon: Upload, action: onUploadVersion },
+    onShowVersions && { label: 'Version history', icon: History, action: onShowVersions },
     onCopyUuid && { label: 'Copy UUID', icon: Copy, action: onCopyUuid },
     onShowUsage && { label: 'Where is this used?', icon: Link2, action: onShowUsage },
     onConvertToTeam && { label: 'Convert to team folder', icon: Users, action: onConvertToTeam },

@@ -41,8 +41,11 @@ class Collection:
                 return False
         return True
 
-    def find_one(self, query):
+    def find_one(self, query, projection=None):
         return deepcopy(next((d for d in self.docs if self.matches(d, query)), None))
+
+    def find(self, query, projection=None):
+        return [deepcopy(d) for d in self.docs if self.matches(d, query)]
 
     def find_one_and_update(self, query, update, upsert=False, **kwargs):
         doc = next((d for d in self.docs if self.matches(d, query)), None)
@@ -67,7 +70,7 @@ class Collection:
 
 @pytest.fixture
 def db():
-    return SimpleNamespace(html_artifacts=Collection(), chat_page_previews=Collection(), workflow=Collection(), workflow_result=Collection(), activity_event=Collection())
+    return SimpleNamespace(html_artifacts=Collection(), chat_page_previews=Collection(), workflow=Collection(), workflow_result=Collection(), activity_event=Collection(), smart_document=Collection())
 
 
 def make(db, key="one", owner="testuser", html="<main><h1>Original</h1></main>"):
@@ -313,7 +316,7 @@ async def test_public_revision_no_private_metadata_revocation_rotation_and_opera
     response = await client.get(f"/api/pages/public/{token}")
     from fastapi.encoders import jsonable_encoder
     assert response.json() == jsonable_encoder({"title": "Review", "revision": rev,
-        "version": 1, "updated_at": doc["revisions"][0]["created_at"]})
+        "version": 1, "updated_at": doc["revisions"][0]["created_at"], "newer_data_available": False})
     content = await client.get(f"/api/pages/public/{token}/content")
     assert "Original" in content.text and "Not published" not in content.text
     assert "private-chat" not in content.text

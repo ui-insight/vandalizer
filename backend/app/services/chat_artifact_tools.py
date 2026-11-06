@@ -11,7 +11,7 @@ from fastapi import HTTPException
 from pydantic_ai.tools import RunContext
 
 from app.services.chat_deps import AgenticChatDeps
-from app.services import artifacts, chat_page_previews
+from app.services import artifacts, chat_page_previews, page_sources
 from app.services.page_authoring import PAGE_INTERACTION_RULES, PAGE_LANGUAGE_RULES, PAGE_SOURCE_FIDELITY_RULES
 from app.tasks import get_sync_db
 from app.schemas.page_template import TemplateTable, TemplateValue
@@ -113,9 +113,22 @@ async def find_pages(context: RunContext[AgenticChatDeps], name: str = "", limit
     return found
 
 
-async def get_html_artifact(context: RunContext[AgenticChatDeps], artifact_uuid: str) -> dict:
-    """Read your own page's latest saved HTML and revision before revising it.
 
+def _revision_by_version(doc: dict, version: int | None) -> dict:
+    if version is None:
+        return artifacts.revision(doc)
+    for number, entry in enumerate(doc["revisions"], 1):
+        if entry.get("version", number) == version:
+            return dict(entry)
+    raise HTTPException(404, f"This Page has no version {version}; it has versions 1 to {len(doc['revisions'])}.")
+
+
+async def get_html_artifact(context: RunContext[AgenticChatDeps], artifact_uuid: str, version: int | None = None) -> dict:
+    """Read your own page's saved HTML: the latest version, or an earlier one by number.
+
+    Revise from the latest version (omit version). Pass version to read an
+    older saved version, e.g. to quote what it said; to answer "what changed",
+    use compare_page_versions instead.
     Generated HTML is not source evidence. Read the original documents to verify
     values and source notes before revising a document-based page.
     """
@@ -123,11 +136,45 @@ async def get_html_artifact(context: RunContext[AgenticChatDeps], artifact_uuid:
         doc = await _call(artifacts.get, artifact_uuid)
         if doc["user_id"] != context.deps.user_id:
             return {"error": "Page not found or you do not own it."}
-        rev = artifacts.revision(doc)
+        rev = _revision_by_version(doc, version)
+        # The files the version read was built from (an older version may
+        # cite an older file version than the latest one does).
+        sources = await _call(page_sources.freshness, page_sources.revision_sources(rev), changes=True)
+        sources = await page_sources.hide_unreadable_versions(sources, context.deps.user)
         return {"artifact_uuid": doc["uuid"], "title": rev["title"], "revision": rev["uuid"], "html": rev["html"],
+                # status "updated" names the newer version (latest.uuid) and what
+                # changed; rebuild every affected value from that file.
+                "source_files": sources,
                 "version": next(i for i, entry in enumerate(doc["revisions"], 1) if entry["uuid"] == rev["uuid"]),
+                "is_latest": rev["uuid"] == doc["latest_revision"], "change_summary": rev.get("change_summary"),
                 "warnings": rev["warnings"], "rendering_note": RENDERING_NOTE,
                 "source_fidelity_note": PAGE_SOURCE_FIDELITY_RULES, "language_note": PAGE_LANGUAGE_RULES}
+    except HTTPException as exc:
+        return {"error": exc.detail}
+
+
+async def compare_page_versions(context: RunContext[AgenticChatDeps], artifact_uuid: str, from_version: int, to_version: int | None = None) -> dict:
+    """Compare two saved versions of your Page: what changed from from_version to to_version (latest if omitted).
+
+    Returns changed figures (label, old, new), sections added and removed, other
+    text edits, and design-only changes, each computed from the saved HTML.
+    Report them as given: list every changed figure with old → new, then the
+    sections, then text edits; mention design changes separately. Each version
+    also has a one-line change_summary.
+    """
+    from app.services.page_diff import compare
+    try:
+        doc = await _call(artifacts.get, artifact_uuid)
+        if doc["user_id"] != context.deps.user_id:
+            return {"error": "Page not found or you do not own it."}
+        old = _revision_by_version(doc, from_version)
+        new = _revision_by_version(doc, to_version)
+        number = {r["uuid"]: r.get("version", i) for i, r in enumerate(doc["revisions"], 1)}
+        diff = await anyio.to_thread.run_sync(compare, old["html"], new["html"])
+        summaries = [{"version": r.get("version", i), "change_summary": r.get("change_summary")}
+                     for i, r in enumerate(doc["revisions"], 1) if number[old["uuid"]] < r.get("version", i) <= number[new["uuid"]]]
+        return {"artifact_uuid": doc["uuid"], "from_version": number[old["uuid"]], "to_version": number[new["uuid"]],
+                **diff, "versions_between": summaries}
     except HTTPException as exc:
         return {"error": exc.detail}
 
@@ -170,7 +217,7 @@ async def create_html_artifact(context: RunContext[AgenticChatDeps], title: str,
             title = f"{template['name']} — {document.title}"[:200]
             return await _save(context, title, html, confirmed, template_source={
                 'template_uuid': template_uuid, 'template_check': check,
-            })
+            }, source_documents=[document.uuid])
         except artifacts.PageTooLargeError:
             raise
         except HTTPException as exc:
@@ -208,7 +255,54 @@ async def revise_html_artifact(context: RunContext[AgenticChatDeps], artifact_uu
     return await _save(context, title, html, confirmed, artifact_uuid, base_revision)
 
 
-async def _save(context: RunContext[AgenticChatDeps], title: str, html: str, confirmed: bool, artifact_uuid: str | None=None, base_revision: str | None=None, template_source: dict | None=None) -> dict:
+def _used_documents(context: RunContext[AgenticChatDeps]) -> list[str]:
+    """Files this turn's page was built from: attached files, then files read."""
+    used = list(getattr(context.deps, "context_document_uuids", None) or [])
+    used += [u for u in getattr(context.deps, "documents_read", None) or [] if u not in used]
+    return used
+
+
+def _source_documents(db: Database[dict], doc: dict | None, used: list[str]) -> list[dict]:
+    if doc is None:
+        return page_sources.resolve(db, used)
+    previous = page_sources.revision_sources(artifacts.revision(doc))
+    return page_sources.resolve(db, page_sources.carry_forward(db, previous, used))
+
+
+def _figure_check_view(result: dict | None) -> dict:
+    """The figure check as the preview card and chat see it: the summary, and
+    the figures that need attention (manual edits, figures not found)."""
+    from app.services import page_figures
+
+    figures = (result or {}).get("figures") or []
+    return {
+        "summary": page_figures.summary(result),
+        "checked": result is not None,
+        "manual": [f for f in figures if f["status"] == "manual"][:20],
+        "unmatched": [f["figure"] for f in figures if f["status"] == "unmatched"][:20],
+        "instruction": (
+            "Tell the user this summary. For each figure not found in the source, check it against the "
+            "source and fix it, or mark a requested change with data-source-value; never call an "
+            "unmatched figure verified."
+        ) if result and (result.get("unmatched") or result.get("manual")) else None,
+    }
+
+
+def _annotated(snapshot: dict) -> str:
+    """The preview HTML with each figure's origin as hover text (display only)."""
+    from bs4 import BeautifulSoup
+
+    from app.services import page_figures
+
+    result = (snapshot.get("source") or {}).get("figure_check")
+    if not result:
+        return str(snapshot["prepared_html"])
+    soup = BeautifulSoup(snapshot["prepared_html"], "html.parser")
+    page_figures.annotate(soup, result)
+    return str(soup)
+
+
+async def _save(context: RunContext[AgenticChatDeps], title: str, html: str, confirmed: bool, artifact_uuid: str | None=None, base_revision: str | None=None, template_source: dict | None=None, source_documents: list[str] | None=None) -> dict:
     from app.services.chat_tools import _confirm_gate
     conversation = context.deps.conversation
     if conversation is None:
@@ -227,8 +321,10 @@ async def _save(context: RunContext[AgenticChatDeps], title: str, html: str, con
         from app.services.inbox_provenance import PAGE_ERROR, credits_inbox
         if not confirmed and credits_inbox(html) and not getattr(context.deps, "inbox_read", False):
             return {"error": PAGE_ERROR}
+        documents = await _call(_source_documents, doc, source_documents or _used_documents(context))
         snapshot = await _call(chat_page_previews.prepare, context.deps.user_id,
-            conversation.uuid, title, html, artifact_uuid, base_revision, {**_source(context), **(template_source or {})})
+            conversation.uuid, title, html, artifact_uuid, base_revision,
+            {**_source(context), **(template_source or {}), "documents": documents})
         digest = hashlib.sha256((title + snapshot["prepared_html"]).encode()).hexdigest()
         gate = await _confirm_gate(context, tool_name=name,
             key={"artifact": artifact_uuid, "base": base_revision, "sha256": digest}, confirmed=confirmed,
@@ -236,7 +332,8 @@ async def _save(context: RunContext[AgenticChatDeps], title: str, html: str, con
                      "preview": f'Save a private Page: {title}. This does not publish it.',
                      "preview_id": snapshot["_id"], "title": snapshot["title"],
                      "template_check": snapshot["source"].get("template_check"),
-                     "artifact_preview_html": snapshot["prepared_html"], "warnings": snapshot["warnings"], "rendering_note": RENDERING_NOTE,
+                     "figure_check": _figure_check_view(snapshot["source"].get("figure_check")),
+                     "artifact_preview_html": _annotated(snapshot), "warnings": snapshot["warnings"], "rendering_note": RENDERING_NOTE,
                      "source_fidelity_note": PAGE_SOURCE_FIDELITY_RULES, "language_note": PAGE_LANGUAGE_RULES})
         if gate is not None:
             return gate

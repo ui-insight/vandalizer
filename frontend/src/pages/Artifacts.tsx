@@ -1,7 +1,7 @@
 import { SavePageTemplate } from '../components/artifacts/SavePageTemplate'
 import { PageVersionLinks } from '../components/artifacts/PageVersionLinks'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowLeft, ArrowUpRight, Check, ChevronRight, Code2, Copy, Download, FileText, Globe2, Link2, LockKeyhole, MessageSquare, Share2, Trash2, Workflow } from 'lucide-react'
+import { ArrowLeft, ArrowUpRight, Check, ChevronRight, Code2, Copy, Download, FileText, GitCompare, Globe2, Link2, LockKeyhole, MessageSquare, Share2, Trash2, Workflow } from 'lucide-react'
 import * as api from '../api/artifacts'
 import { PagesBrowser } from '../components/artifacts/PagesBrowser'
 import { PageDeleteDialog } from '../components/artifacts/PageDeleteDialog'
@@ -9,6 +9,8 @@ import { PageBadge, PageDialog, PagePreview, pagesUrl } from '../components/arti
 import { listTeams } from '../api/teams'
 import { PagePrintLink, pageViewUrl } from '../components/artifacts/PagePrintLink'
 import { PublishedPageContent } from '../components/artifacts/PublishedPageContent'
+import { PageBuiltFrom, PageSourceUpdates, updateRequest } from '../components/artifacts/PageSourceUpdates'
+import { PageCompare } from '../components/artifacts/PageCompare'
 import type { PageSpot } from '../components/artifacts/PublishedPageContent'
 import { AskOwnerPanel, OwnerFeedbackPanel, type FrameControl } from '../components/artifacts/PageFeedbackPanel'
 import * as feedbackApi from '../api/pageFeedback'
@@ -40,6 +42,7 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [requestChanges, setRequestChanges] = useState(false)
   const [changes, setChanges] = useState('')
+  const [comparing, setComparing] = useState(false)
   // Page feedback: what the frame is doing (picking a spot, showing one), the
   // spot a viewer picked, and the question a notification linked to.
   const [frame, setFrame] = useState<FrameControl>({ picking: false, spot: null })
@@ -124,6 +127,17 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
   const chatUrl = uuid ? `/?editPage=${encodeURIComponent(uuid)}${artifact?.source?.conversation_uuid ? `&conversation=${encodeURIComponent(artifact.source.conversation_uuid)}` : ''}${artifact?.source?.project_uuid ? `&project=${encodeURIComponent(artifact.source.project_uuid)}` : ''}` : ''
   const closeSharing = () => { setSharing(false); if (window.location.hash === '#share') window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search) }
   const openSharing = () => { setPublicRevision(artifact?.latest_revision || ''); setSharing(true) }
+  const updateFromSources = (updated: api.PageSourceDocument[]) => {
+    if (!uuid) return
+    try {
+      sessionStorage.setItem(`pages:edit-request:${uuid}`, updateRequest(updated))
+      sessionStorage.setItem(`pages:edit-documents:${uuid}`, JSON.stringify({
+        uuids: updated.map(s => s.latest!.uuid), names: Object.fromEntries(updated.map(s => [s.latest!.uuid, s.latest!.title])),
+        detach: updated.map(s => s.uuid),
+      }))
+      window.location.assign(chatUrl)
+    } catch { setError('Could not open chat. Attach the new file in chat and ask it to update this page.') }
+  }
   const feedback = <>{error && <p role="alert" className="page-alert">{error}</p>}{notice && <p role="status" className="page-notice">{notice}</p>}</>
   return <main className="page-workspace"><div className="page-workspace-inner">
     {!publicToken && <nav className="page-breadcrumb" aria-label="Breadcrumb"><a href={backUrl}><ArrowLeft size={15} />Files</a><ChevronRight size={13} /><a href={backUrl}>Pages</a><ChevronRight size={13} /><span>{loading ? 'Loading…' : 'Page details'}</span></nav>}
@@ -149,8 +163,12 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
     {loading && <p role="status" className="pages-loading">Loading your page…</p>}
     {!loading && !artifact && !publicInfo && <div className="pages-empty"><FileText size={32} /><h2>Page unavailable</h2><p>{publicToken ? 'This link may have been removed. Ask the owner for a current link.' : 'The page may have been removed, or your access may have changed.'}</p><button className="page-button" onClick={() => setAttempt(n => n + 1)}>Try again</button></div>}
     {!loading && (artifact || publicInfo) && <>
-      {artifact && <div className="page-revision-bar">{artifact.can_manage ? <label>Version<select aria-label="Page version" disabled={busy || !!editor} value={selected} onChange={e => setSelected(e.target.value)}>{artifact.revisions.map((r, index) => <option key={r.uuid} value={r.uuid}>Version {r.version ?? index + 1}{isPublished(r.uuid) ? ' · published' : ''}{r.uuid === artifact.latest_revision ? ' · latest' : ''}</option>)}</select></label> : <span>Shared version {version}</span>}<a className="page-text-button" href={pageViewUrl(contentUrl, 'full')} target="_blank" rel="noreferrer"><ArrowUpRight size={14} />Open full page</a></div>}
+      {artifact && <div className="page-revision-bar">{artifact.can_manage ? <label>Version<select aria-label="Page version" disabled={busy || !!editor} value={selected} onChange={e => setSelected(e.target.value)}>{artifact.revisions.map((r, index) => <option key={r.uuid} value={r.uuid}>Version {r.version ?? index + 1}{isPublished(r.uuid) ? ' · published' : ''}{r.uuid === artifact.latest_revision ? ' · latest' : ''}</option>)}</select></label> : <span>Shared version {version}</span>}{artifact.can_manage && artifact.revisions.length > 1 && <button type="button" className="page-text-button" aria-expanded={comparing} onClick={() => setComparing(v => !v)}><GitCompare size={14} />{comparing ? 'Hide comparison' : 'Compare versions'}</button>}<a className="page-text-button" href={pageViewUrl(contentUrl, 'full')} target="_blank" rel="noreferrer"><ArrowUpRight size={14} />Open full page</a></div>}
+      {artifact?.can_manage && revision?.change_summary && <p className="page-change-summary"><strong>What changed in version {version}:</strong> {revision.change_summary}</p>}
+      {comparing && artifact?.can_manage && uuid && <PageCompare uuid={uuid} revisions={artifact.revisions} versionNumber={versionNumber} />}
       {hasDraft && publishedVersion > 0 && !selectedIsPublished && <p className="page-revision-note">You’re previewing version {version}. The public link still shows version {publishedVersion}. Share → Publish updates when you’re ready.</p>}
+      {publicToken && publicInfo?.newer_data_available && <p className="page-revision-note" role="status">Newer source data is available. The page owner hasn’t published an updated version yet.</p>}
+      {artifact?.can_manage && artifact.source_documents && <PageSourceUpdates sources={artifact.source_documents} disabled={busy || !!editor} onUpdate={updateFromSources} />}
       {!!revision?.warnings.length && <div className="page-revision-note"><strong>Some content was removed to keep this page safe.</strong>{revision.warnings.map(w => <p key={w}>{w}</p>)}</div>}
       {publicToken || frame.picking || frame.spot
         ? <PublishedPageContent key={contentUrl} src={contentUrl} picking={frame.picking} onPick={setPicked} spot={frame.spot}
@@ -167,6 +185,7 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
       {artifact?.source && <nav aria-label="Page source" className="page-source">
         {artifact.source.conversation_uuid && <a href={`/?conversation=${encodeURIComponent(artifact.source.conversation_uuid)}${artifact.source.project_uuid ? `&project=${encodeURIComponent(artifact.source.project_uuid)}` : ''}`}><MessageSquare size={14} />Open originating chat</a>}
         {artifact.source.workflow_id && <a href={`/?mode=files&workflow=${encodeURIComponent(artifact.source.workflow_id)}${artifact.source.session_id ? `&run=${encodeURIComponent(artifact.source.session_id)}` : ''}${artifact.source.project_uuid ? `&project=${encodeURIComponent(artifact.source.project_uuid)}` : ''}`}><Workflow size={14} />Open originating workflow run</a>}
+        {artifact.source_documents && <PageBuiltFrom sources={artifact.source_documents} />}
         <span>Saved in Files → Pages</span>
       </nav>}
       {artifact?.can_manage && uuid && <>
@@ -190,7 +209,9 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
         <div className="page-actions"><button className="page-button" disabled={busy || teamError || !accessDirty} onClick={() => void action(async () => { await api.shareArtifactTeam(uuid, team || null, team ? teamRevision : undefined); await reload(true); setNotice('Workspace access updated.') })}>Save access</button>{accessDirty && <button className="page-button" disabled={busy} onClick={discardAccessChanges}>Discard access changes</button>}<button className="page-button" disabled={busy} onClick={() => copy(`${window.location.origin}/pages/${uuid}`, 'Workspace link copied. The recipient still needs access.')}><Copy size={15} />Copy private link</button></div>
       </section>
       <section className="page-share-section"><h3><Globe2 size={17} />Main public link {publishedVersion > 0 && <PageBadge published>Version {publishedVersion} is live</PageBadge>}</h3>
-        <p>Before publishing, compare figures and source notes with the original documents. Saving a page does not verify its accuracy.</p>
+        {artifact.figure_check?.[publicRevision]
+          ? <p className="page-figure-check" role="note"><strong>Built-in figure check for this version:</strong> {artifact.figure_check[publicRevision]}. It compares values only; check that each figure is in the right place before publishing.</p>
+          : <p>Before publishing, compare figures and source notes with the original documents. Saving a page does not verify its accuracy.</p>}
         <p>{publishedVersion ? `Anyone with this link can view version ${publishedVersion}. Saving edits does not change this link.` : `Publish version ${publicVersion} so anyone with its link can view it. Check the page for private information before publishing.`}</p>
         {hasDraft && publishedVersion > 0 && <p className="page-revision-note">Version {latestVersion} is newer than the published version.</p>}
         <label>Version to publish<select aria-label="Version to publish" value={publicRevision} disabled={busy || !!editor || !artifact.public_sharing_enabled} onChange={e => setPublicRevision(e.target.value)}>{artifact.revisions.map((r, index) => <option key={r.uuid} value={r.uuid}>Version {r.version ?? index + 1}{r.uuid === artifact.published_revision ? ' · public now' : ''}{r.uuid === artifact.latest_revision ? ' · latest saved' : ''}</option>)}</select></label>

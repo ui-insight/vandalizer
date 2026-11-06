@@ -68,8 +68,10 @@ def render_page(revision: dict, version: int, view: str = "content") -> tuple[st
     if body is None:
         body = soup.new_tag("body")
         root.append(body)
-    for element in soup.select("#vandalizer-print-style, #vandalizer-print-footer, #vandalizer-print-controls, #vandalizer-print-script"):
+    for element in soup.select("#vandalizer-print-style, #vandalizer-print-footer, #vandalizer-print-controls, #vandalizer-print-script, #vandalizer-figure-style, #vandalizer-figure-check"):
         element.decompose()
+    from app.services import page_figures
+    page_figures.annotate(soup, (revision.get("source") or {}).get("figure_check"))
     saved = revision.get("created_at")
     if saved is not None:
         if saved.tzinfo is None:

@@ -1,6 +1,17 @@
 import { apiFetch } from './client'
 import type { ExportMessage } from './chat'
 
+/** A file a Page was built from, and whether a newer version exists. */
+export interface PageSourceDocument {
+  uuid: string
+  title: string
+  version_number: number
+  status: 'current' | 'updated' | 'missing'
+  /** The newest version; null when it exists but the viewer cannot open it. */
+  latest?: { uuid: string; title: string; version_number: number; created_at: string | null; ready: boolean } | null
+  changes?: { items: string[]; more: number; total: number }
+}
+
 export interface Artifact {
   uuid: string
   created_at?: string
@@ -15,10 +26,28 @@ export interface Artifact {
   team_revision?: string | null
   can_manage: boolean
   public_sharing_enabled?: boolean
-  revisions: { uuid: string; title: string; created_at: string; warnings: string[]; version?: number }[]
+  /** change_summary: owner only, one line on what the version changed from the one before. */
+  revisions: { uuid: string; title: string; created_at: string; warnings: string[]; version?: number; change_summary?: string | null }[]
+  /** Owner only: the latest version's source files. */
+  source_documents?: PageSourceDocument[]
+  /** Built-in figure check summary per revision uuid. */
+  figure_check?: Record<string, string>
+}
+
+export interface PageComparison {
+  base: { revision: string; version: number }
+  target: { revision: string; version: number }
+  title: { old: string; new: string } | null
+  numbers: { label: string; old: string; new: string; section?: string }[]
+  sections_added: string[]
+  sections_removed: string[]
+  text: { label: string; old: string; new: string; section?: string }[]
+  design: string[]
+  truncated: boolean
+  summary: string
 }
 const path = (id: string) => `/api/pages/${encodeURIComponent(id)}`
-export interface PublicArtifact { title: string; revision: string; version: number; updated_at: string }
+export interface PublicArtifact { title: string; revision: string; version: number; updated_at: string; newer_data_available?: boolean }
 export interface ArtifactPageResult { items: Artifact[]; total: number; page: number; page_size: number }
 export const browseArtifacts = (params: { search?: string; sort?: string; page?: number; project_uuid?: string }) => {
   const query = new URLSearchParams()
@@ -40,6 +69,7 @@ export const unpublishArtifact = (id: string) => apiFetch(`${path(id)}/publicati
 export const publishArtifactVersion = (id: string, revision: string) => apiFetch<Artifact>(`${path(id)}/publication`, { method: 'PUT', body: JSON.stringify({ revision, separate_link: true }) })
 export const unpublishArtifactVersion = (id: string, revision: string) => apiFetch(`${path(id)}/publication?revision=${encodeURIComponent(revision)}`, { method: 'DELETE' })
 export const shareArtifactTeam = (id: string, teamId: string | null, revision?: string) => apiFetch(`${path(id)}/team`, { method: 'PUT', body: JSON.stringify({ team_id: teamId, revision }) })
+export const compareArtifactVersions = (id: string, base: string, target: string) => apiFetch<PageComparison>(`${path(id)}/compare?base=${encodeURIComponent(base)}&target=${encodeURIComponent(target)}`)
 export const deleteArtifact = (id: string) => apiFetch(path(id), { method: 'DELETE' })
 export const renameArtifact = (id: string, title: string) => apiFetch<Artifact>(path(id), { method: 'PATCH', body: JSON.stringify({ title }) })
 export const duplicateArtifact = (id: string, requestId: string) => apiFetch<Artifact>(`${path(id)}/duplicate`, { method: 'POST', body: JSON.stringify({ request_id: requestId }) })

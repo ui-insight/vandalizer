@@ -16,10 +16,11 @@ from app.schemas.documents import (
     MoveFileRequest,
     RenameDocumentRequest,
     UploadRequest,
+    UploadVersionRequest,
 )
 from app.services import document_usage as document_usage_service
 from app.services import file_service
-from app.services import knowledge_service
+from app.services import access_control, knowledge_service
 from app.utils.file_validation import ALLOWED_EXTS
 from app.utils.content_disposition import content_disposition
 
@@ -230,6 +231,39 @@ async def sheet_json(
     if result is None:
         raise HTTPException(status_code=404, detail="Sheet rendering not available")
     return result
+
+
+@router.post("/{doc_uuid}/versions", response_model=None)
+@limiter.limit("30/minute")
+async def upload_version(
+    request: Request,
+    doc_uuid: str,
+    body: UploadVersionRequest,
+    user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> dict:
+    """Upload a revised file as the next version of ``doc_uuid``.
+
+    Pages built from the earlier version then show that their source changed.
+    """
+    current = await access_control.get_authorized_document(doc_uuid, user, manage=True)
+    if not current or current.soft_deleted:
+        raise HTTPException(status_code=404, detail="Document not found")
+    try:
+        return await file_service.upload_document(
+            blob=body.contentAsBase64String, filename=body.fileName, raw_extension=body.extension,
+            user=user, settings=settings, replaces=current,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/{doc_uuid}/versions", response_model=None)
+async def versions(doc_uuid: str, user: User = Depends(get_current_user)) -> dict:
+    document = await access_control.get_authorized_document(doc_uuid, user)
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return {"versions": await file_service.list_versions(document, user)}
 
 
 @router.get("/{doc_uuid}/usage", response_model=None)

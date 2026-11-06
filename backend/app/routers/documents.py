@@ -62,7 +62,8 @@ async def search_documents(
         owner_conditions.append({"team_id": {"$in": list(team_access.team_object_ids)}})
     owner_filter: dict = {"$or": owner_conditions}
 
-    base_conditions: list[dict] = [owner_filter]
+    # Older versions of a revised file stay reachable from its version history.
+    base_conditions: list[dict] = [owner_filter, {"superseded_by": None}]
     if folder is not None:
         if folder == "__root__":
             base_conditions.append({"$or": [{"folder": None}, {"folder": ""}, {"folder": "0"}]})
@@ -70,7 +71,7 @@ async def search_documents(
             base_conditions.append({"folder": folder})
 
     if not q.strip():
-        query: dict = {"$and": base_conditions} if len(base_conditions) > 1 else owner_filter
+        query: dict = {"$and": base_conditions}
         results = await SmartDocument.find(query).sort('-created_at').limit(limit).to_list()
     else:
         regex = re.compile(re.escape(q), re.IGNORECASE)

@@ -152,6 +152,14 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
               >
                 {doc.title}
               </span>
+              {(doc.version_number ?? 1) > 1 && (
+                <span
+                  className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-xs font-semibold text-slate-600"
+                  title={`Version ${doc.version_number}. Earlier versions are in Version history.`}
+                >
+                  v{doc.version_number}
+                </span>
+              )}
               {doc.classification && doc.classification !== 'unrestricted' && (
                 <span
                   className="inline-flex items-center gap-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-xs font-semibold uppercase"

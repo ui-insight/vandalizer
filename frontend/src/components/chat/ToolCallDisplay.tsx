@@ -372,6 +372,8 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
       return { text: `Saved private Page: ${String(obj.title || 'Untitled Page')}`, qualityHint }
     case 'get_html_artifact':
       return { text: `Read Page: ${String(obj.title || 'Untitled Page')}`, qualityHint }
+    case 'compare_page_versions':
+      return { text: obj.summary ? `Version ${String(obj.from_version)} → ${String(obj.to_version)}: ${String(obj.summary)}` : 'Compared page versions', qualityHint }
     case 'list_skills':
       return { text: Array.isArray(content) ? `Found ${content.length} Skill${content.length === 1 ? '' : 's'}` : 'Skills', qualityHint: '' }
     case 'get_skill':
@@ -1456,7 +1458,7 @@ export function ToolStatusLine({
   if (['create_html_artifact', 'revise_html_artifact'].includes(name)) {
     const uuid = typeof obj?.artifact_uuid === 'string' && /^[a-f0-9]{32}$/.test(obj.artifact_uuid) ? obj.artifact_uuid : undefined
     const revision = typeof obj?.revision === 'string' ? obj.revision : undefined
-    return <ChatPageCard previewId={typeof obj?.preview_id === 'string' ? obj.preview_id : undefined} templateCheck={obj?.template_check} saving={args.confirmed === true} title={String(obj?.title || args.title || 'Untitled page')}
+    return <ChatPageCard previewId={typeof obj?.preview_id === 'string' ? obj.preview_id : undefined} templateCheck={obj?.template_check} figureCheck={obj?.figure_check} saving={args.confirmed === true} title={String(obj?.title || args.title || 'Untitled page')}
       html={typeof obj?.artifact_preview_html === 'string' ? obj.artifact_preview_html : undefined}
       warnings={Array.isArray(obj?.warnings) ? obj.warnings.filter((warning): warning is string => typeof warning === 'string') : []}
       uuid={uuid} revision={revision} running={isActive} error={isError ? summaryText || 'The page could not be saved. Ask the assistant to check the result before retrying.' : undefined}

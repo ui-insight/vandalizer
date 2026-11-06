@@ -93,3 +93,10 @@ it('keeps jump links inside the unsaved and expanded preview', () => {
   expect(screen.getByTitle('Award report expanded preview')).toHaveAttribute('srcdoc', frame.getAttribute('srcdoc'))
   expect(frame.getAttribute('sandbox')).not.toMatch(/allow-scripts|allow-same-origin|allow-top-navigation(?: |$)/)
 })
+it('shows the built-in figure check on the preview card, whatever the reply says', () => {
+  const summary = '23 of 24 figures match the source · 1 manual edit (Personnel)'
+  render(<ToolStatusLine call={call} result={{ ...result, content: { ...result.content, figure_check: { summary, checked: true, manual: [], unmatched: [] } } }} onConfirm={vi.fn()} />)
+  const note = screen.getByText('Figure check:').closest('p')
+  expect(note).toHaveTextContent(summary)
+  expect(note).toHaveClass('page-figure-check--review')
+})
