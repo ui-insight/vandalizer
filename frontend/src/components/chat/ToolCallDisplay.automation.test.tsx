@@ -21,7 +21,7 @@ const settings = [
 const result = (content: Record<string, unknown>) => ({ tool_name: 'create_automation', tool_call_id: 'auto', quality: null, content })
 
 describe('automation approval options', () => {
-  it('does not hide a revised configuration as a duplicate approval', () => {
+  it('shows a revised configuration as replaced, not hidden as a duplicate approval', () => {
     const calls = ['pdf', 'docx', 'pdf'].map((extension, index) => ({
       ...call, tool_call_id: `auto-${index}`, args: { name: 'NIH PDFs', file_types: [extension] },
     }))
@@ -31,9 +31,13 @@ describe('automation approval options', () => {
         automation_settings: [{ label: 'File types', value: `.${call.args.file_types[0]}` }],
       }), tool_call_id: call.tool_call_id })),
     }} />)
-    expect(screen.getAllByLabelText('Automation settings')).toHaveLength(2)
+    // The repeated .pdf proposal is one card; the .docx revision stays on
+    // screen, but as Replaced: only the newest proposal can be approved.
+    expect(screen.getAllByLabelText('Automation settings')).toHaveLength(1)
     expect(screen.getByText('.pdf')).toBeVisible()
-    expect(screen.getByText('.docx')).toBeVisible()
+    expect(screen.getAllByText(/· Replaced$/)).toHaveLength(1)
+    // The live card is the newest proposal, not the revision between them.
+    expect(screen.queryByText('.docx')).toBeNull()
   })
 
   it('shows every resolved option inside the approval card before creation', () => {

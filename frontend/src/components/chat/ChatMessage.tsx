@@ -268,9 +268,11 @@ export function ChatMessage({
   // two identical "Confirm / Cancel" cards for one action. Keep only the first
   // occurrence of each awaiting-confirmation action within this message.
   const suppressedConfirmCallIds = useMemo(() => {
-    const suppressed = new Set<string>()
+    // Each hidden duplicate maps to the card that is kept in its place. The
+    // first copy is kept: it is the call id the confirm gate keeps armed.
+    const suppressed = new Map<string, string>()
     if (!segments) return suppressed
-    const seen = new Set<string>()
+    const seen = new Map<string, string>()
     for (const seg of segments) {
       if (seg.kind !== 'tool_call') continue
       const content = resultMap.get(seg.call.tool_call_id)?.content as
@@ -278,21 +280,28 @@ export function ChatMessage({
         | undefined
       if (!content || content.needs_confirmation !== true) continue
       const key = `${seg.call.tool_name}|${String(content.preview ?? '')}|${JSON.stringify(content.automation_settings ?? null)}`
-      if (seen.has(key)) suppressed.add(seg.call.tool_call_id)
-      else seen.add(key)
+      const kept = seen.get(key)
+      if (kept) suppressed.set(seg.call.tool_call_id, kept)
+      else seen.set(key, seg.call.tool_call_id)
     }
     return suppressed
   }, [segments, resultMap])
 
-  // Approval cards a later call to the same tool replaced. Hidden duplicates
-  // are left out so they can't retire the copy that is still shown.
-  const supersededIds = useMemo(
-    () => supersededCallIds(
-      (segments ?? []).flatMap(seg => (seg.kind === 'tool_call' && !suppressedConfirmCallIds.has(seg.call.tool_call_id) ? [seg.call.tool_call_id] : [])),
-      resultMap,
-    ),
-    [segments, resultMap, suppressedConfirmCallIds],
-  )
+  // Approval cards a later call to the same tool replaced. A kept card counts
+  // as proposed where its latest duplicate was: in pdf → docx → pdf the .docx
+  // revision is replaced and the .pdf card stays live. Counting the kept card
+  // only at its first position retired it and left the .docx card approvable.
+  const supersededIds = useMemo(() => {
+    const order: string[] = []
+    for (const seg of segments ?? []) {
+      if (seg.kind !== 'tool_call') continue
+      const id = suppressedConfirmCallIds.get(seg.call.tool_call_id) ?? seg.call.tool_call_id
+      const at = order.indexOf(id)
+      if (at >= 0) order.splice(at, 1)
+      order.push(id)
+    }
+    return supersededCallIds(order, resultMap)
+  }, [segments, resultMap, suppressedConfirmCallIds])
 
   return (
     <div
