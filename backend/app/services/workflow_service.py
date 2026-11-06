@@ -247,6 +247,9 @@ async def get_workflow(
         # as the Library menu does.
         "verified": bool(wf.verified),
         "created_by_user_id": wf.created_by_user_id or wf.user_id,
+        # The current entry in the Versions tab; a run whose workflow_version
+        # differs ran an earlier (or replaced) definition.
+        "version": wf.version or 1,
     }
 
 
@@ -723,6 +726,10 @@ async def get_workflow_status(
         # Which models actually answered and with what settings, plus the
         # configuration to reproduce the run (services/run_metadata.py).
         "run_metadata": describe_run(result),
+        # The workflow version this run executed (None for runs recorded
+        # before run configs were snapshotted), so the editor can tell a
+        # result from a version that has since been replaced or restored over.
+        "workflow_version": ((getattr(result, "run_config", None) or {}).get("workflow") or {}).get("version"),
     }
 
 
