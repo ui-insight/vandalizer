@@ -70,3 +70,24 @@ def test_the_step_is_off_unless_chat_config_turns_it_on():
 
 def test_section_of_drops_the_part():
     assert A.section_of("Subpart E—Cost Principles · § 200.475 · part 3") == "subpart e—cost principles · § 200.475"
+
+
+def test_the_chat_step_runs_only_when_on_cites_no_web_result_and_keeps_the_answer_when_the_pass_raises(monkeypatch):
+    from app.services import chat_service
+
+    answer = ("- Costs of promotional items and memorabilia, including gifts and souvenirs, are unallowable public "
+              "relations costs.")
+    on = {"chat_config": {"kb_citation_attach_enabled": True}}
+    assert chat_service._attach_kb_citations(answer, POOL, None) == (answer, None)
+    text, rec = chat_service._attach_kb_citations(answer, POOL, on)
+    assert "[Source: Subpart E—Cost Principles · § 200.421 · part 3]" in text and rec["changed"] is True
+    # What web_search and fetch_url streamed sits in the same pool (no chunk or document id, a url) and is never
+    # cited, even when it holds the claim; a base built from web pages carries a url too, with its chunk id.
+    web = [{"ref": 9, "label": "Promotional items", "document_title": "Promotional items", "chunk_id": None,
+            "document_id": None,
+            "url": "https://example.test/promotional-items", "content": POOL[0]["content"]}]
+    assert chat_service._attach_kb_citations(answer, web, on) == (answer, None)
+    text, rec = chat_service._attach_kb_citations(answer, web + POOL[1:], on)
+    assert text == answer and rec["attached"] == []
+    monkeypatch.setattr(A, "attach_citations", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+    assert chat_service._attach_kb_citations(answer, POOL, on) == (answer, None)

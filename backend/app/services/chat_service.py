@@ -2765,9 +2765,9 @@ async def chat_stream(
                 # chat_config turns it on; kb_citation_attach). The sources
                 # the new citations name count as used.
                 kb_citation_attach = None
-                if streamed_citations and kb_sources:
+                if streamed_citations:
                     assistant_message, kb_citation_attach = _attach_kb_citations(
-                        assistant_message, kb_sources, sys_config_doc,
+                        assistant_message, streamed_citations, sys_config_doc,
                     )
                     if kb_citation_attach and kb_citation_attach.get("changed"):
                         streamed_segments[:] = [
@@ -4706,11 +4706,18 @@ def _attach_kb_citations(
     from app.services import kb_citation_attach
 
     config = kb_citation_attach.config(system_config_doc)
-    if config is None or not answer.strip() or not sources:
+    if config is None or not answer.strip():
+        return answer, None
+    # The pool holds every passage streamed this turn: the pre-fetched ones,
+    # what search_knowledge_base returned, and what web_search and fetch_url
+    # returned, which carries no chunk or document id. Only knowledge-base
+    # passages are cited.
+    passages = [s for s in sources or [] if s.get("chunk_id") or s.get("document_id")]
+    if not passages:
         return answer, None
     try:
         return kb_citation_attach.attach_citations(
-            answer, sources, min_share=config["min_share"],
+            answer, passages, min_share=config["min_share"],
             anchored_min_share=config["anchored_min_share"], margin=config["margin"],
         )
     except Exception as e:  # noqa: BLE001
