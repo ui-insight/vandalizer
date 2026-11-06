@@ -73,10 +73,9 @@ class ChatMessage(Document):
     # states — likely recalled from the model's memory, which can predate the
     # current regulation. Chat shows them under the answer.
     unsupported_figures: Optional[list[str]] = None
-    # Figures the answer states that only a calculate step produced: worked
-    # out from the sources, not found in them. Labelled "calculated", not
-    # "may come from general knowledge".
-    calculated_figures: Optional[list[str]] = None
+    # Figures the answer calculated from ones the sources state, each with its
+    # formula: {"figure": "$131,560", "formula": "52% × $253,000 = $131,560"}.
+    calculated_figures: Optional[list[dict]] = None
     # Sentences that conclude a rule from the sources' silence (#1012).
     silence_inferences: Optional[list[str]] = None
     # Set on a turn that ended early: "stopped" when the user pressed Stop,
@@ -92,6 +91,10 @@ class ChatMessage(Document):
     # Chat shows them under the answer; a later turn that reads the cited page
     # checks them for a silent correction (web_answer_grounding).
     unconfirmed_web_facts: Optional[list[str]] = None
+    # User turns sent by an approval card's button: the preview tool call id
+    # the card approved or cancelled, so each card's history is its own.
+    approval_for: Optional[str] = None
+    decline_for: Optional[str] = None
     # The documents in scope when this turn was asked: ``{uuid, title}`` each,
     # plus ``{"truncated": n}`` as a final entry if the selection was larger
     # than we record.
@@ -135,6 +138,10 @@ class ChatMessage(Document):
             d["unsupported_citations"] = self.unsupported_citations
         if self.unconfirmed_web_facts:
             d["unconfirmed_web_facts"] = self.unconfirmed_web_facts
+        if self.approval_for:
+            d["approval_for"] = self.approval_for
+        if self.decline_for:
+            d["decline_for"] = self.decline_for
         if self.source_documents:
             d["source_documents"] = self.source_documents
         return d
@@ -383,9 +390,11 @@ class ChatConversation(Document):
         unsupported_figures: Optional[list[str]] = None,
         silence_inferences: Optional[list[str]] = None,
         interruption: Optional[str] = None,
-        calculated_figures: Optional[list[str]] = None,
+        calculated_figures: Optional[list[dict]] = None,
         unsupported_citations: Optional[list[str]] = None,
         unconfirmed_web_facts: Optional[list[str]] = None,
+        approval_for: Optional[str] = None,
+        decline_for: Optional[str] = None,
     ) -> ChatMessage:
         msg = ChatMessage(
             role=role,
@@ -403,6 +412,8 @@ class ChatConversation(Document):
             interruption=interruption or None,
             unsupported_citations=unsupported_citations or None,
             unconfirmed_web_facts=unconfirmed_web_facts or None,
+            approval_for=approval_for or None,
+            decline_for=decline_for or None,
             source_documents=_cap_source_documents(source_documents),
         )
         await msg.insert()

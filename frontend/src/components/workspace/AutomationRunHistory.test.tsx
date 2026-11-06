@@ -10,6 +10,18 @@ function deferred<T>() { let resolve!: (value: T) => void; const promise = new P
 beforeEach(() => { vi.mocked(getAutomationHistory).mockReset(); vi.mocked(getAutomationRun).mockReset() })
 const props = { automationId: 'a', open: true, canRun: true, onPrepareRun: vi.fn() }
 describe('automation run history', () => {
+  it('says which runs a new file started, and which file', async () => {
+    // Support ticket: a folder-watch run must be told apart from a Run now.
+    vi.mocked(getAutomationHistory).mockResolvedValue({ items: [
+      { ...run('auto'), action_type: 'extraction', trigger_type: 'folder_watch', document_title: 'QA_Citation_Test_5pages.pdf' },
+      { ...run('manual'), action_type: 'extraction', trigger_type: 'manual' },
+    ], next_cursor: null })
+    render(<AutomationRunHistory {...props} />)
+    await screen.findByRole('button', { name: 'Open run auto' })
+    expect(screen.getByText('New file · QA_Citation_Test_5pages.pdf')).toBeInTheDocument()
+    expect(screen.getByText('Run now')).toBeInTheDocument()
+  })
+
   it('shows the same local instant in a zoned list row and older unzoned run details', async () => {
     const local = new Date('2026-10-29T21:38:00Z').toLocaleString(undefined, { timeZoneName: 'short' })
     vi.mocked(getAutomationHistory).mockResolvedValue({ items: [{ ...run('local'), created_at: '2026-10-29T21:38:00+00:00' }], next_cursor: null })

@@ -17,12 +17,15 @@ vi.mock('./CertificationCards', () => ({ useCertificationSync: vi.fn(), CertChec
 const { CalculationSteps } = await import('./ToolCallDisplay')
 
 describe('calculated figures', () => {
-  it('labels calculated figures as calculations to verify, not general knowledge', () => {
-    render(<ChatMessage message={{ role: 'assistant', content: 'Y1 direct costs are $253,000.', calculated_figures: ['$253,000'] }} />)
-    const note = screen.getByRole('note')
-    expect(note).toHaveTextContent('Calculated from the document: $253,000')
-    expect(note).toHaveTextContent(/verify/)
-    expect(note).not.toHaveTextContent(/general knowledge/)
+  it('lists a calculate step\'s figure with its working, not as general knowledge', () => {
+    render(<ChatMessage message={{
+      role: 'assistant',
+      content: 'Y1 direct costs are $253,000.',
+      calculated_figures: [{ figure: '$253,000', formula: 'Y1 direct: 200000 + 15000 + 8000 + 20000 + 10000 = 253,000' }],
+    }} />)
+    const list = screen.getByRole('list', { name: 'Calculations', hidden: true })
+    expect(list).toHaveTextContent('Y1 direct: 200000 + 15000 + 8000 + 20000 + 10000 = 253,000')
+    expect(screen.queryByText(/general knowledge/)).toBeNull()
   })
 
   it('shows the working, with range checks as Yes/No and refused steps called out', () => {

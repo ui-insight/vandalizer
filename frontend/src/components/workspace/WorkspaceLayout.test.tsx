@@ -15,6 +15,7 @@ vi.mock('./RightPanel', () => ({ RightPanel: () => <div data-testid="library">Li
 vi.mock('./UtilityBar', () => ({ UtilityBar: () => <div>Navigation</div> }))
 vi.mock('../certification/CourseEditorReturn', () => ({ CourseEditorReturn: () => null }))
 vi.mock('./ProjectContextBar', () => ({ ProjectContextBar: () => null }))
+vi.mock('../projects/AwardSnapshotPanel', () => ({ AwardSnapshotPanel: () => null }))
 vi.mock('./ProjectManageModal', () => ({ ProjectManageModal: () => null }))
 vi.mock('./ProjectsPanel', () => ({ ProjectsPanel: () => <div>Projects</div> }))
 vi.mock('./AutomationsPanel', () => ({ AutomationsPanel: () => <div>Automations</div> }))

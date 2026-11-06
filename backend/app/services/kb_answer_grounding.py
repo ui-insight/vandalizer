@@ -22,6 +22,10 @@ the question or too common to check without drowning the real signal.
 
 import json
 import re
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.figure_derivation import Derivation
 
 _SCALES = {
     "k": 1_000,
@@ -158,22 +162,38 @@ def unsupported_figures(answer: str, snippets: str) -> list[str]:
     Values are compared, not strings: "$1 million" in the answer is supported
     by "$1,000,000" in a snippet, and "15%" by "15 percent". A percentage is
     never supported by a dollar amount of the same number, or the reverse.
-    Returned in the answer's own wording, first occurrence, in order.
+    A figure the answer calculated from stated ones is supported (see
+    ``check_figures``). Returned in the answer's own wording, first
+    occurrence, in order.
     """
+    return check_figures(answer, snippets)[0]
+
+
+def check_figures(answer: str, snippets: str) -> tuple[list[str], list["Derivation"]]:
+    """(figures no source states, figures calculated from ones they do).
+
+    Support ticket: correct sums and percentages worked out from an NIH budget
+    table were flagged as possibly "from the model's general knowledge". See
+    ``figure_derivation``.
+    """
+    from app.services.figure_derivation import derive_figures
+
     if not answer or not answer.strip():
-        return []
+        return [], []
     snippet_money = set(_money_values(snippets or ""))
     snippet_pct = set(_percent_values(snippets or ""))
+    calculated = derive_figures(answer, snippet_money, snippet_pct)
+    derived = {d.label for d in calculated}
     missing = [
         label for value, label in _money_values(answer).items()
-        if value not in snippet_money
+        if value not in snippet_money and label not in derived
     ]
     missing += [
         label for value, label in _percent_values(answer).items()
-        if value not in snippet_pct
+        if value not in snippet_pct and label not in derived
     ]
     order = {label: answer.find(label) for label in missing}
-    return sorted(missing, key=lambda label: order[label])
+    return sorted(missing, key=lambda label: order[label]), calculated
 
 
 def _figure_value_and_unit(label: str) -> tuple[float, float] | None:
@@ -196,8 +216,9 @@ def _figure_value_and_unit(label: str) -> tuple[float, float] | None:
     return None
 
 
-def _calculated_values(outputs: list[str]) -> list[float]:
-    values: list[float] = []
+def _calculated_steps(outputs: list[str]) -> list[tuple[float, str]]:
+    """Each numeric calculate step's value and its working ("label: terms = result")."""
+    steps: list[tuple[float, str]] = []
     for text in outputs:
         try:
             parsed = json.loads(text)
@@ -207,34 +228,42 @@ def _calculated_values(outputs: list[str]) -> list[float]:
             result = step.get("result") if isinstance(step, dict) and "check" not in step else None
             if isinstance(result, str):
                 try:
-                    values.append(float(result.replace(",", "")))
+                    value = float(result.replace(",", ""))
                 except ValueError:
                     continue
-    return values
+                steps.append((value, f"{step.get('label') or 'Step'}: {step.get('expression') or ''} = {result}"))
+    return steps
 
 
-def calculated_only(figures: list[str], answer: str, calculate_outputs: list[str]) -> list[str]:
-    """The *figures* (labels from ``unsupported_figures``) that a calculate
-    step produced, allowing for the rounding the answer wrote them with.
+def calculation_formulas(figures: list[str], calculate_outputs: list[str]) -> dict[str, str]:
+    """The *figures* (labels from ``check_figures``) that a calculate step
+    produced, allowing for the rounding the answer wrote them with, each
+    mapped to that step's working.
 
     Support ticket (NIH R01 budget): yearly direct costs the model worked out
     were shown as "Not in the retrieved sources … may come from the model's
-    general knowledge". A calculated figure is neither: it is labelled as a
-    calculation to check against the document instead.
+    general knowledge". A calculated figure is neither: it is listed with the
+    other calculated figures, with the calculation that produced it.
     """
-    values = _calculated_values(calculate_outputs)
-    if not values:
-        return []
-    out = []
+    steps = _calculated_steps(calculate_outputs)
+    if not steps:
+        return {}
+    out: dict[str, str] = {}
     for label in figures:
         parsed = _figure_value_and_unit(label)
         if parsed is None:
             continue
         value, unit = parsed
         tolerance = unit / 2 + 1e-9
-        if any(abs(candidate - value) <= tolerance for candidate in values):
-            out.append(label)
+        match = next((formula for candidate, formula in steps if abs(candidate - value) <= tolerance), None)
+        if match is not None:
+            out[label] = match
     return out
+
+
+def calculated_only(figures: list[str], answer: str, calculate_outputs: list[str]) -> list[str]:
+    """The *figures* a calculate step produced (see ``calculation_formulas``)."""
+    return list(calculation_formulas(figures, calculate_outputs))
 
 
 # ---------------------------------------------------------------------------

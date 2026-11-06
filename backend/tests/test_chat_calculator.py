@@ -11,7 +11,7 @@ from pydantic_ai.models.function import AgentInfo, DeltaToolCall, FunctionModel
 
 from app.services.calculation_claims import require_calculated_figures
 from app.services.chat_calculator import Calculation, run
-from app.services.kb_answer_grounding import calculated_only, unsupported_figures
+from app.services.kb_answer_grounding import calculated_only, calculation_formulas, unsupported_figures
 
 # The ticket's sheet: five cost rows, an indirect row, and stated totals.
 SHEET = """## Budget
@@ -90,6 +90,35 @@ def test_calculated_figures_are_labelled_not_flagged_as_general_knowledge():
     answer = "Y1 direct costs are $253k (20.2% indirect). Unrelated: $99,000."
     flagged = unsupported_figures(answer, "")
     assert calculated_only(flagged, answer, [output]) == ["$253k", "20.2%"]
+
+
+def test_calculated_figures_carry_the_step_as_their_formula():
+    # Merged onto 6ef022e1's calculated_figures shape ({figure, formula}).
+    output = json.dumps(run([Calculation(label="Y1 direct", expression="200000 + 15000 + 8000 + 20000 + 10000")]))
+    assert calculation_formulas(["$253k", "$99,000"], [output]) == {
+        "$253k": "Y1 direct: 200000 + 15000 + 8000 + 20000 + 10000 = 253,000",
+    }
+
+
+@pytest.mark.parametrize("expression", [
+    "1e400",  # a float literal that is infinite
+    "9e999999 * 9e999999",  # Decimal overflow
+    "-" * 1500 + "1",  # recursion past the stack limit
+    "0 ** -1",
+])
+def test_pathological_input_is_a_step_error_not_a_crash(expression):
+    step = run([Calculation(label="x", expression=expression)])["steps"][0]
+    assert "error" in step and "result" not in step
+
+
+def test_later_steps_use_full_precision_not_the_displayed_rounding():
+    steps = _steps(run([
+        Calculation(label="rate", expression="1 / 3"),
+        Calculation(label="amount", expression="{rate} * 300000"),
+    ]))
+    assert steps["rate"]["result"] == "0.333333"
+    # 0.333333 × 300000 would be 99,999.9.
+    assert steps["amount"]["result"] == "100,000"
 
 
 def _agent(replies: list[str], calculate_first: bool = False):

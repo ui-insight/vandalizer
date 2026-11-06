@@ -23,7 +23,7 @@ import {
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useCertificationPanelOptional } from '../../contexts/CertificationPanelContext'
 import type { WorkspaceMode } from '../../contexts/WorkspaceContext'
-import type { ToolCallInfo, ToolResultInfo, QualityMeta } from '../../types/chat'
+import type { CardDecision, ToolCallInfo, ToolResultInfo, QualityMeta } from '../../types/chat'
 import { getWorkflowStatus } from '../../api/workflows'
 import { WorkflowArtifactAction } from '../workspace/WorkflowArtifactAction'
 import { announceWorkflowEdited } from '../../lib/workflowEdits'
@@ -1289,7 +1289,7 @@ export function ToolStatusLine({
   call?: ToolCallInfo
   result?: ToolResultInfo
   isActive?: boolean
-  onConfirm?: (message: string, pageApproval?: string) => boolean | void
+  onConfirm?: (message: string, pageApproval?: string, cardDecision?: CardDecision) => boolean | void
   approvalHistory?: ApprovalRecord
   /** This call failed, and a later call to the same tool succeeded. */
   recovered?: boolean
@@ -1322,9 +1322,13 @@ export function ToolStatusLine({
     if (!onConfirm || decisionRef.current) return
     decisionRef.current = true
     try {
+      // The card names its own preview, so the click approves (or cancels)
+      // this action only — never every card waiting (support ticket).
+      const cardId = call?.tool_call_id ?? result?.tool_call_id
+      const cardDecision: CardDecision | undefined = cardId ? (value === 'approved' ? { approve: cardId } : { decline: cardId }) : undefined
       const accepted = value === 'approved' && ['create_html_artifact', 'revise_html_artifact'].includes(name) && typeof obj?.preview_id === 'string'
-        ? onConfirm('Yes, go ahead', obj.preview_id)
-        : onConfirm(value === 'approved' ? 'Yes, go ahead' : 'No, cancel that')
+        ? onConfirm('Yes, go ahead', obj.preview_id, cardDecision)
+        : onConfirm(value === 'approved' ? 'Yes, go ahead' : 'No, cancel that', undefined, cardDecision)
       if (accepted === false) {
         setDecisionError('The decision could not be sent yet. Wait for the current attachment or response, then try again.')
         decisionRef.current = false
@@ -1337,6 +1341,7 @@ export function ToolStatusLine({
     }
   }
   const executionLabel = needsConfirmation ? approvalHistory?.label ?? (decision === 'approved' ? 'Approval requested' : decision === 'canceled' ? 'Cancellation requested' : 'Awaiting approval')
+    : obj?.still_waiting === true ? 'Waiting for its own approval'
     : canceled ? 'Canceled' : certificationIssue ? 'Result needs review' : isError ? 'Failed' : unconfirmed ? 'Completion not confirmed' : isActive ? 'Running'
     : name === 'run_workflow' && typeof obj?.session_id === 'string' ? 'Run accepted'
     : name === 'select_skill' ? selectedSkill === null ? 'Skill removed' : selectedSkill ? 'Skill selected' : 'Change not confirmed'
@@ -1344,9 +1349,13 @@ export function ToolStatusLine({
     : obj?.status === 'queued' || obj?.status === 'pending' ? 'Queued'
     : obj?.status === 'running' ? 'Running' : obj?.status === 'paused' ? 'Awaiting approval' : obj?.status && obj.status !== 'completed' ? 'Result received' : 'Completed'
 
-  const actionLabel = name === 'select_skill'
-    ? typeof obj?.approval_label === 'string' ? obj.approval_label : args.skill_uuid === null || obj?.skill_uuid === null ? 'Remove Skill' : 'Use Skill'
-    : ({ propose_obligations: 'Add to inbox', create_project: 'Create project', move_documents_to_project: 'Move files', create_workflow: 'Create workflow', update_workflow: 'Update workflow', create_automation: 'Create automation', create_extraction_from_document: 'Create extraction', run_workflow: 'Run workflow', run_validation: 'Run validation', approve_workflow_step: 'Approve step', complete_certification_module: 'Complete module' } as Record<string, string>)[name] ?? approveLabel(name)
+  // The preview names its own button (approval_label), so the card and the
+  // Assistant's "click X" agree. The map is for chats saved before previews
+  // carried one: the two used to drift, and a reject card read "Approve reject
+  // workflow step" (support ticket).
+  const actionLabel = typeof obj?.approval_label === 'string' && obj.approval_label ? obj.approval_label
+    : name === 'select_skill' ? args.skill_uuid === null || obj?.skill_uuid === null ? 'Remove Skill' : 'Use Skill'
+    : ({ propose_obligations: 'Add to inbox', create_project: 'Create project', move_documents_to_project: 'Move files', create_workflow: 'Create workflow', update_workflow: 'Update workflow', create_automation: 'Create automation', create_extraction_from_document: 'Create extraction', run_workflow: 'Run workflow', run_validation: 'Run validation', approve_workflow_step: 'Approve and continue', reject_workflow_step: 'Reject run', complete_certification_module: 'Complete module' } as Record<string, string>)[name] ?? approveLabel(name)
   const target = args.name ?? args.title ?? obj?.default_title
   const artifact = !isActive && !needsConfirmation && !isError && obj
     ? (name === 'create_workflow' || name === 'update_workflow') && typeof obj.workflow_id === 'string' ? { label: 'Open workflow', open: () => openWorkflow(obj.workflow_id as string) }
@@ -1526,7 +1535,7 @@ interface Props {
   toolCalls: ToolCallInfo[]
   toolResults: ToolResultInfo[]
   isStreaming?: boolean
-  onConfirm?: (message: string, pageApproval?: string) => boolean | void
+  onConfirm?: (message: string, pageApproval?: string, cardDecision?: CardDecision) => boolean | void
   approvalHistory?: Record<string, ApprovalRecord>
 }
 

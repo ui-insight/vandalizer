@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import ast
 import re
-from decimal import ROUND_HALF_UP, Decimal, DivisionByZero, InvalidOperation, localcontext
+from decimal import ROUND_HALF_UP, Decimal, localcontext
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -160,11 +160,23 @@ def evaluate(expression: str, results: dict[str, Decimal | bool]) -> tuple[str, 
         ctx.prec = 34
         try:
             value = _evaluate(tree)
-        except (InvalidOperation, DivisionByZero, OverflowError) as exc:
+            if isinstance(value, Decimal) and not value.is_finite():
+                raise CalculationError("The result is undefined or too large to compute.")
+        except (ArithmeticError, RecursionError) as exc:
+            # InvalidOperation/Overflow/DivisionByZero are ArithmeticErrors;
+            # a long run of unary signs recurses past the stack limit.
             raise CalculationError("The arithmetic could not be completed.") from exc
-    if isinstance(value, Decimal):
-        value = value.quantize(Decimal("1e-6")).normalize() if value != value.to_integral_value() else value.quantize(Decimal(1))
     return resolved, value
+
+
+def _shown(value: Decimal) -> Decimal:
+    """Rounded to six decimal places for display only; later steps that
+    refer to this one get the full-precision value."""
+    if value == value.to_integral_value():
+        return value
+    with localcontext() as ctx:
+        ctx.prec = 60
+        return value.quantize(Decimal("1e-6")).normalize()
 
 
 def run(calculations: list[Calculation]) -> dict[str, Any]:
@@ -186,7 +198,7 @@ def run(calculations: list[Calculation]) -> dict[str, Any]:
             steps.append({"label": label, "expression": resolved, "check": value,
                           "result": "true" if value else "false"})
         else:
-            steps.append({"label": label, "expression": resolved, "result": _display(value)})
+            steps.append({"label": label, "expression": resolved, "result": _display(_shown(value))})
     return {
         "steps": steps,
         "note": (

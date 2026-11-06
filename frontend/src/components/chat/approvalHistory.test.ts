@@ -24,6 +24,20 @@ describe('historical approval evidence', () => {
     const different = { ...saved, tool_calls: [{ ...saved.tool_calls![0], args: { preview_id: 'other', confirmed: true } }] }
     expect(approvalHistoryFor(page, [approval, different])['page-preview'].label).toBe('Approval requested')
   })
+  it.each([
+    ['approve_workflow_step', 'approve it', { status: 'approved', step: 'Review' }, 'Approved', 'The workflow continued from the approval step.'],
+    ['reject_workflow_step', 'reject it', { status: 'rejected', step: 'Review' }, 'Rejected', 'The run was stopped and marked failed. It will not continue.'],
+  ])('says plainly what a %s decision did', (tool, typed, receipt, label, detail) => {
+    // Support ticket: after approving, the card read "A matching confirmed
+    // action has a result below. Inspect that result for details…".
+    const card: ChatMessage = { role: 'assistant', content: '',
+      tool_calls: [{ tool_name: tool, tool_call_id: 'p', args: { session_id: 's1' } }],
+      tool_results: [{ tool_name: tool, tool_call_id: 'p', content: { needs_confirmation: true }, quality: null }] }
+    const done: ChatMessage = { role: 'assistant', content: '',
+      tool_calls: [{ tool_name: tool, tool_call_id: 'x', args: { session_id: 's1', confirmed: true } }],
+      tool_results: [{ tool_name: tool, tool_call_id: 'x', content: receipt, quality: null }] }
+    expect(approvalHistoryFor(card, [{ role: 'user', content: typed }, done]).p).toEqual({ label, detail })
+  })
   it('leaves the current preview actionable', () => expect(approvalHistoryFor(preview, [])).toEqual({}))
   it('records an accepted decision without claiming execution while the turn runs', () => expect(approvalHistoryFor(preview, [approval], true).preview.label).toBe('Approval requested'))
   it('says nothing was done when the Assistant never answered the approval', () => {

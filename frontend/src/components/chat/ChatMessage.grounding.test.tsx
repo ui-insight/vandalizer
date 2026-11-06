@@ -146,3 +146,16 @@ describe('ChatMessage unsupported citations', () => {
     expect(screen.getAllByRole('note')).toHaveLength(2)
   })
 })
+
+describe('ChatMessage calculated figures', () => {
+  it('lists each calculated figure with its formula, not as general knowledge', () => {
+    render(<ChatMessage message={answer({
+      content: 'Indirect is $51,000 ÷ $253,000 = 20.2% of direct costs.',
+      calculated_figures: [{ figure: '20.2%', formula: '$51,000 ÷ $253,000 = 20.2%' }],
+    })} />)
+
+    expect(screen.getByText('Calculated from figures in the sources (1)')).toBeInTheDocument()
+    expect(screen.getByRole('list', { name: 'Calculations', hidden: true })).toHaveTextContent('$51,000 ÷ $253,000 = 20.2%')
+    expect(screen.queryByRole('note')).not.toBeInTheDocument()
+  })
+})

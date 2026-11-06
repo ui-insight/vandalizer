@@ -29,6 +29,7 @@ page's own words says the opposite of it.
 
 import re
 
+from app.services.figure_derivation import derive_figures
 from app.services.kb_answer_grounding import _money_values, _percent_values
 
 FOUND = "found"
@@ -115,20 +116,16 @@ def _missing_anchors(claim: str, page: str) -> tuple[int, int]:
     total = missing = 0
 
     page_money, page_pct = set(_money_values(page)), set(_percent_values(page))
-    claim_money = set(_money_values(claim))
-    for value in claim_money:
+    # A figure the claim worked out from figures the page states ("$50,000 ÷
+    # $200,000 = 25%" in #1005 run 4; "52% × $253,000 = $131,560", a budget
+    # table's yearly total) is supported by them, not missing from the page.
+    derived = {d.label for d in derive_figures(claim, page_money, page_pct)}
+    for value, label in _money_values(claim).items():
         total += 1
-        missing += value not in page_money
-    # A percentage the answer worked out from two amounts the page states
-    # ("$50,000 ÷ $200,000 = 25%") is supported by those amounts, not missing
-    # from the page (#1005 run 4).
-    stated = claim_money & page_money
-    derived = {
-        round(100 * a / b, 4) for a in stated for b in stated if b and a != b
-    }
-    for value in _percent_values(claim):
+        missing += value not in page_money and label not in derived
+    for value, label in _percent_values(claim).items():
         total += 1
-        missing += value not in page_pct and not any(abs(value - d) <= 0.5 for d in derived)
+        missing += value not in page_pct and label not in derived
 
     page_dates = _dates(page)
     for date in _dates(claim):
@@ -293,11 +290,16 @@ def ground_citation(
     against them together, as long as this page itself supplies part of it.
     """
     claims = [c for c in (_claim_for_ref(answer, r, page_ref_re) for r in refs) if c]
+    # A figure the answer calculated from this page's figures, anywhere in the
+    # answer ("$253,000" summed in one sentence, divided into in the next), is
+    # as good as stated on the page for judging. The preview stays page text.
+    calculated = derive_figures(answer, set(_money_values(page_text)), set(_percent_values(page_text)))
+    judged_text = page_text + "".join(f"\n{d.formula}" for d in calculated)
     verdicts = []
     for claim in claims:
-        verdict = _judge(claim, page_text, title)
+        verdict = _judge(claim, judged_text, title)
         if verdict == NOT_FOUND and joint_text and _contributes(claim, page_text):
-            verdict = _judge(claim, page_text + "\n" + joint_text, title)
+            verdict = _judge(claim, judged_text + "\n" + joint_text, title)
         verdicts.append(verdict)
     if FOUND in verdicts:
         supported = [c for c, v in zip(claims, verdicts) if v == FOUND]

@@ -16,15 +16,33 @@ describe('approval button label', () => {
     expect(container).not.toHaveTextContent(/artifact|0625f9ce|confirmed/)
   })
 
-  it('reads "Approve step" for a workflow approval', () => {
-    const call = { tool_name: 'approve_workflow_step', tool_call_id: 'a1', args: {} }
-    render(<ToolStatusLine
+  // Support ticket: "Approve approve workflow step", and a reject card whose
+  // only button read "Approve reject workflow step".
+  it.each([
+    ['approve_workflow_step', 'Approve and continue'],
+    ['reject_workflow_step', 'Reject run'],
+  ])('names the workflow review decision for %s in plain words', (name, label) => {
+    const call = { tool_name: name, tool_call_id: 'a1', args: {} }
+    // A chat saved before previews carried their label still reads plainly.
+    const { unmount } = render(<ToolStatusLine
       call={call}
-      result={{ tool_name: 'approve_workflow_step', tool_call_id: 'a1', content: { needs_confirmation: true, preview: 'Approve the review step' }, quality: null }}
+      result={{ tool_name: name, tool_call_id: 'a1', content: { needs_confirmation: true, preview: 'Paused step' }, quality: null }}
       onConfirm={vi.fn()}
     />)
-    expect(screen.getByRole('button', { name: 'Approve step' })).toBeInTheDocument()
-    expect(screen.queryByText(/Approve approve/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: label })).toBeInTheDocument()
+    expect(screen.queryByText(/Approve (approve|reject)/)).not.toBeInTheDocument()
+    unmount()
+  })
+
+  it("uses the preview's own label so the card matches what the Assistant says", () => {
+    const call = { tool_name: 'reject_workflow_step', tool_call_id: 'r1', args: {} }
+    render(<ToolStatusLine
+      call={call}
+      result={{ tool_name: 'reject_workflow_step', tool_call_id: 'r1', content: { needs_confirmation: true, preview: 'Paused step', approval_label: 'Reject run' }, quality: null }}
+      onConfirm={vi.fn()}
+    />)
+    expect(screen.getByRole('button', { name: 'Reject run' })).toBeInTheDocument()
+    expect(screen.getByText('Reject run', { selector: 'dd' })).toBeInTheDocument()
   })
 
   it('never doubles the verb for a tool without its own label', () => {

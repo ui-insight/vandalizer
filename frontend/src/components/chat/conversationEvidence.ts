@@ -38,7 +38,7 @@ export function conversationEvidence(message: ChatMessage, names: Record<string,
   }
   if (message.interruption) lines.push(message.interruption === 'stopped' ? 'Response stopped; this is partial output. Server work may continue.' : 'Connection interrupted; this is partial output. Server work may continue.')
   if (message.unsupported_figures?.length) lines.push(`Unconfirmed figures: ${message.unsupported_figures.join(', ')}. Check these against the source.`)
-  if (message.calculated_figures?.length) lines.push(`Calculated figures: ${message.calculated_figures.join(', ')}. Worked out from the document; verify the inputs.`)
+  if (message.calculated_figures?.length) lines.push(`Calculated figures: ${message.calculated_figures.map(c => c.formula).join('; ')}. Worked out from the sources; verify the inputs.`)
   if (message.unsupported_citations?.length) lines.push(`Unsupported citations: ${message.unsupported_citations.join(', ')}. The retrieved text does not support the claim; check the originals.`)
   if (message.unconfirmed_web_facts?.length) lines.push(`Unconfirmed web details: ${message.unconfirmed_web_facts.join(', ')}. No page read for this answer states them; check the official page.`)
   if (message.silence_inferences?.length) lines.push(`Inferences from missing information: ${message.silence_inferences.join(' ')}. A gap in the sources does not establish a rule.`)
