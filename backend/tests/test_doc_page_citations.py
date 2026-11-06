@@ -227,3 +227,15 @@ def test_chat_runs_the_step_only_when_on_and_keeps_the_answer_when_it_raises(mon
 
     monkeypatch.setattr(P, "repair_page_citations", boom)
     assert chat_service._repair_page_citations(answer, [_doc()], on) == (answer, None)
+
+
+def test_a_name_with_an_initial_gets_its_page_after_the_name_not_inside_it():
+    doc = _doc(["Award notice. Project title: Deep vent ecology.\n",
+                "NSF contacts. Managing Grants Official: Marcus T. Hollowell, phone (703) 292-8101, "
+                "mhollowell@nsf.gov.\n",
+                "Budget. I. Indirect Costs: $393,333 on modified total direct costs.\n"])
+    text, rec = _fix("- Grants contact: Marcus T. Hollowell, phone (703) 292-8101.\n"
+                     "- Line I. Indirect Costs is $393,333.", [doc])
+    assert text == ("- Grants contact: Marcus T. Hollowell, phone (703) 292-8101 (p. 2).\n"
+                    "- Line I. Indirect Costs is $393,333 (p. 3).")
+    assert [a["page"] for a in rec["attached"]] == [2, 3]

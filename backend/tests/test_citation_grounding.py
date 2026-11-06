@@ -91,3 +91,20 @@ class TestApproximatePages:
 
     def test_a_measured_page_does_not(self):
         assert _chip("The maximum direct-cost request is $180,000 (p. 2).")["grounding"] == "not_found"
+
+
+class TestSentenceSplit:
+    """The sentence split behind the chips and the page-label pass."""
+
+    def test_an_initial_or_a_lettered_line_does_not_end_a_sentence(self):
+        from app.services import citation_grounding as cg
+        text = ("Contact Marcus T. Hollowell at NSF. Line I. Indirect Costs is $393,333. "
+                "See Dr. Underbrush. Vitamin C. The end.")
+        parts = [text[s:e] for s, e in cg._sentences(text)]
+        assert parts == ["Contact Marcus T. Hollowell at NSF.", "Line I. Indirect Costs is $393,333.",
+                         "See Dr. Underbrush.", "Vitamin C. The end."]
+
+    def test_a_lower_case_letter_or_a_word_before_the_period_still_ends_one(self):
+        from app.services import citation_grounding as cg
+        text = "Pick option a. The cap is $180,000. Then it ends."
+        assert len(cg._sentences(text)) == 3

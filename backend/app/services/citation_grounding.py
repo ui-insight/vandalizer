@@ -63,6 +63,10 @@ _ABBREVIATION_RE = re.compile(
     r"\b(?:[ap]\.m|e\.g|i\.e|u\.s|no|nos|sec|secs|vs|etc|approx|dr|mr|ms|mrs|st|inc|corp|fig|vol)\.",
     re.IGNORECASE,
 )
+# A lone capital letter before a period and a capitalised word is an initial
+# ("Marcus T. Hollowell") or a lettered line ("I. Indirect Costs"), not the
+# end of a sentence: split there, and a page label lands inside the name.
+_INITIAL_RE = re.compile(r"(?<![\w.])[A-Z]\.(?=\s+[A-Z])")
 _STOPWORDS = frozenset("""
     about above after again also although among another because been before
     being below between both cannot could does doing down during each either
@@ -153,6 +157,7 @@ def _mask_dots(text: str, page_ref_re: re.Pattern | None = None) -> str:
     this "(p. 3)" splits after "p." and the reference loses its sentence."""
     chars = list(text)
     spans = [m.span() for m in _ABBREVIATION_RE.finditer(text)]
+    spans += [m.span() for m in _INITIAL_RE.finditer(text)]
     if page_ref_re is not None:
         spans += [m.span() for m in page_ref_re.finditer(text)]
     for start, end in spans:
