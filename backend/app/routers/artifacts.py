@@ -160,7 +160,7 @@ async def optional_user(request: Request, settings: Settings) -> User | None:
         return None
 
 
-async def public_doc(token: str, settings: Settings, request: Request | None = None, *, count_view: bool = False) -> tuple[dict, dict]:
+async def public_doc(token: str, settings: Settings, request: Request | None, *, count_view: bool = False) -> tuple[dict, dict]:
     if not settings.artifact_public_sharing_enabled:
         raise HTTPException(404, "Page not found")
     doc = await run(lambda db: db.html_artifacts.find_one({

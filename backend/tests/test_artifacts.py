@@ -65,9 +65,22 @@ class Collection:
         return self.find_one_and_update(query, update)
 
 
+class _NoViewers:
+    """page_link_viewers for an owner's GET of a published Page: nobody signed in has opened it."""
+    def find(self, query):
+        return self
+
+    def sort(self, *args):
+        return self
+
+    def limit(self, n):
+        return iter(())
+
+
 @pytest.fixture
 def db():
-    return SimpleNamespace(html_artifacts=Collection(), chat_page_previews=Collection(), workflow=Collection(), workflow_result=Collection(), activity_event=Collection())
+    return SimpleNamespace(html_artifacts=Collection(), chat_page_previews=Collection(), workflow=Collection(), workflow_result=Collection(), activity_event=Collection(),
+                           page_link_viewers=_NoViewers())
 
 
 def make(db, key="one", owner="testuser", html="<main><h1>Original</h1></main>"):

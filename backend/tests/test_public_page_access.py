@@ -64,3 +64,34 @@ def test_link_for_token_reads_main_and_version_settings():
     assert (revision, kind, settings["audience"]) == ("r1", "version", "anyone") and settings["expires_at"]
     assert access.link_for_token(doc, "nope") is None
     assert access.link_for_token({**doc, "published_revision": None}, "main") is None
+
+
+async def test_feedback_routes_see_the_signed_in_viewer_of_a_sign_in_link(monkeypatch):
+    """The page-feedback routes reuse public_doc; they must pass the request so a
+    signed-in, verified viewer of a sign-in-only link isn't refused with 401."""
+    from app.routers import artifacts as pages_router
+    from app.routers import page_feedback as feedback_router
+
+    doc = {"uuid": "p1", "user_id": "owner", "public_token": "tok", "published_revision": "r1",
+           "public_audience": "signed_in", "public_emails": [], "deleted_at": None,
+           "revisions": [{"uuid": "r1", "title": "Budget", "created_at": NOW}]}
+
+    async def fake_run(fn, *args, **kwargs):
+        return doc
+
+    async def viewer(request, settings):
+        return _user()
+
+    async def shared_by(d):
+        return "Shared by Owner"
+
+    async def for_public(d, revision):
+        return []
+
+    monkeypatch.setattr(pages_router, "run", fake_run)
+    monkeypatch.setattr(pages_router, "optional_user", viewer)
+    monkeypatch.setattr(feedback_router.service, "shared_by", shared_by)
+    monkeypatch.setattr(feedback_router.service, "for_public", for_public)
+    settings = SimpleNamespace(artifact_public_sharing_enabled=True)
+    out = await feedback_router.public_feedback("tok", SimpleNamespace(cookies={}), settings)
+    assert out["shared_by"] == "Shared by Owner"
