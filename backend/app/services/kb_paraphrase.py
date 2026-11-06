@@ -235,11 +235,13 @@ async def precise_pool(dm, kb_uuid: str, query: str, *, k: int, floor: float,
     (``kb_retrieval.CHAT_OTHER_SECTION_WITHIN``); when it keeps nothing, the
     passages paraphrases of ``query`` find, marked :data:`RESCUED`; when they
     find nothing either, the best candidates a model finds answer ``query``
-    (:mod:`app.services.kb_empty_check`, off unless the setting is on). Each
-    way followed by its passages' neighbours in their sections
-    (:func:`kb_grounding.with_neighbours`). None when precise retrieval cannot
-    run here."""
-    from app.services import kb_empty_check, kb_grounding, kb_retrieval
+    (:mod:`app.services.kb_empty_check`, off unless the setting is on); when
+    those pass nothing, the same for the best candidates of the passage the
+    model expects the base to hold (:mod:`app.services.kb_hypothetical`, off
+    unless its setting is on). Each way followed by its passages' neighbours
+    in their sections (:func:`kb_grounding.with_neighbours`). None when
+    precise retrieval cannot run here."""
+    from app.services import kb_empty_check, kb_grounding, kb_hypothetical, kb_retrieval
 
     pool = await asyncio.to_thread(kb_grounding._precise_pool, dm, kb_uuid, query, k=k, floor=floor,
                                    other_within=kb_retrieval.CHAT_OTHER_SECTION_WITHIN)
@@ -258,6 +260,8 @@ async def precise_pool(dm, kb_uuid: str, query: str, *, k: int, floor: float,
             rescued = bool(pool)
     if not pool and model_name:
         pool = await kb_empty_check.checked_pool(dm, kb_uuid, query, k=k, floor=floor, model_name=model_name)
+    if not pool and model_name:
+        pool = await kb_hypothetical.checked_pool(dm, kb_uuid, query, k=k, floor=floor, model_name=model_name)
     if pool:
         pool = await asyncio.to_thread(kb_grounding.with_neighbours, dm, kb_uuid, query, pool, k=k)
     return mark_rescued(pool) if rescued else pool

@@ -248,6 +248,12 @@ class SystemConfig(Document):
     #       "kb_section_completion_max_chars" (a section at most this long is
     #       completed; default 12000) and "kb_section_completion_turn_chars"
     #       (what a turn gains at most; default 24000).
+    #   "kb_hypothetical_search_enabled": bool (default False) — a question
+    #       that keeps no passage, even reworded and checked, is searched
+    #       once more with the passage the model expects the base to hold,
+    #       and the best candidates for it are read by the empty-pool
+    #       check's model against the question (kb_hypothetical). With it:
+    #       "kb_hypothetical_search_candidates" (candidates read; default 3).
     # Missing keys mean "use the default" so deployments never need a
     # migration to pick up new phases.
     chat_config: dict = {}
