@@ -53,6 +53,7 @@ async def get_html_artifact(context: RunContext[AgenticChatDeps], artifact_uuid:
             return {"error": "Page not found or you do not own it."}
         rev = artifacts.revision(doc)
         sources = await _call(page_sources.freshness, page_sources.revision_sources(rev), changes=True)
+        sources = await page_sources.hide_unreadable_versions(sources, context.deps.user)
         return {"artifact_uuid": doc["uuid"], "title": rev["title"], "revision": rev["uuid"], "html": rev["html"],
                 # status "updated" names the newer version (latest.uuid) and what
                 # changed; rebuild every affected value from that file.

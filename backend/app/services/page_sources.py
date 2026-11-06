@@ -118,6 +118,32 @@ def freshness(db: Database[dict], documents: list[dict], *, changes: bool = Fals
     return result
 
 
+async def hide_unreadable_versions(sources: list[dict], user: Any) -> list[dict]:
+    """Drop the title and changes of a newer version the viewer can't open.
+
+    Say one exists, not what it holds. Used by the Page screen and by chat.
+    """
+    from app.services import access_control
+
+    access = None
+    for item in sources:
+        latest = item.get("latest")
+        if not latest:
+            continue
+        if access is None:
+            access = await access_control.get_team_access_context(user)
+        if not await access_control.get_authorized_document(latest["uuid"], user, team_access=access):
+            item["latest"] = None
+            item.pop("changes", None)
+    return sources
+
+
+def editor_source(revision: dict) -> dict | None:
+    """Source for a hand-edited revision: the editor, and the same files."""
+    documents = revision_sources(revision)
+    return {"kind": "editor", "documents": documents} if documents else None
+
+
 def newer_data_available(db: Database[dict], revision: dict) -> bool:
     return any(s["status"] == "updated" for s in freshness(db, revision_sources(revision)))
 

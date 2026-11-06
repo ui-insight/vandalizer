@@ -373,6 +373,8 @@ async def _unlink_version(doc: SmartDocument) -> None:
     Deleting the current version makes the previous one current again (it
     returns to the file list); deleting an older one links its neighbours.
     """
+    if not (doc.previous_version_uuid or doc.superseded_by):
+        return  # never revised: nothing to relink
     collection = SmartDocument.get_motor_collection()
     if doc.previous_version_uuid:
         await collection.update_one(
