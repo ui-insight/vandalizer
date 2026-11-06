@@ -18,6 +18,8 @@ const mockAuthValue = { user: mockUser, refreshUser: mockRefreshUser }
 vi.mock('../api/obligations', () => ({
   getInbox: vi.fn().mockResolvedValue({ items: [], inbox_hidden: false }),
   setInboxHidden: vi.fn(),
+  getReminderSettings: vi.fn().mockResolvedValue({ settings: { bell: true, email: false, days_before: [14, 3], on_due: true, overdue: true, weekly_summary: false, team_projects: false }, team_admin: false }),
+  updateReminderSettings: vi.fn(),
 }))
 vi.mock('../hooks/useAuth', () => ({
   useAuth: () => mockAuthValue,

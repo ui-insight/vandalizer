@@ -106,6 +106,10 @@ class TriggerEventStatusResponse(BaseModel):
     completed_at: Optional[str] = None
     output: Optional[Any] = None
     error: Optional[str] = None
+    # History rows: what started the run (manual, folder_watch, schedule…)
+    # and, for a single-file run, which file.
+    trigger_type: Optional[str] = None
+    document_title: Optional[str] = None
 
 
 class RunNowRequest(BaseModel):
