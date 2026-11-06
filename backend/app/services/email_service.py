@@ -1309,3 +1309,24 @@ def deadline_summary_email(
       {_deadline_footer(frontend_url)}
     </div></div></body></html>"""
     return subject, html
+
+
+def page_feedback_answer_email(
+    *, title: str, question: str, spot: str, answer: str, owner: str, link: str | None,
+) -> tuple[str, str]:
+    """The owner's answer to a question a public viewer left on a shared page."""
+    subject = f"Answer to your question on {title}"
+    spot_html = f'<p>About: <span class="highlight">{escape(spot)}</span></p>' if spot else ""
+    button = f'<p style="margin-top:24px"><a class="btn" href="{escape(link, quote=True)}">Open the page</a></p>' if link else ""
+    html = f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">{_BASE_STYLE}</head><body>
+    <div class="container"><div class="card">
+      <div class="logo">Vandalizer</div>
+      <h1>{escape(subject)}</h1>
+      {spot_html}
+      <p>You asked: “{escape(question)}”</p>
+      <p><strong style="color:#fff">{escape(owner or 'The page owner')} answered:</strong></p>
+      <p style="color:#e5e7eb;white-space:pre-wrap">{escape(answer)}</p>
+      {button}
+      <div class="footer">You're getting this because you left your email with a question on this page. We don't use it for anything else.</div>
+    </div></div></body></html>"""
+    return subject, html

@@ -37,6 +37,13 @@ function decidedDetail(label: string): string {
   }
 }
 
+/** Whether *message* holds an approval card the server still has waiting. */
+export function hasWaitingCard(message: ChatMessage, pending: readonly string[]): boolean {
+  if (!pending.length) return false
+  const waiting = new Set(pending)
+  return results(message).some(result => waiting.has(result.tool_call_id) && object(result.content).needs_confirmation === true)
+}
+
 /** Associate an execution with a preview in the next turn by matching its
  * arguments, a stored Page preview ID, or a successful Skill receipt's target.
  * A later unrelated run must never make an old approval look completed.
@@ -47,8 +54,9 @@ function decidedDetail(label: string): string {
  * ticket: clicking Create extraction when the Assistant couldn't respond
  * (tokens ran out) left the card at "Approval requested" with nothing created
  * and nothing saying the click was lost. */
-export function approvalHistoryFor(message: ChatMessage, following: ChatMessage[], turnActive = false): Record<string, ApprovalRecord> {
+export function approvalHistoryFor(message: ChatMessage, following: ChatMessage[], turnActive = false, pending: readonly string[] = []): Record<string, ApprovalRecord> {
   if (!following.length) return {}
+  const waiting = new Set(pending)
   const previews = results(message).filter(result => object(result.content).needs_confirmation === true)
   const output: Record<string, ApprovalRecord> = {}
   for (const preview of previews) {
@@ -56,9 +64,21 @@ export function approvalHistoryFor(message: ChatMessage, following: ChatMessage[
     const previewId = object(preview.content).preview_id
     const storedPage = typeof previewId === 'string' && ['create_html_artifact', 'revise_html_artifact'].includes(original?.tool_name ?? '')
     let record: ApprovalRecord = { label: 'Earlier action preview', detail: 'This preview is no longer actionable. See the later messages for the decision and outcome.' }
-    const nextUser = following.findIndex(m => m.role === 'user')
+    // A card's button decides that card only (support ticket: one click ran
+    // every waiting card). Turns that decided other cards are skipped; a typed
+    // message, or one saved before cards named themselves, decides them all
+    // as before.
+    const id = preview.tool_call_id
+    // Still armed on the server and no click decided it: still clickable,
+    // even after a typed reply or another card's decision.
+    const clicked = following.some(m => m.role === 'user' && (m.approval_for === id || m.decline_for === id))
+    if (waiting.has(id) && !clicked) continue
+    const nextUser = following.findIndex(m => m.role === 'user' && (
+      (!m.approval_for && !m.decline_for) || m.approval_for === id || m.decline_for === id))
+    if (nextUser < 0 && following.some(m => m.role === 'user')) continue
     if (nextUser >= 0) {
-      const decision = following[nextUser].content.trim()
+      const decider = following[nextUser]
+      const decision = decider.approval_for === id ? 'Yes, go ahead' : decider.decline_for === id ? 'No, cancel that' : decider.content.trim()
       if (decision === 'Yes, go ahead') record = { label: 'Approval requested', detail: 'You sent approval. Execution is not confirmed by this preview.' }
       if (decision === 'No, cancel that') record = { label: 'Cancellation requested', detail: 'You asked the Assistant to cancel this action. This preview cannot be approved again.' }
       const nextTurn = following.slice(nextUser + 1)
@@ -82,7 +102,8 @@ export function approvalHistoryFor(message: ChatMessage, following: ChatMessage[
         const result = execution && results(response).find(r => r.tool_call_id === execution.tool_call_id)
         if (!result) continue
         const content = object(result.content)
-        if (content.needs_confirmation) continue
+        // "Still waiting on its own card" is a refusal, not this action running.
+        if (content.needs_confirmation || content.still_waiting) continue
         const status = content.status
         const failed = Boolean(content.error) || status === 'failed' || status === 'error'
         const label = status === 'canceled' || status === 'cancelled' ? 'Canceled'

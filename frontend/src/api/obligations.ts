@@ -38,9 +38,14 @@ export interface Obligation {
   dismissed: boolean
 }
 
-export function getInbox(includeDismissed = false) {
+/** Home's list across your projects, or one project's when *projectUuid* is given. */
+export function getInbox(includeDismissed = false, projectUuid?: string | null) {
+  const query = new URLSearchParams()
+  if (includeDismissed) query.set('include_dismissed', 'true')
+  if (projectUuid) query.set('project_uuid', projectUuid)
+  const search = query.toString()
   return apiFetch<{ items: Obligation[]; inbox_hidden: boolean; project_count?: number }>(
-    `/api/obligations${includeDismissed ? '?include_dismissed=true' : ''}`,
+    `/api/obligations${search ? `?${search}` : ''}`,
   )
 }
 

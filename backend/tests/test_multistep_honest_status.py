@@ -53,8 +53,20 @@ async def test_cards_from_earlier_turns_dont_block_a_finished_plan():
 
 async def test_one_in_progress_is_still_required_while_work_remains():
     deps = _deps()
-    bad = await chat_tools.update_plan(types.SimpleNamespace(deps=deps), [_task("A", "awaiting_approval"), _task("B", "pending")])
+    bad = await chat_tools.update_plan(types.SimpleNamespace(deps=deps), [_task("A", "completed"), _task("B", "pending")])
     assert "Exactly one task must be in_progress" in bad["error"]
+    two = await chat_tools.update_plan(types.SimpleNamespace(deps=deps), [_task("A", "in_progress"), _task("B", "in_progress")])
+    assert "Exactly one task must be in_progress" in two["error"]
+
+
+async def test_a_step_waiting_on_another_steps_approval_stays_pending():
+    # The ticket's end state: the inbox step waits for Create project
+    # (propose_obligations says to keep it pending) while cards wait.
+    deps = _deps(pending=[("create_project", 7), ("save_to_folder", 7)])
+    tasks = [_task("Create project", "awaiting_approval"), _task("Add deadlines", "pending"),
+             _task("Extract details", "completed"), _task("Make page", "awaiting_approval")]
+    ok = await chat_tools.update_plan(types.SimpleNamespace(deps=deps), tasks)
+    assert ok.get("ok") and ok["awaiting_approval"] == 2 and not ok["all_done"]
 
 
 # ── "Saved" while cards wait ────────────────────────────────────────────────
@@ -117,6 +129,19 @@ async def test_repeating_an_action_in_one_reply_is_one_card():
     assert first["approval_key"] == second["approval_key"]
     assert "already_waiting" not in first and second["already_waiting"] is True
     assert len(conversation.pending_confirmations) == 1
+
+
+async def test_the_card_the_chat_shows_is_the_one_armed():
+    # The chat keeps the first card per approval_key; its button sends that
+    # card's call id (approval_for), so the first call id must stay armed.
+    conversation = types.SimpleNamespace(pending_confirmations=[], save=AsyncMock())
+    deps = types.SimpleNamespace(conversation=conversation, turn_marker=9)
+    kwargs = {"tool_name": "propose_obligations", "key": {"project": "p", "items": "abc"}, "confirmed": False}
+    await chat_tools._confirm_gate(types.SimpleNamespace(deps=deps, tool_call_id="call-1"),
+                                   preview={"preview": "Add 3 items"}, **kwargs)
+    await chat_tools._confirm_gate(types.SimpleNamespace(deps=deps, tool_call_id="call-2"),
+                                   preview={"preview": "Add 3 items\nNot included: X"}, **kwargs)
+    assert [p["call_id"] for p in conversation.pending_confirmations] == ["call-1"]
 
 
 # ── Page without a template ─────────────────────────────────────────────────

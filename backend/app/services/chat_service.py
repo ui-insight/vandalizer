@@ -1634,6 +1634,8 @@ async def chat_stream(
     active_skill: SkillSnapshot | None=None,
     retry: bool = False,
     client_timezone: str | None = None,
+    approval_for: str | None = None,
+    decline_for: str | None = None,
 ) -> AsyncGenerator[str, None]:
     """Async generator yielding newline-delimited JSON chunks for streaming chat."""
 
@@ -2551,6 +2553,20 @@ async def chat_stream(
                 default=0,
             ),
         )
+        # One click approves one card (support ticket): decide which armed
+        # actions this turn may run before the agent sees the message.
+        from app.services.approval_scope import decide
+
+        turn_approval = decide(
+            getattr(conversation, "pending_confirmations", None),
+            approval_for=approval_for, decline_for=decline_for,
+        )
+        deps.approved_confirmations = turn_approval.approved
+        deps.approval_mode = turn_approval.mode
+        deps.approval_waiting = turn_approval.waiting
+        if turn_approval.remaining is not None:
+            conversation.pending_confirmations = turn_approval.remaining
+            await conversation.save()
         agent: Agent[AgenticChatDeps, str] | Agent[None, str] = create_agentic_chat_agent(
             model_name, system_config_doc=sys_config_doc,
         )
@@ -2999,6 +3015,16 @@ async def chat_stream(
                     unconfirmed_web_facts=unconfirmed_web or None,
                     calculated_figures=calculated_figures or None,
                 )
+                # Which approval cards are still waiting, so the client keeps
+                # exactly those clickable after this turn.
+                if deps is not None:
+                    from app.services.approval_scope import pending_call_ids
+
+                    yield json.dumps({
+                        "kind": "pending_approvals",
+                        "content": "",
+                        "call_ids": pending_call_ids(getattr(conversation, "pending_confirmations", None)),
+                    }) + "\n"
                 if unsupported or silent or miscited or unconfirmed_web or calculated_figures:
                     yield json.dumps({
                         "kind": "grounding_warning",

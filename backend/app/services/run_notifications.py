@@ -119,3 +119,43 @@ def notify_extraction_completed(
         )
     except Exception:
         logger.exception("Failed to emit extraction completion notification")
+
+
+def notify_automation_run_completed(
+    db: Database[dict],
+    *,
+    automation: dict | None,
+    run_id: str | None,
+    document_title: str | None = None,
+) -> None:
+    """Bell an automation's owner when a run nobody clicked has completed.
+
+    Support ticket: a file arriving in a watched folder ran the automation
+    with no word to anyone. The concern that kept automation runs out of the
+    bell (a busy folder watch burying everything else) is met by coalescing:
+    one unread entry per automation, "Automation finished 4×: …", opening the
+    automation, whose Run history lists each run with View result.
+    """
+    try:
+        automation = automation or {}
+        recipient = automation.get("user_id")
+        if not recipient or recipient == "system":
+            return
+        automation_id = str(automation.get("_id") or "")
+        name = automation.get("name") or "Automation"
+        create_notification_sync(
+            db,
+            user_id=recipient,
+            kind="automation_completed",
+            title=f"Automation finished: {name}",
+            body=(f"Ran on {document_title}. " if document_title else "")
+            + "Open Run history to view the result.",
+            link=f"/?mode=automations&automation={automation_id}" if automation_id else "/?mode=automations",
+            item_kind="automation",
+            item_id=automation_id or None,
+            item_name=name,
+            coalesce_key=f"automation_completed:{automation_id or name}",
+            group_title=f"Automation finished {{count}}×: {name}",
+        )
+    except Exception:
+        logger.exception("Failed to emit automation completion notification (run %s)", run_id)

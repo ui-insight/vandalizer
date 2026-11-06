@@ -444,7 +444,26 @@ async def _confirm_gate(
         (p for p in armed if isinstance(p, dict) and p.get("fp") == fp), None
     )
 
-    # Execute only when a prior-turn preview armed this exact action.
+    # Execute only when a prior-turn preview armed this exact action, and this
+    # turn approved it: a card's button approves that card only, and a typed
+    # "yes" only when one action is waiting (approval_scope).
+    approved = getattr(deps, "approved_confirmations", None)
+    if (
+        confirmed and match is not None and int(match.get("turn", marker)) < marker
+        and approved is not None and fp not in approved
+    ):
+        from app.services.approval_scope import blocked_instruction
+
+        # Not a new card: the action is still waiting on its own card, whose
+        # id the client already has. A card here would carry this call's id,
+        # which nothing armed, so its button could never work.
+        out = {k: v for k, v in preview.items() if k != "needs_confirmation"}
+        out["status"] = "awaiting_user_confirmation"
+        out["still_waiting"] = True
+        out["assistant_instruction"] = blocked_instruction(
+            getattr(deps, "approval_mode", "none"), int(getattr(deps, "approval_waiting", 0) or 0),
+        )
+        return out
     if confirmed and match is not None and int(match.get("turn", marker)) < marker:
         if conv is not None:
             conv.pending_confirmations = [
@@ -460,12 +479,21 @@ async def _confirm_gate(
     # Otherwise (re)arm the confirmation for a future turn and return the
     # preview. confirmed=true with no prior-turn arming is downgraded here —
     # this is the injection defense.
-    if conv is not None:
+    # The identical action already armed earlier in this reply: its first card
+    # is the one the chat shows (later copies are hidden by approval_key), so
+    # that card's call id must stay the armed one. Re-arming with this call's
+    # id would leave the visible card's button approving nothing.
+    armed_this_turn = match is not None and int(match.get("turn", -1)) == marker
+    if conv is not None and not armed_this_turn:
         new_pending = [
             p for p in armed
             if not (isinstance(p, dict) and p.get("fp") == fp)
         ]
         entry = {"fp": fp, "turn": marker, "tool": tool_name}
+        # The preview's tool call id: the id its card's button sends back.
+        call_id = getattr(context, "tool_call_id", None)
+        if isinstance(call_id, str) and call_id:
+            entry["call_id"] = call_id
         if stash is not None:
             entry["stash"] = stash
         new_pending.append(entry)
@@ -482,7 +510,7 @@ async def _confirm_gate(
     # three identical "Add to inbox" cards). The chat de-duplicates cards by
     # this key, not by preview wording, which varies with rejected items.
     out.setdefault("approval_key", fp)
-    if match is not None and int(match.get("turn", -1)) == marker:
+    if armed_this_turn:
         out["already_waiting"] = True
         out["already_waiting_note"] = (
             "This exact action is already waiting for the user's approval from earlier in this reply. "
@@ -6420,15 +6448,19 @@ async def update_plan(
     completed = sum(1 for t in normalized if t["status"] == "completed")
     awaiting = sum(1 for t in normalized if t["status"] == "awaiting_approval")
     all_done = completed == len(normalized)
-    # Nothing left to work on: every step is done or waiting for the user.
-    settled = completed + awaiting == len(normalized)
+    # Nothing left to work on this reply: every step is done, or the reply is
+    # handing back to the user with approval cards waiting. Steps that depend
+    # on one of those approvals (inbox items for a project not yet created)
+    # stay pending, as the docstring and propose_obligations say.
+    settled = completed == len(normalized) or (awaiting > 0 and in_progress == 0)
     if not settled and in_progress != 1:
         return _err(
             f"Exactly one task must be in_progress (got {in_progress}).",
             hint=(
                 "Mark the task you are working on RIGHT NOW as in_progress "
                 "and everything not yet started as pending. Zero in_progress "
-                "is only valid when every task is completed or awaiting_approval."
+                "is only valid when every task is completed, or when some are "
+                "awaiting_approval and the rest wait on those approvals."
             ),
         )
     # Support ticket: "✓ All 4 steps completed" while four approval cards
