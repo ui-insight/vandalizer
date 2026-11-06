@@ -55,3 +55,18 @@ def send_weekly_deadline_summaries(self: Task) -> dict[str, int]:
 
     sent: int = _run(send_weekly_summaries)
     return {"sent": sent}
+
+
+@celery_app.task(
+    bind=True,
+    name="tasks.obligations.remind_expiring_page_links",
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
+    max_retries=2,
+)
+def remind_expiring_page_links(self: Task) -> dict[str, int]:
+    """Bell Page owners whose public links expire within three days. Idempotent."""
+    from app.services.public_page_access import remind_expiring
+    from app.tasks import get_sync_db
+
+    return {"sent": remind_expiring(get_sync_db())}

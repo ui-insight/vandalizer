@@ -16,7 +16,7 @@ import threading
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from collections.abc import Callable, Iterable
-from typing import Protocol
+from typing import Any, Protocol
 
 from pydantic_ai.settings import ModelSettings
 from pydantic_ai.usage import RunUsage
@@ -34,6 +34,7 @@ from app.services.form_fill import (  # noqa: F401  (form_value_is_missing is re
 )
 from app.services.llm_service import create_chat_agent
 from app.services.metering import current_scope, metered_step, step_models
+from app.services import workflow_workspace_steps as _ws
 from app.services.page_locator import annotate_chunk_pages, cited_pages, format_page_range, locator_for_meta
 
 logger = logging.getLogger(__name__)
@@ -2370,6 +2371,112 @@ class ApprovalNode(Node):
         }
 
 
+# ---------------------------------------------------------------------------
+# Workspace steps: create a project, add RA inbox deadlines, save the award
+# snapshot as a Page (services/workflow_workspace_steps.py). They act only
+# when the builder passes workspace_actions (real runs); otherwise they say
+# what they would do.
+# ---------------------------------------------------------------------------
+
+def _doc_titles(doc_uuids: list[str]) -> list[str]:
+    from app.tasks import get_sync_db
+    found = {d["uuid"]: d.get("title") or "file" for d in get_sync_db().smart_document.find({"uuid": {"$in": doc_uuids}}, {"uuid": 1, "title": 1})}
+    return [found[u] for u in doc_uuids if u in found]
+
+
+class CreateProjectNode(_ws._WorkspaceNode, Node):
+    def __init__(self, data: dict) -> None:
+        super().__init__("CreateProject")
+        self.data = data
+
+    def process(self, inputs: dict) -> dict:
+        docs = _ws.run_documents(inputs)
+        template = str(self.data.get("name_template") or "{document}")
+        if not self.acting():
+            title = _ws.project_title(template, _doc_titles(docs))
+            return _ws._preview(self.name, f"Would create project “{title}” and move {len(docs)} file(s) into it "
+                                           "(or reuse the project a file is already in).")
+        self.report_progress("Creating the project")
+
+        async def go() -> dict:
+            return await _ws.create_project_for(await self._user(), docs, template)
+        try:
+            result = _ws._run(go)
+        except RuntimeError as e:
+            return {"output": "", "step_name": self.name, "error": f"Create project: {e}."}
+        text, warning = _ws.describe_project(result)
+        out = {"output": text, "input": inputs.get("output"), "step_name": self.name}
+        if warning:
+            out["warning"] = warning
+        return out
+
+
+_NO_PROJECT = ("No project to work in: put a Create project step before this one, so the routine "
+               "knows which project's inbox and pages to use.")
+
+
+class InboxDeadlinesNode(_ws._WorkspaceNode, Node):
+    def __init__(self, data: dict) -> None:
+        super().__init__("InboxDeadlines")
+        self.data = data
+
+    def process(self, inputs: dict) -> dict:
+        docs = _ws.run_documents(inputs)
+        project_uuid = _ws.run_project(inputs)
+        if not self.acting():
+            return _ws._preview(self.name, f"Would read {len(docs)} file(s) for reporting deadlines, required material "
+                                           "and sponsor limits, check each against its quoted page, and add the ones "
+                                           "that pass to the project's RA inbox.")
+        if not project_uuid:
+            return {"output": "", "step_name": self.name, "error": _NO_PROJECT}
+        self.report_progress("Reading the documents for deadlines")
+        model, sys_cfg = self.model, self._sys_cfg
+
+        async def go() -> dict:
+            return await _ws.add_deadlines(await self._user(), project_uuid, docs, model, sys_cfg)
+        try:
+            result = _ws._run(go)
+        except RuntimeError as e:
+            return {"output": "", "step_name": self.name, "error": f"Add deadlines to RA inbox: {e}."}
+        text, warning = _ws.describe_deadlines(result)
+        out = {"output": text, "input": inputs.get("output"), "step_name": self.name}
+        if warning:
+            out["warning"] = warning
+        return out
+
+
+class AwardSnapshotPageNode(_ws._WorkspaceNode, Node):
+    def __init__(self, data: dict) -> None:
+        super().__init__("AwardSnapshotPage")
+        self.data = data
+
+    def process(self, inputs: dict) -> dict:
+        project_uuid = _ws.run_project(inputs)
+        if not self.acting():
+            return _ws._preview(self.name, "Would build the project's award snapshot (key facts with their sources, "
+                                           "deadlines, status) and save it as a project Page.")
+        if not project_uuid:
+            return {"output": "", "step_name": self.name, "error": _NO_PROJECT}
+        self.report_progress("Building the award snapshot")
+
+        async def user() -> Any:
+            return await self._user()
+        try:
+            result = _ws.snapshot_page(_ws._run(user), project_uuid)
+        except RuntimeError as e:
+            return {"output": "", "step_name": self.name, "error": f"Award snapshot page: {e}."}
+        text, warning = _ws.describe_snapshot(result)
+        out = {"output": text, "input": inputs.get("output"), "step_name": self.name}
+        if warning:
+            out["warning"] = warning
+        return out
+
+
+WORKSPACE_NODES: dict[str, type[Node]] = {
+    "CreateProject": CreateProjectNode, "InboxDeadlines": InboxDeadlinesNode, "AwardSnapshotPage": AwardSnapshotPageNode,
+}
+
+
 class BrowserAutomationNode(Node):
     """Workflow step that drives a Chrome extension browser session."""
 
@@ -3120,6 +3227,7 @@ def _apply_step_override(
 _MODEL_TASKS = frozenset({
     "Extraction", "Prompt", "Formatter", "DescribeImage", "ResearchNode",
     "FormFiller", "KnowledgeBaseQuery", "BrowserAutomation", "Browser",
+    "InboxDeadlines",
 })
 
 
@@ -3131,6 +3239,7 @@ def build_workflow_engine(
     allow_code_execution: bool = False,
     config_override: dict | None = None,
     force_model: bool = False,
+    workspace_actions: bool = False,
 ) -> WorkflowEngine:
     """Build a WorkflowEngine from step data dicts.
 
@@ -3147,6 +3256,10 @@ def build_workflow_engine(
             into each task's ``data`` before node construction.
         force_model: Run every task on ``model``, over a step's own model and
             an optimizer model swap. Set for a run started on a named model.
+        workspace_actions: Let workspace steps (Create project, Add deadlines
+            to RA inbox, Award snapshot page) act. Only real runs set it;
+            validation, step tests, the optimizer and certification get a
+            description of what they would do.
     """
     engine = WorkflowEngine()
     nodes: list[Node] = []
@@ -3264,6 +3377,10 @@ def build_workflow_engine(
                     tasks.append(n)
                 elif task_name == "Approval":
                     n = ApprovalNode(data=task_data)
+                    tasks.append(n)
+                elif task_name in _ws.WORKSPACE_TASKS:
+                    task_data["_workspace_actions"] = workspace_actions
+                    n = WORKSPACE_NODES[task_name](data=task_data)  # type: ignore[call-arg]
                     tasks.append(n)
                 else:
                     # Same reasoning as the CodeNode refusal above: skipping

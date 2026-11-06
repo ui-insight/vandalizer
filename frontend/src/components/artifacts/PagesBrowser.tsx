@@ -5,6 +5,7 @@ import { addProjectPin } from '../../api/projects'
 import { PageBadge, PageDialog, PagePreview } from './PagePrimitives'
 import { announceWorkspaceWrite, useRefreshOnChatWrite } from '../../lib/chatWrites'
 import { PageCardActions, type PageCardNotice } from './PageCardActions'
+import { PublicLinksPanel } from './PublicLinkControls'
 
 const message = (e: unknown) => e instanceof Error ? e.message : 'Could not load pages. Please try again.'
 function readView(key: string) {
@@ -62,6 +63,7 @@ export function PagesBrowser({ projectUuid, canManage = false }: { projectUuid?:
     <header className="pages-library-heading"><div><p className="page-eyebrow">{projectUuid ? 'PROJECT LIBRARY' : 'YOUR LIBRARY'}</p><h2>{adding ? 'Add an existing page' : projectUuid ? 'Project pages' : 'Pages'}</h2></div><button className="page-button page-button-primary" disabled={busy} onClick={() => setStarting(true)}><Plus size={16} />{busy ? 'Working…' : 'New page'}</button></header>
     {starting && <PageDialog title="New page" onClose={() => setStarting(false)} busy={busy}><p>Start with a reusable design and a new file, or create a blank Page.</p>{error && <p role="alert">{error}</p>}<div className="page-actions"><a className="page-button page-button-primary" href="/?mode=files&files=templates">Start from template</a><button className="page-button" disabled={busy} onClick={newPage}>Create blank page</button></div></PageDialog>}
     <p className="pages-library-intro">Your finished work, ready to revisit and share. Pages from chat and workflows start private.</p>
+    {!projectUuid && <PublicLinksPanel />}
     {projectUuid && canManage && <button className="page-button mb-4" disabled={busy} onClick={() => { setAdding(!adding); setSearch(''); setQuery(''); setPage(1) }}><FolderOpen size={16} />{adding ? 'Back to project pages' : 'Add existing page'}</button>}
     <div className="pages-toolbar"><label className="pages-search">Search pages<input type="search" placeholder="Find a page…" value={search} onChange={e => setSearch(e.target.value)} /></label><label>Sort pages<select value={sort} onChange={e => { setSort(e.target.value); setPage(1) }}><option value="updated">Recently updated</option><option value="newest">Newest first</option><option value="title">Title</option></select></label></div>
     {notice && <p role="status" className="page-notice">{notice.message}{notice.href && <> <a className="underline" href={notice.href}>Open copy</a></>}</p>}

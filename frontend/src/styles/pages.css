@@ -83,6 +83,20 @@
 .page-compare-section, .page-compare-label { color:#5b6573; font-weight:400; }
 .page-compare del { color:#9b1c1c; background:#fdecec; text-decoration:line-through; padding:0 2px; border-radius:3px; }
 .page-compare ins { color:#14532d; background:#e7f6ec; text-decoration:none; padding:0 2px; border-radius:3px; }
+.page-link-access { border:0; padding:0; margin:12px 0; display:grid; gap:10px; font-size:13px; }
+.page-link-access label { display:flex; flex-direction:column; gap:4px; font-weight:600; }
+.page-link-access select, .page-link-access input[type=date], .page-link-access textarea { padding:7px 9px; border:1px solid #d9dee5; border-radius:8px; font-size:13px; font-weight:400; background:#fff; }
+.page-link-audience { display:grid; gap:6px; }
+.page-link-audience label { flex-direction:row; align-items:center; gap:6px; font-weight:400; }
+.page-link-hint { font-size:12px; font-weight:400; color:#5b6573; }
+.page-link-status { font-size:13px; color:#303b49; margin:10px 0; }
+.page-link-status p { display:flex; align-items:center; gap:6px; margin:3px 0; }
+.page-link-status ul { margin:6px 0 0; padding-left:20px; list-style:disc; }
+.page-link-expired { color:#9b1c1c; }
+.page-public-links { border:1px solid #d9dee5; border-radius:10px; background:#fff; padding:10px 14px; margin-bottom:16px; font-size:13px; }
+.page-public-links summary { display:flex; align-items:center; gap:6px; font-weight:600; cursor:pointer; }
+.page-public-links ul { margin:8px 0 0; padding-left:18px; list-style:disc; display:grid; gap:4px; }
+.page-public-links span { color:#5b6573; }
 .page-editor { margin:20px 0; padding:24px; border:1px solid #dce1e7; border-radius:12px; background:white; }
 .page-editor h2 { font-size:17px; font-weight:650; }
 .page-editor p { font-size:13px; color:#5b6573; margin-top:6px; }
@@ -213,3 +227,6 @@
 .page-feedback-settings { margin-top:12px; font-size:13px; }
 .page-feedback-settings summary { cursor:pointer; color:#334155; font-weight:600; }
 .page-feedback-settings form { display:flex; flex-direction:column; gap:8px; margin-top:8px; }
+/* Edit text mode (owner fixes text in place). */
+.page-text-edit-bar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin: 12px 0; padding: 10px 14px; border: 1px solid #bfdbfe; border-radius: 10px; background: #eff6ff; color: #1e3a8a; font-size: 13px; }
+.page-text-edit-bar p { margin: 0; flex: 1 1 320px; }

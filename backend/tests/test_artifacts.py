@@ -68,9 +68,22 @@ class Collection:
         return self.find_one_and_update(query, update)
 
 
+class _NoViewers:
+    """page_link_viewers for an owner's GET of a published Page: nobody signed in has opened it."""
+    def find(self, query):
+        return self
+
+    def sort(self, *args):
+        return self
+
+    def limit(self, n):
+        return iter(())
+
+
 @pytest.fixture
 def db():
-    return SimpleNamespace(html_artifacts=Collection(), chat_page_previews=Collection(), workflow=Collection(), workflow_result=Collection(), activity_event=Collection(), smart_document=Collection())
+    return SimpleNamespace(html_artifacts=Collection(), chat_page_previews=Collection(), workflow=Collection(), workflow_result=Collection(), activity_event=Collection(), smart_document=Collection(),
+                           page_link_viewers=_NoViewers())
 
 
 def make(db, key="one", owner="testuser", html="<main><h1>Original</h1></main>"):
@@ -316,7 +329,7 @@ async def test_public_revision_no_private_metadata_revocation_rotation_and_opera
     response = await client.get(f"/api/pages/public/{token}")
     from fastapi.encoders import jsonable_encoder
     assert response.json() == jsonable_encoder({"title": "Review", "revision": rev,
-        "version": 1, "updated_at": doc["revisions"][0]["created_at"], "newer_data_available": False})
+        "version": 1, "updated_at": doc["revisions"][0]["created_at"], "newer_data_available": False, "expires_at": None, "audience": "anyone"})
     content = await client.get(f"/api/pages/public/{token}/content")
     assert "Original" in content.text and "Not published" not in content.text
     assert "private-chat" not in content.text

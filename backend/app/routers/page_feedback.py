@@ -113,9 +113,10 @@ async def update_settings(uuid: str, body: dict, user: User = Depends(get_curren
 
 
 @router.get("/public/{token}/feedback", response_model=None)
-async def public_feedback(token: str, settings: Settings = Depends(get_settings)) -> dict:
+async def public_feedback(token: str, request: Request, settings: Settings = Depends(get_settings)) -> dict:
     """Who shared the page, whether it takes questions, and answers shown on it."""
-    doc, rev = await public_doc(token, settings)
+    # The request carries the signed-in viewer for a sign-in-only link.
+    doc, rev = await public_doc(token, settings, request)
     return {
         "shared_by": await service.shared_by(doc),
         "public_questions": service.settings_of(doc)["public_questions"],
@@ -127,7 +128,7 @@ async def public_feedback(token: str, settings: Settings = Depends(get_settings)
 @limiter.limit("5/hour")
 async def public_ask(request: Request, token: str, body: PublicFeedbackRequest, settings: Settings = Depends(get_settings)) -> dict:
     """A public-link viewer's question, when the owner allows them."""
-    doc, rev = await public_doc(token, settings)
+    doc, rev = await public_doc(token, settings, request)
     if body.website.strip():
         # Pretend success to a bot; nothing is stored or sent.
         return {"ok": True}

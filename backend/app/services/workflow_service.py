@@ -1909,6 +1909,23 @@ async def generate_validation_plan(workflow_id: str, user: User) -> list[dict]:
                     f"**Website task** — fetches content from `{url}` and passes text to next step."
                 )
 
+            elif task_name == "CreateProject":
+                step_desc_parts.append(
+                    "**Create project task** — creates a project named from the document and moves the run's files into it "
+                    "(or reuses the project a file is already in)."
+                )
+
+            elif task_name == "InboxDeadlines":
+                step_desc_parts.append(
+                    "**Add deadlines to RA inbox task** — reads the files for deadlines, required material and limits, "
+                    "checks each against its quoted page, and adds the ones that pass to the project's RA inbox."
+                )
+
+            elif task_name == "AwardSnapshotPage":
+                step_desc_parts.append(
+                    "**Award snapshot page task** — builds the project's award snapshot and saves it as a project Page."
+                )
+
             elif task_name == "WebSearch":
                 step_desc_parts.append(
                     f"**Web Search task** — searches the web for `{data.get('query', '')}` and "
