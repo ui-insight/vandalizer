@@ -1,3 +1,9 @@
+/** A figure the answer worked out from figures its sources state. */
+export interface CalculatedFigure {
+  figure: string
+  formula: string
+}
+
 export interface SkillSnapshot {
   uuid: string
   title: string
@@ -5,8 +11,14 @@ export interface SkillSnapshot {
   instructions: string
 }
 
+/** Which approval card a user turn decided (its preview's tool call id). */
+export type CardDecision = { approve: string } | { decline: string }
+
 export interface ChatMessage {
   active_skill?: SkillSnapshot | null
+  /** User turns sent by a card's button: the preview tool call id it approved or cancelled. */
+  approval_for?: string
+  decline_for?: string
   /** Local stream interruption; does not claim cancellation of server work. */
   interruption?: 'stopped' | 'connection'
   role: 'system' | 'user' | 'assistant'
@@ -20,6 +32,8 @@ export interface ChatMessage {
   /** KB and attached-document answers: dollar amounts / percentages in the
    *  answer that no source states — likely recalled from the model's memory. */
   unsupported_figures?: string[]
+  /** Figures the answer calculated from ones the sources state, with the formula. */
+  calculated_figures?: CalculatedFigure[]
   /** Sentences that read a gap in the sources as a rule, e.g. "may be any length" (#1012). */
   silence_inferences?: string[]
   /** KB answers only: sources the answer cites for text they don't contain —
@@ -258,6 +272,7 @@ export interface StreamChunk {
     | 'sources'
     | 'sources_used'
     | 'grounding_warning'
+    | 'pending_approvals'
   content: string
   activity?: ChatActivity
   duration?: number
@@ -289,8 +304,12 @@ export interface StreamChunk {
   sources?: Citation[]
   // sources_used only: the [S#] numbers the finished answer cited.
   used_refs?: number[]
+  // pending_approvals only: approval cards still waiting (their previews' tool call ids).
+  call_ids?: string[]
   // grounding_warning only: figures in the finished answer no snippet states.
   unsupported_figures?: string[]
+  // grounding_warning only: figures the answer calculated from stated ones.
+  calculated_figures?: CalculatedFigure[]
   /** Sentences that read a gap in the sources as a rule, e.g. "may be any length" (#1012). */
   silence_inferences?: string[]
   // grounding_warning only: cited sources that don't contain the cited text.

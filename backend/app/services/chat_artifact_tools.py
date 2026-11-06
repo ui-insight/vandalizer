@@ -141,6 +141,9 @@ async def _save(context: RunContext[AgenticChatDeps], title: str, html: str, con
             if doc["latest_revision"] != base_revision:
                 return {"error": "Page changed. Read the latest revision before proposing an edit."}
         name = "revise_html_artifact" if artifact_uuid else "create_html_artifact"
+        from app.services.inbox_provenance import PAGE_ERROR, credits_inbox
+        if not confirmed and credits_inbox(html) and not getattr(context.deps, "inbox_read", False):
+            return {"error": PAGE_ERROR}
         snapshot = await _call(chat_page_previews.prepare, context.deps.user_id,
             conversation.uuid, title, html, artifact_uuid, base_revision, {**_source(context), **(template_source or {})})
         digest = hashlib.sha256((title + snapshot["prepared_html"]).encode()).hexdigest()

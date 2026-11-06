@@ -10,6 +10,10 @@ class ChatRequest(BaseModel):
     client_timezone: Optional[str] = Field(default=None, max_length=100)
     retry: bool = False
     page_approval: Optional[str] = Field(default=None, pattern=r"^[a-f0-9]{32}$")
+    # An approval card's button: the tool call id of the preview it approves
+    # or cancels. Only that action may run this turn (approval_scope).
+    approval_for: Optional[str] = Field(default=None, pattern=r"^[A-Za-z0-9_\-:.]{1,128}$")
+    decline_for: Optional[str] = Field(default=None, pattern=r"^[A-Za-z0-9_\-:.]{1,128}$")
     # Omitted: retain the conversation's pinned Skill. Null: remove it.
     skill_uuid: Optional[str] = None
     skill_version: Optional[str] = None

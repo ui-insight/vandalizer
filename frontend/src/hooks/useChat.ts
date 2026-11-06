@@ -3,7 +3,7 @@ import { isPagePreparation } from '../lib/chatProgress'
 import { getProjectDefaultSkill } from '../api/projects'
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { streamChat, getHistory, previewSkill, selectConversationSkill, stopChatTurn, type ChatHistory } from '../api/chat'
-import type { ChatActivity, SkillSnapshot } from '../types/chat'
+import type { CardDecision, ChatActivity, SkillSnapshot } from '../types/chat'
 import { expandSnippetRefs, markUsed } from '../utils/snippetRefs'
 import { completedSkillSelection } from '../lib/skillSelection'
 import type { ChatMessage, Citation, ContextBudgetPlan, ContextMeterInfo, OversizeDocument, PlanTask, StreamChunk, StreamSegment, SuggestedModel, ToolCallInfo, ToolResultInfo } from '../types/chat'
@@ -61,6 +61,7 @@ type SendArgs = [
   projectUuid?: string,
   skillUuid?: string,
   pageApproval?: string,
+  cardDecision?: CardDecision,
 ]
 
 interface ChatEvents {
@@ -174,6 +175,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
   const lastSendArgsRef = useRef<SendArgs | null>(null)
   const lastSendAcceptedRef = useRef(false)
   const unsupportedFiguresRef = useRef<string[]>([])
+  const calculatedFiguresRef = useRef<NonNullable<ChatMessage['calculated_figures']>>([])
   const silenceInferencesRef = useRef<string[]>([])
   const unsupportedCitationsRef = useRef<string[]>([])
   const unconfirmedWebFactsRef = useRef<string[]>([])
@@ -190,6 +192,10 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
     setToolResults([])
     setSegments([])
   }, [])
+
+  // Approval cards the server still has waiting (preview tool call ids):
+  // exactly these stay clickable, whatever was clicked or typed since.
+  const [pendingApprovals, setPendingApprovals] = useState<string[]>([])
 
   const queueMessage = useCallback(async (...args: SendArgs) => {
     const text = args[0].trim()
@@ -210,9 +216,9 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
   }, [])
 
   const send = useCallback(
-    async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuids?: string[], includeOnboardingContext?: boolean, folderUuids?: string[], isFirstSession?: boolean, runDemo?: boolean, projectUuid?: string, skillUuid?: string, pageApproval?: string, retry = false) => {
+    async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuids?: string[], includeOnboardingContext?: boolean, folderUuids?: string[], isFirstSession?: boolean, runDemo?: boolean, projectUuid?: string, skillUuid?: string, pageApproval?: string, cardDecision?: CardDecision, retry = false) => {
       if (abortRef.current || (awaitingPageApproval && !pageApproval && !pageDecision(message) && !retry)) {
-        await queueMessage(message, documentUuids, model, knowledgeBaseUuids, includeOnboardingContext, folderUuids, isFirstSession, runDemo, projectUuid, skillUuid, pageApproval)
+        await queueMessage(message, documentUuids, model, knowledgeBaseUuids, includeOnboardingContext, folderUuids, isFirstSession, runDemo, projectUuid, skillUuid, pageApproval, cardDecision)
         return
       }
       if (isLoadingHistory || isSelectingSkill || (projectSkillBlocked && !skillUuid)) return
@@ -245,7 +251,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
         }
       }
       const deliveredResults = new Set<string>()
-      lastSendArgsRef.current = [message, documentUuids, model, knowledgeBaseUuids, includeOnboardingContext, folderUuids, isFirstSession, runDemo, projectUuid, skillUuid, pageApproval]
+      lastSendArgsRef.current = [message, documentUuids, model, knowledgeBaseUuids, includeOnboardingContext, folderUuids, isFirstSession, runDemo, projectUuid, skillUuid, pageApproval, cardDecision]
       if (!retry) lastSendAcceptedRef.current = false
       setError(null)
       setPlanTasks(null) // The previous turn's plan must not label this new action.
@@ -269,6 +275,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
       segmentsRef.current = []
       citationsRef.current = []
       unsupportedFiguresRef.current = []
+      calculatedFiguresRef.current = []
       silenceInferencesRef.current = []
       unsupportedCitationsRef.current = []
       unconfirmedWebFactsRef.current = []
@@ -276,7 +283,9 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
       // Capture the invocation before tool results can change turnSkill.
       const invokedSkill = turnSkill
       // Add user message immediately
-      if (!retry) setMessages((prev) => [...prev, { role: 'user', content: message, ...(invokedSkill ? { active_skill: invokedSkill } : {}), request_scope: { documents: [...documentUuids], folders: [...(folderUuids ?? [])], knowledgeBases: [...(knowledgeBaseUuids ?? [])], ...(projectUuid ? { project: projectUuid } : {}) } }])
+      if (!retry) setMessages((prev) => [...prev, { role: 'user', content: message, ...(invokedSkill ? { active_skill: invokedSkill } : {}),
+        ...(cardDecision && 'approve' in cardDecision ? { approval_for: cardDecision.approve } : {}),
+        ...(cardDecision && 'decline' in cardDecision ? { decline_for: cardDecision.decline } : {}), request_scope: { documents: [...documentUuids], folders: [...(folderUuids ?? [])], knowledgeBases: [...(knowledgeBaseUuids ?? [])], ...(projectUuid ? { project: projectUuid } : {}) } }])
 
       // Build and append an assistant message from whatever has accumulated so
       // far. Shared by the normal-completion, user-stop, and network-failure
@@ -320,6 +329,9 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
         }
         if (unsupportedFiguresRef.current.length) {
           assistantMsg.unsupported_figures = unsupportedFiguresRef.current
+        }
+        if (calculatedFiguresRef.current.length) {
+          assistantMsg.calculated_figures = calculatedFiguresRef.current
         }
         if (silenceInferencesRef.current.length) {
           assistantMsg.silence_inferences = silenceInferencesRef.current
@@ -463,8 +475,11 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
               }
             } else if (chunk.kind === 'sources_used') {
               citationsRef.current = markUsed(citationsRef.current, chunk.used_refs ?? [])
+            } else if (chunk.kind === 'pending_approvals') {
+              setPendingApprovals(chunk.call_ids ?? [])
             } else if (chunk.kind === 'grounding_warning') {
               unsupportedFiguresRef.current = chunk.unsupported_figures ?? []
+              calculatedFiguresRef.current = chunk.calculated_figures ?? []
               silenceInferencesRef.current = chunk.silence_inferences ?? []
               unsupportedCitationsRef.current = chunk.unsupported_citations ?? []
               unconfirmedWebFactsRef.current = chunk.unconfirmed_web_facts ?? []
@@ -505,6 +520,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
           turnSkill?.version,
           retry && lastSendAcceptedRef.current && !!activityId,
           pageApproval,
+          cardDecision,
         )
         if (!ownsView()) return
 
@@ -602,6 +618,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
       const data = await getHistory(uuid)
       if (version !== historyLoadVersion.current) return null
       setMessages(data.messages)
+      setPendingApprovals(data.pending_approvals ?? [])
       setActivityId(data.activity_id ?? null)
       setContextMode(data.context_mode ?? 'full')
       setContextCutoffIndex(data.context_cutoff_index ?? 0)
@@ -629,6 +646,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
     detachLiveTurn()
     setIsLoadingHistory(false)
     setMessages([])
+    setPendingApprovals([])
     setConversationUuid(null)
     setActivityId(null)
     setError(null)
@@ -664,6 +682,8 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
     const [, ...contextArgs] = args
     setError(null)
     setErrorDetails(null)
+    // "Continue" is not a card's decision; only the click itself is.
+    contextArgs[10] = undefined
     send('Continue', ...contextArgs)
   }, [send])
 
@@ -706,6 +726,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
     planTasks,
     queuedMessages,
     awaitingPageApproval,
+    pendingApprovals,
     queueMessage,
     resumeQueuedMessages,
     setContextTokens,
