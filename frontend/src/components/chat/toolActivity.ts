@@ -43,6 +43,7 @@ export const TOOL_META: Record<string, { label: string; category: ToolCategory }
   save_to_folder:        { label: 'Saving to folder',         category: 'write' },
   create_html_artifact:  { label: 'Creating page',        category: 'write' },
   revise_html_artifact:  { label: 'Updating page',        category: 'write' },
+  find_pages:            { label: 'Finding pages',        category: 'read' },
   get_html_artifact:     { label: 'Reading page',         category: 'read' },
   create_project:        { label: 'Creating project',         category: 'write' },
   list_projects:         { label: 'Finding projects',         category: 'read' },
