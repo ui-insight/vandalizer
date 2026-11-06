@@ -105,6 +105,8 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
   // same conversation (a follow-up "continue" resumes it); cleared on reset
   // and seeded from history on load.
   const [planTasks, setPlanTasks] = useState<PlanTask[] | null>(null)
+  // Approval cards the plan's reply left waiting (end-of-reply plan_update).
+  const [planWaiting, setPlanWaiting] = useState(0)
   // Busy-chat submissions become separate turns after the current stream
   // completes. Never inject a new request into an older model response.
   const [queuedMessages, setQueuedMessages] = useState<string[]>([])
@@ -255,6 +257,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
       if (!retry) lastSendAcceptedRef.current = false
       setError(null)
       setPlanTasks(null) // The previous turn's plan must not label this new action.
+      setPlanWaiting(0)
       setErrorDetails(null)
       setIsStreaming(true)
       setActivityProgress({ phase: 'starting' })
@@ -455,6 +458,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
               if (chunk.plan_tasks) {
                 setPlanTasks(chunk.plan_tasks)
               }
+              setPlanWaiting(chunk.waiting_approvals ?? 0)
             } else if (chunk.kind === 'queue_consumed') {
               const consumed = chunk.content
               // Legacy server queues can still be replayed by older clients.
@@ -659,6 +663,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
     setContextMeter(null)
     setCompactionStatus(null)
     setPlanTasks(null)
+    setPlanWaiting(0)
   }, [detachLiveTurn])
 
   const clearError = useCallback(() => {
@@ -724,6 +729,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
     contextMeter,
     compactionStatus,
     planTasks,
+    planWaiting,
     queuedMessages,
     awaitingPageApproval,
     pendingApprovals,

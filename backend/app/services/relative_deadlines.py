@@ -12,7 +12,8 @@ from app.models.obligation import DeadlineCalculation, ObligationSource
 MAX_OCCURRENCES = 100
 _OFFSET = re.compile(r"\b(?P<days>\d{1,3})\s+(?:calendar\s+)?days?\s+(?P<direction>before|after|of)\s+", re.I)
 _PERIOD_NAMES = {
-    "period_of_performance": r"(?:period\s+of\s+performance|performance\s+period)",
+    # Subaward forms label it "Start Date … End Date" or "Project/Award Period".
+    "period_of_performance": r"(?:period\s+of\s+performance|performance\s+period|(?:project|award|subaward)\s+period|\bend\s+date\b)",
     "budget_period": r"budget\s+period",
 }
 
@@ -39,7 +40,7 @@ def _period(source: ObligationSource, role: str) -> tuple[datetime.date | None, 
             raise ValueError("a single period date must be explicitly labeled as its end date")
         return None, dates[0]
     between = text[matches[0].end():matches[1].start()]
-    if not re.fullmatch(r"\s*,?\s*(?:[-–—]|through|to|until|(?:and\s+)?end(?:s|ing)?(?:\s+date)?\s*(?:on|is|:)?)\s*", between, re.I):
+    if not re.fullmatch(r"\s*[,;]?\s*(?:[-–—]|through|to|until|(?:and\s+)?end(?:s|ing)?(?:\s+date)?\s*(?:on|is|:)?)\s*", between, re.I):
         raise ValueError("the period quote must explicitly connect its start and end dates, not unrelated dates")
     if dates[0] > dates[1]:
         raise ValueError("the quoted period start must precede its end")
@@ -63,6 +64,22 @@ def calculate_deadlines(sources: list[ObligationSource]) -> list[dict]:
     days = int(match['days'])
     direction = match['direction'].lower()
     tail = rule[match.end():].strip().rstrip('.;')
+    offset = -days if direction == "before" else days
+
+    # "60 days after March 1, 2027": the rule states its own anchor date, so
+    # no period quote is needed (support ticket: a NIFA subaward's annual
+    # report was refused as "needs clearer source evidence").
+    from app.services.obligation_service import _DATE_IN_TEXT
+    stated = _DATE_IN_TEXT.fullmatch(re.sub(r"^(?:the\s+)?", "", tail))
+    if stated:
+        year, month, day = next(iter(_dates_in(stated.group())))
+        if year is None:
+            raise ValueError("a stated anchor date must include its year")
+        if direction == "of":
+            raise ValueError("the rule must say before or after its anchor date")
+        anchor = datetime.date(year, month, day)
+        return [_occurrence(rule, "stated_date", anchor, offset)]
+
     performance = [s for s in sources if s.role == "period_of_performance"]
     if len(performance) != 1:
         raise ValueError("cite the Period of Performance dates in one source with role 'period_of_performance'")
@@ -81,7 +98,12 @@ def calculate_deadlines(sources: list[ObligationSource]) -> list[dict]:
                 raise ValueError("the cited budget period falls outside the Period of Performance")
             anchors.append(budget_end)
         anchor_kind = "budget_period_end"
-    elif re.fullmatch(r"(?:the\s+)?end\s+of\s+(?:the\s+)?(?:period\s+of\s+performance|performance\s+period)", tail, re.I):
+    elif re.fullmatch(
+        r"(?:the\s+)?end\s+of\s+(?:the\s+)?(?:period\s+of\s+performance|performance\s+period)"
+        # "120 days after the End Date": the subaward's end, i.e. the quoted period's end.
+        r"|(?:the\s+)?(?:(?:sub)?award\s+|project\s+)?(?:end|expiration|completion)\s+date(?:\s+of\s+(?:this|the)\s+(?:sub)?award)?",
+        tail, re.I,
+    ):
         if direction == "of":
             raise ValueError("the rule must specify before or after the performance-period end")
         anchors = [end]
@@ -117,14 +139,13 @@ def calculate_deadlines(sources: list[ObligationSource]) -> list[dict]:
         raise ValueError("no reporting anchors fall within the quoted performance period")
     if len(anchors) > MAX_OCCURRENCES:
         raise ValueError("too many occurrences; review a narrower period")
-    offset = -days if direction == "before" else days
-    results = []
-    for anchor in anchors:
-        due = anchor + datetime.timedelta(days=offset)
-        calculation = DeadlineCalculation(
-            rule=rule, anchor_kind=anchor_kind, anchor_date=anchor.isoformat(), offset_days=offset,
-            formula=f"{anchor.isoformat()} {'−' if offset < 0 else '+'} {abs(offset)} calendar days = {due.isoformat()}",
-        )
-        results.append({"due_at": datetime.datetime.combine(due, datetime.time()),
-                        "due_text": None, "deadline_calculation": calculation})
-    return results
+    return [_occurrence(rule, anchor_kind, anchor, offset) for anchor in anchors]
+
+
+def _occurrence(rule: str, anchor_kind: str, anchor: datetime.date, offset: int) -> dict:
+    due = anchor + datetime.timedelta(days=offset)
+    calculation = DeadlineCalculation(
+        rule=rule, anchor_kind=anchor_kind, anchor_date=anchor.isoformat(), offset_days=offset,
+        formula=f"{anchor.isoformat()} {'−' if offset < 0 else '+'} {abs(offset)} calendar days = {due.isoformat()}",
+    )
+    return {"due_at": datetime.datetime.combine(due, datetime.time()), "due_text": None, "deadline_calculation": calculation}

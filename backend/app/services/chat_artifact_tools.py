@@ -175,8 +175,19 @@ async def create_html_artifact(context: RunContext[AgenticChatDeps], title: str,
             raise
         except HTTPException as exc:
             return {'error': exc.detail}
-    if source_document_uuid or template_values or template_tables:
-        return {'error': 'Choose a template before filling its fields.'}
+    # Support ticket: "make a one-page award snapshot page" was refused with
+    # "Choose a template before filling its fields" (a source file was passed
+    # without a template), and chat saved a .md file instead.
+    if template_values or template_tables:
+        return {'error': 'template_values and template_tables only fill a saved Page template, and none was given.',
+                'hint': ('To make a new Page, call create_html_artifact again with the complete page in html '
+                         '(no template needed), using values you read from the document. Make a Page as asked: '
+                         'do not deliver a different kind of output, such as a file, instead.')}
+    if not (html or '').strip():
+        return {'error': 'Write the Page in html: complete, self-contained HTML/CSS.',
+                'hint': 'A source file alone does not make a Page. Read it, then write the page in html.'}
+    # A source file passed without a template is simply what the page is
+    # built from; it needs no template.
     return await _save(context, title, html, confirmed)
 
 
