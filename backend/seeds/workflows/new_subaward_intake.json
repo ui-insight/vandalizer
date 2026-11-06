@@ -1,0 +1,113 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "workflow",
+  "_seed_meta": {
+    "seed_id": "wf-new-subaward-intake",
+    "display_name": "New Subaward Intake",
+    "description": "An RA routine for a new subaward or award: pulls out the key details, pauses once for your review, then creates a project with the file in it, adds its reporting deadlines and required material to the RA inbox (each checked against its page), and saves an award snapshot Page. Start it on a new award, or attach it to a folder so it runs on each one that arrives.",
+    "collections": [
+      "post-award"
+    ]
+  },
+  "items": [
+    {
+      "name": "New Subaward Intake",
+      "description": "Key details → review once → create project → RA inbox deadlines → award snapshot Page.",
+      "steps": [
+        {
+          "name": "Key award details",
+          "data": {},
+          "is_output": false,
+          "tasks": [
+            {
+              "name": "Extraction",
+              "data": {
+                "searchphrases": "Pass-Through Entity, Subrecipient, Federal Award Number (FAIN), Subaward Number, Awarding Agency, Project Title, Start Date, End Date, Amount Funded, Principal Investigator"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Review before setup",
+          "data": {},
+          "is_output": false,
+          "tasks": [
+            {
+              "name": "Approval",
+              "data": {
+                "review_instructions": "Check the award details above. Approving creates a project for this award with the file in it, adds its deadlines and required material to the RA inbox (each checked against its page; anything that can't be checked is listed for review, not added), and saves an award snapshot Page.",
+                "assignee_role": "workflow_owner"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create project",
+          "data": {},
+          "is_output": false,
+          "tasks": [
+            {
+              "name": "CreateProject",
+              "data": {
+                "name_template": "{document}"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add deadlines to RA inbox",
+          "data": {},
+          "is_output": true,
+          "tasks": [
+            {
+              "name": "InboxDeadlines",
+              "data": {}
+            }
+          ]
+        },
+        {
+          "name": "Award snapshot page",
+          "data": {},
+          "is_output": true,
+          "tasks": [
+            {
+              "name": "AwardSnapshotPage",
+              "data": {}
+            }
+          ]
+        }
+      ],
+      "input_config": {},
+      "output_config": {},
+      "validation_plan": [
+        {
+          "id": "b1c1adc6-1070-59d0-976b-939dacd2ab15",
+          "name": "Award details match the agreement",
+          "category": "accuracy",
+          "description": "The subaward number, FAIN, parties, period, amount and PI in the Key award details step appear in the agreement with the same value and year. FAIL if any differs or has no basis in the document."
+        },
+        {
+          "id": "8b5e9f0a-3f25-59c4-86ac-e2a3acf0080f",
+          "name": "Every stated key detail is extracted",
+          "category": "completeness",
+          "description": "When the agreement states them, the details give the pass-through entity, subrecipient, FAIN, subaward number, agency, project title, start and end dates, amount and PI. FAIL for each stated detail that is missing."
+        },
+        {
+          "id": "3bea2351-034f-514d-b792-4b4f55893291",
+          "name": "Setup steps say what they do, and nothing is invented",
+          "category": "content",
+          "description": "The Create project, Add deadlines to RA inbox and Award snapshot page steps describe creating the project with this file, adding checked deadlines and saving a snapshot Page (in a validation run they only describe it). FAIL if a step reports a deadline, project or page the document doesn't support."
+        }
+      ],
+      "validation_inputs": [
+        {
+          "id": "446f52a2-6b89-5016-86a6-7a58665f076a",
+          "type": "text",
+          "label": "Fictional subaward. Answer key: subaward EXSU-2026-0412; FAIN 2026-67013-99999; PTE Example State University; subrecipient Example Research Institute; period September 1, 2026 to August 31, 2027; amount $148,500; PI Dr. Jordan Lee. Deadlines: dataset December 15, 2026; annual progress report April 30, 2027 (60 days after March 1, 2027); final technical report December 29, 2027 (120 days after the End Date); quarterly reports are a rule without stated quarter dates, so they need review rather than a guessed date. In a validation run the workspace steps only describe what they would do.",
+          "text": "FICTIONAL QA MATERIAL — NOT A REAL AWARD\nResearch Subaward Agreement\nPass-Through Entity (PTE): Example State University\nSubrecipient: Example Research Institute\nPTE Federal Award No (FAIN): 2026-67013-99999\nSubaward No: EXSU-2026-0412\nFederal Awarding Agency: Example Agency for Food and Agriculture\nProject Title: Greenhouse Pollinator Habitat Trial\nStart Date: September 1, 2026  End Date: August 31, 2027\nAmount Funded This Action: $148,500\nSubrecipient Principal Investigator: Dr. Jordan Lee\n\nReporting Requirements\n1. Quarterly financial reports and invoices are due within 30 days after the end of each quarter.\n2. The annual progress report is due 60 days after March 1, 2027.\n3. The final technical report is due 120 days after the End Date.\n4. The greenhouse trial dataset is due December 15, 2026.\n5. A subject invention disclosure must be submitted for any invention made under this subaward.\n"
+        }
+      ]
+    }
+  ]
+}

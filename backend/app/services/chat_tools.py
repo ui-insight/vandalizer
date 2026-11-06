@@ -5835,6 +5835,11 @@ _WORKFLOW_STEP_TYPES = {
     "website": ("AddWebsite", False),
     "web_search": ("WebSearch", False),
     "approval": ("Approval", False),
+    # Workspace steps for RA routines ("New subaward intake"): they run in
+    # this order, after an approval step when the run should be reviewed.
+    "create_project": ("CreateProject", False),
+    "inbox_deadlines": ("InboxDeadlines", True),
+    "award_snapshot_page": ("AwardSnapshotPage", False),
 }
 
 
@@ -5920,6 +5925,13 @@ async def _build_workflow_step_data(
             "assignee_role": "workflow_owner",
         }, None
 
+    if step_type == "create_project":
+        return {"name_template": str(step.get("name_template") or instruction or "{document}")[:120]}, None
+    if step_type == "inbox_deadlines":
+        return {"model": model}, None
+    if step_type == "award_snapshot_page":
+        return {}, None
+
     return None, f"unknown step type '{step_type}'"
 
 
@@ -5961,6 +5973,18 @@ async def create_workflow(
                           search is set up; the query must not carry names,
                           award numbers or figures from the user's documents.
           "approval"    — pause for human review. "instructions" optional.
+          "create_project" — create a project named from the document
+                          ("name_template", default "{document}") and move the
+                          run's files into it. Workspace step: acts only in
+                          real runs.
+          "inbox_deadlines" — add the files' deadlines, required material and
+                          limits to that project's RA inbox (each checked
+                          against its quoted page). After create_project.
+          "award_snapshot_page" — build the award snapshot and save it as a
+                          project Page. After create_project.
+                          For an RA routine ("new subaward intake"), put an
+                          approval step before the workspace steps so the run
+                          is reviewed once before anything is created.
       - "is_output": optional bool — mark this step's result as a deliverable.
 
     Steps are wired linearly: the first content step reads the workflow's input;
