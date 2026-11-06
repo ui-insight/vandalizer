@@ -17,6 +17,7 @@ from app.middleware.csrf import CSRFMiddleware
 from app.observability import init_sentry
 from app.routers import artifacts, page_templates
 from app.rate_limit import limiter
+from app.routers import award_snapshots, page_feedback
 from app.routers import activity, admin, audit, auth, automations, browser_automation, certification, chat, config, contact, credentials, demo, documents, extractions, feedback, feedback_admin, feedback_prompt, files, folders, graph_webhooks, knowledge, library, mgmt, notifications, obligations, office, optimizer_inbox, organizations, projects, reviews, spaces, support, teams, telemetry, verification, verification_sessions, workflows
 
 
@@ -74,6 +75,18 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
     if get_settings().enable_trial_system:
         from app.services.feedback_prompt_service import seed_default_prompts
         await seed_default_prompts()
+
+    # Documents OCR'd before raw OCR envelopes were decoded still hold the
+    # JSON wrapper as their text; repair them in place until a sweep finishes
+    # clean. Queued, never run here: it scans the documents collection.
+    try:
+        from app.models.system_config import SystemConfig
+        config = await SystemConfig.find_one()
+        if config is None or config.ocr_envelope_repair_completed_at is None:
+            from app.celery_app import celery_app
+            celery_app.send_task("tasks.document.repair_ocr_envelopes", queue="documents")
+    except Exception:
+        logger.warning("Could not queue the OCR envelope repair sweep", exc_info=True)
 
     # One-time bell notification to admins when the bundled catalog is newer
     # than what's applied. Best-effort — never block startup on it.
@@ -230,6 +243,7 @@ app.include_router(extractions.router, prefix="/api/extractions", tags=["extract
 app.include_router(workflows.router, prefix="/api/workflows", tags=["workflows"])
 app.include_router(config.router, prefix="/api/config", tags=["config"])
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
+app.include_router(page_feedback.router, prefix="/api/pages", tags=["pages"])
 app.include_router(artifacts.router, prefix="/api/pages", tags=["pages"])
 app.include_router(page_templates.router, prefix="/api/page-templates", tags=["page-templates"])
 app.include_router(activity.router, prefix="/api/activity", tags=["activity"])
@@ -258,6 +272,7 @@ app.include_router(reviews.router, prefix="/api/reviews", tags=["reviews"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
 app.include_router(spaces.router, prefix="/api/spaces", tags=["spaces"])
 app.include_router(projects.router, prefix="/api/projects", tags=["projects"])
+app.include_router(award_snapshots.router, prefix="/api/projects", tags=["projects"])
 app.include_router(obligations.router, prefix="/api/obligations", tags=["obligations"])
 app.include_router(support.router, prefix="/api/support", tags=["support"])
 app.include_router(mgmt.router, prefix="/api/mgmt/v1", tags=["mgmt"])

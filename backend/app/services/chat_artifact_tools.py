@@ -103,6 +103,8 @@ async def create_html_artifact(context: RunContext[AgenticChatDeps], title: str,
             return await _save(context, title, html, confirmed, template_source={
                 'template_uuid': template_uuid, 'template_check': check,
             }, source_documents=[document.uuid])
+        except artifacts.PageTooLargeError:
+            raise
         except HTTPException as exc:
             return {'error': exc.detail}
     if source_document_uuid or template_values or template_tables:
@@ -157,6 +159,9 @@ async def _save(context: RunContext[AgenticChatDeps], title: str, html: str, con
             if doc["latest_revision"] != base_revision:
                 return {"error": "Page changed. Read the latest revision before proposing an edit."}
         name = "revise_html_artifact" if artifact_uuid else "create_html_artifact"
+        from app.services.inbox_provenance import PAGE_ERROR, credits_inbox
+        if not confirmed and credits_inbox(html) and not getattr(context.deps, "inbox_read", False):
+            return {"error": PAGE_ERROR}
         documents = await _call(_source_documents, doc, source_documents or _used_documents(context))
         snapshot = await _call(chat_page_previews.prepare, context.deps.user_id,
             conversation.uuid, title, html, artifact_uuid, base_revision,
@@ -176,5 +181,9 @@ async def _save(context: RunContext[AgenticChatDeps], title: str, html: str, con
             conversation.uuid, snapshot["_id"])
         return {**saved, "rendering_note": RENDERING_NOTE,
                 "source_fidelity_note": PAGE_SOURCE_FIDELITY_RULES, "language_note": PAGE_LANGUAGE_RULES}
+    except artifacts.PageTooLargeError:
+        # Do not ask the model to regenerate the same oversized Page this turn.
+        # Chat translates this into the actionable size message and stops.
+        raise
     except HTTPException as exc:
         return {"error": exc.detail}

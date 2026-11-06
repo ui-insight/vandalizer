@@ -69,4 +69,7 @@ export interface AutomationRunStatus {
   completed_at: string | null
   output: unknown
   error: string | null
+  /** History rows: what started the run, and for a single-file run, which file. */
+  trigger_type?: string | null
+  document_title?: string | null
 }

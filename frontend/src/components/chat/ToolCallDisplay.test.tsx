@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ToolCallDisplay, ToolStatusLine, WorkflowProgress, toolResultToText } from './ToolCallDisplay'
+import { ToolCallDisplay, ToolStatusLine, WorkflowProgress, supersededCallIds, toolResultToText } from './ToolCallDisplay'
 import { getWorkflowStatus } from '../../api/workflows'
 import type { WorkflowStatus } from '../../types/workflow'
 
@@ -47,7 +47,7 @@ describe('tool states and recovery', () => {
     expect(screen.getByRole('region', { name: 'Review proposed action' })).toHaveTextContent('2027-12-31 + 60 calendar days = 2028-02-29')
     expect(onConfirm).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Add to inbox' }))
-    expect(onConfirm).toHaveBeenCalledWith('Yes, go ahead')
+    expect(onConfirm).toHaveBeenCalledWith('Yes, go ahead', undefined, { approve: expect.any(String) })
   })
 
   it('shows the exact Skill instructions before approving selection', () => {
@@ -73,7 +73,7 @@ describe('tool states and recovery', () => {
     expect(screen.queryByText('Inspect Skill instructions')).not.toBeInTheDocument()
     expect(screen.queryByText('Apply Skill selection')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Remove Skill' }))
-    expect(onConfirm).toHaveBeenCalledWith('Yes, go ahead')
+    expect(onConfirm).toHaveBeenCalledWith('Yes, go ahead', undefined, { approve: expect.any(String) })
   })
   it.each([
     [{ status: 'selected', active_skill: null }, 'Skill removed'],
@@ -108,8 +108,30 @@ describe('tool states and recovery', () => {
     const confirm=vi.fn()
     render(<ToolCallDisplay toolCalls={[call]} toolResults={[result({needs_confirmation:true,preview:'Create a workflow'})]} onConfirm={confirm} />)
     fireEvent.click(screen.getByRole('button',{name:'Cancel action'}))
-    expect(confirm).toHaveBeenCalledWith('No, cancel that')
+    expect(confirm).toHaveBeenCalledWith('No, cancel that', undefined, { decline: expect.any(String) })
     expect(screen.getByRole('status')).toHaveTextContent('Cancellation requested')
+  })
+  it('retires an earlier inbox proposal once a retry replaces it, leaving one live approval', () => {
+    const onConfirm = vi.fn()
+    const preview = (id: string, items: string[]) => ({ tool_name: 'propose_obligations', tool_call_id: id, quality: null, content: {
+      needs_confirmation: true, obligation_review: { project: 'Award', items, excluded: [] } } })
+    render(<ToolCallDisplay onConfirm={onConfirm}
+      toolCalls={['first', 'second'].map(id => ({ tool_name: 'propose_obligations', tool_call_id: id, args: {} }))}
+      toolResults={[preview('first', ['Final report']), preview('second', ['Final report', 'Invoice', 'RPPR'])]} />)
+    expect(screen.getAllByRole('button', { name: 'Add to inbox' })).toHaveLength(1)
+    expect(screen.getAllByRole('status')[0]).toHaveTextContent('Replaced')
+    expect(screen.getByText(/replaced this proposal with the one below/)).toBeInTheDocument()
+    expect(screen.getByRole('list', { name: 'Items to add' }).children).toHaveLength(3)
+    fireEvent.click(screen.getByRole('button', { name: 'Add to inbox' }))
+    expect(onConfirm).toHaveBeenCalledWith('Yes, go ahead', undefined, { approve: expect.any(String) })
+  })
+  it('keeps a proposal live when the later attempt failed', () => {
+    const results = new Map([
+      ['a', { tool_name: 'propose_obligations', tool_call_id: 'a', quality: null, content: { needs_confirmation: true } }],
+      ['b', { tool_name: 'propose_obligations', tool_call_id: 'b', quality: null, content: { error: 'None could be checked' } }],
+      ['c', { tool_name: 'create_workflow', tool_call_id: 'c', quality: null, content: { needs_confirmation: true } }],
+    ])
+    expect(supersededCallIds(['a', 'b', 'c'], results).size).toBe(0)
   })
   it('shows the failed tool and protocol hint while requesting recovery without repeating completed changes', () => {
     const confirm=vi.fn()

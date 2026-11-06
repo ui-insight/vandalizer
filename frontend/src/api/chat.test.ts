@@ -117,3 +117,15 @@ it('still detects a genuinely silent connection and cancels its reader', async (
     expect(cancel).toHaveBeenCalledOnce()
   } finally { vi.useRealTimers() }
 })
+
+it('names the approval card a click decided', async () => {
+  vi.mocked(rawFetch).mockImplementation(async () => new Response(''))
+  await streamChat('Yes, go ahead', [], 'activity', undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, false, undefined, { approve: 'call-move' })
+  let body = JSON.parse(vi.mocked(rawFetch).mock.lastCall![1]!.body as string)
+  expect(body.approval_for).toBe('call-move')
+  expect(body).not.toHaveProperty('decline_for')
+  await streamChat('No, cancel that', [], 'activity', undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, false, undefined, { decline: 'call-save' })
+  body = JSON.parse(vi.mocked(rawFetch).mock.lastCall![1]!.body as string)
+  expect(body.decline_for).toBe('call-save')
+  expect(body).not.toHaveProperty('approval_for')
+})

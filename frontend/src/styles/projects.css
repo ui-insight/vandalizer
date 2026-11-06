@@ -83,3 +83,38 @@
   .project-button { min-height:44px; }
 }
 @media (prefers-reduced-motion:reduce) { .project-card { transition:none; } }
+
+/* Award snapshot (support ticket): one line under the project header, open for the detail. */
+.award-snapshot { flex-shrink:0; border-bottom:1px solid #e2e6eb; background:#fff; font-size:13px; color:#334155; }
+.award-snapshot__bar { display:flex; align-items:center; flex-wrap:wrap; gap:8px 16px; padding:6px 24px; }
+.award-snapshot__toggle { display:flex; align-items:center; gap:8px; flex:1 1 320px; min-width:0; min-height:32px; text-align:left; cursor:pointer; }
+.award-snapshot__title { font-weight:650; color:#17212f; white-space:nowrap; }
+.award-snapshot__summary { color:#596579; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+.award-snapshot__actions { display:flex; align-items:center; gap:8px; color:#596579; }
+.award-snapshot__actions button { display:inline-flex; align-items:center; gap:4px; min-height:30px; padding:2px 10px; border:1px solid #d5dbe3; border-radius:6px; background:#fff; color:#334155; cursor:pointer; }
+.award-snapshot__actions button:disabled { opacity:.55; cursor:default; }
+.award-snapshot__detail { max-height:45vh; overflow:auto; padding:4px 24px 14px; border-top:1px solid #eef1f4; }
+.award-snapshot__columns { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px 28px; }
+.award-snapshot h3 { margin:10px 0 6px; font-size:12px; font-weight:650; color:#4b5563; text-transform:uppercase; letter-spacing:.04em; }
+.award-snapshot h4 { margin:8px 0 2px; font-size:12px; font-weight:600; color:#4b5563; }
+.award-snapshot__deadlines--overdue h4 { color:#b45309; }
+.award-snapshot__fact { display:grid; grid-template-columns:110px 1fr; gap:8px; padding:3px 0; }
+.award-snapshot__fact dt { color:#64748b; }
+.award-snapshot__fact dd { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; margin:0; min-width:0; overflow-wrap:anywhere; color:#17212f; }
+.award-snapshot__source { display:inline-flex; align-items:center; gap:3px; padding:0 6px; border:1px solid #e2e6eb; border-radius:999px; font-size:11px; color:#2563eb; cursor:pointer; }
+.award-snapshot__unconfirmed { display:inline-flex; align-items:center; gap:3px; font-size:11px; color:#92400e; }
+.award-snapshot__deadlines ul, .award-snapshot__fact ul { margin:0; padding:0; list-style:none; }
+.award-snapshot__deadlines li { display:flex; flex-wrap:wrap; align-items:center; gap:2px 8px; padding:2px 0; }
+.award-snapshot__deadlines p { margin:0; color:#64748b; }
+.award-snapshot__deadline { text-align:left; cursor:pointer; color:inherit; }
+.award-snapshot__deadline:hover { text-decoration:underline; }
+.award-snapshot__deadlines--overdue em { color:#b45309; font-style:normal; font-weight:600; }
+.award-snapshot__meta { font-size:11px; color:#64748b; font-weight:400; text-transform:none; letter-spacing:0; }
+.award-snapshot__note, .award-snapshot__message { margin:6px 0 0; padding:6px 10px; border-radius:6px; background:#fef3c7; color:#92400e; }
+.award-snapshot__message { margin:0 24px 8px; }
+@media (max-width: 640px) {
+  .award-snapshot__bar { padding:6px 16px; }
+  .award-snapshot__detail { padding:4px 16px 12px; }
+  .award-snapshot__summary { white-space:normal; }
+  .award-snapshot__fact { grid-template-columns:96px 1fr; }
+}

@@ -45,7 +45,7 @@ from pydantic_ai.messages import (
 )
 
 from app.models.activity import ActivityEvent, ActivityStatus
-from app.models.chat import ChatConversation, ChatRole
+from app.models.chat import ChatConversation, ChatMessage, ChatRole
 from app.models.document import SmartDocument
 from app.models.system_config import SystemConfig
 from app.models.user import User
@@ -64,15 +64,23 @@ from app.services.context_budget import (
     token_safety_margin,
 )
 from app.services.citation_grounding import ground_citation, normalize_citation_markup
-from app.services.approval_claims import unprepared_card_note
+from app.services.approval_claims import announces_unfinished_action, unprepared_card_note
+from app.services.page_authoring import declares_page_too_large, requests_page
 from app.services.chat_output import public_chat_text
 from app.services.chat_budget_tables import reconcile_budget_tables
 from app.services.chat_source_claims import attachment_sources, ground_source_checks
+from app.services.compliance_claims import relabel_presence_checks, superseded_threshold_note
+from app.services.inbox_provenance import REPLY_NOTE as INBOX_REPLY_NOTE, credits_inbox
+from app.services.web_answer_grounding import (
+    correction_note,
+    missed_corrections,
+    unconfirmed_web_facts,
+)
 from app.services.kb_answer_grounding import (
     expand_snippet_refs,
     tool_output_as_source,
     unsupported_citations,
-    unsupported_figures,
+    check_figures,
     used_snippet_refs,
 )
 from app.services.silence_inference import inferences_from_silence
@@ -612,15 +620,15 @@ def _stream_error_event(exc: BaseException, user_message: str) -> dict:
 
 
 class _OutputLimitExceeded(Exception):
-    """A response ended at the output cap, before tools may execute it."""
+    """Generation hit a size limit or explicitly refused an oversized Page."""
 
 
-def _check_response_size(response: ModelResponse) -> None:
+def _check_response_size(response: ModelResponse, *, preparing_page: bool = False) -> None:
     if response.finish_reason != "length":
         return
     from app.services.artifacts import PAGE_TOO_LARGE_MESSAGE
 
-    page = any(
+    page = preparing_page or any(
         isinstance(part, ToolCallPart)
         and part.tool_name in {"create_html_artifact", "revise_html_artifact"}
         for part in response.parts
@@ -629,6 +637,41 @@ def _check_response_size(response: ModelResponse) -> None:
         PAGE_TOO_LARGE_MESSAGE if page else
         "The response is too large for the model to finish. Ask for less content or split the request into parts."
     )
+
+
+def _size_failure_message(
+    exc: BaseException, preparing_page: bool, seen: set[int] | None = None,
+) -> str | None:
+    """SDK/tool tasks may wrap size failures in exception groups or causes.
+
+    Only confirmed size failures qualify; a large request alone does not turn
+    a network failure or an unrelated programming error into a size error.
+    """
+    from openai import LengthFinishReasonError
+    from pydantic_ai.exceptions import IncompleteToolCall, UnexpectedModelBehavior
+    from app.services.artifacts import PAGE_TOO_LARGE_MESSAGE, PageTooLargeError
+
+    seen = set() if seen is None else seen
+    if id(exc) in seen:
+        return None
+    seen.add(id(exc))
+    if isinstance(exc, BaseExceptionGroup):
+        messages = [_size_failure_message(child, preparing_page, seen) for child in exc.exceptions]
+        if all(messages):
+            return PAGE_TOO_LARGE_MESSAGE if PAGE_TOO_LARGE_MESSAGE in messages else messages[0]
+        return None
+    if isinstance(exc, PageTooLargeError):
+        return PAGE_TOO_LARGE_MESSAGE
+    if isinstance(exc, _OutputLimitExceeded):
+        return str(exc)
+    if isinstance(exc, (IncompleteToolCall, LengthFinishReasonError)) or (
+        isinstance(exc, UnexpectedModelBehavior)
+        and re.match(r"Model token limit \(.+\) exceeded before any response was generated\.", str(exc))
+    ):
+        return (PAGE_TOO_LARGE_MESSAGE if preparing_page else
+                "The response is too large for the model to finish. Ask for less content or split the request into parts.")
+    cause = exc.__cause__ or (None if exc.__suppress_context__ else exc.__context__)
+    return _size_failure_message(cause, preparing_page, seen) if cause else None
 
 
 def _classify_stream_error(exc: BaseException, *, preparing_page: bool = False) -> tuple[str, str]:
@@ -641,16 +684,9 @@ def _classify_stream_error(exc: BaseException, *, preparing_page: bool = False) 
     text = str(exc)
     lower = text.lower()
 
-    from pydantic_ai.exceptions import IncompleteToolCall
-    from app.services.artifacts import PAGE_TOO_LARGE_MESSAGE
-
-    if isinstance(exc, _OutputLimitExceeded):
-        return "warning", str(exc)
-    if isinstance(exc, IncompleteToolCall):
-        return "warning", (
-            PAGE_TOO_LARGE_MESSAGE if preparing_page else
-            "The response is too large for the model to finish. Ask for less content or split the request into parts."
-        )
+    size_message = _size_failure_message(exc, preparing_page)
+    if size_message:
+        return "warning", size_message
 
     # Trial lifecycle events (out of tokens, unconfirmed address, fleet pause)
     # — expected states with actionable messages, not bugs.
@@ -1598,6 +1634,8 @@ async def chat_stream(
     active_skill: SkillSnapshot | None=None,
     retry: bool = False,
     client_timezone: str | None = None,
+    approval_for: str | None = None,
+    decline_for: str | None = None,
 ) -> AsyncGenerator[str, None]:
     """Async generator yielding newline-delimited JSON chunks for streaming chat."""
 
@@ -2515,6 +2553,20 @@ async def chat_stream(
                 default=0,
             ),
         )
+        # One click approves one card (support ticket): decide which armed
+        # actions this turn may run before the agent sees the message.
+        from app.services.approval_scope import decide
+
+        turn_approval = decide(
+            getattr(conversation, "pending_confirmations", None),
+            approval_for=approval_for, decline_for=decline_for,
+        )
+        deps.approved_confirmations = turn_approval.approved
+        deps.approval_mode = turn_approval.mode
+        deps.approval_waiting = turn_approval.waiting
+        if turn_approval.remaining is not None:
+            conversation.pending_confirmations = turn_approval.remaining
+            await conversation.save()
         agent: Agent[AgenticChatDeps, str] | Agent[None, str] = create_agentic_chat_agent(
             model_name, system_config_doc=sys_config_doc,
         )
@@ -2539,7 +2591,8 @@ async def chat_stream(
     # Citations accumulated this turn: pre-agent KB context (classic path)
     # plus any search_knowledge_base tool calls (agentic path).
     streamed_citations: list[dict] = list(kb_sources)
-    preparing_page = False
+    page_requested = requests_page(message)
+    preparing_page = page_requested
 
     def _completed_work() -> dict:
         """What a turn that ends early finished, for _save_failed_assistant_turn."""
@@ -2622,36 +2675,49 @@ async def chat_stream(
                             }) + "\n"
                     yield _activity_chunk("model")
                     tool_preparation = _ToolPreparationProgress()
-                    preparing_page = False
+                    preparing_page = page_requested
                     stream: ChatResponseStream
                     async with node.stream(agent_run.ctx) as stream:
-                        async for event in stream:
-                            preparation = tool_preparation.feed(event)
-                            preparing_page = any(
-                                name in {"create_html_artifact", "revise_html_artifact"}
-                                for name in tool_preparation.names.values()
-                            )
-                            if preparation:
-                                yield preparation
-                            event_content, is_api_thinking = _extract_event_content(event)
-                            if event_content is None:
-                                continue
+                        try:
+                            async for event in stream:
+                                preparation = tool_preparation.feed(event)
+                                preparing_page = preparing_page or any(
+                                    name in {"create_html_artifact", "revise_html_artifact"}
+                                    for name in tool_preparation.names.values()
+                                )
+                                page_requested = page_requested or preparing_page
+                                if preparation:
+                                    yield preparation
+                                event_content, is_api_thinking = _extract_event_content(event)
+                                if event_content is None:
+                                    continue
 
-                            if is_api_thinking:
-                                # Retain timing, never publish or persist raw reasoning.
-                                if thinking_started_at is None:
-                                    thinking_started_at = time.monotonic()
-                            elif thinking_started_at is not None:
-                                thinking_duration = round(time.monotonic() - thinking_started_at, 1)
-                                thinking_started_at = None
-                            # Text is not public yet. It can precede a tool call,
-                            # contain untagged deliberation, or fail an output
-                            # validator. Publish only the accepted final answer
-                            # below; tool activity continues streaming meanwhile.
+                                if is_api_thinking:
+                                    # Retain timing, never publish or persist raw reasoning.
+                                    if thinking_started_at is None:
+                                        thinking_started_at = time.monotonic()
+                                elif thinking_started_at is not None:
+                                    thinking_duration = round(time.monotonic() - thinking_started_at, 1)
+                                    thinking_started_at = None
+                                # Text is not public yet. It can precede a tool call,
+                                # contain untagged deliberation, or fail an output
+                                # validator. Publish only the accepted final answer
+                                # below; tool activity continues streaming meanwhile.
+                        except Exception:
+                            # Some providers/SDK paths fail while consuming the
+                            # final chunk, before the normal post-stream check.
+                            _check_response_size(stream.response, preparing_page=preparing_page)
+                            raise
 
-                    # Check before advancing to the tool node: even parseable
-                    # JSON can contain incomplete HTML at the output cap.
-                    _check_response_size(stream.response)
+                        # Check inside the context, before SDK finalization or
+                        # output validators can retry a truncated/refused Page.
+                        _check_response_size(stream.response, preparing_page=preparing_page)
+                        response_text = public_chat_text("\n".join(
+                            part.content for part in stream.response.parts if isinstance(part, TextPart)
+                        ))
+                        if preparing_page and declares_page_too_large(response_text):
+                            from app.services.artifacts import PAGE_TOO_LARGE_MESSAGE
+                            raise _OutputLimitExceeded(PAGE_TOO_LARGE_MESSAGE)
 
                 elif Agent.is_call_tools_node(node):
                     # Stream tool call / result events to the frontend
@@ -2732,6 +2798,23 @@ async def chat_stream(
                     attachment_sources(documents, file_attachments, compacted.documents, compacted.attachments),
                     streamed_tool_results,
                 ))
+                # "Mentioned in the document" is not "compliant", and a
+                # threshold the 2024 Uniform Guidance replaced is not current.
+                answer = relabel_presence_checks(answer, streamed_tool_results)
+                if not getattr(deps, "inbox_read", False) and credits_inbox(answer):
+                    answer += "\n\n" + INBOX_REPLY_NOTE
+                threshold_note = superseded_threshold_note(answer)
+                if threshold_note:
+                    answer += "\n\n" + threshold_note
+                if page_requested and announces_unfinished_action(answer) and not any(
+                    result["tool_name"] in {"create_html_artifact", "revise_html_artifact"}
+                    and isinstance(result["content"], dict) and result["content"].get("preview_id")
+                    for result in streamed_tool_results
+                ):
+                    answer += (
+                        "\n\nI couldn't finish preparing the Page preview. No further work is running. "
+                        "Try fewer rows or tabs, or split the request into pages."
+                    )
                 if not answer:
                     # Never infer success from approval or repeat an action just
                     # because its prose was withheld. Receipts remain visible.
@@ -2754,6 +2837,21 @@ async def chat_stream(
                     else:
                         streamed_segments.append({"kind": "text", "content": note})
                     yield json.dumps({"kind": "text", "content": note}) + "\n"
+                # A page read this turn may contradict a date or figure the
+                # previous answer took from a search snippet. The prompt asks
+                # for "Correction: …"; when the answer just states the new
+                # value, say it here.
+                correction = await _silent_correction_note(
+                    conversation, "".join(full_response),
+                    streamed_tool_calls, streamed_tool_results,
+                )
+                if correction:
+                    full_response.append(correction)
+                    if streamed_segments and streamed_segments[-1].get("kind") == "text":
+                        streamed_segments[-1]["content"] += correction
+                    else:
+                        streamed_segments.append({"kind": "text", "content": correction})
+                    yield json.dumps({"kind": "text", "content": correction}) + "\n"
                 # Safety-net: strip any residual think tags the parser missed
                 # Stored with the model's own 【…】 citation syntax rewritten as
                 # plain "(file, p. N)" text, which is also what names the file
@@ -2822,19 +2920,53 @@ async def chat_stream(
                 # document it never ran an extraction on. So once a
                 # conversation has used tools, its figures are checked against
                 # what those tools returned.
-                tool_outputs = [
-                    r["content"] if isinstance(r["content"], str)
-                    else json.dumps(r["content"], default=str)
+                named_outputs = [
+                    (
+                        r.get("tool_name") or "",
+                        r["content"] if isinstance(r["content"], str)
+                        else json.dumps(r["content"], default=str),
+                    )
                     for r in streamed_tool_results
-                ] + _replayed_tool_outputs(previous_messages)
-                unsupported = (
-                    unsupported_figures(assistant_message, "\n".join(
-                        [s.text for s in (*doc_segments, *attachment_segments)]
-                        + [getattr(d, "raw_text", None) or "" for d in documents or []]
-                        + [message]
+                ] + _replayed_named_tool_outputs(previous_messages)
+                tool_outputs = [text for _, text in named_outputs]
+                workspace_sources = (
+                    [s.text for s in (*doc_segments, *attachment_segments)]
+                    + [getattr(d, "raw_text", None) or "" for d in documents or []]
+                    # Whole attached files: the prompt carries only an excerpt
+                    # (see attachment_segments), and a figure from a later page
+                    # was checked only when a tool had happened to read it.
+                    + [a.content or "" for a in file_attachments]
+                    + [message]
+                )
+                # Same sources every turn, so the same calculation gets the
+                # same label (support ticket: flagged once, then all 16
+                # figures, then none).
+                unsupported, calculated = (
+                    check_figures(assistant_message, "\n".join(
+                        workspace_sources
                         + [tool_output_as_source(t) for t in tool_outputs]
                     ))
-                    if active_kbs or documents or tool_outputs else []
+                    if active_kbs or documents or file_attachments or tool_outputs else ([], [])
+                )
+                calculated_figures = [{"figure": d.label, "formula": d.formula} for d in calculated]
+                # An answer from a web search: its exact dates and figures
+                # must be on a page it read, not only in a search snippet.
+                unconfirmed_web = (
+                    unconfirmed_web_facts(
+                        assistant_message,
+                        "\n".join(
+                            workspace_sources
+                            # Raw text as well: tool_output_as_source reads a
+                            # bare year as dollars ("Dec. 8, $2025").
+                            + [
+                                f"{t}\n{tool_output_as_source(t)}"
+                                for name, t in named_outputs if name != "web_search"
+                            ]
+                        ),
+                        already_flagged=unsupported,
+                    )
+                    if any(r.get("tool_name") == "web_search" for r in streamed_tool_results)
+                    else []
                 )
                 # A gap in the sources read as a rule ("may be any length")
                 # is flagged the same way (#1012).
@@ -2871,14 +3003,28 @@ async def chat_stream(
                     unsupported_figures=unsupported or None,
                     silence_inferences=silent or None,
                     unsupported_citations=miscited or None,
+                    unconfirmed_web_facts=unconfirmed_web or None,
+                    calculated_figures=calculated_figures or None,
                 )
-                if unsupported or silent or miscited:
+                # Which approval cards are still waiting, so the client keeps
+                # exactly those clickable after this turn.
+                if deps is not None:
+                    from app.services.approval_scope import pending_call_ids
+
+                    yield json.dumps({
+                        "kind": "pending_approvals",
+                        "content": "",
+                        "call_ids": pending_call_ids(getattr(conversation, "pending_confirmations", None)),
+                    }) + "\n"
+                if unsupported or silent or miscited or unconfirmed_web or calculated_figures:
                     yield json.dumps({
                         "kind": "grounding_warning",
                         "content": "",
                         "unsupported_figures": unsupported,
+                        "calculated_figures": calculated_figures,
                         "silence_inferences": silent,
                         "unsupported_citations": miscited,
+                        "unconfirmed_web_facts": unconfirmed_web,
                     }) + "\n"
 
                 # Ground truth has just arrived. The planner's belief and what
@@ -4256,18 +4402,68 @@ def _miscited_sources(
     return unsupported_citations(answer, texts, question)
 
 
-def _replayed_tool_outputs(history: list[ModelMessage]) -> list[str]:
-    """Text of every tool result replayed from earlier turns."""
-    out: list[str] = []
+def _replayed_named_tool_outputs(history: list[ModelMessage]) -> list[tuple[str, str]]:
+    """(tool name, text) of every tool result replayed from earlier turns."""
+    out: list[tuple[str, str]] = []
     for msg in history:
         for part in getattr(msg, "parts", ()):
             if isinstance(part, ToolReturnPart):
                 content = part.content
-                out.append(
-                    content if isinstance(content, str)
-                    else json.dumps(content, default=str)
-                )
+                out.append((
+                    part.tool_name or "",
+                    content if isinstance(content, str) else json.dumps(content, default=str),
+                ))
     return out
+
+
+async def _silent_correction_note(
+    conversation: ChatConversation,
+    answer: str,
+    tool_calls: list[dict],
+    tool_results: list[dict],
+) -> str:
+    """A correction note when this turn's page read contradicts the last answer.
+
+    See ``web_answer_grounding.missed_corrections``. Only pages read this turn
+    count, and only against the previous assistant answer's unconfirmed facts.
+    Best-effort: a failed lookup never breaks the answer.
+    """
+    requested = {
+        c.get("tool_call_id"): (c.get("args") or {}).get("url")
+        for c in tool_calls if c.get("tool_name") == "fetch_url"
+    }
+    pages: list[tuple[str, str]] = []
+    for r in tool_results:
+        content = r.get("content")
+        if r.get("tool_name") != "fetch_url" or not isinstance(content, dict) or not content.get("text"):
+            continue
+        for url in {content.get("url"), requested.get(r.get("tool_call_id"))}:
+            if isinstance(url, str) and url:
+                pages.append((url, str(content["text"])))
+    if not pages or not conversation.messages:
+        return ""
+    try:
+        earlier = await ChatMessage.find(
+            {"_id": {"$in": conversation.messages}, "role": ChatRole.ASSISTANT.value},
+        ).sort("-created_at").first_or_none()
+        if earlier is None or not earlier.unconfirmed_web_facts:
+            return ""
+        labels = missed_corrections(
+            earlier_unconfirmed=earlier.unconfirmed_web_facts,
+            earlier_cited_urls=[c.get("url") or "" for c in earlier.citations or []],
+            earlier_answer=earlier.message,
+            answer=answer,
+            pages_read=pages,
+        )
+    except Exception:
+        logger.warning("Correction check against the previous answer failed", exc_info=True)
+        return ""
+    return correction_note(labels)
+
+
+def _replayed_tool_outputs(history: list[ModelMessage]) -> list[str]:
+    """Text of every tool result replayed from earlier turns."""
+    return [text for _, text in _replayed_named_tool_outputs(history)]
 
 
 async def _consume_stop_request(conversation: ChatConversation) -> bool:
@@ -4886,6 +5082,8 @@ async def _finalize(
     unsupported_figures: Optional[list[str]] = None,
     silence_inferences: Optional[list[str]] = None,
     unsupported_citations: Optional[list[str]] = None,
+    unconfirmed_web_facts: Optional[list[str]] = None,
+    calculated_figures: Optional[list[dict]] = None,
 ) -> None:
     """Save assistant message and update activity metrics."""
     await conversation.add_message(
@@ -4900,6 +5098,8 @@ async def _finalize(
         unsupported_figures=unsupported_figures,
         silence_inferences=silence_inferences,
         unsupported_citations=unsupported_citations,
+        unconfirmed_web_facts=unconfirmed_web_facts,
+        calculated_figures=calculated_figures,
     )
 
     # Stamp the usage anchor for next turn's cheap context estimate (uplift

@@ -3,7 +3,8 @@ import { WorkspaceSectionHeader } from '../shared/WorkspaceSectionHeader'
 import { usePanelVisible } from '../shared/PanelVisibility'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { Plus, HelpCircle, MoreHorizontal, Copy, Pin, PinOff, FolderKanban, ArrowUpRight } from 'lucide-react'
+import { Plus, HelpCircle, MoreHorizontal, Copy, Pin, PinOff, FolderKanban, ArrowUpRight, CalendarPlus } from 'lucide-react'
+import { downloadDeadlineCalendar } from '../../api/obligations'
 import { useProjects } from '../../hooks/useProjects'
 import { MAX_HOME_PINS, useHomePinnedProjects } from '../../hooks/useHomePinnedProjects'
 import { useToast } from '../../contexts/ToastContext'
@@ -256,6 +257,16 @@ export function ProjectsPanel() {
                         >
                           {isPinned(p.uuid) ? <PinOff size={14} /> : <Pin size={14} />}
                           {isPinned(p.uuid) ? 'Unpin from Home' : 'Pin to Home'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setMenuOpenId(null)
+                            downloadDeadlineCalendar({ project: p.uuid }).catch((e: unknown) => toast(e instanceof Error ? e.message : 'The calendar file could not be downloaded.', 'error'))
+                          }}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          <CalendarPlus size={14} />
+                          Deadlines calendar
                         </button>
                       </div>
                     </>
