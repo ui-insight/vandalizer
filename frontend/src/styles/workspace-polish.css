@@ -260,6 +260,12 @@
 .agent-step-results dd { margin: 0; white-space: pre-wrap; }
 .agent-step-results pre { margin: 0; white-space: pre-wrap; font-size: var(--workspace-font-meta); }
 .agent-step-results-empty { color: #6b7280; }
+.agent-calculation { margin: 6px 0 0 20px; font-size: var(--workspace-font-meta); }
+.agent-calculation table { margin-top: 6px; border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+.agent-calculation th, .agent-calculation td { border-bottom: 1px solid #e5e7eb; padding: 4px 6px; text-align: left; vertical-align: top; }
+.agent-calculation td:last-child { text-align: right; white-space: nowrap; font-weight: 600; }
+.agent-calculation code { white-space: pre-wrap; word-break: break-word; }
+.agent-calculation-error { color: #b45309; font-weight: 400; white-space: normal; }
 .agent-run-status svg { flex-shrink: 0; }
 .agent-run-error { color: #991b1b; margin: 8px 0; }
 .agent-workflow-progress summary { cursor: pointer; padding: 10px 0; }

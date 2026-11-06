@@ -18,6 +18,7 @@ export const TOOL_META: Record<string, { label: string; category: ToolCategory }
   get_quality_info:      { label: 'Checking quality',         category: 'read' },
   search_library:        { label: 'Searching library',        category: 'read' },
   get_document_text:     { label: 'Reading document',         category: 'read' },
+  calculate:             { label: 'Calculating',              category: 'read' },
   get_app_help:          { label: 'Looking up help',          category: 'read' },
   fetch_url:             { label: 'Reading web page',         category: 'read' },
   web_search:            { label: 'Searching the web',        category: 'read' },

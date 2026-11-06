@@ -93,6 +93,10 @@ class AgenticChatDeps:
     # never took (approval_claims.require_announced_action).
     announced_action_retry_used: bool = False
 
+    # Once-only flag for calculation_claims.require_calculated_figures: a
+    # reply stating figures about a document that it never calculated.
+    calculation_retry_used: bool = False
+
     # Attached knowledge bases that have never been validated, and the
     # once-only flag for sending back a reply that calls one validated
     # (approval_claims.require_honest_validation).

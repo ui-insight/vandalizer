@@ -81,6 +81,7 @@ from app.services.kb_answer_grounding import (
     tool_output_as_source,
     unsupported_citations,
     check_figures,
+    calculation_formulas,
     used_snippet_refs,
 )
 from app.services.silence_inference import inferences_from_silence
@@ -2944,11 +2945,19 @@ async def chat_stream(
                 unsupported, calculated = (
                     check_figures(assistant_message, "\n".join(
                         workspace_sources
-                        + [tool_output_as_source(t) for t in tool_outputs]
+                        + [tool_output_as_source(t) for name, t in named_outputs if name != "calculate"]
                     ))
                     if active_kbs or documents or file_attachments or tool_outputs else ([], [])
                 )
                 calculated_figures = [{"figure": d.label, "formula": d.formula} for d in calculated]
+                # A figure a calculate step produced was worked out from the
+                # sources, not recalled: list it with the other calculated
+                # figures, with the tool's working as its formula, not as
+                # possible general knowledge.
+                calculation_outputs = [t for name, t in named_outputs if name == "calculate"]
+                by_tool = calculation_formulas(unsupported, calculation_outputs) if calculation_outputs else {}
+                calculated_figures += [{"figure": f, "formula": formula} for f, formula in by_tool.items()]
+                unsupported = [f for f in unsupported if f not in by_tool]
                 # An answer from a web search: its exact dates and figures
                 # must be on a page it read, not only in a search snippet.
                 unconfirmed_web = (
@@ -5096,10 +5105,10 @@ async def _finalize(
         segments=segments,
         citations=citations,
         unsupported_figures=unsupported_figures,
+        calculated_figures=calculated_figures,
         silence_inferences=silence_inferences,
         unsupported_citations=unsupported_citations,
         unconfirmed_web_facts=unconfirmed_web_facts,
-        calculated_figures=calculated_figures,
     )
 
     # Stamp the usage anchor for next turn's cheap context estimate (uplift
