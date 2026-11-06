@@ -239,3 +239,23 @@ def test_a_name_with_an_initial_gets_its_page_after_the_name_not_inside_it():
     assert text == ("- Grants contact: Marcus T. Hollowell, phone (703) 292-8101 (p. 2).\n"
                     "- Line I. Indirect Costs is $393,333 (p. 3).")
     assert [a["page"] for a in rec["attached"]] == [2, 3]
+
+
+def test_a_bare_reference_is_given_the_one_document_whose_page_holds_the_claim():
+    other = _doc(["Budget justification. Personnel: one graduate student at 50% effort.\n",
+                  "Travel. Two trips to the field site at $3,000 each; no foreign travel.\n",
+                  "Equipment. A spectrometer at $45,000, essential to the project.\n"], uuid="b", title="budget.pdf")
+    docs = [_doc(uuid="a", title="award.pdf"), other]
+    text, rec = _fix("- The PI must obtain NSF EPSCoR approval to carry the funds forward (p. 2).\n"
+                     "- Two trips to the field site are budgeted at $3,000 each [p. 2].", docs)
+    assert text == ("- The PI must obtain NSF EPSCoR approval to carry the funds forward (award.pdf, p. 2).\n"
+                    "- Two trips to the field site are budgeted at $3,000 each [budget.pdf, p. 2].")
+    assert rec["attributed"] == [{"page": 2, "doc": "award.pdf"}, {"page": 2, "doc": "budget.pdf"}]
+    assert rec["unattributed"] == 0 and rec["changed"] is True
+
+
+def test_a_bare_reference_two_documents_could_hold_stays_bare():
+    docs = [_doc(uuid="a", title="a.pdf"), _doc(uuid="b", title="b.pdf")]
+    answer = "The PI must obtain NSF EPSCoR approval to carry the funds forward (p. 2)."
+    text, rec = _fix(answer, docs)
+    assert text == answer and rec["unattributed"] == 1 and rec["attributed"] == []

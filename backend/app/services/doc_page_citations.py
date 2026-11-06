@@ -39,7 +39,7 @@ from typing import Optional
 from app.services import citation_grounding as cg
 from app.services.kb_answer_grounding import _money_values, _percent_values
 
-VERSION = 1
+VERSION = 2
 KIND = "page_citations"
 MAX_ATTACH = 20
 # A claim without anchors is attached to a page only when that page holds this
@@ -244,8 +244,8 @@ def repair_page_citations(answer: str, documents: list, *, attach: bool = True) 
 
     started = time.monotonic()
     record: dict = {"version": VERSION, "kind": KIND, "refs": 0, "checked": 0, "kept": 0, "repointed": [],
-                    "unresolved": 0, "unattributed": 0, "alongside": 0, "attached": [], "considered": 0,
-                    "changed": False}
+                    "unresolved": 0, "unattributed": 0, "attributed": [], "alongside": 0, "attached": [],
+                    "considered": 0, "changed": False}
 
     def done(text: str) -> tuple[str, dict]:
         record["changed"] = text != answer
@@ -276,10 +276,23 @@ def repair_page_citations(answer: str, documents: list, *, attach: bool = True) 
         except ValueError:
             continue
         doc = _cited_document(answer, m.span(), named) or only
+        claim_text = cg._claim_for_ref(answer, m.span(), _PAGE_REF_RE)
         if doc is None or doc.uuid not in indexed:
+            # A bare "p. N" with several documents attached names none of
+            # them, so the chips cannot check it and the reader cannot open
+            # it. When exactly one attached document's page N holds the
+            # claim, the reference is given that document's name, in the
+            # form the chips read ("(award.pdf, p. 3)").
+            if doc is None and len(indexed) > 1 and claim_text and cg._has_substance(claim_text):
+                claim = _claim(claim_text)
+                holders = [p for _d, pages in indexed.values() for p in pages
+                           if p.page == page and _score(claim, p, floor=CANDIDATE_MIN_OVERLAP) is not None]
+                if len(holders) == 1 and holders[0].title:
+                    edits.append((m.start(), m.start(), f"{holders[0].title}, "))
+                    record["attributed"].append({"page": page, "doc": holders[0].title})
+                    continue
             record["unattributed"] += 1
             continue
-        claim_text = cg._claim_for_ref(answer, m.span(), _PAGE_REF_RE)
         if not claim_text or not cg._has_substance(claim_text):
             continue
         record["checked"] += 1
