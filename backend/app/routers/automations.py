@@ -423,7 +423,12 @@ async def get_active_automations(user: User = Depends(get_current_user)) -> dict
             raw = await Automation.get_motor_collection().find_one(
                 {"_id": a.id}, {"_running": 1}
             )
-            if raw and raw.get("_running"):
+            # A queued or running extraction run (Run now or a watched
+            # folder) counts too; only the old inline path set _running.
+            in_flight = await ExtractionTriggerEvent.find(
+                {"automation_id": a_id_str, "status": {"$in": ["queued", "running"]}},
+            ).count()
+            if (raw and raw.get("_running")) or in_flight:
                 active_ids.append(a_id_str)
 
     # Resolve document ObjectIds to uuid+title for recently completed

@@ -38,6 +38,9 @@ def test_policy_questions_route_to_the_matching_built_in_kb(question, seeds):
     "What's on my calendar this week?",                   # no regulation named
     "Summarize this proposal",
     "Thanks!",
+    "Can you list my NIH workflows?",                     # about the app, not the regulation
+    "How do I attach the PAPPG knowledge base?",
+    "Which extraction templates work for NSF budgets?",
 ])
 def test_tasks_and_unrelated_messages_do_not_route(message):
     assert builtin_kbs.matching_seed_ids(message) == []
@@ -58,6 +61,16 @@ async def test_only_searchable_built_in_kbs_are_routed():
         routed = await builtin_kbs.route("Does an NSF award follow the Uniform Guidance for indirect costs?")
     assert [kb.title for kb in routed] == ["NSF PAPPG Reference"]
     assert builtin_kbs._searchable(_kb("x", "Empty", chunks=0)) is False
+
+
+@pytest.mark.asyncio
+async def test_the_catalog_copy_wins_over_another_kb_with_the_same_seed():
+    system = SimpleNamespace(**{**vars(PAPPG), "uuid": "system-pappg", "user_id": "system"})
+    legacy = SimpleNamespace(**{**vars(PAPPG), "uuid": "legacy-pappg", "user_id": "someone"})
+    for order in ([system, legacy], [legacy, system]):
+        with patch.object(builtin_kbs, "builtin_kbs", AsyncMock(return_value=order)):
+            routed = await builtin_kbs.route("What is the effective date of PAPPG 24-1?")
+        assert [kb.uuid for kb in routed] == ["system-pappg"]
 
 
 def _agent(seen: list[str], answer: str):

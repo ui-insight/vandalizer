@@ -1234,3 +1234,99 @@ def certification_complete_email(name: str, frontend_url: str) -> tuple[str, str
       <div class="footer">Vandalizer &middot; Certified Workflow Architect</div>
     </div></div></body></html>"""
     return subject, html
+
+
+def _deadline_rows_html(rows: list[dict[str, str]]) -> str:
+    items = []
+    for r in rows:
+        items.append(
+            '<li style="margin-bottom:12px">'
+            f'<a href="{escape(r["url"], quote=True)}" style="color:#fff;font-weight:600">{escape(r["title"])}</a>'
+            f'<br><span class="highlight">{escape(r["when"])}</span> &middot; {escape(r["date"])}'
+            f'<br>{escape(r["project"])}'
+            + (f'<br><span style="font-size:13px">{escape(r["source"])}</span>' if r.get("source") else "")
+            + "</li>"
+        )
+    return '<ul style="padding-left:20px;margin:16px 0;color:#d1d5db">' + "".join(items) + "</ul>"
+
+
+def _deadline_footer(frontend_url: str) -> str:
+    base = escape(frontend_url.rstrip("/"), quote=True)
+    return (
+        '<div class="footer">Vandalizer &middot; Deadline reminders for your projects &middot; '
+        f'<a href="{base}/account" style="color:#6b7280">Change reminder settings</a></div>'
+    )
+
+
+def deadline_reminder_email(
+    name: str, rows: list[dict[str, str]], frontend_url: str,
+) -> tuple[str, str]:
+    """Reminders that came due in one sweep, for one user.
+
+    ``rows`` carry title, project, when ("in 3 days", "today", "5 days past
+    due"), date, source and url, soonest (most overdue) first.
+    """
+    first = rows[0]
+    subject = (
+        f"Deadline {first['when']}: {first['title']}" if len(rows) == 1
+        else f"{len(rows)} project deadlines need attention"
+    )
+    greeting = f"Hi {escape(name)}," if name else "Hi,"
+    html = f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">{_BASE_STYLE}</head><body>
+    <div class="container"><div class="card">
+      <div class="logo">Vandalizer</div>
+      <h1>{escape(subject)}</h1>
+      <p>{greeting} these deadlines come from your projects' documents. Each link opens the item with the passage it was found in.</p>
+      {_deadline_rows_html(rows)}
+      <p>Mark an item done on Home once it's handled, and reminders for it stop.</p>
+      {_deadline_footer(frontend_url)}
+    </div></div></body></html>"""
+    return subject, html
+
+
+def deadline_summary_email(
+    name: str, groups: dict[str, list[dict[str, str]]], frontend_url: str,
+) -> tuple[str, str]:
+    """The weekly summary: overdue, due this week, next 30 days."""
+    counts = {k: len(v) for k, v in groups.items()}
+    subject = (
+        f"Deadlines this week: {counts.get('this_week', 0)} due, "
+        f"{counts.get('overdue', 0)} overdue"
+    )
+    sections = []
+    for key, heading in (("overdue", "Overdue"), ("this_week", "Due this week"), ("next_30_days", "Next 30 days")):
+        rows = groups.get(key) or []
+        if rows:
+            sections.append(f'<h2 style="font-size:16px;color:#fff;margin:24px 0 0">{heading}</h2>{_deadline_rows_html(rows)}')
+    greeting = f"Hi {escape(name)}," if name else "Hi,"
+    html = f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">{_BASE_STYLE}</head><body>
+    <div class="container"><div class="card">
+      <div class="logo">Vandalizer</div>
+      <h1>Your project deadlines</h1>
+      <p>{greeting} here is what is coming up across your projects.</p>
+      {''.join(sections)}
+      <p style="margin-top:24px"><a class="btn" href="{escape(frontend_url.rstrip('/'), quote=True)}/">Open Home</a></p>
+      {_deadline_footer(frontend_url)}
+    </div></div></body></html>"""
+    return subject, html
+
+
+def page_feedback_answer_email(
+    *, title: str, question: str, spot: str, answer: str, owner: str, link: str | None,
+) -> tuple[str, str]:
+    """The owner's answer to a question a public viewer left on a shared page."""
+    subject = f"Answer to your question on {title}"
+    spot_html = f'<p>About: <span class="highlight">{escape(spot)}</span></p>' if spot else ""
+    button = f'<p style="margin-top:24px"><a class="btn" href="{escape(link, quote=True)}">Open the page</a></p>' if link else ""
+    html = f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">{_BASE_STYLE}</head><body>
+    <div class="container"><div class="card">
+      <div class="logo">Vandalizer</div>
+      <h1>{escape(subject)}</h1>
+      {spot_html}
+      <p>You asked: “{escape(question)}”</p>
+      <p><strong style="color:#fff">{escape(owner or 'The page owner')} answered:</strong></p>
+      <p style="color:#e5e7eb;white-space:pre-wrap">{escape(answer)}</p>
+      {button}
+      <div class="footer">You're getting this because you left your email with a question on this page. We don't use it for anything else.</div>
+    </div></div></body></html>"""
+    return subject, html

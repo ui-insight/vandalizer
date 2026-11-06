@@ -85,3 +85,32 @@ class Obligation(Document):
             and self.observed_value is not None
             and self.observed_value > self.limit_value
         )
+
+
+class ObligationReminder(Document):
+    """One reminder sent to one user for one deadline stage.
+
+    The unique key is what makes the reminder sweep safe to run every hour and
+    on several workers: a stage is claimed by inserting this row first, and a
+    duplicate insert means someone already sent it. ``due_date`` is part of
+    the key, so an obligation whose date changes is reminded again on its new
+    schedule. The weekly summary uses the same table with
+    ``obligation_uuid="weekly-summary"`` and the ISO week as ``stage``.
+    """
+
+    obligation_uuid: str
+    user_id: str
+    # "before_14", "before_3", ... "due", "overdue"; an ISO week for the summary.
+    stage: str
+    due_date: str = ""
+    channels: list[str] = []
+    sent_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+    class Settings:
+        name = "obligation_reminder"
+        indexes = [
+            IndexModel(
+                [("obligation_uuid", ASCENDING), ("user_id", ASCENDING), ("stage", ASCENDING), ("due_date", ASCENDING)],
+                unique=True,
+            ),
+        ]

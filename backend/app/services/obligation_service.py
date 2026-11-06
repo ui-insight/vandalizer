@@ -414,6 +414,58 @@ async def find_replaced(project_uuid: str, clean: dict) -> Optional[Obligation]:
     return None
 
 
+_TITLE_FILLER = frozenset({"a", "an", "and", "the", "of", "for", "to", "due", "deadline", "date", "on", "by"})
+
+
+def _title_words(title: str) -> set[str]:
+    return {w for w in re.findall(r"[a-z0-9]+", (title or "").lower()) if w not in _TITLE_FILLER}
+
+
+def _similar_titles(a: str, b: str) -> bool:
+    """"Semi-annual results due" and "Semi-annual results report": yes.
+    "Final invoice" and "Final report": no."""
+    wa, wb = _title_words(a), _title_words(b)
+    if not wa or not wb:
+        return False
+    return len(wa & wb) / len(wa | wb) > 0.5
+
+
+def _same_rule(a: str, b: str) -> bool:
+    return " ".join(re.findall(r"[a-z0-9]+", a.lower())) == " ".join(re.findall(r"[a-z0-9]+", b.lower()))
+
+
+def _same_deadline(ob: Obligation, clean: dict) -> bool:
+    if not (ob.due_at and clean.get("due_at")) or ob.due_at.date() != clean["due_at"].date():
+        return False
+    # Same date, same title (ignoring case, punctuation and "due"/"deadline")
+    # is the same deadline, however each request typed or sourced it. Support
+    # ticket: "Validated qPCR assay protocol", Jun 30 2026, was added twice,
+    # once from a stated date and once from a timing rule.
+    if _title_words(ob.title) and _title_words(ob.title) == _title_words(clean["title"]):
+        return True
+    old_calc, new_calc = ob.deadline_calculation, clean.get("deadline_calculation")
+    if old_calc or new_calc:
+        # Occurrences of a recurring rule. Support ticket: the 4 semi-annual
+        # results deadlines already in the inbox were proposed again because
+        # chat titled them differently. Same date + same quoted rule + a
+        # similar title is the same deadline; two deliverables a rule names
+        # separately ("final invoice", "final report") keep distinct titles.
+        if _norm_title(ob.title) == _norm_title(clean["title"]):
+            return True
+        if not (old_calc and new_calc and _similar_titles(ob.title, clean["title"])):
+            return False
+        # The quoted rule can be worded differently from one proposal to the
+        # next; the calculation it produced (anchor and offset) can't.
+        return _same_rule(old_calc.rule, new_calc.rule) or (
+            old_calc.anchor_kind == new_calc.anchor_kind and old_calc.offset_days == new_calc.offset_days
+        )
+    return ob.deadline_type == clean.get("deadline_type")
+
+
+def _norm_title(title: str) -> str:
+    return (title or "").strip().lower()
+
+
 async def is_duplicate(project_uuid: str, clean: dict) -> bool:
     existing = await Obligation.find(
         Obligation.project_uuid == project_uuid,
@@ -422,11 +474,9 @@ async def is_duplicate(project_uuid: str, clean: dict) -> bool:
     ).to_list()
     for ob in existing:
         if clean["kind"] == "deadline" and ob.due_at and clean.get("due_at"):
-            if ob.deadline_type == clean.get("deadline_type") and ob.due_at.date() == clean["due_at"].date():
-                if (ob.deadline_calculation or clean.get("deadline_calculation")) and ob.title.strip().lower() != clean["title"].strip().lower():
-                    continue
+            if _same_deadline(ob, clean):
                 return True
-        elif ob.title.strip().lower() == clean["title"].strip().lower():
+        elif _norm_title(ob.title) == _norm_title(clean["title"]):
             return True
     return False
 
@@ -547,6 +597,13 @@ async def set_done(ob: Obligation, user: User, done: bool) -> Obligation:
     ob.completed_at = _now() if done else None
     ob.updated_at = _now()
     await ob.save()
+    if done:
+        # A finished deadline stops asking for attention in anyone's bell.
+        from app.models.notification import Notification
+
+        await Notification.find(
+            {"item_kind": "obligation", "item_id": ob.uuid, "read": False},
+        ).update_many({"$set": {"read": True}})
     return ob
 
 

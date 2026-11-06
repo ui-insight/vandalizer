@@ -1138,166 +1138,50 @@ def _check_folder_watch_automations(db: Database[dict], document_uuid: str) -> N
 
 
 def _run_automation_extraction(db: Database[dict], automation: dict, search_set_uuid: str, doc: dict) -> None:
-    """Run an extraction search set against a document (sync, for Celery workers)."""
+    """Queue a folder-watch extraction for a new file, exactly as Run now does.
+
+    Support ticket: a file arriving in a watched folder ran the extraction
+    inline here, saved the results onto the document where nothing in the app
+    reads them, and recorded no run — Run history stayed empty, the bell
+    stayed silent, and the user couldn't tell it had run. Run now went through
+    an ExtractionTriggerEvent and ``process_extraction_outputs``, which is
+    what Run history lists (Running → Completed/Failed, View result), meters
+    the model calls to the owner, bells failures and delivers the configured
+    outputs. The automatic path now takes that same route.
+    """
     from datetime import datetime, timezone
 
-    from app.services.extraction_engine import ExtractionEngine
+    from app.models.passive import ExtractionTriggerEvent
 
-    # Mark automation as running
     now = datetime.now(timezone.utc)
-    db.automation.update_one(
-        {"_id": automation["_id"]},
-        {"$set": {"_running": True, "_running_since": now}},
+    event = ExtractionTriggerEvent.model_construct(
+        automation_id=str(automation["_id"]),
+        search_set_uuid=search_set_uuid,
+        user_id=automation.get("user_id") or "",
+        status="queued",
+        document_uuids=[doc["uuid"]],
+        trigger_context={
+            "trigger_type": automation.get("trigger_type") or "folder_watch",
+            "document_title": doc.get("title") or "",
+        },
+        created_at=now,
+    ).model_dump(exclude={"id", "revision_id"})
+    inserted = db.extraction_trigger_event.insert_one(event)
+    celery_app.send_task(
+        "tasks.passive.process_extraction_outputs",
+        kwargs={
+            "automation_id": str(automation["_id"]),
+            "search_set_uuid": search_set_uuid,
+            "document_uuids": [doc["uuid"]],
+            "user_id": automation.get("user_id") or "",
+            "extraction_event_id": str(inserted.inserted_id),
+        },
+        queue="passive",
     )
-
-    try:
-        # Get extraction keys from search set items
-        ss_items = list(db.search_set_item.find({
-            "searchset": search_set_uuid,
-            "searchtype": "extraction",
-        }))
-        keys = [item["searchphrase"] for item in ss_items]
-        if not keys:
-            logger.warning("No extraction keys found for search set %s", search_set_uuid)
-            return
-
-        doc_text = doc.get("raw_text", "")
-        if not doc_text:
-            logger.warning("Document %s has no raw_text, skipping extraction", doc.get("uuid"))
-            return
-
-        # Resolve model
-        sys_config = db.system_config.find_one() or {}
-        models = sys_config.get("available_models", [])
-        model = models[0]["name"] if models else "gpt-4o-mini"
-
-        # Load search set config (honors optimizer override if set)
-        from app.services.search_set_service import effective_extraction_config
-        ss_doc = db.search_set.find_one({"uuid": search_set_uuid})
-        extraction_config = effective_extraction_config(ss_doc)
-
-        # Load field metadata, in the list shape the engine reads
-        # ({"key", ...} per field). This was a dict keyed by field name, which
-        # the engine iterated as strings: any field with allowed values or an
-        # optional flag raised TypeError. It also read "optional", a key the
-        # items don't have.
-        field_metadata = [
-            {
-                "key": item["searchphrase"],
-                "is_optional": item.get("is_optional", False),
-                "enum_values": item.get("enum_values", []),
-                "description": item.get("description"),
-            }
-            for item in ss_items
-        ]
-
-        engine = ExtractionEngine(system_config_doc=sys_config)
-        results = engine.extract(
-            extract_keys=keys,
-            model=model,
-            doc_texts=[doc_text],
-            extraction_config_override=extraction_config or None,
-            field_metadata=field_metadata,
-        )
-
-        # Save results to the document's extraction_results
-        db.smart_document.update_one(
-            {"_id": doc["_id"]},
-            {"$set": {
-                f"extraction_results.{search_set_uuid}": results,
-            }},
-        )
-
-        logger.info(
-            "Extraction automation '%s' completed: %d keys extracted for doc %s",
-            automation.get("name"), len(keys), doc.get("uuid"),
-        )
-
-        # Process output_config (storage, notifications, webhooks)
-        _process_extraction_outputs(db, automation, results)
-
-    finally:
-        # Clear running flag
-        db.automation.update_one(
-            {"_id": automation["_id"]},
-            {"$unset": {"_running": "", "_running_since": ""}},
-        )
-
-
-def _process_extraction_outputs(db: Database[dict], automation: dict, results: dict | list[dict]) -> None:
-    """Process output_config for an extraction automation."""
-
-    from app.services.output_handlers import (
-        call_webhook,
-        save_extraction_results_to_folder,
-        send_workflow_notification,
-        should_send_notification,
+    logger.info(
+        "Queued extraction run %s for automation '%s' on doc %s",
+        inserted.inserted_id, automation.get("name"), doc.get("uuid"),
     )
-
-    output_config = automation.get("output_config") or {}
-    if not output_config:
-        return
-
-    # Build a result-like dict for notification/webhook handlers
-    result_doc = {
-        "automation_user_id": automation.get("user_id"),
-        "status": "completed",
-        "trigger_type": automation.get("trigger_type", "folder_watch"),
-        "final_output": {"output": results},
-    }
-
-    # Each output is attempted independently (one failed webhook must not
-    # block storage), but failures are COLLECTED, not swallowed: the
-    # automation used to report success with its deliverables never leaving
-    # the building (#810).
-    delivery_failures: list[str] = []
-
-    # 1. Storage
-    storage_cfg = output_config.get("storage", {})
-    if storage_cfg.get("enabled"):
-        try:
-            path = save_extraction_results_to_folder(results, automation, storage_cfg)
-            logger.info("Extraction results saved to %s", path)
-        except Exception as e:
-            logger.error("Failed to save extraction results: %s", e)
-            delivery_failures.append(f"library save failed: {str(e)[:200]}")
-
-    # 2. Notifications
-    for notification in output_config.get("notifications", []):
-        try:
-            if should_send_notification(result_doc, notification):
-                send_workflow_notification(result_doc, notification)
-        except Exception as e:
-            logger.error("Failed to send extraction notification: %s", e)
-            delivery_failures.append(
-                f"notification ({notification.get('channel') or 'configured'}) failed: {str(e)[:200]}"
-            )
-
-    # 3. Webhooks
-    for webhook_cfg in output_config.get("webhooks", []):
-        try:
-            call_webhook(result_doc, webhook_cfg)
-        except Exception as e:
-            logger.error("Failed to call extraction webhook: %s", e)
-            delivery_failures.append(
-                f"webhook ({webhook_cfg.get('url') or 'configured'}) failed: {str(e)[:200]}"
-            )
-
-    if delivery_failures:
-        # delivery_failed, not automation_failed: the extraction RAN and its
-        # results exist — and coalescing onto the automation_failed key would
-        # overwrite an unread genuine dispatch failure's detail.
-        from app.services.failure_notifications import notify_delivery_failed
-
-        notify_delivery_failed(
-            db,
-            automation=automation,
-            detail=(
-                "The extraction ran, but "
-                f"{len(delivery_failures)} configured output(s) failed to "
-                "deliver: " + "; ".join(delivery_failures)
-            ),
-        )
 
 
 @celery_app.task(
@@ -1442,6 +1326,11 @@ def perform_semantic_ingestion(self: Task, raw_text: str, document_uuid: str, us
             logger.exception(
                 "Project KB ingestion failed for %s", document_uuid
             )
+        # A project's award snapshot reads its documents: a new or re-read
+        # one rebuilds it (only once someone has built it). Never raises.
+        from app.services.award_snapshot import queue_rebuild_for_document_sync
+
+        queue_rebuild_for_document_sync(db, doc)
 
     return document_uuid
 

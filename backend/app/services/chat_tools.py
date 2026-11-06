@@ -444,7 +444,26 @@ async def _confirm_gate(
         (p for p in armed if isinstance(p, dict) and p.get("fp") == fp), None
     )
 
-    # Execute only when a prior-turn preview armed this exact action.
+    # Execute only when a prior-turn preview armed this exact action, and this
+    # turn approved it: a card's button approves that card only, and a typed
+    # "yes" only when one action is waiting (approval_scope).
+    approved = getattr(deps, "approved_confirmations", None)
+    if (
+        confirmed and match is not None and int(match.get("turn", marker)) < marker
+        and approved is not None and fp not in approved
+    ):
+        from app.services.approval_scope import blocked_instruction
+
+        # Not a new card: the action is still waiting on its own card, whose
+        # id the client already has. A card here would carry this call's id,
+        # which nothing armed, so its button could never work.
+        out = {k: v for k, v in preview.items() if k != "needs_confirmation"}
+        out["status"] = "awaiting_user_confirmation"
+        out["still_waiting"] = True
+        out["assistant_instruction"] = blocked_instruction(
+            getattr(deps, "approval_mode", "none"), int(getattr(deps, "approval_waiting", 0) or 0),
+        )
+        return out
     if confirmed and match is not None and int(match.get("turn", marker)) < marker:
         if conv is not None:
             conv.pending_confirmations = [
@@ -466,6 +485,10 @@ async def _confirm_gate(
             if not (isinstance(p, dict) and p.get("fp") == fp)
         ]
         entry = {"fp": fp, "turn": marker, "tool": tool_name}
+        # The preview's tool call id: the id its card's button sends back.
+        call_id = getattr(context, "tool_call_id", None)
+        if isinstance(call_id, str) and call_id:
+            entry["call_id"] = call_id
         if stash is not None:
             entry["stash"] = stash
         new_pending.append(entry)
@@ -5283,6 +5306,70 @@ def _obligation_review_reason(reason: str) -> str:
     return "More supporting information is needed before this item can be added."
 
 
+_MAX_OBLIGATION_FAILURES = 2
+
+
+async def list_project_inbox(
+    context: RunContext[AgenticChatDeps],
+    project_uuid: Optional[str] = None,
+) -> dict:
+    """Read what is already in a project's RA inbox: deadlines, required material, limits.
+
+    Use this whenever the user refers to the inbox's existing items: "the deadlines
+    in this project's RA inbox", "what's in the inbox", "what's due on this award",
+    or a Page or summary built "from the RA inbox". It only reads. Do not call
+    propose_obligations unless the user asks to add or track items.
+
+    Describe items as "from the RA inbox" only when they came from this result, and
+    name the document each came from (its sources). Done items are listed with
+    status "done"; replaced ones are left out.
+
+    Args:
+        context: The call context.
+        project_uuid: The project; defaults to the one open in chat.
+    """
+    from app.services import obligation_service, project_service
+
+    if project_uuid:
+        project = await project_service.get_authorized_project(project_uuid, context.deps.user)
+    else:
+        project = await _resolve_active_project(context)
+    if not project:
+        return _err(
+            "No project is open.",
+            hint="Open the project in chat, or pass its project_uuid (list it with list_projects).",
+        )
+    rows = await obligation_service.project_obligations(project, context.deps.user)
+    context.deps.inbox_read = True
+    items = []
+    for row in rows:
+        if row["status"] == "superseded":
+            continue
+        calculation = row.get("deadline_calculation") or {}
+        items.append({
+            "title": row["title"],
+            "kind": row["kind"],
+            "status": row["status"],
+            **({"due": (row["due_at"] or "")[:10], "due_text": row.get("due_text")} if row["kind"] == "deadline" else {}),
+            **({"formula": calculation["formula"]} if calculation.get("formula") else {}),
+            **({"limit_value": row["limit_value"], "observed_value": row["observed_value"], "unit": row["unit"]}
+               if row["kind"] == "limit" else {}),
+            "sources": [
+                {"document_title": s.get("document_title"), "page": s.get("page")}
+                for s in row.get("sources") or []
+            ],
+        })
+    return {
+        "project": project.title,
+        "count": len(items),
+        "items": items,
+        "message": (
+            f'The RA inbox for "{project.title}" has {len(items)} item{"s" if len(items) != 1 else ""}.'
+            if items else f'The RA inbox for "{project.title}" is empty.'
+        ),
+    }
+
+
 async def propose_obligations(
     context: RunContext[AgenticChatDeps],
     obligations: list[dict],
@@ -5361,6 +5448,17 @@ async def propose_obligations(
         return {"error": "You need edit access to change this project's inbox."}
     if not isinstance(obligations, list) or not obligations:
         return {"error": "Pass at least one obligation."}
+    # Support ticket: five retries in one reply, each "None of the proposed
+    # items could be checked", before a second card appeared.
+    failures = getattr(context.deps, "obligation_failures", 0)
+    if failures >= _MAX_OBLIGATION_FAILURES:
+        return {
+            "error": "Stopped: the inbox items couldn't be verified after repeated attempts in this reply.",
+            "hint": (
+                "Do not call propose_obligations again in this reply. Tell the user which items "
+                "couldn't be checked against their documents and why, and ask how to proceed."
+            ),
+        }
 
     checked = await obligation_service.propose(project, context.deps.user, obligations)
     accepted, rejected = checked["accepted"], checked["rejected"]
@@ -5378,6 +5476,7 @@ async def propose_obligations(
     lines = [f"Add: {description}" for description in descriptions]
     lines += [f"Not included: {r['title']} — {r['explanation']}" for r in excluded]
     if not accepted:
+        context.deps.obligation_failures = failures + 1
         return {
             "error": "None of the proposed items could be checked against their documents.",
             "rejected": rejected,
@@ -7016,6 +7115,7 @@ async def submit_certification_assessment(
 
 
 from app.services.chat_workflow_tools import get_workflow_definition, update_workflow  # noqa: E402
+from app.services.chat_snapshot_tools import get_award_snapshot  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Tool registry — imported by llm_service.create_agentic_chat_agent()
@@ -7081,6 +7181,8 @@ TOOLS: list[ToolFuncContext[AgenticChatDeps, ...]] = [
     pin_to_project,
     unpin_from_project,
     set_project_status,
+    list_project_inbox,
+    get_award_snapshot,
     propose_obligations,
     # Phase 9 — Automations
     create_automation,
@@ -7131,6 +7233,8 @@ COMPACTABLE_TOOLS: frozenset[str] = frozenset({
     "list_test_cases",
     "list_optimization_recommendations",
     "list_project_documents",
+    "list_project_inbox",
+    "get_award_snapshot",
     "list_projects",
     "get_certification_progress",
     "get_certification_module",

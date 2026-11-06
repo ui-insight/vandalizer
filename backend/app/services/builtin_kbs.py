@@ -73,10 +73,20 @@ _QUESTION = re.compile(
     re.IGNORECASE,
 )
 
+# A question about the user's own things in Vandalizer ("Can you list my NIH
+# workflows?", "How do I attach the PAPPG KB?") names a sponsor but is about
+# the app, not the regulation: knowledge-base mode would answer it from
+# regulation snippets instead of with tools.
+_APP_OBJECT = re.compile(
+    r"\b(?:workflows?|extractions?|templates?|folders?|automations?|knowledge bases?|kbs?|vandalizer"
+    r"|my (?:documents?|files?|library|projects?|uploads?))\b",
+    re.IGNORECASE,
+)
+
 
 def is_policy_question(message: str) -> bool:
     text = message or ""
-    return bool(_QUESTION.search(text)) and not _ACTION.search(text)
+    return bool(_QUESTION.search(text)) and not _ACTION.search(text) and not _APP_OBJECT.search(text)
 
 
 def matching_seed_ids(message: str) -> list[str]:
@@ -115,7 +125,10 @@ async def route(message: str) -> list[Any]:
     seeds = matching_seed_ids(message)
     if not seeds:
         return []
-    by_seed = {(kb.resource_config or {}).get("seed_id"): kb for kb in await builtin_kbs()}
+    # The catalog's own copy (owned by "system") wins over any other verified
+    # KB that carries the same seed_id (a legacy KB stamped by title).
+    found = sorted(await builtin_kbs(), key=lambda kb: getattr(kb, "user_id", None) == "system")
+    by_seed = {(kb.resource_config or {}).get("seed_id"): kb for kb in found}
     return [by_seed[seed] for seed in seeds if seed in by_seed]
 
 

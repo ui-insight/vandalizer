@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from '@tanstack/react-router'
-import { AlertTriangle, CalendarClock, Check, EyeOff, FileText, Inbox } from 'lucide-react'
-import { getInbox, setInboxHidden, setObligationDismissed, setObligationDone } from '../../api/obligations'
+import { Link, useNavigate } from '@tanstack/react-router'
+import { AlertTriangle, CalendarClock, CalendarPlus, Check, EyeOff, FileText, Inbox } from 'lucide-react'
+import { downloadDeadlineCalendar, getInbox, plainQuote, quoteSearchTerms, setInboxHidden, setObligationDismissed, setObligationDone } from '../../api/obligations'
 import type { Obligation } from '../../api/obligations'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 
@@ -50,14 +50,6 @@ function urgency(item: Obligation): string | null {
   return null
 }
 
-/** A source quote as people read it: quotes match the document's extracted
- * text, which can keep table markup (`<td>Period of Performance</td>…`). */
-function plainQuote(quote: string): string {
-  const text = quote.replace(/<[^>]+>/g, ' ')
-  const decoded = new DOMParser().parseFromString(text, 'text/html').documentElement.textContent ?? text
-  return decoded.split(/\s+/).filter(Boolean).join(' ')
-}
-
 const SOURCE_ROLES: Record<string, string> = {
   limit: 'Limit', observed: 'Observed value', timing: 'Timing rule',
   period_of_performance: 'Period of Performance', budget_period: 'Budget period',
@@ -77,14 +69,38 @@ const BUTTON = {
 // one bordered control a row needs.
 const QUIET = { ...BUTTON, border: '1px solid transparent', color: '#374151' } as const
 
-function InboxRow({ item, onChanged, onError }: {
+// Upcoming groups, in the order they are shown. Dated deadlines only; undated
+// ones, required material and limits follow under "Needed".
+const GROUPS = [
+  { key: 'overdue', label: 'Overdue' },
+  { key: 'this_week', label: 'Due this week' },
+  { key: 'next_30_days', label: 'Next 30 days' },
+  { key: 'later', label: 'Later' },
+  { key: 'needed', label: 'Needed and limits' },
+] as const
+type GroupKey = typeof GROUPS[number]['key']
+
+export function upcomingGroup(item: Obligation): GroupKey {
+  const days = item.kind === 'deadline' ? daysUntil(item) : null
+  if (days == null) return 'needed'
+  if (days < 0) return 'overdue'
+  if (days <= 6) return 'this_week'
+  if (days <= 30) return 'next_30_days'
+  return 'later'
+}
+
+function InboxRow({ item, focused, onChanged, onError }: {
   item: Obligation
+  focused: boolean
   onChanged: (uuid: string, change: 'done' | 'dismissed') => void
   onError: (message: string) => void
 }) {
   const navigate = useNavigate()
   const { viewDocument } = useWorkspace()
   const [busy, setBusy] = useState(false)
+  const rowRef = useRef<HTMLLIElement>(null)
+  // A reminder's link lands here: bring the item into view.
+  useEffect(() => { if (focused) rowRef.current?.scrollIntoView?.({ block: 'nearest' }) }, [focused])
   const soon = urgency(item)
   const Icon = item.kind === 'deadline' ? CalendarClock : item.kind === 'limit' ? AlertTriangle : FileText
   const alert = item.in_conflict || (soon != null && (daysUntil(item) ?? 99) <= 7)
@@ -103,7 +119,10 @@ function InboxRow({ item, onChanged, onError }: {
   }
 
   return (
-    <li style={{ display: 'flex', gap: 'var(--workspace-space-8)', padding: 'var(--workspace-space-8) var(--workspace-space-12)', borderRadius: 'var(--workspace-radius-medium)', listStyle: 'none' }}>
+    <li ref={rowRef} aria-current={focused ? 'true' : undefined} style={{
+      display: 'flex', gap: 'var(--workspace-space-8)', padding: 'var(--workspace-space-8) var(--workspace-space-12)', borderRadius: 'var(--workspace-radius-medium)', listStyle: 'none',
+      ...(focused ? { outline: '2px solid #f1b300', backgroundColor: '#fffbeb' } : {}),
+    }}>
       <Icon size={16} aria-hidden style={{ flexShrink: 0, marginTop: 2, color: alert ? '#b45309' : '#6b7280' }} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 'var(--workspace-font-control)', color: '#111827', fontWeight: 500 }}>
@@ -133,7 +152,7 @@ function InboxRow({ item, onChanged, onError }: {
               <button key={`${source.document_uuid}-${source.page}-${i}`} type="button" title={plainQuote(source.quote)} style={BUTTON}
                 aria-label={role ? `Open the ${role.toLowerCase()} in ${where}` : `Open ${where}`}
                 onClick={() => viewDocument(source.document_uuid, source.document_title, {
-                  terms: [plainQuote(source.quote).split(' ').slice(0, 8).join(' ')],
+                  terms: [quoteSearchTerms(source.quote)],
                   page: source.page,
                 })}>
                 {role && <span style={{ fontWeight: 600 }}>{role}:</span>}
@@ -142,6 +161,11 @@ function InboxRow({ item, onChanged, onError }: {
             )
           })}
           <span style={{ flex: 1 }} />
+          {item.kind === 'deadline' && item.due_at && <button type="button" style={QUIET} disabled={busy}
+            aria-label={`Add "${item.title}" to your calendar`}
+            onClick={() => { downloadDeadlineCalendar({ obligation: item.uuid }).catch((e: unknown) => onError(e instanceof Error ? e.message : 'The calendar file could not be downloaded.')) }}>
+            <CalendarPlus size={12} aria-hidden /> Add to calendar
+          </button>}
           <button type="button" style={QUIET} disabled={busy}
             aria-label={`Mark "${item.title}" done for everyone on the project`}
             onClick={() => act('done', () => setObligationDone(item.uuid, true))}>
@@ -158,7 +182,11 @@ function InboxRow({ item, onChanged, onError }: {
   )
 }
 
-export function RAInbox() {
+/** "Due and needed": Home's list across your projects, or, inside a project,
+ * only that project's (support ticket: a project chat listed another
+ * project's deadlines above its own). */
+export function RAInbox({ projectUuid }: { projectUuid?: string | null } = {}) {
+  const { focusedObligationUuid } = useWorkspace()
   const [items, setItems] = useState<Obligation[] | null>(null)
   const [loadError, setLoadError] = useState(false)
   const [hidden, setHidden] = useState(false)
@@ -169,7 +197,7 @@ export function RAInbox() {
   const loaded = useRef(false)
   const load = useCallback(async (includeDismissed: boolean) => {
     try {
-      const data = await getInbox(includeDismissed)
+      const data = await getInbox(includeDismissed, projectUuid)
       loaded.current = true
       setLoadError(false)
       setItems(data.items)
@@ -180,7 +208,7 @@ export function RAInbox() {
       // load that fails is shown as an error, never as an empty inbox.
       if (!loaded.current) setLoadError(true)
     }
-  }, [])
+  }, [projectUuid])
 
   useEffect(() => { void load(showDismissed) }, [load, showDismissed])
 
@@ -201,12 +229,17 @@ export function RAInbox() {
   if (hidden) return null
   const visible = showDismissed ? items : items.filter(i => !i.dismissed)
   const dismissedCount = items.filter(i => i.dismissed).length
+  const open = visible.filter(i => !i.dismissed)
+  const dismissed = visible.filter(i => i.dismissed)
+  const focusMissing = focusedObligationUuid != null && !items.some(i => i.uuid === focusedObligationUuid && !i.dismissed)
   // With projects to cover, an empty inbox says what it checked: silence
   // would read as "nothing is due", which it can't know about unsaved work.
   if (visible.length === 0 && !showDismissed) {
     if (projectCount === 0) return null
     return <p role="status" className="home-meta">
-      Nothing due or missing in your {projectCount === 1 ? 'project' : `${projectCount} projects`}. Only deadlines and materials saved to a project appear here.
+      {projectUuid
+        ? 'Nothing due or missing in this project. Only deadlines and materials saved to it appear here.'
+        : `Nothing due or missing in your ${projectCount === 1 ? 'project' : `${projectCount} projects`}. Only deadlines and materials saved to a project appear here.`}
     </p>
   }
 
@@ -243,28 +276,56 @@ export function RAInbox() {
         <h2 style={{ margin: 0, fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           Due and needed
         </h2>
+        <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>{projectUuid ? 'This project' : 'All your projects'}</span>
         <span style={{ flex: 1 }} />
         {(dismissedCount > 0 || showDismissed) && (
           <button type="button" style={{ ...BUTTON, border: 'none' }} onClick={() => setShowDismissed(v => !v)}>
             {showDismissed ? 'Hide dismissed' : `Show dismissed (${dismissedCount})`}
           </button>
         )}
-        <button type="button" style={{ ...BUTTON, border: 'none' }} onClick={hideInbox}
+        {visible.some(i => i.kind === 'deadline' && i.due_at && !i.dismissed) && (
+          <button type="button" style={{ ...BUTTON, border: 'none' }}
+            aria-label={projectUuid ? "Download a calendar file with this project's open deadlines" : 'Download a calendar file with all your open deadlines'}
+            onClick={() => { downloadDeadlineCalendar(projectUuid ? { project: projectUuid } : 'all').catch((e: unknown) => setError(e instanceof Error ? e.message : 'The calendar file could not be downloaded.')) }}>
+            <CalendarPlus size={12} aria-hidden /> Calendar
+          </button>
+        )}
+        <Link to="/account" hash="deadline-reminders" style={{ ...BUTTON, border: 'none', textDecoration: 'none' }}
+          aria-label="Deadline reminder settings">
+          Reminders
+        </Link>
+        {!projectUuid && <button type="button" style={{ ...BUTTON, border: 'none' }} onClick={hideInbox}
           aria-label="Hide this inbox from your Home. You can turn it back on in Account settings.">
           Hide inbox
-        </button>
+        </button>}
       </div>
       {error && <p role="alert" style={{ margin: 'var(--workspace-space-4) var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: '#b91c1c' }}>{error}</p>}
-      <ul style={{ margin: 'var(--workspace-space-4) 0 0', padding: 0 }}>
-        {visible.map(item => item.dismissed ? (
-          <li key={item.uuid} style={{ listStyle: 'none', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', padding: 'var(--workspace-space-6) var(--workspace-space-12)', color: '#6b7280', fontSize: 'var(--workspace-font-meta)' }}>
-            <span style={{ flex: 1 }}>{item.title} · {item.project_title}</span>
-            <button type="button" style={BUTTON} onClick={() => restore(item.uuid)}>Restore</button>
-          </li>
-        ) : (
-          <InboxRow key={item.uuid} item={item} onChanged={changed} onError={setError} />
-        ))}
-      </ul>
+      {focusMissing && <p role="status" style={{ margin: 'var(--workspace-space-4) var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: '#4b5563' }}>
+        The deadline from that reminder is no longer open here: it was marked done, replaced by an amendment, or dismissed.
+      </p>}
+      {GROUPS.map(group => {
+        const rows = open.filter(i => upcomingGroup(i) === group.key)
+        if (!rows.length) return null
+        return <div key={group.key} role="group" aria-label={group.label}>
+          <h3 style={{ margin: 'var(--workspace-space-8) var(--workspace-space-12) 0', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: group.key === 'overdue' ? '#b45309' : '#6b7280' }}>
+            {group.label} <span style={{ fontWeight: 400 }}>({rows.length})</span>
+          </h3>
+          <ul style={{ margin: 'var(--workspace-space-4) 0 0', padding: 0 }}>
+            {rows.map(item => <InboxRow key={item.uuid} item={item} focused={item.uuid === focusedObligationUuid} onChanged={changed} onError={setError} />)}
+          </ul>
+        </div>
+      })}
+      {showDismissed && dismissed.length > 0 && <div role="group" aria-label="Dismissed">
+        <h3 style={{ margin: 'var(--workspace-space-8) var(--workspace-space-12) 0', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280' }}>Dismissed</h3>
+        <ul style={{ margin: 'var(--workspace-space-4) 0 0', padding: 0 }}>
+          {dismissed.map(item => (
+            <li key={item.uuid} style={{ listStyle: 'none', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', padding: 'var(--workspace-space-6) var(--workspace-space-12)', color: '#6b7280', fontSize: 'var(--workspace-font-meta)' }}>
+              <span style={{ flex: 1 }}>{item.title} · {item.project_title}</span>
+              <button type="button" style={BUTTON} onClick={() => restore(item.uuid)}>Restore</button>
+            </li>
+          ))}
+        </ul>
+      </div>}
     </section>
   )
 }
