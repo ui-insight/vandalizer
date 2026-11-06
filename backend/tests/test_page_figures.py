@@ -137,3 +137,57 @@ def test_a_page_without_source_files_is_not_checked():
     rendered, _ = render_page({"title": "Notes", "html": preview["prepared_html"],
                                "created_at": datetime.now(timezone.utc), "source": preview["source"]}, 1)
     assert "vandalizer-figure-check" not in rendered and not re.search(r"vz-figure", rendered)
+
+
+# ── Review fixes ────────────────────────────────────────────────────────────
+
+def test_annotation_markup_written_into_the_page_is_not_trusted():
+    """Chat sees the annotated preview HTML; spans it copies back (or invents)
+    used to be skipped, keeping their stale "From …" hover on a figure the
+    check could not find."""
+    page = EDITED_PAGE.replace(
+        "<p>Indirect costs", '<p><span class="vz-figure vz-figure--stated" title="From NIH R01 Budget Table.xlsx">$999k</span> '
+        '<aside id="vandalizer-figure-check">Figures checked: all match</aside>Indirect costs')
+    result = pf.check(page, _sources())
+    assert _by_figure(result)["$999k"]["status"] == "unmatched"
+    soup = BeautifulSoup(page, "html.parser")
+    pf.annotate(soup, result)
+    [span] = [s for s in soup.find_all("span", class_="vz-figure") if s.get_text() == "$999k"]
+    assert span["title"] == "Not found in the source files"
+    assert len(soup.select("#vandalizer-figure-check")) == 1
+    assert "all match" not in soup.get_text()
+
+
+def test_share_dialog_summary_only_for_checked_versions():
+    db = SimpleNamespace(html_artifacts=Collection(), chat_page_previews=Collection(), smart_document=Collection())
+    page = artifacts.create(db, "owner", "Notes", "<p>$5,000</p>", "k", {"kind": "chat"})
+    assert artifacts.metadata(page, True)["figure_check"] == {}
+
+
+async def test_a_hand_edit_in_the_page_editor_is_checked(client):
+    from unittest.mock import AsyncMock, patch
+
+    from app.dependencies import get_current_user
+    from app.main import app
+    from app.services.access_control import TeamAccessContext
+    from tests.test_chat_routes import _auth, _make_user
+
+    db = SimpleNamespace(html_artifacts=Collection(), chat_page_previews=Collection(), smart_document=Collection())
+    db.smart_document.docs.append({"uuid": "sheet", "title": TITLE, "raw_text": SHEET, "text_markers": None})
+    page = artifacts.create(db, "testuser", "Budget", "<p>$250k</p>", "k",
+                            {"kind": "chat", "documents": [{"uuid": "sheet", "title": TITLE, "version_number": 1}]})
+    user = _make_user()
+    app.dependency_overrides[get_current_user] = lambda: user
+    cookies, headers = _auth()
+    try:
+        with patch("app.routers.artifacts.get_sync_db", return_value=db), \
+             patch("app.routers.artifacts.access_control.get_team_access_context", new=AsyncMock(return_value=TeamAccessContext())):
+            response = await client.post(f"/api/pages/{page['uuid']}/revisions", cookies=cookies, headers=headers,
+                                         json={"title": "Budget", "html": "<p>$250k and $777k</p>", "base_revision": page["latest_revision"]})
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+    assert response.status_code == 200, response.text
+    edited = artifacts.revision(artifacts.get(db, page["uuid"]))
+    check = edited["source"]["figure_check"]
+    assert (check["stated"], check["unmatched"]) == (1, 1)
+    assert response.json()["figure_check"][edited["uuid"]].endswith("1 not found in the source ($777k)")

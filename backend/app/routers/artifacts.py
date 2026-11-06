@@ -237,6 +237,10 @@ async def revise_artifact(request: Request, uuid: str, body: ReviseArtifactReque
     # A hand edit is still built from the same files: keep them, so the Page
     # still notices when one of them gets a new version.
     source = page_sources.editor_source(artifacts.revision(doc))
+    if source:
+        # The built-in figure check runs on hand edits too (page_figures).
+        from app.services import page_figures
+        source = await run(page_figures.with_check, body.html, body.title, source)
     return artifacts.metadata(await run(artifacts.revise, doc, body.title, body.html, body.base_revision, source), True)
 
 

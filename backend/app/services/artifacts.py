@@ -266,9 +266,10 @@ def metadata(doc: dict, owner: bool=False) -> dict:
     from app.services import page_figures
     # The built-in figure check per revision, so the Share dialog can show it
     # for whichever version is about to be published.
+    # Unchecked versions are left out, so the dialog keeps its generic warning.
     result["figure_check"] = {
         r["uuid"]: page_figures.summary((r.get("source") or {}).get("figure_check"))
-        for r in doc["revisions"]
+        for r in doc["revisions"] if (r.get("source") or {}).get("figure_check")
     }
     if owner:
         result["public_token"] = doc.get("public_token")

@@ -202,11 +202,26 @@ def _origin(location: _Location) -> dict[str, Any]:
     return {"text": location.describe(), "row": location.row, "column": location.column}
 
 
+def strip_annotations(soup: BeautifulSoup) -> None:
+    """Remove figure-check markup that isn't ours to trust.
+
+    Stored HTML never holds annotations: they are added when a Page is shown.
+    Any that are present were written into the page (for example copied from
+    a preview chat was shown), so their hover text is stale or invented.
+    """
+    for element in soup.select("#vandalizer-figure-style, #vandalizer-figure-check"):
+        element.decompose()
+    for span in soup.find_all(class_=re.compile(r"^vz-figure")):
+        if isinstance(span, Tag):
+            span.unwrap()
+
+
 def check(html: str, sources: list[tuple[str, list[_SourceValue]]]) -> dict[str, Any] | None:
     """The figure check for a Page's HTML, or None when it has no source files."""
     if not sources:
         return None
     soup = BeautifulSoup(html or "", "html.parser")
+    strip_annotations(soup)
     manual = _manual_edits(soup)
     text = _page_text(soup)
     figures: list[Figure] = []
@@ -262,6 +277,15 @@ def check(html: str, sources: list[tuple[str, list[_SourceValue]]]) -> dict[str,
         **counts,
         "figures": ordered,
     }
+
+
+def with_check(db: Database[dict], html: str, title: str, source: dict[str, Any]) -> dict[str, Any]:
+    """``source`` plus the figure check of ``html`` against its recorded files."""
+    from app.services.artifacts import clean_html
+
+    prepared, _warnings = clean_html(html, title)
+    result = check(prepared, load_sources(db, source.get("documents") or []))
+    return {**source, "figure_check": result} if result is not None else source
 
 
 def summary(result: dict[str, Any] | None) -> str:
@@ -352,14 +376,13 @@ def _hover(entry: dict[str, Any], node: Any = None) -> str:
 
 def annotate(soup: BeautifulSoup, result: dict[str, Any] | None) -> None:
     """Hover text on each checked figure and a "Figures checked" line, in place."""
+    strip_annotations(soup)
     if not result or not soup.body:
         return
     entries = {e["figure"]: e for e in result.get("figures") or []}
     pattern = re.compile(f"{_MONEY_RE.pattern}|{_PERCENT_RE.pattern}", re.IGNORECASE)
     for node in list(soup.body.find_all(string=True)):
         if node.parent is None or node.parent.name in {"script", "style", "title"}:
-            continue
-        if isinstance(node.parent, Tag) and "vz-figure" in (node.parent.get("class") or []):
             continue
         text = str(node)
         pieces: list[Any] = []
