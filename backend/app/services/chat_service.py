@@ -2760,6 +2760,32 @@ async def chat_stream(
                             "answer_check": answer_check,
                             "page_citations": page_citations,
                         }) + "\n"
+                # A knowledge-base answer's uncited claims given the passage
+                # of the pool that holds each outright (off unless
+                # chat_config turns it on; kb_citation_attach). The sources
+                # the new citations name count as used.
+                kb_citation_attach = None
+                if streamed_citations and kb_sources:
+                    assistant_message, kb_citation_attach = _attach_kb_citations(
+                        assistant_message, kb_sources, sys_config_doc,
+                    )
+                    if kb_citation_attach and kb_citation_attach.get("changed"):
+                        streamed_segments[:] = [
+                            s for s in streamed_segments if s.get("kind") != "text"
+                        ] + [{"kind": "text", "content": assistant_message}]
+                        yield json.dumps({
+                            "kind": "answer_revised",
+                            "content": assistant_message,
+                            "answer_check": answer_check,
+                            "kb_citation_attach": kb_citation_attach,
+                        }) + "\n"
+                        used_refs = _mark_used_citations(assistant_message, streamed_citations)
+                        if used_refs is not None:
+                            yield json.dumps({
+                                "kind": "sources_used",
+                                "content": "",
+                                "used_refs": used_refs,
+                            }) + "\n"
 
                 # Clean think tags from text segments before persisting
                 cleaned_segments: list[dict] = []
@@ -2876,6 +2902,7 @@ async def chat_stream(
                     claim_checks=claim_checks,
                     answer_check=answer_check,
                     page_citations=page_citations,
+                    kb_citation_attach=kb_citation_attach,
                 )
                 if unsupported or silent or miscited:
                     yield json.dumps({
@@ -4666,6 +4693,31 @@ def _repair_page_citations(
         return answer, None
 
 
+def _attach_kb_citations(
+    answer: str,
+    sources: list[dict],
+    system_config_doc: Optional[dict],
+) -> tuple[str, Optional[dict]]:
+    """``answer`` with each uncited checkable claim given the passage of
+    ``sources`` that holds it outright (``kb_citation_attach``): the answer
+    to keep, and the record of what was done. The record is None when
+    ``chat_config`` leaves the step off. Never raises: a failure keeps the
+    answer."""
+    from app.services import kb_citation_attach
+
+    config = kb_citation_attach.config(system_config_doc)
+    if config is None or not answer.strip() or not sources:
+        return answer, None
+    try:
+        return kb_citation_attach.attach_citations(
+            answer, sources, min_share=config["min_share"],
+            anchored_min_share=config["anchored_min_share"], margin=config["margin"],
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning("KB citations not attached: %s", e)
+        return answer, None
+
+
 def _miscited_sources(
     answer: str,
     question: str,
@@ -5313,6 +5365,7 @@ async def _finalize(
     claim_checks: Optional[dict] = None,
     answer_check: Optional[dict] = None,
     page_citations: Optional[dict] = None,
+    kb_citation_attach: Optional[dict] = None,
 ) -> None:
     """Save assistant message and update activity metrics."""
     await conversation.add_message(
@@ -5330,6 +5383,7 @@ async def _finalize(
         claim_checks=claim_checks,
         answer_check=answer_check,
         page_citations=page_citations,
+        kb_citation_attach=kb_citation_attach,
     )
 
     # Stamp the usage anchor for next turn's cheap context estimate (uplift

@@ -98,6 +98,10 @@ class ChatMessage(Document):
     # unresolved, attached, changed, seconds, ...}``. ``message`` is the
     # answer after the step.
     page_citations: Optional[dict] = None
+    # A knowledge-base answer's uncited claims given the passages that hold
+    # them (see kb_citation_attach): ``{version, kind, claims, attached,
+    # ambiguous, no_passage, changed, seconds}``.
+    kb_citation_attach: Optional[dict] = None
     # The documents in scope when this turn was asked: ``{uuid, title}`` each,
     # plus ``{"truncated": n}`` as a final entry if the selection was larger
     # than we record.
@@ -141,6 +145,8 @@ class ChatMessage(Document):
             d["answer_check"] = self.answer_check
         if self.page_citations:
             d["page_citations"] = self.page_citations
+        if self.kb_citation_attach:
+            d["kb_citation_attach"] = self.kb_citation_attach
         if self.source_documents:
             d["source_documents"] = self.source_documents
         return d
@@ -392,6 +398,7 @@ class ChatConversation(Document):
         claim_checks: Optional[dict] = None,
         answer_check: Optional[dict] = None,
         page_citations: Optional[dict] = None,
+        kb_citation_attach: Optional[dict] = None,
     ) -> ChatMessage:
         msg = ChatMessage(
             role=role,
@@ -409,6 +416,7 @@ class ChatConversation(Document):
             claim_checks=claim_checks or None,
             answer_check=answer_check or None,
             page_citations=page_citations or None,
+            kb_citation_attach=kb_citation_attach or None,
             source_documents=_cap_source_documents(source_documents),
         )
         await msg.insert()

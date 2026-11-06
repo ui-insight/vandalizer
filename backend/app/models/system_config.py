@@ -254,6 +254,16 @@ class SystemConfig(Document):
     #       and the best candidates for it are read by the empty-pool
     #       check's model against the question (kb_hypothetical). With it:
     #       "kb_hypothetical_search_candidates" (candidates read; default 3).
+    #   "kb_citation_attach_enabled": bool (default False) — after a
+    #       knowledge-base answer is final, each uncited checkable claim is
+    #       given the passage of the pool that holds it outright, by the
+    #       source chips' lexical test (kb_citation_attach). With it:
+    #       "kb_citation_attach_min_share" (content words an anchorless claim
+    #       needs on the passage; default 0.85),
+    #       "kb_citation_attach_anchored_min_share" (the same for a claim whose
+    #       figures, dates and quoted phrases are all on it; default 0.6) and
+    #       "kb_citation_attach_margin" (how far the passage must beat the best
+    #       of any other section; default 0.2).
     # Missing keys mean "use the default" so deployments never need a
     # migration to pick up new phases.
     chat_config: dict = {}
