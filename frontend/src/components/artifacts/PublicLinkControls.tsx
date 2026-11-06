@@ -24,7 +24,9 @@ export function formatDate(iso: string | null | undefined, withTime = false): st
 export function draftFrom(link: api.PublicLinkInfo | null | undefined): LinkDraft {
   if (!link) return DEFAULT_LINK
   return {
-    expiry: link.expires_at && !link.expired ? 'custom' : 'never',
+    // An expired link opens on an empty date, not "Never": saving it untouched
+    // must ask for a new date instead of making the link permanent.
+    expiry: link.expires_at ? 'custom' : 'never',
     customDate: link.expires_at && !link.expired ? link.expires_at.slice(0, 10) : '',
     audience: link.audience, emails: link.emails.join(', '),
   }

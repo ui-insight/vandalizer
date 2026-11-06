@@ -3,7 +3,7 @@ import { beforeEach, expect, it, vi } from 'vitest'
 import ArtifactPage from './Artifacts'
 import * as api from '../api/artifacts'
 import { ApiError } from '../api/client'
-import { settingsFrom, DEFAULT_LINK } from '../components/artifacts/PublicLinkControls'
+import { settingsFrom, draftFrom, DEFAULT_LINK } from '../components/artifacts/PublicLinkControls'
 
 // Public links: expiry, sign-in audience, view record (support ticket).
 vi.mock('../api/artifacts', async importOriginal => ({ ...await importOriginal<typeof api>(), getArtifact: vi.fn(), getPublicArtifact: vi.fn(), publishArtifact: vi.fn(), updatePublicLink: vi.fn(), listPublicLinks: vi.fn() }))
@@ -66,4 +66,10 @@ it('turns the expiry choice into a date the server can check', () => {
   // Email addresses only apply to signed-in links.
   expect(settingsFrom({ ...DEFAULT_LINK, emails: 'a@b.edu' }, now)).toMatchObject({ emails: [] })
   expect(settingsFrom({ ...DEFAULT_LINK, audience: 'signed_in', emails: 'a@b.edu, c@d.edu;e@f.edu' }, now)).toMatchObject({ emails: ['a@b.edu', 'c@d.edu', 'e@f.edu'] })
+})
+
+it('reopens an expired link asking for a new date, never as a permanent link', () => {
+  const draft = draftFrom({ ...link, expires_at: '2026-10-01T23:59:59Z', expired: true })
+  expect(draft.expiry).toBe('custom')
+  expect(settingsFrom(draft, new Date('2026-11-06T12:00:00Z'))).toBe('Choose the date the link should expire.')
 })
