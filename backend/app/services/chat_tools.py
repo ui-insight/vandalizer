@@ -35,9 +35,10 @@ from app.models.verification_session import VerificationField, VerificationSessi
 from app.models.workflow import Workflow
 from app.services.chat_deps import AgenticChatDeps
 from app.services.chat_page_templates import find_page_templates, get_page_template
-from app.services.chat_artifact_tools import create_html_artifact, get_html_artifact, revise_html_artifact
+from app.services.chat_artifact_tools import create_html_artifact, find_pages, get_html_artifact, revise_html_artifact
 from app.services.chat_skill_tools import get_skill, list_skills, select_skill
 from app.services.chat_file_tools import list_projects, move_documents_to_project
+from app.services.chat_calculator import calculate
 from app.services.certification_versions.runtime import course_operation
 from app.services.certification_versions.tool_results import (
     CheckResult, CompletionResult, LessonResult, ModuleResult, ProgressResult,
@@ -479,7 +480,12 @@ async def _confirm_gate(
     # Otherwise (re)arm the confirmation for a future turn and return the
     # preview. confirmed=true with no prior-turn arming is downgraded here —
     # this is the injection defense.
-    if conv is not None:
+    # The identical action already armed earlier in this reply: its first card
+    # is the one the chat shows (later copies are hidden by approval_key), so
+    # that card's call id must stay the armed one. Re-arming with this call's
+    # id would leave the visible card's button approving nothing.
+    armed_this_turn = match is not None and int(match.get("turn", -1)) == marker
+    if conv is not None and not armed_this_turn:
         new_pending = [
             p for p in armed
             if not (isinstance(p, dict) and p.get("fp") == fp)
@@ -501,6 +507,16 @@ async def _confirm_gate(
 
     out = dict(preview)
     out["needs_confirmation"] = True
+    # The same action previewed twice must show one card (support ticket:
+    # three identical "Add to inbox" cards). The chat de-duplicates cards by
+    # this key, not by preview wording, which varies with rejected items.
+    out.setdefault("approval_key", fp)
+    if armed_this_turn:
+        out["already_waiting"] = True
+        out["already_waiting_note"] = (
+            "This exact action is already waiting for the user's approval from earlier in this reply. "
+            "It shows as one card; do not propose it again."
+        )
     # Make it impossible for the model to read this result as a completed
     # action. Without these the model routinely narrates success ("the PDFs
     # are now indexed") on the preview turn even though nothing was written,
@@ -1684,6 +1700,17 @@ async def fetch_url(
     return page
 
 
+def _is_official_url(url: object) -> bool:
+    """A government site: .gov, .mil or .fed.us (ecfr.gov, nsf.gov, grants.nih.gov…)."""
+    from urllib.parse import urlsplit
+
+    try:
+        host = (urlsplit(str(url or "")).hostname or "").lower().rstrip(".")
+    except ValueError:
+        return False
+    return host.endswith((".gov", ".mil", ".fed.us")) or host in {"gov", "mil"}
+
+
 async def web_search(
     context: RunContext[AgenticChatDeps],
     query: str,
@@ -1739,7 +1766,13 @@ async def web_search(
     if result.get("error") and not result.get("results"):
         return {"error": result["error"], "results": []}
 
-    results = result.get("results", [])
+    # Official sources first (support ticket: the Single Audit threshold was
+    # answered from four commercial blogs). Stable, so the provider's order
+    # holds within each group.
+    results = sorted(
+        ({**r, "official": _is_official_url(r.get("url"))} for r in result.get("results", [])),
+        key=lambda r: not r["official"],
+    )
 
     # Citation sidecar — mirror search_knowledge_base so web results render as
     # source chips. The streaming layer pops this by tool_call_id and emits a
@@ -1764,6 +1797,12 @@ async def web_search(
             context.deps.citation_annotations[context.tool_call_id] = citations
 
     response: dict = {"query": result.get("query", query), "results": results}
+    if any(r["official"] for r in results):
+        response["official_note"] = (
+            "Results marked official are government sites. For a regulation, policy, date or "
+            "threshold, use and cite the official result; treat commercial sites as secondary "
+            "and never as the only source."
+        )
     if results:
         # Support ticket: an effective date taken from a snippet was wrong
         # beside the official link it came with.
@@ -5417,6 +5456,21 @@ async def propose_obligations(
     else:
         project = await _resolve_active_project(context)
     if not project:
+        # Support ticket: "set up this subaward" proposed inbox items before
+        # the user had approved the new project, and the step failed with
+        # "No project is open". It waits for that approval instead.
+        conversation = getattr(context.deps, "conversation", None)
+        if any(isinstance(p, dict) and p.get("tool") == "create_project"
+               for p in (getattr(conversation, "pending_confirmations", None) or [])):
+            return {
+                "waiting_for": "create_project",
+                "note": (
+                    "The project these items belong to is waiting for the user's approval, so nothing "
+                    "can be added to its inbox yet. Don't retry now: mark this step pending (not failed "
+                    "or completed), tell the user it runs once they approve Create project, and propose "
+                    "the items in your reply after that approval."
+                ),
+            }
         return _err(
             "No project is open.",
             hint="Open the project in chat, or pass its project_uuid (list it with the project tools).",
@@ -6317,7 +6371,15 @@ async def analyze_documents(
 # Plan / progress tracking (uplift plan Phase 8)
 # ---------------------------------------------------------------------------
 
-_PLAN_STATUSES = ("pending", "in_progress", "completed")
+_PLAN_STATUSES = ("pending", "in_progress", "awaiting_approval", "completed")
+
+
+def _cards_waiting_this_turn(deps: AgenticChatDeps) -> list[str]:
+    """Tools whose approval card this turn showed and the user hasn't approved."""
+    conversation = getattr(deps, "conversation", None)
+    marker = int(getattr(deps, "turn_marker", 0) or 0)
+    return [str(p.get("tool") or "") for p in (getattr(conversation, "pending_confirmations", None) or [])
+            if isinstance(p, dict) and int(p.get("turn", -1)) == marker]
 _PLAN_MAX_TASKS = 20
 
 
@@ -6342,6 +6404,10 @@ async def update_plan(
       completions.
     - NEVER mark a task completed if its tool call failed or was cancelled —
       keep it in_progress and surface the blocker to the user.
+    - A step whose tool returned an approval card (needs_confirmation) is
+      awaiting_approval, not completed: nothing is saved until the user
+      approves it. Steps that need an earlier step's approval (inbox items
+      for a project not yet created) stay pending.
     - Every task needs both forms: content (imperative: "Run extraction on
       FY24 proposals") and active_form (present continuous: "Running
       extraction on FY24 proposals").
@@ -6364,7 +6430,7 @@ async def update_plan(
         context: The call context.
         tasks: Full task list. Each task: {"content": str (imperative),
             "active_form": str (present continuous),
-            "status": "pending" | "in_progress" | "completed"}.
+            "status": "pending" | "in_progress" | "awaiting_approval" | "completed"}.
     """
     if not isinstance(tasks, list) or not tasks:
         return _err(
@@ -6396,7 +6462,7 @@ async def update_plan(
         if status not in _PLAN_STATUSES:
             return _err(
                 f"Task {i} has invalid status {status!r}.",
-                hint="Status must be pending, in_progress, or completed.",
+                hint="Status must be pending, in_progress, awaiting_approval, or completed.",
             )
         normalized.append(
             {"content": content, "active_form": active_form, "status": status}
@@ -6404,14 +6470,33 @@ async def update_plan(
 
     in_progress = sum(1 for t in normalized if t["status"] == "in_progress")
     completed = sum(1 for t in normalized if t["status"] == "completed")
+    awaiting = sum(1 for t in normalized if t["status"] == "awaiting_approval")
     all_done = completed == len(normalized)
-    if not all_done and in_progress != 1:
+    # Nothing left to work on this reply: every step is done, or the reply is
+    # handing back to the user with approval cards waiting. Steps that depend
+    # on one of those approvals (inbox items for a project not yet created)
+    # stay pending, as the docstring and propose_obligations say.
+    settled = completed == len(normalized) or (awaiting > 0 and in_progress == 0)
+    if not settled and in_progress != 1:
         return _err(
             f"Exactly one task must be in_progress (got {in_progress}).",
             hint=(
                 "Mark the task you are working on RIGHT NOW as in_progress "
                 "and everything not yet started as pending. Zero in_progress "
-                "is only valid when every task is completed."
+                "is only valid when every task is completed, or when some are "
+                "awaiting_approval and the rest wait on those approvals."
+            ),
+        )
+    # Support ticket: "✓ All 4 steps completed" while four approval cards
+    # were still waiting. A plan can't be complete while this turn's cards are.
+    waiting = _cards_waiting_this_turn(context.deps)
+    if waiting and all_done:
+        names = ", ".join(sorted(set(waiting)))
+        return _err(
+            f"{len(waiting)} approval card(s) from this reply are still waiting for the user ({names}).",
+            hint=(
+                "Mark each step whose card is waiting as awaiting_approval, not completed. "
+                "Nothing is saved until the user approves it."
             ),
         )
 
@@ -6420,6 +6505,7 @@ async def update_plan(
         "ok": True,
         "task_count": len(normalized),
         "completed": completed,
+        "awaiting_approval": awaiting,
         "all_done": all_done,
     }
 
@@ -7105,6 +7191,7 @@ TOOLS: list[ToolFuncContext[AgenticChatDeps, ...]] = [
     find_page_templates,
     get_page_template,
     create_html_artifact,
+    find_pages,
     get_html_artifact,
     revise_html_artifact,
     # Phase 0 — Plan/progress tracking (sequential: mutates deps.plan_state)
@@ -7124,6 +7211,7 @@ TOOLS: list[ToolFuncContext[AgenticChatDeps, ...]] = [
     fetch_url,
     web_search,
     get_document_text,
+    calculate,
     analyze_documents,
     run_extraction,
     check_compliance,
@@ -7204,6 +7292,7 @@ COMPACTABLE_TOOLS: frozenset[str] = frozenset({
     "fetch_url",
     "web_search",
     "get_document_text",
+    "calculate",
     "analyze_documents",
     "run_extraction",
     "check_compliance",

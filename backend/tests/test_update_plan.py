@@ -26,7 +26,7 @@ class TestUpdatePlanValidation:
             _task("Check compliance", "Checking compliance", "pending"),
             _task("Save summary", "Saving summary", "pending"),
         ])
-        assert result == {"ok": True, "task_count": 3, "completed": 0, "all_done": False}
+        assert result == {"ok": True, "task_count": 3, "completed": 0, "awaiting_approval": 0, "all_done": False}
         assert len(ctx.deps.plan_state) == 3
         assert ctx.deps.plan_state[0]["status"] == "in_progress"
 

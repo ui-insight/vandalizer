@@ -3,6 +3,8 @@ import functools
 from typing import Callable, Concatenate, ParamSpec, TypeVar
 from pymongo.database import Database
 import hashlib
+import re
+from datetime import datetime
 
 import anyio
 from fastapi import HTTPException
@@ -39,6 +41,76 @@ def _source(context: RunContext[AgenticChatDeps]) -> dict:
             "project_uuid": getattr(context.deps, "active_project_uuid", None),
             "turn": context.deps.turn_marker,
             "skill": {"uuid": skill.uuid, "version": skill.version} if skill else None}
+
+
+MAX_FOUND_PAGES = 20
+
+
+def name_pattern(name: str) -> str | None:
+    """A title regex that matches every word of *name*, in any order.
+
+    Support ticket: a page asked for as "NIH R01 Budget Dashboard — 5-Year
+    Breakdown" must match whatever dash or quotes the saved title uses.
+    """
+    words = re.findall(r"[^\W_]+", name or "", flags=re.UNICODE)
+    if not words:
+        return None
+    return "".join(f"(?=.*{re.escape(word)})" for word in words[:12])
+
+
+def _find_pages(db: Database[dict], user_id: str, team_ids: list[str], name: str, limit: int) -> dict:
+    conditions: list[dict] = [{"deleted_at": None}, {"$or": [{"user_id": user_id}, {"team_id": {"$in": team_ids}}]}]
+    pipeline: list[dict] = [{"$match": {"$and": conditions}}, *artifacts.visible_metadata_stages(user_id)]
+    pattern = name_pattern(name)
+    if pattern:
+        pipeline.append({"$match": {"title": {"$regex": pattern, "$options": "is"}}})
+    pipeline.append({"$facet": {
+        "items": [{"$sort": {"updated_at": -1, "uuid": 1}}, {"$limit": limit}],
+        "total": [{"$count": "value"}],
+    }})
+    result: dict = next(db.html_artifacts.aggregate(pipeline), {"items": [], "total": []})
+    items = []
+    for doc in result["items"]:
+        meta = artifacts.metadata(doc, doc["user_id"] == user_id)
+        latest = next((r for r in meta["revisions"] if r["uuid"] == meta["latest_revision"]), None)
+        updated = meta.get("updated_at")
+        items.append({
+            "artifact_uuid": meta["uuid"], "title": meta["title"],
+            "version": latest["version"] if latest else len(meta["revisions"]),
+            "updated_at": updated.isoformat() if isinstance(updated, datetime) else updated,
+            "yours": meta["can_manage"], "shared_with_team": bool(meta.get("team_id")),
+            "published": bool(meta.get("published_revision")), "link": f"/pages/{meta['uuid']}",
+        })
+    return {"items": items, "total": result["total"][0]["value"] if result["total"] else 0}
+
+
+async def find_pages(context: RunContext[AgenticChatDeps], name: str = "", limit: int = 10) -> dict:
+    """Find the user's saved Pages (Files → Pages), and Pages shared with their team, by name.
+
+    Use it whenever the user names a Page or asks to see, open, change or update
+    one, and for "show me my pages" (leave name empty for the most recent). Every
+    word of name must appear in the title, in any order. Then read a result with
+    get_html_artifact(artifact_uuid) before revising it. Only Pages marked yours
+    can be revised; for a team Page, say only its owner can change it and offer
+    to make the change in a copy (Duplicate on the Page). If nothing matches,
+    say plainly you couldn't find a Page called that and suggest opening it
+    from Files → Pages and choosing Request changes. Never answer from a Page
+    template or a document instead.
+    """
+    from app.services import access_control
+    limit = max(1, min(int(limit or 10), MAX_FOUND_PAGES))
+    access = await access_control.get_team_access_context(context.deps.user)
+    team_ids = [str(t) for t in (access.team_uuids | access.team_object_ids)]
+    found = await _call(_find_pages, context.deps.user_id, team_ids, name, limit)
+    if not found["items"]:
+        found["note"] = (
+            f"No saved Page matches “{name}”. Tell the user you couldn't find a Page called that, "
+            "and suggest opening it from Files → Pages and choosing Request changes, or asking to list their Pages."
+            if name.strip() else "The user has no saved Pages yet."
+        )
+    elif found["total"] > len(found["items"]):
+        found["note"] = f"Showing {len(found['items'])} of {found['total']} matching Pages, most recently updated first."
+    return found
 
 
 async def get_html_artifact(context: RunContext[AgenticChatDeps], artifact_uuid: str) -> dict:
@@ -103,8 +175,19 @@ async def create_html_artifact(context: RunContext[AgenticChatDeps], title: str,
             raise
         except HTTPException as exc:
             return {'error': exc.detail}
-    if source_document_uuid or template_values or template_tables:
-        return {'error': 'Choose a template before filling its fields.'}
+    # Support ticket: "make a one-page award snapshot page" was refused with
+    # "Choose a template before filling its fields" (a source file was passed
+    # without a template), and chat saved a .md file instead.
+    if template_values or template_tables:
+        return {'error': 'template_values and template_tables only fill a saved Page template, and none was given.',
+                'hint': ('To make a new Page, call create_html_artifact again with the complete page in html '
+                         '(no template needed), using values you read from the document. Make a Page as asked: '
+                         'do not deliver a different kind of output, such as a file, instead.')}
+    if not (html or '').strip():
+        return {'error': 'Write the Page in html: complete, self-contained HTML/CSS.',
+                'hint': 'A source file alone does not make a Page. Read it, then write the page in html.'}
+    # A source file passed without a template is simply what the page is
+    # built from; it needs no template.
     return await _save(context, title, html, confirmed)
 
 

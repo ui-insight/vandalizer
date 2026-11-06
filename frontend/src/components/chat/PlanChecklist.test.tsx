@@ -17,7 +17,7 @@ describe('PlanChecklist', () => {
 
   it('shows progress count and per-status forms', () => {
     render(<PlanChecklist tasks={tasks} />)
-    expect(screen.getByText('Plan · 1/3 done')).toBeInTheDocument()
+    expect(screen.getByText('Plan · 1 of 3 done')).toBeInTheDocument()
     // Completed and pending show the imperative content…
     expect(screen.getByText('Run extraction')).toBeInTheDocument()
     expect(screen.getByText('Save summary')).toBeInTheDocument()
@@ -38,7 +38,7 @@ describe('PlanChecklist', () => {
 
   it('preserves completed steps and labels unfinished work without a running indicator after Stop', () => {
     const { container } = render(<PlanChecklist tasks={tasks} isStreaming={false} />)
-    expect(screen.getByRole('status')).toHaveTextContent('1/3 done · response ended')
+    expect(screen.getByRole('status')).toHaveTextContent('1 of 3 done · response ended')
     expect(screen.getByText('Completed')).toBeInTheDocument()
     expect(screen.getAllByText('Not confirmed')).toHaveLength(2)
     expect(container.querySelector('.animate-spin')).toBeNull()

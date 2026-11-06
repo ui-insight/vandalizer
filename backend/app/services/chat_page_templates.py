@@ -6,9 +6,18 @@ from app.services.chat_deps import AgenticChatDeps
 
 
 async def find_page_templates(context: RunContext[AgenticChatDeps], name: str = '') -> dict:
-    """Find your private and shared team Page templates by name. Does not create a Page."""
+    """Find your private and shared team Page templates by name. Does not create a Page.
+
+    Templates are reusable designs, not saved Pages: to change an existing Page,
+    use find_pages.
+    """
     from app.routers.page_templates import browse
-    return await browse(context.deps.user, name)
+    try:
+        return await browse(context.deps.user, name or '')
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception('Page template search failed')
+        return {'error': 'Page templates could not be searched right now.', 'items': []}
 
 
 async def get_page_template(context: RunContext[AgenticChatDeps], template_uuid: str) -> dict:

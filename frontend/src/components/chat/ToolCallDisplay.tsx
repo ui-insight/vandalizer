@@ -12,6 +12,7 @@ import { AlertTriangle, Check, ChevronRight, ClipboardCopy, Download, ExternalLi
 import { runModelLabel } from '../../lib/runModel'
 import { QualityBadge } from './QualityBadge'
 import { renderMarkdown } from './markdown'
+import { describeStepResults, stepResultsText } from './workflowStepResults'
 import { ExpandableValue, formatExtractedValue } from './extractionValue'
 import {
   CertCheckCard,
@@ -222,6 +223,19 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
       const passages = kbPassages(content)
       if (passages.length === 0) return { text: 'No matching passages', qualityHint: '' }
       return { text: `Found ${passages.length} relevant passage${passages.length !== 1 ? 's' : ''}`, qualityHint }
+    }
+
+    case 'calculate': {
+      const steps = Array.isArray(obj.steps) ? obj.steps as Array<Record<string, unknown>> : []
+      const failed = steps.filter(step => step.error).length
+      return { text: `${steps.length} calculation${steps.length === 1 ? '' : 's'}${failed ? `, ${failed} not computed` : ''}`, qualityHint: '' }
+    }
+
+    case 'find_pages': {
+      const pages = Array.isArray(obj.items) ? obj.items as Array<Record<string, unknown>> : []
+      if (pages.length === 0) return { text: 'No matching pages', qualityHint: '' }
+      if (pages.length === 1) return { text: `Found "${String(pages[0].title).slice(0, 60)}" (version ${pages[0].version})`, qualityHint: '' }
+      return { text: `Found ${pages.length} page${pages.length !== 1 ? 's' : ''}`, qualityHint: '' }
     }
 
     case 'get_document_text': {
@@ -996,6 +1010,31 @@ function KBPassages({ content, actions }: { content: unknown; actions?: KBSource
   )
 }
 
+interface CalculationStep { label: string; expression: string; result?: string; check?: boolean; error?: string }
+
+/** The calculate tool's working: each step's terms and exact result. */
+export function CalculationSteps({ steps }: { steps: CalculationStep[] }) {
+  const text = steps.map(step => `${step.label}: ${step.expression} = ${step.error ? `not computed (${step.error})` : step.result}`).join('\n')
+  return (
+    <details className="agent-calculation">
+      <summary>Show the working</summary>
+      <table>
+        <thead><tr><th scope="col">Step</th><th scope="col">Calculation</th><th scope="col">Result</th></tr></thead>
+        <tbody>
+          {steps.map((step, index) => (
+            <tr key={`${step.label}-${index}`}>
+              <th scope="row">{step.label}</th>
+              <td><code>{step.expression}</code></td>
+              <td>{step.error ? <span className="agent-calculation-error">Not computed: {step.error}</span> : step.check === undefined ? step.result : step.check ? 'Yes' : 'No'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <CopyButton text={text} label="Copy the working" />
+    </details>
+  )
+}
+
 /** Render completed workflow output as structured content. */
 function WorkflowOutput({ content }: { content: Record<string, unknown> }) {
   const status = content.status as string | undefined
@@ -1081,7 +1120,7 @@ export function WorkflowProgress({ sessionId, initialStatus, workflowId }: { ses
   const labels: Record<string, string> = { queued: 'Workflow queued', pending: 'Workflow queued', running: 'Workflow running', completed: 'Workflow complete', failed: 'Workflow failed', error: 'Workflow failed', canceled: 'Workflow canceled', paused: 'Awaiting workflow approval', pending_approval: 'Awaiting workflow approval' }
   const failed = effective === 'failed' || effective === 'error'
   const active = ['running', 'queued', 'pending'].includes(effective)
-  const partial = status?.steps_output && Object.keys(status.steps_output).length ? JSON.stringify(status.steps_output, null, 2) : null
+  const partial = status?.steps_output && Object.keys(status.steps_output).length ? status.steps_output : null
   return (
     <section className="agent-workflow-progress" aria-label="Workflow run progress">
       <div role="status" aria-atomic="true" className="agent-run-status">
@@ -1096,11 +1135,34 @@ export function WorkflowProgress({ sessionId, initialStatus, workflowId }: { ses
       {effective === 'paused' && <p>Review the proposed step in the workflow runner before continuing.</p>}
       {(fetchFailed || effective === 'paused') && <button type="button" className="chat-action-btn" disabled={checking} onClick={() => { setChecking(true); setAttempt(value => value + 1) }}>{checking ? 'Checking workflow status…' : 'Check workflow status'}</button>}
       {workflowId && <button type="button" className="chat-action-btn" onClick={() => openWorkflow(workflowId, sessionId)}>Open this workflow run</button>}
-      {partial && effective !== 'completed' && <details><summary>Completed step results</summary><pre tabIndex={0} aria-label="Completed workflow step results">{partial}</pre><CopyButton text={partial} label="Copy completed step results" /></details>}
+      {partial && effective !== 'completed' && <CompletedStepResults stepsOutput={partial} documents={status?.run_metadata?.documents} />}
       {effective === 'completed' && <WorkflowOutput content={{ status: 'completed', output: unwrapWorkflowOutput(status?.final_output) }} />}
       {effective === 'completed' && <WorkflowArtifactAction sessionId={sessionId} />}
       {effective === 'completed' && status && status.final_output == null && <p>No final output was returned for this run.</p>}
     </section>
+  )
+}
+
+/** Completed steps of a paused or canceled run, readable for whoever approves it. */
+export function CompletedStepResults({ stepsOutput, documents }: { stepsOutput: Record<string, unknown>; documents?: { uuid?: string; title?: string | null }[] }) {
+  const results = describeStepResults(stepsOutput, documents)
+  return (
+    <details className="agent-step-results">
+      <summary>Completed step results</summary>
+      <div role="region" aria-label="Completed workflow step results" tabIndex={0}>
+        {results.map((result, index) => (
+          <section key={`${result.name}-${index}`}>
+            <h4>{result.name}</h4>
+            {result.kind === 'documents' && <ul>{(result.items ?? []).map((item, itemIndex) => <li key={`${itemIndex}-${item}`}><FileText size={12} aria-hidden="true" /> {item}</li>)}</ul>}
+            {result.kind === 'text' && <div className="chat-markdown select-text" dangerouslySetInnerHTML={{ __html: renderMarkdown(result.text ?? '') }} />}
+            {result.kind === 'fields' && <dl>{(result.fields ?? []).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>}
+            {result.kind === 'data' && <pre>{result.text}</pre>}
+            {result.kind === 'empty' && <p className="agent-step-results-empty">No output.</p>}
+          </section>
+        ))}
+      </div>
+      <CopyButton text={stepResultsText(results)} label="Copy completed step results" />
+    </details>
   )
 }
 
@@ -1430,6 +1492,9 @@ export function ToolStatusLine({
       )}
       {result && name === 'search_knowledge_base' && !isError && (
         <KBPassages content={result.content} actions={kbActions} />
+      )}
+      {result && name === 'calculate' && Array.isArray(obj?.steps) && (
+        <CalculationSteps steps={obj.steps as CalculationStep[]} />
       )}
       {result && name === 'get_workflow_status' && obj?.status === 'completed' && obj?.output != null && (
         <WorkflowOutput content={obj} />

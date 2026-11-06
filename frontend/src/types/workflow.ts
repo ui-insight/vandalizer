@@ -151,6 +151,8 @@ export interface WorkflowStatus {
   models_used?: string[];
   /** The workflow version this run executed; null for older runs. */
   workflow_version?: number | null;
+  /** The run's configuration snapshot; documents names the run's input files. */
+  run_metadata?: { documents?: { uuid?: string; title?: string | null }[] } | null;
 }
 
 export interface ModelInfo {

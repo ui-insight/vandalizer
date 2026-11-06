@@ -1269,6 +1269,13 @@ def create_agentic_chat_agent(
         agent.output_validator(require_lessons_in_order)
         # A summary of the lesson card it sits under, which can reverse it.
         agent.output_validator(require_lesson_not_restated)
+        # Totals and differences about a document worked out in the model's
+        # head (budget ticket): redo them with the calculate tool.
+        from app.services.calculation_claims import require_calculated_figures
+        agent.output_validator(require_calculated_figures)
+        # "All steps completed / saved" while this reply's approval cards wait.
+        from app.services.approval_claims import require_honest_completion
+        agent.output_validator(require_honest_completion)
         _agentic_chat_agent_cache[cache_key] = agent
 
     return _agentic_chat_agent_cache[cache_key]
@@ -1500,6 +1507,14 @@ AGENTIC_CHAT_SYSTEM_PROMPT = (
     "(in a summary, a Page, a reply) → list_project_inbox. That is a read: do not propose "
     "additions. Say \"from the RA inbox\" only for items it returned; for anything taken from "
     "a document, name the document and page instead.\n"
+    "- Any arithmetic on figures (does a budget add up, totals, subtotals, differences, "
+    "indirect = total − direct, rates, percentages, whether values fall in a range) → "
+    "calculate, for every number you state. Never add, subtract or compare in your head. "
+    "First read the whole table and list every row that belongs in each sum (every "
+    "category, e.g. Other, and every year); then show the working step by step (the terms, "
+    "the result) and state conclusions from the tool's results and checks, e.g. 'Indirect "
+    "for Y1–Y4 ($51k–$57k) matches the stated range; Y5 works out to $49k, below it.' "
+    "Say calculated figures were calculated from the document.\n"
     "- User wants reporting deadlines or obligations added to a project → read the documents, "
     "then propose_obligations. For relative deadlines, pass the quoted timing rule and dated "
     "performance/budget periods with relative_deadline=true; let the server compute the dates. "
@@ -1515,7 +1530,11 @@ AGENTIC_CHAT_SYSTEM_PROMPT = (
     "- User says 'save this', 'save it to my <name> folder', 'write this up as a document', "
     "or 'export the results' → save_to_folder (preview first, then confirm). "
     "For a hosted HTML page or report use create_html_artifact; read and revise existing pages "
-    "with get_html_artifact and revise_html_artifact. These support static self-contained HTML/CSS "
+    "with get_html_artifact and revise_html_artifact. When the user names a saved Page or asks "
+    "for their pages, call find_pages first (not search_documents, search_library or "
+    "find_page_templates: Pages are none of those). When the user asks for a page, make a Page with "
+    "create_html_artifact (write the HTML; no template is needed). If it can't be made, say why: never "
+    "substitute a different output, such as a file saved with save_to_folder, unless the user agrees. These support static self-contained HTML/CSS "
     "only and require preview then confirmation. They create private drafts; only the owner can "
     "publish a reviewed version by opening the Page and choosing Share. Build dashboards with complete "
     "HTML tables, labeled CSS bars and appropriate native HTML interactions. Embed every "
