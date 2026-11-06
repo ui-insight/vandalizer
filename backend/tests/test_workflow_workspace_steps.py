@@ -122,3 +122,33 @@ def test_the_catalog_ships_the_intake_routine_with_one_review_before_setup():
         assert quote in example["text"]
     for answer in ("April 30, 2027", "December 29, 2027", "December 15, 2026"):
         assert answer in example["label"]
+
+
+def test_only_a_create_project_report_names_the_runs_project():
+    # A prompt step's answer (or a document it echoes) can carry a project link;
+    # it must not redirect where the inbox and snapshot steps write.
+    other = "b" * 32
+    echoed = {"output": f"See the award at https://x.edu/?project={other} for details.", ws.EARLIER: [
+        {"name": "Document", "output": ["D1"]},
+        {"name": "Summarize", "output": f"Created by the PI. Link: [old](/?project={other})"},
+    ]}
+    assert ws.run_project(echoed) is None
+    reused = {"output": "x", ws.EARLIER: [
+        {"name": "Create project", "output": f"The file is already in project [A [draft] award](/?project={PROJECT}), so it was reused."},
+        {"name": "Summarize", "output": f"[old](/?project={other})"},
+    ]}
+    assert ws.run_project(reused) == PROJECT
+
+
+def test_the_snapshot_step_checks_edit_access_before_building():
+    project = SimpleNamespace(uuid=PROJECT, title="Award")
+    sync_db = MagicMock()
+    with patch.object(ws, "_run", lambda make: asyncio.run(make())), \
+         patch("app.tasks.get_sync_db", return_value=sync_db), \
+         patch("app.services.project_service.get_authorized_project", AsyncMock(return_value=project)), \
+         patch("app.services.project_service.can_manage_project", AsyncMock(return_value=False)), \
+         patch("app.services.award_snapshot.build_sync") as build:
+        with pytest.raises(RuntimeError, match="edit access"):
+            ws.snapshot_page(SimpleNamespace(user_id="viewer"), PROJECT)
+    sync_db.award_snapshot.update_one.assert_not_called()
+    build.assert_not_called()

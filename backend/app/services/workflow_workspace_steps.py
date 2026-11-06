@@ -39,7 +39,10 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 EARLIER = "_earlier_steps"
-PROJECT_LINK = re.compile(r"\?project=([0-9a-f]{32})\b")
+# Only a Create project step's own report names the run's project. Any other
+# step's text (a prompt's answer, an echoed document) may contain a project
+# link too, and must not redirect where later steps write.
+PROJECT_LINK = re.compile(r"^(?:Created project|The file is already in project) \[.*?\]\(/\?project=([0-9a-f]{32})\)")
 MAX_DEADLINE_ITEMS = 25
 _READ_CHARS = 120_000
 
@@ -71,7 +74,7 @@ def run_project(inputs: dict) -> Optional[str]:
     """The project an earlier Create project step made (its output links it)."""
     texts = [inputs.get("output")] + [s.get("output") for s in reversed(inputs.get(EARLIER) or []) if isinstance(s, dict)]
     for text in texts:
-        match = PROJECT_LINK.search(text) if isinstance(text, str) else None
+        match = PROJECT_LINK.match(text) if isinstance(text, str) else None
         if match:
             return match.group(1)
     return None
@@ -300,13 +303,25 @@ def snapshot_page(user: Any, project_uuid: str) -> dict:
     from app.services import award_snapshot
     from app.tasks import get_sync_db
 
+    async def authorize() -> Any:
+        from app.services import project_service
+        project = await project_service.get_authorized_project(project_uuid, user)
+        if project is None:
+            raise RuntimeError("the project from the earlier step is unavailable")
+        if not await project_service.can_manage_project(project, user):
+            raise RuntimeError("you need edit access to build and share this project's snapshot")
+        return project
+
+    # Same rule as Build snapshot / Share as Page: check before claiming a build.
+    _run(authorize)
     db = get_sync_db()
     token = uuid_mod.uuid4().hex
     db.award_snapshot.update_one(
         {"project_uuid": project_uuid},
         {"$set": {"status": "building", "build_token": token, "requested_by": user.user_id,
                   "requested_at": datetime.datetime.now(datetime.timezone.utc), "error": None},
-         "$setOnInsert": {"project_uuid": project_uuid, "facts": [], "budget_years": [], "documents": []}},
+         "$setOnInsert": {"project_uuid": project_uuid, "facts": [], "budget_years": [], "documents": [],
+                          "created_at": datetime.datetime.now(datetime.timezone.utc)}},
         upsert=True,
     )
     status = award_snapshot.build_sync(project_uuid, token)
