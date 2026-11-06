@@ -1,7 +1,7 @@
 import { SavePageTemplate } from '../components/artifacts/SavePageTemplate'
 import { PageVersionLinks } from '../components/artifacts/PageVersionLinks'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowLeft, ArrowUpRight, Check, ChevronRight, Code2, Copy, Download, FileText, Globe2, Link2, LockKeyhole, MessageSquare, Share2, Trash2, Workflow } from 'lucide-react'
+import { ArrowLeft, ArrowUpRight, Check, ChevronRight, Code2, Copy, Download, FileText, Globe2, Link2, LockKeyhole, MessageSquare, PencilLine, Share2, Trash2, Workflow } from 'lucide-react'
 import * as api from '../api/artifacts'
 import { PagesBrowser } from '../components/artifacts/PagesBrowser'
 import { PageDeleteDialog } from '../components/artifacts/PageDeleteDialog'
@@ -49,6 +49,10 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
   // Page feedback: what the frame is doing (picking a spot, showing one), the
   // spot a viewer picked, and the question a notification linked to.
   const [frame, setFrame] = useState<FrameControl>({ picking: false, spot: null })
+  // Edit text (support ticket): fix words and numbers in place, no chat or HTML.
+  const [textEditing, setTextEditing] = useState(false)
+  const [editCount, setEditCount] = useState(0)
+  const [collect, setCollect] = useState(0)
   const [picked, setPicked] = useState<PageSpot | null>(null)
   const [focusFeedback] = useState(() => new URLSearchParams(window.location.search).get('feedback'))
   const [viewerFeedback, setViewerFeedback] = useState<{ sharedBy: string; publicQuestions: boolean; items: feedbackApi.PageFeedbackItem[] } | null>(null)
@@ -165,7 +169,10 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
       <PagePrintLink contentUrl={contentUrl} />
       {artifact && <button className="page-button" disabled={busy || !!editor} onClick={() => setSaveTemplate(true)}>Save as template</button>}
       <a className="page-button" href={`${contentUrl}${contentUrl.includes('?') ? '&' : '?'}download=true`}><Download size={16} />Download HTML</a>
-      {artifact?.can_manage && <><button className="page-button" disabled={busy || !!editor} onClick={() => { setNotice(''); setError(''); setRequestChanges(true) }}><MessageSquare size={16} />Request changes</button><button className="page-button page-button-primary" disabled={busy} onClick={openSharing}><Share2 size={16} />Share</button></>}
+      {artifact?.can_manage && !textEditing && <button className="page-button" disabled={busy || !!editor || selected !== artifact.latest_revision}
+        title={selected !== artifact.latest_revision ? 'Switch to the latest version to edit its text' : 'Click any heading, sentence, number or table cell and type the fix'}
+        onClick={() => { setNotice(''); setError(''); setEditCount(0); setCollect(0); setFrame({ picking: false, spot: null }); setTextEditing(true) }}><PencilLine size={16} />Edit text</button>}
+      {artifact?.can_manage && <><button className="page-button" disabled={busy || !!editor || textEditing} onClick={() => { setNotice(''); setError(''); setRequestChanges(true) }}><MessageSquare size={16} />Request changes</button><button className="page-button page-button-primary" disabled={busy} onClick={openSharing}><Share2 size={16} />Share</button></>}
       {publicToken && <a className="page-button page-button-primary" href={pageViewUrl(contentUrl, 'full')} target="_blank" rel="noreferrer"><ArrowUpRight size={16} />Open full page</a>}
     </div>}</header>
     {!sharing && !requestChanges && !confirmDelete && !editor && feedback}
@@ -176,11 +183,23 @@ export default function ArtifactPage({ uuid, publicToken }: { uuid?: string; pub
     </div>}
     {!loading && !artifact && !publicInfo && !publicRefusal && <div className="pages-empty"><FileText size={32} /><h2>Page unavailable</h2><p>{publicToken ? 'This link may have been removed. Ask the owner for a current link.' : 'The page may have been removed, or your access may have changed.'}</p><button className="page-button" onClick={() => setAttempt(n => n + 1)}>Try again</button></div>}
     {!loading && (artifact || publicInfo) && <>
-      {artifact && <div className="page-revision-bar">{artifact.can_manage ? <label>Version<select aria-label="Page version" disabled={busy || !!editor} value={selected} onChange={e => setSelected(e.target.value)}>{artifact.revisions.map((r, index) => <option key={r.uuid} value={r.uuid}>Version {r.version ?? index + 1}{isPublished(r.uuid) ? ' · published' : ''}{r.uuid === artifact.latest_revision ? ' · latest' : ''}</option>)}</select></label> : <span>Shared version {version}</span>}<a className="page-text-button" href={pageViewUrl(contentUrl, 'full')} target="_blank" rel="noreferrer"><ArrowUpRight size={14} />Open full page</a></div>}
+      {artifact && <div className="page-revision-bar">{artifact.can_manage ? <label>Version<select aria-label="Page version" disabled={busy || !!editor || textEditing} value={selected} onChange={e => setSelected(e.target.value)}>{artifact.revisions.map((r, index) => <option key={r.uuid} value={r.uuid}>Version {r.version ?? index + 1}{isPublished(r.uuid) ? ' · published' : ''}{r.uuid === artifact.latest_revision ? ' · latest' : ''}</option>)}</select></label> : <span>Shared version {version}</span>}<a className="page-text-button" href={pageViewUrl(contentUrl, 'full')} target="_blank" rel="noreferrer"><ArrowUpRight size={14} />Open full page</a></div>}
       {hasDraft && publishedVersion > 0 && !selectedIsPublished && <p className="page-revision-note">You’re previewing version {version}. The public link still shows version {publishedVersion}. Share → Publish updates when you’re ready.</p>}
       {!!revision?.warnings.length && <div className="page-revision-note"><strong>Some content was removed to keep this page safe.</strong>{revision.warnings.map(w => <p key={w}>{w}</p>)}</div>}
-      {publicToken || frame.picking || frame.spot
-        ? <PublishedPageContent key={contentUrl} src={contentUrl} picking={frame.picking} onPick={setPicked} spot={frame.spot}
+      {textEditing && uuid && artifact && <div className="page-text-edit-bar" role="region" aria-label="Edit text">
+        <p><strong>Editing text.</strong> Click a heading, sentence, number or table cell and type the fix. Saving creates version {latestVersion + 1}; the public link keeps showing the published version until you publish again.</p>
+        <span role="status">{editCount === 0 ? 'No changes yet' : `${editCount} block${editCount === 1 ? '' : 's'} changed`}</span>
+        <div className="page-actions"><button className="page-button page-button-primary" disabled={busy || editCount === 0} onClick={() => setCollect(n => n + 1)}>{busy ? 'Saving…' : 'Save new version'}</button><button className="page-button" disabled={busy} onClick={() => { setTextEditing(false); setEditCount(0) }}>Cancel</button></div>
+      </div>}
+      {publicToken || frame.picking || frame.spot || textEditing
+        ? <PublishedPageContent key={textEditing ? `${contentUrl}#edit` : contentUrl} src={contentUrl} picking={frame.picking} onPick={setPicked} spot={frame.spot}
+            editing={textEditing} onEditCount={setEditCount} collect={collect}
+            onEdits={edits => { if (!uuid || !artifact) return; if (!edits.length) { setNotice('No text was changed.'); return }
+              void action(async () => {
+                const saved = await api.saveTextEdits(uuid, artifact.latest_revision, edits)
+                await reload(); setSelected(saved.latest_revision); setTextEditing(false); setEditCount(0)
+                setNotice(`Saved as version ${saved.version}. ${saved.published_revision ? 'Your public link still shows the published version until you publish this one.' : 'Share it when you’re ready.'}${saved.notes.length ? ` ${saved.notes.join(' ')}` : ''}`)
+              }) }}
             onSpotShown={found => { if (!found) setNotice('That spot isn’t on this version of the page. The question shows the text it was about.') }} />
         : <PagePreview key={contentUrl} src={contentUrl} title={title} />}
       {artifact?.can_manage && uuid && <OwnerFeedbackPanel uuid={uuid} onFrame={showFrame} focus={focusFeedback}

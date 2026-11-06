@@ -15,7 +15,7 @@ from app.config import Settings
 from app.dependencies import get_current_user, get_settings
 from app.models.user import User
 from app.rate_limit import limiter
-from app.schemas.artifact import ChatArtifactRequest, CreateArtifactRequest, DuplicateArtifactRequest, PublicLinkSettingsRequest, PublishArtifactRequest, RenameArtifactRequest, ReviseArtifactRequest, ShareArtifactRequest
+from app.schemas.artifact import ChatArtifactRequest, CreateArtifactRequest, DuplicateArtifactRequest, PageTextEditsRequest, PublicLinkSettingsRequest, PublishArtifactRequest, RenameArtifactRequest, ReviseArtifactRequest, ShareArtifactRequest
 from app.services import public_page_access
 from app.services.page_links import prepare_page_links
 from app.services import access_control, artifacts
@@ -323,3 +323,33 @@ async def delete_artifact(uuid: str, user: User = Depends(get_current_user)) -> 
         "deleted_at": datetime.now(timezone.utc), "public_token": None, "published_revision": None, "publications": [], "revisions": [],
     }}))
     return {"ok": True}
+
+
+
+@router.post("/{uuid}/text-edits", response_model=None)
+@limiter.limit("30/minute")
+async def save_text_edits(request: Request, uuid: str, body: PageTextEditsRequest,
+                          user: User = Depends(get_current_user)) -> dict:
+    """Save the owner's in-place text changes as a new version (Edit text).
+
+    No AI and no HTML: the changed blocks are found in the saved HTML and only
+    their text changes. Like any save, the published link is untouched.
+    """
+    from app.services import page_text_edits
+
+    doc = await authorized(uuid, user, manage=True)
+    if doc["latest_revision"] != body.base_revision:
+        raise HTTPException(409, "This page changed. Reload it and make your edits on the latest version.")
+    current = artifacts.revision(doc, body.base_revision)
+    html, notes = page_text_edits.apply(current["html"], [
+        page_text_edits.TextEdit(tag=e.tag.lower(), index=e.index, original=e.original, text=e.text) for e in body.edits
+    ])
+    # Keep what the page was built from (Living Pages), not checks of the old text.
+    previous = {k: v for k, v in (current.get("source") or {}).items() if k not in {"figure_check", "template_check"}}
+    source = {**previous, "kind": "text_edit", "edited_revision": body.base_revision}
+    # The owner's library name, as Edit HTML saves it: a revision's own title
+    # would undo a rename (revise sets the page title).
+    title = doc.get("title") or current["title"]
+    saved = await run(artifacts.revise, doc, title, html, body.base_revision, source)
+    version = len(saved["revisions"])
+    return {**artifacts.metadata(saved, True), "version": version, "notes": notes}
