@@ -12,6 +12,7 @@ import { LeftPanel } from './LeftPanel'
 import { RightPanel } from './RightPanel'
 import { UtilityBar } from './UtilityBar'
 import { ProjectContextBar } from './ProjectContextBar'
+import { AwardSnapshotPanel } from '../projects/AwardSnapshotPanel'
 import { ProjectManageModal } from './ProjectManageModal'
 import { ProjectsPanel } from './ProjectsPanel'
 import { AutomationsPanel } from './AutomationsPanel'
@@ -164,6 +165,7 @@ export function WorkspaceLayout() {
       </a>
       <Header onOpenActivity={isCompact ? openActivity : undefined} />
       <ProjectContextBar railWidth={railWidth} onOpenManage={() => setManageOpen(true)} />
+      <AwardSnapshotPanel railWidth={railWidth} />
       <ProjectManageModal key={activeProjectUuid ?? 'no-project'} open={manageOpen} onClose={() => setManageOpen(false)} />
       <h1 className="sr-only">{workspaceHeading}</h1>
       <div className="flex flex-1 overflow-hidden">

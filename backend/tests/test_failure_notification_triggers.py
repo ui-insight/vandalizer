@@ -325,7 +325,7 @@ class TestProcessOutputsOnFailedRun:
 
 class TestExtractionOutputDeliveryFailures:
     def _run(self, *, storage_fails=False, webhook_fails=False, notification_fails=False):
-        import app.tasks.document_tasks as dt
+        from app.tasks.passive_tasks import process_extraction_outputs
 
         db = MagicMock()
         automation = {
@@ -351,8 +351,12 @@ class TestExtractionOutputDeliveryFailures:
             side_effect=RuntimeError("teams 403") if notification_fails else MagicMock(),
         ), patch(
             "app.services.failure_notifications.notify_delivery_failed"
-        ) as notify:
-            dt._process_extraction_outputs(db, automation, {"F": "v"})
+        ) as notify, patch("app.tasks.passive_tasks.get_sync_db", return_value=db):
+            db.automation.find_one.return_value = automation
+            process_extraction_outputs.run(
+                automation_id=str(automation["_id"]), search_set_uuid="ss", document_uuids=["d"],
+                user_id="owner", results=[{"F": "v"}],
+            )
         return notify
 
     def test_all_outputs_delivering_rings_nothing(self):
@@ -380,7 +384,7 @@ class TestExtractionOutputDeliveryFailures:
     def test_one_failed_output_does_not_block_the_others(self):
         """Storage failing must not stop the webhook attempt (and vice versa) —
         collection, not early exit."""
-        import app.tasks.document_tasks as dt
+        from app.tasks.passive_tasks import process_extraction_outputs
 
         db = MagicMock()
         automation = {
@@ -396,8 +400,14 @@ class TestExtractionOutputDeliveryFailures:
             side_effect=RuntimeError("boom"),
         ), patch("app.services.output_handlers.call_webhook", webhook), \
              patch("app.services.output_handlers.should_send_notification", return_value=False), \
-             patch("app.services.failure_notifications.notify_automation_failed"):
-            dt._process_extraction_outputs(db, automation, {"F": "v"})
+             patch("app.services.failure_notifications.notify_automation_failed"), \
+             patch("app.services.failure_notifications.notify_delivery_failed"), \
+             patch("app.tasks.passive_tasks.get_sync_db", return_value=db):
+            db.automation.find_one.return_value = automation
+            process_extraction_outputs.run(
+                automation_id=str(automation["_id"]), search_set_uuid="ss", document_uuids=["d"],
+                user_id="owner", results=[{"F": "v"}],
+            )
         webhook.assert_called_once()
 
 
