@@ -1685,6 +1685,17 @@ async def fetch_url(
     return page
 
 
+def _is_official_url(url: object) -> bool:
+    """A government site: .gov, .mil or .fed.us (ecfr.gov, nsf.gov, grants.nih.gov…)."""
+    from urllib.parse import urlsplit
+
+    try:
+        host = (urlsplit(str(url or "")).hostname or "").lower().rstrip(".")
+    except ValueError:
+        return False
+    return host.endswith((".gov", ".mil", ".fed.us")) or host in {"gov", "mil"}
+
+
 async def web_search(
     context: RunContext[AgenticChatDeps],
     query: str,
@@ -1740,7 +1751,13 @@ async def web_search(
     if result.get("error") and not result.get("results"):
         return {"error": result["error"], "results": []}
 
-    results = result.get("results", [])
+    # Official sources first (support ticket: the Single Audit threshold was
+    # answered from four commercial blogs). Stable, so the provider's order
+    # holds within each group.
+    results = sorted(
+        ({**r, "official": _is_official_url(r.get("url"))} for r in result.get("results", [])),
+        key=lambda r: not r["official"],
+    )
 
     # Citation sidecar — mirror search_knowledge_base so web results render as
     # source chips. The streaming layer pops this by tool_call_id and emits a
@@ -1765,6 +1782,12 @@ async def web_search(
             context.deps.citation_annotations[context.tool_call_id] = citations
 
     response: dict = {"query": result.get("query", query), "results": results}
+    if any(r["official"] for r in results):
+        response["official_note"] = (
+            "Results marked official are government sites. For a regulation, policy, date or "
+            "threshold, use and cite the official result; treat commercial sites as secondary "
+            "and never as the only source."
+        )
     if results:
         # Support ticket: an effective date taken from a snippet was wrong
         # beside the official link it came with.

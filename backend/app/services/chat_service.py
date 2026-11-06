@@ -1952,6 +1952,25 @@ async def chat_stream(
             len(skipped_no_text),
         )
 
+    # Built-in regulation knowledge bases (support ticket): with nothing
+    # attached, a question about 2 CFR 200, the PAPPG, the NIH GPS… consults
+    # the matching catalog KB for this turn, with the same retrieval, citation
+    # and figure checks as an attached one, instead of memory or web blogs.
+    from app.services import builtin_kbs
+    auto_kbs: list[dict] = []
+    if (
+        not kbs and not kb_uuid and not document_uuids and not attachment_segments
+        and not include_onboarding_context and not is_first_session and not run_demo
+    ):
+        try:
+            routed = await builtin_kbs.route(message)
+        except Exception as e:
+            logger.warning("Built-in knowledge base routing failed: %s", e)
+            routed = []
+        if routed:
+            auto_kbs = [builtin_kbs.describe(kb) for kb in routed]
+            kbs = [(kb["uuid"], kb["title"]) for kb in auto_kbs]
+
     # KB context: query ChromaDB for relevant chunks and add as a segment.
     active_kbs: list[tuple[str, str]] = list(kbs or [])
     if not active_kbs and kb_uuid:
@@ -2007,6 +2026,33 @@ async def chat_stream(
             # nothing" — so remember the difference and tell both the model
             # and the user.
             kb_retrieval_failed = True
+
+    builtin_note = ""
+    if auto_kbs:
+        builtin_names = ", ".join(kb["title"] for kb in auto_kbs)
+        if kb_sources:
+            yield json.dumps({
+                "kind": "context_notice",
+                "content": (
+                    f"Searched Vandalizer's built-in knowledge base{'s' if len(auto_kbs) > 1 else ''}: "
+                    + "; ".join(kb["title"] + (f" (updated {kb['updated']})" if kb["updated"] else "") for kb in auto_kbs)
+                    + ". Attach one from Knowledge to keep using it in this chat."
+                ),
+                "action": "builtin_kbs_consulted",
+                "tokens_dropped": 0,
+            }) + "\n"
+        else:
+            # Consulted on the user's behalf and found nothing (or couldn't be
+            # searched): this turn is an ordinary unattached chat, not an
+            # empty or failed knowledge base the user chose.
+            builtin_note = (
+                f"Vandalizer's built-in knowledge base(s) ({builtin_names}) were searched for this "
+                + ("question but could not be reached this turn. " if kb_retrieval_failed else "question and returned nothing relevant. ")
+                + "If you search the web, prefer the official source over commercial sites; if you "
+                "answer from memory, say so plainly and suggest attaching the built-in knowledge base."
+            )
+            active_kbs, kb_manifest, manifests, kbs_not_searched = [], [], {}, []
+            kb_retrieval_failed = False
 
     # Hold instead of hallucinate. The user attached document(s) but none are
     # readable — text extraction hasn't finished or it failed — and there's no
@@ -2072,6 +2118,8 @@ async def chat_stream(
         # can distinguish "exists here but wasn't retrieved" from "not in this
         # project" on follow-ups too.
         reminder_blocks.append(KB_CHAT_RULES + _build_manifest_block(kb_manifest))
+        if auto_kbs:
+            reminder_blocks.append(builtin_kbs.consulted_reminder(auto_kbs))
         if kbs_not_searched:
             reminder_blocks.append(_kbs_not_searched_reminder(kbs_not_searched))
     elif have_context:
@@ -2125,6 +2173,19 @@ async def chat_stream(
         # base carries no grounding rule, which would let it answer "what is
         # the total in this proposal?" as though a proposal were present.
         reminder_blocks.append(NO_DOCUMENT_CHAT_RULES)
+
+    if builtin_note:
+        reminder_blocks.append(builtin_note)
+    # With no knowledge base in play, say which built-in ones the agent can
+    # search by kb_uuid: follow-ups and questions the topic list misses.
+    if not active_kbs and not is_first_session and not include_onboarding_context and not run_demo:
+        try:
+            available = [builtin_kbs.describe(kb) for kb in await builtin_kbs.builtin_kbs()]
+        except Exception as e:
+            logger.warning("Listing built-in knowledge bases failed: %s", e)
+            available = []
+        if available:
+            reminder_blocks.append(builtin_kbs.available_reminder(available))
 
     # Workspace inventory (already "" for first-session/help/demo paths).
     # Excluded in empty-KB mode for parity with the pre-Phase-1 behavior: that
