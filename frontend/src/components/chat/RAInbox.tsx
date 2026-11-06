@@ -1,13 +1,31 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { AlertTriangle, CalendarClock, CalendarPlus, Check, EyeOff, FileText, Inbox } from 'lucide-react'
-import { downloadDeadlineCalendar, getInbox, plainQuote, quoteSearchTerms, setInboxHidden, setObligationDismissed, setObligationDone } from '../../api/obligations'
+import { AlertTriangle, CalendarClock, CalendarPlus, Check, ChevronDown, ChevronRight, EyeOff, FileText, Inbox } from 'lucide-react'
+import { downloadDeadlineCalendar, getInbox, plainQuote, quoteSearchTerms, setObligationDismissed, setObligationDone } from '../../api/obligations'
 import type { Obligation } from '../../api/obligations'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 
 // The RA inbox (#999): what each proposal or award needs, from its own
 // documents, every row cited to its page. Done is shared with the project;
 // Dismiss and Hide inbox only change this person's Home.
+//
+// Hide inbox collapses the box to a "Due and needed (N) · Show inbox" bar in
+// the same place (support ticket: it used to turn the inbox off for the
+// account, leaving nothing on screen to bring it back). Collapsed is
+// remembered in this browser; Account → Home turns the inbox off for good.
+
+const COLLAPSED_KEY = 'home:ra-inbox-collapsed'
+
+function readCollapsed(): boolean {
+  try { return localStorage.getItem(COLLAPSED_KEY) === '1' } catch { return false }
+}
+
+function storeCollapsed(collapsed: boolean) {
+  try {
+    if (collapsed) localStorage.setItem(COLLAPSED_KEY, '1')
+    else localStorage.removeItem(COLLAPSED_KEY)
+  } catch { /* Collapsing still works for this visit. */ }
+}
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -193,6 +211,21 @@ export function RAInbox({ projectUuid }: { projectUuid?: string | null } = {}) {
   const [projectCount, setProjectCount] = useState(0)
   const [showDismissed, setShowDismissed] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [collapsed, setCollapsed] = useState(readCollapsed)
+  // Keep focus on the toggle as the box collapses or expands.
+  const toggleFocus = useRef<'show' | 'hide' | null>(null)
+  const showButton = useRef<HTMLButtonElement>(null)
+  const hideButton = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    const target = toggleFocus.current === 'show' ? showButton.current : toggleFocus.current === 'hide' ? hideButton.current : null
+    toggleFocus.current = null
+    target?.focus()
+  }, [collapsed])
+  const setInboxCollapsed = (next: boolean) => {
+    toggleFocus.current = next ? 'show' : 'hide'
+    storeCollapsed(next)
+    setCollapsed(next)
+  }
 
   const loaded = useRef(false)
   const load = useCallback(async (includeDismissed: boolean) => {
@@ -226,12 +259,32 @@ export function RAInbox({ projectUuid }: { projectUuid?: string | null } = {}) {
 
   if (loadError) return <p role="status" className="home-meta">Project obligations could not be loaded. <button type="button" className="home-text-action" onClick={() => void load(showDismissed)}>Retry obligations</button></p>
   if (items == null) return <p role="status" className="home-meta">Loading project obligations…</p>
+  // Turned off in Account → Home: gone for good until turned back on there.
   if (hidden) return null
   const visible = showDismissed ? items : items.filter(i => !i.dismissed)
   const dismissedCount = items.filter(i => i.dismissed).length
   const open = visible.filter(i => !i.dismissed)
   const dismissed = visible.filter(i => i.dismissed)
   const focusMissing = focusedObligationUuid != null && !items.some(i => i.uuid === focusedObligationUuid && !i.dismissed)
+  const openCount = items.filter(i => !i.dismissed).length
+  // Collapse is Home's; inside a project the inbox is that project's list.
+  if (collapsed && !projectUuid) {
+    if (openCount === 0 && projectCount === 0) return null
+    return (
+      <div role="group" aria-label="RA inbox (hidden)" style={{
+        display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', marginTop: 'var(--workspace-space-12)',
+        padding: 'var(--workspace-space-4) var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: '#4b5563',
+      }}>
+        <Inbox size={14} aria-hidden style={{ color: '#6b7280' }} />
+        <span style={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Due and needed ({openCount})</span>
+        <span aria-hidden>·</span>
+        <button ref={showButton} type="button" aria-expanded={false} style={{ ...BUTTON, border: 'none', padding: 0, color: '#2563eb', textDecoration: 'underline' }}
+          onClick={() => setInboxCollapsed(false)}>
+          <ChevronRight size={12} aria-hidden /> Show inbox
+        </button>
+      </div>
+    )
+  }
   // With projects to cover, an empty inbox says what it checked: silence
   // would read as "nothing is due", which it can't know about unsaved work.
   if (visible.length === 0 && !showDismissed) {
@@ -255,14 +308,6 @@ export function RAInbox({ projectUuid }: { projectUuid?: string | null } = {}) {
       setItems(current => (current ?? []).map(i => (i.uuid === uuid ? { ...i, dismissed: false } : i)))
     } catch {
       setError('That item could not be restored. Try again.')
-    }
-  }
-  const hideInbox = async () => {
-    try {
-      await setInboxHidden(true)
-      setHidden(true)
-    } catch {
-      setError('The inbox could not be hidden. Try again.')
     }
   }
 
@@ -294,9 +339,9 @@ export function RAInbox({ projectUuid }: { projectUuid?: string | null } = {}) {
           aria-label="Deadline reminder settings">
           Reminders
         </Link>
-        {!projectUuid && <button type="button" style={{ ...BUTTON, border: 'none' }} onClick={hideInbox}
-          aria-label="Hide this inbox from your Home. You can turn it back on in Account settings.">
-          Hide inbox
+        {!projectUuid && <button ref={hideButton} type="button" aria-expanded style={{ ...BUTTON, border: 'none' }} onClick={() => setInboxCollapsed(true)}
+          title="Collapse to one line. To turn the inbox off for good, use Account → Home.">
+          <ChevronDown size={12} aria-hidden /> Hide inbox
         </button>}
       </div>
       {error && <p role="alert" style={{ margin: 'var(--workspace-space-4) var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: '#b91c1c' }}>{error}</p>}

@@ -38,6 +38,7 @@ const LETTER = item({ uuid: 'ob-3', kind: 'required_material', title: 'Signed co
 
 beforeEach(() => {
   vi.clearAllMocks()
+  localStorage.clear()
   workspace.focusedObligationUuid = null
   api.downloadDeadlineCalendar.mockResolvedValue(undefined)
   api.getInbox.mockResolvedValue({ items: [DEADLINE, CAP, LETTER], inbox_hidden: false })
@@ -149,11 +150,35 @@ describe('RA inbox', () => {
     await waitFor(() => expect(api.setObligationDismissed).toHaveBeenCalledWith('ob-2', false))
   })
 
-  it('hides the whole inbox for this account', async () => {
+  it('Hide inbox collapses to a Show inbox line in the same place, and Show brings it back', async () => {
+    const { unmount } = render(<RAInbox />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Hide inbox' }))
+    expect(screen.queryByRole('region', { name: 'RA inbox' })).not.toBeInTheDocument()
+    const collapsed = screen.getByRole('group', { name: 'RA inbox (hidden)' })
+    expect(collapsed).toHaveTextContent('Due and needed (3)')
+    const show = screen.getByRole('button', { name: 'Show inbox' })
+    expect(show).toHaveFocus()
+    // Collapsing is not the account setting: nothing is turned off for good.
+    expect(api.setInboxHidden).not.toHaveBeenCalled()
+
+    // Remembered on this browser across visits.
+    unmount()
     render(<RAInbox />)
-    fireEvent.click(await screen.findByRole('button', { name: /Hide this inbox from your Home/ }))
-    await waitFor(() => expect(screen.queryByRole('region', { name: 'RA inbox' })).not.toBeInTheDocument())
-    expect(api.setInboxHidden).toHaveBeenCalledWith(true)
+    fireEvent.click(await screen.findByRole('button', { name: 'Show inbox' }))
+    expect(screen.getByRole('region', { name: 'RA inbox' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Hide inbox' })).toHaveFocus()
+    expect(screen.getByText('Sponsor deadline')).toBeInTheDocument()
+  })
+
+  it('collapses even when browser storage is unavailable', async () => {
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked') })
+    try {
+      render(<RAInbox />)
+      fireEvent.click(await screen.findByRole('button', { name: 'Hide inbox' }))
+      expect(screen.getByRole('button', { name: 'Show inbox' })).toBeInTheDocument()
+    } finally {
+      setItem.mockRestore()
+    }
   })
 
   it('shows nothing when the inbox is hidden or there are no projects to cover', async () => {
@@ -226,9 +251,16 @@ describe('RA inbox inside a project', () => {
     await screen.findByText('Sponsor deadline')
     expect(api.getInbox).toHaveBeenCalledWith(false, 'nifa')
     expect(screen.getByText('This project')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Hide this inbox/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Hide inbox' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: "Download a calendar file with this project's open deadlines" }))
     expect(api.downloadDeadlineCalendar).toHaveBeenCalledWith({ project: 'nifa' })
+  })
+
+  it('stays open inside a project after Home collapsed the inbox', async () => {
+    localStorage.setItem('home:ra-inbox-collapsed', '1')
+    render(<RAInbox projectUuid="nifa" />)
+    expect(await screen.findByText('Sponsor deadline')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Show inbox' })).not.toBeInTheDocument()
   })
 
   it('says an empty project has nothing due, instead of showing other projects', async () => {
