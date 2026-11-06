@@ -39,7 +39,7 @@ WRITE_TOOLS = {
 
 # Page reads already use the conservative sequential default and are excluded
 # from compaction. Classify them without changing their runtime behavior.
-SEQUENTIAL_READ_TOOLS = {"get_html_artifact", "find_page_templates", "get_page_template"}
+SEQUENTIAL_READ_TOOLS = {"get_html_artifact", "compare_page_versions", "find_page_templates", "get_page_template"}
 
 
 class TestParallelSafeClassification:

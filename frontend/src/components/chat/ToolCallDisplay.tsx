@@ -358,6 +358,8 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
       return { text: `Saved private Page: ${String(obj.title || 'Untitled Page')}`, qualityHint }
     case 'get_html_artifact':
       return { text: `Read Page: ${String(obj.title || 'Untitled Page')}`, qualityHint }
+    case 'compare_page_versions':
+      return { text: obj.summary ? `Version ${String(obj.from_version)} → ${String(obj.to_version)}: ${String(obj.summary)}` : 'Compared page versions', qualityHint }
     case 'list_skills':
       return { text: Array.isArray(content) ? `Found ${content.length} Skill${content.length === 1 ? '' : 's'}` : 'Skills', qualityHint: '' }
     case 'get_skill':
