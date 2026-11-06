@@ -288,6 +288,9 @@ async def save_text_edits(request: Request, uuid: str, body: PageTextEditsReques
     # Keep what the page was built from (Living Pages), not checks of the old text.
     previous = {k: v for k, v in (current.get("source") or {}).items() if k not in {"figure_check", "template_check"}}
     source = {**previous, "kind": "text_edit", "edited_revision": body.base_revision}
-    saved = await run(artifacts.revise, doc, current["title"], html, body.base_revision, source)
+    # The owner's library name, as Edit HTML saves it: a revision's own title
+    # would undo a rename (revise sets the page title).
+    title = doc.get("title") or current["title"]
+    saved = await run(artifacts.revise, doc, title, html, body.base_revision, source)
     version = len(saved["revisions"])
     return {**artifacts.metadata(saved, True), "version": version, "notes": notes}

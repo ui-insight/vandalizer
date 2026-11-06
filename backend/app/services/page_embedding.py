@@ -106,7 +106,7 @@ EMBED_SCRIPT = """(() => {
     const seen = new Map();
     Array.from(document.querySelectorAll(EDITABLE)).forEach(el => {
       const original = el.textContent || '';
-      const key = el.tagName.toLowerCase() + '\u0000' + original;
+      const key = el.tagName.toLowerCase() + '\\u0000' + original;
       const index = seen.get(key) || 0;
       seen.set(key, index + 1);
       if (el.querySelector(EDITABLE) || !original.trim()) return;

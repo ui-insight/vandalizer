@@ -99,3 +99,21 @@ async def test_team_members_cannot_edit(client, db, route_env):
         "edits": [{"tag": "h1", "index": 0, "original": "NIH R01 Budget Dashbord", "text": "x"}],
     })
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_a_text_edit_keeps_the_owners_rename(client, db, route_env):
+    doc = make(db, html=PAGE)
+    doc = artifacts.rename(db, doc, "R01 budget for the dean")
+    cookies, headers = _auth()
+    response = await client.post(f'/api/pages/{doc["uuid"]}/text-edits', cookies=cookies, headers=headers, json={
+        "base_revision": doc["latest_revision"],
+        "edits": [{"tag": "h1", "index": 0, "original": "NIH R01 Budget Dashbord", "text": "NIH R01 Budget Dashboard"}],
+    })
+    assert response.status_code == 200, response.text
+    assert artifacts.get(db, doc["uuid"])["title"] == "R01 budget for the dean"
+
+
+def test_the_embed_script_has_no_raw_nul_character():
+    # A NUL inside <script> is a parse error the browser rewrites to U+FFFD.
+    assert "\x00" not in EMBED_SCRIPT
