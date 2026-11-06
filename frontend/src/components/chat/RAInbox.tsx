@@ -182,7 +182,10 @@ function InboxRow({ item, focused, onChanged, onError }: {
   )
 }
 
-export function RAInbox() {
+/** "Due and needed": Home's list across your projects, or, inside a project,
+ * only that project's (support ticket: a project chat listed another
+ * project's deadlines above its own). */
+export function RAInbox({ projectUuid }: { projectUuid?: string | null } = {}) {
   const { focusedObligationUuid } = useWorkspace()
   const [items, setItems] = useState<Obligation[] | null>(null)
   const [loadError, setLoadError] = useState(false)
@@ -194,7 +197,7 @@ export function RAInbox() {
   const loaded = useRef(false)
   const load = useCallback(async (includeDismissed: boolean) => {
     try {
-      const data = await getInbox(includeDismissed)
+      const data = await getInbox(includeDismissed, projectUuid)
       loaded.current = true
       setLoadError(false)
       setItems(data.items)
@@ -205,7 +208,7 @@ export function RAInbox() {
       // load that fails is shown as an error, never as an empty inbox.
       if (!loaded.current) setLoadError(true)
     }
-  }, [])
+  }, [projectUuid])
 
   useEffect(() => { void load(showDismissed) }, [load, showDismissed])
 
@@ -234,7 +237,9 @@ export function RAInbox() {
   if (visible.length === 0 && !showDismissed) {
     if (projectCount === 0) return null
     return <p role="status" className="home-meta">
-      Nothing due or missing in your {projectCount === 1 ? 'project' : `${projectCount} projects`}. Only deadlines and materials saved to a project appear here.
+      {projectUuid
+        ? 'Nothing due or missing in this project. Only deadlines and materials saved to it appear here.'
+        : `Nothing due or missing in your ${projectCount === 1 ? 'project' : `${projectCount} projects`}. Only deadlines and materials saved to a project appear here.`}
     </p>
   }
 
@@ -271,6 +276,7 @@ export function RAInbox() {
         <h2 style={{ margin: 0, fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           Due and needed
         </h2>
+        <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>{projectUuid ? 'This project' : 'All your projects'}</span>
         <span style={{ flex: 1 }} />
         {(dismissedCount > 0 || showDismissed) && (
           <button type="button" style={{ ...BUTTON, border: 'none' }} onClick={() => setShowDismissed(v => !v)}>
@@ -279,8 +285,8 @@ export function RAInbox() {
         )}
         {visible.some(i => i.kind === 'deadline' && i.due_at && !i.dismissed) && (
           <button type="button" style={{ ...BUTTON, border: 'none' }}
-            aria-label="Download a calendar file with all your open deadlines"
-            onClick={() => { downloadDeadlineCalendar('all').catch((e: unknown) => setError(e instanceof Error ? e.message : 'The calendar file could not be downloaded.')) }}>
+            aria-label={projectUuid ? "Download a calendar file with this project's open deadlines" : 'Download a calendar file with all your open deadlines'}
+            onClick={() => { downloadDeadlineCalendar(projectUuid ? { project: projectUuid } : 'all').catch((e: unknown) => setError(e instanceof Error ? e.message : 'The calendar file could not be downloaded.')) }}>
             <CalendarPlus size={12} aria-hidden /> Calendar
           </button>
         )}
@@ -288,10 +294,10 @@ export function RAInbox() {
           aria-label="Deadline reminder settings">
           Reminders
         </Link>
-        <button type="button" style={{ ...BUTTON, border: 'none' }} onClick={hideInbox}
+        {!projectUuid && <button type="button" style={{ ...BUTTON, border: 'none' }} onClick={hideInbox}
           aria-label="Hide this inbox from your Home. You can turn it back on in Account settings.">
           Hide inbox
-        </button>
+        </button>}
       </div>
       {error && <p role="alert" style={{ margin: 'var(--workspace-space-4) var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: '#b91c1c' }}>{error}</p>}
       {focusMissing && <p role="status" style={{ margin: 'var(--workspace-space-4) var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: '#4b5563' }}>

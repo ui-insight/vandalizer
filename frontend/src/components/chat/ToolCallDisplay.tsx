@@ -23,7 +23,7 @@ import {
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useCertificationPanelOptional } from '../../contexts/CertificationPanelContext'
 import type { WorkspaceMode } from '../../contexts/WorkspaceContext'
-import type { ToolCallInfo, ToolResultInfo, QualityMeta } from '../../types/chat'
+import type { CardDecision, ToolCallInfo, ToolResultInfo, QualityMeta } from '../../types/chat'
 import { getWorkflowStatus } from '../../api/workflows'
 import { WorkflowArtifactAction } from '../workspace/WorkflowArtifactAction'
 import { announceWorkflowEdited } from '../../lib/workflowEdits'
@@ -1265,7 +1265,7 @@ export function ToolStatusLine({
   call?: ToolCallInfo
   result?: ToolResultInfo
   isActive?: boolean
-  onConfirm?: (message: string, pageApproval?: string) => boolean | void
+  onConfirm?: (message: string, pageApproval?: string, cardDecision?: CardDecision) => boolean | void
   approvalHistory?: ApprovalRecord
   /** This call failed, and a later call to the same tool succeeded. */
   recovered?: boolean
@@ -1298,9 +1298,13 @@ export function ToolStatusLine({
     if (!onConfirm || decisionRef.current) return
     decisionRef.current = true
     try {
+      // The card names its own preview, so the click approves (or cancels)
+      // this action only — never every card waiting (support ticket).
+      const cardId = call?.tool_call_id ?? result?.tool_call_id
+      const cardDecision: CardDecision | undefined = cardId ? (value === 'approved' ? { approve: cardId } : { decline: cardId }) : undefined
       const accepted = value === 'approved' && ['create_html_artifact', 'revise_html_artifact'].includes(name) && typeof obj?.preview_id === 'string'
-        ? onConfirm('Yes, go ahead', obj.preview_id)
-        : onConfirm(value === 'approved' ? 'Yes, go ahead' : 'No, cancel that')
+        ? onConfirm('Yes, go ahead', obj.preview_id, cardDecision)
+        : onConfirm(value === 'approved' ? 'Yes, go ahead' : 'No, cancel that', undefined, cardDecision)
       if (accepted === false) {
         setDecisionError('The decision could not be sent yet. Wait for the current attachment or response, then try again.')
         decisionRef.current = false
@@ -1313,6 +1317,7 @@ export function ToolStatusLine({
     }
   }
   const executionLabel = needsConfirmation ? approvalHistory?.label ?? (decision === 'approved' ? 'Approval requested' : decision === 'canceled' ? 'Cancellation requested' : 'Awaiting approval')
+    : obj?.still_waiting === true ? 'Waiting for its own approval'
     : canceled ? 'Canceled' : certificationIssue ? 'Result needs review' : isError ? 'Failed' : unconfirmed ? 'Completion not confirmed' : isActive ? 'Running'
     : name === 'run_workflow' && typeof obj?.session_id === 'string' ? 'Run accepted'
     : name === 'select_skill' ? selectedSkill === null ? 'Skill removed' : selectedSkill ? 'Skill selected' : 'Change not confirmed'
@@ -1503,7 +1508,7 @@ interface Props {
   toolCalls: ToolCallInfo[]
   toolResults: ToolResultInfo[]
   isStreaming?: boolean
-  onConfirm?: (message: string, pageApproval?: string) => boolean | void
+  onConfirm?: (message: string, pageApproval?: string, cardDecision?: CardDecision) => boolean | void
   approvalHistory?: Record<string, ApprovalRecord>
 }
 

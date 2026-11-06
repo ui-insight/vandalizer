@@ -9,6 +9,8 @@ EMBED_STYLE = """
 html, body { height: auto !important; min-height: 0 !important; max-height: none !important; overflow-y: visible !important; }
 .vandalizer-table-scroll { max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
 .vandalizer-table-scroll:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+html.vandalizer-picking :is(td, th, li, p, h1, h2, h3, h4, h5, h6, dt, dd, figcaption, caption, blockquote, pre):hover { outline: 2px dashed #b45309; outline-offset: 2px; cursor: crosshair; }
+.vandalizer-feedback-spot { outline: 3px solid #f1b300 !important; outline-offset: 2px; background: #fffbeb !important; }
 """
 EMBED_SCRIPT = """(() => {
   // Page-authored JavaScript remains blocked by CSP. Only this nonce-bearing
@@ -44,6 +46,57 @@ EMBED_SCRIPT = """(() => {
   document.addEventListener('toggle', schedule, true);
   document.fonts?.ready.then(schedule);
   schedule();
+
+  // Questions from viewers (page feedback): the app turns on picking, a click
+  // reports the element's path from <body> and its text, and the app can ask
+  // for a reported spot to be shown again. Only the parent may ask; nothing
+  // here reads or sends anything beyond the clicked element's own text.
+  const BLOCKS = 'td, th, li, p, h1, h2, h3, h4, h5, h6, dt, dd, figcaption, caption, blockquote, pre';
+  const pathOf = (el) => {
+    const parts = [];
+    while (el && el !== document.body && el.parentElement) {
+      parts.unshift(Array.prototype.indexOf.call(el.parentElement.children, el));
+      el = el.parentElement;
+    }
+    return el === document.body ? parts.join('/') : '';
+  };
+  const textOf = (el) => (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 300);
+  const resolve = (path, text) => {
+    let el = document.body;
+    for (const i of (path || '').split('/').filter(Boolean)) { el = el && el.children[Number(i)]; }
+    if (el && el !== document.body && (!text || textOf(el) === text)) return el;
+    if (!text) return null;
+    return Array.from(document.querySelectorAll(BLOCKS)).find(c => textOf(c) === text)
+      || Array.from(document.querySelectorAll(BLOCKS)).find(c => textOf(c).includes(text.slice(0, 80))) || null;
+  };
+  let picking = false;
+  window.addEventListener('message', (event) => {
+    if (event.source !== window.parent || !event.data || typeof event.data !== 'object') return;
+    const data = event.data;
+    if (data.type === 'vandalizer:pick-mode') {
+      picking = data.on === true;
+      document.documentElement.classList.toggle('vandalizer-picking', picking);
+    } else if (data.type === 'vandalizer:show-spot') {
+      document.querySelectorAll('.vandalizer-feedback-spot').forEach(e => e.classList.remove('vandalizer-feedback-spot'));
+      const el = resolve(typeof data.path === 'string' ? data.path : '', typeof data.text === 'string' ? data.text : '');
+      if (el) {
+        el.classList.add('vandalizer-feedback-spot');
+        const top = el.getBoundingClientRect().top + window.scrollY;
+        window.parent.postMessage({ type: 'vandalizer:spot-shown', found: true, top }, '*');
+      } else {
+        window.parent.postMessage({ type: 'vandalizer:spot-shown', found: false }, '*');
+      }
+    }
+  });
+  document.addEventListener('click', (event) => {
+    if (!picking) return;
+    const target = event.target instanceof Element ? event.target : null;
+    const el = (target && target.closest(BLOCKS)) || target;
+    if (!el || el === document.body || el === document.documentElement) return;
+    event.preventDefault();
+    event.stopPropagation();
+    window.parent.postMessage({ type: 'vandalizer:page-pick', path: pathOf(el), text: textOf(el) }, '*');
+  }, true);
 })();"""
 
 

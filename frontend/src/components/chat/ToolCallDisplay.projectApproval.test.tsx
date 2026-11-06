@@ -16,6 +16,6 @@ it('uses a plain Create project button and sends approval once', () => {
   expect(screen.queryByRole('button', { name: 'Approve create project' })).not.toBeInTheDocument()
   expect(onConfirm).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: 'Create project' }))
-  expect(onConfirm).toHaveBeenCalledExactlyOnceWith('Yes, go ahead')
+  expect(onConfirm).toHaveBeenCalledExactlyOnceWith('Yes, go ahead', undefined, { approve: expect.any(String) })
   expect(screen.queryByRole('button', { name: 'Create project' })).not.toBeInTheDocument()
 })

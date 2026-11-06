@@ -25,7 +25,8 @@ async def list_runs(automation_id: str, limit: int, before: datetime.datetime | 
             {"$match": query},
             {"$sort": {"created_at": -1, "_id": -1}},
             {"$limit": limit + 1},
-            {"$project": {"_id": 1, "status": 1, "created_at": 1, "started_at": 1, "completed_at": 1, "error": 1}},
+            {"$project": {"_id": 1, "status": 1, "created_at": 1, "started_at": 1, "completed_at": 1, "error": 1,
+                          "trigger_type": 1, "trigger_context.trigger_type": 1, "trigger_context.document_title": 1}},
         ]
         for event in await model.aggregate(pipeline).to_list():
             rows.append({
@@ -36,6 +37,8 @@ async def list_runs(automation_id: str, limit: int, before: datetime.datetime | 
                 "started_at": utc_iso(event.get("started_at")),
                 "completed_at": utc_iso(event.get("completed_at")),
                 "error": event.get("error"),
+                "trigger_type": (event.get("trigger_context") or {}).get("trigger_type") or event.get("trigger_type"),
+                "document_title": (event.get("trigger_context") or {}).get("document_title"),
             })
     rows.sort(key=lambda row: (row["created_at"], row["trigger_event_id"]), reverse=True)
     page = rows[:limit]

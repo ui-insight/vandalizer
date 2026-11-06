@@ -1,5 +1,5 @@
 import { apiFetch, rawFetch } from './client'
-import type { ChatMessage, UrlAttachment, FileAttachment, PlanTask, StreamChunk, SkillSnapshot } from '../types/chat'
+import type { CardDecision, ChatMessage, UrlAttachment, FileAttachment, PlanTask, StreamChunk, SkillSnapshot } from '../types/chat'
 
 function browserTimeZone(): string | undefined {
   try { return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined }
@@ -47,6 +47,7 @@ export async function streamChat(
   skillVersion?: string,
   retry = false,
   pageApproval?: string,
+  cardDecision?: CardDecision,
 ): Promise<{ conversationUuid: string; activityId: string }> {
   const res = await rawFetch('/api/chat', {
     method: 'POST',
@@ -57,6 +58,9 @@ export async function streamChat(
       client_timezone: browserTimeZone(),
       ...(retry ? { retry: true } : {}),
       ...(pageApproval ? { page_approval: pageApproval } : {}),
+      // One click approves one card: name the preview it decides.
+      ...(cardDecision && 'approve' in cardDecision ? { approval_for: cardDecision.approve } : {}),
+      ...(cardDecision && 'decline' in cardDecision ? { decline_for: cardDecision.decline } : {}),
       ...(skillUuid !== undefined ? { skill_uuid: skillUuid } : {}),
       ...(skillVersion ? { skill_version: skillVersion } : {}),
       document_uuids: documentUuids,
@@ -225,6 +229,8 @@ export interface ChatHistoryScope {
 export interface ChatHistory {
   active_skill?: SkillSnapshot | null
   messages: ChatMessage[]
+  /** Approval cards still waiting: their previews' tool call ids. */
+  pending_approvals?: string[]
   url_attachments: UrlAttachment[]
   file_attachments: FileAttachment[]
   context_mode?: 'full' | 'truncated' | 'compacted'
