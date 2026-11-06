@@ -176,6 +176,7 @@ def revise(db: Database[dict], doc: dict, title: str, html: str, base_revision: 
         return doc  # a retried save must not append again
     if len(doc["revisions"]) >= MAX_REVISIONS:
         raise HTTPException(422, "This page has 25 revisions. Create a new page to continue.")
+    new["change_summary"] = _change_summary(doc, base_revision, new)
     _pin_legacy_team_revision(db, doc)
     saved = db.html_artifacts.find_one_and_update({
         "uuid": doc["uuid"], "user_id": doc["user_id"], "deleted_at": None,
@@ -189,6 +190,33 @@ def revise(db: Database[dict], doc: dict, title: str, html: str, base_revision: 
             return latest
         raise HTTPException(409, "This page changed. Reload before saving another revision.")
     return saved
+
+
+def _change_summary(doc: dict, base: str, new: dict) -> str | None:
+    """One line on what this version changed from the one it was saved over."""
+    from app.services.page_diff import compare
+    previous = next((r for r in doc["revisions"] if r["uuid"] == base), None)
+    if previous is None:
+        return None
+    try:
+        summary: str = compare(previous["html"], new["html"])["summary"]
+        return summary
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception("Could not summarize page changes for %s", doc.get("uuid"))
+        return None
+
+
+def fill_change_summaries(db: Database[dict], doc: dict) -> dict:
+    """Summaries for versions saved before they were recorded, stored once."""
+    revisions = doc.get("revisions") or []
+    for previous, current in zip(revisions, revisions[1:]):
+        if "change_summary" in current or "html" not in current or "html" not in previous:
+            continue
+        current["change_summary"] = _change_summary(doc, previous["uuid"], current)
+        db.html_artifacts.update_one({"uuid": doc["uuid"]}, {"$set": {"revisions.$[r].change_summary": current["change_summary"]}},
+                                     array_filters=[{"r.uuid": current["uuid"]}])
+    return doc
 
 
 def team_revision(doc: dict) -> str | None:
@@ -257,7 +285,9 @@ def metadata(doc: dict, owner: bool=False) -> dict:
               "team_id": doc.get("team_id"), "can_manage": owner, "published_revision": doc.get("published_revision"),
               "team_revision": team_revision(doc),
               "revisions": [{**{k: r[k] for k in ("uuid", "title", "created_at", "warnings")},
-                             "version": r.get("version", i)} for i, r in enumerate(doc["revisions"], 1)]}
+                             "version": r.get("version", i),
+                             **({"change_summary": r["change_summary"]} if owner and r.get("change_summary") else {})}
+                            for i, r in enumerate(doc["revisions"], 1)]}
     result["created_at"] = doc.get("created_at")
     result["updated_at"] = doc.get("updated_at")
     source = doc.get("source") or doc["revisions"][0].get("source", {})

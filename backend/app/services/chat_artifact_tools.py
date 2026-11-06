@@ -41,9 +41,21 @@ def _source(context: RunContext[AgenticChatDeps]) -> dict:
             "skill": {"uuid": skill.uuid, "version": skill.version} if skill else None}
 
 
-async def get_html_artifact(context: RunContext[AgenticChatDeps], artifact_uuid: str) -> dict:
-    """Read your own page's latest saved HTML and revision before revising it.
+def _revision_by_version(doc: dict, version: int | None) -> dict:
+    if version is None:
+        return artifacts.revision(doc)
+    for number, entry in enumerate(doc["revisions"], 1):
+        if entry.get("version", number) == version:
+            return dict(entry)
+    raise HTTPException(404, f"This Page has no version {version}; it has versions 1 to {len(doc['revisions'])}.")
 
+
+async def get_html_artifact(context: RunContext[AgenticChatDeps], artifact_uuid: str, version: int | None = None) -> dict:
+    """Read your own page's saved HTML: the latest version, or an earlier one by number.
+
+    Revise from the latest version (omit version). Pass version to read an
+    older saved version, e.g. to quote what it said; to answer "what changed",
+    use compare_page_versions instead.
     Generated HTML is not source evidence. Read the original documents to verify
     values and source notes before revising a document-based page.
     """
@@ -51,7 +63,9 @@ async def get_html_artifact(context: RunContext[AgenticChatDeps], artifact_uuid:
         doc = await _call(artifacts.get, artifact_uuid)
         if doc["user_id"] != context.deps.user_id:
             return {"error": "Page not found or you do not own it."}
-        rev = artifacts.revision(doc)
+        rev = _revision_by_version(doc, version)
+        # The files the version read was built from (an older version may
+        # cite an older file version than the latest one does).
         sources = await _call(page_sources.freshness, page_sources.revision_sources(rev), changes=True)
         sources = await page_sources.hide_unreadable_versions(sources, context.deps.user)
         return {"artifact_uuid": doc["uuid"], "title": rev["title"], "revision": rev["uuid"], "html": rev["html"],
@@ -59,8 +73,35 @@ async def get_html_artifact(context: RunContext[AgenticChatDeps], artifact_uuid:
                 # changed; rebuild every affected value from that file.
                 "source_files": sources,
                 "version": next(i for i, entry in enumerate(doc["revisions"], 1) if entry["uuid"] == rev["uuid"]),
+                "is_latest": rev["uuid"] == doc["latest_revision"], "change_summary": rev.get("change_summary"),
                 "warnings": rev["warnings"], "rendering_note": RENDERING_NOTE,
                 "source_fidelity_note": PAGE_SOURCE_FIDELITY_RULES, "language_note": PAGE_LANGUAGE_RULES}
+    except HTTPException as exc:
+        return {"error": exc.detail}
+
+
+async def compare_page_versions(context: RunContext[AgenticChatDeps], artifact_uuid: str, from_version: int, to_version: int | None = None) -> dict:
+    """Compare two saved versions of your Page: what changed from from_version to to_version (latest if omitted).
+
+    Returns changed figures (label, old, new), sections added and removed, other
+    text edits, and design-only changes, each computed from the saved HTML.
+    Report them as given: list every changed figure with old → new, then the
+    sections, then text edits; mention design changes separately. Each version
+    also has a one-line change_summary.
+    """
+    from app.services.page_diff import compare
+    try:
+        doc = await _call(artifacts.get, artifact_uuid)
+        if doc["user_id"] != context.deps.user_id:
+            return {"error": "Page not found or you do not own it."}
+        old = _revision_by_version(doc, from_version)
+        new = _revision_by_version(doc, to_version)
+        number = {r["uuid"]: r.get("version", i) for i, r in enumerate(doc["revisions"], 1)}
+        diff = await anyio.to_thread.run_sync(compare, old["html"], new["html"])
+        summaries = [{"version": r.get("version", i), "change_summary": r.get("change_summary")}
+                     for i, r in enumerate(doc["revisions"], 1) if number[old["uuid"]] < r.get("version", i) <= number[new["uuid"]]]
+        return {"artifact_uuid": doc["uuid"], "from_version": number[old["uuid"]], "to_version": number[new["uuid"]],
+                **diff, "versions_between": summaries}
     except HTTPException as exc:
         return {"error": exc.detail}
 
