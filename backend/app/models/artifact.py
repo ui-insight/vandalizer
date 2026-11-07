@@ -27,7 +27,10 @@ class Artifact(Document):
     class Settings:
         name = "html_artifacts"
         indexes = [IndexModel("uuid", unique=True), "user_id", "team_id", "public_token", "publications.token", "project_uuid", "updated_at",
-                   "public_expires_at", "publications.expires_at"]
+                   "public_expires_at", "publications.expires_at",
+                   # page_sources.notify_source_revised: Pages built from a file
+                   # that just got a new version, scanned on every version upload.
+                   "revisions.source.documents.uuid"]
 
 
 class PageLinkViewer(Document):
