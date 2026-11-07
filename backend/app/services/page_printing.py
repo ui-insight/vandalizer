@@ -42,7 +42,7 @@ PRINT_SCRIPT = """document.getElementById('vandalizer-print-button').addEventLis
 AUTO_PRINT_SCRIPT = """window.addEventListener('load', function () { window.print(); });"""
 
 
-def render_page(revision: dict, version: int, view: str = "content") -> tuple[str, str]:
+def render_page(revision: dict, version: int, view: str = "content", public: bool = False) -> tuple[str, str]:
     """Return HTML and CSP without modifying immutable stored source.
 
     Preview/download content remains script-free. Full-page and print views
@@ -71,7 +71,7 @@ def render_page(revision: dict, version: int, view: str = "content") -> tuple[st
     for element in soup.select("#vandalizer-print-style, #vandalizer-print-footer, #vandalizer-print-controls, #vandalizer-print-script, #vandalizer-figure-style, #vandalizer-figure-check"):
         element.decompose()
     from app.services import page_figures
-    page_figures.annotate(soup, (revision.get("source") or {}).get("figure_check"))
+    page_figures.annotate(soup, (revision.get("source") or {}).get("figure_check"), public=public)
     saved = revision.get("created_at")
     if saved is not None:
         if saved.tzinfo is None:

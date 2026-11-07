@@ -322,13 +322,14 @@ _FIGURE_STYLE = """
 """
 
 
-def note(result: dict[str, Any]) -> str:
+def note(result: dict[str, Any], public: bool = False) -> str:
     when = result.get("checked_at") or ""
     try:
         when = datetime.fromisoformat(when).strftime("%b %-d, %Y")
     except ValueError:
         pass
-    sources = ", ".join(result.get("sources") or []) or "the source files"
+    # A public link keeps file names private (as its source details are).
+    sources = "the source files" if public else ", ".join(result.get("sources") or []) or "the source files"
     return f"Figures checked against {sources} on {when} · {summary(result)}"
 
 
@@ -355,8 +356,12 @@ def _same(a: str | None, b: str | None) -> bool:
     return bool(a and b and a.strip().lower() == b.strip().lower())
 
 
-def _hover(entry: dict[str, Any], node: Any = None) -> str:
+def _hover(entry: dict[str, Any], node: Any = None, public: bool = False) -> str:
     status = entry["status"]
+    if public:
+        # No file names, cell locations or the source values behind hand edits.
+        return {"stated": "Found in the source files", "calculated": "Calculated from figures in the source files",
+                "manual": "Edited by hand after the check"}.get(status, "Not found in the source files")
     if status == "stated":
         origins = entry.get("origins") or []
         if node is not None and len(origins) > 1:
@@ -374,7 +379,7 @@ def _hover(entry: dict[str, Any], node: Any = None) -> str:
     return "Not found in the source files"
 
 
-def annotate(soup: BeautifulSoup, result: dict[str, Any] | None) -> None:
+def annotate(soup: BeautifulSoup, result: dict[str, Any] | None, public: bool = False) -> None:
     """Hover text on each checked figure and a "Figures checked" line, in place."""
     strip_annotations(soup)
     if not result or not soup.body:
@@ -393,7 +398,7 @@ def annotate(soup: BeautifulSoup, result: dict[str, Any] | None) -> None:
                 continue
             pieces.append(text[last:m.start()])
             span = soup.new_tag("span", attrs={
-                "class": f"vz-figure vz-figure--{entry['status']}", "title": _hover(entry, node),
+                "class": f"vz-figure vz-figure--{entry['status']}", "title": _hover(entry, node, public),
             })
             span.string = m.group(0)
             pieces.append(span)
@@ -410,5 +415,5 @@ def annotate(soup: BeautifulSoup, result: dict[str, Any] | None) -> None:
         style.string = _FIGURE_STYLE
         head.append(style)
     footer = soup.new_tag("aside", id="vandalizer-figure-check", role="note")
-    footer.string = note(result)
+    footer.string = note(result, public)
     soup.body.append(footer)

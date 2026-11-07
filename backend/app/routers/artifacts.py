@@ -87,10 +87,10 @@ async def authorized(uuid: str, user: User, manage: bool=False) -> dict:
     raise HTTPException(404, "Page not found")
 
 
-def content_response(rev: dict, download: bool=False, *, version: int=1, view: Literal["content", "full", "print", "embed"]="content") -> HTMLResponse:
+def content_response(rev: dict, download: bool=False, *, version: int=1, view: Literal["content", "full", "print", "embed"]="content", public: bool=False) -> HTMLResponse:
     title = rev["title"].strip() or "Page"
     filename = title if title.lower().endswith(".html") else f"{title}.html"
-    html, csp = render_page(rev, version, "content" if download else view)
+    html, csp = render_page(rev, version, "content" if download else view, public=public)
     html, csp = prepare_page_links(html, csp)
     if view == "embed" and not download:
         html, csp = prepare_page_embed(html, csp)
@@ -213,7 +213,8 @@ async def public_content(token: str, request: Request, download: bool = False, r
     if revision is not None and revision != rev["uuid"]:
         raise HTTPException(409, "The published page changed. Reload the page to view the current version.")
     version = next(i for i, item in enumerate(doc["revisions"], 1) if item["uuid"] == rev["uuid"])
-    return content_response(rev, download, version=version, view=view)
+    # Public viewers see that figures were checked, not which files or cells.
+    return content_response(rev, download, version=version, view=view, public=True)
 
 
 @router.get("/{uuid}", response_model=None)

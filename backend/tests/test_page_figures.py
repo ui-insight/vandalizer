@@ -106,6 +106,19 @@ def test_hover_text_names_the_cell_a_repeated_value_comes_from():
     assert "1 manual edit (Personnel)" in note
 
 
+def test_a_public_link_shows_the_check_without_file_names_cells_or_source_values():
+    result = pf.check(EDITED_PAGE, _sources())
+    soup = BeautifulSoup(EDITED_PAGE, "html.parser")
+    pf.annotate(soup, result, public=True)
+    rendered = str(soup)
+    assert TITLE not in rendered and "Equipment, Y1" not in rendered and "$124k" not in rendered.split("</table>")[1]
+    hovers = {s.get_text(): s["title"] for s in soup.find_all("span", class_="vz-figure")}
+    assert hovers["$15k"] == "Found in the source files"
+    assert hovers["$142k"] == "Edited by hand after the check"
+    assert hovers["52%"] == "Not found in the source files"
+    assert soup.find(id="vandalizer-figure-check").get_text().startswith("Figures checked against the source files on ")
+
+
 def test_the_sanitizer_keeps_the_manual_edit_marker():
     cleaned, _warnings = artifacts.clean_html(EDITED_PAGE, "Budget")
     assert 'data-source-value="$124k"' in cleaned
