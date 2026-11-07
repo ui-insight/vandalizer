@@ -17,6 +17,8 @@ budget-exceeded signal itself always propagates.
 """
 
 from __future__ import annotations
+from app.config import Settings
+from app.models.user import User
 
 import datetime
 import logging
@@ -31,8 +33,9 @@ logger = logging.getLogger(__name__)
 
 EXCEEDED_MESSAGE = (
     "This trial account has used all of its included AI tokens. "
-    "A top-up link is on its way to your email — one click (and a little "
-    "feedback) brings you right back."
+    "Choose Top up in the banner at the top of the page to keep going — one "
+    "click (and a little feedback) brings you right back. A top-up link is "
+    "also on its way to your email."
 )
 
 UNVERIFIED_MESSAGE = (
@@ -48,6 +51,17 @@ FLEET_PAUSED_MESSAGE = (
 )
 
 _USAGE_PIPELINE = [{"$group": {"_id": None, "total": {"$sum": "$total_tokens"}}}]
+
+#: Metering features whose tokens don't count toward a trial account's own
+#: budget. Certification runs through chat at ~60K prompt tokens a request, so
+#: the 11-module course costs about ten 2M allowances: a trial learner ran out
+#: in Module 1 (support ticket). Certification is the onboarding funnel, so a
+#: trial user can always finish it. These tokens still count toward the
+#: monthly fleet ceiling, which stays the money guard.
+BUDGET_EXEMPT_FEATURES = frozenset({"certification_chat"})
+
+#: Ledger filter for the tokens a trial account's budget counts.
+BUDGETED_USAGE = {"feature": {"$nin": sorted(BUDGET_EXEMPT_FEATURES)}}
 
 #: Redis key holding "1" while fleet-wide trial spend is over the monthly
 #: ceiling. Written by the hourly sweep, read on the hot path. Carries a TTL so
@@ -126,7 +140,7 @@ async def fleet_tokens_this_month() -> int:
     return int(rows[0]["total"]) if rows else 0
 
 
-async def refresh_fleet_pause(settings=None) -> dict:
+async def refresh_fleet_pause(settings: Settings | None=None) -> dict:
     """Recompute the fleet ceiling and set/clear the Redis pause flag.
 
     Called by the hourly trial sweep. The flag is what the hot path reads, so
@@ -209,14 +223,14 @@ async def tokens_used_async(user_id: str) -> int:
     from app.models.llm_usage import LlmUsageRecord
 
     rows = (
-        await LlmUsageRecord.find(LlmUsageRecord.user_id == user_id)
+        await LlmUsageRecord.find({"user_id": user_id, **BUDGETED_USAGE})
         .aggregate(_USAGE_PIPELINE)
         .to_list()
     )
     return int(rows[0]["total"]) if rows else 0
 
 
-async def get_trial_usage(user) -> dict:
+async def get_trial_usage(user: User) -> dict:
     """Budget/usage snapshot for one trial user — the shape the meter, the
     lifecycle emails, and the trial-end screen all read.
 
@@ -249,8 +263,12 @@ async def get_trial_usage(user) -> dict:
     }
 
 
-async def check_async(user_id: str | None) -> None:
+async def check_async(user_id: str | None, feature: str | None = None) -> None:
     """Gate LLM spend for a trial user: verified, under budget, fleet not paused.
+
+    ``feature`` is the metering feature about to spend. One in
+    ``BUDGET_EXEMPT_FEATURES`` skips the per-account budget only: an
+    unverified address and a paused fleet still block it.
 
     Raises TrialUnverifiedError or TrialBudgetExceededError. Non-trial users
     and deployments with the trial system off return immediately.
@@ -272,7 +290,7 @@ async def check_async(user_id: str | None) -> None:
         # the cheaper answer and the more actionable message.
         if not user.email_verified:
             raise TrialUnverifiedError(UNVERIFIED_MESSAGE)
-        budget = effective_budget(user.trial_token_budget)
+        budget = 0 if feature in BUDGET_EXEMPT_FEATURES else effective_budget(user.trial_token_budget)
         # An uncapped account still counts against the fleet ceiling.
         used = await tokens_used_async(user_id) if budget else 0
         over_budget = bool(budget) and used >= budget
@@ -285,10 +303,10 @@ async def check_async(user_id: str | None) -> None:
     if over_budget:
         raise TrialBudgetExceededError(EXCEEDED_MESSAGE)
     if fleet_paused:
-        raise TrialBudgetExceededError(FLEET_PAUSED_MESSAGE)
+        raise TrialBudgetExceededError(FLEET_PAUSED_MESSAGE, code="fleet_paused")
 
 
-def check_sync(user_id: str | None, *, extra_used: int = 0) -> None:
+def check_sync(user_id: str | None, *, extra_used: int = 0, feature: str | None = None) -> None:
     """Sync twin of check_async, for Celery-side metering scopes.
 
     ``extra_used`` is spend that has happened but is not in the ledger yet.
@@ -312,12 +330,12 @@ def check_sync(user_id: str | None, *, extra_used: int = 0) -> None:
             return
         if not user.get("email_verified"):
             raise TrialUnverifiedError(UNVERIFIED_MESSAGE)
-        budget = effective_budget(user.get("trial_token_budget"))
+        budget = 0 if feature in BUDGET_EXEMPT_FEATURES else effective_budget(user.get("trial_token_budget"))
         used = 0
         if budget:
             rows = list(
                 db.llm_usage.aggregate(
-                    [{"$match": {"user_id": user_id}}, *_USAGE_PIPELINE]
+                    [{"$match": {"user_id": user_id, **BUDGETED_USAGE}}, *_USAGE_PIPELINE]
                 )
             )
             used = int(rows[0]["total"]) if rows else 0
@@ -332,4 +350,4 @@ def check_sync(user_id: str | None, *, extra_used: int = 0) -> None:
     if over_budget:
         raise TrialBudgetExceededError(EXCEEDED_MESSAGE)
     if fleet_paused:
-        raise TrialBudgetExceededError(FLEET_PAUSED_MESSAGE)
+        raise TrialBudgetExceededError(FLEET_PAUSED_MESSAGE, code="fleet_paused")

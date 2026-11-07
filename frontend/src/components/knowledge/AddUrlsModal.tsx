@@ -1,64 +1,175 @@
+import { FieldLabel, FieldMessage } from '../shared/FormField'
+import { ActionButton } from '../shared/ActionButton'
+import { usePanelEffect } from '../shared/usePanelEffect'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { FocusTrap } from 'focus-trap-react'
-import { ChevronDown, ChevronRight, Loader2, X } from 'lucide-react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
+import { ArrowLeft, Loader2, X } from 'lucide-react'
+import { TopicSourceFinder } from './TopicSourceFinder'
+import { UrlReviewList, type UrlCandidate } from './UrlReviewList'
+import { UrlPreviewList, plural } from './UrlPreviewList'
+import { extractUrls } from '../../utils/extractUrls'
 import {
   cancelUrlPreview,
   commitUrlPreview,
+  getSourceSuggestionsAvailable,
   getUrlPreview,
-  getUrlPreviewPageText,
   previewUrlsForKB,
+  readSitemap,
   type UrlPreview,
-  type UrlPreviewPage,
-  type UrlPreviewVerdict,
 } from '../../api/knowledge'
 
+// Mirrors MAX_URLS_PER_ADD / MAX_CRAWL_URLS_PER_ADD in routers/knowledge.py.
+const MAX_URLS_PER_ADD = 500
+const MAX_CRAWL_URLS_PER_ADD = 25
+// Mirrors MAX_URLS_PER_PREVIEW / MAX_CRAWL_URLS_PER_PREVIEW: a preview fetches
+// every page in one worker task, so it checks a handful, not a whole sitemap.
+const MAX_URLS_PER_PREVIEW = 50
+const MAX_CRAWL_URLS_PER_PREVIEW = 5
+const POLL_MS = 2000
+// A list of links is small; a file this size is a document, not a list.
+const MAX_FILE_BYTES = 5 * 1024 * 1024
+
+type Method = 'paste' | 'file' | 'sitemap' | 'topic'
+
+const METHOD_LABELS: Record<Method, string> = {
+  paste: 'Paste',
+  file: 'File',
+  sitemap: 'Sitemap',
+  topic: 'Topic',
+}
+
 interface AddUrlsModalProps {
-  kbUuid: string
-  /** Called once the kept pages are queued for indexing. */
-  onCommitted: (added: number) => void
+  /** Enables the Sitemap and Topic ways in (both read on the server for this KB). */
+  kbUuid?: string
+  onSubmit: (urls: string[], crawlEnabled: boolean, maxCrawlPages: number, allowedDomains: string) => void | Promise<void>
+  /** Enables "Fetch & check": called once a checked preview's kept pages are queued. */
+  onCommitted?: (added: number) => void
   onClose: () => void
 }
 
-const POLL_MS = 2000
+/**
+ * Add URLs, in two steps: gather links, then review them (feature request —
+ * links could only be typed one per line). Links come from pasted text of any
+ * kind (an email, a document: the links are pulled out of it), a file, a
+ * site's sitemap, or a topic search. The review step lists every one found;
+ * only the checked ones are added. "Fetch & check" optionally fetches the
+ * checked links first and shows each page's text and verdict (#1022); Add then
+ * indexes exactly the text that was shown.
+ */
+export function AddUrlsModal({ kbUuid, onSubmit, onCommitted, onClose }: AddUrlsModalProps) {
+  const [step, setStep] = useState<'choose' | 'review'>('choose')
+  const [method, setMethod] = useState<Method>('paste')
+  const [topicAvailable, setTopicAvailable] = useState(false)
 
-const VERDICT_BADGE: Record<UrlPreviewVerdict, { label: string; color: string; background: string }> = {
-  good: { label: 'Good', color: '#4ade80', background: 'rgba(74,222,128,0.12)' },
-  low: { label: 'Low quality', color: '#fbbf24', background: 'rgba(251,191,36,0.12)' },
-  empty: { label: 'Empty or blocked', color: '#f87171', background: 'rgba(248,113,113,0.12)' },
-  error: { label: "Couldn't fetch", color: '#f87171', background: 'rgba(248,113,113,0.12)' },
-  duplicate: { label: 'Already added', color: '#9ca3af', background: 'rgba(156,163,175,0.12)' },
-  navigation: { label: 'Navigation — not added', color: '#9ca3af', background: 'rgba(156,163,175,0.12)' },
-}
-
-const plural = (n: number, word: string) => `${n.toLocaleString()} ${word}${n === 1 ? '' : 's'}`
-
-export function AddUrlsModal({ kbUuid, onCommitted, onClose }: AddUrlsModalProps) {
   const [text, setText] = useState('')
+  const [fileName, setFileName] = useState<string | null>(null)
+  const [fileUrls, setFileUrls] = useState<string[]>([])
+  const [fileError, setFileError] = useState<string | null>(null)
+  const [sitemapUrl, setSitemapUrl] = useState('')
+  const [readingSitemap, setReadingSitemap] = useState(false)
+  const [sitemapError, setSitemapError] = useState<string | null>(null)
+  const [sourceNote, setSourceNote] = useState<string | null>(null)
+
+  const [candidates, setCandidates] = useState<UrlCandidate[]>([])
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+
   const [crawlEnabled, setCrawlEnabled] = useState(false)
   const [maxCrawlPages, setMaxCrawlPages] = useState(5)
   const [allowedDomains, setAllowedDomains] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const pasteRef = useRef<HTMLTextAreaElement>(null)
 
-  const [step, setStep] = useState<'enter' | 'review'>('enter')
   const [preview, setPreview] = useState<UrlPreview | null>(null)
-  const [requestError, setRequestError] = useState<string | null>(null)
   // Page ids the user has kept. Pages are judged once, as they arrive: good
   // ones start kept, low-quality ones start dropped, the rest can't be kept.
   const [kept, setKept] = useState<Set<string>>(new Set())
   const judgedRef = useRef<Set<string>>(new Set())
+  const [checking, setChecking] = useState(false)
 
   useEffect(() => {
+    if (!kbUuid) return
+    let cancelled = false
+    getSourceSuggestionsAvailable(kbUuid)
+      .then(r => { if (!cancelled) setTopicAvailable(r.available) })
+      .catch(() => { if (!cancelled) setTopicAvailable(false) })
+    return () => { cancelled = true }
+  }, [kbUuid])
+
+  const methods: Method[] = ['paste', 'file', ...(kbUuid ? ['sitemap' as const] : []), ...(topicAvailable ? ['topic' as const] : [])]
+
+  usePanelEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape' && !submittedRef.current) onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
   // Ref, not state: a double-click's second event can fire before React
-  // re-renders the disabled button, and two POSTs start two previews (or, on
-  // Add, two commits) — the duplicate-source support ticket.
-  const busyRef = useRef(false)
-  const [busy, setBusy] = useState(false)
+  // re-renders the disabled button, and two POSTs enqueue two ingest runs
+  // that race each other (the duplicate-source support ticket).
+  const submittedRef = useRef(false)
+  const [submitted, setSubmitted] = useState(false)
+
+  const pastedUrls = method === 'paste' ? extractUrls(text) : []
+
+  // Links a person gathered themselves start checked; a sitemap or a search
+  // offers pages to choose from, so those start unchecked.
+  const review = (found: UrlCandidate[], preselect: boolean, note: string | null = null) => {
+    setCandidates(found)
+    setSelected(preselect ? new Set(found.filter(c => !c.inKb).map(c => c.url)) : new Set())
+    setSourceNote(note)
+    setError(null)
+    setStep('review')
+  }
+
+  const readFile = async (file: File | undefined) => {
+    setFileError(null)
+    setFileUrls([])
+    setFileName(file?.name ?? null)
+    if (!file) return
+    if (file.size > MAX_FILE_BYTES) {
+      setFileError(`${file.name} is larger than 5 MB. Upload a list of links, not the documents themselves.`)
+      return
+    }
+    try {
+      const urls = extractUrls(await file.text())
+      setFileUrls(urls)
+      if (urls.length === 0) setFileError(`No web links found in ${file.name}.`)
+    } catch {
+      setFileError(`${file.name} could not be read as text.`)
+    }
+  }
+
+  const loadSitemap = async () => {
+    if (!kbUuid || !sitemapUrl.trim() || readingSitemap) return
+    setReadingSitemap(true)
+    setSitemapError(null)
+    try {
+      const result = await readSitemap(kbUuid, sitemapUrl.trim())
+      if (result.pages.length === 0) {
+        setSitemapError(`${result.sitemap_url} lists no pages.`)
+        return
+      }
+      const notes = [`From ${result.sitemap_url}.`]
+      if (result.truncated) notes.push(`The sitemap lists more pages than can be shown; the first ${result.pages.length} are here.`)
+      if (result.errors.length) notes.push(`${result.errors.length} of its sitemaps could not be read.`)
+      review(
+        result.pages.map(p => ({ url: p.url, inKb: p.in_kb, detail: p.lastmod ? `Updated ${p.lastmod.slice(0, 10)}` : null })),
+        false,
+        notes.join(' '),
+      )
+    } catch (e) {
+      setSitemapError(e instanceof Error ? e.message : 'Could not read the sitemap')
+    } finally {
+      setReadingSitemap(false)
+    }
+  }
+
+  const limit = crawlEnabled ? MAX_CRAWL_URLS_PER_ADD : MAX_URLS_PER_ADD
+  const overLimit = selected.size > limit
+  const previewLimit = crawlEnabled ? MAX_CRAWL_URLS_PER_PREVIEW : MAX_URLS_PER_PREVIEW
+  const canCheck = Boolean(kbUuid && onCommitted)
 
   const absorb = useCallback((next: UrlPreview) => {
     setPreview(next)
@@ -79,54 +190,56 @@ export function AddUrlsModal({ kbUuid, onCommitted, onClose }: AddUrlsModalProps
   previewRef.current = preview
   useEffect(() => () => {
     const open = previewRef.current
-    if (open?.status === 'running') cancelUrlPreview(kbUuid, open.preview_uuid).catch(() => {})
+    if (kbUuid && open?.status === 'running') cancelUrlPreview(kbUuid, open.preview_uuid).catch(() => {})
   }, [kbUuid])
 
   // Poll while the worker is still fetching.
   const previewUuid = preview?.preview_uuid
-  const running = preview?.status === 'running'
+  const previewRunning = preview?.status === 'running'
   useEffect(() => {
-    if (!previewUuid || !running) return
+    if (!kbUuid || !previewUuid || !previewRunning) return
     let cancelled = false
     const timer = window.setInterval(async () => {
       try {
         const next = await getUrlPreview(kbUuid, previewUuid)
         if (!cancelled) absorb(next)
       } catch (err) {
-        if (!cancelled) setRequestError(err instanceof Error ? err.message : 'Lost track of the preview')
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Lost track of the preview')
       }
     }, POLL_MS)
     return () => { cancelled = true; window.clearInterval(timer) }
-  }, [kbUuid, previewUuid, running, absorb])
+  }, [kbUuid, previewUuid, previewRunning, absorb])
+
+  const keptPages = useMemo(
+    () => (preview?.pages ?? []).filter(p => p.addable && kept.has(p.page_id)),
+    [preview, kept],
+  )
+  const keptChunks = keptPages.reduce((sum, p) => sum + p.chunk_count, 0)
 
   // Stop the worker fetching for a preview the user has walked away from.
   // Best effort: a preview that already finished has nothing to stop.
   const stopPreview = () => {
-    if (preview?.status === 'running') {
+    if (kbUuid && preview?.status === 'running') {
       cancelUrlPreview(kbUuid, preview.preview_uuid).catch(() => {})
     }
   }
 
-  const handleBack = () => {
+  const discardPreview = () => {
     stopPreview()
-    setStep('enter')
     setPreview(null)
-    setRequestError(null)
+    setKept(new Set())
+    judgedRef.current = new Set()
+    setError(null)
   }
 
-  const handleRetry = () => {
-    stopPreview()
-    void handlePreview()
-  }
-
-  const handlePreview = async () => {
-    if (busyRef.current) return
-    const urls = text.split('\n').map(u => u.trim()).filter(u => u.length > 0)
-    if (urls.length === 0) return
-    busyRef.current = true
-    setBusy(true)
-    setRequestError(null)
+  const handleCheck = async () => {
+    if (!kbUuid || submittedRef.current || selected.size === 0 || selected.size > previewLimit) return
+    submittedRef.current = true
+    setSubmitted(true)
+    setChecking(true)
+    setError(null)
     try {
+      const urls = candidates.filter(c => selected.has(c.url)).map(c => c.url)
       const started = await previewUrlsForKB(kbUuid, urls, crawlEnabled, maxCrawlPages, allowedDomains)
       judgedRef.current = new Set()
       setKept(new Set())
@@ -137,37 +250,31 @@ export function AddUrlsModal({ kbUuid, onCommitted, onClose }: AddUrlsModalProps
         crawl_enabled: crawlEnabled,
         pages: [],
       })
-      setStep('review')
-    } catch (err) {
-      setRequestError(err instanceof Error ? err.message : 'Could not start the preview')
-    } finally {
-      busyRef.current = false
-      setBusy(false)
-    }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not start the check')
+    } finally { submittedRef.current = false; setSubmitted(false); setChecking(false) }
   }
 
-  const keptPages = useMemo(
-    () => (preview?.pages ?? []).filter(p => p.addable && kept.has(p.page_id)),
-    [preview, kept],
-  )
-  const keptChunks = keptPages.reduce((sum, p) => sum + p.chunk_count, 0)
+  const handleRetry = () => {
+    stopPreview()
+    void handleCheck()
+  }
 
-  const handleAdd = async () => {
-    if (busyRef.current || !preview || keptPages.length === 0) return
-    busyRef.current = true
-    setBusy(true)
-    setRequestError(null)
+  const handleCommit = async () => {
+    if (!kbUuid || !preview || submittedRef.current || keptPages.length === 0) return
+    submittedRef.current = true
+    setSubmitted(true)
+    setError(null)
     try {
       await commitUrlPreview(kbUuid, preview.preview_uuid, keptPages.map(p => p.page_id))
-      onCommitted(keptPages.length)
-    } catch (err) {
-      setRequestError(err instanceof Error ? err.message : 'Could not add the pages')
-      busyRef.current = false
-      setBusy(false)
-    }
+      onCommitted?.(keptPages.length)
+      onClose()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not add the pages')
+    } finally { submittedRef.current = false; setSubmitted(false) }
   }
 
-  const toggle = (pageId: string) =>
+  const toggleKept = (pageId: string) =>
     setKept(prev => {
       const out = new Set(prev)
       if (out.has(pageId)) out.delete(pageId)
@@ -175,8 +282,45 @@ export function AddUrlsModal({ kbUuid, onCommitted, onClose }: AddUrlsModalProps
       return out
     })
 
-  const canPreview = text.trim().length > 0 && !busy
-  const canAdd = !busy && preview?.status === 'ready' && keptPages.length > 0
+  const canCommit = !submitted && preview?.status === 'ready' && keptPages.length > 0
+
+  const handleSubmit = async () => {
+    if (submittedRef.current || selected.size === 0 || overLimit) return
+    submittedRef.current = true
+    setSubmitted(true)
+    setError(null)
+    try {
+      // Kept in the order they were found, not the order they were checked.
+      await onSubmit(candidates.filter(c => selected.has(c.url)).map(c => c.url), crawlEnabled, maxCrawlPages, allowedDomains)
+      onClose()
+    } catch (e) {
+      setError(`${e instanceof Error ? e.message : 'Could not add URLs'}. Your selection and settings are preserved; retry Add.`)
+    } finally { submittedRef.current = false; setSubmitted(false) }
+  }
+
+  const chooseNext = () => {
+    if (method === 'paste') {
+      if (pastedUrls.length === 0) { pasteRef.current?.focus(); return }
+      review(pastedUrls.map(url => ({ url })), true)
+    } else if (method === 'file') {
+      if (fileUrls.length) review(fileUrls.map(url => ({ url })), true, fileName ? `From ${fileName}.` : null)
+    } else if (method === 'sitemap') {
+      void loadSitemap()
+    }
+  }
+
+  const inputStyle = {
+    width: '100%', padding: 'var(--workspace-space-6) var(--workspace-space-8)', fontSize: 'var(--workspace-font-control)', fontFamily: 'inherit',
+    backgroundColor: 'var(--workspace-surface)', color: 'var(--workspace-text)',
+    border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)',
+  } as const
+
+  const nextDisabled = submitted || (
+    method === 'paste' ? pastedUrls.length === 0
+      : method === 'file' ? fileUrls.length === 0
+        : method === 'sitemap' ? !sitemapUrl.trim() || readingSitemap
+          : true
+  )
 
   return (
     <div
@@ -185,366 +329,261 @@ export function AddUrlsModal({ kbUuid, onCommitted, onClose }: AddUrlsModalProps
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         backgroundColor: 'rgba(0,0,0,0.6)',
       }}
-      onClick={onClose}
+      onClick={() => { if (!submitted) onClose() }}
     >
       <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={step === 'enter' ? 'Add URLs' : 'Review pages before adding'}
+        aria-label="Add URLs"
         style={{
-          width: step === 'enter' ? 480 : 760, maxWidth: '100vw', maxHeight: '85vh',
-          backgroundColor: '#1e1e1e', borderRadius: 12,
-          border: '1px solid #3a3a3a', padding: 24,
-          display: 'flex', flexDirection: 'column', gap: 16,
-          overflowY: step === 'enter' ? 'auto' : 'hidden',
+          width: 560, maxWidth: 'calc(100vw - 24px)', maxHeight: '90dvh',
+          backgroundColor: 'var(--workspace-canvas)', borderRadius: 'var(--workspace-radius-large)',
+          border: '1px solid var(--workspace-border)', padding: 'var(--workspace-space-16)',
+          display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-16)',
+          overflow: 'hidden',
         }}
         onClick={e => e.stopPropagation()}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 16, fontWeight: 600, color: '#fff' }}>
-            {step === 'enter' ? 'Add URLs' : 'Review pages before adding'}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+          <span style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: 'var(--workspace-text)' }}>
+            {step === 'choose' ? 'Add URLs' : preview ? 'Review pages before adding' : 'Review links'}
           </span>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, display: 'flex' }}
-          >
-            <X size={18} style={{ color: '#888' }} />
-          </button>
+          <ActionButton variant="quiet" iconOnly onClick={onClose} aria-label="Close" disabled={submitted}>
+            <X size={18} style={{ color: 'var(--workspace-muted)' }} />
+          </ActionButton>
         </div>
 
-        {step === 'enter' ? (
-          <EnterStep
-            text={text} setText={setText}
-            crawlEnabled={crawlEnabled} setCrawlEnabled={setCrawlEnabled}
-            maxCrawlPages={maxCrawlPages} setMaxCrawlPages={setMaxCrawlPages}
-            allowedDomains={allowedDomains} setAllowedDomains={setAllowedDomains}
-          />
-        ) : preview && (
-          <ReviewStep
+        <div style={{ overflowY: 'auto', minHeight: 0, display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-16)' }}>
+        {step === 'choose' && (
+          <>
+            <div role="tablist" aria-label="Where the links come from" style={{ display: 'flex', gap: 'var(--workspace-space-4)', borderBottom: '1px solid var(--workspace-border)', flexShrink: 0 }}>
+              {methods.map(m => (
+                <button
+                  key={m}
+                  type="button"
+                  role="tab"
+                  id={`add-urls-tab-${m}`}
+                  aria-selected={method === m}
+                  aria-controls="add-urls-method-panel"
+                  onClick={() => setMethod(m)}
+                  style={{
+                    padding: 'var(--workspace-space-6) var(--workspace-space-12)', background: 'transparent', cursor: 'pointer',
+                    border: 'none', borderBottom: `2px solid ${method === m ? 'var(--workspace-accent-ink)' : 'transparent'}`,
+                    color: method === m ? 'var(--workspace-text)' : 'var(--workspace-muted)',
+                    fontSize: 'var(--workspace-font-control)', fontWeight: method === m ? 600 : 400, fontFamily: 'inherit',
+                  }}
+                >
+                  {METHOD_LABELS[m]}
+                </button>
+              ))}
+            </div>
+
+            <div id="add-urls-method-panel" role="tabpanel" aria-labelledby={`add-urls-tab-${method}`} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-8)' }}>
+              {method === 'paste' && (
+                <>
+                  <FieldLabel htmlFor="add-urls-input" required>Links, or any text with links in it</FieldLabel>
+                  <textarea
+                    id="add-urls-input"
+                    ref={pasteRef}
+                    aria-describedby="add-urls-help"
+                    value={text}
+                    disabled={submitted}
+                    onChange={e => setText(e.target.value)}
+                    placeholder={'https://example.com/page1\nhttps://example.com/page2\n\nor paste an email or document; its links are picked out'}
+                    rows={8}
+                    style={{ ...inputStyle, padding: 'var(--workspace-space-12)', borderRadius: 'var(--workspace-radius-medium)', resize: 'vertical', minHeight: 120 }}
+                  />
+                  <div id="add-urls-help" role="status" style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
+                    {text.trim()
+                      ? `${pastedUrls.length} link${pastedUrls.length === 1 ? '' : 's'} found.`
+                      : 'One per line, or paste an email or document. Addresses without http:// use https://.'}
+                  </div>
+                </>
+              )}
+
+              {method === 'file' && (
+                <>
+                  <FieldLabel htmlFor="add-urls-file" required>File of links</FieldLabel>
+                  <input
+                    id="add-urls-file"
+                    type="file"
+                    accept=".txt,.csv,.tsv,.md,.html,.htm,.xml,.json,text/plain,text/csv,text/html"
+                    disabled={submitted}
+                    onChange={e => { void readFile(e.target.files?.[0]) }}
+                    style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}
+                  />
+                  <div role="status" style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
+                    {fileUrls.length
+                      ? `${fileUrls.length} link${fileUrls.length === 1 ? '' : 's'} found in ${fileName}.`
+                      : 'A text, CSV, Markdown or HTML file, such as a bookmarks export. Every web link in it is picked out.'}
+                  </div>
+                  {fileError && <FieldMessage id="add-urls-file-error" error>{fileError}</FieldMessage>}
+                </>
+              )}
+
+              {method === 'sitemap' && (
+                <>
+                  <FieldLabel htmlFor="add-urls-sitemap" required>Sitemap or site address</FieldLabel>
+                  <input
+                    id="add-urls-sitemap"
+                    type="text"
+                    value={sitemapUrl}
+                    disabled={submitted || readingSitemap}
+                    onChange={e => { setSitemapUrl(e.target.value); setSitemapError(null) }}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void loadSitemap() } }}
+                    placeholder="https://www.example.edu/sitemap.xml or www.example.edu"
+                    style={inputStyle}
+                  />
+                  <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
+                    A sitemap is the site's own list of its pages. Pick exactly the ones to add, rather than crawling and getting whatever the links lead to. Given a site address, its sitemap is looked up.
+                  </div>
+                  {sitemapError && <FieldMessage id="add-urls-sitemap-error" error>{sitemapError}</FieldMessage>}
+                </>
+              )}
+
+              {method === 'topic' && kbUuid && (
+                <TopicSourceFinder
+                  kbUuid={kbUuid}
+                  disabled={submitted}
+                  onResults={(suggestions, alreadyInKb) => review(
+                    suggestions.map(s => ({ url: s.url, title: s.title, detail: s.reason || s.snippet || null })),
+                    false,
+                    alreadyInKb ? `${alreadyInKb} more page${alreadyInKb === 1 ? '' : 's'} found ${alreadyInKb === 1 ? 'is' : 'are'} already in this knowledge base.` : null,
+                  )}
+                />
+              )}
+            </div>
+          </>
+        )}
+
+        {step === 'review' && preview && kbUuid && (
+          <UrlPreviewList
             kbUuid={kbUuid}
             preview={preview}
             kept={kept}
-            onToggle={toggle}
+            onToggle={toggleKept}
             onRetry={handleRetry}
-            onCancel={handleBack}
-            busy={busy}
+            onCancel={discardPreview}
+            disabled={submitted}
           />
         )}
 
-        {requestError && (
-          <div role="alert" style={{ fontSize: 13, color: '#f87171' }}>{requestError}</div>
-        )}
+        {step === 'review' && !preview && (
+          <>
+            {sourceNote && <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>{sourceNote}</div>}
+            <UrlReviewList candidates={candidates} selected={selected} onChange={setSelected} disabled={submitted} />
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <div style={{ fontSize: 12, color: '#888' }}>
-            {step === 'review' && preview?.status === 'ready' && (
-              <>{plural(keptPages.length, 'page')} kept · {plural(keptChunks, 'chunk')}</>
+            {/* Crawl toggle */}
+            <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                disabled={submitted}
+                checked={crawlEnabled}
+                onChange={e => setCrawlEnabled(e.target.checked)}
+                style={{ accentColor: 'var(--workspace-accent-ink)' }}
+              />
+              <span style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>Enable crawling</span>
+            </label>
+
+            {crawlEnabled && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-12)', paddingLeft: 'var(--workspace-space-4)' }}>
+                <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
+                  The crawler will follow links on each page — including links embedded in PDFs — and add discovered pages as additional sources.
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)' }}>
+                  <FieldLabel htmlFor="add-urls-max-pages" required>Max pages</FieldLabel>
+                  <input
+                    id="add-urls-max-pages"
+                    aria-required="true"
+                    type="number"
+                    disabled={submitted}
+                    value={maxCrawlPages}
+                    onChange={e => setMaxCrawlPages(Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))}
+                    min={1}
+                    max={50}
+                    style={{ ...inputStyle, width: 72 }}
+                  />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)' }}>
+                  <FieldLabel htmlFor="add-urls-allowed-domains" optional>Allowed domains</FieldLabel>
+                  <input
+                    id="add-urls-allowed-domains"
+                    type="text"
+                    disabled={submitted}
+                    value={allowedDomains}
+                    onChange={e => setAllowedDomains(e.target.value)}
+                    placeholder="example.com, example.com/section"
+                    style={inputStyle}
+                  />
+                  <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
+                    Comma-separated. Include a path (e.g. example.com/irb) to limit the crawl
+                    to that section of the site. Defaults to the same domain as the URL.
+                  </div>
+                </div>
+              </div>
             )}
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {step === 'review' && (
-              <button
-                type="button"
-                onClick={handleBack}
-                disabled={busy}
-                style={secondaryButton}
-              >
-                Back
-              </button>
+
+            {overLimit && (
+              <FieldMessage id="add-urls-limit" error>
+                {`At most ${limit} links can be added at once${crawlEnabled ? ' with crawling on' : ''}; ${selected.size} are selected. Add them in parts.`}
+              </FieldMessage>
             )}
-            <button type="button" onClick={onClose} style={secondaryButton}>
-              Cancel
-            </button>
-            {step === 'enter' ? (
-              <button
-                type="button"
-                onClick={handlePreview}
-                disabled={!canPreview}
-                style={{ ...primaryButton, cursor: canPreview ? 'pointer' : 'default', opacity: canPreview ? 1 : 0.5 }}
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
+              Each page is fetched and becomes usable once its text is indexed. Links already in this knowledge base are skipped; use Refresh on their source rows to fetch them again.
+              {canCheck && ` To see each page's text first, use Fetch & check (up to ${previewLimit} links${crawlEnabled ? ' with crawling on' : ''}).`}
+            </div>
+          </>
+        )}
+        </div>
+
+        {error && <FieldMessage id="add-urls-submit-error" error>{error}</FieldMessage>}
+        <div style={{ display: 'flex', justifyContent: step === 'review' ? 'space-between' : 'flex-end', gap: 'var(--workspace-space-8)', flexShrink: 0 }}>
+          {step === 'review' && (
+            <ActionButton
+              variant="quiet"
+              onClick={() => { if (preview) discardPreview(); else { setStep('choose'); setError(null) } }}
+              disabled={submitted}
+            >
+              <ArrowLeft size={14} aria-hidden="true" /> {preview ? 'Back to links' : 'Back'}
+            </ActionButton>
+          )}
+          {step === 'review' && preview?.status === 'ready' && (
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', alignSelf: 'center' }}>
+              {plural(keptPages.length, 'page')} kept · {plural(keptChunks, 'chunk')}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 'var(--workspace-space-8)' }}>
+            <ActionButton variant="secondary" onClick={onClose} disabled={submitted}>Cancel</ActionButton>
+            {step === 'choose' && method !== 'topic' && (
+              <ActionButton variant="primary" onClick={chooseNext} disabled={nextDisabled} aria-busy={readingSitemap}>
+                {readingSitemap ? <><Loader2 size={14} className="animate-spin" aria-hidden="true" /> Reading sitemap…</> : method === 'sitemap' ? 'Read sitemap' : 'Review links'}
+              </ActionButton>
+            )}
+            {step === 'review' && !preview && canCheck && (
+              <ActionButton
+                variant="secondary"
+                onClick={handleCheck}
+                disabled={selected.size === 0 || selected.size > previewLimit || submitted}
+                title={selected.size > previewLimit ? `Fetch & check reads up to ${previewLimit} links at once` : undefined}
               >
-                {busy ? 'Starting…' : 'Preview pages'}
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleAdd}
-                disabled={!canAdd}
-                style={{ ...primaryButton, cursor: canAdd ? 'pointer' : 'default', opacity: canAdd ? 1 : 0.5 }}
-              >
-                {busy ? 'Adding…' : `Add ${plural(keptPages.length, 'page')}`}
-              </button>
+                {checking ? <><Loader2 size={14} className="animate-spin" aria-hidden="true" /> Starting…</> : 'Fetch & check'}
+              </ActionButton>
+            )}
+            {step === 'review' && !preview && (
+              <ActionButton variant="primary" aria-busy={submitted && !checking} onClick={handleSubmit} disabled={selected.size === 0 || overLimit || submitted}>
+                {submitted && !checking ? 'Adding…' : `Add ${selected.size} URL${selected.size === 1 ? '' : 's'}`}
+              </ActionButton>
+            )}
+            {step === 'review' && preview && (
+              <ActionButton variant="primary" aria-busy={submitted} onClick={handleCommit} disabled={!canCommit}>
+                {submitted ? 'Adding…' : `Add ${plural(keptPages.length, 'page')}`}
+              </ActionButton>
             )}
           </div>
         </div>
       </div>
       </FocusTrap>
     </div>
-  )
-}
-
-const secondaryButton: React.CSSProperties = {
-  padding: '8px 16px', fontSize: 13, fontWeight: 500, fontFamily: 'inherit',
-  color: '#ccc', backgroundColor: 'transparent',
-  border: '1px solid #3a3a3a', borderRadius: 6, cursor: 'pointer',
-}
-
-const primaryButton: React.CSSProperties = {
-  padding: '8px 16px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
-  color: 'var(--highlight-text-color, #000)', backgroundColor: 'var(--highlight-color, #eab308)',
-  border: 'none', borderRadius: 6,
-}
-
-const fieldStyle: React.CSSProperties = {
-  padding: '6px 8px', fontSize: 13, fontFamily: 'inherit',
-  backgroundColor: '#2a2a2a', color: '#e5e5e5',
-  border: '1px solid #3a3a3a', borderRadius: 6,
-}
-
-function EnterStep(props: {
-  text: string; setText: (v: string) => void
-  crawlEnabled: boolean; setCrawlEnabled: (v: boolean) => void
-  maxCrawlPages: number; setMaxCrawlPages: (v: number) => void
-  allowedDomains: string; setAllowedDomains: (v: string) => void
-}) {
-  const { text, setText, crawlEnabled, setCrawlEnabled, maxCrawlPages, setMaxCrawlPages, allowedDomains, setAllowedDomains } = props
-  return (
-    <>
-      <div style={{ fontSize: 13, color: '#aaa' }}>
-        Paste one URL per line. Each page is fetched and shown to you first — its text,
-        how many chunks it would add, and how it looks — and nothing is added until you confirm.
-      </div>
-      <textarea
-        value={text}
-        onChange={e => setText(e.target.value)}
-        aria-label="URLs to add, one per line"
-        placeholder={'https://example.com/page1\nhttps://example.com/page2'}
-        rows={8}
-        style={{ ...fieldStyle, width: '100%', padding: 12, borderRadius: 8, resize: 'vertical' }}
-      />
-
-      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-        <input
-          type="checkbox"
-          checked={crawlEnabled}
-          onChange={e => setCrawlEnabled(e.target.checked)}
-          style={{ accentColor: 'var(--highlight-color, #eab308)' }}
-        />
-        <span style={{ fontSize: 13, color: '#e5e5e5' }}>Enable crawling</span>
-      </label>
-
-      {crawlEnabled && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 4 }}>
-          <div style={{ fontSize: 12, color: '#888', lineHeight: 1.5 }}>
-            The crawler will follow links on each page — including links embedded in PDFs — and the pages it finds are included in the preview.
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <label htmlFor="add-urls-max-pages" style={{ fontSize: 13, color: '#aaa', minWidth: 80 }}>Max pages</label>
-            <input
-              id="add-urls-max-pages"
-              type="number"
-              value={maxCrawlPages}
-              onChange={e => setMaxCrawlPages(Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))}
-              min={1}
-              max={50}
-              style={{ ...fieldStyle, width: 72 }}
-            />
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <label htmlFor="add-urls-allowed-domains" style={{ fontSize: 13, color: '#aaa' }}>Allowed domains (optional)</label>
-            <input
-              id="add-urls-allowed-domains"
-              type="text"
-              value={allowedDomains}
-              onChange={e => setAllowedDomains(e.target.value)}
-              placeholder="example.com, example.com/section"
-              style={{ ...fieldStyle, width: '100%' }}
-            />
-            <div style={{ fontSize: 11, color: '#666' }}>
-              Comma-separated. Include a path (e.g. example.com/irb) to limit the crawl
-              to that section of the site. Defaults to the same domain as the URL.
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  )
-}
-
-function ReviewStep({ kbUuid, preview, kept, onToggle, onRetry, onCancel, busy }: {
-  kbUuid: string
-  preview: UrlPreview
-  kept: Set<string>
-  onToggle: (pageId: string) => void
-  onRetry: () => void
-  onCancel: () => void
-  busy: boolean
-}) {
-  const running = preview.status === 'running'
-  const pages = preview.pages
-  const notAddable = pages.filter(p => !p.addable).length
-  return (
-    <>
-      <div style={{ fontSize: 13, color: '#aaa', lineHeight: 1.5 }}>
-        {running ? (
-          <span role="status" aria-live="polite" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-            <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
-            Fetching pages… {pages.length > 0 && `${plural(pages.length, 'page')} so far`}
-          </span>
-        ) : null}
-        {running && preview.stalled ? (
-          <div
-            role="alert"
-            style={{
-              marginTop: 8, padding: '10px 12px', borderRadius: 8,
-              border: '1px solid rgba(251,191,36,0.4)', backgroundColor: 'rgba(251,191,36,0.08)',
-              color: '#fbbf24', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
-            }}
-          >
-            <span style={{ flex: 1, minWidth: 200 }}>{preview.stall_message}</span>
-            {!preview.workers_down && (
-              <button type="button" onClick={onRetry} disabled={busy} style={secondaryButton}>Retry</button>
-            )}
-            <button type="button" onClick={onCancel} disabled={busy} style={secondaryButton}>Cancel preview</button>
-          </div>
-        ) : running ? null : preview.status === 'error' ? (
-          <span role="alert" style={{ color: '#f87171' }}>{preview.error_message || 'The preview failed.'}</span>
-        ) : preview.status === 'canceled' ? (
-          <span>The preview was canceled.</span>
-        ) : (
-          <>
-            Untick anything you don&rsquo;t want. Low-quality pages start unticked.
-            {notAddable > 0 && <> {plural(notAddable, 'page')} can&rsquo;t be added and {notAddable === 1 ? 'is' : 'are'} shown so you can see why.</>}
-          </>
-        )}
-      </div>
-      <ul
-        aria-label="Fetched pages"
-        style={{ listStyle: 'none', margin: 0, padding: 0, overflowY: 'auto', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 8 }}
-      >
-        {pages.map(page => (
-          <PreviewRow
-            key={page.page_id}
-            kbUuid={kbUuid}
-            previewUuid={preview.preview_uuid}
-            page={page}
-            kept={kept.has(page.page_id)}
-            onToggle={() => onToggle(page.page_id)}
-          />
-        ))}
-      </ul>
-    </>
-  )
-}
-
-function PreviewRow({ kbUuid, previewUuid, page, kept, onToggle }: {
-  kbUuid: string
-  previewUuid: string
-  page: UrlPreviewPage
-  kept: boolean
-  onToggle: () => void
-}) {
-  const [open, setOpen] = useState(false)
-  const [fullText, setFullText] = useState<string | null>(null)
-  const [loadingFull, setLoadingFull] = useState(false)
-  const badge = VERDICT_BADGE[page.verdict]
-  const name = page.title || page.url
-  const hasMore = page.char_count > page.excerpt.length
-
-  const loadFull = async () => {
-    setLoadingFull(true)
-    try {
-      const res = await getUrlPreviewPageText(kbUuid, previewUuid, page.page_id)
-      setFullText(res.text)
-    } finally {
-      setLoadingFull(false)
-    }
-  }
-
-  return (
-    <li style={{
-      border: '1px solid #3a3a3a', borderRadius: 8, padding: '10px 12px',
-      backgroundColor: page.addable ? '#242424' : '#202020',
-      opacity: page.addable ? 1 : 0.75,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-        <input
-          type="checkbox"
-          checked={page.addable && kept}
-          disabled={!page.addable}
-          onChange={onToggle}
-          aria-label={`Add ${name}`}
-          style={{ marginTop: 3, accentColor: 'var(--highlight-color, #eab308)' }}
-        />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#e5e5e5', overflowWrap: 'anywhere' }}>{name}</span>
-            <span style={{
-              fontSize: 11, fontWeight: 600, padding: '1px 8px', borderRadius: 999,
-              color: badge.color, backgroundColor: badge.background, whiteSpace: 'nowrap',
-            }}>
-              {badge.label}
-            </span>
-          </div>
-          {page.title && (
-            <div style={{ fontSize: 11, color: '#777', overflowWrap: 'anywhere' }}>{page.url}</div>
-          )}
-          <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>
-            {page.addable && <>{plural(page.chunk_count, 'chunk')} · </>}
-            {plural(page.char_count, 'character')}
-            {page.parent_url && <> · found by crawling {page.parent_url}</>}
-            {page.truncated && <span style={{ color: '#fbbf24' }}> · cut off at the length limit</span>}
-          </div>
-          {page.reason && (
-            <div style={{ fontSize: 12, color: page.addable ? '#fbbf24' : '#aaa', marginTop: 4 }}>{page.reason}</div>
-          )}
-          {page.warnings.map(w => (
-            <div key={w} style={{ fontSize: 12, color: '#fbbf24', marginTop: 4 }}>{w}</div>
-          ))}
-          {page.excerpt.trim() && (
-            <button
-              type="button"
-              onClick={() => setOpen(o => !o)}
-              aria-expanded={open}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 6, padding: 0,
-                fontSize: 12, fontFamily: 'inherit', color: '#aaa',
-                background: 'transparent', border: 'none', cursor: 'pointer',
-              }}
-            >
-              {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-              {open ? 'Hide text' : 'Show text'}
-            </button>
-          )}
-          {open && (
-            <div style={{ marginTop: 6 }}>
-              <pre style={{
-                margin: 0, maxHeight: 240, overflowY: 'auto', whiteSpace: 'pre-wrap',
-                fontSize: 12, lineHeight: 1.5, color: '#ccc', fontFamily: 'inherit',
-                backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: 6, padding: 10,
-              }}>
-                {fullText ?? page.excerpt}
-              </pre>
-              {hasMore && fullText === null && (
-                <button
-                  type="button"
-                  onClick={loadFull}
-                  disabled={loadingFull}
-                  style={{
-                    marginTop: 4, padding: 0, fontSize: 12, fontFamily: 'inherit',
-                    color: 'var(--highlight-color, #eab308)', background: 'transparent',
-                    border: 'none', cursor: loadingFull ? 'default' : 'pointer',
-                  }}
-                >
-                  {loadingFull ? 'Loading…' : `Show all ${plural(page.char_count, 'character')}`}
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    </li>
   )
 }

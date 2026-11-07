@@ -4,15 +4,22 @@ Ported from Flask app/utilities/document_readers.py.
 All functions are synchronous — safe for Celery workers.
 """
 
+from __future__ import annotations
+
 import io
 import logging
 import os
 import re
 from collections.abc import Callable
 from datetime import date, datetime, time
-from typing import NoReturn
+from typing import TYPE_CHECKING, IO, NoReturn
 
 from markitdown import MarkItDown
+
+if TYPE_CHECKING:
+    from pdf_inspector import PdfClassification, PagesExtractionResult
+    from pymupdf import Page
+    from xml.etree.ElementTree import Element
 
 from app.services import pdf_hidden_text
 
@@ -173,7 +180,7 @@ def _is_numeric_cell(text: str) -> bool:
     return bool(_NUMERIC_CELL.fullmatch(text.strip()))
 
 
-def _page_text_with_table_rows(page) -> str:
+def _page_text_with_table_rows(page: Page) -> str:
     """PyMuPDF's page text, with each table row kept on one line.
 
     ``get_text("text")`` emits a borderless table one cell per line, so the
@@ -197,7 +204,7 @@ def _page_text_with_table_rows(page) -> str:
     """
     import pymupdf
 
-    plain = page.get_text("text")
+    plain: str = page.get_text("text")
     lines: list[dict] = []
     for block in page.get_text("dict", flags=pymupdf.TEXTFLAGS_TEXT).get("blocks", []):
         for line in block.get("lines", []):
@@ -262,7 +269,7 @@ def _page_text_with_table_rows(page) -> str:
     return "\n".join(out) + "\n"
 
 
-def _pymupdf_page_text(page) -> str:
+def _pymupdf_page_text(page: Page) -> str:
     """One page's text layer via PyMuPDF, with any filled form fields."""
     page_text = _page_text_with_table_rows(page)
     field_lines: list[str] = []
@@ -277,7 +284,7 @@ def _pymupdf_page_text(page) -> str:
     return page_text or ""
 
 
-def _page_has_unread_content(page, text: str) -> bool:
+def _page_has_unread_content(page: Page, text: str) -> bool:
     """True when ``page`` shows content that its reading ``text`` does not hold.
 
     A page left out of the text used to vanish without a trace: the document
@@ -348,7 +355,8 @@ def _pymupdf_extract_with_pages(pdf_path: str, report: dict | None = None) -> tu
 
     unread: list[int] = []
     with doc:
-        for i, page in enumerate(doc, start=1):
+        for i in range(1, len(doc) + 1):
+            page = doc.load_page(i - 1)
             page_text = _pymupdf_page_text(page)
             if _page_has_unread_content(page, page_text):
                 unread.append(i)
@@ -681,7 +689,7 @@ class _EntityDeclared(Exception):
     """An XML part declares an entity, which no Excel-written workbook does."""
 
 
-def _xml_part_well_formed(stream) -> bool:
+def _xml_part_well_formed(stream: IO[bytes]) -> bool:
     """Whether one package part is well-formed XML, checked as a stream.
 
     Plain expat with no content handlers: nothing is kept, so a valid
@@ -692,7 +700,7 @@ def _xml_part_well_formed(stream) -> bool:
     """
     import xml.parsers.expat as expat
 
-    def refuse(*_args):
+    def refuse(*_args: object) -> NoReturn:
         raise _EntityDeclared()
 
     parser = expat.ParserCreate()
@@ -706,7 +714,7 @@ def _xml_part_well_formed(stream) -> bool:
     return True
 
 
-def describe_damaged_workbook(source) -> str | None:
+def describe_damaged_workbook(source: str | os.PathLike[str] | IO[bytes]) -> str | None:
     """A user-facing message when an .xlsx package is physically damaged.
 
     ``source`` is a path or a binary file object. Damaged means provably
@@ -891,8 +899,8 @@ def extract_text_from_xlsx(xlsx_path: str) -> str:
             extras.append(f"_Hidden columns: {hidden_cols}_")
 
         comments = []
-        for row in ws_v.iter_rows():
-            for cell in row:
+        for comment_row in ws_v.iter_rows():
+            for cell in comment_row:
                 if cell.comment and cell.comment.text:
                     text = cell.comment.text.strip()
                     if len(text) > MAX_XLSX_COMMENT_LEN:
@@ -1068,7 +1076,7 @@ def extract_sheet_json_from_xls(xls_path: str) -> dict:
 _DOCX_W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 
 
-def _docx_text_of(element) -> str:
+def _docx_text_of(element: Element) -> str:
     """Concatenate all <w:t> and <w:delText> descendants of a DOCX element."""
     parts = []
     for tag in ("t", "delText"):
@@ -1273,7 +1281,8 @@ def pdf_page_count(pdf_path: str) -> int:
     try:
         import pymupdf
         with pymupdf.open(pdf_path) as doc:
-            return doc.page_count
+            count: int = doc.page_count
+            return count
     except Exception as e:
         logger.warning(
             "Could not read PDF page count for %s (%s) — sparse-text "
@@ -1326,7 +1335,7 @@ def pdf_has_ocrable_content(pdf_path: str) -> bool:
     return False
 
 
-def _classify_pdf(pdf_path: str):
+def _classify_pdf(pdf_path: str) -> PdfClassification | None:
     """Classify with pdf-inspector; None when it can't run. Never raises."""
     try:
         import pdf_inspector
@@ -1341,7 +1350,7 @@ def _classify_pdf(pdf_path: str):
 
 
 def _local_markdown_extract_from_pdf(
-    pdf_path: str, classification,
+    pdf_path: str, classification: PdfClassification | None,
 ) -> tuple[str, list[dict]] | None:
     """Given a PDF's pdf-inspector classification, extract structured
     Markdown locally when it's confidently text-based with no pages flagged
@@ -1360,7 +1369,7 @@ def _local_markdown_extract_from_pdf(
     function never raises.
     """
     parsed = _fast_path_parse(pdf_path, classification)
-    if parsed is None:
+    if parsed is None or classification is None:
         return None
     result, problem = parsed
     if problem:
@@ -1384,7 +1393,7 @@ def _local_markdown_extract_from_pdf(
     return text, markers
 
 
-def _fast_path_parse(pdf_path: str, classification):
+def _fast_path_parse(pdf_path: str, classification: PdfClassification | None) -> tuple[PagesExtractionResult, list[int]] | None:
     """pdf-inspector's full parse and the 0-indexed pages it did not read.
 
     None when the document is not a fit for the fast path at all: no
@@ -1464,7 +1473,7 @@ def _single_page_pdf(pdf_path: str, page_index: int, out_path: str) -> None:
 
 
 def _fast_path_with_page_ocr(
-    pdf_path: str, classification, report: dict, *,
+    pdf_path: str, classification: PdfClassification | None, report: dict, *,
     local_on_ocr_outage: bool = False,
     on_stage: Callable[[str], None] | None = None,
 ) -> tuple[str, list[dict]] | None:
@@ -1638,7 +1647,7 @@ def _pages_missing_from_ocr(pdf_path: str, ocr_text: str) -> list[int]:
     return missing
 
 
-def _text_layer_untrustworthy(classification) -> bool:
+def _text_layer_untrustworthy(classification: PdfClassification | None) -> bool:
     """True when pdf-inspector's document-level verdict says the text layer
     may be untrustworthy.
 
@@ -1663,7 +1672,7 @@ def _text_layer_untrustworthy(classification) -> bool:
 
 
 def _local_reading_for_ocr_outage(
-    pdf_path: str, classification, report: dict,
+    pdf_path: str, classification: PdfClassification | None, report: dict,
 ) -> tuple[str, list[dict]] | None:
     """The local reading to store when OCR is down for good, or None to fail.
 
@@ -1928,7 +1937,7 @@ def _read_pdf_text_and_markers(
         # to refuse the only text there is: those cases keep the PyMuPDF
         # fallback below and the existing low-quality notice, exactly as
         # before the gate existed.
-        if untrustworthy:
+        if untrustworthy and classification is not None:
             reason = (
                 "classifier says image_based "
                 f"({len(classification.pages_needing_ocr or [])} page(s) need OCR)"

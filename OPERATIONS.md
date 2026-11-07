@@ -18,7 +18,7 @@ Back up all of these before upgrades:
 
 | Component | Where it lives | Why it matters |
 | --- | --- | --- |
-| MongoDB application data | `mongo-data` volume / `/data/db` in the `mongo` container | users, teams, workflows, audit data, document metadata |
+| MongoDB application data | `mongo-data` volume / `/data/db` in the `mongo` container | users, teams, workflows, audit data, document metadata, chat conversations, validation runs, certification progress |
 | Uploaded files | `uploads` volume / `/app/static/uploads` in the `api` and `celery` containers | source PDFs and generated files |
 | ChromaDB embeddings | `chroma-data` volume / `/chroma/chroma` in the `chromadb` container | vector index for chat and retrieval |
 | Environment secrets | [`backend/.env`](backend/.env) | JWT secret, provider keys, auth configuration |
@@ -45,6 +45,16 @@ docker compose logs --tail=100 celery
 If uploads stay at "extracting", workflows at "Preparing" or a URL preview never starts, check the workers first: `curl -s http://localhost:8001/api/health` shows `workers.status` and any `missing_queues`, and `docker compose ps -a celery` shows whether the container is running. Docker restarts a `celery` container that crashed, but one that was stopped (`docker stop`, `docker compose stop`) stays down until it is started again (`restart: unless-stopped`). Bring it back with `docker compose up -d celery`.
 
 `status.sh` does not exercise the OCR service. The setup checklist on **Admin → System Config** does: it live-probes OCR after it loads and marks the row "Not working" in red when a real conversion fails. **Test Connection** on the OCR settings runs the same one-page conversion with a step-by-step breakdown. A dead OCR service does not stop uploads (they fall back to basic text extraction), so check that row after any OCR-side change.
+
+### Agentic chat smoke test
+
+`./status.sh` does not exercise the agent, so add a manual check after any upgrade or model change. Signed in as a user **with a team**, ask the chat:
+
+1. *"What documents do I have?"* — exercises tool selection and read-only workspace access.
+2. *"Create a knowledge base called Ops Smoke Test."* — must return a **preview** and wait, not create outright. If it creates without asking, the confirm gate is broken; stop and investigate before letting users near it.
+3. Confirm it, then delete the KB.
+
+If the agent answers conversationally but never calls a tool, the usual causes are a user with no team context (agentic mode is off, see [DEPLOY.md](DEPLOY.md#agentic-chat)) or a chat model with weak tool-calling support.
 
 ## Backup Procedure
 

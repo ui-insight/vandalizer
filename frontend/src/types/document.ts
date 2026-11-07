@@ -18,6 +18,8 @@ export interface Document {
   classified_by?: string | null
   retention_hold?: boolean
   soft_deleted?: boolean
+  /** 2+ once "Upload new version" has replaced an earlier copy of this file. */
+  version_number?: number
   chromadb_ready?: boolean
   chunk_count?: number
   ingest_error?: string | null

@@ -25,7 +25,7 @@ const BULLETS: Record<Kind, { when: string; why: string }[]> = {
   workflow: [
     { when: 'First time', why: 'after you\'ve configured the steps and want a baseline so future changes have something to beat' },
     { when: 'After step changes', why: 'when you\'ve swapped models, rewritten prompts, or restructured steps and want to confirm the change actually helped' },
-    { when: 'Before handing off', why: 'before teammates or production traffic start relying on the workflow — you don\'t want them finding the regressions' },
+    { when: 'Before handing off', why: 'before teammates or production traffic start relying on the workflow, since you don\'t want them finding the regressions' },
     { when: 'Quarterly', why: 'for workflows you depend on, since models drift and last quarter\'s best config may not be today\'s' },
   ],
 }
@@ -33,18 +33,18 @@ const BULLETS: Record<Kind, { when: string; why: string }[]> = {
 export function WhenToRunDisclosure({ kind, theme = 'dark' }: Props) {
   const [open, setOpen] = useState(false)
   const bullets = BULLETS[kind]
-  const triggerColor = theme === 'light' ? '#6b21a8' : '#a78bfa'
-  const bodyColor = theme === 'light' ? '#4b5563' : '#bbb'
-  const labelColor = theme === 'light' ? '#111827' : '#ddd'
+  const triggerColor = theme === 'light' ? '#6b21a8' : 'var(--workspace-info)'
+  const bodyColor = theme === 'light' ? '#4b5563' : 'var(--workspace-muted)'
+  const labelColor = theme === 'light' ? '#111827' : 'var(--workspace-text)'
 
   return (
-    <div style={{ margin: '0 0 12px 0' }}>
+    <div style={{ margin: "0 0 var(--workspace-space-12) 0" }}>
       <button
         onClick={() => setOpen(v => !v)}
         style={{
-          display: 'inline-flex', alignItems: 'center', gap: 4,
+          display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
           background: 'transparent', border: 'none', padding: 0,
-          fontSize: 11, color: triggerColor, fontFamily: 'inherit', cursor: 'pointer',
+          fontSize: 'var(--workspace-font-meta)', color: triggerColor, fontFamily: 'inherit', cursor: 'pointer',
         }}
       >
         {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
@@ -52,7 +52,7 @@ export function WhenToRunDisclosure({ kind, theme = 'dark' }: Props) {
       </button>
       {open && (
         <ul style={{
-          margin: '8px 0 0 0', paddingLeft: 18, fontSize: 12, color: bodyColor, lineHeight: 1.7,
+          margin: "var(--workspace-space-8) 0 0 0", paddingLeft: 'var(--workspace-space-20)', fontSize: 'var(--workspace-font-meta)', color: bodyColor, lineHeight: 1.7,
         }}>
           {bullets.map(b => (
             <li key={b.when}>

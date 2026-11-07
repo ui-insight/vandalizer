@@ -1,0 +1,110 @@
+import DOMPurify from 'dompurify'
+import { marked } from 'marked'
+
+// Matches [ACTION:type]Label[/ACTION] (correct) plus tolerated LLM variants:
+// backslash-escaped brackets (\[ACTION:...\] — marked would otherwise unescape
+// them and show the raw markup), backtick-wrapped tags, stray whitespace, and
+// lowercase "action". Also [Label][ACTION:type] / [Label](ACTION:type)
+// (common LLM mistakes), and leftover open/close fragments, so raw ACTION
+// markup never reaches the user.
+const ACTION_RE = /`?\\?\[\s*ACTION:\s*([\w-]+)\s*\\?\](.*?)\\?\[\s*\/\s*ACTION\s*\\?\]`?/gi
+const ACTION_RE_ALT = /\[([^\]]+)\]\\?\[\s*ACTION:\s*([\w-]+)\s*\\?\]/gi
+const ACTION_RE_ALT2 = /\[([^\]]+)\]\(\s*ACTION:\s*([\w-]+)\s*\)/gi
+const ACTION_OPEN_REMNANT_RE = /\\?\[\s*ACTION:\s*([\w-]+)\s*\\?\]/gi
+const ACTION_CLOSE_REMNANT_RE = /\\?\[\s*\/\s*ACTION\s*\\?\]/gi
+export const THINK_BLOCK_RE = /<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>\n?/g
+export const THINK_TRAILING_RE = /<think(?:ing)?>[\s\S]*$/
+
+marked.setOptions({ breaks: true, gfm: true })
+
+// gpt-oss writes citations in its own syntax — 【p. 1】, 【sponsor-notice.pdf†p. 2】,
+// 【Source: a.pdf】 and search anchors like 【3†L4-L10】 — which showed as raw text.
+// Rewritten to the app's own "(file, p. N)" form; the backend stores the same
+// rewrite, so this covers the answer while it is still streaming (#1011).
+const FULLWIDTH_CITATION_RE = /\s*【([^】]{1,200})】/g
+const RESULT_ANCHOR_RE = /^\d+†L\d+(?:-L\d+)?$/
+
+export function normalizeCitationMarkup(text: string): string {
+  if (!text.includes('【')) return text
+  return text.replace(FULLWIDTH_CITATION_RE, (_match, raw: string) => {
+    const inner = raw.trim()
+    if (RESULT_ANCHOR_RE.test(inner)) return ''
+    const readable = inner.replace(/\s*†\s*/g, ', ')
+    return /^source:/i.test(readable) ? ` [${readable}]` : ` (${readable})`
+  })
+}
+
+// Display labels for a bare [ACTION:type] the model emitted without label
+// text. Unknown types fall back to the humanized type — actionRoute sends the
+// label as a chat message, so it must read like a request.
+const ACTION_FALLBACK_LABELS: Record<string, string> = {
+  'start-cert': 'Start the Certification Program',
+  'upload-docs': 'Upload your documents',
+}
+
+function actionButton(type: string, label: string): string {
+  const clean = label.trim()
+    || ACTION_FALLBACK_LABELS[type.toLowerCase()]
+    || type.replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase())
+  return `<button data-action="${type}" class="chat-action-btn">${clean}</button>`
+}
+
+// [Title](doc:<uuid>) — the model's link to a workspace document. DOMPurify
+// drops the unknown doc: scheme from an <a>, so it becomes a button that
+// ChatMessage opens in the viewer.
+const DOC_LINK_RE = /\[([^\]\n]+)\]\(\s*doc:\s*([\w-]{4,80})\s*\)/g
+
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+function docLinkButton(label: string, uuid: string): string {
+  const clean = label.trim().replace(/^[*_`]+|[*_`]+$/g, '') || 'Open document'
+  return `<button type="button" data-doc-uuid="${uuid}" class="chat-doc-link">${escapeHtml(clean)}</button>`
+}
+
+/** Render a markdown string to sanitized HTML. */
+export function renderMarkdown(text: string): string {
+  let cleaned = normalizeCitationMarkup(text.replace(THINK_BLOCK_RE, '').replace(THINK_TRAILING_RE, ''))
+  // Canonical (and escaped/backticked/spaced variants): [ACTION:type]Label[/ACTION]
+  cleaned = cleaned.replace(ACTION_RE, (_match, type: string, label: string) =>
+    actionButton(type, label)
+  )
+  // LLM mistake: [Label][ACTION:type]
+  cleaned = cleaned.replace(ACTION_RE_ALT, (_match, label: string, type: string) =>
+    actionButton(type, label)
+  )
+  // LLM mistake: [Label](ACTION:type)
+  cleaned = cleaned.replace(ACTION_RE_ALT2, (_match, label: string, type: string) =>
+    actionButton(type, label)
+  )
+  // Last resort: unpaired fragments — a bare open tag still becomes a button,
+  // a dangling close tag disappears.
+  cleaned = cleaned.replace(ACTION_OPEN_REMNANT_RE, (_match, type: string) =>
+    actionButton(type, '')
+  )
+  cleaned = cleaned.replace(ACTION_CLOSE_REMNANT_RE, '')
+  cleaned = cleaned.replace(DOC_LINK_RE, (_match, label: string, uuid: string) =>
+    docLinkButton(label, uuid)
+  )
+  const sanitized = DOMPurify.sanitize(marked.parse(cleaned) as string, {
+    ADD_TAGS: ['button'],
+    ADD_ATTR: ['data-action', 'data-doc-uuid'],
+  })
+  const content = document.createElement('div')
+  content.innerHTML = sanitized
+  for (const block of content.querySelectorAll('pre')) {
+    block.tabIndex = 0
+    block.setAttribute('aria-label', 'Code block')
+  }
+  for (const table of content.querySelectorAll('table')) {
+    const scroller = document.createElement('div')
+    scroller.className = 'chat-table-scroll'
+    scroller.tabIndex = 0
+    scroller.setAttribute('role', 'region')
+    scroller.setAttribute('aria-label', 'Response table')
+    table.before(scroller)
+    scroller.append(table)
+  }
+  return content.innerHTML
+}

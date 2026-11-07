@@ -28,17 +28,20 @@ def test_single_line_runaway_leaves_no_live_thread():
     number doesn't change, so a per-line deadline check fires exactly once and
     the thread runs forever.
     """
-    before = threading.active_count()
+    before = set(threading.enumerate())
 
     result = execute_sandboxed_code("while True: pass", {}, timeout=1)
     assert result == {"timed_out": True}
 
+    # Track identities: an existing background thread may finish during the
+    # call. Count equality both rejects that harmless exit and can hide a new
+    # leaked thread if another thread exits at the same time.
     # Give the runner a moment to unwind before judging it.
     deadline = time.monotonic() + 5.0
-    while threading.active_count() > before and time.monotonic() < deadline:
+    while set(threading.enumerate()) - before and time.monotonic() < deadline:
         time.sleep(0.05)
 
-    assert threading.active_count() == before, (
+    assert not set(threading.enumerate()) - before, (
         "sandbox timeout left a thread running; it will spin for the life of "
         "the process and starve everything else of the GIL"
     )
@@ -46,16 +49,16 @@ def test_single_line_runaway_leaves_no_live_thread():
 
 def test_multi_line_runaway_leaves_no_live_thread():
     """The same guarantee for the multi-line form, which traces differently."""
-    before = threading.active_count()
+    before = set(threading.enumerate())
 
     result = execute_sandboxed_code("while True:\n    pass", {}, timeout=1)
     assert result == {"timed_out": True}
 
     deadline = time.monotonic() + 5.0
-    while threading.active_count() > before and time.monotonic() < deadline:
+    while set(threading.enumerate()) - before and time.monotonic() < deadline:
         time.sleep(0.05)
 
-    assert threading.active_count() == before
+    assert not set(threading.enumerate()) - before
 
 
 def test_process_is_idle_after_a_timeout():

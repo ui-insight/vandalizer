@@ -1,15 +1,49 @@
 import { apiFetch, rawFetch } from './client'
 
+export interface UploadPolicy { extensions: string[]; max_size_bytes: number | null }
+let policyRequest: Promise<UploadPolicy> | undefined
+let policyReadAt = 0
+export function getUploadPolicy(): Promise<UploadPolicy> {
+  if (!policyRequest || Date.now() - policyReadAt > 300000) {
+    policyReadAt = Date.now()
+    policyRequest = apiFetch<UploadPolicy>('/api/files/upload-policy').catch(error => { policyRequest = undefined; throw error })
+  }
+  return policyRequest
+}
+
 export function uploadFile(data: {
   contentAsBase64String: string
   fileName: string
   extension: string
   folder?: string
-}) {
+}, signal?: AbortSignal) {
   return apiFetch<{ complete: boolean; uuid?: string; exists?: boolean }>(
     '/api/files/upload',
+    { method: 'POST', body: JSON.stringify(data), signal },
+  )
+}
+
+export interface FileVersion {
+  uuid: string
+  title: string
+  extension: string
+  version_number: number
+  created_at: string | null
+  current: boolean
+  processing: boolean
+}
+
+/** Upload a revised file as the next version of `docUuid`. Pages built from
+ * the earlier version then offer an update. */
+export function uploadFileVersion(docUuid: string, data: { contentAsBase64String: string; fileName: string; extension: string }) {
+  return apiFetch<{ complete: boolean; uuid: string; version_number: number; replaces: string }>(
+    `/api/files/${encodeURIComponent(docUuid)}/versions`,
     { method: 'POST', body: JSON.stringify(data) },
   )
+}
+
+export function listFileVersions(docUuid: string) {
+  return apiFetch<{ versions: FileVersion[] }>(`/api/files/${encodeURIComponent(docUuid)}/versions`)
 }
 
 export interface DeleteFileResult {

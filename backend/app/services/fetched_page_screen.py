@@ -183,7 +183,7 @@ def _parse_stylesheets(soup: BeautifulSoup) -> list[tuple[Optional[str], list[st
 def _matches(el: Tag, tag: Optional[str], parts: list[str]) -> bool:
     if tag and el.name != tag:
         return False
-    classes = el.get("class") or []
+    classes = el.get_attribute_list("class")
     for p in parts:
         if p[0] == "." and p[1:] not in classes:
             return False
@@ -192,7 +192,7 @@ def _matches(el: Tag, tag: Optional[str], parts: list[str]) -> bool:
     return bool(tag or parts)
 
 
-def _declarations_for(el: Tag, rules) -> dict[str, str]:
+def _declarations_for(el: Tag, rules: list[tuple[Optional[str], list[str], dict[str, str]]]) -> dict[str, str]:
     decls: dict[str, str] = {}
     for tag, parts, rule in rules:
         if _matches(el, tag, parts):
@@ -259,7 +259,7 @@ def _rgba(value: str) -> Optional[tuple[int, int, int, float]]:
     return None
 
 
-def _is_white(rgba) -> bool:
+def _is_white(rgba: tuple[float, float, float, float] | None) -> bool:
     return rgba is not None and rgba[3] > _MAX_INVISIBLE_ALPHA and min(rgba[:3]) >= _NEAR_WHITE_CHANNEL
 
 
@@ -326,7 +326,7 @@ class _State:
     clip_anchor: Optional[int] = None
 
 
-def _walk(el: Tag, state: _State, rules, hidden: dict, visible: list[str]) -> None:
+def _walk(el: Tag, state: _State, rules: list[tuple[Optional[str], list[str], dict[str, str]]], hidden: dict, visible: list[str]) -> None:
     decls = _declarations_for(el, rules)
     s = _State(**state.__dict__)
     anchor = id(el)

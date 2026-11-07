@@ -188,3 +188,38 @@ class TestOfficeRouteAuthz:
         assert resp.json()["detail"] == "Matched workflow not found"
         item.save.assert_not_awaited()
         mock_send_task.assert_not_called()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["outlook", "onedrive"])
+async def test_subscription_creation_includes_expiration(client, kind):
+    import datetime
+
+    user = _make_user("owner")
+    cookies, headers = _auth("owner")
+    intake = SimpleNamespace(id="intake-oid", uuid="intake-1", intake_type=kind,
+        mailbox_address=None, outlook_folder_id=None, folder_path=None)
+    recorded = {}
+
+    def save_model(**fields):
+        recorded.update(fields)
+        return SimpleNamespace(**fields, uuid="stored-subscription", insert=AsyncMock())
+
+    before = datetime.datetime.now(datetime.timezone.utc)
+    with (
+        patch("app.dependencies.decode_token", return_value={"sub": "owner", "type": "access"}),
+        patch("app.dependencies.User") as users,
+        patch("app.routers.office._get_owned_intake", new=AsyncMock(return_value=intake)),
+        patch("app.services.graph_client.GraphClient._post", return_value={
+            "id": "graph-sub", "expirationDateTime": "2026-10-31T12:00:00Z",
+        }) as post,
+        patch("app.models.passive.GraphSubscription", side_effect=save_model),
+    ):
+        users.find_one = AsyncMock(return_value=user)
+        response = await client.post("/api/office/intakes/intake-1/subscribe", cookies=cookies, headers=headers)
+    assert response.status_code == 200, response.text
+    payload = post.call_args.args[1]
+    expiration = datetime.datetime.fromisoformat(payload["expirationDateTime"])
+    assert before + datetime.timedelta(days=2) <= expiration <= datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=2)
+    assert payload["clientState"] == "vandalizer:owner:intake-1"
+    assert recorded["owner_user_id"] == "owner"

@@ -13,7 +13,7 @@ export function listProjects() {
   return apiFetch<Project[]>('/api/projects')
 }
 
-export function createProject(data: { title: string; description?: string }) {
+export function createProject(data: { title: string; description?: string; context?: string }) {
   return apiFetch<Project>('/api/projects', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -36,7 +36,7 @@ export function getProjectDocuments(uuid: string) {
 
 export function updateProject(
   uuid: string,
-  data: { title?: string; description?: string; state?: ProjectState },
+  data: { title?: string; description?: string; context?: string | null; state?: ProjectState },
 ) {
   return apiFetch<Project>(`/api/projects/${uuid}`, {
     method: 'PATCH',
@@ -110,3 +110,6 @@ export function listProjectMembers(uuid: string) {
 export function removeProjectMember(uuid: string, memberUserId: string) {
   return apiFetch<{ ok: boolean }>(`/api/projects/${uuid}/members/${memberUserId}`, { method: 'DELETE' })
 }
+
+export const getProjectDefaultSkill = (uuid: string) => apiFetch<{ active_skill: import('../types/chat').SkillSnapshot | null }>(`/api/projects/${encodeURIComponent(uuid)}/default-skill`)
+export const setProjectDefaultSkill = (uuid: string, skillUuid: string | null) => apiFetch(`/api/projects/${encodeURIComponent(uuid)}/default-skill`, { method: 'PUT', body: JSON.stringify({ skill_uuid: skillUuid }) })

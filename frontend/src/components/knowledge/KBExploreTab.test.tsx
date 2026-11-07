@@ -54,7 +54,7 @@ const item = (i: number, name: string, tier: string): VerifiedCatalogItem => ({
   created_at: '2026-01-01T00:00:00', display_name: null, description: null, markdown: null,
   organization_ids: [], quality_score: 90, quality_tier: tier, quality_grade: 'A',
   last_validated_at: null, validation_run_count: 0, source_uuid: `kb-uuid-${i}`,
-  quality_asserted: true,
+  quality_asserted: false,
 } as VerifiedCatalogItem)
 
 const items = CATALOG.map(([name, tier], i) => item(i, name, tier))
@@ -64,12 +64,12 @@ describe('KBExploreTab landing', () => {
     vi.mocked(listVerifiedItems).mockResolvedValue({ items, total: items.length })
     render(<KBExploreTab />)
 
-    await screen.findByText('Top Rated')
+    await screen.findByRole('heading', { name: 'Strong on tested examples' })
     for (const [name] of CATALOG) {
       expect(screen.getAllByText(name), name).toHaveLength(1)
     }
     // The count names every excellent item, not just the six on show.
-    expect(screen.getByText('10 excellent-tier items')).toBeTruthy()
+    expect(screen.getByText('11 items with strong measured results')).toBeTruthy()
   })
 })
 
@@ -77,7 +77,7 @@ describe('splitSpotlight', () => {
   it('puts each item in exactly one section', () => {
     const { spotlight, rest, topRatedCount } = splitSpotlight(items)
     expect(spotlight).toHaveLength(SPOTLIGHT_SIZE)
-    expect(topRatedCount).toBe(10)
+    expect(topRatedCount).toBe(11)
     expect(rest.map(i => i.name)).toEqual(expect.arrayContaining([
       'DOE Financial Assistance Rules', 'DOD Research Funding & DFARS',
       'Federal Acquisition Regulation (FAR)', 'Responsible Conduct of Research',
@@ -88,7 +88,9 @@ describe('splitSpotlight', () => {
 
   it('leads the spotlight with measured ratings over seeded ones', () => {
     const measured = { ...items[9], quality_asserted: false }
-    const { spotlight } = splitSpotlight([...items.slice(0, 9), measured])
+    const { spotlight, rest } = splitSpotlight([...items.slice(0, 9).map(item => ({ ...item, quality_score: null, quality_asserted: true })), measured])
+    expect(spotlight).toHaveLength(1)
+    expect(rest).toHaveLength(9)
     expect(spotlight[0].name).toBe('Federal Acquisition Regulation (FAR)')
   })
 })

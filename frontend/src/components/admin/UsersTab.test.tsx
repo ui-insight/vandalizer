@@ -80,7 +80,7 @@ beforeEach(() => {
 async function openDrillDown() {
   render(<UsersTab />)
   await waitFor(() => expect(screen.getByText('Target User')).toBeInTheDocument())
-  fireEvent.click(screen.getByRole('button', { name: /view target-1/i }))
+  fireEvent.click(screen.getByRole('button', { name: /view Target User/i }))
   await waitFor(() => expect(screen.getByText('Platform Roles')).toBeInTheDocument())
 }
 

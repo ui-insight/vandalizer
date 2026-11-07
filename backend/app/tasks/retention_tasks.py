@@ -1,5 +1,13 @@
 """Celery beat tasks for data retention policy enforcement."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from celery import Task
+
+
 import asyncio
 import datetime
 import logging
@@ -10,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 @celery.task(name="tasks.retention.schedule_deletions", bind=True)
-def schedule_deletions_task(self):
+def schedule_deletions_task(self: Task) -> None:
     """Find documents past retention period and schedule them for deletion."""
     loop = asyncio.new_event_loop()
     try:
@@ -19,7 +27,7 @@ def schedule_deletions_task(self):
         loop.close()
 
 
-async def _schedule_deletions():
+async def _schedule_deletions() -> None:
     from app.database import init_db
     from app.config import Settings
 
@@ -63,7 +71,7 @@ async def _schedule_deletions():
 
 
 @celery.task(name="tasks.retention.execute_soft_deletes", bind=True)
-def execute_soft_deletes_task(self):
+def execute_soft_deletes_task(self: Task) -> None:
     """Soft-delete documents past their scheduled deletion date."""
     loop = asyncio.new_event_loop()
     try:
@@ -72,7 +80,7 @@ def execute_soft_deletes_task(self):
         loop.close()
 
 
-async def _execute_soft_deletes():
+async def _execute_soft_deletes() -> None:
     from app.database import init_db
     from app.config import Settings
 
@@ -84,7 +92,7 @@ async def _execute_soft_deletes():
     now = datetime.datetime.now(tz=datetime.timezone.utc)
 
     docs = await SmartDocument.find(
-        SmartDocument.scheduled_deletion_at <= now,
+        {"scheduled_deletion_at": {"$lte": now}},
         SmartDocument.soft_deleted != True,  # noqa: E712
         SmartDocument.retention_hold != True,  # noqa: E712
     ).to_list()
@@ -99,7 +107,7 @@ async def _execute_soft_deletes():
 
 
 @celery.task(name="tasks.retention.execute_hard_deletes", bind=True)
-def execute_hard_deletes_task(self):
+def execute_hard_deletes_task(self: Task) -> None:
     """Permanently delete documents after grace period."""
     loop = asyncio.new_event_loop()
     try:
@@ -108,7 +116,7 @@ def execute_hard_deletes_task(self):
         loop.close()
 
 
-async def _execute_hard_deletes():
+async def _execute_hard_deletes() -> None:
     import os
 
     from app.database import init_db
@@ -156,8 +164,8 @@ async def _execute_hard_deletes():
 
         # Delete from ChromaDB
         try:
-            from app.services.document_manager import get_chroma_client
-            chroma = get_chroma_client(settings.chromadb_persist_dir)
+            from app.services.document_manager import get_document_manager
+            chroma = get_document_manager().client
             collection = chroma.get_or_create_collection("documents")
             collection.delete(where={"document_uuid": doc.uuid})
         except Exception:
@@ -172,7 +180,7 @@ async def _execute_hard_deletes():
 
 
 @celery.task(name="tasks.retention.cleanup_ancillary", bind=True)
-def cleanup_ancillary_task(self):
+def cleanup_ancillary_task(self: Task) -> None:
     """Clean up old activity logs, chats, and workflow results."""
     loop = asyncio.new_event_loop()
     try:
@@ -181,7 +189,7 @@ def cleanup_ancillary_task(self):
         loop.close()
 
 
-async def _cleanup_ancillary():
+async def _cleanup_ancillary() -> None:
     from app.database import init_db
     from app.config import Settings
 

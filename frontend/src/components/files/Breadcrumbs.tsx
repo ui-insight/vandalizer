@@ -60,7 +60,7 @@ export function Breadcrumbs({ items, onNavigate, floor = null, homeLabel = 'Home
           backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 15%, white)',
           outline: '2px solid color-mix(in srgb, var(--highlight-color, #eab308) 60%, white)',
           outlineOffset: '-2px',
-          borderRadius: 6,
+          borderRadius: 'var(--workspace-radius-small)',
         }
       : {}
 
@@ -70,8 +70,9 @@ export function Breadcrumbs({ items, onNavigate, floor = null, homeLabel = 'Home
   return (
     <nav
       aria-label="Folder navigation"
-      className="overflow-x-auto whitespace-nowrap flex items-center gap-2"
-      style={{ padding: '20px 30px 0px 0px' }}
+      tabIndex={0}
+      className="flex min-w-0 items-start gap-2"
+      style={{ padding: "var(--workspace-space-16) 0 0" }}
     >
       {!atRoot && (
         <button
@@ -80,15 +81,15 @@ export function Breadcrumbs({ items, onNavigate, floor = null, homeLabel = 'Home
           aria-label="Go to parent folder"
           title="Go to parent folder"
           className="inline-flex items-center justify-center rounded-md border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
-          style={{ width: 28, height: 28, ...dragOverStyle('up') }}
+          style={{ width: 36, height: 36, flexShrink: 0, ...dragOverStyle('up') }}
           {...dropTargetProps('up', upTargetId)}
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
       )}
 
-      <ol className="inline-flex items-center gap-1 list-none m-0 p-0">
-        <li className="inline-flex items-center text-sm">
+      <ol className="flex min-w-0 flex-wrap items-center gap-1 list-none m-0 p-0">
+        <li className="inline-flex min-w-0 items-center text-sm [overflow-wrap:anywhere]">
           {atRoot ? (
             <span style={{ color: '#111', fontWeight: 600 }}>{homeLabel}</span>
           ) : (
@@ -96,7 +97,7 @@ export function Breadcrumbs({ items, onNavigate, floor = null, homeLabel = 'Home
               type="button"
               onClick={() => onNavigate(floor)}
               className="bg-transparent border-0 cursor-pointer text-gray-600 hover:text-gray-900 hover:underline"
-              style={{ fontWeight: 400, padding: '2px 4px', margin: '-2px -4px', ...dragOverStyle('home') }}
+              style={{ fontWeight: 400, minHeight: 'var(--workspace-control-height)', padding: "var(--workspace-space-2) var(--workspace-space-4)", margin: '-2px -4px', ...dragOverStyle('home') }}
               {...dropTargetProps('home', homeTargetId)}
             >
               {homeLabel}
@@ -104,13 +105,13 @@ export function Breadcrumbs({ items, onNavigate, floor = null, homeLabel = 'Home
           )}
         </li>
         {ancestors.map((item) => (
-          <li key={item.uuid} className="inline-flex items-center text-sm">
+          <li key={item.uuid} className="inline-flex min-w-0 items-center text-sm [overflow-wrap:anywhere]">
             <span className="mx-[7.5px] text-gray-400" aria-hidden="true">›</span>
             <button
               type="button"
               onClick={() => onNavigate(item.uuid)}
               className="bg-transparent border-0 cursor-pointer text-gray-600 hover:text-gray-900 hover:underline"
-              style={{ fontWeight: 400, padding: '2px 4px', margin: '-2px -4px', ...dragOverStyle(item.uuid) }}
+              style={{ fontWeight: 400, minHeight: 'var(--workspace-control-height)', padding: "var(--workspace-space-2) var(--workspace-space-4)", margin: '-2px -4px', ...dragOverStyle(item.uuid) }}
               {...dropTargetProps(item.uuid, item.uuid)}
             >
               {item.title}
@@ -118,7 +119,7 @@ export function Breadcrumbs({ items, onNavigate, floor = null, homeLabel = 'Home
           </li>
         ))}
         {currentTitle && (
-          <li className="inline-flex items-center text-sm" aria-current="page">
+          <li className="inline-flex min-w-0 items-center text-sm [overflow-wrap:anywhere]" aria-current="page">
             <span className="mx-[7.5px] text-gray-400" aria-hidden="true">›</span>
             <span style={{ color: '#111', fontWeight: 600 }}>{currentTitle}</span>
           </li>

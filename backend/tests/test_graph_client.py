@@ -2,7 +2,6 @@
 
 from unittest.mock import MagicMock, patch
 
-import httpx
 import pytest
 
 from app.services.graph_client import (
@@ -18,7 +17,7 @@ class TestGetValidToken:
         with patch.dict("os.environ", {"GRAPH_ACCESS_TOKEN": "test-token"}, clear=False):
             with patch("builtins.__import__", side_effect=ImportError):
                 result = _get_valid_token("user1")
-        # Falls back to env var
+        assert result == "test-token"
 
     def test_returns_none_when_no_env_var(self):
         with patch.dict("os.environ", {}, clear=True):
@@ -267,3 +266,20 @@ class TestGraphClient:
         gc = self._client()
         with pytest.raises(ValueError, match="Either content or card_json"):
             gc.send_channel_message("team1", "chan1")
+
+
+@pytest.mark.parametrize("offset", [None, 0, 5])
+def test_subscription_expiry_has_one_utc_timezone(offset):
+    import datetime
+
+    tz = None if offset is None else datetime.timezone(datetime.timedelta(hours=offset))
+    expiration = datetime.datetime(2026, 10, 31, 12, 0, tzinfo=tz)
+    expected = datetime.datetime(2026, 10, 31, 12 - (offset or 0), 0, tzinfo=datetime.timezone.utc)
+    client = GraphClient("owner")
+    with patch.object(client, "_post", return_value={}) as create, patch.object(client, "_patch", return_value={}) as renew:
+        client.create_subscription("me/drive/root", "updated", "https://example.com/webhook", expiration)
+        client.renew_subscription("sub", expiration)
+    for call in (create.call_args, renew.call_args):
+        encoded = call.args[1]["expirationDateTime"]
+        assert encoded.endswith("Z") and "+00:00Z" not in encoded
+        assert datetime.datetime.fromisoformat(encoded) == expected

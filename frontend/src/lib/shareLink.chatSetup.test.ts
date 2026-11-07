@@ -2,6 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { buildChatSetupUrl, parseIdList } from './shareLink'
 
 describe('chat setup links', () => {
+  it('includes a Skill alongside sources, or on its own', () => {
+    for (const kbUuids of [[], ['kb-1']]) {
+      const url = new URL(buildChatSetupUrl({ kbUuids, docUuids: [], folderUuids: [], skillUuid: 'award/review' }))
+      expect(url.searchParams.get('skill')).toBe('award/review')
+      expect(parseIdList(url.searchParams.get('kb'))).toEqual(kbUuids)
+    }
+  })
   it('round-trips knowledge bases, documents and folders', () => {
     const url = new URL(buildChatSetupUrl({
       kbUuids: ['kb-1', 'kb-2', 'kb-3'], docUuids: ['doc-1'], folderUuids: ['fld-1', 'fld-2'],

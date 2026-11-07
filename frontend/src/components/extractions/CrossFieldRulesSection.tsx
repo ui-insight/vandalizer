@@ -35,6 +35,8 @@ const RULE_TYPE_LABELS: Record<CrossFieldRuleType, string> = {
   cross_reference: 'Cross reference',
   date_order: 'Date order',
   custom_expression: 'Custom expression',
+  product_equals: 'Rate applied',
+  at_most_difference: 'At most a difference',
 }
 
 export function CrossFieldRulesSection({ searchSetUuid, canManage, fieldNames }: Props) {
@@ -129,7 +131,7 @@ export function CrossFieldRulesSection({ searchSetUuid, canManage, fieldNames }:
         <div>
           <h3 className="font-medium text-gray-900">Cross-Field Rules</h3>
           <p className="text-xs text-gray-500 mt-0.5">
-            Constraints that span fields — e.g. "Direct + Indirect = Total". The optimizer treats
+            Constraints that span fields, e.g. "Direct + Indirect = Total". The optimizer treats
             violation rate as part of the score, so good rules push it toward configs that satisfy them.
           </p>
         </div>
@@ -281,21 +283,24 @@ function RuleRow({
           </span>
           {rule.auto_disabled && (
             <span
-              className="inline-flex items-center gap-0.5 text-[10px] font-medium text-red-700 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded"
+              className="inline-flex items-center gap-0.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded"
               title={rule.auto_disabled_reason ?? undefined}
             >
               <AlertCircle size={10} aria-hidden="true" /> Auto-disabled
             </span>
           )}
           {rule.source === 'suggested' && (
-            <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+            <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
               Suggested
             </span>
           )}
         </div>
-        <div className="text-gray-800 mt-0.5 break-words">{describeRule(rule)}</div>
+        {rule.label && <div className="text-gray-800 mt-0.5 break-words">{rule.label}</div>}
+        <div className={`mt-0.5 break-words ${rule.label ? 'text-xs text-gray-600 font-mono' : 'text-gray-800'}`}>
+          {describeRule(rule)}
+        </div>
         {evals > 0 && (
-          <div className="text-[11px] text-gray-500 mt-1">
+          <div className="text-xs text-gray-500 mt-1">
             {passes} pass · {fails} fail · {fps > 0 ? `${fps} marked false alarm · ` : ''}
             {evals} total
           </div>
@@ -454,6 +459,74 @@ function RuleEditFields({
             onChange={v => update({ tolerance: v ?? undefined })}
             step={0.01}
           />
+          <MissingAsZero draft={draft} update={update} />
+        </>
+      )
+    case 'product_equals':
+      return (
+        <>
+          <p className="text-xs text-gray-600">
+            Checks that the target equals the base times the rate, computed exactly. A rate with % (or
+            a bare number over 1) is a percentage.
+          </p>
+          <FieldPicker
+            label="Base field"
+            value={draft.base_field ?? ''}
+            options={fieldNames}
+            onChange={v => update({ base_field: v })}
+          />
+          <FieldPicker
+            label="Rate field"
+            value={draft.rate_field ?? ''}
+            options={fieldNames}
+            onChange={v => update({ rate_field: v })}
+          />
+          <FieldPicker
+            label="Target field (base × rate)"
+            value={draft.target_field ?? ''}
+            options={fieldNames}
+            onChange={v => update({ target_field: v })}
+          />
+          <NumberInput
+            label="Tolerance"
+            value={draft.tolerance ?? 1}
+            onChange={v => update({ tolerance: v ?? undefined })}
+            step={0.01}
+          />
+        </>
+      )
+    case 'at_most_difference':
+      return (
+        <>
+          <p className="text-xs text-gray-600">
+            An upper bound: the field can be no more than the first field minus the others. Passing
+            means the value is consistent with those exclusions, not that it is correct.
+          </p>
+          <FieldPicker
+            label="Field"
+            value={draft.field ?? ''}
+            options={fieldNames}
+            onChange={v => update({ field: v })}
+          />
+          <FieldPicker
+            label="At most this field…"
+            value={draft.minuend_field ?? ''}
+            options={fieldNames}
+            onChange={v => update({ minuend_field: v })}
+          />
+          <MultiFieldPicker
+            label="…minus these fields"
+            value={draft.subtrahend_fields ?? []}
+            options={fieldNames}
+            onChange={v => update({ subtrahend_fields: v })}
+          />
+          <NumberInput
+            label="Tolerance"
+            value={draft.tolerance ?? 0.01}
+            onChange={v => update({ tolerance: v ?? undefined })}
+            step={0.01}
+          />
+          <MissingAsZero draft={draft} update={update} />
         </>
       )
     case 'conditional_required':
@@ -550,7 +623,7 @@ function RuleEditFields({
       return (
         <>
           <p className="text-xs text-gray-600">
-            Python expression — field names become variables with non-identifier characters replaced
+            Python expression: field names become variables with non-identifier characters replaced
             by underscores. Evaluated in a sandbox; numeric values are pre-converted.
           </p>
           <TextInput
@@ -752,7 +825,34 @@ function blankRule(type: CrossFieldRuleType): CrossFieldRule {
   if (type === 'range_check') return { ...base, field: '', min: null, max: null }
   if (type === 'cross_reference') return { ...base, field_a: '', field_b: '', match_type: 'contains' }
   if (type === 'date_order') return { ...base, field_a: '', field_b: '' }
+  if (type === 'product_equals') return { ...base, base_field: '', rate_field: '', target_field: '', tolerance: 1 }
+  if (type === 'at_most_difference') return { ...base, field: '', minuend_field: '', subtrahend_fields: [], tolerance: 0.01 }
   return { ...base, expression: '' }
+}
+
+function MissingAsZero({
+  draft,
+  update,
+}: {
+  draft: CrossFieldRule
+  update: (patch: Partial<CrossFieldRule>) => void
+}) {
+  const id = useId()
+  return (
+    <div className="flex items-start gap-2">
+      <input
+        id={id}
+        type="checkbox"
+        checked={!!draft.missing_as_zero}
+        onChange={e => update({ missing_as_zero: e.target.checked })}
+        className="mt-0.5"
+      />
+      <label htmlFor={id} className="text-xs text-gray-700">
+        Count a field the document doesn't state (empty or N/A) as 0. The result lists every field
+        counted this way.
+      </label>
+    </div>
+  )
 }
 
 function validateDraft(rule: CrossFieldRule): string | null {
@@ -775,6 +875,13 @@ function validateDraft(rule: CrossFieldRule): string | null {
     case 'custom_expression':
       if (!rule.expression?.trim()) return 'Enter an expression'
       return null
+    case 'product_equals':
+      if (!rule.base_field || !rule.rate_field || !rule.target_field) return 'Pick the base, rate and target fields'
+      return null
+    case 'at_most_difference':
+      if (!rule.field || !rule.minuend_field) return 'Pick the field and the field it is bounded by'
+      if (!rule.subtrahend_fields || rule.subtrahend_fields.length < 1) return 'Pick at least one field to subtract'
+      return null
   }
 }
 
@@ -792,5 +899,9 @@ export function describeRule(rule: CrossFieldRule): string {
       return `"${rule.field_a}" ≤ "${rule.field_b}"`
     case 'custom_expression':
       return rule.expression ?? '(empty)'
+    case 'product_equals':
+      return `${rule.target_field || '?'} = ${rule.base_field || '?'} × ${rule.rate_field || '?'}`
+    case 'at_most_difference':
+      return `${rule.field || '?'} ≤ ${rule.minuend_field || '?'} − ${(rule.subtrahend_fields ?? []).join(' − ') || '?'}`
   }
 }

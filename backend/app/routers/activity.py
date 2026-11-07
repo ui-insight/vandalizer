@@ -4,6 +4,7 @@ import logging
 
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 
 from app.dependencies import get_current_user
 from app.models.system_config import SystemConfig
@@ -16,17 +17,17 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-async def _team_ids_for_user(user) -> list[str]:
+async def _team_ids_for_user(user: User) -> list[str]:
     """Collect all team identifiers (UUID and ObjectId forms) for the user."""
     ctx = await access_control.get_team_access_context(user)
     return list(ctx.team_uuids | ctx.team_object_ids)
 
 
-@router.get("/{activity_id}")
+@router.get("/{activity_id}", response_model=None)
 async def get_activity(
     activity_id: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Get a single activity event."""
     team_ids = await _team_ids_for_user(user)
     ev = await activity_service.get_activity(
@@ -37,11 +38,33 @@ async def get_activity(
     return {"activity": ev.to_dict()}
 
 
-@router.delete("/{activity_id}")
+class RenameActivityRequest(BaseModel):
+    title: str
+
+
+@router.patch("/{activity_id}", response_model=None)
+async def rename_activity(
+    activity_id: str,
+    body: RenameActivityRequest,
+    user: User = Depends(get_current_user),
+) -> dict[str, object]:
+    """Rename a chat. The new name shows in the activity list and on the chat."""
+    try:
+        ev = await activity_service.rename_conversation_activity(
+            PydanticObjectId(activity_id), user.user_id, body.title,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    if not ev:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    return {"activity": ev.to_dict()}
+
+
+@router.delete("/{activity_id}", response_model=None)
 async def delete_activity(
     activity_id: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Delete an activity event with cascade."""
     deleted = await activity_service.delete_activity(
         PydanticObjectId(activity_id), user.user_id,
@@ -51,11 +74,11 @@ async def delete_activity(
     return {"status": "success", "message": f"Activity {activity_id} deleted."}
 
 
-@router.get("/streams/")
+@router.get("/streams/", response_model=None)
 async def activity_streams(
     limit: int = Query(default=50, ge=1, le=200),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """List recent activity events for the current user and their teams."""
     team_ids = await _team_ids_for_user(user)
     events = await activity_service.list_activities(user.user_id, limit=limit, team_ids=team_ids)

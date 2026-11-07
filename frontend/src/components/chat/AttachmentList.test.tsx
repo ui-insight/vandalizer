@@ -9,6 +9,25 @@ const file = (id: string, filename: string) => ({ id, filename }) as FileAttachm
 // Before these, knowledge bases lived in their own bars at the other end of the
 // window and folders were sent to the backend with nothing on screen at all.
 describe('AttachmentList', () => {
+  it('updates the Skill chip live, locks changes while busy, and clears after removal', () => {
+    const { rerender, container } = render(<AttachmentList />)
+    const activeSkill = { uuid: 'award', title: 'Award Review', version: 'v1', instructions: 'Review dates.' }
+    rerender(<AttachmentList activeSkill={activeSkill} skillBusy onChangeSkill={vi.fn()} onRemoveSkill={vi.fn()} onInspectSkill={vi.fn()} />)
+    expect(screen.getByText('Award Review')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Change Skill' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Remove Skill' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Inspect instructions' })).toBeEnabled()
+    rerender(<AttachmentList activeSkill={{ ...activeSkill, title: 'Budget Review' }} />)
+    expect(screen.getByText('Budget Review')).toBeInTheDocument()
+    expect(screen.queryByText('Award Review')).not.toBeInTheDocument()
+    rerender(<AttachmentList activeSkill={null} />)
+    expect(container).toBeEmptyDOMElement()
+  })
+  it('does not label a failed document ready after its progress notice disappears', () => {
+    render(<AttachmentList selectedDocUuids={['failed']} selectedDocNames={{ failed: 'Scanned.pdf' }} processingByUuid={{}} documentErrors={{ failed: 'OCR failed' }} />)
+    expect(screen.getByText('Processing failed · open Files to retry')).toBeInTheDocument()
+    expect(screen.queryByText('Ready')).not.toBeInTheDocument()
+  })
   it('renders knowledge bases, folders and documents in one row', () => {
     const { container } = render(
       <AttachmentList

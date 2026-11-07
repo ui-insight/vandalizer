@@ -15,6 +15,11 @@ describe('requiredFieldMessage', () => {
     expect(requiredFieldMessage('AddWebsite', { url: 'https://example.com' })).toBeNull()
   })
 
+  it('blocks a Web Search step with nothing to search for', () => {
+    expect(requiredFieldMessage('WebSearch', { query: '  ' })).toMatch(/search for/)
+    expect(requiredFieldMessage('WebSearch', { query: 'NSF page limit' })).toBeNull()
+  })
+
   it('blocks an API step with no URL', () => {
     expect(requiredFieldMessage('APINode', { url: '' })).toMatch(/URL/)
     expect(requiredFieldMessage('APINode', { url: 'https://api.example.com' })).toBeNull()

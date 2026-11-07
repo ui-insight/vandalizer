@@ -75,7 +75,7 @@ describe('LibraryItemRow', () => {
 
   it('shows kind label for extraction (search_set)', () => {
     render(<LibraryItemRow item={makeItem({ kind: 'search_set', name: 'NSF Extractor' })} {...defaultProps} />)
-    expect(screen.getByText('Extraction Task')).toBeTruthy()
+    expect(screen.getByText('Extraction')).toBeTruthy()
   })
 
   it('renders tags', () => {
@@ -146,5 +146,35 @@ describe('LibraryItemRow', () => {
       openMenu(makeItem({ verified: true }), 'team')
       expect(screen.queryByText('Share…')).toBeNull()
     })
+  })
+})
+
+describe('Library row actions', () => {
+  it('moves the exact item with a keyboard-accessible inline folder choice', () => {
+    const move = vi.fn()
+    render(<LibraryItemRow item={makeItem()} {...defaultProps} onMoveToFolder={move} folders={[{ uuid: 'destination', name: 'Team evidence', item_count: 0 } as import('../../types/library').LibraryFolder]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Move to folder' }))
+    const destination = screen.getByRole('button', { name: 'Team evidence' })
+    destination.focus()
+    expect(destination).toHaveFocus()
+    fireEvent.click(destination)
+    expect(move).toHaveBeenCalledExactlyOnceWith('item-1', 'destination')
+    expect(defaultProps.onOpen).not.toHaveBeenCalled()
+  })
+  it('closes actions with Escape and restores the trigger', () => {
+    render(<LibraryItemRow item={makeItem()} {...defaultProps} />)
+    const trigger = screen.getByRole('button', { name: 'More actions' })
+    fireEvent.click(trigger)
+    fireEvent.keyDown(screen.getByRole('group', { name: 'Actions for Budget Analyzer' }), { key: 'Escape' })
+    expect(screen.queryByRole('group', { name: 'Actions for Budget Analyzer' })).not.toBeInTheDocument()
+    expect(trigger).toHaveFocus()
+  })
+  it('disables mutation controls while the item action is pending', () => {
+    render(<LibraryItemRow item={makeItem()} {...defaultProps} busy />)
+    const favorite = screen.getByRole('button', { name: 'Favorite (shows in all views)' })
+    expect(favorite).toBeDisabled()
+    fireEvent.click(favorite)
+    expect(defaultProps.onFavorite).not.toHaveBeenCalled()
   })
 })

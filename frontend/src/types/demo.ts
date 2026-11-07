@@ -46,6 +46,18 @@ export interface TrialUsage {
   email_verified: boolean
 }
 
+/** The in-app top-up dialog's view of the signed-in trial user. */
+export interface InAppTopUpInfo {
+  available: boolean
+  /** Why `available` is false: not_metered, email_unverified, not_low or no_application. */
+  reason: string | null
+  engagement: 'low' | 'engaged' | string
+  tokens_used: number
+  tokens_budget: number
+  percent: number
+  topup_tokens: number
+}
+
 export interface TrialExtensionResult {
   ok: boolean
   message: string

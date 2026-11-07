@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { Link, useSearch } from '@tanstack/react-router'
 import { AuthLayout } from '../components/layout/AuthLayout'
 import { forgotPassword, resetPassword } from '../api/auth'
@@ -8,10 +8,13 @@ function ForgotPasswordForm() {
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const submitting = useRef(false)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    if (submitting.current) return
     setError('')
+    submitting.current = true
     setLoading(true)
     try {
       await forgotPassword(email)
@@ -19,6 +22,7 @@ function ForgotPasswordForm() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
+      submitting.current = false
       setLoading(false)
     }
   }
@@ -43,12 +47,12 @@ function ForgotPasswordForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
+    <form onSubmit={handleSubmit} aria-busy={loading} className="space-y-3">
       <p className="text-sm text-gray-400 mb-4">
         Enter your email address and we'll send you a link to reset your password.
       </p>
       {error && (
-        <div className="rounded-md bg-red-500/20 border border-red-500/30 p-3 text-sm text-red-300">
+        <div role="alert" id="password-form-error" className="rounded-md bg-red-500/20 border border-red-500/30 p-3 text-sm text-red-300">
           {error}
         </div>
       )}
@@ -58,6 +62,9 @@ function ForgotPasswordForm() {
         autoComplete="email"
         placeholder="Email address"
         required
+        disabled={loading}
+        aria-invalid={!!error}
+        aria-describedby={error ? 'password-form-error' : undefined}
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-highlight-on-dark/50 focus:outline-none focus:ring-1 focus:ring-highlight-on-dark/50"
@@ -83,10 +90,12 @@ function ResetPasswordForm({ token }: { token: string }) {
   const [confirm, setConfirm] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const submitting = useRef(false)
   const [success, setSuccess] = useState(false)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    if (submitting.current) return
     setError('')
 
     if (password !== confirm) {
@@ -94,6 +103,7 @@ function ResetPasswordForm({ token }: { token: string }) {
       return
     }
 
+    submitting.current = true
     setLoading(true)
     try {
       await resetPassword(token, password)
@@ -101,6 +111,7 @@ function ResetPasswordForm({ token }: { token: string }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Reset failed')
     } finally {
+      submitting.current = false
       setLoading(false)
     }
   }
@@ -126,9 +137,9 @@ function ResetPasswordForm({ token }: { token: string }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
+    <form onSubmit={handleSubmit} aria-busy={loading} className="space-y-3">
       {error && (
-        <div className="rounded-md bg-red-500/20 border border-red-500/30 p-3 text-sm text-red-300">
+        <div role="alert" id="password-form-error" className="rounded-md bg-red-500/20 border border-red-500/30 p-3 text-sm text-red-300">
           {error}
         </div>
       )}
@@ -138,6 +149,9 @@ function ResetPasswordForm({ token }: { token: string }) {
         autoComplete="new-password"
         placeholder="New password"
         required
+        disabled={loading}
+        aria-invalid={!!error}
+        aria-describedby={error ? 'password-form-error' : undefined}
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-highlight-on-dark/50 focus:outline-none focus:ring-1 focus:ring-highlight-on-dark/50"
@@ -148,11 +162,14 @@ function ResetPasswordForm({ token }: { token: string }) {
         autoComplete="new-password"
         placeholder="Confirm new password"
         required
+        disabled={loading}
+        aria-invalid={!!error}
+        aria-describedby={error ? 'password-form-error' : undefined}
         value={confirm}
         onChange={(e) => setConfirm(e.target.value)}
         className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-highlight-on-dark/50 focus:outline-none focus:ring-1 focus:ring-highlight-on-dark/50"
       />
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-gray-400">
         Must be at least 8 characters with uppercase, lowercase, and a digit.
       </p>
       <button
@@ -162,6 +179,7 @@ function ResetPasswordForm({ token }: { token: string }) {
       >
         {loading ? 'Resetting...' : 'Reset Password'}
       </button>
+      {error && <Link to="/reset-password" search={{ token: undefined }} className="block text-sm text-highlight-on-dark underline">Request a new reset link</Link>}
     </form>
   )
 }
@@ -172,7 +190,7 @@ export default function ResetPassword() {
 
   return (
     <AuthLayout title={token ? 'Set new password' : 'Forgot password?'}>
-      {token ? <ResetPasswordForm token={token} /> : <ForgotPasswordForm />}
+      {token ? <ResetPasswordForm key={token} token={token} /> : <ForgotPasswordForm />}
     </AuthLayout>
   )
 }

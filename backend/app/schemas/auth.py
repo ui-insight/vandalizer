@@ -16,6 +16,9 @@ class RegisterRequest(BaseModel):
     name: Optional[str] = None
     invite_token: Optional[str] = None
     join_link_token: Optional[str] = None
+    # Optional cohort for drip segmentation: research_admin | pi |
+    # sponsored_programs | compliance | it | other
+    role_segment: Optional[str] = None
 
     @field_validator("password")
     @classmethod

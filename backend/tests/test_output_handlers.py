@@ -312,6 +312,21 @@ class TestSaveWorkflowAsMarkdown:
 
 
 class TestSendWorkflowNotification:
+    @pytest.mark.parametrize("workflow", [None, {"name": "Shared workflow", "user_id": "different-owner"}])
+    def test_notifies_automation_owner_for_extractions_and_shared_workflows(self, workflow):
+        mock_db = MagicMock()
+        mock_db.workflow.find_one.return_value = workflow
+        mock_db.user.find_one.return_value = {"email": "automation-owner@example.org"}
+        with patch("app.services.output_handlers.get_sync_db", return_value=mock_db), \
+             patch("app.services.output_handlers._send_email") as send:
+            from app.services.output_handlers import send_workflow_notification
+            send_workflow_notification(
+                {"automation_user_id": "automation-owner", "status": "completed"},
+                {"channel": "email", "recipients": [], "notify_owner": True},
+            )
+        mock_db.user.find_one.assert_called_once_with({"user_id": "automation-owner"})
+        assert send.call_args.args[0] == ["automation-owner@example.org"]
+
     def test_email_notification_with_owner(self):
         mock_db = MagicMock()
         mock_db.workflow.find_one.return_value = {"name": "My WF", "user_id": "user1"}
@@ -670,3 +685,14 @@ class TestSaveExtractionAsMarkdown:
         assert "# Grant Extract" in content
         assert "| PI | Alice |" in content
         assert "| Amount | $50k |" in content
+
+
+@pytest.mark.parametrize('url', [None, 12, {}, []])
+def test_invalid_webhook_url_is_rejected_before_database_or_network(url):
+    from app.services.output_handlers import call_webhook
+
+    with patch('app.services.output_handlers.get_sync_db') as db, patch('app.services.output_handlers.httpx.post') as post:
+        with pytest.raises(ValueError, match='webhook URL is required'):
+            call_webhook({}, {'url': url})
+        db.assert_not_called()
+        post.assert_not_called()

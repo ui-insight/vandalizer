@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { TableRegion } from './shared/TableRegion'
+import { useAdminQuery } from './shared/useAdminQuery'
 import {
   Globe, Activity, Tag, EyeOff, RefreshCw, Server,
 } from 'lucide-react'
 
-import { getTelemetryAnalytics, type TelemetryAnalytics } from '../../api/admin'
+import { getTelemetryAnalytics } from '../../api/admin'
 import { relativeTime } from '../../utils/time'
 
 function StatCard({ icon: Icon, label, value, color }: {
@@ -14,7 +15,7 @@ function StatCard({ icon: Icon, label, value, color }: {
 }) {
   return (
     <div style={{
-      flex: 1, minWidth: 160,
+      flex: '1 1 160px', minWidth: 0,
       backgroundColor: '#fff', border: '1px solid #e5e7eb',
       borderRadius: 8, padding: 16,
       display: 'flex', flexDirection: 'column', gap: 8,
@@ -34,7 +35,7 @@ function Distribution({ title, data }: { title: string; data: Record<string, num
   const max = entries.reduce((m, [, n]) => Math.max(m, n), 0) || 1
   return (
     <div style={{
-      flex: 1, minWidth: 240,
+      flex: '1 1 240px', minWidth: 0,
       backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: 16,
     }}>
       <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 12 }}>{title}</div>
@@ -44,7 +45,7 @@ function Distribution({ title, data }: { title: string; data: Record<string, num
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {entries.map(([key, n]) => (
             <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 90, fontSize: 12, color: '#6b7280', textAlign: 'right', flexShrink: 0 }}>{key}</div>
+              <div style={{ width: '35%', overflowWrap: 'anywhere', fontSize: 12, color: '#6b7280', textAlign: 'right', flexShrink: 0 }}>{key}</div>
               <div style={{ flex: 1, height: 18, backgroundColor: '#f3f4f6', borderRadius: 4, overflow: 'hidden' }}>
                 <div style={{ width: `${(n / max) * 100}%`, height: '100%', backgroundColor: '#6366f1', borderRadius: 4 }} />
               </div>
@@ -58,35 +59,19 @@ function Distribution({ title, data }: { title: string; data: Record<string, num
 }
 
 export function TelemetryTab() {
-  const [data, setData] = useState<TelemetryAnalytics | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const reload = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      setData(await getTelemetryAnalytics())
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load telemetry')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => { void reload() }, [reload])
+  const { data, loading, error, load: reload } = useAdminQuery(getTelemetryAnalytics)
 
   if (loading && !data) {
     return <div style={{ padding: 24, color: '#6b7280' }}>Loading…</div>
   }
   if (error) {
-    return <div style={{ padding: 24, color: '#dc2626' }}>{error}</div>
+    return <div role="alert" style={{ padding: 24, color: '#991b1b' }}>{error} <button onClick={reload} style={{ textDecoration: 'underline' }}>Retry telemetry</button></div>
   }
   if (!data) return null
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Fleet Telemetry</h2>
           <p style={{ fontSize: 13, color: '#6b7280', margin: '4px 0 0' }}>
@@ -131,7 +116,7 @@ export function TelemetryTab() {
             No deployments have self-identified yet.
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <TableRegion label="Named deployments"><table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ textAlign: 'left', color: '#6b7280' }}>
                 <th scope="col" style={{ padding: '8px 16px', fontWeight: 500 }}>Organization</th>
@@ -142,15 +127,15 @@ export function TelemetryTab() {
             </thead>
             <tbody>
               {data.named_deployments.map((d, i) => (
-                <tr key={`${d.organization}-${i}`} style={{ borderTop: '1px solid #f3f4f6', opacity: d.active ? 1 : 0.5 }}>
+                <tr key={`${d.organization}-${i}`} style={{ borderTop: '1px solid #f3f4f6' }}>
                   <td style={{ padding: '8px 16px', fontWeight: 600, color: '#111827' }}>{d.organization}</td>
                   <td style={{ padding: '8px 16px', color: '#374151' }}>{d.version}</td>
                   <td style={{ padding: '8px 16px', color: '#374151' }}>{d.environment}</td>
-                  <td style={{ padding: '8px 16px', color: '#6b7280' }}>{relativeTime(d.last_seen)}</td>
+                  <td style={{ padding: '8px 16px', color: '#6b7280' }}>{relativeTime(d.last_seen)}<div>{d.active ? 'Active' : 'Inactive'}</div></td>
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></TableRegion>
         )}
       </div>
     </div>

@@ -34,7 +34,7 @@ export function Slide({ slide, variant = 'deck' }: SlideProps) {
         <p
           className={cn(
             'no-print mt-8 text-sm italic',
-            isPrint ? 'hidden' : 'text-gray-500',
+            isPrint ? 'hidden' : 'text-gray-400',
           )}
         >
           <span className="font-semibold not-italic text-gray-400">Note: </span>

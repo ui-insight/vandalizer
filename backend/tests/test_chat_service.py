@@ -9,6 +9,41 @@ from unittest.mock import MagicMock
 import pytest
 
 
+@pytest.mark.parametrize("tool_name", ["create_html_artifact", "revise_html_artifact"])
+@pytest.mark.parametrize("args", ['{"html":"<table>', {"title": "Matrix", "html": "<table>"}])
+def test_truncated_page_arguments_are_rejected_even_when_json_is_valid(tool_name, args):
+    from pydantic_ai.messages import ModelResponse, ToolCallPart
+    from app.services.chat_service import _check_response_size, _classify_stream_error, _OutputLimitExceeded
+    from app.services.artifacts import PAGE_TOO_LARGE_MESSAGE
+
+    response = ModelResponse(parts=[ToolCallPart(tool_name, args)], finish_reason="length")
+    with pytest.raises(_OutputLimitExceeded) as error:
+        _check_response_size(response)
+    assert _classify_stream_error(error.value) == ("warning", PAGE_TOO_LARGE_MESSAGE)
+
+
+def test_small_page_response_is_not_rejected():
+    from pydantic_ai.messages import ModelResponse, ToolCallPart
+    from app.services.chat_service import _check_response_size
+
+    _check_response_size(ModelResponse(parts=[ToolCallPart(
+        "create_html_artifact", {"title": "First ten rows", "html": "<table></table>"},
+    )], finish_reason="tool_call"))
+
+
+def test_sdk_output_exhaustion_is_actionable_without_mislabeling_other_errors():
+    from pydantic_ai.exceptions import IncompleteToolCall
+    from app.services.chat_service import _classify_stream_error
+    from app.services.artifacts import PAGE_TOO_LARGE_MESSAGE
+
+    assert _classify_stream_error(IncompleteToolCall("private provider details"), preparing_page=True) == (
+        "warning", PAGE_TOO_LARGE_MESSAGE,
+    )
+    severity, message = _classify_stream_error(IncompleteToolCall("private provider details"))
+    assert severity == "warning" and "split" in message and "page" not in message
+    assert _classify_stream_error(ValueError("unrelated bug"), preparing_page=True)[0] == "error"
+
+
 # ---------------------------------------------------------------------------
 # _ThinkTagParser
 # ---------------------------------------------------------------------------
@@ -191,8 +226,202 @@ class TestBuildInterruptedBody:
         from app.services.chat_service import _build_interrupted_body
 
         body = _build_interrupted_body(["   \n  "], "context over budget")
-        assert "no response" in body
+        assert body.startswith("_(no response")
         assert "context over budget" in body
+
+
+# ---------------------------------------------------------------------------
+# _build_project_context — the block that makes the agent project-aware
+# ---------------------------------------------------------------------------
+
+
+class TestBuildProjectContext:
+    @pytest.mark.asyncio
+    async def test_empty_when_project_unauthorized(self):
+        from unittest.mock import AsyncMock, patch
+
+        from app.services import chat_service, project_service
+
+        # The helper imports project_service lazily; patch on the module singleton.
+        with patch.object(project_service, "get_authorized_project",
+                          AsyncMock(return_value=None)):
+            out = await chat_service._build_project_context("missing", MagicMock())
+        assert out == ""
+
+    @pytest.mark.asyncio
+    async def test_includes_title_state_role_and_pin_target_ids(self):
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock, patch
+
+        from app.services import chat_service, project_service
+
+        project = SimpleNamespace(
+            uuid="p1", title="NIH R01", state="active", description="Grant",
+        )
+        overview = {
+            "role": "owner",
+            "capabilities": {
+                "files": {"count": 4, "folders": 1},
+                "knowledge": {"ready": True, "documents": 3},
+            },
+        }
+        pins = [
+            {"pin_type": "workflow", "target_id": "wf-1", "name": "Compliance check"},
+            {"pin_type": "extraction", "target_id": "ss-1", "name": "Budget fields"},
+        ]
+        with (
+            patch.object(project_service, "get_authorized_project",
+                        AsyncMock(return_value=project)),
+            patch.object(project_service, "get_project_overview",
+                        AsyncMock(return_value=overview)),
+            patch.object(project_service, "list_pins",
+                        AsyncMock(return_value=pins)),
+        ):
+            out = await chat_service._build_project_context("p1", MagicMock())
+
+        assert "NIH R01" in out
+        assert "state: active" in out
+        assert "their role: owner" in out
+        assert "wf-1" in out and "ss-1" in out  # target_ids the agent runs with
+        assert "WHOLE workspace" in out  # the do-not-narrow instruction
+
+
+# ---------------------------------------------------------------------------
+# _brand_org_text — white-label identity branding
+# ---------------------------------------------------------------------------
+
+
+class TestBrandOrgText:
+    def _brand(self, text, org):
+        from app.services.chat_service import _brand_org_text
+        return _brand_org_text(text, org)
+
+    def test_default_deploy_is_unchanged(self):
+        text = "You are Vandalizer, built for research administration at the University of Idaho."
+        # Empty org and the literal default both mean "use built-in defaults".
+        assert self._brand(text, "") == text
+        assert self._brand(text, "Vandalizer") == text
+
+    def test_custom_org_swaps_product_name(self):
+        out = self._brand("You are the Vandalizer assistant.", "Acme Research")
+        assert "Vandalizer" not in out
+        assert "Acme Research" in out
+
+    def test_custom_org_drops_home_institution(self):
+        # White-label deploys are not the University of Idaho — the geography
+        # must not leak once a custom org name is configured.
+        text = (
+            "You are Vandalizer, a document intelligence assistant built for "
+            "research administration at the University of Idaho."
+        )
+        out = self._brand(text, "Boise State University")
+        assert "University of Idaho" not in out
+        assert "built for research administration." in out
+
+    def test_custom_org_drops_institution_first_session_phrasing(self):
+        text = "You are the assistant, built at the University of Idaho for research administration."
+        out = self._brand(text, "Acme")
+        assert "University of Idaho" not in out
+        assert "built for research administration" in out
+
+
+# ---------------------------------------------------------------------------
+# _classify_stream_error — never leak raw exceptions to the user
+# ---------------------------------------------------------------------------
+
+
+class TestClassifyStreamError:
+    def _classify(self, exc):
+        from app.services.chat_service import _classify_stream_error
+        return _classify_stream_error(exc)
+
+    def test_context_length_is_a_warning(self):
+        severity, msg = self._classify(Exception("This exceeds model's maximum context length"))
+        assert severity == "warning"
+        assert "too large" in msg
+
+    def test_transient_gateway_is_a_warning(self):
+        severity, msg = self._classify(Exception("502 bad gateway"))
+        assert severity == "warning"
+        assert "try again" in msg.lower()
+
+    def test_unexpected_error_does_not_leak_raw_exception(self):
+        secret = "Traceback: psycopg2.OperationalError at 10.0.0.5:5432"
+        severity, msg = self._classify(Exception(secret))
+        assert severity == "error"
+        # The raw exception text must not reach the user-facing message.
+        assert secret not in msg
+        assert "10.0.0.5" not in msg
+        assert "went wrong" in msg.lower()
+
+
+# ---------------------------------------------------------------------------
+# _hold_message_for_unreadable_docs — don't hallucinate about unread files
+# ---------------------------------------------------------------------------
+
+
+class TestHoldMessageForUnreadableDocs:
+    """The user attaches a doc that's still OCR-processing (or that failed
+    extraction) and asks a question. chat_stream must NOT run the agent — it
+    would confabulate about a file it never read — and instead return an honest
+    holding reply. This covers the decision + wording; chat_stream wires it to
+    a stream-and-return."""
+
+    def _hold(self, **over):
+        from app.services.chat_service import _hold_message_for_unreadable_docs
+
+        kwargs = dict(
+            document_uuids=["doc-1"],
+            doc_segments=[],
+            kb_sources=[],
+            attachment_segments=[],
+            skipped_no_text=[],
+            errored_docs=[],
+        )
+        kwargs.update(over)
+        return _hold_message_for_unreadable_docs(**kwargs)
+
+    def test_holds_when_doc_still_processing(self):
+        msg = self._hold(skipped_no_text=["19E777.pdf"])
+        assert msg is not None
+        assert "19E777.pdf" in msg
+        assert "still being processed" in msg
+
+    def test_holds_when_doc_extraction_failed(self):
+        msg = self._hold(errored_docs=["19E777.pdf"])
+        assert msg is not None
+        assert "extraction failed" in msg
+        assert "Retry extraction" in msg
+
+    def test_a_damaged_file_is_not_sent_to_retry(self):
+        # #1021: a damaged workbook's failure is final; "Retry extraction"
+        # reads the same bytes again and can never work.
+        msg = self._hold(errored_docs=["budget.xlsx"], final_failures=["budget.xlsx"])
+        assert "budget.xlsx" in msg
+        assert "Retry extraction" not in msg
+        assert "retrying won't help" in msg and "upload it again" in msg
+
+    def test_mixed_failures_offer_retry_only_for_the_others(self):
+        msg = self._hold(errored_docs=["budget.xlsx", "scan.pdf"], final_failures=["budget.xlsx"])
+        assert "retrying won't help" in msg
+        assert 'For the others, open the document and use "Retry extraction"' in msg
+
+    def test_processing_takes_priority_and_pluralizes(self):
+        msg = self._hold(skipped_no_text=["a.pdf", "b.pdf"], errored_docs=["c.pdf"])
+        assert "they are" in msg and "them" in msg  # plural phrasing
+        assert "still being processed" in msg  # not-ready wins over failed
+
+    def test_no_hold_when_a_doc_is_readable(self):
+        # One doc produced text → run the agent normally.
+        assert self._hold(doc_segments=["## Document: x"], skipped_no_text=["y.pdf"]) is None
+
+    def test_no_hold_with_kb_or_attachment_grounding(self):
+        assert self._hold(kb_sources=[{"x": 1}], skipped_no_text=["y.pdf"]) is None
+        assert self._hold(attachment_segments=["web"], skipped_no_text=["y.pdf"]) is None
+
+    def test_no_hold_when_no_docs_attached(self):
+        # Plain chat with no document context — never holds.
+        assert self._hold(document_uuids=[], skipped_no_text=[]) is None
 
 
 # ---------------------------------------------------------------------------
@@ -301,12 +530,9 @@ class TestCitationPersistence:
 
     @pytest.mark.asyncio
     async def test_finalize_passes_unsupported_figures_to_add_message(self):
-        from unittest.mock import AsyncMock
-
         from app.services.chat_service import _finalize
 
-        conversation = MagicMock()
-        conversation.add_message = AsyncMock()
+        conversation = self._finalize_conversation()
         await _finalize(
             conversation, "It is $750,000.", [], None, None, "user-1",
             unsupported_figures=["$750,000"],
@@ -329,12 +555,9 @@ class TestCitationPersistence:
 
     @pytest.mark.asyncio
     async def test_finalize_passes_unsupported_citations_to_add_message(self):
-        from unittest.mock import AsyncMock
-
         from app.services.chat_service import _finalize
 
-        conversation = MagicMock()
-        conversation.add_message = AsyncMock()
+        conversation = self._finalize_conversation()
         await _finalize(
             conversation, "answer", [], None, None, "user-1",
             unsupported_citations=["2 CFR 200.332"],
@@ -401,15 +624,51 @@ class TestCitationPersistence:
         assert set(texts) == {"PAPPG.pdf (p. ~54)", "Subpart F (p. 4)"}
         assert "first" in texts["PAPPG.pdf (p. ~54)"]
 
-    @pytest.mark.asyncio
-    async def test_finalize_passes_citations_to_add_message(self):
-        from unittest.mock import AsyncMock
+    def test_chat_message_to_dict_carries_silence_inferences(self):
+        """#1012: a sentence that read a gap in the sources as a rule is kept
+        with the message so the note survives a reload."""
+        from app.models.chat import ChatMessage, ChatRole
 
-        from app.models.chat import ChatRole
+        sentence = "The notice does not set a page limit, so it may be any length."
+        msg = ChatMessage.model_construct(
+            role=ChatRole.ASSISTANT, message=sentence, silence_inferences=[sentence],
+        )
+        assert msg.to_dict()["silence_inferences"] == [sentence]
+        bare = ChatMessage.model_construct(
+            role=ChatRole.ASSISTANT, message="answer", silence_inferences=None,
+        )
+        assert "silence_inferences" not in bare.to_dict()
+
+    @pytest.mark.asyncio
+    async def test_finalize_passes_silence_inferences_to_add_message(self):
         from app.services.chat_service import _finalize
+
+        conversation = self._finalize_conversation()
+        await _finalize(
+            conversation, "It may be any length.", [], None, None, "user-1",
+            silence_inferences=["It may be any length."],
+        )
+        _, kwargs = conversation.add_message.await_args
+        assert kwargs["silence_inferences"] == ["It may be any length."]
+
+    def _finalize_conversation(self):
+        """MagicMock with concrete post-turn bookkeeping fields — _finalize
+        reads resume/anchor state, and bare Mock attributes are truthy."""
+        from unittest.mock import AsyncMock
 
         conversation = MagicMock()
         conversation.add_message = AsyncMock()
+        conversation.save = AsyncMock()
+        conversation.resume_attempts = 0
+        conversation.resume_pending = False
+        conversation.messages = []
+        return conversation
+
+    async def test_finalize_passes_citations_to_add_message(self):
+        from app.models.chat import ChatRole
+        from app.services.chat_service import _finalize
+
+        conversation = self._finalize_conversation()
         citations = [self._citation()]
 
         await _finalize(
@@ -421,106 +680,87 @@ class TestCitationPersistence:
         args, kwargs = conversation.add_message.await_args
         assert args[0] == ChatRole.ASSISTANT
         assert kwargs["citations"] == citations
+        conversation.save.assert_not_awaited()  # nothing dirty on this path
+
+    async def test_finalize_resets_resume_state_on_success(self):
+        from app.services.chat_service import _finalize
+
+        conversation = self._finalize_conversation()
+        conversation.resume_attempts = 2
+        conversation.resume_pending = True
+
+        await _finalize(conversation, "answer", [], None, None, "user-1")
+
+        assert conversation.resume_attempts == 0
+        assert conversation.resume_pending is False
+        conversation.save.assert_awaited_once()
+
+    async def test_finalize_stamps_usage_anchor(self):
+        from app.services.chat_service import _finalize
+
+        conversation = self._finalize_conversation()
+        conversation.messages = ["m1", "m2"]
+
+        await _finalize(
+            conversation, "answer", [], None, None, "user-1",
+            context_anchor_tokens=42_000,
+        )
+
+        assert conversation.last_context_tokens == 42_000
+        assert conversation.last_context_message_count == 2
+        conversation.save.assert_awaited_once()
+
+
+class TestOpenDocumentsBlock:
+    """The attachments block is the model's single source of truth for what is
+    attached and must state that the model cannot remove any of it."""
+
+    def _b(self, *args):
+        from app.services.chat_service import _build_open_documents_block
+        return _build_open_documents_block(*args)
+
+    def test_no_attachments_returns_empty(self):
+        assert self._b([]) == ""
+        assert self._b([], [], []) == ""
+
+    def test_lists_all_attachment_types(self):
+        doc = MagicMock(title="Grant.pdf", uuid="u1")
+        file_att = MagicMock(filename="notes.docx")
+        url_att = MagicMock(title="NSF Policy", url="https://nsf.gov/x")
+        out = self._b([doc], [file_att], [url_att])
+        assert '"Grant.pdf" (uuid: u1)' in out
+        assert "notes.docx" in out
+        assert "NSF Policy" in out
+        assert "https://nsf.gov/x" in out
+
+    def test_states_it_cannot_remove_attachments(self):
+        doc = MagicMock(title="Grant.pdf", uuid="u1")
+        out = self._b([doc])
+        assert "CANNOT" in out
+        assert "✕" in out
+        # Must not imply the model can clear the conversation itself.
+        assert "no tool to clear the conversation" in out
+
+    def test_attached_documents_are_the_default_target(self):
+        # Support ticket: a NOA open in the viewer, "run it" → chat asked which
+        # of two NOA files to use instead of running on the open one.
+        out = self._b([MagicMock(title="NOA.pdf", uuid="u1")])
+        assert "Do not ask which file" in out
+        assert "do not offer" in out
+
+    def test_agentic_prompt_names_the_block_it_relies_on(self):
+        # The continuity rule pointed at "Documents open in this chat", a
+        # heading no block has, so the model never matched it to the list.
+        from app.services.llm_service import AGENTIC_CHAT_SYSTEM_PROMPT
+        heading = self._b([MagicMock(title="NOA.pdf", uuid="u1")]).splitlines()[0]
+        assert heading.removeprefix("## ") in AGENTIC_CHAT_SYSTEM_PROMPT
+        assert "Documents open in this chat" not in AGENTIC_CHAT_SYSTEM_PROMPT
+        assert "(doc:<uuid>)" in AGENTIC_CHAT_SYSTEM_PROMPT
 
 
 # ---------------------------------------------------------------------------
-# System prompt selection
+# No-document grounding
 # ---------------------------------------------------------------------------
-
-
-class TestChatSystemPromptSelection:
-    """Every context state must resolve to a grounded prompt.
-
-    The no-context branch used to fall through to ``system_prompt=None``, which
-    ``create_chat_agent`` turns into ``DEFAULT_CHAT_SYSTEM_PROMPT`` — a prompt
-    carrying no grounding rule at all. That let "what is the total requested in
-    this proposal?" be answered from invention when no proposal was attached.
-    """
-
-    def _select(self, **overrides):
-        from app.services.chat_service import select_chat_system_prompt
-        kwargs = dict(
-            kb_sources=[],
-            have_context=False,
-            kb_uuid=None,
-            is_first_session=False,
-            include_onboarding_context=False,
-            manifest_block="",
-        )
-        kwargs.update(overrides)
-        return select_chat_system_prompt(**kwargs)
-
-    def test_no_context_selects_the_no_document_prompt(self):
-        from app.services.llm_service import NO_DOCUMENT_SYSTEM_PROMPT
-        assert self._select() == NO_DOCUMENT_SYSTEM_PROMPT
-
-    def test_no_context_never_resolves_to_the_ungrounded_default(self):
-        from app.services.llm_service import DEFAULT_CHAT_SYSTEM_PROMPT
-        selected = self._select()
-        assert selected
-        assert selected != DEFAULT_CHAT_SYSTEM_PROMPT
-
-    def test_retrieved_kb_sources_select_the_kb_prompt(self):
-        from app.services.llm_service import KB_CHAT_SYSTEM_PROMPT
-        assert self._select(kb_sources=[{"document_title": "budget.xlsx"}]) == (
-            KB_CHAT_SYSTEM_PROMPT
-        )
-
-    def test_kb_prompt_carries_the_manifest_block(self):
-        from app.services.llm_service import KB_CHAT_SYSTEM_PROMPT
-        # Deliberately not a realistic filename: KB_CHAT_SYSTEM_PROMPT cites
-        # "budget.xlsx" as an example, so asserting on that would pass even if
-        # the manifest were dropped entirely.
-        sentinel = "manifest-sentinel-9f3a2c.pdf"
-        selected = self._select(
-            kb_sources=[{"document_title": sentinel}],
-            manifest_block=f"\n--- FILES ---\n{sentinel}\n",
-        )
-        assert selected.startswith(KB_CHAT_SYSTEM_PROMPT)
-        assert sentinel in selected
-
-    def test_document_context_selects_the_document_prompt(self):
-        from app.services.llm_service import DOCUMENT_CHAT_SYSTEM_PROMPT
-        assert self._select(have_context=True) == DOCUMENT_CHAT_SYSTEM_PROMPT
-
-    def test_document_prompt_has_absence_guardrails(self):
-        # Grant budgets are dense with figures yet often lack the asked-for
-        # field; the model must not substitute a neighbouring value (#610).
-        from app.services.llm_service import DOCUMENT_CHAT_SYSTEM_PROMPT
-        assert "Check before answering" in DOCUMENT_CHAT_SYSTEM_PROMPT
-        assert "related-but-different value" in DOCUMENT_CHAT_SYSTEM_PROMPT
-        assert "blank form field is not zero" in DOCUMENT_CHAT_SYSTEM_PROMPT
-        assert 'states "None", report "None"' in DOCUMENT_CHAT_SYSTEM_PROMPT
-
-    def test_requested_kb_with_no_retrieval_selects_the_empty_kb_prompt(self):
-        from app.services.llm_service import build_project_kb_empty_prompt
-        assert self._select(kb_uuid="kb-1") == build_project_kb_empty_prompt("")
-
-    def test_first_session_selects_the_onboarding_prompt(self):
-        from app.services.llm_service import FIRST_SESSION_SYSTEM_PROMPT
-        assert self._select(is_first_session=True) == FIRST_SESSION_SYSTEM_PROMPT
-
-    def test_explicit_onboarding_selects_the_help_prompt(self):
-        from app.services.llm_service import HELP_CHAT_SYSTEM_PROMPT
-        assert self._select(include_onboarding_context=True) == HELP_CHAT_SYSTEM_PROMPT
-
-    def test_retrieved_sources_take_precedence_over_document_context(self):
-        from app.services.llm_service import KB_CHAT_SYSTEM_PROMPT
-        assert self._select(
-            kb_sources=[{"document_title": "a.pdf"}], have_context=True,
-        ) == KB_CHAT_SYSTEM_PROMPT
-
-    def test_document_context_takes_precedence_over_an_empty_kb(self):
-        from app.services.llm_service import DOCUMENT_CHAT_SYSTEM_PROMPT
-        assert self._select(have_context=True, kb_uuid="kb-1") == (
-            DOCUMENT_CHAT_SYSTEM_PROMPT
-        )
-
-    def test_an_empty_kb_still_outranks_onboarding_branches(self):
-        from app.services.llm_service import build_project_kb_empty_prompt
-        assert self._select(
-            kb_uuid="kb-1", is_first_session=True, include_onboarding_context=True,
-        ) == build_project_kb_empty_prompt("")
 
 
 class TestNoDocumentPromptContent:
@@ -594,3 +834,34 @@ class TestNoDocumentGroundingEveryTurn:
             "grounding must persist onto the follow-up turn — this is the turn "
             f"where a user challenges a fabricated answer; saw {seen[1]!r}"
         )
+
+
+class TestNoDocumentChatRulesContent:
+    """The reminder-block variant used by the streaming chat path must carry
+    the same behavioural clauses as the standalone prompt."""
+
+    def _rules(self) -> str:
+        from app.services.llm_service import NO_DOCUMENT_CHAT_RULES
+        return NO_DOCUMENT_CHAT_RULES.lower()
+
+    def test_states_that_no_document_is_available(self):
+        assert "no document" in self._rules()
+
+    def test_forbids_inventing_document_specific_content(self):
+        rules = self._rules()
+        assert "invent" in rules or "fabricat" in rules
+
+    def test_tells_the_model_to_ask_for_the_source(self):
+        assert "attach" in self._rules()
+
+    def test_still_permits_general_knowledge_answers(self):
+        assert "general" in self._rules()
+
+    def test_a_document_from_earlier_turns_is_reported_as_no_longer_attached(self):
+        """Support ticket: a reopened chat had lost its document, and asked
+        "What document is attached?" the model invented an explanation
+        ("provided before the system confirmed the attachment status")."""
+        rules = self._rules()
+        assert "earlier messages" in rules
+        assert "not attached now" in rules
+        assert "do not invent a reason" in rules

@@ -5,6 +5,8 @@ algorithm here insulates against any one consumer's mock noise.
 
 from __future__ import annotations
 
+import pytest
+
 from app.services.optimization_common import (
     DEFAULT_JUDGE_NOISE_FLOOR,
     WINNER_TIE_SIGMAS,
@@ -146,3 +148,41 @@ def test_constants_are_what_callers_expect():
     """Sanity: constants haven't drifted out from under domain consumers."""
     assert WINNER_TIE_SIGMAS == 2.0
     assert DEFAULT_JUDGE_NOISE_FLOOR == 0.02
+
+
+# --- The verdict must cover the scores the run reports ----------------------
+
+from app.services.optimization_common import tie_band, tied_on_reported_scores  # noqa: E402
+
+
+def test_tie_band_is_two_standard_errors():
+    assert tie_band(0.1, 25) == pytest.approx(2 * 0.1 / 5)
+    assert tie_band(None, 1) == pytest.approx(WINNER_TIE_SIGMAS * DEFAULT_JUDGE_NOISE_FLOOR)
+
+
+def test_a_reported_lift_inside_the_band_is_a_tie():
+    # Ticket: 94% vs 92%, a 2-pt band around it.
+    assert tied_on_reported_scores(tied=False, optimized_score=0.94, baseline_score=0.92, band=0.022)
+    assert not tied_on_reported_scores(tied=False, optimized_score=0.97, baseline_score=0.92, band=0.022)
+
+
+def test_an_existing_tie_is_never_undone():
+    assert tied_on_reported_scores(tied=True, optimized_score=0.99, baseline_score=0.50, band=0.01)
+
+
+def test_missing_scores_leave_the_verdict_alone():
+    assert not tied_on_reported_scores(tied=False, optimized_score=None, baseline_score=0.9, band=0.05)
+
+
+def test_an_insignificant_paired_test_is_a_tie():
+    ci = {"lower": -0.01, "upper": 0.06, "p_value": 0.2, "n_queries": 12}
+    assert tied_on_reported_scores(tied=False, optimized_score=0.95, baseline_score=0.85, band=0.02, lift_ci=ci)
+    significant = {**ci, "lower": 0.02, "p_value": 0.01}
+    assert not tied_on_reported_scores(
+        tied=False, optimized_score=0.95, baseline_score=0.85, band=0.02, lift_ci=significant,
+    )
+
+
+def test_a_paired_test_on_too_few_queries_does_not_decide():
+    ci = {"lower": -0.2, "upper": 0.4, "p_value": 0.5, "n_queries": 3}
+    assert not tied_on_reported_scores(tied=False, optimized_score=0.95, baseline_score=0.85, band=0.02, lift_ci=ci)

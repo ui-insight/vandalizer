@@ -1,5 +1,8 @@
 """Workflow API routes."""
 
+from collections.abc import AsyncIterator
+from typing import TypedDict
+
 import asyncio
 import base64
 import csv
@@ -18,9 +21,12 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
+from app.utils.timestamps import utc_iso
 from app.dependencies import get_api_key_user, get_current_user, get_current_user_or_api_key
 from app.exceptions import TrialSpendBlockedError
 from app.models.user import User
+from app.models.workflow_optimization_run import WorkflowOptimizationRun
+from app.services.extraction_dispatch import record_extraction_dispatch
 from app.services import access_control
 from app.services.access_control import get_authorized_search_set, get_authorized_workflow
 from app.schemas.workflows import (
@@ -49,10 +55,16 @@ from app.services import workflow_service as svc
 from app.services.docx_service import data_to_docx_bytes
 from app.services.name_conflicts import DuplicateNameError
 from app.services.user_lookup import resolve_author, resolve_authors
+from app.utils.content_disposition import content_disposition
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+class _WorkflowContextOptions(TypedDict, total=False):
+    project_context: dict
+
 
 # Formats offered by both result-export surfaces (Download and Save to folder).
 # Keep in sync with the frontend menus in WorkflowEditorPanel/RunHistoryTab/
@@ -87,14 +99,14 @@ async def _workflow_response_from_dict(wf: dict) -> WorkflowResponse:
     return WorkflowResponse(**{**wf, "created_by": created_by})
 
 
-def _csv_cell(value) -> str:
+def _csv_cell(value: object) -> str:
     """Format a value for a CSV cell, serializing complex types as JSON."""
     if isinstance(value, (dict, list)):
         return json.dumps(value, default=str)
     return str(value)
 
 
-def _parse_structured_string(text: str):
+def _parse_structured_string(text: str) -> object:
     """Best-effort extraction of structured data from a free-form string output.
 
     Tries, in order: fenced JSON blocks, raw JSON, and GitHub-flavored markdown
@@ -168,7 +180,7 @@ async def _authorize_documents(document_uuids: list[str], user: User) -> list[st
 # ---------------------------------------------------------------------------
 
 @router.post("", response_model=WorkflowResponse)
-async def create_workflow(req: CreateWorkflowRequest, user: User = Depends(get_current_user)):
+async def create_workflow(req: CreateWorkflowRequest, user: User = Depends(get_current_user)) -> WorkflowResponse:
     team_id = str(user.current_team) if user.current_team else None
     try:
         wf = await svc.create_workflow(req.name, user.user_id, req.description, team_id=team_id)
@@ -190,7 +202,7 @@ async def list_workflows(
     scope: str | None = Query(default=None),
     search: str | None = Query(default=None),
     user: User = Depends(get_current_user),
-):
+) -> WorkflowPageResponse:
     """One page of the caller's visible workflows, newest first.
 
     ``search`` filters server-side across the whole result set, not just the
@@ -232,7 +244,7 @@ async def get_workflow_status(
     session_id: str,
     share_token: str | None = Query(default=None),
     user: User = Depends(get_current_user_or_api_key),
-):
+) -> WorkflowStatusResponse:
     """Poll a workflow run by session id.
 
     Accepts a session cookie (the UI) or an ``x-api-key`` header — the run
@@ -251,25 +263,25 @@ async def get_batch_status(
     batch_id: str,
     share_token: str | None = Query(default=None),
     user: User = Depends(get_current_user),
-):
+) -> dict:
     status = await svc.get_batch_status(batch_id, user=user, share_token=share_token)
     if not status:
         raise HTTPException(status_code=404, detail="Batch not found")
     return status
 
 
-@router.get("/status/stream")
+@router.get("/status/stream", response_model=None)
 async def stream_workflow_status(
     session_id: str,
     share_token: str | None = Query(default=None),
     user: User = Depends(get_current_user_or_api_key),
-):
+) -> StreamingResponse:
     """SSE endpoint that streams workflow status updates until completion."""
     initial_status = await svc.get_workflow_status(session_id, user=user, share_token=share_token)
     if not initial_status:
         raise HTTPException(status_code=404, detail="Workflow result not found")
 
-    async def event_generator():
+    async def event_generator() -> AsyncIterator[str]:
         last_json = ""
         not_found_retries = 0
         while True:
@@ -305,12 +317,12 @@ async def stream_workflow_status(
     )
 
 
-@router.get("/steps/test/{task_id}")
-async def poll_step_test(task_id: str, user: User = Depends(get_current_user)):
+@router.get("/steps/test/{task_id}", response_model=None)
+async def poll_step_test(task_id: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     return svc.get_test_status(task_id)
 
 
-def _step_output_value(step_payload):
+def _step_output_value(step_payload: object) -> object:
     """Extract the displayable value from a stored step output payload.
 
     Each entry in WorkflowResult.steps_output is the full node return dict
@@ -321,7 +333,7 @@ def _step_output_value(step_payload):
     return step_payload.get("formatted_output") or step_payload.get("output")
 
 
-def _zip_member_for_step(step_name: str, value):
+def _zip_member_for_step(step_name: str, value: object) -> tuple[str, bytes]:
     """Return (filename, bytes) for one step's output, for inclusion in a multi-output zip."""
     safe_name = re.sub(r"[^A-Za-z0-9_\-]+", "_", step_name).strip("_") or "step"
 
@@ -403,7 +415,7 @@ def _download_zone(tz: str | None) -> ZoneInfo | None:
         return None
 
 
-def _run_stamp(start_time, zone: ZoneInfo | None) -> str | None:
+def _run_stamp(start_time: object, zone: ZoneInfo | None) -> str | None:
     """``2026-09-02 02-30 PM`` in ``zone``, or ``… UTC`` without one.
 
     Colons are not allowed in Windows file names, hence the dash in the time.
@@ -492,6 +504,20 @@ def _render_workflow_output(status: dict, format: str, parse_structured: bool) -
         media_type = media_type_map.get(file_type, "application/octet-stream")
         return file_bytes, media_type, file_type or "bin", output_data.get("filename", "output")
 
+    # The evidence behind the output: extracted fields' quotes and pages, and
+    # passages knowledge-base steps retrieved. Carried into every format that
+    # can hold it, so whoever receives the file can check it (#1008).
+    from app.services.export_provenance import (
+        append_sources_to_docx,
+        collect_run_sources,
+        field_source_cell,
+        output_step_field_sources,
+        sources_markdown,
+    )
+
+    source_rows = collect_run_sources(status)
+    row_sources = output_step_field_sources(status)
+
     if format == "csv":
         buf = io.StringIO()
         writer = csv.writer(buf)
@@ -509,18 +535,35 @@ def _render_workflow_output(status: dict, format: str, parse_structured: bool) -
             if data and isinstance(data[0], dict):
                 # Collect keys from ALL items so no columns are missing
                 headers = list(dict.fromkeys(k for row in data for k in row.keys()))
-                writer.writerow(headers)
-                for row in data:
-                    writer.writerow([_csv_cell(row.get(h, "")) for h in headers])
+                # Each field's source sits beside it, when the rows are the
+                # extraction's own (its sidecar is positional per row).
+                with_sources = len(row_sources) == len(data) and any(row_sources)
+                if with_sources:
+                    writer.writerow([c for h in headers for c in (h, f"{h} (source)")])
+                    for row, srcs in zip(data, row_sources):
+                        writer.writerow([
+                            c for h in headers
+                            for c in (_csv_cell(row.get(h, "")), field_source_cell(srcs.get(h)))
+                        ])
+                else:
+                    writer.writerow(headers)
+                    for row in data:
+                        writer.writerow([_csv_cell(row.get(h, "")) for h in headers])
             else:
                 writer.writerow(["Value"])
                 for item in data:
                     writer.writerow([str(item)])
         elif isinstance(data, dict):
             # Transpose to Field/Value rows instead of one wide row
-            writer.writerow(["Field", "Value"])
-            for k, v in data.items():
-                writer.writerow([str(k), _csv_cell(v)])
+            srcs = row_sources[0] if len(row_sources) == 1 else {}
+            if srcs:
+                writer.writerow(["Field", "Value", "Source"])
+                for k, v in data.items():
+                    writer.writerow([str(k), _csv_cell(v), field_source_cell(srcs.get(k))])
+            else:
+                writer.writerow(["Field", "Value"])
+                for k, v in data.items():
+                    writer.writerow([str(k), _csv_cell(v)])
         else:
             writer.writerow(["Output"])
             text = str(data)
@@ -547,16 +590,25 @@ def _render_workflow_output(status: dict, format: str, parse_structured: bool) -
         from app.services.output_handlers import render_workflow_markdown
 
         md_text = render_workflow_markdown(output_data, title=workflow_name or "Workflow Results")
+        if source_rows:
+            md_text = f"{md_text.rstrip()}\n\n{sources_markdown(source_rows)}"
         return md_text.encode(), "text/markdown", "md", None
 
     if format == "pdf":
         from app.services.pdf_service import render_workflow_pdf
 
-        pdf_bytes = render_workflow_pdf(output_data, title="Workflow Results")
+        if source_rows:
+            # Rendered through Markdown so the Sources table follows the output.
+            from app.services.output_handlers import render_workflow_markdown
+
+            body = render_workflow_markdown(output_data, title=workflow_name or "Workflow Results")
+            pdf_bytes = render_workflow_pdf(f"{body.rstrip()}\n\n{sources_markdown(source_rows)}", title="Workflow Results")
+        else:
+            pdf_bytes = render_workflow_pdf(output_data, title="Workflow Results")
         return pdf_bytes, "application/pdf", "pdf", None
 
     if format == "docx":
-        docx_bytes = data_to_docx_bytes(output_data)
+        docx_bytes = append_sources_to_docx(data_to_docx_bytes(output_data), source_rows)
         return (
             docx_bytes,
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -569,14 +621,14 @@ def _render_workflow_output(status: dict, format: str, parse_structured: bool) -
     return json_bytes, "application/json", "json", None
 
 
-@router.get("/download")
+@router.get("/download", response_model=None)
 async def download_results(
     session_id: str,
     format: str = "json",
     parse_structured: bool = False,
     tz: str | None = Query(default=None, description="IANA time zone for the run time in the file name"),
     user: User = Depends(get_current_user),
-):
+) -> StreamingResponse:
     """Download workflow results in specified format.
 
     If the workflow has multiple steps marked as deliverables (is_output), the
@@ -596,11 +648,11 @@ async def download_results(
     return StreamingResponse(
         io.BytesIO(content),
         media_type=media_type,
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": content_disposition(filename)},
     )
 
 
-@router.get("/batch-download")
+@router.get("/batch-download", response_model=None)
 async def download_batch_results(
     batch_id: str,
     format: str = "json",
@@ -608,7 +660,7 @@ async def download_batch_results(
     share_token: str | None = Query(default=None),
     tz: str | None = Query(default=None, description="IANA time zone for run times in member names"),
     user: User = Depends(get_current_user),
-):
+) -> StreamingResponse:
     """Bundle every completed run in a batch into a single ZIP.
 
     One member per completed run, each formatted like the single-session
@@ -639,7 +691,7 @@ async def download_batch_results(
 
     zone = _download_zone(tz)
 
-    def _build_zip():
+    def _build_zip() -> "tempfile.SpooledTemporaryFile[bytes]":
         """Render and compress every run.
 
         Off the event loop: rendering to pdf/docx is CPU-bound, and doing it
@@ -674,7 +726,7 @@ async def download_batch_results(
     return StreamingResponse(
         zip_buf,
         media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{zip_name}.zip"'},
+        headers={"Content-Disposition": content_disposition(f"{zip_name}.zip")},
     )
 
 
@@ -684,12 +736,12 @@ class SaveOutputToFolderRequest(BaseModel):
     file_name: str | None = None
 
 
-@router.post("/sessions/{session_id}/save-to-folder")
+@router.post("/sessions/{session_id}/save-to-folder", response_model=None)
 async def save_session_output_to_folder(
     session_id: str,
     req: SaveOutputToFolderRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Save a workflow run's output as a SmartDocument in the chosen SmartFolder.
 
     Writes the rendered output to disk (PDF/Markdown/CSV/JSON/text) and inserts
@@ -739,8 +791,8 @@ async def save_session_output_to_folder(
     return {"ok": True, "folder_uuid": req.folder_uuid, "file_path": file_path}
 
 
-@router.get("/{workflow_id}/export")
-async def export_workflow(workflow_id: str, user: User = Depends(get_current_user)):
+@router.get("/{workflow_id}/export", response_model=None)
+async def export_workflow(workflow_id: str, user: User = Depends(get_current_user)) -> StreamingResponse:
     """Download workflow definition as a shareable JSON file."""
     wf = await get_authorized_workflow(workflow_id, user)
     if not wf:
@@ -763,15 +815,15 @@ async def export_workflow(workflow_id: str, user: User = Depends(get_current_use
     return StreamingResponse(
         io.BytesIO(json_bytes),
         media_type="application/json",
-        headers={"Content-Disposition": f'attachment; filename="{safe_name}.vandalizer.json"'},
+        headers={"Content-Disposition": content_disposition(f"{safe_name}.vandalizer.json")},
     )
 
 
-@router.post("/import")
+@router.post("/import", response_model=None)
 async def import_workflow(
     file: UploadFile = File(...),
     user: User = Depends(get_current_user),
-):
+) -> WorkflowResponse:
     """Import a workflow from an exported JSON file."""
     from app.services import export_import_service as eis
 
@@ -795,7 +847,7 @@ async def import_into_workflow(
     workflow_id: str,
     file: UploadFile = File(...),
     user: User = Depends(get_current_user),
-):
+) -> WorkflowResponse:
     """Replace the contents of an existing workflow with imported JSON data.
 
     The workflow's id, name, and description are preserved; steps, tasks,
@@ -827,7 +879,7 @@ async def get_workflow(
     workflow_id: str,
     share_token: str | None = Query(default=None),
     user: User = Depends(get_current_user),
-):
+) -> WorkflowResponse:
     wf = await svc.get_workflow(workflow_id, user=user, share_token=share_token)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
@@ -839,8 +891,8 @@ async def get_workflow(
     return await _workflow_response_from_dict(wf)
 
 
-@router.post("/{workflow_id}/share-token")
-async def mint_workflow_share_token(workflow_id: str, user: User = Depends(get_current_user)):
+@router.post("/{workflow_id}/share-token", response_model=None)
+async def mint_workflow_share_token(workflow_id: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     """Mint (or return existing) view-only share token for a workflow.
 
     Manager-level access required: owners and team owner/admin can issue
@@ -859,7 +911,7 @@ async def mint_workflow_share_token(workflow_id: str, user: User = Depends(get_c
 
 
 @router.patch("/{workflow_id}", response_model=WorkflowResponse)
-async def update_workflow(workflow_id: str, req: UpdateWorkflowRequest, user: User = Depends(get_current_user)):
+async def update_workflow(workflow_id: str, req: UpdateWorkflowRequest, user: User = Depends(get_current_user)) -> WorkflowResponse:
     try:
         wf = await svc.update_workflow(
             workflow_id, user=user, name=req.name, description=req.description,
@@ -883,8 +935,8 @@ async def update_workflow(workflow_id: str, req: UpdateWorkflowRequest, user: Us
     )
 
 
-@router.delete("/{workflow_id}")
-async def delete_workflow(workflow_id: str, user: User = Depends(get_current_user)):
+@router.delete("/{workflow_id}", response_model=None)
+async def delete_workflow(workflow_id: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     ok = await svc.delete_workflow(workflow_id, user=user)
     if not ok:
         raise HTTPException(status_code=404, detail="Workflow not found")
@@ -896,7 +948,7 @@ async def duplicate_workflow(
     workflow_id: str,
     share_token: str | None = Query(default=None),
     user: User = Depends(get_current_user),
-):
+) -> WorkflowResponse:
     team_id = str(user.current_team) if user.current_team else None
     wf = await svc.duplicate_workflow(
         workflow_id,
@@ -911,7 +963,7 @@ async def duplicate_workflow(
 
 
 @router.delete("/{workflow_id}/team", response_model=WorkflowResponse)
-async def remove_workflow_from_team(workflow_id: str, user: User = Depends(get_current_user)):
+async def remove_workflow_from_team(workflow_id: str, user: User = Depends(get_current_user)) -> WorkflowResponse:
     """Remove a workflow from its team library without deleting it.
 
     The workflow stays owned by its creator (``user_id``) and disappears from
@@ -943,16 +995,16 @@ async def remove_workflow_from_team(workflow_id: str, user: User = Depends(get_c
 # Steps
 # ---------------------------------------------------------------------------
 
-@router.post("/{workflow_id}/steps")
-async def add_step(workflow_id: str, req: AddStepRequest, user: User = Depends(get_current_user)):
+@router.post("/{workflow_id}/steps", response_model=None)
+async def add_step(workflow_id: str, req: AddStepRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
     step = await svc.add_step(workflow_id, req.name, user=user, data=req.data, is_output=req.is_output)
     if not step:
         raise HTTPException(status_code=404, detail="Workflow not found")
     return step
 
 
-@router.patch("/steps/{step_id}")
-async def update_step(step_id: str, req: UpdateStepRequest, user: User = Depends(get_current_user)):
+@router.patch("/steps/{step_id}", response_model=None)
+async def update_step(step_id: str, req: UpdateStepRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
     step = await svc.update_step(step_id, user=user, name=req.name, data=req.data, is_output=req.is_output)
     if not step:
         raise HTTPException(status_code=404, detail="Step not found")
@@ -964,8 +1016,8 @@ async def update_step(step_id: str, req: UpdateStepRequest, user: User = Depends
     return step
 
 
-@router.delete("/steps/{step_id}")
-async def delete_step(step_id: str, user: User = Depends(get_current_user)):
+@router.delete("/steps/{step_id}", response_model=None)
+async def delete_step(step_id: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     ok = await svc.delete_step(step_id, user=user)
     if not ok:
         raise HTTPException(status_code=404, detail="Step not found")
@@ -976,8 +1028,8 @@ async def delete_step(step_id: str, user: User = Depends(get_current_user)):
 # Tasks
 # ---------------------------------------------------------------------------
 
-@router.post("/steps/{step_id}/tasks")
-async def add_task(step_id: str, req: AddTaskRequest, user: User = Depends(get_current_user)):
+@router.post("/steps/{step_id}/tasks", response_model=None)
+async def add_task(step_id: str, req: AddTaskRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
     task = await svc.add_task(step_id, req.name, user=user, data=req.data)
     if not task:
         status_code, detail = await _diagnose_step_mutation_failure(step_id, user)
@@ -998,7 +1050,7 @@ async def _diagnose_step_mutation_failure(step_id: str, user: User) -> tuple[int
         step = await WorkflowStep.get(PydanticObjectId(step_id))
     except Exception:
         return 404, "Step not found"
-    if not step:
+    if not step or step.id is None:
         return 404, "Step not found"
     parent = await svc._get_workflow_for_step(step.id)
     if not parent:
@@ -1022,7 +1074,7 @@ async def _diagnose_task_mutation_failure(task_id: str, user: User) -> tuple[int
         task = await WorkflowStepTask.get(PydanticObjectId(task_id))
     except Exception:
         return 404, "Task not found"
-    if not task:
+    if not task or task.id is None:
         return 404, "Task not found"
     parent = await svc._get_workflow_for_task(task.id)
     if not parent:
@@ -1033,8 +1085,8 @@ async def _diagnose_task_mutation_failure(task_id: str, user: User) -> tuple[int
     return 500, "Failed to update task"
 
 
-@router.patch("/tasks/{task_id}")
-async def update_task(task_id: str, req: UpdateTaskRequest, user: User = Depends(get_current_user)):
+@router.patch("/tasks/{task_id}", response_model=None)
+async def update_task(task_id: str, req: UpdateTaskRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
     task = await svc.update_task(task_id, user=user, name=req.name, data=req.data)
     if not task:
         status_code, detail = await _diagnose_task_mutation_failure(task_id, user)
@@ -1047,8 +1099,8 @@ async def update_task(task_id: str, req: UpdateTaskRequest, user: User = Depends
     return task
 
 
-@router.delete("/tasks/{task_id}")
-async def delete_task(task_id: str, user: User = Depends(get_current_user)):
+@router.delete("/tasks/{task_id}", response_model=None)
+async def delete_task(task_id: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     ok = await svc.delete_task(task_id, user=user)
     if not ok:
         status_code, detail = await _diagnose_task_mutation_failure(task_id, user)
@@ -1060,9 +1112,9 @@ async def delete_task(task_id: str, user: User = Depends(get_current_user)):
 # Execution
 # ---------------------------------------------------------------------------
 
-@router.post("/{workflow_id}/run")
+@router.post("/{workflow_id}/run", response_model=None)
 @limiter.limit("20/minute")
-async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowRequest, user: User = Depends(get_current_user)):
+async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
     from app.models.activity import ActivityType
     from app.services import activity_service
     from beanie import PydanticObjectId
@@ -1080,6 +1132,11 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
             status_code=400,
             detail="This workflow has no steps yet — add at least one step before running it.",
         )
+    project_context = None
+    if req.project_context_uuid:
+        from app.services.project_context import snapshot_project_context
+        project_context = await snapshot_project_context(req.project_context_uuid, user)
+    context_options: _WorkflowContextOptions = {"project_context": project_context} if project_context else {}
     document_uuids = await _authorize_documents(req.document_uuids, user)
     if req.folder_uuids:
         from app.services import folder_service
@@ -1106,7 +1163,10 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
         team_id=str(user.current_team) if user.current_team else None,
         workflow=PydanticObjectId(workflow_id),
         steps_total=num_steps,
+        document_uuids=document_uuids,
     )
+    if activity.id is None:
+        raise RuntimeError("Workflow activity was not persisted")
 
     try:
         if req.batch_mode and len(document_uuids) > 1:
@@ -1115,6 +1175,7 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
                 activity_id=str(activity.id),
                 user=user,
                 share_token=req.share_token,
+                **context_options,
             )
             return {"batch_id": batch_id, "activity_id": str(activity.id)}
         else:
@@ -1123,6 +1184,7 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
                 activity_id=str(activity.id),
                 user=user,
                 share_token=req.share_token,
+                **context_options,
             )
             activity.workflow_session_id = session_id
             await activity.save()
@@ -1133,12 +1195,12 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.post("/sessions/{session_id}/cancel")
+@router.post("/sessions/{session_id}/cancel", response_model=None)
 async def cancel_workflow_run(
     session_id: str,
     share_token: str | None = Query(default=None),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Stop an in-flight workflow run (single-run sessions)."""
     result = await svc.cancel_workflow(session_id, user, share_token=share_token)
     if result is None:
@@ -1146,12 +1208,12 @@ async def cancel_workflow_run(
     return result
 
 
-@router.post("/batches/{batch_id}/cancel")
+@router.post("/batches/{batch_id}/cancel", response_model=None)
 async def cancel_batch_run(
     batch_id: str,
     share_token: str | None = Query(default=None),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Stop every in-flight run in a batch (per-document runs)."""
     result = await svc.cancel_batch(batch_id, user, share_token=share_token)
     if result is None:
@@ -1159,9 +1221,9 @@ async def cancel_batch_run(
     return result
 
 
-@router.post("/steps/test")
+@router.post("/steps/test", response_model=None)
 @limiter.limit("20/minute")
-async def test_step(request: Request, req: TestStepRequest, user: User = Depends(get_current_user)):
+async def test_step(request: Request, req: TestStepRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
     document_uuids = await _authorize_documents(req.document_uuids, user)
     if req.task_name == "Extraction":
         search_set_uuid = (req.task_data or {}).get("search_set_uuid")
@@ -1184,18 +1246,18 @@ async def test_step(request: Request, req: TestStepRequest, user: User = Depends
     return {"task_id": task_id}
 
 
-@router.post("/{workflow_id}/reorder-steps")
-async def reorder_steps(workflow_id: str, req: ReorderStepsRequest, user: User = Depends(get_current_user)):
+@router.post("/{workflow_id}/reorder-steps", response_model=None)
+async def reorder_steps(workflow_id: str, req: ReorderStepsRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
     ok = await svc.reorder_steps(workflow_id, req.step_ids, user=user)
     if not ok:
         raise HTTPException(status_code=400, detail="Invalid step IDs or workflow not found")
     return {"ok": True}
 
 
-@router.get("/{workflow_id}/history")
+@router.get("/{workflow_id}/history", response_model=None)
 async def get_workflow_history(
     workflow_id: str, limit: int = 50, user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """List the current user's past runs of this workflow."""
     wf = await get_authorized_workflow(workflow_id, user)
     if not wf:
@@ -1213,13 +1275,30 @@ async def get_workflow_history(
         .limit(limit)
         .to_list()
     )
+    # What ran comes from the run's metered calls (model_usage). Runs recorded
+    # before calls were metered have none; for those only, fall back to the
+    # models their WorkflowResult recorded, in the same ``models`` field.
+    from app.models.workflow import WorkflowResult
+    unmetered = [ev.workflow_session_id for ev in events if ev.workflow_session_id and not ev.model_usage]
+    recorded: dict[str, list[str]] = {}
+    if unmetered:
+        for r in await WorkflowResult.find({"session_id": {"$in": unmetered}}).to_list():
+            used = [m for m in (r.models_used or []) if m]
+            recorded[r.session_id] = used or ([r.model] if r.model else [])
+
+    def models_of(ev: ActivityEvent) -> dict:
+        fields = run_model_fields(ev.model_usage)
+        if not fields["models"]:
+            fields["models"] = recorded.get(ev.workflow_session_id or "", [])
+        return fields
+
     return {
         "runs": [
             {
                 "id": str(ev.id),
                 "status": ev.status,
-                "started_at": ev.started_at.isoformat() if ev.started_at else None,
-                "finished_at": ev.finished_at.isoformat() if ev.finished_at else None,
+                "started_at": utc_iso(ev.started_at),
+                "finished_at": utc_iso(ev.finished_at),
                 "duration_ms": ev.duration_ms,
                 "error": ev.error or "",
                 "tokens_input": ev.tokens_input,
@@ -1233,20 +1312,84 @@ async def get_workflow_history(
                 # history row say "awaiting approval" and link to the review
                 # instead of showing a run that has been "running" for days.
                 "pending_review_uuid": (ev.meta_summary or {}).get("pending_review_uuid"),
-                # What actually ran, from the metered calls (support ticket:
-                # History couldn't say which model a run used). Empty for runs
-                # recorded before models were.
-                **run_model_fields(ev.model_usage),
+                # What actually ran (support ticket: History couldn't say
+                # which model a run used).
+                **models_of(ev),
             }
             for ev in events
         ],
     }
 
 
-@router.get("/{workflow_id}/quality-history")
+class SaveWorkflowVersionRequest(BaseModel):
+    note: str = ""
+
+
+@router.get("/{workflow_id}/versions", response_model=None)
+async def list_workflow_versions(workflow_id: str, user: User = Depends(get_current_user)) -> dict:
+    """The workflow's version history, newest first."""
+    from app.services import workflow_versions
+
+    wf = await get_authorized_workflow(workflow_id, user)
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    history = await workflow_versions.list_versions(wf)
+    authors = await resolve_authors({v["created_by_user_id"] for v in history["versions"] if v["created_by_user_id"]})
+    for v in history["versions"]:
+        author = authors.get(v["created_by_user_id"]) if v["created_by_user_id"] else None
+        v["created_by_name"] = (author.name or author.email) if author else None
+    team_access = await access_control.get_team_access_context(user)
+    history["can_manage"] = access_control.can_manage_workflow(wf, user, team_access)
+    return history
+
+
+@router.post("/{workflow_id}/versions", response_model=None)
+async def save_workflow_version(
+    workflow_id: str, body: SaveWorkflowVersionRequest, user: User = Depends(get_current_user),
+) -> dict[str, object]:
+    """Save the workflow as it stands now as a version, with an optional note."""
+    from app.services import workflow_versions
+
+    wf = await get_authorized_workflow(workflow_id, user, manage=True)
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    latest = await workflow_versions.latest_version(str(wf.id))
+    definition = await workflow_versions.current_definition(wf)
+    if latest and latest.definition_hash == workflow_versions.definition_hash(definition):
+        raise HTTPException(status_code=409, detail=f"Nothing has changed since version {latest.number}.")
+    source = "editor" if latest else "original"
+    version = await workflow_versions.record_version(
+        wf, note=body.note.strip() or workflow_versions.SOURCE_LABELS[source], source=source,
+        user_id=user.user_id, definition=definition,
+    )
+    return {"id": str(version.id), "number": version.number}
+
+
+@router.post("/{workflow_id}/versions/{version_id}/restore", response_model=None)
+async def restore_workflow_version(
+    workflow_id: str, version_id: str, user: User = Depends(get_current_user),
+) -> dict[str, object]:
+    """Make an earlier version current again. Recorded as a new version."""
+    from app.models.workflow import WorkflowVersion
+    from app.services import workflow_versions
+
+    wf = await get_authorized_workflow(workflow_id, user, manage=True)
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    try:
+        version = await WorkflowVersion.get(PydanticObjectId(version_id))
+    except Exception:
+        version = None
+    if not version or version.workflow_id != str(wf.id):
+        raise HTTPException(status_code=404, detail="Version not found")
+    restored, name_note = await workflow_versions.restore_version(wf, version, user.user_id)
+    return {"id": str(restored.id), "number": restored.number, "restored_from": version.number, "name_note": name_note}
+
+
+@router.get("/{workflow_id}/quality-history", response_model=None)
 async def get_workflow_quality_history(
     workflow_id: str, limit: int = 50, user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     wf = await get_authorized_workflow(workflow_id, user)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
@@ -1254,10 +1397,10 @@ async def get_workflow_quality_history(
     return {"runs": await get_quality_history("workflow", workflow_id, limit)}
 
 
-@router.get("/{workflow_id}/quality")
+@router.get("/{workflow_id}/quality", response_model=None)
 async def get_workflow_quality(
     workflow_id: str, user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Phase 3 unified quality endpoint — mirrors ``/api/knowledge/{uuid}/quality``.
 
     Returns ``{history, contract}`` so the shared QualityTimeline component
@@ -1272,10 +1415,10 @@ async def get_workflow_quality(
     return {"history": history, "contract": contract}
 
 
-@router.get("/{workflow_id}/quality-sparkline")
+@router.get("/{workflow_id}/quality-sparkline", response_model=None)
 async def get_workflow_quality_sparkline(
     workflow_id: str, limit: int = 10, user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Return compact score history for sparkline visualization."""
     wf = await get_authorized_workflow(workflow_id, user)
     if not wf:
@@ -1286,12 +1429,12 @@ async def get_workflow_quality_sparkline(
     return {"scores": scores}
 
 
-@router.post("/{workflow_id}/improvement-suggestions")
+@router.post("/{workflow_id}/improvement-suggestions", response_model=None)
 @limiter.limit("5/minute")
 async def get_workflow_suggestions(
     request: Request,
     workflow_id: str, user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Use LLM to suggest improvements based on the latest validation run."""
     wf = await get_authorized_workflow(workflow_id, user)
     if not wf:
@@ -1316,13 +1459,13 @@ class ImprovePromptRequest(BaseModel):
     sample_input: str | None = None
 
 
-@router.post("/improve-prompt")
+@router.post("/improve-prompt", response_model=None)
 @limiter.limit("10/minute")
 async def improve_prompt_endpoint(
     request: Request,
     body: ImprovePromptRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """LLM-suggested rewrite of a Prompt task's prompt, with rationale."""
     if not body.prompt.strip():
         raise HTTPException(status_code=400, detail="Prompt is required")
@@ -1344,10 +1487,10 @@ async def improve_prompt_endpoint(
         raise HTTPException(status_code=502, detail=f"Failed to generate suggestion: {exc}")
 
 
-@router.get("/{workflow_id}/quality-status")
+@router.get("/{workflow_id}/quality-status", response_model=None)
 async def get_workflow_quality_status(
     workflow_id: str, user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Return quality status for Quality Pulse card (mirrors extraction quality-status)."""
     import hashlib
     import datetime as _dt
@@ -1371,8 +1514,28 @@ async def get_workflow_quality_status(
             "regression_pending_review": False,
         }
 
-    score = meta.quality_score if meta else latest.get("score") if latest else None
-    tier = meta.quality_tier if meta else None
+    # A catalog tier with no score and no run behind it is the author's claim,
+    # not a measurement (#1013 §5): report the item as unvalidated and pass
+    # the claim separately so the card can say whose rating it is.
+    if not latest and meta and meta.quality_score is None:
+        return {
+            "status": "unvalidated", "score": None, "tier": None,
+            "tier_asserted": meta.quality_tier,
+            "config_changed": False, "stale": False, "last_validated_at": None,
+            "regression_pending_review": bool(meta.regression_pending_review),
+        }
+
+    measured_meta = meta is not None and meta.quality_score is not None
+    score = meta.quality_score if meta is not None and measured_meta else latest.get("score") if latest else None
+    if meta is not None and measured_meta:
+        tier = meta.quality_tier
+    else:
+        # A saved run can precede catalog metadata. Interpret it with the same
+        # configured thresholds rather than presenting a missing tier as poor.
+        from app.models.system_config import SystemConfig
+        from app.services.quality_service import compute_quality_tier
+        config = await SystemConfig.get_config()
+        tier = compute_quality_tier(score, config.get_quality_config())
     last_at = (meta.last_validated_at.isoformat() if meta and meta.last_validated_at else
                latest.get("created_at") if latest else None)
 
@@ -1380,7 +1543,8 @@ async def get_workflow_quality_status(
     config_changed = False
     if latest:
         last_config = latest.get("extraction_config", {})
-        current_steps = [{"name": s.get("name", ""), "tasks": s.get("tasks", [])} for s in (wf.get("steps_expanded", []) if isinstance(wf, dict) else [])]
+        current_steps = [{"name": s.get("name", ""), "tasks": s.get("tasks", [])} for s in (dict(wf).get("steps_expanded", []) if isinstance(wf, dict) else [])]
+        current_config: object
         if not current_steps:
             # Fallback: hash validation_plan + step IDs
             current_config = {"validation_plan": wf.validation_plan if hasattr(wf, "validation_plan") else [], "steps": [str(s) for s in (wf.steps if hasattr(wf, "steps") else [])]}
@@ -1405,13 +1569,20 @@ async def get_workflow_quality_status(
             created = created.replace(tzinfo=_dt.timezone.utc)
         stale = (now_utc - created).days > 14
 
+    from app.services.quality_service import item_validation_drift
+
+    drift = await item_validation_drift("workflow", latest, user_id=user.user_id, item=wf)
+
     return {
         "status": "validated",
         "score": score,
         "tier": tier,
         "last_validated_at": last_at,
+        "num_test_cases": latest.get("num_test_cases") if latest else None,
+        "num_runs": latest.get("num_runs") if latest else None,
         "config_changed": config_changed,
         "stale": stale,
+        **drift,
         # Monitoring already decided this item regressed and nobody has looked
         # at it yet; the badge says so instead of showing the tier alone.
         "regression_pending_review": bool(meta and meta.regression_pending_review),
@@ -1419,7 +1590,7 @@ async def get_workflow_quality_status(
 
 
 @router.get("/{workflow_id}/validation-plan", response_model=ValidationPlanResponse)
-async def get_validation_plan(workflow_id: str, user: User = Depends(get_current_user)):
+async def get_validation_plan(workflow_id: str, user: User = Depends(get_current_user)) -> ValidationPlanResponse:
     try:
         plan_info = await svc.get_validation_plan(workflow_id, user=user)
         return ValidationPlanResponse(**plan_info)
@@ -1430,32 +1601,32 @@ async def get_validation_plan(workflow_id: str, user: User = Depends(get_current
 @router.put("/{workflow_id}/validation-plan", response_model=ValidationPlanResponse)
 async def update_validation_plan(
     workflow_id: str, req: UpdateValidationPlanRequest, user: User = Depends(get_current_user),
-):
+) -> ValidationPlanResponse:
     try:
         checks = await svc.update_validation_plan(workflow_id, [c.model_dump() for c in req.checks], user=user)
-        return ValidationPlanResponse(checks=checks)
+        return ValidationPlanResponse.model_validate({"checks": checks})
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.post("/{workflow_id}/validation-plan/generate", response_model=ValidationPlanResponse)
 @limiter.limit("5/minute")
-async def generate_validation_plan(request: Request, workflow_id: str, user: User = Depends(get_current_user)):
+async def generate_validation_plan(request: Request, workflow_id: str, user: User = Depends(get_current_user)) -> ValidationPlanResponse:
     try:
         checks = await svc.generate_validation_plan(workflow_id, user=user)
-        return ValidationPlanResponse(checks=checks)
+        return ValidationPlanResponse.model_validate({"checks": checks})
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/{workflow_id}/validation-report")
+@router.get("/{workflow_id}/validation-report", response_model=None)
 async def download_validation_report(
     workflow_id: str,
     format: str = Query("md"),
     user: User = Depends(get_current_user),
-):
+) -> Response:
     """Download the latest validation run as a report file (Markdown or JSON)."""
     fmt = (format or "md").lower()
     if fmt not in ("md", "json"):
@@ -1469,20 +1640,20 @@ async def download_validation_report(
     return Response(
         content=content,
         media_type=media_type,
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": content_disposition(filename)},
     )
 
 
 @router.get("/{workflow_id}/validation-inputs", response_model=ValidationInputsResponse)
-async def get_validation_inputs(workflow_id: str, user: User = Depends(get_current_user)):
+async def get_validation_inputs(workflow_id: str, user: User = Depends(get_current_user)) -> ValidationInputsResponse:
     try:
         inputs = await svc.get_validation_inputs(workflow_id, user=user)
-        doc_uuids = [inp.get("document_uuid") for inp in inputs if inp.get("document_uuid")]
+        doc_uuids = [doc_uuid for inp in inputs if isinstance(doc_uuid := inp.get("document_uuid"), str) and doc_uuid]
         exists_map = await _check_validation_input_documents_exist(doc_uuids)
         for inp in inputs:
             if inp.get("document_uuid"):
                 inp["document_exists"] = exists_map.get(inp["document_uuid"], False)
-        return ValidationInputsResponse(inputs=inputs)
+        return ValidationInputsResponse.model_validate({"inputs": inputs})
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -1490,18 +1661,18 @@ async def get_validation_inputs(workflow_id: str, user: User = Depends(get_curre
 @router.put("/{workflow_id}/validation-inputs", response_model=ValidationInputsResponse)
 async def update_validation_inputs(
     workflow_id: str, req: UpdateValidationInputsRequest, user: User = Depends(get_current_user),
-):
+) -> ValidationInputsResponse:
     try:
         inputs = await svc.update_validation_inputs(workflow_id, [i.model_dump() for i in req.inputs], user=user)
-        return ValidationInputsResponse(inputs=inputs)
+        return ValidationInputsResponse.model_validate({"inputs": inputs})
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.post("/{workflow_id}/create-temp-documents")
+@router.post("/{workflow_id}/create-temp-documents", response_model=None)
 async def create_temp_documents(
     workflow_id: str, req: CreateTempDocumentsRequest, user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     wf = await get_authorized_workflow(workflow_id, user)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
@@ -1510,7 +1681,7 @@ async def create_temp_documents(
 
 
 @router.post("/{workflow_id}/validate", response_model=ValidateWorkflowResponse)
-async def validate_workflow(workflow_id: str, user: User = Depends(get_current_user)):
+async def validate_workflow(workflow_id: str, user: User = Depends(get_current_user)) -> ValidateWorkflowResponse:
     try:
         result = await svc.validate_workflow(workflow_id, user=user)
         return ValidateWorkflowResponse(**result)
@@ -1518,8 +1689,8 @@ async def validate_workflow(workflow_id: str, user: User = Depends(get_current_u
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/{workflow_id}/save-expected-output")
-async def save_expected_output(workflow_id: str, request: Request, user: User = Depends(get_current_user)):
+@router.post("/{workflow_id}/save-expected-output", response_model=None)
+async def save_expected_output(workflow_id: str, request: Request, user: User = Depends(get_current_user)) -> dict[str, object]:
     """Mark a completed workflow execution as expected output for validation."""
     body = await request.json()
     session_id = body.get("session_id")
@@ -1533,8 +1704,8 @@ async def save_expected_output(workflow_id: str, request: Request, user: User = 
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/{workflow_id}/expected-outputs")
-async def get_expected_outputs(workflow_id: str, user: User = Depends(get_current_user)):
+@router.get("/{workflow_id}/expected-outputs", response_model=None)
+async def get_expected_outputs(workflow_id: str, user: User = Depends(get_current_user)) -> dict[str, object]:
     """List stored expected outputs for a workflow."""
     try:
         outputs = await svc.get_expected_outputs(workflow_id, user)
@@ -1543,10 +1714,10 @@ async def get_expected_outputs(workflow_id: str, user: User = Depends(get_curren
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.delete("/{workflow_id}/expected-outputs/{expected_id}")
+@router.delete("/{workflow_id}/expected-outputs/{expected_id}", response_model=None)
 async def delete_expected_output(
     workflow_id: str, expected_id: str, user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Remove a stored expected output."""
     ok = await svc.delete_expected_output(workflow_id, expected_id, user)
     if not ok:
@@ -1570,14 +1741,14 @@ class TestCaseAcceptRequest(BaseModel):
     label_overrides: dict[str, str] | None = None
 
 
-@router.post("/{workflow_id}/test-cases/propose")
+@router.post("/{workflow_id}/test-cases/propose", response_model=None)
 @limiter.limit("10/minute")
 async def propose_test_cases(
     request: Request,
     workflow_id: str,
     body: TestCaseProposeRequest | None = None,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Scan recent runs and return scored candidate test cases for review."""
     from app.services import workflow_test_case_generator as tcg
 
@@ -1588,13 +1759,13 @@ async def propose_test_cases(
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.post("/{workflow_id}/test-cases/synthesize")
+@router.post("/{workflow_id}/test-cases/synthesize", response_model=None)
 @limiter.limit("5/minute")
 async def synthesize_test_case(
     request: Request,
     workflow_id: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Synthesize a candidate input document for a workflow with no history."""
     from app.services import workflow_test_case_generator as tcg
 
@@ -1604,12 +1775,12 @@ async def synthesize_test_case(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/{workflow_id}/test-cases/accept")
+@router.post("/{workflow_id}/test-cases/accept", response_model=None)
 async def accept_test_cases(
     workflow_id: str,
     body: TestCaseAcceptRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Persist accepted proposals as expected_output entries."""
     from app.services import workflow_test_case_generator as tcg
 
@@ -1631,14 +1802,14 @@ async def accept_test_cases(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/run-integrated")
+@router.post("/run-integrated", response_model=None)
 @limiter.limit("10/minute")
 async def run_workflow_integrated(
     request: Request,
     workflow_id: str = Form(...),
     files: list[UploadFile] = File(default=[]),
     user: User = Depends(get_api_key_user),
-):
+) -> dict[str, object]:
     """Run a workflow via external API with file uploads."""
     import uuid as _uuid
     from pathlib import Path
@@ -1666,6 +1837,7 @@ async def run_workflow_integrated(
         doc = SmartDocument(
             title=upload.filename,
             processing=True,
+            validating=True,
             valid=True,
             raw_text="",
             downloadpath=str(relative_path),
@@ -1681,8 +1853,7 @@ async def run_workflow_integrated(
             document_uuid=uid, extension=ext, document_path=str(file_path),
             user_id=user.user_id,
         )
-        doc.task_id = task_id
-        await doc.save()
+        await record_extraction_dispatch(doc, task_id)
         doc_uuids.append(uid)
 
     if not doc_uuids:
@@ -1695,6 +1866,8 @@ async def run_workflow_integrated(
         user_id=user.user_id,
         workflow=PydanticObjectId(workflow_id),
     )
+    if activity.id is None:
+        raise RuntimeError("Workflow activity was not persisted")
 
     try:
         # The activity id ties the run's token and model usage to its
@@ -1727,7 +1900,7 @@ async def run_workflow_integrated(
 # ---------------------------------------------------------------------------
 
 
-def _iso_utc(dt):
+def _iso_utc(dt: datetime.datetime | None) -> str | None:
     """ISO-8601 string with an explicit UTC offset.
 
     Datetimes read back from Mongo are naive (the Motor client isn't tz_aware),
@@ -1744,7 +1917,7 @@ def _iso_utc(dt):
     return dt.astimezone(_dt.timezone.utc).isoformat()
 
 
-def _elapsed_seconds(started_at, completed_at):
+def _elapsed_seconds(started_at: datetime.datetime | None, completed_at: datetime.datetime | None) -> int | None:
     """Server-authoritative elapsed seconds for the live run timer.
 
     Computed on the server so the readout can't be corrupted by client/server
@@ -1765,7 +1938,7 @@ def _elapsed_seconds(started_at, completed_at):
     return max(0, int((end - start).total_seconds()))
 
 
-def _serialize_workflow_optimization_run(run) -> dict:
+def _serialize_workflow_optimization_run(run: WorkflowOptimizationRun) -> dict:
     return {
         "uuid": run.uuid,
         "workflow_id": run.workflow_id,
@@ -1803,7 +1976,7 @@ def _serialize_workflow_optimization_run(run) -> dict:
     }
 
 
-def _summarise_workflow_optimization_run(run) -> dict:
+def _summarise_workflow_optimization_run(run: WorkflowOptimizationRun) -> dict:
     return {
         "uuid": run.uuid,
         "workflow_id": run.workflow_id,
@@ -1823,11 +1996,11 @@ def _summarise_workflow_optimization_run(run) -> dict:
     }
 
 
-@router.post("/{workflow_id}/optimize")
+@router.post("/{workflow_id}/optimize", response_model=None)
 @limiter.limit("5/minute")
 async def start_workflow_optimization(
     workflow_id: str, request: Request, user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Kick off a Workflow Autovalidate optimization run.
 
     Body (all optional):
@@ -1863,8 +2036,6 @@ async def start_workflow_optimization(
         token_budget = int(body.get("token_budget", 0))
     except (TypeError, ValueError):
         raise HTTPException(status_code=400, detail="token_budget must be an integer")
-    if token_budget < 0:
-        raise HTTPException(status_code=400, detail="token_budget must be >= 0")
 
     try:
         max_candidates = int(body.get("max_candidates", 10))
@@ -1923,35 +2094,33 @@ async def start_workflow_optimization(
         token_budget=token_budget,
     )
 
-    run = WorkflowOptimizationRun(
-        workflow_id=workflow_id,
-        user_id=user.user_id,
-        status="queued",
-        token_budget=token_budget,
-        options={
-            "apply_on_finish": apply_on_finish,
-            "include_judge": include_judge,
-            "max_candidates": max_candidates,
-        },
+    # Dispatch through the service (this branch's extraction of main's inline
+    # block); the reap-on-start and celery_task_id capture that main added to
+    # its inline version live inside start_workflow_optimization here.
+    from app.services.optimization_actions import (
+        OptimizationActionError,
+        start_workflow_optimization as _start,
     )
-    await run.insert()
-
-    from app.tasks.workflow_optimization_tasks import optimize_workflow_task
-    async_result = optimize_workflow_task.delay(
-        workflow_id, user.user_id, run.uuid,
-        token_budget, apply_on_finish, max_candidates, include_judge,
-    )
-    # Stored so the reaper can revoke a still-queued task rather than let it
-    # resurrect a doc already finalized as abandoned (same as extraction).
-    run.celery_task_id = async_result.id
-    await run.save()
+    try:
+        run = await _start(
+            workflow_id, user.user_id,
+            token_budget=token_budget,
+            apply_on_finish=apply_on_finish,
+            max_candidates=max_candidates,
+            include_judge=include_judge,
+        )
+    except OptimizationActionError as e:
+        raise HTTPException(
+            status_code=409 if e.code == "active_run" else 400,
+            detail=e.message,
+        )
     return {"run_uuid": run.uuid, "status": "queued"}
 
 
-@router.get("/{workflow_id}/optimize/active")
+@router.get("/{workflow_id}/optimize/active", response_model=None)
 async def get_active_workflow_optimization(
     workflow_id: str, user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     wf = await get_authorized_workflow(workflow_id, user)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
@@ -1970,13 +2139,13 @@ async def get_active_workflow_optimization(
     return {"run": _serialize_workflow_optimization_run(run) if run else None}
 
 
-@router.get("/{workflow_id}/optimize")
+@router.get("/{workflow_id}/optimize", response_model=None)
 async def list_workflow_optimization_history(
     workflow_id: str,
     limit: int = Query(20, ge=1, le=100),
     skip: int = Query(0, ge=0),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """List past optimization runs for this workflow, newest first."""
     wf = await get_authorized_workflow(workflow_id, user)
     if not wf:
@@ -1997,10 +2166,10 @@ async def list_workflow_optimization_history(
     }
 
 
-@router.get("/{workflow_id}/optimize/{run_uuid}")
+@router.get("/{workflow_id}/optimize/{run_uuid}", response_model=None)
 async def get_workflow_optimization(
     workflow_id: str, run_uuid: str, user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Full state of one optimization run (UI polls this while status=running)."""
     wf = await get_authorized_workflow(workflow_id, user)
     if not wf:
@@ -2018,10 +2187,10 @@ async def get_workflow_optimization(
     return _serialize_workflow_optimization_run(run)
 
 
-@router.post("/{workflow_id}/optimize/{run_uuid}/cancel")
+@router.post("/{workflow_id}/optimize/{run_uuid}/cancel", response_model=None)
 async def cancel_workflow_optimization(
     workflow_id: str, run_uuid: str, user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Request cancellation. The worker checks this flag between trials."""
     wf = await get_authorized_workflow(workflow_id, user, validate=True)
     if not wf:
@@ -2058,13 +2227,13 @@ class ApplyWorkflowOptimizationRequest(BaseModel):
     force: bool = False
 
 
-@router.post("/{workflow_id}/optimize/{run_uuid}/apply")
+@router.post("/{workflow_id}/optimize/{run_uuid}/apply", response_model=None)
 async def apply_workflow_optimization(
     workflow_id: str,
     run_uuid: str,
     req: ApplyWorkflowOptimizationRequest | None = None,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Apply a completed run's best config to ``Workflow.config_override``.
 
     Optional body: ``{"step_ids": ["step-uuid-1", "step-uuid-2"]}`` to
@@ -2072,8 +2241,6 @@ async def apply_workflow_optimization(
     the body — or sending ``{}`` — applies all winning step overrides,
     matching the legacy behavior.
     """
-    import datetime as _dt
-
     wf = await get_authorized_workflow(workflow_id, user, manage=True)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
@@ -2084,95 +2251,33 @@ async def apply_workflow_optimization(
     )
     if not run:
         raise HTTPException(status_code=404, detail="Optimization run not found")
-    if run.status != "completed":
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cannot apply — run status is '{run.status}', expected 'completed'",
-        )
-    if not run.best_config:
-        raise HTTPException(status_code=400, detail="Run has no best_config to apply")
-    if run.tied_with_baseline and not (req and req.force):
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "code": "tied_with_baseline",
-                "message": (
-                    "The winning configuration is statistically tied with the "
-                    "workflow's current settings (within judge noise), so the data "
-                    "doesn't justify a config change. Re-submit with force=true to "
-                    "apply anyway."
-                ),
-            },
-        )
 
-    # Snapshot the previous override so revert is exact.
-    run.previous_override = wf.config_override
-    await run.save()
-
-    winning_overrides: dict = (run.best_config or {}).get("step_overrides") or {}
-    requested_step_ids = req.step_ids if req else None
-    if requested_step_ids is not None:
-        # Validate: every requested step_id must exist in the winning config.
-        unknown = [s for s in requested_step_ids if s not in winning_overrides]
-        if unknown:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unknown step_ids in winning config: {unknown}",
-            )
-        # Subset apply: start from the currently-live step_overrides (so the
-        # user's prior choices on other steps survive) and overlay only the
-        # selected ones from this run's winner.
-        live_overrides: dict = ((wf.config_override or {}).get("step_overrides") or {})
-        merged = dict(live_overrides)
-        for sid in requested_step_ids:
-            merged[sid] = winning_overrides[sid]
-        applied_overrides = merged
-    else:
-        applied_overrides = dict(winning_overrides)
-
-    wf.config_override = {
-        "step_overrides": applied_overrides,
-        "from_run_uuid": run.uuid,
-        "partial": requested_step_ids is not None,
-    }
-    wf.config_override_set_at = _dt.datetime.now(tz=_dt.timezone.utc)
-    await wf.save()
-
-    # Phase 4: record this apply on the unified quality timeline so workflow
-    # applies show up alongside validation runs in the shared QualityTimeline.
+    from app.services.optimization_actions import (
+        OptimizationActionError,
+        apply_workflow_optimization as _apply,
+    )
     try:
-        from app.services import quality_service as _qs
-        score_pct = float((run.optimized_score or 0.0) * 100.0)
-        wf_name = getattr(wf, "name", "") or getattr(wf, "title", "") or ""
-        await _qs.record_optimizer_apply(
-            item_kind="workflow",
-            item_id=str(wf.id),
-            item_name=wf_name,
-            run_type="workflow",
-            score=score_pct,
-            user_id=user.user_id,
-            source_run_uuid=run.uuid,
-            applied_config=wf.config_override,
-            judge_model=run.judge_model,
-            judge_variance=run.judge_variance,
+        return await _apply(
+            wf, run, user.user_id,
+            step_ids=req.step_ids if req else None,
+            force=bool(req and req.force),
         )
-    except Exception:
-        logger.warning("Failed to record optimizer-apply ValidationRun for workflow %s", wf.id)
-
-    return {
-        "ok": True,
-        "applied_config": wf.config_override,
-        "applied_step_ids": list(applied_overrides.keys()),
-        "partial": requested_step_ids is not None,
-    }
+    except OptimizationActionError as e:
+        if e.code == "tied_with_baseline":
+            raise HTTPException(
+                status_code=409,
+                detail={"code": e.code, "message": e.message},
+            )
+        raise HTTPException(status_code=400, detail=e.message)
 
 
-@router.post("/{workflow_id}/optimize/{run_uuid}/revert")
+@router.post("/{workflow_id}/optimize/{run_uuid}/revert", response_model=None)
 async def revert_workflow_optimization(
     workflow_id: str, run_uuid: str, user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Restore the config_override that was in effect before this run applied."""
     import datetime as _dt
+    from app.models.workflow import Workflow
 
     wf = await get_authorized_workflow(workflow_id, user, manage=True)
     if not wf:
@@ -2185,7 +2290,15 @@ async def revert_workflow_optimization(
     if not run:
         raise HTTPException(status_code=404, detail="Optimization run not found")
 
-    wf.config_override = run.previous_override
-    wf.config_override_set_at = _dt.datetime.now(tz=_dt.timezone.utc) if run.previous_override else None
-    await wf.save()
-    return {"ok": True, "reverted_to": wf.config_override}
+    if (wf.config_override or {}).get("from_run_uuid") != run_uuid:
+        if wf.config_override == run.previous_override:
+            return {"ok": True, "reverted_to": wf.config_override}
+        raise HTTPException(status_code=409, detail="A different configuration is now active. Refresh before reverting it.")
+    reverted_at = _dt.datetime.now(tz=_dt.timezone.utc) if run.previous_override else None
+    result = await Workflow.get_motor_collection().update_one(
+        {"_id": wf.id, "config_override": wf.config_override},
+        {"$set": {"config_override": run.previous_override, "config_override_set_at": reverted_at}},
+    )
+    if result.modified_count != 1:
+        raise HTTPException(status_code=409, detail="The configuration changed during this request. Refresh before reverting it.")
+    return {"ok": True, "reverted_to": run.previous_override}

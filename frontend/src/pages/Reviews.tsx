@@ -1,3 +1,4 @@
+import { TaskHelpLink } from '../components/shared/TaskHelpLink'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { PageLayout } from '../components/layout/PageLayout'
@@ -40,12 +41,12 @@ function StatusPill({ status }: { status: ReviewStatus }) {
 }
 
 function dueLabel(review: ReviewSummary): string | null {
-  if (!review.expires_at) return null
+  if (!review.expires_at || !['pending', 'escalated'].includes(review.status)) return null
   const due = new Date(review.expires_at).getTime()
   const now = Date.now()
   if (due <= now) return 'Past due'
   const days = Math.ceil((due - now) / (24 * 3600 * 1000))
-  if (days === 1) return 'Due tomorrow'
+  if (days === 1) return `Due in ${Math.max(1, Math.ceil((due - now) / 3600000))} hours`
   return `Due in ${days} days`
 }
 
@@ -95,14 +96,16 @@ export default function Reviews() {
           meantime.
         </p>
 
+        <TaskHelpLink topic="human-review">How to review output against its sources</TaskHelpLink>
         <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb', marginBottom: 16 }}>
           <button
+            aria-pressed={tab === 'mine'}
             onClick={() => setTab('mine')}
             style={{
               padding: '8px 16px', fontSize: 13, fontWeight: tab === 'mine' ? 700 : 500,
               background: 'none', border: 'none', cursor: 'pointer',
               borderBottom: tab === 'mine' ? '2px solid #eab308' : '2px solid transparent',
-              color: tab === 'mine' ? '#eab308' : '#6b7280',
+              color: tab === 'mine' ? 'var(--highlight-on-light, #806600)' : '#59616b',
               display: 'inline-flex', alignItems: 'center', gap: 6,
             }}
           >
@@ -110,12 +113,13 @@ export default function Reviews() {
             My reviews
           </button>
           <button
+            aria-pressed={tab === 'team'}
             onClick={() => setTab('team')}
             style={{
               padding: '8px 16px', fontSize: 13, fontWeight: tab === 'team' ? 700 : 500,
               background: 'none', border: 'none', cursor: 'pointer',
               borderBottom: tab === 'team' ? '2px solid #eab308' : '2px solid transparent',
-              color: tab === 'team' ? '#eab308' : '#6b7280',
+              color: tab === 'team' ? 'var(--highlight-on-light, #806600)' : '#59616b',
               display: 'inline-flex', alignItems: 'center', gap: 6,
             }}
           >
@@ -125,8 +129,9 @@ export default function Reviews() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-          <label style={{ fontSize: 12, color: '#6b7280' }}>Status</label>
+          <label htmlFor="review-status" style={{ fontSize: 12, color: '#6b7280' }}>Status</label>
           <select
+            id="review-status"
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value)}
             style={{
@@ -167,17 +172,21 @@ export default function Reviews() {
                   textDecoration: 'none', color: 'inherit',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                  <div style={{ minWidth: 0, flex: '1 1 220px' }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#111827', overflowWrap: 'anywhere' }}>
                       {r.workflow_name || 'Workflow'}
                     </div>
                     <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
                       Step "{r.step_name}"
                       {r.created_at ? ` · opened ${relativeTime(r.created_at)}` : ''}
                     </div>
+                    <div style={{ fontSize: 12, color: '#59616b', marginTop: 6, overflowWrap: 'anywhere' }}>
+                      Requested by {r.requester_user_id === user?.user_id ? 'you' : r.requester_user_id || 'not recorded'}
+                      <br />Assigned to {r.assignee_role === 'team_admins' ? 'team administrators' : r.assignee_role === 'workflow_owner' ? 'the workflow owner' : r.assigned_to_user_ids.includes(user?.user_id || '') ? 'you' + (r.assigned_to_user_ids.length > 1 ? ` and ${r.assigned_to_user_ids.length - 1} other reviewer(s)` : '') : r.assigned_to_user_ids.join(', ') || 'no named reviewer'}
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
                     {due && (
                       <span style={{
                         fontSize: 11, fontWeight: 600,

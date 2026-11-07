@@ -23,6 +23,7 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
   const [serverSheets, setServerSheets] = useState<ServerSheet[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadAttempt, setLoadAttempt] = useState(0)
 
   // Text extraction is separate from the preview: a workbook can render here
   // and still have failed extraction (so chat can't read it), or fail both.
@@ -133,7 +134,7 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
       })
 
     return () => { cancelled = true }
-  }, [docUuid, reloadKey])
+  }, [docUuid, loadAttempt, reloadKey])
 
   useEffect(() => {
     if (processing) return
@@ -202,15 +203,15 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
 
   const btnStyle: React.CSSProperties = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    width: 32, height: 32, borderRadius: 6, border: '1px solid #d1d5db',
+    width: 32, height: 32, borderRadius: 'var(--workspace-radius-small)', border: "1px solid var(--workspace-border)",
     background: '#fff', cursor: 'pointer', color: '#374151',
-    fontSize: 13, fontWeight: 500,
+    fontSize: 'var(--workspace-font-control)', fontWeight: 500,
   }
 
   if (loading) {
     return (
       <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9fafb' }}>
-        <div role="status" aria-live="polite" style={{ color: '#6b7280', fontSize: 14 }}>Loading spreadsheet...</div>
+        <div role="status" aria-live="polite" style={{ color: '#59616b', fontSize: 'var(--workspace-font-body)' }}>Loading spreadsheet...</div>
       </div>
     )
   }
@@ -244,6 +245,9 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
           )}
           <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
             {extractionFailure?.retryable && retryButton}
+            {!extractionFailure && (
+              <button type="button" className="workspace-action" onClick={() => setLoadAttempt(value => value + 1)}>Retry spreadsheet</button>
+            )}
             <a
               href={url}
               download
@@ -269,18 +273,18 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
       {processing && (
         <div role="status" aria-live="polite" style={{
           position: 'absolute', top: 0, left: 0, right: 0, zIndex: 50,
-          display: 'flex', justifyContent: 'center', padding: '20px 24px',
+          display: 'flex', justifyContent: 'center', padding: "var(--workspace-space-20) var(--workspace-space-24)",
         }}>
           <div style={{
-            width: '100%', maxWidth: 420, padding: '20px 24px', borderRadius: 'var(--ui-radius, 12px)',
+            width: '100%', maxWidth: 420, padding: "var(--workspace-space-20) var(--workspace-space-24)", borderRadius: 'var(--ui-radius, 12px)',
             background: 'linear-gradient(135deg, var(--highlight-complement, #6a11cb), color-mix(in srgb, var(--highlight-color, #f1b300) 70%, #ffffff 30%))',
             color: '#fff', boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)' }}>
               <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white shrink-0" />
               <div>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>Processing Your Document...</div>
-                <div style={{ fontSize: 12, opacity: 0.8, marginTop: 3 }}>Please wait while we prepare your document.</div>
+                <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600 }}>Processing Your Document...</div>
+                <div style={{ fontSize: 'var(--workspace-font-meta)', opacity: 0.8, marginTop: 'var(--workspace-space-4)' }}>Please wait while we prepare your document.</div>
               </div>
             </div>
           </div>
@@ -303,20 +307,20 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
 
       {/* Toolbar */}
       <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-        padding: '6px 12px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb',
+        display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 'var(--workspace-space-6)',
+        padding: "var(--workspace-space-6) var(--workspace-space-12)", borderBottom: "1px solid var(--workspace-border)", backgroundColor: '#f9fafb',
         flexShrink: 0,
       }}>
         <button type="button" onClick={() => setZoom(prev => Math.max(prev - 1, 0))} style={btnStyle} title="Zoom out" aria-label="Zoom out" disabled={zoom <= 0}>
           <ZoomOut size={16} />
         </button>
-        <button type="button" onClick={() => setZoom(2)} style={{ ...btnStyle, width: 'auto', padding: '0 10px' }} title="Reset zoom" aria-label="Reset zoom">
+        <button type="button" onClick={() => setZoom(2)} style={{ ...btnStyle, width: 'auto', padding: "0 var(--workspace-space-12)" }} title="Reset zoom" aria-label="Reset zoom">
           {Math.round(zoomLevel * 100)}%
         </button>
         <button type="button" onClick={() => setZoom(prev => Math.min(prev + 1, ZOOM_LEVELS.length - 1))} style={btnStyle} title="Zoom in" aria-label="Zoom in" disabled={zoom >= ZOOM_LEVELS.length - 1}>
           <ZoomIn size={16} />
         </button>
-        <div style={{ width: 1, height: 20, backgroundColor: '#d1d5db', margin: '0 4px' }} />
+        <div style={{ width: 1, height: 20, backgroundColor: '#d1d5db', margin: "0 var(--workspace-space-4)" }} />
         <button type="button" onClick={openSearch} style={btnStyle} title="Find in document (⌘F / Ctrl+F)" aria-label="Find in document">
           <Search size={16} />
         </button>
@@ -327,21 +331,22 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
 
       {/* Sheet tabs */}
       {sheets.length > 1 && (
-        <div style={{
-          display: 'flex', gap: 0, borderBottom: '1px solid #e5e7eb',
+        <div role="group" aria-label="Worksheets" style={{
+          display: 'flex', gap: 0, borderBottom: "1px solid var(--workspace-border)",
           backgroundColor: '#f3f4f6', flexShrink: 0, overflowX: 'auto',
         }}>
           {sheets.map((name, i) => (
             <button
               key={name}
               type="button"
+              aria-pressed={i === activeSheet}
               onClick={() => handleSheetChange(i)}
               style={{
-                padding: '6px 16px', fontSize: 12, fontWeight: i === activeSheet ? 600 : 400,
-                color: i === activeSheet ? '#111827' : '#6b7280',
+                padding: "var(--workspace-space-6) var(--workspace-space-16)", fontSize: 'var(--workspace-font-meta)', fontWeight: i === activeSheet ? 600 : 400,
+                color: i === activeSheet ? '#111827' : '#59616b',
                 backgroundColor: i === activeSheet ? '#fff' : 'transparent',
                 borderBottom: i === activeSheet ? '2px solid var(--highlight-color, #eab308)' : '2px solid transparent',
-                border: 'none', borderRight: '1px solid #e5e7eb',
+                border: 'none', borderRight: "1px solid var(--workspace-border)",
                 cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit',
               }}
             >
@@ -365,27 +370,27 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
       )}
 
       {/* Table */}
-      <div ref={tableScrollRef} style={{ flex: 1, overflow: 'auto', backgroundColor: '#fff', position: 'relative' }}>
+      <div ref={tableScrollRef} role="region" aria-label={`Spreadsheet: ${sheets[activeSheet] || 'data'}`} tabIndex={0} style={{ flex: 1, overflow: 'auto', backgroundColor: '#fff', position: 'relative' }}>
         <div style={{
           transform: `scale(${zoomLevel})`,
           transformOrigin: 'top left',
           width: `${100 / zoomLevel}%`,
         }}>
           {headers.length === 0 && rows.length === 0 ? (
-            <div role="status" style={{ padding: 40, textAlign: 'center', color: '#6b7280', fontSize: 14 }}>
+            <div role="status" style={{ padding: 40, textAlign: 'center', color: '#59616b', fontSize: 'var(--workspace-font-body)' }}>
               This sheet is empty
             </div>
           ) : (
             <table style={{
-              width: '100%', borderCollapse: 'collapse', fontSize: 13,
+              width: '100%', borderCollapse: 'collapse', fontSize: 'var(--workspace-font-control)',
             }}>
               {headers.length > 0 && (
                 <thead>
                   <tr>
                     <th scope="col" style={{
-                      padding: '8px 12px', textAlign: 'center', fontSize: 11, fontWeight: 600,
-                      color: '#6b7280', backgroundColor: '#f9fafb',
-                      borderBottom: '2px solid #e5e7eb', borderRight: '1px solid #e5e7eb',
+                      padding: "var(--workspace-space-8) var(--workspace-space-12)", textAlign: 'center', fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
+                      color: '#59616b', backgroundColor: '#f9fafb',
+                      borderBottom: "2px solid var(--workspace-border)", borderRight: "1px solid var(--workspace-border)",
                       position: 'sticky', top: 0, zIndex: 2, width: 44,
                     }}>
                       #
@@ -399,12 +404,12 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
                           data-cell-r={-1}
                           data-cell-c={i}
                           style={{
-                            padding: '8px 12px', textAlign: 'left', fontWeight: 600,
+                            padding: "var(--workspace-space-8) var(--workspace-space-12)", textAlign: 'left', fontWeight: 600,
                             color: '#374151',
                             backgroundColor: isCurrent ? '#fbbf24' : isMatch ? '#fde68a' : '#f9fafb',
                             outline: isCurrent ? '2px solid #f59e0b' : 'none',
                             outlineOffset: '-2px',
-                            borderBottom: '2px solid #e5e7eb', borderRight: '1px solid #f3f4f6',
+                            borderBottom: "2px solid var(--workspace-border)", borderRight: '1px solid #f3f4f6',
                             position: 'sticky', top: 0, zIndex: 2,
                             whiteSpace: 'nowrap',
                           }}
@@ -420,9 +425,9 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
                 {rows.map((row, ri) => (
                   <tr key={ri} style={{ backgroundColor: ri % 2 === 0 ? '#fff' : '#fafafa' }}>
                     <td style={{
-                      padding: '6px 12px', textAlign: 'center', fontSize: 11,
-                      color: '#6b7280', borderBottom: '1px solid #f3f4f6',
-                      borderRight: '1px solid #e5e7eb', backgroundColor: '#f9fafb',
+                      padding: "var(--workspace-space-6) var(--workspace-space-12)", textAlign: 'center', fontSize: 'var(--workspace-font-meta)',
+                      color: '#59616b', borderBottom: '1px solid #f3f4f6',
+                      borderRight: "1px solid var(--workspace-border)", backgroundColor: '#f9fafb',
                     }}>
                       {ri + 1}
                     </td>
@@ -436,7 +441,7 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
                           data-cell-r={ri}
                           data-cell-c={ci}
                           style={{
-                            padding: '6px 12px', color: '#374151',
+                            padding: "var(--workspace-space-6) var(--workspace-space-12)", color: '#374151',
                             backgroundColor: isCurrent ? '#fbbf24' : isMatch ? '#fde68a' : baseBg,
                             outline: isCurrent ? '2px solid #f59e0b' : 'none',
                             outlineOffset: '-2px',

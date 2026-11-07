@@ -1,0 +1,376 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link, useNavigate } from '@tanstack/react-router'
+import { AlertTriangle, CalendarClock, CalendarPlus, Check, ChevronDown, ChevronRight, EyeOff, FileText, Inbox } from 'lucide-react'
+import { downloadDeadlineCalendar, getInbox, plainQuote, quoteSearchTerms, setObligationDismissed, setObligationDone } from '../../api/obligations'
+import type { Obligation } from '../../api/obligations'
+import { useWorkspace } from '../../contexts/WorkspaceContext'
+
+// The RA inbox (#999): what each proposal or award needs, from its own
+// documents, every row cited to its page. Done is shared with the project;
+// Dismiss and Hide inbox only change this person's Home.
+//
+// Hide inbox collapses the box to a "Due and needed (N) · Show inbox" bar in
+// the same place (support ticket: it used to turn the inbox off for the
+// account, leaving nothing on screen to bring it back). Collapsed is
+// remembered in this browser; Account → Home turns the inbox off for good.
+
+const COLLAPSED_KEY = 'home:ra-inbox-collapsed'
+
+function readCollapsed(): boolean {
+  try { return localStorage.getItem(COLLAPSED_KEY) === '1' } catch { return false }
+}
+
+function storeCollapsed(collapsed: boolean) {
+  try {
+    if (collapsed) localStorage.setItem(COLLAPSED_KEY, '1')
+    else localStorage.removeItem(COLLAPSED_KEY)
+  } catch { /* Collapsing still works for this visit. */ }
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+function dueLabel(item: Obligation): string {
+  if (!item.due_at) return ''
+  const [y, m, d] = item.due_at.slice(0, 10).split('-').map(Number)
+  const date = `${MONTHS[m - 1]} ${d}, ${y}`
+  return item.due_text ? `${date}, ${item.due_text}` : date
+}
+
+function daysUntil(item: Obligation): number | null {
+  if (!item.due_at) return null
+  const [y, m, d] = item.due_at.slice(0, 10).split('-').map(Number)
+  const due = Date.UTC(y, m - 1, d)
+  const now = new Date()
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())
+  return Math.round((due - today) / 86_400_000)
+}
+
+function money(value: number | null, unit: string | null): string {
+  if (value == null) return ''
+  return unit === '%' ? `${value}%` : `${unit === '$' ? '$' : ''}${value.toLocaleString('en-US')}`
+}
+
+function summary(item: Obligation): string {
+  if (item.kind === 'deadline') return dueLabel(item)
+  if (item.kind === 'limit') {
+    const verdict = item.in_conflict ? 'exceeds' : 'within'
+    return `${money(item.observed_value, item.unit)} ${verdict} the ${money(item.limit_value, item.unit)} limit`
+  }
+  return 'Still needed'
+}
+
+function urgency(item: Obligation): string | null {
+  const days = daysUntil(item)
+  if (days == null) return null
+  if (days < 0) return `${-days} day${days === -1 ? '' : 's'} past`
+  if (days === 0) return 'today'
+  if (days <= 14) return `in ${days} day${days === 1 ? '' : 's'}`
+  return null
+}
+
+const SOURCE_ROLES: Record<string, string> = {
+  limit: 'Limit', observed: 'Observed value', timing: 'Timing rule',
+  period_of_performance: 'Period of Performance', budget_period: 'Budget period',
+}
+
+// Home stays open while people work elsewhere; recheck when they come back to
+// it so an item done or added from chat or another tab doesn't stay stale.
+const REFRESH_MS = 60_000
+
+const BUTTON = {
+  display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+  padding: 'var(--workspace-space-4) var(--workspace-space-8)', fontSize: 'var(--workspace-font-meta)',
+  fontFamily: 'inherit', borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
+  border: '1px solid var(--workspace-border)', backgroundColor: '#fff', color: '#374151',
+} as const
+// Row actions read as actions without a box each: the source button is the
+// one bordered control a row needs.
+const QUIET = { ...BUTTON, border: '1px solid transparent', color: '#374151' } as const
+
+// Upcoming groups, in the order they are shown. Dated deadlines only; undated
+// ones, required material and limits follow under "Needed".
+const GROUPS = [
+  { key: 'overdue', label: 'Overdue' },
+  { key: 'this_week', label: 'Due this week' },
+  { key: 'next_30_days', label: 'Next 30 days' },
+  { key: 'later', label: 'Later' },
+  { key: 'needed', label: 'Needed and limits' },
+] as const
+type GroupKey = typeof GROUPS[number]['key']
+
+export function upcomingGroup(item: Obligation): GroupKey {
+  const days = item.kind === 'deadline' ? daysUntil(item) : null
+  if (days == null) return 'needed'
+  if (days < 0) return 'overdue'
+  if (days <= 6) return 'this_week'
+  if (days <= 30) return 'next_30_days'
+  return 'later'
+}
+
+function InboxRow({ item, focused, onChanged, onError }: {
+  item: Obligation
+  focused: boolean
+  onChanged: (uuid: string, change: 'done' | 'dismissed') => void
+  onError: (message: string) => void
+}) {
+  const navigate = useNavigate()
+  const { viewDocument } = useWorkspace()
+  const [busy, setBusy] = useState(false)
+  const rowRef = useRef<HTMLLIElement>(null)
+  // A reminder's link lands here: bring the item into view.
+  useEffect(() => { if (focused) rowRef.current?.scrollIntoView?.({ block: 'nearest' }) }, [focused])
+  const soon = urgency(item)
+  const Icon = item.kind === 'deadline' ? CalendarClock : item.kind === 'limit' ? AlertTriangle : FileText
+  const alert = item.in_conflict || (soon != null && (daysUntil(item) ?? 99) <= 7)
+
+  const act = async (change: 'done' | 'dismissed', fn: () => Promise<unknown>) => {
+    if (busy) return
+    setBusy(true)
+    try {
+      await fn()
+      onChanged(item.uuid, change)
+    } catch (e) {
+      onError(e instanceof Error ? e.message : 'That change could not be saved.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <li ref={rowRef} aria-current={focused ? 'true' : undefined} style={{
+      display: 'flex', gap: 'var(--workspace-space-8)', padding: 'var(--workspace-space-8) var(--workspace-space-12)', borderRadius: 'var(--workspace-radius-medium)', listStyle: 'none',
+      ...(focused ? { outline: '2px solid #f1b300', backgroundColor: '#fffbeb' } : {}),
+    }}>
+      <Icon size={16} aria-hidden style={{ flexShrink: 0, marginTop: 2, color: alert ? '#b45309' : '#6b7280' }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 'var(--workspace-font-control)', color: '#111827', fontWeight: 500 }}>
+          {item.title}
+          {soon && <span style={{ marginLeft: 'var(--workspace-space-8)', fontSize: 'var(--workspace-font-meta)', color: alert ? '#b45309' : '#6b7280', fontWeight: 600 }}>{soon}</span>}
+        </div>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: item.in_conflict ? '#92400e' : '#4b5563' }}>
+          {summary(item)}
+        </div>
+        {item.deadline_calculation && <details style={{ fontSize: 'var(--workspace-font-meta)', color: '#4b5563' }}>
+          <summary>How this date was calculated</summary>
+          <p>{item.deadline_calculation.rule}</p>
+          <p>{item.deadline_calculation.formula}</p>
+          <p>Calendar days; anchor day excluded. No weekend or holiday adjustment.</p>
+        </details>}
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-6)', marginTop: 'var(--workspace-space-4)' }}>
+          <button type="button" style={{ ...BUTTON, border: 'none', padding: 0, color: '#2563eb', textDecoration: 'underline' }}
+            onClick={() => navigate({ to: '/', search: { project: item.project_uuid } as never })}>
+            {item.project_title || 'Project'}
+          </button>
+          {item.sources.map((source, i) => {
+            // A limit cites the sponsor's limit and the figure that breaks it,
+            // often in different documents; both open at their passage.
+            const role = SOURCE_ROLES[source.role]
+            const where = `${source.document_title}${source.page ? ` at page ${source.page}` : ''}`
+            return (
+              <button key={`${source.document_uuid}-${source.page}-${i}`} type="button" title={plainQuote(source.quote)} style={BUTTON}
+                aria-label={role ? `Open the ${role.toLowerCase()} in ${where}` : `Open ${where}`}
+                onClick={() => viewDocument(source.document_uuid, source.document_title, {
+                  terms: [quoteSearchTerms(source.quote)],
+                  page: source.page,
+                })}>
+                {role && <span style={{ fontWeight: 600 }}>{role}:</span>}
+                {source.document_title}{source.page ? ` · p. ${source.page}` : ''}
+              </button>
+            )
+          })}
+          <span style={{ flex: 1 }} />
+          {item.kind === 'deadline' && item.due_at && <button type="button" style={QUIET} disabled={busy}
+            aria-label={`Add "${item.title}" to your calendar`}
+            onClick={() => { downloadDeadlineCalendar({ obligation: item.uuid }).catch((e: unknown) => onError(e instanceof Error ? e.message : 'The calendar file could not be downloaded.')) }}>
+            <CalendarPlus size={12} aria-hidden /> Add to calendar
+          </button>}
+          <button type="button" style={QUIET} disabled={busy}
+            aria-label={`Mark "${item.title}" done for everyone on the project`}
+            onClick={() => act('done', () => setObligationDone(item.uuid, true))}>
+            <Check size={12} aria-hidden /> Done
+          </button>
+          <button type="button" style={QUIET} disabled={busy}
+            aria-label={`Hide "${item.title}" from your Home`}
+            onClick={() => act('dismissed', () => setObligationDismissed(item.uuid, true))}>
+            <EyeOff size={12} aria-hidden /> Dismiss
+          </button>
+        </div>
+      </div>
+    </li>
+  )
+}
+
+/** "Due and needed": Home's list across your projects, or, inside a project,
+ * only that project's (support ticket: a project chat listed another
+ * project's deadlines above its own). */
+export function RAInbox({ projectUuid }: { projectUuid?: string | null } = {}) {
+  const { focusedObligationUuid } = useWorkspace()
+  const [items, setItems] = useState<Obligation[] | null>(null)
+  const [loadError, setLoadError] = useState(false)
+  const [hidden, setHidden] = useState(false)
+  const [projectCount, setProjectCount] = useState(0)
+  const [showDismissed, setShowDismissed] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [collapsed, setCollapsed] = useState(readCollapsed)
+  // Keep focus on the toggle as the box collapses or expands.
+  const toggleFocus = useRef<'show' | 'hide' | null>(null)
+  const showButton = useRef<HTMLButtonElement>(null)
+  const hideButton = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    const target = toggleFocus.current === 'show' ? showButton.current : toggleFocus.current === 'hide' ? hideButton.current : null
+    toggleFocus.current = null
+    target?.focus()
+  }, [collapsed])
+  const setInboxCollapsed = (next: boolean) => {
+    toggleFocus.current = next ? 'show' : 'hide'
+    storeCollapsed(next)
+    setCollapsed(next)
+  }
+
+  const loaded = useRef(false)
+  const load = useCallback(async (includeDismissed: boolean) => {
+    try {
+      const data = await getInbox(includeDismissed, projectUuid)
+      loaded.current = true
+      setLoadError(false)
+      setItems(data.items)
+      setHidden(data.inbox_hidden)
+      setProjectCount(data.project_count ?? 0)
+    } catch {
+      // A failed background refresh keeps what is on screen; only a first
+      // load that fails is shown as an error, never as an empty inbox.
+      if (!loaded.current) setLoadError(true)
+    }
+  }, [projectUuid])
+
+  useEffect(() => { void load(showDismissed) }, [load, showDismissed])
+
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState === 'visible') void load(showDismissed) }
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    const timer = window.setInterval(refresh, REFRESH_MS)
+    return () => {
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', refresh)
+      window.clearInterval(timer)
+    }
+  }, [load, showDismissed])
+
+  if (loadError) return <p role="status" className="home-meta">Project obligations could not be loaded. <button type="button" className="home-text-action" onClick={() => void load(showDismissed)}>Retry obligations</button></p>
+  if (items == null) return <p role="status" className="home-meta">Loading project obligations…</p>
+  // Turned off in Account → Home: gone for good until turned back on there.
+  if (hidden) return null
+  const visible = showDismissed ? items : items.filter(i => !i.dismissed)
+  const dismissedCount = items.filter(i => i.dismissed).length
+  const open = visible.filter(i => !i.dismissed)
+  const dismissed = visible.filter(i => i.dismissed)
+  const focusMissing = focusedObligationUuid != null && !items.some(i => i.uuid === focusedObligationUuid && !i.dismissed)
+  const openCount = items.filter(i => !i.dismissed).length
+  // Collapse is Home's; inside a project the inbox is that project's list.
+  if (collapsed && !projectUuid) {
+    if (openCount === 0 && projectCount === 0) return null
+    return (
+      <div role="group" aria-label="RA inbox (hidden)" style={{
+        display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', marginTop: 'var(--workspace-space-12)',
+        padding: 'var(--workspace-space-4) var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: '#4b5563',
+      }}>
+        <Inbox size={14} aria-hidden style={{ color: '#6b7280' }} />
+        <span style={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Due and needed ({openCount})</span>
+        <span aria-hidden>·</span>
+        <button ref={showButton} type="button" aria-expanded={false} style={{ ...BUTTON, border: 'none', padding: 0, color: '#2563eb', textDecoration: 'underline' }}
+          onClick={() => setInboxCollapsed(false)}>
+          <ChevronRight size={12} aria-hidden /> Show inbox
+        </button>
+      </div>
+    )
+  }
+  // With projects to cover, an empty inbox says what it checked: silence
+  // would read as "nothing is due", which it can't know about unsaved work.
+  if (visible.length === 0 && !showDismissed) {
+    if (projectCount === 0) return null
+    return <p role="status" className="home-meta">
+      {projectUuid
+        ? 'Nothing due or missing in this project. Only deadlines and materials saved to it appear here.'
+        : `Nothing due or missing in your ${projectCount === 1 ? 'project' : `${projectCount} projects`}. Only deadlines and materials saved to a project appear here.`}
+    </p>
+  }
+
+  // Done leaves the inbox for everyone; Dismiss only hides it here, so it
+  // stays countable under "Show dismissed".
+  const changed = (uuid: string, change: 'done' | 'dismissed') => setItems(current =>
+    change === 'done'
+      ? (current ?? []).filter(i => i.uuid !== uuid)
+      : (current ?? []).map(i => (i.uuid === uuid ? { ...i, dismissed: true } : i)))
+  const restore = async (uuid: string) => {
+    try {
+      await setObligationDismissed(uuid, false)
+      setItems(current => (current ?? []).map(i => (i.uuid === uuid ? { ...i, dismissed: false } : i)))
+    } catch {
+      setError('That item could not be restored. Try again.')
+    }
+  }
+
+  return (
+    <section aria-label="RA inbox" style={{
+      padding: 'var(--workspace-space-12) var(--workspace-space-8)', borderRadius: 'var(--ui-radius, 12px)',
+      backgroundColor: '#fff', border: '1px solid var(--workspace-border)', marginTop: 'var(--workspace-space-12)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', padding: '0 var(--workspace-space-12)' }}>
+        <Inbox size={14} aria-hidden style={{ color: '#6b7280' }} />
+        <h2 style={{ margin: 0, fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          Due and needed
+        </h2>
+        <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>{projectUuid ? 'This project' : 'All your projects'}</span>
+        <span style={{ flex: 1 }} />
+        {(dismissedCount > 0 || showDismissed) && (
+          <button type="button" style={{ ...BUTTON, border: 'none' }} onClick={() => setShowDismissed(v => !v)}>
+            {showDismissed ? 'Hide dismissed' : `Show dismissed (${dismissedCount})`}
+          </button>
+        )}
+        {visible.some(i => i.kind === 'deadline' && i.due_at && !i.dismissed) && (
+          <button type="button" style={{ ...BUTTON, border: 'none' }}
+            aria-label={projectUuid ? "Download a calendar file with this project's open deadlines" : 'Download a calendar file with all your open deadlines'}
+            onClick={() => { downloadDeadlineCalendar(projectUuid ? { project: projectUuid } : 'all').catch((e: unknown) => setError(e instanceof Error ? e.message : 'The calendar file could not be downloaded.')) }}>
+            <CalendarPlus size={12} aria-hidden /> Calendar
+          </button>
+        )}
+        <Link to="/account" hash="deadline-reminders" style={{ ...BUTTON, border: 'none', textDecoration: 'none' }}
+          aria-label="Deadline reminder settings">
+          Reminders
+        </Link>
+        {!projectUuid && <button ref={hideButton} type="button" aria-expanded style={{ ...BUTTON, border: 'none' }} onClick={() => setInboxCollapsed(true)}
+          title="Collapse to one line. To turn the inbox off for good, use Account → Home.">
+          <ChevronDown size={12} aria-hidden /> Hide inbox
+        </button>}
+      </div>
+      {error && <p role="alert" style={{ margin: 'var(--workspace-space-4) var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: '#b91c1c' }}>{error}</p>}
+      {focusMissing && <p role="status" style={{ margin: 'var(--workspace-space-4) var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: '#4b5563' }}>
+        The deadline from that reminder is no longer open here: it was marked done, replaced by an amendment, or dismissed.
+      </p>}
+      {GROUPS.map(group => {
+        const rows = open.filter(i => upcomingGroup(i) === group.key)
+        if (!rows.length) return null
+        return <div key={group.key} role="group" aria-label={group.label}>
+          <h3 style={{ margin: 'var(--workspace-space-8) var(--workspace-space-12) 0', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: group.key === 'overdue' ? '#b45309' : '#6b7280' }}>
+            {group.label} <span style={{ fontWeight: 400 }}>({rows.length})</span>
+          </h3>
+          <ul style={{ margin: 'var(--workspace-space-4) 0 0', padding: 0 }}>
+            {rows.map(item => <InboxRow key={item.uuid} item={item} focused={item.uuid === focusedObligationUuid} onChanged={changed} onError={setError} />)}
+          </ul>
+        </div>
+      })}
+      {showDismissed && dismissed.length > 0 && <div role="group" aria-label="Dismissed">
+        <h3 style={{ margin: 'var(--workspace-space-8) var(--workspace-space-12) 0', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280' }}>Dismissed</h3>
+        <ul style={{ margin: 'var(--workspace-space-4) 0 0', padding: 0 }}>
+          {dismissed.map(item => (
+            <li key={item.uuid} style={{ listStyle: 'none', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', padding: 'var(--workspace-space-6) var(--workspace-space-12)', color: '#6b7280', fontSize: 'var(--workspace-font-meta)' }}>
+              <span style={{ flex: 1 }}>{item.title} · {item.project_title}</span>
+              <button type="button" style={BUTTON} onClick={() => restore(item.uuid)}>Restore</button>
+            </li>
+          ))}
+        </ul>
+      </div>}
+    </section>
+  )
+}

@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, patch
 
 from app.services import llm_service
 from app.services.llm_service import (
+    FIRST_SESSION_SYSTEM_PROMPT,
     SUPPORTED_PROTOCOLS,
     build_thinking_model_settings,
     detect_api_protocol,
@@ -17,6 +18,18 @@ def _cfg(**model_fields):
     """Wrap a single model config in a SystemConfig-shaped doc."""
     model_fields.setdefault("name", "the-model")
     return {"available_models": [model_fields]}
+
+
+class TestFirstSessionPrompt:
+    def test_retains_the_normal_agent_tool_and_confirmation_rules(self):
+        assert FIRST_SESSION_SYSTEM_PROMPT.startswith(llm_service.AGENTIC_CHAT_SYSTEM_PROMPT)
+        assert "create_workflow" in FIRST_SESSION_SYSTEM_PROMPT
+
+    def test_supports_starting_without_documents_or_a_tour(self):
+        assert "No upload is required" in FIRST_SESSION_SYSTEM_PROMPT
+        assert "Knowledge bases may already contain" in FIRST_SESSION_SYSTEM_PROMPT
+        assert "Fulfill concrete requests immediately" in FIRST_SESSION_SYSTEM_PROMPT
+        assert "Phase 1:" not in FIRST_SESSION_SYSTEM_PROMPT
 
 
 class TestExplicitProtocol:
@@ -568,3 +581,16 @@ class TestTruncationCapture:
 
         text = describe_truncation([{"model": "qwen3", "max_tokens": None}])
         assert "output limit" in text
+
+
+@pytest.mark.asyncio
+async def test_custom_openrouter_client_retains_application_attribution():
+    """Attribution belongs on a supplied SDK client, not provider-only options."""
+    async with httpx.AsyncClient() as client:
+        with patch.object(llm_service, '_get_loop_http_client', return_value=client):
+            model = llm_service._build_agent_model('openrouter/openai/gpt-4o', system_config_doc=_cfg(
+                name='openrouter/openai/gpt-4o', api_protocol='openrouter',
+                endpoint='https://gateway.example.test/v1', api_key='test-key',
+            ))
+        assert model.client.default_headers['X-Title'] == 'Vandalizer'
+        assert str(model.client.base_url) == 'https://gateway.example.test/v1/'

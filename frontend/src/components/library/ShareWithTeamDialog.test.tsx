@@ -78,3 +78,20 @@ describe('ShareWithTeamDialog', () => {
     expect((screen.getByLabelText('Team') as HTMLSelectElement).value).toBe('team-a')
   })
 })
+
+it('keeps the note after failure and prevents duplicate submission or dismissal while pending', async () => {
+  let reject!: (reason: Error) => void
+  const submit = vi.fn(() => new Promise<void>((_resolve, fail) => { reject = fail }))
+  const cancel = vi.fn()
+  render(<ShareWithTeamDialog itemName="Research" teamName="Operations" onConfirm={submit} onCancel={cancel} />)
+  fireEvent.change(screen.getByLabelText('Add a note (optional)'), { target: { value: 'Please review these sources.' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Share with Operations' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Sharing…' }))
+  fireEvent.keyDown(document, { key: 'Escape' })
+  expect(submit).toHaveBeenCalledTimes(1); expect(cancel).not.toHaveBeenCalled()
+  reject(new Error('Sharing temporarily unavailable.'))
+  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Sharing temporarily unavailable.'))
+  expect(screen.getByLabelText('Add a note (optional)')).toHaveValue('Please review these sources.')
+  fireEvent.click(screen.getByRole('button', { name: 'Share with Operations' }))
+  expect(submit).toHaveBeenNthCalledWith(2, 'Please review these sources.', undefined)
+})

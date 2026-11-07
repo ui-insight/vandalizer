@@ -5,6 +5,7 @@ Tests cover happy paths, error handling, and input routing logic.
 """
 
 import base64
+import csv
 import json
 import zipfile
 import io
@@ -504,6 +505,22 @@ class TestDescribeImageNode:
     """
 
     MULTIMODAL_CFG = {"available_models": [{"name": "gpt-4o", "multimodal": True}]}
+
+    @pytest.fixture(autouse=True)
+    def _offline_dns(self, monkeypatch):
+        """Resolve example.com to a fixed public address so these unit tests
+        don't need network access. The real SSRF validator still runs: IP
+        literals such as 169.254.169.254 resolve without DNS and stay blocked."""
+        import socket
+
+        real = socket.getaddrinfo
+
+        def fake(host, port, *args, **kwargs):
+            if host in ("example.com", "www.example.com"):
+                return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.215.14", port))]
+            return real(host, port, *args, **kwargs)
+
+        monkeypatch.setattr("app.utils.url_validation.socket.getaddrinfo", fake)
 
     def _node(self, sys_cfg=None, **data):
         data.setdefault("image_url", "https://example.com/img.png")
@@ -1964,14 +1981,14 @@ class TestApprovalNode:
 # ---------------------------------------------------------------------------
 
 class TestKnowledgeBaseQueryNode:
-    @patch("app.services.document_manager.DocumentManager")
-    def test_basic_query(self, mock_dm_cls):
+    @patch("app.services.document_manager.get_document_manager")
+    def test_basic_query(self, mock_get_dm):
         mock_dm = MagicMock()
         mock_dm.query_kb.return_value = [
             {"content": "Chunk 1 text", "metadata": {"source_name": "doc1.pdf"}},
             {"content": "Chunk 2 text", "metadata": {"source_name": "doc2.pdf"}},
         ]
-        mock_dm_cls.return_value = mock_dm
+        mock_get_dm.return_value = mock_dm
 
         node = KnowledgeBaseQueryNode({
             "kb_uuid": "kb-123",
@@ -1999,39 +2016,39 @@ class TestKnowledgeBaseQueryNode:
         assert result["output"] == ""
         assert "query is empty" in result["error"]
 
-    @patch("app.services.document_manager.DocumentManager")
-    def test_no_results(self, mock_dm_cls):
+    @patch("app.services.document_manager.get_document_manager")
+    def test_no_results(self, mock_get_dm):
         """An empty result set surfaces a warning and an explicit output
         message instead of silently feeding "" to the next step."""
         mock_dm = MagicMock()
         mock_dm.query_kb.return_value = []
-        mock_dm_cls.return_value = mock_dm
+        mock_get_dm.return_value = mock_dm
 
         node = KnowledgeBaseQueryNode({"kb_uuid": "kb-123", "query": "obscure"})
         result = node.process({"output": "prev"})
         assert "no matching passages" in result["output"]
         assert "obscure" in result["warning"]
 
-    @patch("app.services.document_manager.DocumentManager")
-    def test_passages_output_has_framing_header(self, mock_dm_cls):
+    @patch("app.services.document_manager.get_document_manager")
+    def test_passages_output_has_framing_header(self, mock_get_dm):
         """Downstream LLM steps are told the chunks are partial retrieval
         excerpts, mirroring the framing the chat RAG path uses."""
         mock_dm = MagicMock()
         mock_dm.query_kb.return_value = [
             {"content": "Chunk text", "metadata": {"source_name": "doc.pdf"}},
         ]
-        mock_dm_cls.return_value = mock_dm
+        mock_get_dm.return_value = mock_dm
 
         node = KnowledgeBaseQueryNode({"kb_uuid": "kb-1", "query": "anything"})
         result = node.process({"output": "prev"})
         assert "partial excerpts" in result["output"]
         assert "Chunk text" in result["output"]
 
-    @patch("app.services.document_manager.DocumentManager")
-    def test_templated_query_uses_previous_output(self, mock_dm_cls):
+    @patch("app.services.document_manager.get_document_manager")
+    def test_templated_query_uses_previous_output(self, mock_get_dm):
         mock_dm = MagicMock()
         mock_dm.query_kb.return_value = []
-        mock_dm_cls.return_value = mock_dm
+        mock_get_dm.return_value = mock_dm
 
         node = KnowledgeBaseQueryNode({
             "kb_uuid": "kb-1",
@@ -2052,14 +2069,14 @@ class TestKnowledgeBaseQueryNode:
         assert result["error"]
         assert result["output"] == ""
 
-    @patch("app.services.document_manager.DocumentManager")
-    def test_min_similarity_filters_low_relevance_chunks(self, mock_dm_cls):
+    @patch("app.services.document_manager.get_document_manager")
+    def test_min_similarity_filters_low_relevance_chunks(self, mock_get_dm):
         mock_dm = MagicMock()
         mock_dm.query_kb.return_value = [
             {"content": "Relevant", "metadata": {"source_name": "a.pdf"}, "similarity": 0.8},
             {"content": "Junk", "metadata": {"source_name": "b.pdf"}, "similarity": 0.05},
         ]
-        mock_dm_cls.return_value = mock_dm
+        mock_get_dm.return_value = mock_dm
 
         node = KnowledgeBaseQueryNode({
             "kb_uuid": "kb-1", "query": "q", "min_similarity": "0.3",
@@ -2069,13 +2086,13 @@ class TestKnowledgeBaseQueryNode:
         assert "Junk" not in result["output"]
         assert len(result["retrieved_sources"]) == 1
 
-    @patch("app.services.document_manager.DocumentManager")
-    def test_min_similarity_filtering_everything_warns(self, mock_dm_cls):
+    @patch("app.services.document_manager.get_document_manager")
+    def test_min_similarity_filtering_everything_warns(self, mock_get_dm):
         mock_dm = MagicMock()
         mock_dm.query_kb.return_value = [
             {"content": "Junk", "metadata": {"source_name": "b.pdf"}, "similarity": 0.05},
         ]
-        mock_dm_cls.return_value = mock_dm
+        mock_get_dm.return_value = mock_dm
 
         node = KnowledgeBaseQueryNode({
             "kb_uuid": "kb-1", "query": "q", "min_similarity": 0.5,
@@ -2083,15 +2100,15 @@ class TestKnowledgeBaseQueryNode:
         result = node.process({"output": "prev"})
         assert "no matching passages" in result["warning"]
 
-    @patch("app.services.document_manager.DocumentManager")
-    def test_query_error_hard_fails_the_step(self, mock_dm_cls):
+    @patch("app.services.document_manager.get_document_manager")
+    def test_query_error_hard_fails_the_step(self, mock_get_dm):
         """Reversal of the earlier soft-fail (#805): the warning let the run
         finish Completed while the failure text flowed downstream as the next
         step's INPUT — a workflow summarizing "Knowledge base lookup failed:
         chroma down" as if it were retrieved content."""
         mock_dm = MagicMock()
         mock_dm.query_kb.side_effect = RuntimeError("chroma down")
-        mock_dm_cls.return_value = mock_dm
+        mock_get_dm.return_value = mock_dm
 
         node = KnowledgeBaseQueryNode({"kb_uuid": "kb-1", "query": "q"})
         result = node.process({"output": "prev"})
@@ -2099,13 +2116,13 @@ class TestKnowledgeBaseQueryNode:
         assert result["output"] == ""
 
     @patch("app.services.workflow_engine.llm_chat_model")
-    @patch("app.services.document_manager.DocumentManager")
-    def test_answer_mode_synthesizes_grounded_answer(self, mock_dm_cls, mock_llm):
+    @patch("app.services.document_manager.get_document_manager")
+    def test_answer_mode_synthesizes_grounded_answer(self, mock_get_dm, mock_llm):
         mock_dm = MagicMock()
         mock_dm.query_kb.return_value = [
             {"content": "Cost share is 50%", "metadata": {"source_name": "PAPPG.pdf", "page": 234}},
         ]
-        mock_dm_cls.return_value = mock_dm
+        mock_get_dm.return_value = mock_dm
         mock_llm.return_value = "Cost share is 50% [PAPPG.pdf · p. 234]"
 
         node = KnowledgeBaseQueryNode({
@@ -2125,20 +2142,20 @@ class TestKnowledgeBaseQueryNode:
         assert "Cost share is 50%" in call.kwargs["data"]
 
     @patch("app.services.workflow_engine.llm_chat_model")
-    @patch("app.services.document_manager.DocumentManager")
-    def test_passages_mode_makes_no_llm_call(self, mock_dm_cls, mock_llm):
+    @patch("app.services.document_manager.get_document_manager")
+    def test_passages_mode_makes_no_llm_call(self, mock_get_dm, mock_llm):
         mock_dm = MagicMock()
         mock_dm.query_kb.return_value = [
             {"content": "Chunk", "metadata": {"source_name": "a.pdf"}},
         ]
-        mock_dm_cls.return_value = mock_dm
+        mock_get_dm.return_value = mock_dm
 
         node = KnowledgeBaseQueryNode({"kb_uuid": "kb-1", "query": "q"})
         node.process({"output": "prev"})
         mock_llm.assert_not_called()
 
-    @patch("app.services.document_manager.DocumentManager")
-    def test_emits_retrieved_sources_with_page_and_score(self, mock_dm_cls):
+    @patch("app.services.document_manager.get_document_manager")
+    def test_emits_retrieved_sources_with_page_and_score(self, mock_get_dm):
         """The KB node returns a structured citation list for the workflow
         result to persist, in addition to the joined prompt text."""
         mock_dm = MagicMock()
@@ -2156,7 +2173,7 @@ class TestKnowledgeBaseQueryNode:
                 "score": 0.19,
             },
         ]
-        mock_dm_cls.return_value = mock_dm
+        mock_get_dm.return_value = mock_dm
 
         node = KnowledgeBaseQueryNode({"kb_uuid": "kb-1", "query": "cost share"})
         result = node.process({"output": "prev"})
@@ -2640,3 +2657,24 @@ class TestDataExportNonTabularCsv:
         assert result["output"]["file_type"] == "csv"
         assert result["output"]["filename"] == "rows.csv"
         assert "warning" not in result
+
+    @pytest.mark.parametrize("text", [
+        '{"PI Name": "Dr. Sarah Chen", "Total Budget": "USD 485000"}',
+        '```json\n{"PI Name": "Dr. Sarah Chen", "Total Budget": "USD 485000"}\n```',
+        '[{"PI Name": "Dr. Sarah Chen", "Total Budget": "USD 485000"}]',
+    ])
+    def test_a_json_record_returned_as_text_exports_as_csv(self, text):
+        # A Formatter or Prompt step returns its record as text.
+        node = DataExportNode({"format": "csv", "filename": "summary"})
+        result = node.process({"output": text})
+        assert result["output"]["file_type"] == "csv"
+        assert "warning" not in result
+        rows = list(csv.DictReader(io.StringIO(base64.b64decode(result["output"]["data_b64"]).decode())))
+        assert rows == [{"PI Name": "Dr. Sarah Chen", "Total Budget": "USD 485000"}]
+
+    @pytest.mark.parametrize("text", ['["a", "b"]', '{"unterminated": ', '42', 'Summary: {"a": 1}'])
+    def test_text_that_is_not_a_json_record_still_exports_as_text(self, text):
+        node = DataExportNode({"format": "csv", "filename": "summary"})
+        result = node.process({"output": text})
+        assert result["output"]["file_type"] == "txt"
+        assert "not tabular" in result["warning"]

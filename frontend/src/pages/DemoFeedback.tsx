@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useSearch } from '@tanstack/react-router'
 import {
   MessageSquare,
@@ -8,6 +8,7 @@ import {
   ExternalLink,
   AlertCircle,
 } from 'lucide-react'
+import { ApiError } from '../api/client'
 import { Footer } from '../components/layout/Footer'
 import { getPostQuestionnaire, submitPostQuestionnaire } from '../api/demo'
 import { SurveyFieldRenderer } from '../components/survey/SurveyFieldRenderer'
@@ -27,32 +28,35 @@ export default function DemoFeedback() {
   const [feedbackInfo, setFeedbackInfo] = useState<FeedbackInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [invalidLink, setInvalidLink] = useState(false)
+  const [readAttempt, setReadAttempt] = useState(0)
+  const pending = useRef(false)
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [answers, setAnswers] = useState<Record<string, unknown>>({})
 
   useEffect(() => {
-    if (!token) {
-      setError('No feedback token provided.')
-      setLoading(false)
-      return
-    }
-    getPostQuestionnaire(token)
-      .then((info) => {
-        setFeedbackInfo(info)
-        if (info.already_completed) {
-          setSubmitted(true)
-        }
-      })
-      .catch(() => setError('Invalid or expired feedback link.'))
-      .finally(() => setLoading(false))
-  }, [token])
+    let cancelled = false
+    setFeedbackInfo(null); setError(''); setInvalidLink(false); setAnswers({}); setSubmitted(false)
+    if (!token) { setInvalidLink(true); setError('No feedback token provided.'); setLoading(false); return }
+    setLoading(true)
+    getPostQuestionnaire(token).then(value => { if (!cancelled) { setFeedbackInfo(value); if (value.already_completed) setSubmitted(true) } })
+      .catch(reason => { if (!cancelled) {
+        const invalid = reason instanceof ApiError && [400, 403, 404, 410].includes(reason.status)
+        setInvalidLink(invalid)
+        setError(invalid ? 'This link is invalid or has expired.' : reason instanceof Error ? reason.message : 'Could not load feedback. Retry in a moment.')
+      } })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [token, readAttempt])
 
   function updateAnswer(key: string, value: unknown) {
     setAnswers((prev) => ({ ...prev, [key]: value }))
   }
 
   async function handleSubmit() {
+    if (pending.current) return
+    pending.current = true
     setError('')
     setSubmitting(true)
     try {
@@ -61,6 +65,7 @@ export default function DemoFeedback() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit feedback')
     } finally {
+      pending.current = false
       setSubmitting(false)
     }
   }
@@ -114,14 +119,15 @@ export default function DemoFeedback() {
       <div className="relative z-10 pt-28 pb-16">
         <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
           {loading ? (
-            <div className="flex justify-center py-20">
+            <div role="status" aria-label="Loading feedback" className="flex justify-center py-20">
               <Loader2 className="w-8 h-8 animate-spin text-[#f1b300]" />
             </div>
           ) : error && !feedbackInfo ? (
             <div className="text-center py-20">
               <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-6" />
-              <h2 className="text-2xl font-bold text-white mb-4">Invalid Link</h2>
-              <p className="text-gray-400">{error}</p>
+              <h2 className="text-2xl font-bold text-white mb-4">{invalidLink ? 'Invalid Link' : 'Unable to load'}</h2>
+              <p role="alert" className="text-gray-400">{error}</p>
+              {!invalidLink && <button onClick={() => setReadAttempt(value => value + 1)} className="mt-4 rounded-lg bg-white/10 px-6 py-3 font-bold text-white">Retry feedback</button>}
                 <Link
                   to="/landing"
                   search={{ error: undefined, invite_token: undefined, admin: undefined, next: undefined, register: undefined }}

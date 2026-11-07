@@ -1,4 +1,10 @@
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { FullExportButton } from './shared/FullExportButton'
+import { useAdminDetailScroll } from './shared/AdminScrollRestoration'
+import { InventoryPages } from './shared/InventoryPages'
+import { useAdminViewState } from './shared/AdminViewState'
+import { TableRegion } from './shared/TableRegion'
+import { useAdminQuery } from './shared/useAdminQuery'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import {
   ArrowLeft, Check, MessageSquare, CheckCircle2, Cpu, FileText, XCircle, Zap,
   Download, AlertCircle,
@@ -10,7 +16,7 @@ import {
   getUserLeaderboard, getUserDetail, getUserHistory, updateUserRoles,
 } from '../../api/admin'
 import type {
-  UserLeaderboardItem, UserDetailResponse, UserHistoryItem,
+  UserHistoryItem, UserLeaderboardItem,
 } from '../../api/admin'
 import * as auditApi from '../../api/audit'
 import { useAuth } from '../../hooks/useAuth'
@@ -27,24 +33,11 @@ function UserDrillDown({ userId, onBack }: { userId: string; onBack: () => void 
   const { user: currentUser } = useAuth()
   const confirm = useConfirm()
   const { toast } = useToast()
-  const [data, setData] = useState<UserDetailResponse | null>(null)
   const [days, setDays] = useState(30)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [savingRoles, setSavingRoles] = useState(false)
 
-  const load = useCallback(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-    getUserDetail(userId, days)
-      .then(res => { if (!cancelled) setData(res) })
-      .catch(e => { if (!cancelled) setError(e?.message || 'Failed to load') })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [userId, days])
-
-  useEffect(() => load(), [load])
+  const request = useCallback(() => getUserDetail(userId, days), [userId, days])
+  const { data, setData, loading, error, load } = useAdminQuery(request)
 
   const prev = data?.previous_period
 
@@ -54,7 +47,8 @@ function UserDrillDown({ userId, onBack }: { userId: string; onBack: () => void 
       <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: '#6b7280', padding: '4px 0' }}>
         <ArrowLeft size={16} /> Back to Users
       </button>
-      <div style={{ padding: 40, textAlign: 'center', color: '#dc2626' }}>Error: {error}</div>
+      <div role="alert" style={{ padding: 20, color: '#991b1b' }}>Error: {error}</div>
+      <button type="button" onClick={load} className="admin-open-record">Retry user details</button>
     </div>
   )
   if (!data) return null
@@ -62,15 +56,15 @@ function UserDrillDown({ userId, onBack }: { userId: string; onBack: () => void 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Back + header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: '#6b7280', padding: '4px 0' }}>
           <ArrowLeft size={16} /> Back to Users
         </button>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', overflowWrap: 'anywhere' }}>
         <UserAvatar name={data.name || data.email} />
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 20, fontWeight: 700 }}>{data.name || 'Unknown'}</span>
             {data.is_admin && <RoleBadge role="admin" />}
             {data.is_staff && <RoleBadge role="staff" />}
@@ -192,7 +186,7 @@ function UserDrillDown({ userId, onBack }: { userId: string; onBack: () => void 
       </div>
 
       {/* KPI Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+      <div className="admin-metrics-grid">
         <KpiCard label="Conversations" value={formatNumber(data.conversations)} icon={MessageSquare} color="#3b82f6" trend={prev ? { current: data.conversations, previous: prev.conversations } : undefined} />
         <KpiCard label="Workflows Completed" value={formatNumber(data.workflows_completed)} icon={CheckCircle2} color="#22c55e" trend={prev ? { current: data.workflows_completed, previous: prev.workflows_completed } : undefined} />
         <KpiCard label="Total Tokens" value={formatNumber(data.tokens_in + data.tokens_out)} icon={Cpu} color="#8b5cf6" trend={prev ? { current: data.tokens_in + data.tokens_out, previous: prev.tokens_in + prev.tokens_out } : undefined} />
@@ -208,8 +202,8 @@ function UserDrillDown({ userId, onBack }: { userId: string; onBack: () => void 
           <ResponsiveContainer width="100%" height={280}>
             <AreaChart data={data.timeseries}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-              <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9ca3af' }} tickFormatter={v => v.slice(5)} />
-              <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} width={50} />
+              <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#59616b' }} tickFormatter={v => v.slice(5)} />
+              <YAxis tick={{ fontSize: 11, fill: '#59616b' }} width={50} />
               <Tooltip contentStyle={{ borderRadius: 8, fontSize: 13, border: '1px solid #e5e7eb' }} />
               <Area type="monotone" dataKey="conversations" stackId="1" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.15} name="Conversations" />
               <Area type="monotone" dataKey="workflows_started" stackId="1" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.15} name="Workflows" />
@@ -225,7 +219,7 @@ function UserDrillDown({ userId, onBack }: { userId: string; onBack: () => void 
           <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', fontSize: 15, fontWeight: 600 }}>
             Recent Workflows
           </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <TableRegion label="Recent user workflows — scroll for more columns"><table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
                 <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Status</th>
@@ -246,7 +240,7 @@ function UserDrillDown({ userId, onBack }: { userId: string; onBack: () => void 
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></TableRegion>
         </div>
       )}
 
@@ -282,33 +276,49 @@ function UserActivityHistory({ userId, email }: { userId: string; email: string 
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Reload from scratch whenever the time range changes.
-  useEffect(() => {
-    let cancelled = false
+  const historyVersion = useRef(0)
+  const fetchingMore = useRef(false)
+  const load = useCallback(() => {
+    const version = ++historyVersion.current
+    fetchingMore.current = false
+    setLoadingMore(false)
     setLoading(true)
     setError(null)
     getUserHistory(userId, days, 0, HISTORY_PAGE_SIZE)
       .then(res => {
-        if (cancelled) return
+        if (version !== historyVersion.current) return
         setItems(res.items)
         setTotal(res.total)
         setCapped(res.capped)
       })
-      .catch(e => { if (!cancelled) setError(e?.message || 'Failed to load history') })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
+      .catch(e => { if (version === historyVersion.current) setError(e?.message || 'Failed to load history') })
+      .finally(() => { if (version === historyVersion.current) setLoading(false) })
   }, [userId, days])
+  useEffect(() => {
+    const guard = historyVersion
+    load()
+    return () => { guard.current++ }
+  }, [load])
 
   const loadMore = useCallback(() => {
+    if (fetchingMore.current) return
+    fetchingMore.current = true
+    const version = historyVersion.current
     setLoadingMore(true)
+    setError(null)
     getUserHistory(userId, days, items.length, HISTORY_PAGE_SIZE)
       .then(res => {
+        if (version !== historyVersion.current) return
         setItems(prev => [...prev, ...res.items])
         setTotal(res.total)
         setCapped(res.capped)
       })
-      .catch(e => setError(e?.message || 'Failed to load history'))
-      .finally(() => setLoadingMore(false))
+      .catch(e => { if (version === historyVersion.current) setError(e?.message || 'Failed to load history') })
+      .finally(() => {
+        if (version !== historyVersion.current) return
+        fetchingMore.current = false
+        setLoadingMore(false)
+      })
   }, [userId, days, items.length])
 
   const startTime = useMemo(
@@ -345,12 +355,12 @@ function UserActivityHistory({ userId, email }: { userId: string; email: string 
       {loading ? (
         <div style={{ padding: 32, textAlign: 'center', color: '#6b7280', fontSize: 14 }}>Loading activity history...</div>
       ) : error ? (
-        <div style={{ padding: 32, textAlign: 'center', color: '#dc2626', fontSize: 14 }}>Error: {error}</div>
+        <div style={{ padding: 24 }}><p role="alert" style={{ color: '#991b1b' }}>{error}</p><button type="button" onClick={load} className="admin-open-record">Retry activity history</button></div>
       ) : items.length === 0 ? (
         <div style={{ padding: 32, textAlign: 'center', color: '#6b7280', fontSize: 14 }}>No recorded activity in this period.</div>
       ) : (
         <>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <TableRegion label="User activity history — scroll for more columns"><TableRegion label="User leaderboard — scroll for more columns"><table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
                 <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>When</th>
@@ -368,14 +378,14 @@ function UserActivityHistory({ userId, email }: { userId: string; email: string 
                   <td style={{ padding: '10px 16px' }}><SourceBadge source={it.source} /></td>
                   <td style={{ padding: '10px 16px', fontSize: 13, fontFamily: 'ui-monospace, monospace' }}>{it.action}</td>
                   <td style={{ padding: '10px 16px', fontSize: 13 }}>
-                    {it.title || (it.resource_type ? <span style={{ color: '#9ca3af' }}>{it.resource_type}</span> : '-')}
+                    {it.title || (it.resource_type ? <span style={{ color: '#59616b' }}>{it.resource_type}</span> : '-')}
                   </td>
-                  <td style={{ padding: '10px 16px' }}>{it.status ? <StatusBadge status={it.status} /> : <span style={{ color: '#d1d5db' }}>—</span>}</td>
+                  <td style={{ padding: '10px 16px' }}>{it.status ? <StatusBadge status={it.status} /> : <span style={{ color: '#59616b' }}>—</span>}</td>
                   <td style={{ padding: '10px 16px', fontSize: 12, color: '#6b7280', fontFamily: 'ui-monospace, monospace' }}>{it.ip_address || '—'}</td>
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></TableRegion></TableRegion>
           <div style={{ padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 12, borderTop: '1px solid #f3f4f6' }}>
             <span role="status" aria-live="polite" style={{ fontSize: 12, color: '#6b7280' }}>Showing {items.length} of {total}{email ? ` · ${email}` : ''}</span>
             <div style={{ flex: 1 }} />
@@ -400,28 +410,17 @@ function UserActivityHistory({ userId, email }: { userId: string; email: string 
 }
 
 export function UsersTab() {
-  const [users, setUsers] = useState<UserLeaderboardItem[]>([])
-  const [capped, setCapped] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [search, setSearch] = useState('')
-  const [sort, setSort] = useState<{ key: UserSortKey; dir: 'asc' | 'desc' }>({ key: 'tokens_total', dir: 'desc' })
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
-  const [days, setDays] = useState<DayOption>('all')
+  const [offset, setOffset] = useAdminViewState('UsersTab.offset', 0)
+  const [search, setSearch] = useAdminViewState('UsersTab.search', '')
+  const [sort, setSort] = useAdminViewState<{ key: UserSortKey; dir: 'asc' | 'desc' }>('UsersTab.sort', { key: 'tokens_total', dir: 'desc' })
+  const [selectedUserId, selectUserId] = useState<string | null>(null)
+  const setSelectedUserId = useAdminDetailScroll(selectedUserId, selectUserId)
+  const [days, setDays] = useAdminViewState<DayOption>('UsersTab.days', 'all')
 
-  const load = useCallback(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-    const arg = typeof days === 'number' ? days : undefined
-    getUserLeaderboard(arg)
-      .then(res => { if (!cancelled) { setUsers(res.items); setCapped(res.capped) } })
-      .catch(e => { if (!cancelled) setError(e?.message || 'Failed to load users') })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [days])
-
-  useEffect(() => load(), [load])
+  const request = useCallback(() => getUserLeaderboard(typeof days === 'number' ? days : undefined, 500, offset), [days, offset])
+  const { data, loading, error, load } = useAdminQuery(request)
+  const users = useMemo(() => data?.items ?? [], [data])
+  const capped = data?.capped ?? false
 
   const handleSort = (key: string) => {
     setSort(prev => ({
@@ -430,27 +429,7 @@ export function UsersTab() {
     }))
   }
 
-  const filtered = useMemo(() => {
-    let list = users
-    if (search.trim()) {
-      const q = search.toLowerCase()
-      list = list.filter(u =>
-        (u.name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q)
-      )
-    }
-    const sorted = [...list].sort((a, b) => {
-      let cmp = 0
-      switch (sort.key) {
-        case 'name': cmp = (a.name || '').localeCompare(b.name || ''); break
-        case 'tokens_total': cmp = a.tokens_total - b.tokens_total; break
-        case 'workflows_run': cmp = a.workflows_run - b.workflows_run; break
-        case 'conversations': cmp = a.conversations - b.conversations; break
-        case 'last_active': cmp = (a.last_active || '').localeCompare(b.last_active || ''); break
-      }
-      return sort.dir === 'asc' ? cmp : -cmp
-    })
-    return sorted
-  }, [users, search, sort])
+  const filtered = useMemo(() => filterUsers(users, search, sort), [users, search, sort])
 
   const maxTokens = users.reduce((max, u) => Math.max(max, u.tokens_total), 1)
 
@@ -461,7 +440,8 @@ export function UsersTab() {
         i + 1, u.name, u.email,
         [u.is_admin ? 'admin' : '', u.is_staff ? 'staff' : '', u.is_examiner ? 'examiner' : ''].filter(Boolean).join(', '),
         u.tokens_total, u.workflows_run, u.conversations, u.last_active,
-      ])
+      ]),
+      { Scope: 'Current page', Offset: String(offset), 'Window (days)': String(days), Search: search, Sort: `${sort.key} ${sort.dir}`, Timezone: 'UTC' }
     )
   }
 
@@ -476,34 +456,37 @@ export function UsersTab() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <TimeRangeSelector value={days} onChange={setDays} includeAll onRefresh={load} />
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <SearchInput value={search} onChange={setSearch} placeholder="Search users..." />
         <div style={{ flex: 1 }} />
-        <ExportButton onClick={handleExport} />
+        <ExportButton onClick={handleExport} disabled={loading || !!error || !data} />
+        <FullExportButton scope={JSON.stringify([days, search, sort])} filename="users-all-matching.csv" disabled={loading || !!error}
+          headers={['Name', 'Email', 'Roles', 'Tokens', 'Workflows', 'Conversations', 'Last Active']}
+          fetchPage={offset => getUserLeaderboard(typeof days === 'number' ? days : undefined, 500, offset)} getKey={user => user.user_id}
+          select={items => filterUsers(items, search, sort)}
+          row={user => [user.name, user.email, [user.is_admin ? 'admin' : '', user.is_staff ? 'staff' : '', user.is_examiner ? 'examiner' : ''].filter(Boolean).join(', '), user.tokens_total, user.workflows_run, user.conversations, user.last_active]}
+          metadata={{ 'Window (days)': String(days), Search: search, Sort: `${sort.key} ${sort.dir}`, Timezone: 'UTC' }} />
       </div>
 
       <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', fontSize: 15, fontWeight: 600 }}>
           User Leaderboard ({filtered.length}) {days !== 'all' && <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 400 }}>· last {days} days</span>}
         </div>
-        {capped && (
-          <div style={{ padding: '10px 20px', background: '#fffbeb', borderBottom: '1px solid #fde68a', fontSize: 13, color: '#92400e', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <AlertCircle size={14} /> Showing the top {users.length} users by token usage — this list is truncated. Sorting and export cover only these loaded rows, not the full user base.
-          </div>
-        )}
+        <InventoryPages offset={offset} count={users.length} total={data?.total} hasMore={capped} busy={loading} onChange={setOffset} />
         {error && (
           <div style={{
             display: 'flex', alignItems: 'center', gap: 8,
             padding: '10px 16px', background: '#fef2f2', borderBottom: '1px solid #fecaca',
             color: '#991b1b', fontSize: 13,
           }}>
-            <AlertCircle size={14} /> {error}
+            <span role="alert"><AlertCircle size={14} /> {error}</span>
+            <button type="button" onClick={load} className="admin-open-record">Retry users</button>
           </div>
         )}
         {filtered.length === 0 ? (
           !error && <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>No users found.</div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <TableRegion label="User leaderboard — scroll for more columns"><table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
                 <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>#</th>
@@ -516,14 +499,14 @@ export function UsersTab() {
             </thead>
             <tbody>
               {filtered.map((u, i) => (
-                <tr key={u.user_id} tabIndex={0} role="button" aria-label={`View ${u.user_id}`} onClick={() => setSelectedUserId(u.user_id)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedUserId(u.user_id) } }} style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#f9fafb')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = '')}>
-                  <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 600, color: '#9ca3af' }}>{i + 1}</td>
+                <tr key={u.user_id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                  <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 600, color: '#59616b' }}>{i + 1}</td>
                   <td style={{ padding: '12px 16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <UserAvatar name={u.name || u.email} />
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ fontSize: 14, fontWeight: 500 }}>{u.name || 'Unknown'}</span>
+                          <button type="button" className="admin-open-record" aria-label={`View ${u.name || u.email || u.user_id}`} onClick={() => setSelectedUserId(u.user_id)}>{u.name || u.email || 'Unknown'}</button>
                           {u.is_admin && <RoleBadge role="admin" />}
                           {u.is_staff && <RoleBadge role="staff" />}
                           {u.is_examiner && <RoleBadge role="examiner" />}
@@ -548,9 +531,31 @@ export function UsersTab() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></TableRegion>
         )}
       </div>
     </div>
   )
+}
+
+function filterUsers(users: UserLeaderboardItem[], search: string, sort: { key: UserSortKey; dir: 'asc' | 'desc' }) {
+    let list = users
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      list = list.filter(u =>
+        (u.name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q)
+      )
+    }
+    const sorted = [...list].sort((a, b) => {
+      let cmp = 0
+      switch (sort.key) {
+        case 'name': cmp = (a.name || '').localeCompare(b.name || ''); break
+        case 'tokens_total': cmp = a.tokens_total - b.tokens_total; break
+        case 'workflows_run': cmp = a.workflows_run - b.workflows_run; break
+        case 'conversations': cmp = a.conversations - b.conversations; break
+        case 'last_active': cmp = (a.last_active || '').localeCompare(b.last_active || ''); break
+      }
+      return sort.dir === 'asc' ? cmp : -cmp
+    })
+    return sorted
 }

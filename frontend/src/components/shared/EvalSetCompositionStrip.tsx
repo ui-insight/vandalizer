@@ -22,9 +22,9 @@ export function EvalSetCompositionStrip({
     // Older runs without a snapshot — fall back to bare query count.
     if (fallbackQueryCount == null) return null
     return (
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 'var(--workspace-space-6)', flexWrap: 'wrap' }}>
         <Chip label={`${fallbackQueryCount} ${fallbackQueryCount === 1 ? 'query' : 'queries'}`} tone="neutral" />
-        <Chip label="no composition snapshot" tone="warn" title="This run pre-dates eval-set snapshots — composition info is unavailable." />
+        <Chip label="no composition snapshot" tone="warn" title="This run pre-dates eval-set snapshots, so composition info is unavailable." />
       </div>
     )
   }
@@ -47,7 +47,7 @@ export function EvalSetCompositionStrip({
 
   return (
     <div style={{
-      display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center',
+      display: 'flex', gap: 'var(--workspace-space-6)', flexWrap: 'wrap', alignItems: 'center',
     }}>
       <Chip
         label={`${total} ${total === 1 ? 'query' : 'queries'}`}
@@ -58,7 +58,7 @@ export function EvalSetCompositionStrip({
           label={`${auto} auto · ${user} user`}
           tone={autoTone}
           title={autoRatio > 0.5
-            ? `${Math.round(autoRatio * 100)}% of the eval set is LLM-generated — scores may be optimistic if the judge shares assumptions with the generator.`
+            ? `${Math.round(autoRatio * 100)}% of the eval set is LLM-generated, so scores may be optimistic if the judge shares assumptions with the generator.`
             : 'Mix of LLM-generated and user-authored test queries.'}
         />
       )}
@@ -80,7 +80,7 @@ export function EvalSetCompositionStrip({
         />
       )}
       {variant === 'expanded' && categoryCount > 0 && (
-        <div style={{ flexBasis: '100%', marginTop: 4, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+        <div style={{ flexBasis: '100%', marginTop: 'var(--workspace-space-4)', display: 'flex', gap: 'var(--workspace-space-4)', flexWrap: 'wrap' }}>
           {Object.entries(snapshot.categories || {}).map(([cat, count]) => (
             <SubChip key={cat} label={`${cat} · ${count}`} />
           ))}
@@ -93,10 +93,10 @@ export function EvalSetCompositionStrip({
 type ChipTone = 'neutral' | 'good' | 'warn' | 'bad'
 
 const TONE_COLORS: Record<ChipTone, { fg: string; bg: string; border: string }> = {
-  neutral: { fg: '#aaa', bg: 'rgba(255,255,255,0.04)', border: '#2e2e2e' },
-  good: { fg: '#86efac', bg: 'rgba(34, 197, 94, 0.08)', border: 'rgba(34, 197, 94, 0.3)' },
-  warn: { fg: '#fbbf24', bg: 'rgba(245, 158, 11, 0.08)', border: 'rgba(245, 158, 11, 0.3)' },
-  bad: { fg: '#fca5a5', bg: 'rgba(239, 68, 68, 0.08)', border: 'rgba(239, 68, 68, 0.3)' },
+  neutral: { fg: 'var(--workspace-muted)', bg: 'var(--workspace-canvas)', border: 'var(--workspace-border)' },
+  good: { fg: 'var(--workspace-success)', bg: 'rgba(34, 197, 94, 0.08)', border: 'rgba(34, 197, 94, 0.3)' },
+  warn: { fg: 'var(--workspace-warning)', bg: 'rgba(245, 158, 11, 0.08)', border: 'rgba(245, 158, 11, 0.3)' },
+  bad: { fg: 'var(--workspace-danger)', bg: 'rgba(239, 68, 68, 0.08)', border: 'rgba(239, 68, 68, 0.3)' },
 }
 
 function Chip({ label, tone, title }: { label: string; tone: ChipTone; title?: string }) {
@@ -106,8 +106,8 @@ function Chip({ label, tone, title }: { label: string; tone: ChipTone; title?: s
       title={title}
       style={{
         display: 'inline-flex', alignItems: 'center',
-        fontSize: 10, fontWeight: 600,
-        padding: '2px 8px', borderRadius: 6,
+        fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
+        padding: "var(--workspace-space-2) var(--workspace-space-8)", borderRadius: 'var(--workspace-radius-small)',
         color: c.fg, backgroundColor: c.bg,
         border: `1px solid ${c.border}`,
         whiteSpace: 'nowrap',
@@ -121,10 +121,10 @@ function Chip({ label, tone, title }: { label: string; tone: ChipTone; title?: s
 function SubChip({ label }: { label: string }) {
   return (
     <span style={{
-      fontSize: 9, color: '#888',
-      padding: '1px 6px', borderRadius: 4,
-      backgroundColor: 'rgba(255,255,255,0.02)',
-      border: '1px solid #2a2a2a',
+      fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)',
+      padding: "1px var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-small)',
+      backgroundColor: 'var(--workspace-canvas)',
+      border: '1px solid var(--workspace-border)',
     }}>{label}</span>
   )
 }

@@ -3,14 +3,14 @@
 BACKEND_DIR := backend
 FRONTEND_DIR := frontend
 
-.PHONY: help backend-install backend-lint backend-typecheck backend-test backend-security backend-audit review-graph endpoint-map endpoint-map-check backend-static backend-backlog backend-ci backend-test-integration-t1 backend-test-integration-t2 backend-test-integration-t3 backend-test-integration-t4 backend-judge-calibration frontend-install frontend-typecheck frontend-lint frontend-test frontend-build frontend-audit frontend-ci ci helm-lint docker-build release-check security security-gate security-built-images
+.PHONY: certification-release-check frontend-certification-check help backend-install backend-lint backend-typecheck backend-test backend-security backend-audit review-graph endpoint-map endpoint-map-check backend-static backend-backlog backend-ci backend-test-integration-t1 backend-test-integration-t2 backend-test-integration-t3 backend-test-integration-t4 backend-judge-calibration frontend-install frontend-typecheck frontend-lint frontend-test frontend-build frontend-audit frontend-ci ci helm-lint docker-build release-check security security-gate security-built-images
 
 help:
 	@printf "Common targets:\n"
 	@printf "  make backend-install   Install backend dev dependencies\n"
 	@printf "  make backend-ci        Run the backend release-gating test suite\n"
-	@printf "  make backend-static    Run release-gating backend lint and security checks\n"
-	@printf "  make backend-backlog   Run backend typecheck and dependency audit backlog\n"
+	@printf "  make backend-static    Run release-gating backend lint, typing and security checks\n"
+	@printf "  make backend-backlog   Run the remaining backend dependency audit backlog\n"
 	@printf "  make endpoint-map      Write the UI-to-endpoint map for reading\n"
 	@printf "  make frontend-install  Install frontend dependencies\n"
 	@printf "  make frontend-ci       Run frontend typecheck, lint, tests, and build\n"
@@ -29,7 +29,7 @@ backend-lint:
 	cd $(BACKEND_DIR) && uv run ruff check app/
 
 backend-typecheck:
-	cd $(BACKEND_DIR) && uv run mypy app/ --ignore-missing-imports
+	cd $(BACKEND_DIR) && uv run python ../scripts/check_backend_types.py
 
 # Coverage gate set just below current measured (~51%). Bump as untested
 # modules (m365_tasks, demo_tasks, support_service, passive_tasks, etc.)
@@ -94,14 +94,16 @@ endpoint-map:
 endpoint-map-check:
 	cd $(BACKEND_DIR) && uv run python ../scripts/map_ui_endpoints.py --check --stdout >/dev/null
 
-backend-static: backend-lint backend-security endpoint-map-check
+certification-release-check:
+	cd $(BACKEND_DIR) && uv run python ../scripts/check_certification_releases.py
 
-backend-backlog: backend-typecheck backend-audit
+backend-static: certification-release-check backend-lint backend-typecheck backend-security endpoint-map-check
 
-# Advisory jobs split for independent progress tracking. Both are non-blocking
-# in CI today: backend-typecheck has ~924 errors (mypy was added late), and
-# backend-audit has open CVEs in indirect deps. As either reaches zero, flip
-# the corresponding `continue-on-error` to `false` in .github/workflows/ci.yaml.
+backend-backlog: backend-audit
+
+# Typing is a blocking static gate. The dependency audit remains advisory while
+# upstream Chroma fixes are unavailable; findings are not waived or suppressed.
+# See docs/v5-release-readiness.md.
 
 backend-test-integration-t1:
 	cd $(BACKEND_DIR) && uv run pytest tests/integration/test_tier1_engine.py -x -q
@@ -151,7 +153,10 @@ frontend-build:
 frontend-audit:
 	./scripts/npm_audit_gate.sh
 
-frontend-ci: frontend-typecheck frontend-lint frontend-audit frontend-test frontend-build
+frontend-certification-check:
+	cd $(FRONTEND_DIR) && npm run certification:check
+
+frontend-ci: frontend-certification-check frontend-typecheck frontend-lint frontend-audit frontend-test frontend-build
 
 ci: backend-ci frontend-ci
 
@@ -256,7 +261,7 @@ security: security-runtime-images
 #   the fix; the gap in the upstream tag is recorded in .trivyignore.yaml, each
 #   entry with an expiry so it fails loudly if the rebuild never comes.
 #
-#   HIGH stays advisory *for now*, matching the backend-typecheck / backend-audit
+#   HIGH stays advisory *for now*, matching the backend-audit
 #   convention above. The difference from before is that it is now reported
 #   rather than hidden: `npm audit --audit-level=critical` silently passed six
 #   HIGH findings, and pip-audit's twenty-nine sat in a non-blocking target

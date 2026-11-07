@@ -32,20 +32,20 @@ export function BudgetTierPicker({
   description = 'Each setup costs LLM tokens to test. The smaller tiers confirm whether tuning helps at all; larger tiers find a more confident winner.',
 }: BudgetTierPickerProps) {
   return (
-    <div style={{ fontSize: 13, color: '#ccc' }}>
-      <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: '#fff' }}>{title}</h4>
-      <p style={{ margin: '0 0 12px 0', color: '#bbb', lineHeight: 1.5 }}>{description}</p>
+    <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>
+      <h4 style={{ margin: "0 0 var(--workspace-space-8) 0", fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>{title}</h4>
+      <p style={{ margin: "0 0 var(--workspace-space-12) 0", color: 'var(--workspace-muted)', lineHeight: 1.5 }}>{description}</p>
       {recommendedTierId && recommendationReason && (
         <div style={{
-          marginBottom: 10, padding: '8px 10px',
-          backgroundColor: 'rgba(124, 58, 237, 0.08)',
-          border: '1px solid rgba(124, 58, 237, 0.3)', borderRadius: 6,
-          fontSize: 11, color: '#c4b5fd', lineHeight: 1.5,
+          marginBottom: 'var(--workspace-space-12)', padding: "var(--workspace-space-8) var(--workspace-space-12)",
+          backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 8%, transparent)',
+          border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 30%, transparent)', borderRadius: 'var(--workspace-radius-small)',
+          fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-accent-ink)', lineHeight: 1.5,
         }}>
           {recommendationReason}
         </div>
       )}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-6)' }}>
         {tiers.map(t => {
           const active = selected === t.id
           const recommended = recommendedTierId === t.id
@@ -55,29 +55,29 @@ export function BudgetTierPicker({
               key={t.id}
               onClick={() => onSelect(t.id)}
               style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '10px 12px', textAlign: 'left',
-                backgroundColor: active ? 'rgba(124, 58, 237, 0.12)' : '#262626',
-                border: '1px solid ' + (active ? '#7c3aed' : '#333'),
-                borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', color: '#e5e5e5',
+                display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)',
+                padding: "var(--workspace-space-12) var(--workspace-space-12)", textAlign: 'left',
+                backgroundColor: active ? 'color-mix(in srgb, var(--highlight-color, #eab308) 12%, transparent)' : 'var(--workspace-surface)',
+                border: '1px solid ' + (active ? 'var(--highlight-color, #eab308)' : 'var(--workspace-border)'),
+                borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer', fontFamily: 'inherit', color: 'var(--workspace-text)',
               }}
             >
               <Radio active={active} />
               <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{t.label}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)' }}>
+                  <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600 }}>{t.label}</div>
                   {recommended && (
                     <span style={{
-                      fontSize: 9, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase',
-                      padding: '2px 6px', borderRadius: 10,
-                      color: '#a78bfa', backgroundColor: 'rgba(124, 58, 237, 0.18)',
-                      border: '1px solid rgba(124, 58, 237, 0.45)',
+                      fontSize: 'var(--workspace-font-meta)', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase',
+                      padding: "var(--workspace-space-2) var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-large)',
+                      color: 'var(--workspace-accent-ink)', backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 18%, transparent)',
+                      border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 45%, transparent)',
                     }}>
                       Recommended for you
                     </span>
                   )}
                 </div>
-                <div style={{ fontSize: 11, color: '#888' }}>
+                <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
                   {rowTokens}
                   {rowCost && <> · {rowCost}</>}
                   {' · '}{t.trialsEstimate} · {t.timeEstimate}
@@ -89,16 +89,16 @@ export function BudgetTierPicker({
         <button
           onClick={() => onSelect('custom')}
           style={{
-            display: 'flex', alignItems: 'center', gap: 10,
-            padding: '10px 12px', textAlign: 'left',
-            backgroundColor: selected === 'custom' ? 'rgba(124, 58, 237, 0.12)' : '#262626',
-            border: '1px solid ' + (selected === 'custom' ? '#7c3aed' : '#333'),
-            borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', color: '#e5e5e5',
+            display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)',
+            padding: "var(--workspace-space-12) var(--workspace-space-12)", textAlign: 'left',
+            backgroundColor: selected === 'custom' ? 'color-mix(in srgb, var(--highlight-color, #eab308) 12%, transparent)' : 'var(--workspace-surface)',
+            border: '1px solid ' + (selected === 'custom' ? 'var(--highlight-color, #eab308)' : 'var(--workspace-border)'),
+            borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer', fontFamily: 'inherit', color: 'var(--workspace-text)',
           }}
         >
           <Radio active={selected === 'custom'} />
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 600 }}>Custom</div>
+            <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600 }}>Custom</div>
             {selected === 'custom' && (
               <input
                 type="number"
@@ -106,9 +106,9 @@ export function BudgetTierPicker({
                 onChange={e => onCustomTokens(Math.max(0, Number(e.target.value) || 0))}
                 onClick={e => e.stopPropagation()}
                 style={{
-                  marginTop: 4, width: 120,
-                  background: '#1a1a1a', color: '#e5e5e5', border: '1px solid #333',
-                  borderRadius: 4, padding: '4px 6px', fontSize: 12,
+                  marginTop: 'var(--workspace-space-4)', width: 120,
+                  background: 'var(--workspace-canvas)', color: 'var(--workspace-text)', border: '1px solid var(--workspace-border)',
+                  borderRadius: 'var(--workspace-radius-small)', padding: "var(--workspace-space-4) var(--workspace-space-6)", fontSize: 'var(--workspace-font-meta)',
                 }}
               />
             )}
@@ -116,14 +116,14 @@ export function BudgetTierPicker({
         </button>
       </div>
       <div style={{
-        marginTop: 12, padding: '8px 10px',
-        backgroundColor: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 6,
-        fontSize: 12, color: '#aaa',
+        marginTop: 'var(--workspace-space-12)', padding: "var(--workspace-space-8) var(--workspace-space-12)",
+        backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)',
+        fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)',
       }}>
         Selected: <b>{tokensLabel}</b>{costLabel && <> · <b>{costLabel}</b></>}
       </div>
-      <p style={{ margin: '8px 0 0 0', fontSize: 11, color: '#777', lineHeight: 1.5 }}>
-        Time estimates are approximate — actual runtime scales with your test-set
+      <p style={{ margin: "var(--workspace-space-8) 0 0 0", fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
+        Time estimates are approximate. Actual runtime scales with your test-set
         size and current model speed, so larger test sets can take noticeably longer.
       </p>
     </div>

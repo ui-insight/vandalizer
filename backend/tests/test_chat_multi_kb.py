@@ -297,3 +297,74 @@ class TestChatRouteAcceptsSeveralKBs:
             )
 
         assert resp.status_code == 404
+
+
+class TestMultiKBRetrievalFailures:
+    """A failed search must never read as an empty knowledge base (#997).
+
+    Returning no segment puts the turn in empty-KB mode, whose rules allow a
+    general-knowledge answer, so an outage on every attached KB, or on some of
+    them when the rest found nothing, used to come back as an ungrounded answer
+    with no warning. A partial failure was never mentioned at all."""
+
+    @staticmethod
+    async def _run(pools, failed_kbs):
+        async def fake_retrieve(kb_uuid, *_args, **_kwargs):
+            pool = pools[kb_uuid]
+            if isinstance(pool, Exception):
+                raise pool
+            return list(pool)
+
+        with (
+            patch.object(chat_service, "_retrieve_kb_results", new=fake_retrieve),
+            patch(
+                "app.services.knowledge_service.resolve_openable_documents",
+                new_callable=AsyncMock, return_value={},
+            ),
+        ):
+            return await chat_service._build_multi_kb_segment(
+                [("kb-a", "Policies"), ("kb-b", "Awards")],
+                "question?", "test-model", failed_kbs=failed_kbs,
+            )
+
+    @pytest.mark.asyncio
+    async def test_every_kb_failing_raises_instead_of_reading_as_empty(self):
+        failed: list[str] = []
+        with pytest.raises(chat_service.KBRetrievalFailed):
+            await self._run({"kb-a": RuntimeError("down"), "kb-b": RuntimeError("down")}, failed)
+        assert failed == ["Policies", "Awards"]
+
+    @pytest.mark.asyncio
+    async def test_a_failure_with_nothing_found_elsewhere_raises(self):
+        failed: list[str] = []
+        with pytest.raises(chat_service.KBRetrievalFailed):
+            await self._run({"kb-a": RuntimeError("down"), "kb-b": []}, failed)
+        assert failed == ["Policies"]
+
+    @pytest.mark.asyncio
+    async def test_a_partial_failure_answers_from_the_rest_and_names_the_failed_kb(self):
+        failed: list[str] = []
+        segment, sources = await self._run(
+            {"kb-a": RuntimeError("down"), "kb-b": [_chunk(0, "award.pdf")]}, failed,
+        )
+        assert segment is not None
+        assert [s["kb_title"] for s in sources] == ["Awards"]
+        assert failed == ["Policies"]
+
+    @pytest.mark.asyncio
+    async def test_kbs_that_searched_and_found_nothing_are_still_empty_not_failed(self):
+        failed: list[str] = []
+        assert await self._run({"kb-a": [], "kb-b": []}, failed) == (None, [])
+        assert failed == []
+
+    def test_the_partial_failure_notice_names_the_kbs_and_says_what_the_answer_used(self):
+        notice = chat_service._kbs_not_searched_notice(["Policies"], 2)
+        assert notice["action"] == "kb_partially_searched"
+        assert notice["kind"] == "context_notice"
+        assert "1 of 2" in notice["content"] and "Policies" in notice["content"]
+        assert "only the others" in notice["content"]
+
+    def test_the_model_is_told_not_to_claim_the_failed_kb_lacks_the_answer(self):
+        text = chat_service._kbs_not_searched_reminder(["Policies", "Awards"])
+        assert '"Policies"' in text and '"Awards"' in text
+        assert "NOT searched" in text and "do not say they lack the answer" in text

@@ -1,7 +1,10 @@
+import { FieldLabel, FieldMessage } from '../shared/FormField'
+import { ActionButton } from '../shared/ActionButton'
+import { usePanelEffect } from '../shared/usePanelEffect'
 import { useEffect, useRef, useState } from 'react'
-import { FocusTrap } from 'focus-trap-react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { Loader2 } from 'lucide-react'
-import { isDuplicateName } from '../../utils/nameValidation'
+import { isDuplicateName, MAX_NAME_LENGTH, getNameError, normalizeName } from '../../utils/nameValidation'
 
 interface CreateKBModalProps {
   onClose: () => void
@@ -15,32 +18,37 @@ export function CreateKBModal({ onClose, onCreate, existingTitles }: CreateKBMod
   const [description, setDescription] = useState('')
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [titleError, setTitleError] = useState<string | null>(null)
   const titleRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     titleRef.current?.focus()
   }, [])
 
-  useEffect(() => {
+  usePanelEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape' && !creating) onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [onClose, creating])
 
   const canSubmit = title.trim().length > 0 && !creating
 
   const handleSubmit = async () => {
     if (!canSubmit) return
+    const nameError = getNameError(title, 'Title')
+    if (nameError) { setTitleError(nameError); titleRef.current?.focus(); return }
     if (existingTitles && isDuplicateName(title, existingTitles)) {
-      setError(`A knowledge base named "${title.trim()}" already exists. Choose a different name.`)
+      setTitleError(`A knowledge base named "${title.trim()}" already exists. Choose a different name.`)
+      titleRef.current?.focus()
       return
     }
+    setTitleError(null)
     setCreating(true)
     setError(null)
     try {
-      await onCreate(title.trim(), description.trim())
+      await onCreate(normalizeName(title), description.trim())
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create knowledge base')
       setCreating(false)
@@ -49,112 +57,93 @@ export function CreateKBModal({ onClose, onCreate, existingTitles }: CreateKBMod
 
   return (
     <div
-      onClick={onClose}
+      onClick={() => { if (!creating) onClose() }}
       style={{
         position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
       }}
     >
-      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, fallbackFocus: '#create-kb-dialog-title', tabbableOptions: { displayCheck: 'none' } }}>
       <div
         role="dialog"
         aria-modal="true"
+        aria-labelledby="create-kb-dialog-title"
         onClick={(e) => e.stopPropagation()}
         style={{
-          backgroundColor: '#1e1e1e', borderRadius: 12, padding: 24, width: 440,
-          border: '1px solid #3a3a3a', maxHeight: '85vh', overflowY: 'auto',
+          backgroundColor: 'var(--workspace-canvas)', borderRadius: 'var(--workspace-radius-large)', width: 440, maxWidth: 'calc(100vw - 24px)',
+          border: '1px solid var(--workspace-border)', maxHeight: 'calc(100dvh - 24px)', overflow: 'hidden', display: 'flex', flexDirection: 'column',
         }}
       >
-        <div style={{ fontSize: 16, fontWeight: 600, color: '#fff', marginBottom: 6 }}>
+        <div className="workspace-dialog-header"><h3 id="create-kb-dialog-title" tabIndex={-1} style={{ marginTop: 0, fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 'var(--workspace-space-6)' }}>
           Create Knowledge Base
-        </div>
-        <p style={{ fontSize: 12, color: '#888', margin: '0 0 16px', lineHeight: 1.5 }}>
+        </h3></div>
+        <div className="workspace-dialog-body">
+        <p style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', margin: "0 0 var(--workspace-space-16)", lineHeight: 1.5 }}>
           A knowledge base groups documents and URLs so you can chat with them as one
           searchable corpus. A clear title and short description help your team (and
           future-you) understand what it covers.
         </p>
 
-        <label htmlFor="create-kb-title" style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#aaa', marginBottom: 4 }}>
-          Title
-        </label>
+        <FieldLabel htmlFor="create-kb-title" required>Title</FieldLabel>
         <input
           id="create-kb-title"
           ref={titleRef}
+          disabled={creating}
+          maxLength={MAX_NAME_LENGTH}
+          aria-required="true"
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={(e) => { setTitle(e.target.value); setTitleError(null) }}
           onKeyDown={(e) => { if (e.key === 'Enter' && canSubmit) handleSubmit() }}
           placeholder="e.g. NIH Grant Proposals 2026"
-          aria-invalid={!!error}
-          aria-describedby={error ? 'create-kb-error' : undefined}
+          aria-invalid={!!titleError}
+          aria-describedby={`create-kb-title-help${titleError ? ' create-kb-title-error' : ''}`}
           style={{
-            width: '100%', padding: '8px 10px', fontSize: 13, fontFamily: 'inherit',
-            backgroundColor: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: 6,
-            color: '#e5e5e5', marginBottom: 14, boxSizing: 'border-box',
+            width: '100%', padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-control)', fontFamily: 'inherit',
+            backgroundColor: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)',
+            color: 'var(--workspace-text)', marginBottom: 'var(--workspace-space-16)', boxSizing: 'border-box',
           }}
         />
 
-        <label htmlFor="create-kb-description" style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#aaa', marginBottom: 4 }}>
-          Description
-        </label>
+        <FieldMessage id="create-kb-title-help">Up to {MAX_NAME_LENGTH} characters.</FieldMessage>
+        {titleError && <FieldMessage id="create-kb-title-error" error>{titleError}</FieldMessage>}
+
+        <FieldLabel htmlFor="create-kb-description" optional>Description</FieldLabel>
         <textarea
           id="create-kb-description"
+          disabled={creating}
+          aria-describedby="create-kb-description-help"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="What is in this knowledge base, and what should it be used for?"
           rows={4}
           style={{
-            width: '100%', padding: '8px 10px', fontSize: 13, fontFamily: 'inherit',
-            backgroundColor: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: 6,
-            color: '#e5e5e5', marginBottom: 6, resize: 'vertical',
+            width: '100%', padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-control)', fontFamily: 'inherit',
+            backgroundColor: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)',
+            color: 'var(--workspace-text)', marginBottom: 'var(--workspace-space-6)', resize: 'vertical',
             boxSizing: 'border-box', lineHeight: 1.5,
           }}
         />
-        <p style={{ fontSize: 11, color: '#666', margin: '0 0 18px' }}>
-          You can edit this later, but adding it now makes the KB easier to find in your
-          grid and helps teammates decide whether to use it.
-        </p>
+        <FieldMessage id="create-kb-description-help">Help teammates understand when to use this knowledge base. You can edit this later.</FieldMessage>
 
-        {error && (
-          <div id="create-kb-error" role="alert" style={{
-            padding: '8px 12px', borderRadius: 6, marginBottom: 12,
-            fontSize: 12, color: '#fca5a5',
-            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-            border: '1px solid rgba(239, 68, 68, 0.25)',
-          }}>
-            {error}
-          </div>
-        )}
+        {error && <FieldMessage id="create-kb-error" error>{error} Your entries are preserved; try again.</FieldMessage>}
 
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button
+        </div>
+        <div className="workspace-dialog-footer">
+          <ActionButton variant="secondary"
             onClick={onClose}
             disabled={creating}
-            style={{
-              padding: '6px 14px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
-              color: '#aaa', backgroundColor: 'transparent',
-              border: '1px solid #3a3a3a', borderRadius: 6,
-              cursor: creating ? 'default' : 'pointer',
-              opacity: creating ? 0.6 : 1,
-            }}
+
           >
             Cancel
-          </button>
-          <button
+          </ActionButton>
+          <ActionButton variant="primary" aria-busy={creating}
             onClick={handleSubmit}
             disabled={!canSubmit}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '6px 14px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
-              color: 'var(--highlight-text-color, #000)',
-              backgroundColor: 'var(--highlight-color, #eab308)',
-              border: 'none', borderRadius: 6,
-              cursor: canSubmit ? 'pointer' : 'default',
-              opacity: canSubmit ? 1 : 0.5,
-            }}
+
           >
             {creating && <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />}
             {creating ? 'Creating...' : 'Create'}
-          </button>
+          </ActionButton>
         </div>
       </div>
       </FocusTrap>

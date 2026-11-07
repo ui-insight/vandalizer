@@ -20,7 +20,7 @@ function show(props: Partial<React.ComponentProps<typeof EditorShareCallout>> = 
 describe('EditorShareCallout', () => {
   it('offers sharing below 80% and opens the same wizard as the Library menu', () => {
     show({ score: 51 })
-    expect(screen.getByText(/scored 51%/)).toBeTruthy()
+    expect(screen.getByText(/Your evaluation results travel with it/)).toBeVisible()
     expect(screen.queryByText(/Great results/)).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Share with everyone' }))
     expect(screen.getByRole('dialog').textContent).toContain('wizard workflow wf-1')
@@ -32,9 +32,10 @@ describe('EditorShareCallout', () => {
     expect(screen.getByRole('button', { name: 'Share with everyone' })).toBeTruthy()
   })
 
-  it('keeps the "Great results" framing at 80% and up, with the new wording', () => {
+  it('encourages sharing without inventing a quality threshold', () => {
     show({ score: 86 })
-    expect(screen.getByText(/Great results!/)).toBeTruthy()
+    expect(screen.queryByText(/Great results|86%/)).toBeNull()
+    expect(screen.getByText(/Share this workflow for review/)).toBeVisible()
     expect(screen.getByRole('button', { name: 'Share with everyone' })).toBeTruthy()
     expect(screen.queryByText(/Public Library/i)).toBeNull()
   })

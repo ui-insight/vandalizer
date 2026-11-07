@@ -6,7 +6,7 @@ import datetime
 import uuid as uuid_mod
 from typing import TYPE_CHECKING
 
-from beanie import PydanticObjectId
+from beanie import Document, PydanticObjectId
 
 if TYPE_CHECKING:
     from app.models.knowledge import KnowledgeBase
@@ -18,6 +18,12 @@ from app.models.workflow import Workflow, WorkflowStep, WorkflowStepTask
 from app.services import name_conflicts, search_set_service, verification_service, workflow_service
 
 SCHEMA_VERSION = 2
+
+
+def _persisted_id(document: Document) -> PydanticObjectId:
+    if document.id is None:
+        raise ValueError("The imported object has no saved database identity")
+    return document.id
 
 
 # ---------------------------------------------------------------------------
@@ -90,6 +96,7 @@ async def _resolve_task_references(task_data: dict, task_name: str) -> dict:
                         "title": it.title,
                         "is_optional": it.is_optional,
                         "enum_values": it.enum_values,
+                        "description": it.description,
                     }
                     for it in items
                 ],
@@ -229,6 +236,7 @@ async def _reconstruct_task_references(
                 user_id=user_id,
                 is_optional=field.get("is_optional", False),
                 enum_values=field.get("enum_values", []),
+            description=field.get("description"),
             )
             await new_item.insert()
 
@@ -305,7 +313,7 @@ async def import_workflow(
                 data=resolved_data,
             )
             await new_task.insert()
-            new_task_ids.append(new_task.id)
+            new_task_ids.append(_persisted_id(new_task))
 
         new_step = WorkflowStep(
             name=step_data["name"],
@@ -314,7 +322,7 @@ async def import_workflow(
             is_output=step_data.get("is_output", False),
         )
         await new_step.insert()
-        new_step_ids.append(new_step.id)
+        new_step_ids.append(_persisted_id(new_step))
 
     imported_name = await name_conflicts.next_available_name(
         f"{item['name']} (Imported)",
@@ -334,9 +342,12 @@ async def import_workflow(
         validation_inputs=item.get("validation_inputs", []),
     )
     await new_wf.insert()
-    await _bookmark(new_wf.id, LibraryItemKind.WORKFLOW, user_id, team_id)
+    await _bookmark(_persisted_id(new_wf), LibraryItemKind.WORKFLOW, user_id, team_id)
 
-    return await workflow_service.get_workflow(str(new_wf.id))
+    imported = await workflow_service.get_workflow(str(_persisted_id(new_wf)))
+    if imported is None:
+        raise ValueError("The imported workflow could not be read after saving")
+    return imported
 
 
 async def import_into_workflow(
@@ -377,7 +388,7 @@ async def import_into_workflow(
                 data=resolved_data,
             )
             await new_task.insert()
-            new_task_ids.append(new_task.id)
+            new_task_ids.append(_persisted_id(new_task))
 
         new_step = WorkflowStep(
             name=step_data["name"],
@@ -386,7 +397,7 @@ async def import_into_workflow(
             is_output=step_data.get("is_output", False),
         )
         await new_step.insert()
-        new_step_ids.append(new_step.id)
+        new_step_ids.append(_persisted_id(new_step))
 
     old_step_ids = list(target.steps)
 
@@ -408,7 +419,10 @@ async def import_into_workflow(
                     await task.delete()
             await step.delete()
 
-    return await workflow_service.get_workflow(str(target.id))
+    imported = await workflow_service.get_workflow(str(_persisted_id(target)))
+    if imported is None:
+        raise ValueError("The imported workflow could not be read after saving")
+    return imported
 
 
 # ---------------------------------------------------------------------------
@@ -435,6 +449,7 @@ async def export_search_set(search_set_uuid: str, user_email: str) -> dict:
             "title": it.title,
             "is_optional": it.is_optional,
             "enum_values": it.enum_values,
+            "description": it.description,
         })
 
     # Text-only test cases
@@ -514,6 +529,7 @@ async def import_search_set(
             user_id=user_id,
             is_optional=field.get("is_optional", False),
             enum_values=field.get("enum_values", []),
+            description=field.get("description"),
         )
         await new_item.insert()
 
@@ -534,7 +550,7 @@ async def import_search_set(
     # manage but do not own — filing it into their personal library on an
     # import of fields is not something they asked for.
     if target is None:
-        await _bookmark(result.id, LibraryItemKind.SEARCH_SET, user_id, team_id)
+        await _bookmark(_persisted_id(result), LibraryItemKind.SEARCH_SET, user_id, team_id)
     return result
 
 
@@ -618,9 +634,9 @@ async def import_knowledge_base(
 
         # Ingest from cached content or re-fetch
         if src.content:
-            from app.services.document_manager import DocumentManager
+            from app.services.document_manager import get_document_manager
             import asyncio
-            dm = DocumentManager()
+            dm = get_document_manager()
             try:
                 chunk_count = await asyncio.to_thread(
                     dm.add_to_kb, kb.uuid, src.uuid,

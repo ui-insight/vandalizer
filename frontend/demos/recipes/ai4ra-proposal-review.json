@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "id": "ai4ra-proposal-review",
+  "title": "AI4RA proposal-review highlight",
+  "description": "Show how a research administrator turns one NSF proposal into a reusable, source-grounded extraction after an explicit approval gate.",
+  "capture": {
+    "path": "/",
+    "viewport": { "width": 1280, "height": 720 },
+    "roleSegment": "research_admin",
+    "recordingAccount": {
+      "userIdPrefix": "ai4ra-demo-proposal-review",
+      "emailDomain": "example.invalid",
+      "displayName": "AI4RA Demo Recorder"
+    },
+    "sourceDocument": {
+      "path": "backend/certification-data/documents/nsf-proposal-alpine-ecology.pdf",
+      "sha256": "eed235f9fdcf7ae37a548dd34ca677a98d437ace2c1814da4ee37dafb9f33821",
+      "label": "NSF proposal: Alpine Ecology"
+    },
+    "extractionName": "Proposal Review Facts",
+    "request": "Using only the attached document, give the proposal title, requested amount, project period, and total equipment budget. Identify the source document for each fact. Name the reusable extraction \"{{extractionName}}\".",
+    "ui": {
+      "dismissFirstRunTour": true,
+      "collapseActivityRail": true,
+      "activityRailWidth": 64
+    },
+    "captions": {
+      "orientation": { "eyebrow": "From document to review-ready facts", "copy": "A repeatable review starts with a source, a clear question, and a human decision point." },
+      "source": { "eyebrow": "1 · Start with the source", "copy": "Attach the proposal so every answer and extracted field can remain tied to it." },
+      "sourceAttached": { "eyebrow": "Source attached", "copy": "The proposal is now the shared evidence for the question and the reusable extraction." },
+      "request": { "eyebrow": "2 · Ask what the review needs", "copy": "These are the facts staff repeatedly find and re-enter for every proposal." },
+      "proposal": { "eyebrow": "3 · Review before creating anything", "copy": "Vandalizer proposes a reusable extraction and stops for human approval." },
+      "approval": { "eyebrow": "Human decision point", "copy": "The extraction is created only after the reviewer explicitly approves the proposed work." },
+      "extraction": { "eyebrow": "4 · Create the repeatable extraction", "copy": "Now the approved fields are structured from this proposal and ready for the next one." },
+      "conclusion": { "eyebrow": "What changes next time", "copy": "The next proposal starts with a reusable, source-grounded review process—not a blank page." }
+    },
+    "pacing": {
+      "orientationSeconds": 3.5,
+      "sourcePromptSeconds": 2,
+      "sourceAttachedSeconds": 3,
+      "requestPreludeSeconds": 1.8,
+      "typeDelayMilliseconds": 18,
+      "requestReadSeconds": 2.5,
+      "sendHoverSeconds": 0.8,
+      "proposalReadSeconds": 4.5,
+      "approvalHoverSeconds": 2.5,
+      "resultReadSeconds": 3.5,
+      "conclusionSeconds": 3.5
+    },
+    "milestones": {
+      "confirmationButton": "Confirm",
+      "buildingExtractionText": "Building extraction from document",
+      "fieldsDiscoveredText": "fields discovered"
+    },
+    "timeouts": {
+      "documentReadySeconds": 180,
+      "agentFirstTokenSeconds": 30,
+      "agentCompletionSeconds": 180
+    }
+  },
+  "edit": {
+    "segments": [
+      { "marker": "orientation", "durationSeconds": 10, "purpose": "Orient in the real workspace and attach the source." },
+      { "marker": "request", "durationSeconds": 9.5, "purpose": "Show the question being typed and leave time to read it." },
+      { "marker": "submitted", "durationSeconds": 3, "purpose": "Acknowledge the submitted request before its proposal appears." },
+      { "marker": "proposalReady", "durationSeconds": 4, "purpose": "Read the proposed extraction and its approval gate." },
+      { "marker": "approval", "durationSeconds": 3, "purpose": "Make the explicit human decision visible." },
+      { "marker": "approved", "durationSeconds": 1.2, "purpose": "Show the confirmation becoming a real product action." },
+      { "marker": "buildingStarted", "durationSeconds": 2.8, "purpose": "Show live extraction work without retaining dead wait time." },
+      { "marker": "fieldsDiscovered", "durationSeconds": 2.5, "purpose": "Show discovery before the completed result." },
+      { "marker": "resultReady", "durationSeconds": 6.7, "purpose": "Give the completed, structured result a readable final beat." }
+    ],
+    "intro": {
+      "background": "0x101216",
+      "logoPath": "frontend/public/videos/ai4ra-logo-white.png",
+      "logoSha256": "eff8258dc74261a260479002c71160b4deeb4caaa12fefff2cb9708c95578651",
+      "durationSeconds": 3,
+      "logoWidthPixels": 360,
+      "fadeInSeconds": 0.4,
+      "fadeOutStartSeconds": 2.2,
+      "fadeOutSeconds": 0.5,
+      "crossFadeSeconds": 0.6,
+      "voiceDelaySeconds": 2.4
+    }
+  },
+  "voiceover": {
+    "scriptPath": "frontend/demos/voiceover/ai4ra-proposal-review.txt",
+    "provider": "mindrouter",
+    "endpoint": "https://mindrouter.uidaho.edu/v1/audio/speech",
+    "model": "kokoro",
+    "voice": "af_bella",
+    "responseFormat": "mp3",
+    "speed": 1
+  },
+  "output": { "directory": "frontend/public/videos/generated", "posterTimeSeconds": 39 }
+}

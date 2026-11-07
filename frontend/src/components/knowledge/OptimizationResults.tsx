@@ -6,6 +6,7 @@ import { FailedBanner, CancelledBanner } from '../shared/RunBanners'
 import { ApplyBackButton } from '../shared/ApplyBackButton'
 import { SuggestionsList, type Suggestion } from '../shared/SuggestionsList'
 import { QualityComparisonCard, type BaselinePoint } from '../shared/QualityComparisonCard'
+import { isHeldOutHeadline, reportedBaselineScore } from '../shared/optimizerScores'
 import { TrialsTable, TrialRow, makeStandardSortOptions } from '../shared/TrialsTable'
 import { TrialExplainerModal } from './TrialExplainerModal'
 import { EvalSetCompositionStrip } from '../shared/EvalSetCompositionStrip'
@@ -77,29 +78,19 @@ export function OptimizationResults({
   // holdout-based) may flatly contradict. holdout_optimized_score is non-null
   // exactly when the headline is holdout-based; for runs that predate that
   // field, headline ≠ train score proves the holdout re-score succeeded.
-  const holdoutHeadline =
-    run.holdout_default_score != null
-    && (
-      run.holdout_optimized_score != null
-      || (
-        run.optimized_score != null
-        && run.optimized_score_train != null
-        && run.optimized_score !== run.optimized_score_train
-      )
-    )
+  const holdoutHeadline = isHeldOutHeadline(run) && run.holdout_default_score != null
   const trainCount = run.train_query_uuids?.length ?? null
   const holdoutCount = run.holdout_query_uuids?.length ?? null
 
   const kbLabels = DOMAIN_LABELS.kb.baselineTile
   const baselines: BaselinePoint[] = [
-    { id: 'no-kb', label: kbLabels.noBaseline, score: run.baseline_no_kb_score, color: '#888' },
     {
       id: 'default',
       label: kbLabels.yourSettings,
-      score: (holdoutHeadline ? run.holdout_default_score : run.baseline_default_score) ?? null,
-      color: '#3b82f6',
+      score: reportedBaselineScore(run),
+      color: 'var(--workspace-info)',
     },
-    { id: 'optimized', label: kbLabels.tuned, score: run.optimized_score, color: '#22c55e', emphasised: true },
+    { id: 'optimized', label: kbLabels.tuned, score: run.optimized_score, color: 'var(--workspace-success)', emphasised: true },
   ]
 
   // Older runs carry no ``winner``; for them the tie gate was the only rule.
@@ -111,7 +102,7 @@ export function OptimizationResults({
   const noKbPerQuery: PerQueryResult[] | undefined = run.no_kb_per_query_results
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-12)' }}>
       {/* Comparison card — now with eval-set composition strip and the
           improved/regressed counter rendered inline so users get the credibility
           context before they read the headline number. */}
@@ -119,17 +110,16 @@ export function OptimizationResults({
         baselines={baselines}
         variance={run.judge_variance ?? 0}
         liftCI={run.lift_ci ?? null}
-        secondaryBaselineId="no-kb"
+        tiedWithBaseline={run.tied_with_baseline}
         scoreFormulaHint={
           'Quality score = 40% LLM judge + 25% retrieval precision + 20% source health + 15% chunk coverage. '
-          + 'Matches the score the validation header reports.'
+          + 'Answer accuracy and AI-only results use a different metric.'
         }
         measurementNote={
           holdoutHeadline
             ? `${kbLabels.yourSettings} and ${kbLabels.tuned} are measured on the `
               + `${holdoutCount ?? ''} held-out quer${holdoutCount === 1 ? 'y' : 'ies'} the optimizer `
-              + `never tuned against; ${kbLabels.noBaseline} uses the `
-              + `${trainCount ?? ''} training queries.`
+              + 'never tuned against.'
             : undefined
         }
         topSlot={
@@ -151,7 +141,7 @@ export function OptimizationResults({
                     above uses the holdout slice — without this caption the two
                     read as contradictory counts over the same queries. */}
                 {holdoutHeadline && (
-                  <div style={{ fontSize: 11, color: '#888', marginBottom: 6, lineHeight: 1.5 }}>
+                  <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginBottom: 'var(--workspace-space-6)', lineHeight: 1.5 }}>
                     Per-query outcomes below are from the {trainCount ?? ''} training
                     quer{trainCount === 1 ? 'y' : 'ies'}; the significance test above uses
                     the {holdoutCount ?? ''} held-out quer{holdoutCount === 1 ? 'y' : 'ies'}.
@@ -164,6 +154,12 @@ export function OptimizationResults({
         }
       />
 
+      {run.baseline_no_kb_score != null && (
+        <p style={{ margin: 0, fontSize: 'var(--workspace-font-meta)', lineHeight: 1.5, color: 'var(--workspace-muted)' }}>
+          AI-only answer accuracy: {Math.round(run.baseline_no_kb_score * 100)}% on the training questions.
+          {' '}This is a separate metric from composite quality above; the two scores cannot be subtracted to measure improvement.
+        </p>
+      )}
       <TuningModelsLine run={run} />
 
       {/* Cross-judge sanity check — only shown when a second judge actually
@@ -171,7 +167,7 @@ export function OptimizationResults({
       {run.cross_judge && (
         <CrossJudgeNote
           crossJudge={run.cross_judge}
-          primaryScore={run.optimized_score ?? 0}
+          primaryScore={run.cross_judge.score - run.cross_judge.delta}
           primaryJudge={run.judge_model ?? null}
         />
       )}
@@ -186,15 +182,15 @@ export function OptimizationResults({
         <div
           role="status"
           style={{
-            padding: '10px 14px', borderRadius: 6, fontSize: 13,
+            padding: "var(--workspace-space-12) var(--workspace-space-16)", borderRadius: 'var(--workspace-radius-small)', fontSize: 'var(--workspace-font-control)',
             background: 'rgba(245, 158, 11, 0.08)',
             border: '1px solid rgba(245, 158, 11, 0.3)',
-            color: '#fbbf24',
-            display: 'flex', flexDirection: 'column', gap: 4,
+            color: 'var(--workspace-warning)',
+            display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)',
           }}
         >
           <div style={{ fontWeight: 600 }}>No significant improvement</div>
-          <div style={{ color: '#d1d5db' }}>
+          <div style={{ color: 'var(--workspace-muted)' }}>
             The best trial was within the <TermDef term="noise-floor">judge's measurement noise</TermDef>{' '}
             (±{((run.judge_variance ?? 0.02) * 80).toFixed(1)} pts confidence interval)
             of your current settings. Apply is disabled — your settings already
@@ -205,8 +201,7 @@ export function OptimizationResults({
 
       {/* Best config + Apply / Revert. ``isAlreadyApplied`` is true if this
           run is the one currently live on the KB. We trust applied_at /
-          reverted_at when present (post-Phase-1) and fall back to the legacy
-          ``apply_on_finish`` flag for runs that pre-date the snapshot. */}
+          reverted_at. An apply-on-finish preference alone does not prove it applied. */}
       {(run.best_config || winner === 'current') && (
         <BestConfigCard
           winner={winner}
@@ -216,7 +211,6 @@ export function OptimizationResults({
           defaultConfig={run.default_config ?? null}
           isAlreadyApplied={
             !!(run.applied_at && !run.reverted_at)
-            || (!run.applied_at && !!run.options?.apply_on_finish)
           }
           canRevert={!!(run.applied_at && !run.reverted_at && onRevert)}
           canManage={canManage && winner === 'challenger'}
@@ -254,7 +248,7 @@ export function OptimizationResults({
           renderRow={(t) => <TrialRow trial={t} summariseConfig={summariseConfig} />}
           getRowKey={(t) => t.trial_id}
           onRowClick={setSelectedTrial}
-          title="Trials — tap any for a plain-English breakdown"
+          title="Trials: tap any for a plain-English breakdown"
           caption={
             holdoutHeadline
               ? `Trial scores are measured on the ${trainCount ?? ''} training queries. `
@@ -287,12 +281,12 @@ export function OptimizationResults({
           onClick={onRunAgain}
           disabled={!canManage}
           style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            padding: '6px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-            color: canManage ? '#a78bfa' : '#555',
+            display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+            padding: "var(--workspace-space-6) var(--workspace-space-16)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+            color: canManage ? 'var(--workspace-info)' : 'var(--workspace-muted)',
             background: 'transparent',
-            border: '1px solid ' + (canManage ? 'rgba(124, 58, 237, 0.3)' : '#333'),
-            borderRadius: 6, cursor: canManage ? 'pointer' : 'not-allowed',
+            border: '1px solid ' + (canManage ? 'rgba(124, 58, 237, 0.3)' : 'var(--workspace-border)'),
+            borderRadius: 'var(--workspace-radius-small)', cursor: canManage ? 'pointer' : 'not-allowed',
           }}
         >
           <RotateCcw size={12} />
@@ -344,21 +338,21 @@ function BestConfigCard({
   if (winner === 'current' || !config) {
     return (
       <div style={{
-        padding: 14, backgroundColor: '#1f1f1f',
-        border: '1px solid #2e2e2e', borderRadius: 8,
+        padding: 'var(--workspace-space-16)', backgroundColor: 'var(--workspace-surface)',
+        border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-medium)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-          <Sparkles size={14} style={{ color: '#a78bfa' }} />
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>Winner: current settings</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-6)' }}>
+          <Sparkles size={14} style={{ color: 'var(--workspace-info)' }} />
+          <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: 'var(--workspace-text)' }}>Winner: current settings</span>
         </div>
-        <div style={{ fontSize: 12, color: '#bbb', lineHeight: 1.5 }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
           {belowCurrent
             ? 'Every setup we tried scored below your current settings.'
             : 'No setup we tried beat your current settings by more than the judge\'s noise.'}
           {' '}Nothing to apply{currentModel ? <> — {currentModel} keeps answering with your current settings</> : null}.
         </div>
         {canRevert && onRevert && (
-          <div style={{ marginTop: 12 }}>
+          <div style={{ marginTop: 'var(--workspace-space-12)' }}>
             <RevertButton canManage={canManage} reverting={reverting} onRevert={onRevert} />
           </div>
         )}
@@ -379,19 +373,19 @@ function BestConfigCard({
 
   return (
     <div style={{
-      padding: 14, backgroundColor: '#1f1f1f',
-      border: '1px solid #2e2e2e', borderRadius: 8,
+      padding: 'var(--workspace-space-16)', backgroundColor: 'var(--workspace-surface)',
+      border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-medium)',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <Sparkles size={14} style={{ color: '#a78bfa' }} />
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-12)' }}>
+        <Sparkles size={14} style={{ color: 'var(--workspace-info)' }} />
+        <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: 'var(--workspace-text)' }}>
           Winner: {fmt('model', config.model)} + tuned settings
         </span>
       </div>
       {hasDefault && (
-        <div style={{ fontSize: 11, color: '#888', marginBottom: 8 }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginBottom: 'var(--workspace-space-8)' }}>
           {changed.length === 0
-            ? 'Apply would change nothing — this is the same as your current settings.'
+            ? 'Apply would change nothing, this is the same as your current settings.'
             : `Apply would change ${changed.length} setting${changed.length === 1 ? '' : 's'}:`}
         </div>
       )}
@@ -399,39 +393,39 @@ function BestConfigCard({
       {/* If we don't have a default snapshot (legacy run), fall back to the
           flat grid; otherwise show diff rows only. */}
       {!hasDefault ? (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--workspace-space-6)' }}>
           {rows.map(r => (
             <div key={r.key} title={r.hint} style={{
-              padding: '6px 10px', backgroundColor: '#262626', borderRadius: 4, cursor: 'help',
+              padding: "var(--workspace-space-6) var(--workspace-space-12)", backgroundColor: 'var(--workspace-surface)', borderRadius: 'var(--workspace-radius-small)', cursor: 'help',
             }}>
-              <div style={{ fontSize: 10, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
-              <div style={{ fontSize: 12, color: '#e5e5e5', marginTop: 2 }}>{r.winner}</div>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)', marginTop: 'var(--workspace-space-2)' }}>{r.winner}</div>
             </div>
           ))}
         </div>
       ) : changed.length === 0 ? (
         <div style={{
-          padding: '8px 12px', fontSize: 12, color: '#bbb',
-          backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid #2a2a2a',
-          borderRadius: 6,
+          padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)',
+          backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)',
+          borderRadius: 'var(--workspace-radius-small)',
         }}>
           The optimizer didn't find a better setting than your current default. Your
           KB is already tuned for this test set.
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-6)' }}>
           {changed.map(r => (
             <div key={r.key} title={r.hint} style={{
-              padding: '8px 10px', backgroundColor: '#262626', borderRadius: 4, cursor: 'help',
+              padding: "var(--workspace-space-8) var(--workspace-space-12)", backgroundColor: 'var(--workspace-surface)', borderRadius: 'var(--workspace-radius-small)', cursor: 'help',
               display: 'grid', gridTemplateColumns: '1fr auto 1fr auto 1fr',
-              alignItems: 'center', gap: 8,
+              alignItems: 'center', gap: 'var(--workspace-space-8)',
             }}>
               <div>
-                <div style={{ fontSize: 10, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
+                <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
               </div>
-              <div style={{ fontSize: 12, color: '#888', textDecoration: 'line-through' }}>{r.def}</div>
-              <div style={{ fontSize: 12, color: '#666', textAlign: 'center' }}>→</div>
-              <div style={{ fontSize: 13, color: '#86efac', fontWeight: 600 }}>{r.winner}</div>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textDecoration: 'line-through' }}>{r.def}</div>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textAlign: 'center' }}>→</div>
+              <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-success)', fontWeight: 600 }}>{r.winner}</div>
               <div />
             </div>
           ))}
@@ -439,23 +433,23 @@ function BestConfigCard({
             <button
               onClick={() => setShowUnchanged(v => !v)}
               style={{
-                marginTop: 4, padding: '4px 8px',
-                fontSize: 11, fontFamily: 'inherit', color: '#888',
+                marginTop: 'var(--workspace-space-4)', padding: "var(--workspace-space-4) var(--workspace-space-8)",
+                fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit', color: 'var(--workspace-muted)',
                 background: 'transparent', border: 'none', cursor: 'pointer',
                 textAlign: 'left',
               }}
             >
-              {showUnchanged ? '▾' : '▸'} {unchanged.length} unchanged knob{unchanged.length === 1 ? '' : 's'}
+              {showUnchanged ? '▾' : '▸'} {unchanged.length} unchanged setting{unchanged.length === 1 ? '' : 's'}
             </button>
           )}
           {showUnchanged && unchanged.length > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--workspace-space-6)' }}>
               {unchanged.map(r => (
                 <div key={r.key} title={r.hint} style={{
-                  padding: '6px 10px', backgroundColor: '#202020', borderRadius: 4, cursor: 'help',
+                  padding: "var(--workspace-space-6) var(--workspace-space-12)", backgroundColor: 'var(--workspace-surface)', borderRadius: 'var(--workspace-radius-small)', cursor: 'help',
                 }}>
-                  <div style={{ fontSize: 10, color: '#666', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
-                  <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>{r.winner}</div>
+                  <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
+                  <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginTop: 'var(--workspace-space-2)' }}>{r.winner}</div>
                 </div>
               ))}
             </div>
@@ -463,7 +457,7 @@ function BestConfigCard({
         </div>
       )}
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', flexWrap: 'wrap', marginTop: 'var(--workspace-space-12)' }}>
         <ApplyBackButton
           canApply={canManage}
           onApply={onApply}
@@ -488,11 +482,11 @@ function RevertButton({ canManage, reverting, onRevert }: {
       onClick={onRevert}
       disabled={!canManage || reverting}
       style={{
-        padding: '6px 12px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
-        color: canManage && !reverting ? '#bbb' : '#555',
+        padding: "var(--workspace-space-6) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
+        color: 'var(--workspace-muted)',
         background: 'transparent',
-        border: '1px solid #3a3a3a',
-        borderRadius: 6,
+        border: '1px solid var(--workspace-border)',
+        borderRadius: 'var(--workspace-radius-small)',
         cursor: canManage && !reverting ? 'pointer' : 'not-allowed',
       }}
       title="Restore your previous KB configuration"

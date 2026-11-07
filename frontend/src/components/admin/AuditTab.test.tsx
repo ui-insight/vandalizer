@@ -1,13 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { AuditTab } from './AuditTab'
 import type { AuditLogEntry } from '../../api/audit'
 
 const mockQueryAuditLog = vi.fn()
+const mockQueryWebSearches = vi.fn()
 
 vi.mock('../../api/audit', () => ({
   queryAuditLog: (...args: unknown[]) => mockQueryAuditLog(...args),
   exportAuditLog: () => '#',
+  queryWebSearches: (...args: unknown[]) => mockQueryWebSearches(...args),
+  exportWebSearches: (params: Record<string, string>) => `/export?${new URLSearchParams(params).toString()}`,
 }))
 
 const entry: AuditLogEntry = {
@@ -27,6 +30,7 @@ const entry: AuditLogEntry = {
 
 beforeEach(() => {
   mockQueryAuditLog.mockReset()
+  mockQueryWebSearches.mockReset()
 })
 
 describe('AuditTab — success', () => {
@@ -142,5 +146,43 @@ describe('AuditTab — debounced action filter (plan 010)', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+describe('AuditTab — web searches', () => {
+  const search = {
+    id: 'w1', timestamp: '2026-10-22T15:30:00Z', feature: 'workflow', user_id: 'ra-1', team_id: 't1',
+    activity_id: null, provider: 'tavily', query: 'NSF equipment threshold', result_count: 0,
+    status: 'error', error: 'Web search provider returned HTTP 401.',
+  }
+
+  it('shows each search, where it came from, and the failures', async () => {
+    mockQueryAuditLog.mockResolvedValue({ entries: [], total: 0, skip: 0, limit: 25 })
+    mockQueryWebSearches.mockResolvedValue({
+      entries: [search], total: 7, skip: 0, limit: 25,
+      by_feature: { chat: 6, workflow: 1 }, by_status: { ok: 6, error: 1 },
+    })
+    render(<AuditTab />)
+    fireEvent.click(screen.getByRole('button', { name: 'Web searches' }))
+
+    await screen.findByText('NSF equipment threshold')
+    expect(screen.getByText('(7 searches)')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Chat 6 · Workflow 1 · 1 did not return results')
+    expect(within(screen.getByRole('table')).getByText('Failed')).toBeInTheDocument()
+    expect(screen.getByText('Web search provider returned HTTP 401.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Web searches' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('filters by source and outcome from the first page, and exports the same filter', async () => {
+    mockQueryWebSearches.mockResolvedValue({ entries: [], total: 0, skip: 0, limit: 25, by_feature: {}, by_status: {} })
+    mockQueryAuditLog.mockResolvedValue({ entries: [], total: 0, skip: 0, limit: 25 })
+    render(<AuditTab />)
+    fireEvent.click(screen.getByRole('button', { name: 'Web searches' }))
+    await screen.findByText('No web searches recorded')
+
+    fireEvent.change(screen.getByLabelText('Filter web searches by source'), { target: { value: 'chat' } })
+    fireEvent.change(screen.getByLabelText('Filter web searches by outcome'), { target: { value: 'error' } })
+    await waitFor(() => expect(mockQueryWebSearches).toHaveBeenLastCalledWith({ feature: 'chat', status: 'error', skip: 0, limit: 25 }))
+    expect(screen.getByRole('link', { name: /Export CSV/ })).toHaveAttribute('href', '/export?feature=chat&status=error')
   })
 })

@@ -27,6 +27,7 @@ class SearchSetItemRequest(BaseModel):
     title: Optional[str] = None
     is_optional: bool = False
     enum_values: list[str] = []
+    description: Optional[str] = None
 
 
 class UpdateSearchSetItemRequest(BaseModel):
@@ -34,6 +35,7 @@ class UpdateSearchSetItemRequest(BaseModel):
     title: Optional[str] = None
     is_optional: Optional[bool] = None
     enum_values: Optional[list[str]] = None
+    description: Optional[str] = None
 
 
 class ReorderItemsRequest(BaseModel):
@@ -95,6 +97,7 @@ class SearchSetItemResponse(BaseModel):
     title: Optional[str] = None
     is_optional: bool = False
     enum_values: list[str] = []
+    description: Optional[str] = None
     pdf_binding: Optional[str] = None
 
 

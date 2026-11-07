@@ -2,11 +2,21 @@
 
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ChatRequest(BaseModel):
     message: str
+    client_timezone: Optional[str] = Field(default=None, max_length=100)
+    retry: bool = False
+    page_approval: Optional[str] = Field(default=None, pattern=r"^[a-f0-9]{32}$")
+    # An approval card's button: the tool call id of the preview it approves
+    # or cancels. Only that action may run this turn (approval_scope).
+    approval_for: Optional[str] = Field(default=None, pattern=r"^[A-Za-z0-9_\-:.]{1,128}$")
+    decline_for: Optional[str] = Field(default=None, pattern=r"^[A-Za-z0-9_\-:.]{1,128}$")
+    # Omitted: retain the conversation's pinned Skill. Null: remove it.
+    skill_uuid: Optional[str] = None
+    skill_version: Optional[str] = None
     activity_id: Optional[str] = None
     document_uuids: list[str] = []
     folder_uuids: list[str] = []
@@ -21,6 +31,7 @@ class ChatRequest(BaseModel):
     project_uuid: Optional[str] = None
     include_onboarding_context: bool = False
     is_first_session: bool = False
+    run_demo: bool = False
 
 
 class AddLinkRequest(BaseModel):
@@ -50,3 +61,16 @@ class CompactContextRequest(BaseModel):
 
 class ClearContextRequest(BaseModel):
     conversation_uuid: str
+
+
+class QueueMessageRequest(BaseModel):
+    conversation_uuid: str
+    message: str
+
+
+class StopTurnRequest(BaseModel):
+    conversation_uuid: str
+
+
+class MemoryPauseRequest(BaseModel):
+    paused: bool

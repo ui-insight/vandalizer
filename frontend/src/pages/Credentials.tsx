@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { KeyRound, Plus, Pencil, Trash2, RefreshCw , Plug } from 'lucide-react'
+import { useAdminQuery } from '../components/admin/shared/useAdminQuery'
 import { PageLayout } from '../components/layout/PageLayout'
 import { useConfirm } from '../components/shared/useConfirm'
 import {
@@ -112,30 +113,15 @@ function nonSecretChanged(form: FormState, original: Credential): boolean {
 export default function Credentials() {
   const confirm = useConfirm()
   const { toast } = useToast()
-  const [creds, setCreds] = useState<Credential[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data, loading, error: readError, load: loadCreds } = useAdminQuery(listCredentials)
+  const creds = data ?? []
+  const pending = useRef(false)
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-
-  const loadCreds = async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const list = await listCredentials()
-      setCreds(list)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load credentials')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    loadCreds()
-  }, [])
 
   const closeForm = () => {
     setShowForm(false)
@@ -174,6 +160,8 @@ export default function Credentials() {
   }
 
   const handleSave = async () => {
+    if (pending.current || !formValid) return
+    pending.current = true; setBusy(true)
     setSaving(true)
     setError(null)
     try {
@@ -210,11 +198,14 @@ export default function Credentials() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save credential')
     } finally {
+      pending.current = false; setBusy(false)
       setSaving(false)
     }
   }
 
   const handleDelete = async (id: string) => {
+    if (pending.current) return
+    pending.current = true
     const cred = creds.find(c => c.id === id)
     const ok = await confirm({
       title: 'Delete credential?',
@@ -226,24 +217,28 @@ export default function Credentials() {
       confirmLabel: 'Delete',
       destructive: true,
     })
-    if (!ok) return
+    if (!ok) { pending.current = false; return }
+    setBusy(true); setError(null)
     try {
       await deleteCredential(id)
       await loadCreds()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete')
-    }
+    } finally { pending.current = false; setBusy(false) }
   }
 
   const [testingId, setTestingId] = useState<string | null>(null)
   const [testUrls, setTestUrls] = useState<Record<string, string>>({})
 
   const handleInvalidate = async (id: string) => {
+    if (pending.current) return
+    pending.current = true; setBusy(true); setError(null)
     try {
       await invalidateCredentialCache(id)
+      toast('Cached authorization cleared. The next request will obtain a fresh token.', 'success')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to invalidate cache')
-    }
+    } finally { pending.current = false; setBusy(false) }
   }
 
   // Editing a credential into another type: the stored secrets belong to the
@@ -264,8 +259,8 @@ export default function Credentials() {
 
   return (
     <PageLayout>
-      <div className="mx-auto max-w-3xl space-y-6">
-        <div className="flex items-center justify-between">
+      <fieldset disabled={busy} className="mx-auto min-w-0 max-w-3xl space-y-6 border-0 p-0">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-xl font-semibold text-gray-900">Credentials</h1>
           <button
             onClick={startCreate}
@@ -277,12 +272,12 @@ export default function Credentials() {
         </div>
 
         <p className="text-sm text-gray-600">
-          Credentials are referenced by ID from API Node steps in workflows. Secret values
-          are encrypted at rest and never returned by the API after creation.
+          Credentials connect workflow integration steps to another service—for example, retrieving a record from your institution’s system. An integration maintainer supplies and tests the connection details.
+          If you are running an existing workflow, use its configured connection; ask your team administrator for help when access fails. Stored secrets are never displayed here.
         </p>
 
         {error && (
-          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {error}
           </div>
         )}
@@ -292,7 +287,8 @@ export default function Credentials() {
             <h3 className="font-medium text-gray-900">
               {editingId ? 'Edit credential' : 'New credential'}
             </h3>
-            <div className="grid grid-cols-2 gap-3">
+            <p className="text-sm text-gray-600">Name this connection for the service it reaches. {form.type === 'static_header' ? 'Required: name, header name and secret header value supplied by that service.' : 'Required: name, client ID, token endpoint and private key supplied by your integration administrator. Scope and audience are optional service-specific settings; keep the default algorithm unless the service requires another.'} {editingId && !typeChanged && 'Leave the secret blank to keep its stored value.'}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label htmlFor="cred-name" className="block text-xs font-medium uppercase text-gray-500 mb-1">Name</label>
                 <input
@@ -339,7 +335,7 @@ export default function Credentials() {
             </div>
 
             {form.type === 'static_header' && (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label htmlFor="cred-header-name" className="block text-xs font-medium uppercase text-gray-500 mb-1">Header name</label>
                   <input
@@ -372,7 +368,7 @@ export default function Credentials() {
 
             {form.type === 'oauth_client_credentials' && (
               <>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label htmlFor="cred-client-id" className="block text-xs font-medium uppercase text-gray-500 mb-1">Client ID</label>
                     <input
@@ -395,7 +391,7 @@ export default function Credentials() {
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label htmlFor="cred-scope" className="block text-xs font-medium uppercase text-gray-500 mb-1">Scope</label>
                     <input
@@ -456,9 +452,10 @@ export default function Credentials() {
             <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
               <div className="mb-2 text-xs font-semibold text-gray-700">Test this credential</div>
               <CredentialTestPanel
+                revision={form}
                 testUrl={form.test_url}
                 onTestUrlChange={url => setForm(f => ({ ...f, test_url: url }))}
-                disabled={!formValid}
+                disabled={!formValid || busy}
                 run={testUrl => editingId && !typeChanged
                   ? testCredential(editingId, { payload: buildUpdatePayload(form), test_url: testUrl || undefined })
                   : testCredentialDraft({ type: form.type, payload: buildPayload(form), test_url: testUrl || undefined })}
@@ -489,7 +486,7 @@ export default function Credentials() {
             <h3 className="font-medium text-gray-900">Stored credentials</h3>
           </div>
 
-          {loading ? (
+          {readError ? <p role="alert" className="p-4 text-sm text-red-800">{readError} <button type="button" onClick={loadCreds} className="underline">Retry credentials</button></p> : loading ? (
             <div className="p-4 text-sm text-gray-500">Loading...</div>
           ) : creds.length === 0 ? (
             <div className="p-4 text-sm text-gray-500">No credentials yet.</div>
@@ -497,10 +494,10 @@ export default function Credentials() {
             <ul className="divide-y divide-gray-100">
               {creds.map(cred => (
                 <li key={cred.id} className="px-4 py-3">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900">{cred.name}</span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="break-all font-medium text-gray-900">{cred.name}</span>
                       <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-mono text-gray-600">
                         {TYPE_LABELS[cred.type]}
                       </span>
@@ -509,11 +506,11 @@ export default function Credentials() {
                       )}
                     </div>
                     {cred.description && (
-                      <div className="mt-1 text-xs text-gray-500 truncate">{cred.description}</div>
+                      <div className="mt-1 break-words text-xs text-gray-500">{cred.description}</div>
                     )}
-                    <div className="mt-1 text-xs font-mono text-gray-500">{cred.id}</div>
+                    <div className="mt-1 break-all text-xs font-mono text-gray-500">{cred.id}</div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       onClick={() => setTestingId(t => (t === cred.id ? null : cred.id))}
                       title="Test this credential"
@@ -526,11 +523,11 @@ export default function Credentials() {
                     {cred.type === 'oauth_client_credentials' && (
                       <button
                         onClick={() => handleInvalidate(cred.id)}
-                        title="Drop cached bearer token"
+                        title="Clear the cached token so the next request obtains a fresh one"
                         className="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
                       >
                         <RefreshCw className="h-3 w-3" />
-                        Invalidate
+                        Refresh token
                       </button>
                     )}
                     {cred.can_manage && (
@@ -569,7 +566,7 @@ export default function Credentials() {
             </ul>
           )}
         </div>
-      </div>
+      </fieldset>
     </PageLayout>
   )
 }

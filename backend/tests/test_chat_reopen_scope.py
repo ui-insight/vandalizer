@@ -287,3 +287,56 @@ class TestHistoryNamesTheActivityToContinue:
     async def test_no_activity_is_none(self, client):
         data = await _get_history(client, _conv([{"role": "user", "content": "q"}]))
         assert data["activity_id"] is None
+
+
+class TestChatRecordsItsProject:
+    @pytest.mark.asyncio
+    async def test_a_project_chat_records_the_project_on_its_activity(self, client):
+        """Home names a continuation row's project from the activity
+        (#1014 item 30)."""
+        user = _make_user()
+        cookies, headers = _auth()
+
+        async def fake_stream(**kwargs):
+            yield '{"kind": "text", "content": "ok"}\n'
+
+        project = MagicMock()
+        project.kb_uuid = None
+        project.default_skill_uuid = None
+        project.title = "NSF CAREER 2027"
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.chat.access_control") as mock_ac,
+            patch("app.routers.chat.organization_service") as mock_org,
+            patch("app.routers.chat.activity_service") as mock_activity,
+            patch("app.routers.chat.ChatConversation") as MockConvo,
+            patch("app.routers.chat.chat_stream", new=fake_stream),
+            patch(
+                "app.services.project_service.get_authorized_project",
+                AsyncMock(return_value=project),
+            ),
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_ac.get_team_access_context = AsyncMock(return_value=MagicMock())
+            convo = MagicMock()
+            convo.uuid = "conv-1"
+            convo.add_message = AsyncMock()
+            convo.insert = AsyncMock()
+            MockConvo.return_value = convo
+            activity = MagicMock()
+            activity.id = "act-1"
+            activity.title = "Chat"
+            activity.save = AsyncMock()
+            mock_activity.activity_start = AsyncMock(return_value=activity)
+
+            resp = await client.post(
+                "/api/chat",
+                json={"message": "hi", "project_uuid": "proj-1"},
+                cookies=cookies, headers=headers,
+            )
+            assert resp.status_code == 200
+            await resp.aread()
+
+        assert mock_activity.activity_start.await_args.kwargs["project_uuid"] == "proj-1"

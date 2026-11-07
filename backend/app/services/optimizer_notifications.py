@@ -40,12 +40,12 @@ _SURFACE_LABELS: dict[str, tuple[str, str]] = {
 _ERROR_SNIPPET = 200
 
 
-def _item_id(surface: Surface, run_doc: Any) -> str:
-    if surface == "kb":
-        return run_doc.kb_uuid
-    if surface == "extraction":
-        return run_doc.search_set_uuid
-    return run_doc.workflow_id
+def _item_id(surface: Surface, run_doc: object) -> str:
+    field = {"kb": "kb_uuid", "extraction": "search_set_uuid", "workflow": "workflow_id"}[surface]
+    value = getattr(run_doc, field, None)
+    if not isinstance(value, str):
+        raise ValueError("The optimizer run has no valid item identifier")
+    return value
 
 
 def _item_link(surface: Surface, item_id: str) -> str:

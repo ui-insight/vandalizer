@@ -17,6 +17,9 @@ not fail a refresh that otherwise succeeded, so failures are logged.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+from typing import TypeVar, overload
+
 import asyncio
 import datetime
 import difflib
@@ -183,6 +186,14 @@ async def get_version(source_uuid: str, version_uuid: str) -> Optional[Knowledge
     )
 
 
+@overload
+def as_utc(value: datetime.datetime) -> datetime.datetime: ...
+
+
+@overload
+def as_utc(value: None) -> None: ...
+
+
 def as_utc(value: Optional[datetime.datetime]) -> Optional[datetime.datetime]:
     # Mongo hands back naive UTC datetimes.
     if value is not None and value.tzinfo is None:
@@ -190,9 +201,12 @@ def as_utc(value: Optional[datetime.datetime]) -> Optional[datetime.datetime]:
     return value
 
 
+VersionT = TypeVar('VersionT', KnowledgeBaseSourceVersion, VersionSummary)
+
+
 def version_in_effect_at(
-    versions: list[KnowledgeBaseSourceVersion], at: datetime.datetime,
-) -> Optional[KnowledgeBaseSourceVersion]:
+    versions: Sequence[VersionT], at: datetime.datetime,
+) -> VersionT | None:
     """The version answers came from at ``at``, or None if the source had
     no recorded text then (before its first version took effect)."""
     at = as_utc(at)

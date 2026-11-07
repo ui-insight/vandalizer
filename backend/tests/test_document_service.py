@@ -82,6 +82,11 @@ def _mock_find_chain(items):
 
 
 class TestListContents:
+    @pytest.fixture(autouse=True)
+    def no_project_scope(self):
+        with patch("app.services.access_control.find_folder_project", new=AsyncMock(return_value=None)):
+            yield
+
     @pytest.mark.asyncio
     async def test_returns_folders_and_documents(self):
         folders = [_make_folder(uuid="f1", title="My Folder")]
@@ -140,6 +145,8 @@ class TestListContents:
         assert filters["soft_deleted"] == {"$ne": True}
         assert filters["user_id"] == "user1"
         assert filters["folder"] == "0"
+        # A revised file's older versions live in Version history only.
+        assert filters["superseded_by"] is None
 
         assert len(result["documents"]) == 1
         assert result["documents"][0]["soft_deleted"] is False

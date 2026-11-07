@@ -7,6 +7,8 @@ from typing import Optional
 from beanie import Document, PydanticObjectId
 from pydantic import Field
 
+from app.utils.timestamps import utc_iso
+
 
 class ActivityType(str, Enum):
     CONVERSATION = "conversation"
@@ -30,6 +32,10 @@ class ActivityEvent(Document):
 
     user_id: str
     team_id: Optional[str] = None
+    # The project the work was done in, so Home can say which proposal or
+    # award a continuation row belongs to (#1014 item 30). Set from the
+    # chat's project scope; None for unscoped work and older events.
+    project_uuid: Optional[str] = None
 
     started_at: datetime.datetime = Field(
         default_factory=lambda: datetime.datetime.now(datetime.timezone.utc)
@@ -40,6 +46,14 @@ class ActivityEvent(Document):
     )
 
     conversation_id: Optional[str] = None
+    # The chat that started this run, when a chat tool started it. Kept apart
+    # from ``conversation_id``, which marks a chat's own entry: deleting an
+    # entry deletes the conversation in ``conversation_id``, and deleting a run
+    # must never delete the chat that ran it.
+    source_conversation_id: Optional[str] = None
+    # Titles of the documents the run read (first ten), so the activity list
+    # can tell apart two runs of the same template.
+    document_titles: list[str] = Field(default_factory=list)
     search_set_uuid: Optional[str] = None
     workflow_result: Optional[PydanticObjectId] = None
     workflow: Optional[PydanticObjectId] = None
@@ -89,12 +103,15 @@ class ActivityEvent(Document):
             "status": self.status,
             "title": self.title,
             "conversation_id": self.conversation_id,
+            "source_conversation_id": self.source_conversation_id,
+            "document_titles": self.document_titles or [],
+            "tags": self.tags or [],
             "search_set_uuid": self.search_set_uuid,
             "workflow_id": str(self.workflow) if self.workflow else None,
             "workflow_session_id": self.workflow_session_id,
-            "started_at": self.started_at.isoformat() if self.started_at else None,
-            "finished_at": self.finished_at.isoformat() if self.finished_at else None,
-            "last_updated_at": self.last_updated_at.isoformat() if self.last_updated_at else None,
+            "started_at": utc_iso(self.started_at),
+            "finished_at": utc_iso(self.finished_at),
+            "last_updated_at": utc_iso(self.last_updated_at),
             "error": self.error or "",
             "tokens_input": self.tokens_input,
             "tokens_output": self.tokens_output,

@@ -1,0 +1,174 @@
+NSF PAPPG (NSF 24-1) — Chapter III: NSF Proposal Processing and Review
+Source: https://www.nsf.gov/policies/pappg/24-1/ch-3-proposal-processing-review
+
+Proposals received by NSF are assigned to the appropriate NSF program and are assessed to ensure that they meet NSF compliance requirements. All compliant proposals are then carefully reviewed by a scientist, engineer, or educator serving as an NSF Program Officer, and usually by three to ten other persons outside NSF either as ad hoc reviewers, panelists, or both, who are experts in the particular fields represented by the proposal. Proposers are invited to suggest names of persons they believe are especially well qualified to review the proposal and/or persons they would prefer not review the proposal.These suggestions may serve as one source in the reviewer selection process at the Program Officer's discretion. In addition, Program Officers may obtain comments from site visits before recommending final action on proposals. Senior NSF staff further review recommendations for awards. A flowchart that depicts the entire NSF proposal and award process (and associated timeline) is included as Exhibit III-1.
+
+A comprehensive description of the Foundation’s merit review process is available on the NSF website.
+
+Proposal review is one step in the NSF program planning and implementation process. Embedded in this process are core strategies that are fundamental to the fulfillment of NSF's mission. More information about NSF's mission and strategies can be found in Leading the World in Discovery and Innovation, STEM Talent Development and the Delivery of Benefits from Research - NSF Strategic Plan for Fiscal Years (FY) 2022 - 2026. NSF's mission is particularly well-implemented through the integration of research and education and broadening participation in NSF programs, projects, and activities.
+
+### A. Merit Review Principles and Criteria
+
+The National Science Foundation strives to invest in a robust and diverse portfolio of projects that creates new knowledge and enables breakthroughs in understanding across all areas of science and engineering research and education. To identify which projects to support, NSF relies on a merit review process that incorporates consideration of both the technical aspects of a proposed project and its potential to contribute more broadly to advancing NSF’s mission “to promote the progress of science; to advance the national health, prosperity, and welfare; to secure the national defense; and for other purposes.” NSF makes every effort to conduct a fair, competitive, transparent merit review process for the selection of projects.
+
+-
+Merit Review Principles
+
+These principles are to be given due diligence by PIs and organizations when preparing proposals and managing projects, by reviewers when reading and evaluating proposals, and by NSF program staff when determining whether or not to recommend proposals for funding and while overseeing awards. Given that NSF is the primary Federal agency charged with nurturing and supporting excellence in basic research and education, the following three principles apply:
+
+- All NSF projects should be of the highest quality and have the potential to advance, if not transform, the frontiers of knowledge.
+- NSF projects, in the aggregate, should contribute more broadly to achieving societal goals. These broader impacts may be accomplished through the research itself, through activities that are directly related to specific research projects, or through activities that are supported by, but are complementary to, the project. The project activities may be based on previously established and/or innovative methods and approaches, but in either case must be well justified.
+- Meaningful assessment and evaluation of NSF funded projects should be based on appropriate metrics, keeping in mind the likely correlation between the effect of broader impacts and the resources provided to implement projects. If the size of the activity is limited, evaluation of that activity in isolation is not likely to be meaningful. Thus, assessing the effectiveness of these activities may best be done at a higher, more aggregated, level than the individual project.
+
+With respect to the third principle, even if assessment of Broader Impacts outcomes for particular projects is done at an aggregated level, PIs are expected to be accountable for carrying out the activities described in the funded project. Thus, individual projects should include clearly stated goals, specific descriptions of the activities that the PI intends to do, and a plan in place to document the outputs of those activities.
+
+These three merit review principles provide the basis for the merit review criteria, as well as a context within which the users of the criteria can better understand their intent.
+
+-
+Merit Review Criteria
+
+All NSF proposals are evaluated through use of two National Science Board approved merit review criteria. In some instances, however, NSF will employ additional criteria as required to highlight the specific objectives of certain programs and activities.
+
+The two merit review criteria are listed below. Both criteria are to be given full consideration during the review and decision-making processes; each criterion is necessary but neither, by itself, is sufficient. Therefore, proposers must fully address both criteria. (Chapter II.D.2.d(i) contains additional information for use by proposers in development of the Project Description section of the proposal.) Reviewers are strongly encouraged to review the criteria, including Chapter II.D.2.d(i), prior to the review of a proposal.
+
+When evaluating NSF proposals, reviewers will be asked to consider what the proposers want to do, why they want to do it, how they plan to do it, how they will know if they succeed, and what benefits could accrue if the project is successful. These issues apply both to the technical aspects of the proposal and the way in which the project may make broader contributions. To that end, reviewers will be asked to evaluate all proposals against two criteria:
+
+- Intellectual Merit: The Intellectual Merit criterion encompasses the potential to advance knowledge; and
+- Broader Impacts: The Broader Impacts criterion encompasses the potential to benefit society and contribute to the achievement of specific, desired societal outcomes.
+
+The following elements should be considered in the review for both criteria:
+
+- What is the potential for the proposed activity to:
+
+- Advance knowledge and understanding within its own field or across different fields (Intellectual Merit); and
+- Benefit society or advance desired societal outcomes (Broader Impacts)?
+
+- To what extent do the proposed activities suggest and explore creative, original, or potentially transformative concepts?
+- Is the plan for carrying out the proposed activities well-reasoned, well-organized, and based on a sound rationale? Does the plan incorporate a mechanism to assess success?
+- How well qualified is the individual, team, or organization to conduct the proposed activities?
+- Are there adequate resources available to the PI (either at the home organization or through collaborations) to carry out the proposed activities?
+
+### B. Selection of Reviewers
+
+The NSF guidelines for the selection of reviewers are designed to ensure selection of experts who can give Program Officers the proper information needed to make a recommendation in accordance with the NSB-approved criteria for selection of projects. Optimally, reviewers should have:
+
+- Special knowledge of the science and engineering subfields involved in the proposals to be reviewed to evaluate competence, intellectual merit, and utility of the proposed activity. Within reasonable limits, reviewers’ fields of specialty should be complementary within a reviewer group.
+- Broader or more generalized knowledge of the science and engineering subfields involved in the proposals to be reviewed to evaluate the broader impacts of the proposed activity. Reviewers with broad expertise are required for proposals involving substantial size or complexity, broad disciplinary or multidisciplinary content, or significant national or international implications.
+- Broad knowledge of the infrastructure of the science and engineering enterprise, and its educational activities, to evaluate contributions to societal goals, scientific and engineering personnel, and distribution of resources to organizations and geographical areas.
+- To the extent possible, diverse representation within the review group. The goal is to achieve a balance among various characteristics. Important factors to consider include type of organization represented, reviewer diversity, age distribution and geographic balance.
+
+### C. Proposal File Updates
+
+It is the responsibility of the proposing organization to thoroughly review each proposal prior to submission. On occasion, however, a problem is identified with a portion of the proposal after the proposal has been submitted electronically to NSF.
+
+The Submitted Proposals Module in Research.gov allows the organization to request the replacement of files or revision of other proposal attributes, associated with a previously submitted proposal. All budgetary revisions must be submitted through Submitted Proposals Module in Research.gov. See Section D. below for further information. A request for a proposal file update must be signed and submitted by the AOR. A Proposal Update Justification must be provided that addresses:
+
+- why the changes or file replacements are being requested; and
+- any differences between the original and proposed replacement files.
+
+A request for a proposal file update automatically will be accepted if submitted prior to:
+
+- the deadline date;
+- initiation of external peer review in cases when a target date is utilized; [54] and
+- initiation of external peer review in the case of an unsolicited proposal.
+
+A request for a proposal file update after the timeframes specified above will require acceptance by the cognizant NSF Program Officer. Such requests shall be submitted only to correct a technical problem with the proposal (i.e., formatting or print problems). Changes in the content of the proposal should not be requested after the timeframes specified above. When a request is accepted, the proposed files or revisions to proposal attributes will immediately replace the existing files and become part of the official proposal.
+
+PIs can access the Proposal File Update Module via the Submitted Proposals Module in Research.gov. Authorized individuals in the organization’s SPO can initiate or review requests for proposal file updates using the Submitted Proposals Module in Research.gov.[55]
+
+NSF will consider only one request for a proposal file update per proposal at a time. It is anticipated that it will be a rare occurrence for more than one file update request to be submitted for a proposal.
+
+### D. Revisions to Proposals Made During the Review Process
+
+In the event of a significant development (e.g., research findings, changed circumstances, unavailability of PI or other senior/key personnel, etc.) that might materially affect the outcome of the review of a pending proposal, the proposer must contact the cognizant NSF Program Officer to discuss the issue. Submitting additional information must not be used as a means of circumventing page limitations or stated deadlines.
+
+Before recommending whether or not NSF should support a particular project, the cognizant NSF Program Officer may, subject to certain constraints outlined below, engage in discussions with the proposing PI(s).
+
+Negotiating budgets generally involves discussing a lower or higher amount of total support for the proposed project. The cognizant NSF Program Officer may suggest reducing or eliminating costs for specific budget items that are clearly unnecessary or unreasonable for the activities to be undertaken, especially when the review process supports such changes; however, this would generally not include faculty salaries, salary rates, fringe benefits, or tuition. Note: indirect cost (F&A) rates are not subject to negotiation. The NSF Program Officer may discuss with PIs the "bottom line" award amount, i.e., the total NSF funding that will be recommended for a project. NSF Program Officers may not renegotiate cost sharing or other organizational commitments.
+
+When such discussions result in a budget reduction of 10% or more from the amount originally proposed, a corresponding reduction should be made in the scope of the project. A revised proposal budget, budget justification, as well as a Budget Impact Statement that describes the impact of the budget reduction on the scope of the project, must be provided. Proposers must use the Submitted Proposals Module in Research.gov to submit this information. Revised proposal budgets must be signed and submitted by the AOR.
+
+### E. Funding Recommendation
+
+After scientific, technical, and programmatic review and consideration of appropriate factors, the NSF Program Officer recommends to the cognizant NSF Division Director whether the proposal should be declined or recommended for award. Normally, final programmatic approval is at the Division/Office level. Because of the large volume of proposals, this review and consideration process may take up to six months. Large or particularly complex proposals may require additional review and processing time.
+
+Should a proposal be recommended for award, the PI may be contacted by the NSF Program Officer for assistance in preparation of the public award abstract and its title. An NSF award abstract, with its title, is an NSF document that describes the project and justifies the expenditure of Federal funds by articulating how the project serves the national interest, as stated by NSF's mission: "to promote the progress of science; to advance the national health, prosperity and welfare; or to secure the national defense."
+
+Note that a recommendation for an award by an NSF Program Officer does not constitute approval or obligation of Federal funds. Proposers are cautioned that only an appointed NSF Grants and Agreements Officer may make commitments, obligations, or awards on behalf of NSF or authorize the expenditure of funds. No commitment on the part of NSF or the Government should be inferred from technical or budgetary discussions with an NSF Program Officer. A PI or organization that makes financial or personnel commitments in the absence of an award notice approved by an NSF Grants and Agreements Officer does so at its own risk.
+
+### F. NSF's Decision to Award or Decline Proposals
+
+Declination of proposals for programmatic reasons is addressed in Chapter IV.C.
+
+#### 1. Decision to Award or Financially/Administratively Decline a Proposal
+
+If the program recommendation is to award a proposal and final Division/Office or other programmatic approval is obtained, then the recommended proposal goes to the Division of Grants and Agreements (DGA) or the Division of Acquisition and Cooperative Support (DACS) for review of business, financial and policy implications. Pre-award review includes utilization of NSF’s risk-based framework, which evaluates the risks posed by proposers prior to issuance of an NSF award. After the completion of any necessary pre-award administrative and/or financial reviews, a final decision by a Grants and Agreements Officer will be made to fund or decline the proposal. See Chapter VI for additional information on NSF Awards.
+
+DGA generally makes the decision to award or decline proposals within 30 days after the program Division/Office makes its recommendation. DACS review of major facilities and related proposals follows the requirements and timeline in the Research Infrastructure Guide.
+
+Proposals from organizations that:
+
+- have not had an active NSF award within the preceding five years;
+- involve special situations (such as coordination with another Federal agency or a private funding source);
+- are to be awarded as cooperative agreements;
+- are new or renewal proposals that exceed $20 million in total costs; or
+- have other unusual considerations;
+
+may require additional review and processing time.
+
+NSF will report proposals that are declined for reasons that meet the guidelines set forth by OMB to the OMB-designated integrity and performance system (currently FAPIIS) in accordance with Federal-wide requirements, but only after the proposer has had an opportunity to exhaust the appeal procedures contained in Chapter III.F.2 below.
+
+#### 2. Process to Appeal NSF’s Decision to Decline a Proposal for Financial or Administrative Reasons
+
+#### a. Background
+
+A proposer who has been declined for an NSF award for reasons related to NSF’s pre-award financial and administrative reviews will be afforded the opportunity to discuss the decline decision with the cognizant NSF Grants and Agreements Officer or Branch Chief in DGA or DACS. If, after obtaining further clarification from the cognizant NSF Grants and Agreements Officer or Branch Chief in DGA or DACS, the proposer believes that NSF made a substantive or procedural error in arriving at its decision to decline an award, the proposer may submit a request for review to the cognizant Division Director of DGA or DACS. The decision made by the cognizant Division Director of DGA or DACS is final.
+
+Award of NSF assistance is discretionary. A formal hearing, therefore, is not provided.
+
+#### b. Applicability
+
+Chapter III.F.2.c below contains the process by which proposers may appeal a DGA or DACS Branch Chief’s decision to decline an NSF award arising from NSF’s pre-award financial and administrative reviews. This process does not apply to decisions to return or decline a proposal for any other reason.
+
+Proposals declined for administrative or financial reasons are not eligible for reconsideration under Chapter IV.D.
+
+#### c. Procedures
+
+(i) Proposers who are declined for an NSF award for financial or administrative reasons will be identified as such in the declination notice. A proposer who disagrees with NSF’s decision should first contact the cognizant NSF Grants and Agreements Officer or Branch Chief in DGA or DACS, who will afford the proposer an informal opportunity to obtain further clarification.
+
+(ii) If dissatisfied with the explanation provided by the cognizant NSF Grants and Agreements Officer or Branch Chief in DGA or DACS, the proposing organization’s AOR may submit a request for review to the cognizant Division Director of DGA or DACS. The letter must be addressed to the Division Director, DGA, or the Division Director, DACS as appropriate, and must be received by the Foundation within 30 days after the date of the declination notice. The time for filing a request for review is strictly enforced and no extensions for the purpose of preparing it will be granted.
+
+(iii) The request for review need not follow any prescribed format. However, it must contain a full statement of the proposer’s position with respect to the disputed matter, as well as the facts and reasons supporting the proposer’s position that the declination was unwarranted. The request may address any errors made in the financial and administrative review process, and it may contain supporting documentation that was not originally presented as part of the financial and administrative review process. However, NSF will not consider any new information that would not have been available at the time the decision to decline was made. Therefore, new information presented in relation to the proposer’s financial stability or the quality of its management systems will not be considered.
+
+(iv) The Division Director, DGA or DACS, will review or designate one or more individuals to review the matter. In no case will the review be undertaken by any individual involved with the decline decision. The reviewing official(s) may request additional information from the proposer, but only information that would have been available at the time the decision to decline was made will be considered.
+
+(v) The designated reviewing official(s) will, within 30 days of NSF’s receipt of the request for review, forward a report to the Division Director, DGA or DACS or designee for a final written decision for the agency. The Division Director, DGA or DACS or designee will communicate the decision in writing to the proposer, normally within 15 days of receipt of the report, unless otherwise specified by NSF. The decision made by the Division Director, DGA or DACS, is final.
+
+### G. Review Information Provided to PI
+
+When a decision has been made (whether an award or a declination), the following information is released electronically to the PI:
+
+- description of the process in which the proposal was reviewed;
+- copies of all reviews used in the decision (with any reviewer-identifying information redacted);
+- if the proposal was reviewed by a panel at any point in the process; a copy of the panel summary and recommendation; and/or
+- site-visit reports, if applicable.
+
+In addition, if not otherwise provided in the panel summary, the PI is provided a written explanation of the basis for the declination. A PI also may request and obtain any other releasable material in NSF's file on the individual's proposal. Everything in the file, except information that identifies either reviewers or other pending or declined proposals is usually releasable to the PI.
+
+Reviews are made available directly to the PI, to provide feedback for the purpose of improving proposed research and research methods, and to assist in preparation of future proposals. They are not intended for any other purpose.
+
+### H. Release of Recipient Proposal Information
+
+A proposal that results in an NSF award will be made available to the public on request, consistent with the Freedom of Information Act, except for privileged information or material that is personal, proprietary, or otherwise exempt from disclosure under law. Appropriate labeling in the proposal aids identification of what may be specifically exempt. (See Chapter II.E.1) Such information will be withheld from public disclosure to the extent permitted by law. Without assuming any liability for inadvertent disclosure, NSF will seek to limit disclosure of such information to its employees and to outside reviewers when necessary for merit review of the proposal, or as otherwise authorized by law.
+
+Portions of proposals resulting in awards that contain descriptions of inventions in which either the Government or the recipient owns a right, title, or interest (including a non-exclusive license) will not normally be made available to the public until a reasonable time has been allowed for filing patent applications. NSF will notify the recipient of receipt of requests for copies of funded proposals so the recipient may advise NSF of such inventions described, or other confidential, commercial, or proprietary information contained in the proposal.
+
+#### Exhibit III-1: NSF Proposal & Award Process Timeline
+
+NSF Proposal and Award Process Timeline (PDF, 306.61 KB)
+
+#### Footnotes to Chapter III
+
+[54] The status of a proposal may be found in Research.gov.
+
+[55] Detailed instructions on submitting proposer-initiated proposal file updates are available on the Research.gov website.

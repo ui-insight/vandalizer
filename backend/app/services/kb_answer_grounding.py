@@ -20,7 +20,12 @@ dates, counts and list numbering are left alone: they are either copied from
 the question or too common to check without drowning the real signal.
 """
 
+import json
 import re
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.figure_derivation import Derivation
 
 _SCALES = {
     "k": 1_000,
@@ -63,6 +68,87 @@ def _money_values(text: str) -> dict[float, str]:
     return out
 
 
+# A bare amount in structured tool output: "1250000", "1,250,000.00". Four or
+# more digits, or comma groups, so short counts and list numbers are skipped.
+# A digit, "$" or separator before it means it is the tail of something longer.
+_BARE_AMOUNT_RE = re.compile(r"(?<![\d$.,])(\d{1,3}(?:,\d{3})+|\d{4,})(\.\d+)?(?!\d|,\d)")
+
+
+def bare_amounts_as_money(text: str) -> str:
+    """*text* with bare amounts written as dollars, for use as a source.
+
+    Extraction and other tool results store a budget as "1250000"; the
+    answer reports it as "$1,250,000". Treating the bare number as support
+    keeps a real extracted value from being flagged, while a figure that no
+    tool returned in any form still is.
+    """
+    return _BARE_AMOUNT_RE.sub(lambda m: "$" + m.group(1) + (m.group(2) or ""), text or "")
+
+
+# Field names whose numbers a reply reports as a percentage or in dollars.
+# Matched against the underscore-separated words of a JSON key, so
+# "aggregate_accuracy", "score_percent" and "estimated_cost_usd" all count
+# while "tokens_used" and "num_runs" do not.
+_PERCENT_KEY_WORDS = frozenset({
+    "score", "accuracy", "consistency", "percent", "pct", "rate",
+    "confidence", "precision", "recall", "f1", "coverage",
+})
+_MONEY_KEY_WORDS = frozenset({"cost", "usd", "price", "dollars", "spend"})
+
+
+def _key_words(key: str) -> set[str]:
+    return set(re.split(r"[^a-z0-9]+", key.lower()))
+
+
+def _number_forms(value: float, unit: str) -> list[str]:
+    """*value* as a reply would quote it: whole, one and two decimals."""
+    return [
+        f"${round(value, d):,.{d}f}" if unit == "$" else f"{round(value, d):.{d}f}%"
+        for d in (0, 1, 2)
+    ]
+
+
+def _keyed_figures(node: object, key: str = "") -> list[str]:
+    """Percent and dollar forms of the numbers under score- and cost-like keys."""
+    if isinstance(node, dict):
+        return [f for k, v in node.items() for f in _keyed_figures(v, str(k))]
+    if isinstance(node, list):
+        return [f for item in node for f in _keyed_figures(item, key)]
+    if isinstance(node, bool) or not isinstance(node, (int, float)):
+        return []
+    words = _key_words(key)
+    if words & _PERCENT_KEY_WORDS:
+        forms = _number_forms(node, "%")
+        # Validation and optimizer scores are stored on a 0..1 scale and
+        # reported as percents: 0.82 is "82%".
+        if 0 <= node <= 1:
+            forms += _number_forms(node * 100, "%")
+        return forms
+    if words & _MONEY_KEY_WORDS:
+        return _number_forms(node, "$")
+    return []
+
+
+def tool_output_as_source(text: str) -> str:
+    """A tool result, as the text a reply's figures are checked against.
+
+    Bare amounts read as dollars (see ``bare_amounts_as_money``). A JSON
+    result also gets each score- or cost-like field written the way a reply
+    states it: ``"accuracy": 0.82`` supports "82%", ``"score_percent": 91``
+    supports "91%", and ``"estimated_cost_usd": 1.37`` supports "$1.37" and
+    "$1". Support ticket: chat repeated a validation run's accuracy and
+    consistency and an optimizer's score straight from the tool result, and
+    every one was flagged as possibly recalled.
+    """
+    text = text or ""
+    try:
+        parsed = json.loads(text)
+    except ValueError:
+        parsed = None
+    extra = _keyed_figures(parsed) if isinstance(parsed, (dict, list)) else []
+    return "\n".join([bare_amounts_as_money(text), *extra])
+
+
 def _percent_values(text: str) -> dict[float, str]:
     out: dict[float, str] = {}
     for m in _PERCENT_RE.finditer(text):
@@ -76,22 +162,108 @@ def unsupported_figures(answer: str, snippets: str) -> list[str]:
     Values are compared, not strings: "$1 million" in the answer is supported
     by "$1,000,000" in a snippet, and "15%" by "15 percent". A percentage is
     never supported by a dollar amount of the same number, or the reverse.
-    Returned in the answer's own wording, first occurrence, in order.
+    A figure the answer calculated from stated ones is supported (see
+    ``check_figures``). Returned in the answer's own wording, first
+    occurrence, in order.
     """
+    return check_figures(answer, snippets)[0]
+
+
+def check_figures(answer: str, snippets: str) -> tuple[list[str], list["Derivation"]]:
+    """(figures no source states, figures calculated from ones they do).
+
+    Support ticket: correct sums and percentages worked out from an NIH budget
+    table were flagged as possibly "from the model's general knowledge". See
+    ``figure_derivation``.
+    """
+    from app.services.figure_derivation import derive_figures
+
     if not answer or not answer.strip():
-        return []
+        return [], []
     snippet_money = set(_money_values(snippets or ""))
     snippet_pct = set(_percent_values(snippets or ""))
+    calculated = derive_figures(answer, snippet_money, snippet_pct)
+    derived = {d.label for d in calculated}
     missing = [
         label for value, label in _money_values(answer).items()
-        if value not in snippet_money
+        if value not in snippet_money and label not in derived
     ]
     missing += [
         label for value, label in _percent_values(answer).items()
-        if value not in snippet_pct
+        if value not in snippet_pct and label not in derived
     ]
     order = {label: answer.find(label) for label in missing}
-    return sorted(missing, key=lambda label: order[label])
+    return sorted(missing, key=lambda label: order[label]), calculated
+
+
+def _figure_value_and_unit(label: str) -> tuple[float, float] | None:
+    """A stated figure's value and the precision it was written to.
+
+    "$51k" is 51,000 to the nearest 1,000; "$1.255M" is 1,255,000 to the
+    nearest 1,000; "20.2%" is 20.2 to the nearest 0.1.
+    """
+    money = _MONEY_RE.search(label)
+    if money:
+        whole, frac, scale = money.group(1), money.group(2) or "", money.group(3)
+        factor = _SCALES[scale.lower()] if scale else 1
+        decimals = len(frac) - 1 if frac else 0
+        return float(whole.replace(",", "") + frac) * factor, factor / 10 ** decimals
+    pct = _PERCENT_RE.search(label)
+    if pct:
+        number = pct.group(1)
+        decimals = len(number.split(".")[1]) if "." in number else 0
+        return float(number), 1 / 10 ** decimals
+    return None
+
+
+def _calculated_steps(outputs: list[str]) -> list[tuple[float, str]]:
+    """Each numeric calculate step's value and its working ("label: terms = result")."""
+    steps: list[tuple[float, str]] = []
+    for text in outputs:
+        try:
+            parsed = json.loads(text)
+        except ValueError:
+            continue
+        for step in (parsed.get("steps") or []) if isinstance(parsed, dict) else []:
+            result = step.get("result") if isinstance(step, dict) and "check" not in step else None
+            if isinstance(result, str):
+                try:
+                    value = float(result.replace(",", ""))
+                except ValueError:
+                    continue
+                steps.append((value, f"{step.get('label') or 'Step'}: {step.get('expression') or ''} = {result}"))
+    return steps
+
+
+def calculation_formulas(figures: list[str], calculate_outputs: list[str]) -> dict[str, str]:
+    """The *figures* (labels from ``check_figures``) that a calculate step
+    produced, allowing for the rounding the answer wrote them with, each
+    mapped to that step's working.
+
+    Support ticket (NIH R01 budget): yearly direct costs the model worked out
+    were shown as "Not in the retrieved sources … may come from the model's
+    general knowledge". A calculated figure is neither: it is listed with the
+    other calculated figures, with the calculation that produced it.
+    """
+    steps = _calculated_steps(calculate_outputs)
+    if not steps:
+        return {}
+    out: dict[str, str] = {}
+    for label in figures:
+        parsed = _figure_value_and_unit(label)
+        if parsed is None:
+            continue
+        value, unit = parsed
+        tolerance = unit / 2 + 1e-9
+        match = next((formula for candidate, formula in steps if abs(candidate - value) <= tolerance), None)
+        if match is not None:
+            out[label] = match
+    return out
+
+
+def calculated_only(figures: list[str], answer: str, calculate_outputs: list[str]) -> list[str]:
+    """The *figures* a calculate step produced (see ``calculation_formulas``)."""
+    return list(calculation_formulas(figures, calculate_outputs))
 
 
 # ---------------------------------------------------------------------------
@@ -256,8 +428,13 @@ def unsupported_citations(
 # those are the answer's sources; the rest were searched but not used.
 
 # "[S3]", "[S1, S3]", "[S1; S3]" or "[S1, 3]". Adjacent "[S1][S3]" are two
-# matches.
-_SNIPPET_REF_RE = re.compile(r"\[\s*S\d+(?:\s*[,;]\s*S?\d+)*\s*\]")
+# matches. gpt-oss also writes "(S1)" and bolds the number, "[**S1**]": seven
+# of twelve KB answers in #1005 run 3 left those raw, so the reader saw
+# "(S1)" where a source should be and the snippet never counted as used.
+_SNIPPET_REF_RE = re.compile(
+    r"\[\s*\**\s*S\d+(?:\s*[,;]\s*S?\d+)*\s*\**\s*\]"
+    r"|\(\s*\**\s*S\d+(?:\s*[,;]\s*S?\d+)*\s*\**\s*\)"
+)
 _DIGITS_RE = re.compile(r"\d+")
 # The filename form the prompt asked for before snippets were numbered, which
 # a model can still fall back on, e.g. after seeing it in earlier turns.
@@ -278,7 +455,8 @@ def _covers_page(source: dict, pages: set[int]) -> bool:
     if not isinstance(start, int):
         # A sheet or a web page has no page to disagree with.
         return True
-    end = source.get("page_end") if isinstance(source.get("page_end"), int) else start
+    page_end = source.get("page_end")
+    end = page_end if isinstance(page_end, int) else start
     return any(start <= p <= end for p in pages)
 
 
@@ -305,23 +483,66 @@ def used_snippet_refs(answer: str, sources: list[dict]) -> list[int]:
     return sorted(used)
 
 
-def expand_snippet_refs(answer: str, sources: list[dict]) -> str:
+def expand_snippet_refs(
+    answer: str,
+    sources: list[dict],
+    page_segments: dict[int, list[tuple[int, str]]] | None = None,
+) -> str:
     """Replace ``[S3]`` with the readable ``[Source: PAPPG.pdf, p. 54]``.
 
     The numbers mean something only within the turn that showed them, so the
     stored answer must not keep them: the next turn numbers its own snippets
     from 1 and reads this one back as history. A reference to a number no
     snippet carries is left as written rather than silently erased.
-    """
-    by_ref = _by_ref(sources)
 
-    def expand(m: re.Match) -> str:
+    *page_segments* maps a snippet whose chunk crosses a page break to its
+    pages' text. Its label was chosen from the question; here each citation
+    of it names the page holding the claim it closes, when exactly one does
+    (#1058). When none can be told — a summary sentence such as "these dates
+    are in the draft" carries nothing to locate — it names the chunk's whole
+    range rather than the page the question happened to match. When every
+    citation of a snippet agrees, its chip moves to that page or range too.
+    """
+    from app.services.citation_grounding import page_holding_claim
+    from app.services.page_locator import format_page, format_page_range
+
+    by_ref = _by_ref(sources)
+    page_segments = page_segments or {}
+    chosen: dict[int, set[int | None]] = {}
+
+    def label_for(n: int, s: dict, page: int | None) -> str:
+        title = s.get("document_title") or f"S{n}"
+        if n in page_segments and page is None:
+            pages = [p for p, _text in page_segments[n]]
+            locator = format_page_range(pages[0], pages[-1], s.get("page_approximate"))
+            return f"{title}, {locator}" if locator else title
+        if page is None:
+            return s.get("cite_label") or title
+        locator = format_page(page, s.get("page_approximate"))
+        return f"{title}, {locator}" if locator else title
+
+    def expand(m: re.Match[str]) -> str:
         labels: list[str] = []
         for n in map(int, _DIGITS_RE.findall(m.group(0))):
             s = by_ref.get(n)
             if s is None:
                 return m.group(0)
-            labels.append(s.get("cite_label") or s.get("document_title") or f"S{n}")
+            page = None
+            if n in page_segments:
+                page = page_holding_claim(answer, m.span(), _SNIPPET_REF_RE, page_segments[n])
+                chosen.setdefault(n, set()).add(page)
+            labels.append(label_for(n, s, page))
         return f"[Source: {'; '.join(dict.fromkeys(labels))}]"
 
-    return _SNIPPET_REF_RE.sub(expand, answer)
+    expanded = _SNIPPET_REF_RE.sub(expand, answer)
+    for n, pages in chosen.items():
+        if len(pages) != 1:
+            continue
+        s, page = by_ref[n], pages.pop()
+        if page is None:
+            span = [p for p, _text in page_segments[n]]
+            s["page"], s["page_end"] = span[0], span[-1]
+        else:
+            s["page"], s["page_end"] = page, None
+        s["cite_label"] = label_for(n, s, page)
+    return expanded

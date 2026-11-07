@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FocusTrap } from 'focus-trap-react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { X, Library, ListChecks, Workflow as WorkflowIcon, Folder, Loader2, ChevronRight } from 'lucide-react'
 import { fetchDocumentUsage, type DocumentUsage } from '../../api/files'
 
@@ -78,7 +78,7 @@ export function describeWorkflowUse(use: DocumentUsage['workflows'][number]['use
  */
 export function UsageCheckFailedNote({ many = false }: { many?: boolean }) {
   return (
-    <div role="status" style={{ marginTop: 8, fontSize: 12, color: '#b45309' }}>
+    <div role="status" style={{ marginTop: 'var(--workspace-space-8)', fontSize: 'var(--workspace-font-meta)', color: '#b45309' }}>
       Couldn&apos;t check where {many ? 'these files are' : 'this document is'} used — {many ? 'they' : 'it'} may be a knowledge-base source, an extraction test case, or a workflow document.
     </div>
   )
@@ -113,12 +113,12 @@ export function describeDeleteEffects(
  */
 export function RemoveFromKnowledgeBasesOption({ count, onChange }: { count: number; onChange: (checked: boolean) => void }) {
   return (
-    <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 10, fontSize: 13, cursor: 'pointer' }}>
+    <label style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--workspace-space-8)', marginTop: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-control)', cursor: 'pointer' }}>
       <input
         type="checkbox"
         defaultChecked
         onChange={e => onChange(e.target.checked)}
-        style={{ marginTop: 2 }}
+        style={{ marginTop: 'var(--workspace-space-2)' }}
       />
       <span>Also remove from {count === 1 ? 'this knowledge base' : `these ${count} knowledge bases`}</span>
     </label>
@@ -142,10 +142,10 @@ export function UsageSummaryList({ usage }: { usage: Pick<DocumentUsage, 'knowle
   ]
   if (rows.length === 0) return null
   return (
-    <ul style={{ listStyle: 'none', margin: '8px 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+    <ul style={{ listStyle: 'none', margin: "var(--workspace-space-8) 0 0", padding: 0, display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)' }}>
       {rows.map((r, i) => (
-        <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 13 }}>
-          <r.icon style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0, marginTop: 2 }} />
+        <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--workspace-space-6)', fontSize: 'var(--workspace-font-control)' }}>
+          <r.icon style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0, marginTop: 'var(--workspace-space-2)' }} />
           <span>
             <span style={{ color: '#6b7280' }}>{r.kind} </span>
             <strong style={{ fontWeight: 600 }}>&ldquo;{r.label}&rdquo;</strong>
@@ -161,14 +161,14 @@ function Section({ icon: Icon, title, count, children }: {
   icon: typeof Library; title: string; count: number; children: React.ReactNode
 }) {
   return (
-    <section aria-label={title} style={{ marginBottom: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+    <section aria-label={title} style={{ marginBottom: 'var(--workspace-space-16)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 'var(--workspace-space-6)' }}>
         <Icon style={{ width: 13, height: 13 }} />
         {title}
         <span style={{ fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>({count})</span>
       </div>
       {count === 0 ? (
-        <div style={{ fontSize: 13, color: '#9ca3af', paddingLeft: 19 }}>None</div>
+        <div style={{ fontSize: 'var(--workspace-font-control)', color: '#9ca3af', paddingLeft: 19 }}>None</div>
       ) : children}
     </section>
   )
@@ -176,7 +176,7 @@ function Section({ icon: Icon, title, count, children }: {
 
 const linkStyle: React.CSSProperties = {
   background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit',
-  fontSize: 13, fontWeight: 600, color: '#1d4ed8', textAlign: 'left',
+  fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#1d4ed8', textAlign: 'left',
 }
 
 export function DocumentUsageDialog({
@@ -211,19 +211,19 @@ export function DocumentUsageDialog({
           aria-labelledby="document-usage-title"
           style={{ maxHeight: '80vh', overflowY: 'auto' }}
         >
-          <div className="mb-4 flex items-start justify-between" style={{ gap: 12 }}>
+          <div className="mb-4 flex items-start justify-between" style={{ gap: 'var(--workspace-space-12)' }}>
             <div>
               <h3 id="document-usage-title" className="text-lg font-medium text-gray-900">Where is this used?</h3>
-              <div style={{ fontSize: 13, color: '#6b7280', wordBreak: 'break-word' }}>{docTitle}</div>
+              <div style={{ fontSize: 'var(--workspace-font-control)', color: '#6b7280', wordBreak: 'break-word' }}>{docTitle}</div>
             </div>
             <button onClick={onClose} aria-label="Close dialog" className="text-gray-500 hover:text-gray-600" style={{ flexShrink: 0 }}>
               <X className="h-5 w-5" />
             </button>
           </div>
 
-          {error && <div role="alert" style={{ fontSize: 13, color: '#b91c1c' }}>{error}</div>}
+          {error && <div role="alert" style={{ fontSize: 'var(--workspace-font-control)', color: '#b91c1c' }}>{error}</div>}
           {!usage && !error && (
-            <div role="status" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#6b7280' }}>
+            <div role="status" style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', fontSize: 'var(--workspace-font-control)', color: '#6b7280' }}>
               <Loader2 style={{ width: 16, height: 16, animation: 'spin 1s linear infinite' }} /> Looking up references…
             </div>
           )}
@@ -231,10 +231,10 @@ export function DocumentUsageDialog({
           {usage && (
             <>
               <div style={{
-                fontSize: 13, color: usage.total === 0 ? '#374151' : '#92400e',
+                fontSize: 'var(--workspace-font-control)', color: usage.total === 0 ? '#374151' : '#92400e',
                 backgroundColor: usage.total === 0 ? '#f9fafb' : '#fffbeb',
                 border: `1px solid ${usage.total === 0 ? '#e5e7eb' : '#fde68a'}`,
-                borderRadius: 6, padding: '8px 12px', marginBottom: 16,
+                borderRadius: 'var(--workspace-radius-small)', padding: "var(--workspace-space-8) var(--workspace-space-12)", marginBottom: 'var(--workspace-space-16)',
               }}>
                 This document is {summarizeUsage(usage)}.
                 {usage.total === 0
@@ -243,10 +243,10 @@ export function DocumentUsageDialog({
               </div>
 
               <Section icon={Folder} title="Location" count={1}>
-                <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 2, fontSize: 13, color: '#374151', paddingLeft: 19 }}>
+                <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--workspace-space-2)', fontSize: 'var(--workspace-font-control)', color: '#374151', paddingLeft: 19 }}>
                   <span>{usage.folder.team_id ? 'Team files' : 'My files'}</span>
                   {usage.folder.path.map(f => (
-                    <span key={f.uuid} style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                    <span key={f.uuid} style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-2)' }}>
                       <ChevronRight style={{ width: 12, height: 12, color: '#9ca3af' }} />
                       {f.title}
                     </span>
@@ -255,26 +255,26 @@ export function DocumentUsageDialog({
               </Section>
 
               <Section icon={Library} title="Knowledge bases" count={usage.knowledge_bases.length}>
-                <ul style={{ listStyle: 'none', margin: 0, padding: '0 0 0 19px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <ul style={{ listStyle: 'none', margin: 0, padding: '0 0 0 19px', display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-6)' }}>
                   {usage.knowledge_bases.map(kb => (
                     <li key={kb.uuid}>
                       {onOpenKnowledgeBase && kb.exists
                         ? <button type="button" style={linkStyle} onClick={go(() => onOpenKnowledgeBase(kb.uuid, kb.title))}>{kb.title}</button>
-                        : <span style={{ fontSize: 13, fontWeight: 600 }}>{kb.title}</span>}
-                      <span style={{ fontSize: 12, color: '#6b7280' }}> — source</span>
+                        : <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600 }}>{kb.title}</span>}
+                      <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}> — source</span>
                     </li>
                   ))}
                 </ul>
               </Section>
 
               <Section icon={ListChecks} title="Extractions" count={usage.extractions.length}>
-                <ul style={{ listStyle: 'none', margin: 0, padding: '0 0 0 19px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <ul style={{ listStyle: 'none', margin: 0, padding: '0 0 0 19px', display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-6)' }}>
                   {usage.extractions.map(ex => (
                     <li key={ex.uuid}>
                       {onOpenExtraction && ex.exists
                         ? <button type="button" style={linkStyle} onClick={go(() => onOpenExtraction(ex.uuid))}>{ex.title}</button>
-                        : <span style={{ fontSize: 13, fontWeight: 600 }}>{ex.title}</span>}
-                      <span style={{ fontSize: 12, color: '#6b7280' }}>
+                        : <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600 }}>{ex.title}</span>}
+                      <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
                         {' — '}{plural(ex.test_cases.length, 'test case', 'test cases')}: {ex.test_cases.map(tc => tc.label).join(', ')}
                       </span>
                     </li>
@@ -283,13 +283,13 @@ export function DocumentUsageDialog({
               </Section>
 
               <Section icon={WorkflowIcon} title="Workflows" count={usage.workflows.length}>
-                <ul style={{ listStyle: 'none', margin: 0, padding: '0 0 0 19px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <ul style={{ listStyle: 'none', margin: 0, padding: '0 0 0 19px', display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-6)' }}>
                   {usage.workflows.map(wf => (
                     <li key={wf.id}>
                       {onOpenWorkflow
                         ? <button type="button" style={linkStyle} onClick={go(() => onOpenWorkflow(wf.id))}>{wf.name}</button>
-                        : <span style={{ fontSize: 13, fontWeight: 600 }}>{wf.name}</span>}
-                      <span style={{ fontSize: 12, color: '#6b7280' }}> — {wf.uses.map(describeWorkflowUse).join('; ')}</span>
+                        : <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600 }}>{wf.name}</span>}
+                      <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}> — {wf.uses.map(describeWorkflowUse).join('; ')}</span>
                     </li>
                   ))}
                 </ul>

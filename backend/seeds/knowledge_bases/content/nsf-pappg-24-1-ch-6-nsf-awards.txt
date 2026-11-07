@@ -1,0 +1,117 @@
+NSF PAPPG (NSF 24-1) — Chapter VI: NSF Awards
+Source: https://www.nsf.gov/policies/pappg/24-1/ch-6-nsf-awards
+
+### Part II: Award, Administration and Monitoring of NSF Assistance Awards
+
+Part II of the NSF Proposal & Award Policies & Procedures Guide sets forth NSF guidance regarding the award, administration, and monitoring of grants and cooperative agreements. Coverage includes the NSF award process, from issuance and administration of an NSF award through closeout. Guidance is provided regarding other requirements or considerations that either are not universally applicable or do not follow the award cycle. Part II also implements other Public Laws, Executive Orders (E.O.) and other directives insofar as they apply to grants and is issued pursuant to the authority of Section 11(a) of the NSF Act (42 U.S.C. § 1870). When NSF award terms and condition or an award notice reference a particular section of the PAPPG, then that section becomes part of the award requirements through incorporation by reference.
+
+### A. Acceptance of Assistance Agreements
+
+Recipients are free to accept or reject the award. Normally, a request to drawdown NSF funds constitutes acceptance, however, in limited circumstances, NSF may require formal acceptance of an award. If the recipient chooses not to accept the award, then a written request should be sent to the cognizant NSF Program Officer to withdraw (or terminate) the award.
+
+### B. Award Instrument
+
+#### 1. Composition of an NSF Award
+
+Composition of an NSF award includes:
+
+- the award notice, including any special conditions applicable to the award and any numbered amendments thereto;
+- general Federal award information as required by 2 CFR § 200.210;
+- the budget, which indicates the amounts, by categories of expense, on which NSF has based its support;
+- the applicable NSF general conditions referenced in the award notice;
+- the proposal referenced in the award notice; and
+- any NSF program announcement, program solicitation or other documents or special requirements incorporated by reference in the award notice.
+
+#### 2. Award Transmission
+
+NSF transmits award notices to organizations via e-mail. In addition to the e-mail notification, grantees and PIs also may access NSF award notices via use of Research.gov. SPOs are able to view, print and/or download NSF award notices for their organizations.
+
+### C. NSF Award Conditions
+
+Each NSF award notice specifically identifies certain conditions that are applicable to, and become part of, that award. The award conditions are available on the NSF website. When these conditions reference a particular PAPPG section, that section becomes part of the award requirements through incorporation by reference.
+
+### D. NSF Award Periods
+
+#### 1. Definitions
+
+- Start Date is the date specified in the award notice on or after which, except for fixed amount awards, expenditures may be charged to the award. With the exception of PI transfers, the start date used by NSF is either the 1st or the 15th day of the month. If no start date is specified, then the date of the award notice is the start date. (For pre-award expenditures, Chapter X.A.2.b.)
+- End Date is the date specified in the award notice after which expenditures may not be charged against the award except to satisfy obligations to pay allowable project costs committed on or before that date. The end date is the last day of a month.
+- Award Date is the date when the NSF award is signed by the cognizant NSF Grants and Agreements Officer.
+- Budget period is the time interval from the start date of a funded portion of an NSF award to the end date of that funded portion during which the recipient is authorized to expend the funds awarded, including any funds carried forward or other revisions pursuant to 2 CFR § 200.308.
+- Award Period is the period of time between the start date and the end date of an NSF award shown as the duration.
+
+#### 2. Significance of Award Period
+
+- An NSF award gives authority to the recipient to commit and expend funds in support of the project up to the award amount specified in the award notice at any time during the award period.
+- Except as provided in Chapter X.A.2.b or Chapter X.A.2.c, expenditures may not be charged prior to the start date or subsequent to the end date under an NSF cost reimbursement award.
+
+#### 3. Changes in an Award Period
+
+-
+Start Date
+
+Once an award is made, the start date cannot be changed; however, recipients have the authority to incur pre-award costs as outlined in Chapter X.A.2.b.
+
+-
+End Date
+
+The end date may be changed for a no-cost extension, or by approval of a request for supplemental support (up to six additional months in accordance with Section E.4. below). When appropriate, the NSF Grants and Agreements Officer will issue an amendment to the award.
+
+- No-Cost Extension
+
+- Grantee-Approved Extension.[62] Grantees may authorize a one-time extension of the end date of the grant of up to 12 months if additional time beyond the established end date is required to assure adequate completion of the original scope of work within the funds already made available. This one-time extension may not be exercised merely for the purpose of using the unliquidated balances. Recipients are not authorized to extend an award that contains a zero balance. The recipient shall notify NSF, providing supporting reasons for the extension and the revised period of performance, at least ten calendar days prior to the end date specified in the grant to ensure accuracy of NSF’s grant data. All grantee-approved extension notifications must be signed and submitted by the AOR via use of NSF’s electronic systems. For grantee-approved extensions, no amendment will be issued. The revised end date may be viewed via NSF’s electronic systems.
+-
+NSF-Approved Extension
+
+- If additional time beyond the extension provided by the grantee is required and exceptional circumstances warrant, a formal request must be signed and submitted by the AOR via use of NSF’s electronic systems. The request should be submitted to NSF at least 45 days prior to the end date of the grant. All late requests must include a strong justification as to why it was not submitted earlier. The request must explain the need for the extension and include an estimate of the unobligated funds remaining and a plan for their use. That unobligated funds may remain at the end of the grant is not in itself sufficient justification for an extension. The plan must adhere to the previously approved objectives of the project. Such requests must be signed and submitted by the AOR via use of NSF’s electronic systems. NSF will not extend an award that contains a zero balance.
+- The first no-cost extension request will be considered for approval by the cognizant NSF Program Officer. The grantee and the PI will be electronically notified of the disposition of this request by the cognizant NSF Program Officer (an amendment to the grant will not be issued). The second (or any subsequent) no-cost extension request will be subject to the approval of an NSF Grants and Agreements Officer, and, if approved, will be in the form of an amendment to the grant specifying a new end date. Recipients are cautioned not to make new commitments or incur new expenditures after the end date of the award in anticipation of a no-cost extension. In addition, recipients must be aware that most NSF appropriated funds have a limited period of availability for expenditure before the appropriation cancels. No-cost extensions do not extend the period of availability for canceling funds[63].
+
+- Two-Year Extensions for Special Creativity
+
+- A Program Officer may recommend the extension of funding for certain research grants beyond the initial period for which the grant was awarded for a period of up to two years. The objective of such extensions is to offer the most creative investigators an extended opportunity to attack adventurous, “high-risk” opportunities in the same general research area, but not necessarily covered by the original/current award. Grants eligible for such an extension are generally continuing grants. Special Creativity Extensions are normally initiated by the NSF Program Officer based on progress during the first two years of the grant; PIs will be informed of such action a year in advance of the end date of the award. In response to the Program Officer’s recommendation, the required information must be signed and submitted by the AOR via use of NSF’s electronic systems.
+
+### E. Additional Funding Support
+
+#### 1. Types of Additional Funding Support
+
+Additional funding of a project beyond the original award amount awarded will be in the form of renewed support, continuing grant or cooperative agreement increments or supplemental support. A description of each of these additional funding mechanisms is provided below.
+
+#### 2. Renewed Support
+
+As defined in 2 CFR § 200.1, Renewal award means an award made subsequent to an expiring NSF award for which the start date is contiguous with, or closely follows, the end of the expiring NSF award. A renewal award's start date will begin a distinct period of performance.
+
+Generally, costs incurred under the old award cannot be transferred to the new award. Residual funds remaining in the old award cannot be transferred to the new award.
+
+Instructions for preparation of renewal proposals are contained in Chapters II and V.
+
+#### 3. Support under Continuing Grants
+
+- Funding increments for projects being supported under continuing grants receive high priority within NSF and normally are not considered in competition with proposals for new grants or for grants for renewed support.
+- Unless otherwise provided for in the original award notice, each increment of a continuing grant will be funded at the level indicated in the original award notice without a formal request, subject to NSF’s judgment of satisfactory progress, availability of funds, and receipt and approval of the required annual report. NSF makes every attempt to honor continuing grant commitments. In order to adjust to changes in the general level of funds for a particular field of science or engineering or to major new opportunities in that field, however, NSF may reduce continuing grant increments below the levels indicated in the original award notice. This requires full written justification by program staff and management review and approval. In the absence of major unanticipated fiscal year constraints, reductions are rare. Continuing grant increments will be released by the cognizant NSF Program Officer upon approval of the annual project report. The SPO and PI will be notified by the cognizant NSF Program Officer of NSF's approval via email.
+- In order to obtain a committed funding increment and ensure continuity of funding, an annual project report must be submitted by the PI via use of Research.gov and approved by the NSF Program Officer prior to the end of the current budget period. (See Chapter VII.D for additional information on submission of project reports).
+
+#### 4. Cooperative Agreement Increments
+
+- Unlike continuing grants, funding increments for projects being supported under cooperative agreements (CA) or cooperative support agreements (CSA) are recommended for funding by the cognizant NSF Program Officer in accordance with the terms and conditions of the CA, which may be based on the original budget or submission of a revised budget via email or as directed.
+- Continued funding is subject to NSF's judgment of satisfactory progress, including milestones or other requirements of the CA or CSA, availability of funds, and receipt and approval of the required annual report, and, if required by the award, the annual cost sharing certification.
+
+#### 5. Supplemental Support
+
+- In unusual circumstances, small amounts of supplemental funding and up to six months of additional support may be requested to assure adequate completion of the original scope of work. Such requests for supplemental funding support must be signed and submitted by the AOR via use of NSF's electronic systems at least two months prior to the need for the additional funds and must be adequately justified. Program Officers may make decisions regarding whether or not to recommend a small supplement without merit review of the supplemental request. Requests for larger supplements will require external merit review. NSF also may announce supplemental funding opportunities with specified durations and additional funding amounts.
+- A request for supplemental support must be submitted electronically via Research.gov and must include:
+
+- A summary of the proposed work;
+- A justification of the need for the supplemental funds; and
+- A budget and budget justification, highlighting the use by budget category of the additional funding as distinguished from the original funding provided in those categories of cost. AORs are required to electronically sign the supplemental funding request via the Authorized Organizational Representative Functions in Research.gov.
+
+- NSF will not approve requests for supplemental support for such purposes as defraying the costs of increases in salaries, wages or staff benefits or for additional indirect cost (F&A) reimbursement, whether caused by a change in the indirect cost rate or by changes in direct cost expenditures which affect the indirect cost base. (See Chapter X.A.2.a.)
+- If approved, the NSF Grants and Agreements Officer will amend the award to provide additional funding for the current support period. The amendment notice will specify both the amount of supplemental funding and the cumulative amount awarded through the end date, which normally will remain unchanged. Recipients are reminded that most NSF appropriated funds have a limited period of availability for expenditure before the appropriation cancels.[64] Any extensions of the end date due to award of supplemental funding does not extend the period of availability for canceling funds of the original award.
+- Special NSF programs such as Research Experiences for Undergraduates may provide their funding through supplements to other NSF grants. In such instances, the guidance in this section may not be applicable. Please see the applicable NSF funding opportunity for the relevant guidance.
+
+#### Footnotes to Chapter VI
+
+[62] NSF cooperative agreements are not eligible for grantee-approved no cost extensions.
+
+[63] In accordance with 31 U.S.C. § 1552(a), funds will no longer be available for expenditure for any purpose beyond September 30th of the fifth fiscal year after the expiration of a fixed appropriation’s period of availability for incurring new obligations – see also Chapter VIII.E for Financial Requirements and Payments.)
+
+[64] In accordance with 31 U.S.C. § 1552(a), funds will no longer be available for expenditure for any purpose beyond September 30th of the fifth fiscal year after the expiration of a fixed appropriation’s period of availability for incurring new obligations – see also PAPPG Chapter VIII.E.

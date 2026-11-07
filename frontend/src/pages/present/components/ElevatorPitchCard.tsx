@@ -31,7 +31,7 @@ function CopyablePitch({
       await navigator.clipboard.writeText(text)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
-      toast(`${kind} pitch copied — paste it anywhere.`, 'success')
+      toast(`${kind} pitch copied. Paste it anywhere.`, 'success')
     } catch {
       toast('Could not copy to clipboard.', 'error')
     }
@@ -50,7 +50,7 @@ function CopyablePitch({
         <div className="flex items-center gap-2 text-sm font-semibold text-white">
           <Icon className="w-4 h-4 text-[#f1b300]" />
           {kind}
-          <span className="font-normal text-gray-500">· {caption}</span>
+          <span className="font-normal text-gray-400">· {caption}</span>
         </div>
         <button
           onClick={copy}

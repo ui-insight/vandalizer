@@ -86,6 +86,11 @@ class TestNextRuns:
         auto = {"created_at": created, "schedule_armed_at": armed, "last_scheduled_run_at": ran}
         assert sched.last_run_base(auto, datetime(2000, 1, 1, tzinfo=UTC)) == armed.replace(tzinfo=UTC)
 
+    def test_last_run_base_ignores_malformed_stamps(self):
+        fallback = datetime(2026, 9, 1, tzinfo=UTC)
+        assert sched.last_run_base({"created_at": "invalid", "last_scheduled_run_at": 42}, fallback) == fallback
+        assert sched.last_run_base({"created_at": fallback, "schedule_armed_at": "invalid"}, fallback) == fallback
+
 
 # ---------------------------------------------------------------------------
 # The scheduler

@@ -1,0 +1,172 @@
+NSF PAPPG (NSF 24-1) — Chapter XII: Recipient Disputes and Misconduct
+Source: https://www.nsf.gov/policies/pappg/24-1/ch-12-disputes-misconduct
+
+### A. Suspension and Termination Procedures
+
+#### 1. Definitions
+
+- SUSPENSION means an action by NSF that temporarily withholds Federal support of a project pending corrective action by the recipient or a decision by NSF to terminate the award.
+- TERMINATION means the ending of the NSF award, in whole or in part at any time prior to the planned end of the period of performance.
+
+#### 2. Suspension and Termination
+
+#### a. NSF Policy
+
+(i) An award may be suspended or terminated in whole or in part in any of the following situations:
+
+-
+(a) By NSF, if the recipient fails to comply with the terms and conditions of a Federal award;
+
+(b) By NSF, to the greatest extent authorized by law, if an award no longer effectuates the program goals or agency priorities;
+
+(c) By NSF, with the consent of the recipient, in which case the two parties must agree upon the termination conditions, including the effective date and, in the case of partial termination, the portion to be terminated;
+
+(d) By the recipient upon sending to NSF written notification setting forth the reasons for such termination, the effective date, and, in the case of partial termination, the portion to be terminated. However, if NSF determines in the case of partial termination that the reduced or modified portion of the NSF award will not accomplish the purposes for which the NSF award was made, NSF may terminate the Federal award in its entirety;
+
+(e) By NSF, pursuant to termination provisions included in the NSF award; or
+
+(f) By NSF, when ordered by the Deputy Director under NSF’s Regulation on Research Misconduct (45 CFR Part 689).
+
+(ii) Normally, action by NSF to suspend or terminate an award will be taken only after the recipient has been informed by NSF of the proposed action, or informed of any deficiency on its part and given an opportunity to correct it. NSF, however, may immediately suspend or terminate an award without notice when it believes such action is reasonable to protect the interests of the government.
+
+(iii) No costs incurred during a suspension period or after the effective date of a termination will be allowable, except those costs which, in the opinion of NSF, the recipient could not reasonably avoid or eliminate, or which were otherwise authorized by the suspension or termination notice, provided such costs would otherwise be allowable under the terms of the award and the governing cost principles.
+
+(iv) Within 30 days of the termination date the recipient will furnish a summary of progress under the award and an itemized accounting of costs incurred prior to the termination date or pursuant to (iii) above. Final allowable costs under a termination settlement shall be in accordance with the terms of the award, including this section, and the governing cost principles, giving due consideration to the progress under the award. In no event will the total of NSF payments under a terminated award exceed the award amount or the NSF pro rata share when cost sharing was anticipated, whichever is less.
+
+(v) A notice of termination other than by mutual agreement and/or the final settlement amount may be subject to review pursuant to Chapter XII.B.
+
+(vi) NSF will report award terminations to the OMB-designated integrity and performance system in accordance with Federal regulation, but only after the recipient has had an opportunity to exhaust the review procedures contained in Chapter XII.B.
+
+#### b. Procedures for Suspension or Termination by NSF
+
+(i) When it is believed that a recipient has failed to comply with one or more of the terms and conditions of an award, the NSF Grants and Agreements Officer will normally advise the recipient in writing of the nature of the problem and that failure to correct the deficiency may result in suspension or termination of the award. The recipient will be requested to respond in writing within 30 calendar days of the date of such letter, describing the action taken or the plan designed to correct the deficiency. Copies of such correspondence will be furnished to the PI and to the cognizant NSF Program Officer. NSF, however, may immediately suspend or terminate an award without notice when it believes such action is reasonable to protect the interests of the government.
+
+(ii) If a satisfactory response is not received within the above period, the NSF Grants and Agreements Officer may issue a notice immediately suspending authority to further obligate award funds, in whole or in part. Notice of suspension is sent to the AOR, with a copy to the PI. Within NSF, copies are furnished to the NSF Division of Financial Management and to the cognizant NSF Program Officer. The notice will set forth the terms of the suspension and its effective date.
+
+(iii) Normally, the suspension will remain in effect for a maximum of 60 days to allow the recipient to take corrective action. In the event that the deficiency is not corrected to the satisfaction of NSF, the NSF Grants and Agreements Officer may issue a notice of termination. The notice will set forth the reasons for the action and its effective date.
+
+(iv) The remedies described in Chapter XII.B do not preclude a recipient from being subject to debarment and suspension under the OMB Guidelines to Agencies on Government-wide Debarment and Suspension (Nonprocurement) published at 2 CFR § 180 and NSF's Implementation of the OMB Guidelines, located at 2 CFR Chapter XXV.
+
+(v) Suspension or termination due to research misconduct will be imposed as provided in that regulation.
+
+#### 3. Termination by Mutual Agreement
+
+#### a. NSF Policy
+
+Circumstances may arise in which either NSF or the recipient wishes to terminate a project. If both parties agree that continuation of the project would not produce results commensurate with the further expenditure of funds, or if there arises any other reason, the award may be terminated by mutual agreement.
+
+#### b. Procedures
+
+(i) If the recipient wishes to terminate the project, the AOR should advise the NSF Grants and Agreements Officer in writing and send a copy to the cognizant NSF Program Officer.
+
+(ii) If NSF wishes to terminate the project, the NSF Grants and Agreements Officer will advise the recipient’s AOR in writing and send copies to the PI and the cognizant NSF Program Officer.
+
+(iii) Within 30 days after receipt of request from either party for termination by mutual agreement, the other party will provide an appropriate written response. In the event of disagreement between the parties, the NSF Grants and Agreements Officer will make a final decision, subject to the review procedures prescribed by Chapter XII.B.
+
+(iv) Following termination, award closeout procedures will be initiated.
+
+#### 4. NSF Suspension or Termination Review Procedure
+
+Recipients should refer to Chapter XII.B.3 for procedures to request review of a suspension or termination notice. Pending resolution of the request for review, a notice of termination shall remain in effect.
+
+### B. Informal Resolution of Award Administration Disputes
+
+#### 1. Background
+
+Consistent with the Recommendation on Grant Disputes by the Administrative Conference of the U.S., and with the intent of the provisions of Alternative Dispute Resolution, the Foundation provides the informal resolution processes described below concerning disputes or disagreements that may arise over Grants and Agreements Officer post-award decisions under an NSF award.
+
+#### 2. Scope of Post-Award Disputes Covered
+
+The disputes below are covered under the process described in Chapter XII.B.3:
+
+- cost disallowances pursuant to a Grants and Agreements Officer’s decision (e.g., specific disallowances under an individual award or as a result of an audit report);
+- termination orders; and
+- the final settlement amount under a termination.
+
+#### 3. Procedures
+
+- The recipient should submit a letter addressed to both the Division Director, Division of Grants and Agreements (DGA) and the Division Director, Division of Acquisition and Cooperative Support (DACS), National Science Foundation, 2415 Eisenhower Avenue, Alexandria, VA 22314. This letter must specify the recipient’s disagreement or dispute and identify the NSF Grants and Agreements Officer’s decision in question, giving reasons for the request for review and providing any other material pertinent to the request. NSF will determine the appropriate Division to respond to the dispute.
+- The letter to the Division Directors, DGA and DACS, must be either postmarked or stamped received by NSF no later than 30 days after the date of the NSF letter notifying the recipient of the decision in question. The time for filing a request for review is strictly enforced and no extensions will be granted.
+- The request for review need not follow a prescribed format; however, it must contain a full statement of the recipient’s position with respect to the disputed matter and the facts and rationale that support the recipient’s position. Dispute requests will be reviewed if the recipient:
+
+- submits new information (which was unavailable at the time of the original decision);
+- identifies an error in fact or application of NSF policy in the original decision; or
+- improper procedures were followed in the original decision.
+
+- The Division Director, DGA or DACS, will review or designate one or more individuals to review the matter. One reviewing official will be at least at a management level equivalent to the official who made the decision that is being reviewed. In no case, will the review be conducted by any individual involved with the original decision or involved in recommending and/or monitoring the programmatic aspects of the project, or responsible for negotiating and/or administering its business or financial aspects.
+- The designated individual(s) will review and consider all relevant information available. A report which identifies the conclusion and recommendation will be completed, and in disputes covered under:
+
+-
+(i) Chapter XII.B.2.a and Chapter XII.B.2.b, the report will be completed within 30 days and forwarded to the Director, DGA or DACS or their designee for a final and unappealable written decision for the agency. The Director, DGA or DACS or their designee will communicate the decision in writing to the recipient, normally within 15 days of receipt of the report, unless otherwise specified by NSF.
+
+(ii) Chapter XII.B.2.c, the report will be completed within 90 days and forwarded to the NSF Deputy Director or designee. The NSF Deputy Director or designee will make the final and unappealable decision for the agency and will communicate the decision in writing to the recipient within 15 days of receipt of the report unless otherwise specified by NSF.
+
+### C. Research Misconduct
+
+RESEARCH MISCONDUCT means fabrication, falsification, or plagiarism in proposing or performing research funded by NSF, reviewing research proposals submitted to NSF, or in reporting research results funded by NSF. The Foundation's Research Misconduct Regulation is found at 45 CFR § 689.
+
+#### 1. NSF Policies and Responsibilities
+
+- NSF will take appropriate action against individuals or organizations upon a determination that misconduct has occurred. It may also take interim action during an investigation. Possible actions include sending a letter of reprimand to the individual or organization, requiring prior NSF approval of particular activities by an individual or organization, requiring special assurances of compliance with particular policies, restricting designated activities or expenditures under particular awards, suspending or terminating awards, debarring or suspending an individual or organization and prohibiting participation by an individual as an NSF reviewer, advisor or consultant.
+- NSF will find misconduct only after careful inquiry and investigation by a recipient, by another Federal agency or by NSF. An “inquiry” consists of preliminary information-gathering and preliminary fact-finding to determine whether an allegation or apparent instance of misconduct has substance. An investigation must be undertaken if the inquiry determines the allegation or apparent instance of misconduct has substance. An “investigation” is a formal development, examination, and evaluation of a factual record to determine whether misconduct has taken place or, if misconduct has already been confirmed, to assess its extent and consequences or determine appropriate action.
+- Before NSF makes any final finding of misconduct or takes any final action on such a finding, NSF will normally afford the accused individual or organization notice, a chance to provide comments and rebuttal and a chance to appeal. In structuring procedures in individual cases, NSF may take into account procedures already followed by other entities investigating or adjudicating the same allegation of misconduct.
+- Debarment or suspension for misconduct will be imposed only after further procedures described in applicable debarment and suspension regulations (2 CFR §180 and 2 CFR Chapter XXV).
+- The OIG oversees investigations of research misconduct and conducts any NSF inquiries and investigations into suspected or alleged research misconduct.
+- The Deputy Director adjudicates research misconduct proceedings, and the Director decides appeals.
+- After receiving an investigation report, the subject’s rebuttal and recommendations of the OIG, the NSF Deputy Director may initiate further investigation or hearings or order interim or final actions. A written disposition specifying actions to be taken will be sent to affected individuals or organizations and will include instructions on how to pursue an appeal to the Director of the Foundation.
+
+#### 2. Role of Recipients
+
+- Recipients bear primary responsibility for prevention and detection of misconduct. In most instances, NSF will rely on recipients to promptly:
+
+-
+(i) initiate an inquiry into any suspected or alleged misconduct;
+
+(ii) conduct a subsequent investigation, if the inquiry finds substance;
+
+(iii) take action necessary to ensure the integrity of research, the rights and interests of research subjects and the public and the observance of legal requirements or responsibilities; and
+
+(iv) provide appropriate safeguards for subjects of allegations as well as informants.
+
+- If a recipient wishes NSF to defer independent inquiry or investigation, it should:
+
+-
+(i) inform NSF immediately if an initial inquiry finds substance;
+
+(ii) keep NSF informed during such an investigation;
+
+(iii) notify NSF even before deciding to initiate an investigation or as required during an investigation:
+
+-
+(a) if there is reasonable indication of possible violations of civil or criminal law;
+
+(b) if public health or safety is at risk;
+
+(c) if NSF’s resources, reputation, or other interests need protecting;
+
+(d) if Federal action may be needed to protect the interests of a subject of the investigation or of others potentially affected;
+
+(e) if the research community or the public should be informed; or
+
+(f) if research activities should be suspended.
+
+(iv) provide NSF with the final report from any investigation.
+
+- If a recipient wishes NSF to defer independent inquiry or investigation, it should complete any inquiry and decide whether an investigation is warranted within 90 days. It should similarly complete any investigation and reach a disposition within 180 days. If completion of an inquiry or investigation is delayed, but the recipient wishes NSF deferral to continue, NSF may require submission of periodic status reports.
+- Recipients should maintain and effectively communicate to their staff appropriate policies and procedures relating to misconduct, which should indicate when NSF must or should be notified.
+- Online research ethics training is available through the Department of Health and Human Services, Office of Research Integrity.
+
+#### 3. Reporting Possible Misconduct
+
+Possible misconduct in activities funded by NSF should be reported to the Office of Inspector General, National Science Foundation through use of one of the following methods:
+
+Website (preferred): https://oig.nsf.gov/contact/hotline
+
+Anonymous Phone: 800-428-2189
+
+US Mail:
+2415 Eisenhower Ave
+Alexandria, VA 22314
+Attn: OIG Hotline
+
+For general inquiries about reporting fraud, waste, and abuse: oig@nsf.gov.

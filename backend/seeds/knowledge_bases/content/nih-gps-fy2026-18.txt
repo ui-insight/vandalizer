@@ -1,0 +1,748 @@
+NIH Grants Policy Statement (FY 2026 revision) — Chapter 18: Grants to For-Profit Organizations
+Source: https://grants.nih.gov/policy-and-compliance/nihgps
+
+18 GRANTS TO FOR-PROFIT ORGANIZATIONS
+18.1 GENERAL
+Some of the terms and conditions for grants to for-profit organizations vary from the standard terms and
+conditions included in IIA. In addition, the terms and conditions of the SBIR and STTR programs vary
+from those otherwise applicable to for-profit organizations. This chapter addresses separately the policies
+applicable to for-profit organizations generally, and those that apply to SBIR and STTR awards specifically. It also highlights several policies in IIA that apply equally to for-profit and non-profit recipients. If an exception is not stated below or in the NoA, the terms and conditions specified in IIA apply,
+including requirements for the protection of human subjects and animal welfare.
+18.2 ELIGIBILITY
+For-profit organizations are eligible to apply under all NIH programs and support mechanisms unless specifically excluded by statute.
+18.3 ALLOWABLE AND UNALLOWABLE COSTS
+18.3.1 Cost Principles
+There are no cost principles specifically applicable to grants to for-profit organizations. Therefore, the
+cost principles for commercial organizations set forth in the FAR (48 CFR Part 31.2) generally are used
+to determine allowable costs under NIH grants to for-profit organizations. As provided in those costs
+principles, allowable travel costs may not exceed those established by the FTR. The cost principles in 2
+CFR Part 200, Appendix IX, Hospital Cost Principles, are used to determine allowable costs under NIH
+grants to proprietary hospitals.
+18.3.2 Indirect Costs
+Indirect costs, including de minimis costs when appropriate, are allowable under awards to for-profit
+organizations. See Reimbursement of Indirect Costs..
+18.3.3 Profit or Fee
+Except for grants awarded under the SBIR/STTR programs, under an NIH grant, no profit or fee will be
+provided to a for-profit organization, whether as a recipient or as a consortium participant. A profit or
+fee under a grant is not a cost but is an amount in excess of actual allowable direct and indirect costs. In
+accordance with normal commercial practice, a profit / fee may be paid to a contractor under an NIH
+grant providing routine goods or services to the recipient.
+18.4 ADMINISTRATIVE REQUIREMENTS
+For-profit organizations generally are subject to the same administrative requirements as non-profit
+organizations, including those relating to personal property title and management. Exceptions to or elaboration of those requirements for for-profit organizations are indicated below.
+(GPS page IIB-128)
+
+18.4.1 Equipment Accountability
+For-profit recipients of NIH grants are nonexempt and subject to the requirements in 2 CFR Part
+200.313, as well as the conditions set forth in Administrative Requirements—Management Systems and
+Procedures—Property Management System Standards and Administrative Requirements—Management
+Systems and Procedures—Procurement Systems Standards and Requirements in IIA. Under the conditions specified in 2 CFR Part 200.313,  for-profit recipients are permitted to retain title to equipment
+purchased under a research grant though NIH reserves the right to order the transfer of equipment, including title, to NIH or an eligible third party named by the NIH awarding office when such third party is otherwise eligible under existing statutes. In addition, for-profit recipients must not use equipment acquired
+with NIH funds to provide services to non-Federal organizations for a fee to compete unfairly with
+private companies that provide equivalent services, unless the terms and conditions of the award provide
+otherwise, and any user charges shall be treated as program income and must be reported on the FFR.
+Conditions for the sale of equipment are specified at Administrative Requirements—Management Systems and Procedures—Sale of Real Property, Equipment, and Supplies in IIA.
+18.4.2 Intellectual Property
+Intellectual property requirements set forth in 37 CFR 401 apply to for-profit organizations, whether
+small businesses or large businesses. However, invention reporting requirements for for-profit organizations differ somewhat from those for non-profit organizations. When the recipient is a for-profit organization, assignment of invention rights to a third party does not require NIH approval, but ongoing
+reporting remains a requirement for each invention. (See Administrative Requirements—Availability of
+Research Results: Publications, Intellectual Property Rights, and Sharing Research Resources in IIA.)
+Additional information about the requirements of 37 CFR 401 may be obtained from the Division of
+Extramural Inventions and Technology Resources, OPERA, NIH (see Part III for address and telephone
+number).
+To the extent authorized by law, the Federal government will not make public any information disclosing
+a Federal government-supported invention.
+18.4.3 Program Income
+Consistent with NIH Standard Terms of Award, for-profit recipients, including those under the
+SBIR/STTR programs, are subject to the additive alternative for the use of program income described in
+Administrative Requirements—Management Systems and Procedures—Program Income in IIA.
+18.4.4 Operating Authorities
+Awards to for-profit organizations are subject to NIH Standard Terms of Award; however, some mechanisms do not allow automatic carryover of unobligated balances of funds. Under those mechanisms, the
+NIH awarding IC will specify the disposition of the reported unobligated balance in the NoA. (See
+Administrative Requirements—Changes in Project and Budget in IIA).
+18.4.5 Audit
+Specific to NIH, for-profit recipients are required to have a non-Federal audit conducted consistent with
+the requirements outlined in 2 CFR 300.218(d) if, during its fiscal year, it expended a total of $750,000
+or more under one or more Federal award (as a direct recipient or  consortium participant).
+(GPS page IIB-129)
+
+For-profit organizations that receive awards (including for-profit hospitals) have two options regarding
+audits:
+ i. A financial related audit of a particular award in accordance with GAGAS, in those cases where
+the for-profit organization receives awards under only one HHS program (for NIH, receives all
+awards from a single Institute or Center); or, if awards are received under multiple HHS programs, a financial related audit of all awards in accordance with GAGAS; or
+ ii. An audit that meets the requirements contained in 2 CFR 200, subpart F.
+Audits must be completed and submitted to the Department of Health and Human Services, Audit Resolution Division within 30 days after receipt of the auditor’s report(s), or 9 months after the end of the
+audit period, i.e., the end of the organization’s fiscal year, whichever is earlier. The address is found in
+Part III.
+Specific to NIH, for-profit organizations expending less than $750,000 a year are not required to have an
+annual audit for that year but must make their grant-related records available to NIH or other designated
+officials for review or audit.
+18.4.6 Labor Distribution Requirements for For-Profit Organizations
+Salary and wage amounts charged to grant-supported projects for personal services must be based on an
+adequate labor distribution system that distributes payroll costs in accordance with generally accepted
+practices of like organizations. Standards for labor distribution systems are contained in the applicable
+cost principles (other than those for for-profit organizations).
+NIH requires for-profit organizations to conform with industry standards to support salary and wage
+charges to NIH grants. Therefore, unless an alternate system is approved by the GMO, the recipient must
+maintain a time and-effort reporting system for both professional and other-than-professional staff reflecting daily after-the-fact reporting of hours expended on individual projects or indirect activities. The system must record both hours worked and hours absent. This information must be certified by an AOR no
+less frequently than every pay period.
+18.5 SMALL BUSINESS INNOVATION RESEARCH AND
+SMALL BUSINESS TECHNOLOGY TRANSFER PROGRAMS
+NIH is required by statute to reserve a portion of its annual extramural budget for projects under the
+SBIR and STTR programs. These programs primarily are intended to encourage private-sector commercialization of technology and to increase small business participation in federally funded R&D.
+The SBIR and STTR programs were reauthorized and modified by Congress under P.L. 114-328, Section
+1834, and P.L. 115-232. These authorities modified several aspects of the programs, including small business eligibility requirements. Updates on reauthorization implementation will be posted on NIH's
+SBIR web page. NIH will issue Guide Notice/s to advise the community about the impact on NIH’s
+SBIR and STTR programs.
+The SBIR and STTR programs are phased programs:
+Phase I. The objective of this phase is to establish the technical merit and feasibility of proposed
+research or R&D efforts and to determine the quality of performance of the applicant (small business concern or SBC) before providing further Federal support in Phase II.
+Phase II. The objective of this phase is to continue the research or R&D efforts initiated in Phase I.
+Funding will be based on the results of Phase I and the scientific and technical merit and commercial
+(GPS page IIB-130)
+
+potential of the Phase II application.  Unless submitted as a Fast-Track application (see here), Phase II
+STTR applications may be submitted only after the Phase I award is made.
+For small businesses that have already demonstrated scientific and technical merit and feasibility but
+have not received a Phase I SBIR or STTR for that project, NIH can issue a SBIR Direct to Phase II
+award. The NIH SBIR Direct to Phase II will accept SBIR Phase II applications regardless of the funding source for the proof of principle work on which the proposed Phase II research is based.
+Small business concerns (SBCs) eligible to submit Phase II applications for projects that were supported
+with a Phase I SBIR or STTR award from NIH or any other agency are expected to submit Phase II
+application through SBIR/STTR solicitations as "Renewal" applications based on the awarded Phase I
+SBIR or STTR project. Only one Phase II award may be made for a specific project supported by a
+Phase I award. NIH policies regarding overlapping applications (Sec. 2.3.7.4) still apply. A Phase II
+recipient may receive one additional, sequential Phase II award (called NIH Phase IIB) to continue the
+work of an initial Phase II award.
+For small businesses that have received a Phase I SBIR or STTR, NIH expects non Fast-Track Phase II
+applications to be submitted within the first six receipt dates following expiration of the Phase I budget
+period, i.e., normally 2 years beyond the completion date of the Phase I award.
+Some NIH ICs offer Phase II SBIR / STTR recipients the opportunity to apply for Phase IIB Competing
+Renewal awards. These are available for those projects that require extraordinary time and effort, including those requiring regulatory approval or developing complex instrumentation, clinical research tools,
+and behavioral interventions. NIH ICs accept phase IIB applications through the Omnibus SBIR/STTR
+Grant Solicitation or other specific Notices of Funding Opportunity. Only those small business concerns
+who have been awarded a Phase II are eligible to apply for a Phase IIB Competing Renewal award. Prospective applicants are strongly encouraged to review the NIH Highlighted Topics prior to submission..
+Additional requirements and instructions  are available in  the specific  Notices of Funding Opportunity.
+Some NIH ICs offer Phase II SBIR/STTR recipients the opportunity to apply for the Commercialization
+Readiness Pilot (CRP) Program. The goal of the CRP is to facilitate the transition of previously funded
+SBIR/STTR Phase I/IIB projects to the commercialization stage by providing additional support for later
+stage research and development (R&D) and product development not typically supported through Phase
+II or Phase IIB grants or contracts.
+There are two major differences between the SBIR and STTR programs:
+ l Primary Employment:
+Under the SBIR Program, the Project Director/Principal Investigator (PD/PI) must have their
+primary employment with the small business concern (i.e. more than one half of the PD/PI’s
+time is spent in the employ of the small business concern) at the time of award and for the duration of the project period. However, deviations from this requirement for Phase I SBIR projects
+are allowable under exceptional circumstances (such as unexpected loss of a PD/PI or to mitigate
+negative effects on employment benefits) and must be approved in writing by the awarding IC.
+To receive a deviation a small business must show:
+ l Significant PI employment at the company;
+ l Significant commitment of the PI to the project;
+ l Commitment to transition the PI to 51% or more employment in the Phase II.
+Deviations from this requirement in Phase II are extremely rare (e.g., the unexpected passing of a
+PD / PI) and must be approved in writing by the awarding IC.
+(GPS page IIB-131)
+
+Under the STTR Program the PD/PI may have their primary employment with either the small business concern or the collaborating research institution. On an STTR project, the PD/PI must devote at least 10 percent of
+their time to the STTR project. The PD/PI must also have a formal appointment with, or commitment to, the
+SBC, which must be in the form of an official relationship between the parties, but need not include a salary or
+other form of remuneration. An STTR applicant organization must officially affiliate a PD/PI with the SBC in the
+eRA Commons if the PD/PI is not an employee of the SBC.
+For purposes of the SBIR and STTR Programs, personnel obtained through a Professional Employer
+Organization or other similar personnel leasing company may be considered employees of the recipient.
+ l Partnering Research Institution: The STTR program requires for both phases I and II that the
+SBC formally partner with a single, non-profit research institution. At least 40 percent of the
+STTR research project is to be conducted by the SBC and at least 30 percent of the work is to be
+conducted by the single, "partnering" research institution through a formal, cooperative arrangement. Such organizations include universities, non-profit hospitals, and other non-profit research
+organizations as well as Federally Funded Research and Development Centers. STTR grants are
+awarded to the SBC, which will receive all of the funding for the project and disburse the appropriate funding to the research institution. The SBIR program allows subcontracting, it does not
+require it so the SBC may conduct the entire SBIR project without outside collaboration.
+SBIR/STTR program policy allows the following:
+ l Phase I STTR Recipients may apply for NIH SBIR or STTR Phase II.
+ l Phase I SBIR Recipients may apply for NIH SBIR or STTR Phase II.
+ l Phase II STTR Recipients may apply for NIH SBIR Phase IIB or STTR Phase IIB or CRP.
+ l Phase II SBIR Recipients may apply for NIH SBIR Phase IIB or STTR Phase IIB or CRP.
+ l Phase IIB STTR Recipients may apply for the CRP Program.
+ l Phase IIB SBIR Recipients may apply for the CRP Program.
+Applicants may ‘switch’ programs to any active and open NIH SBIR or STTR solicitation, including the
+Parent solicitations and any targeted funding opportunity.
+Note: There are distinct policies for each program—SBIR and STTR—and each phase within these programs.  Applicants that ‘switch’ programs must comply with the policies for the program and NOFO to
+which they submit the application.  See 18.5.5.4 SBIR Life Cycle Certification and Sec. 18.5.5.5 STTR
+Life Cycle Certification for further information.
+18.5.1 NIH Fast-Track Application Process
+The NIH Fast-Track application process expedites award decisions and funding of SBIR and STTR
+Phase II applications for scientifically meritorious projects that have a high potential for commercialization. The Fast-Track process allows Phase I and Phase II grant applications to be submitted
+and reviewed together. Fast-Track applications receive a single rating. Before submitting applications for
+Fast-Track review, applicants are strongly encouraged to consult with cognizant NIH program staff to
+assure Fast-Track is appropriate. For additional information on the submission of Fast-Track applications, see the SF424 (R&R) SBIR/STTR Application Guide.
+(GPS page IIB-132)
+
+18.5.2 Eligibility
+Only United States small business concerns (SBCs) are eligible to submit SBIR and STTR applications.
+A small business concern is one that meets all the following criteria. If it appears that an applicant organization does not meet the eligibility requirements, NIH will request a size determination by the SBA. If
+eligibility is unclear, NIH will not make an SBIR or STTR award until the SBA provides a determination.
+1.  SBIR Eligibility Requirements
+ a. Organized for profit, with a place of business located in the United States, which operates primarily within the United States or which makes a significant contribution to the United States economy through payment of taxes or use of American products, materials;
+ b. In the legal form of an individual proprietorship, partnership, limited liability company, corporation, joint venture, association, trust or cooperative, except that where the form is a joint venture, there must be less than 50 percent participation by foreign business entities in the joint
+venture;
+ c.
+ i. Be a concern which is more than 50% directly owned and controlled by one or more individuals (who are citizens or permanent resident aliens of the United States), other business concerns (each of which is more than 50% directly owned and controlled by
+individuals who are citizens or permanent resident aliens of the United States), an Indian
+tribe, ANC (Alaska Native Corporation) or NHO (Native Hawaiian Organization) (or a
+wholly owned business entity of such tribe, ANC or NHO), or any combination of these;
+OR
+ ii. Be a concern which is more than 50% owned by multiple venture capital operating companies, hedge funds, private equity firms, or any combination of these.  No single venture
+capital operating company, hedge fund, or private equity firm may own more than 50%
+of the concern; OR
+ iii. Be a joint venture in which each entity to the joint venture must meet the requirements
+set forth in paragraph c(i) or  c(ii) of this section. A joint venture that includes one or
+more concerns that meet the requirements of paragraph (ii) of this section must comply
+with § 121.705(b) concerning registration and application requirements.
+ d. Has, including its affiliates, not more than 500 employees and meets the other regulatory requirements found in 13 CFR Part 121. Business concerns, other than investment companies licensed,
+or state development companies qualifying under the Small Business Investment Act of 1958, 15
+U.S.C. 661, et seq., are affiliates of one another when either directly or indirectly, (a) one concern controls or has the power to control the other; or (b) a third-party/parties controls or has the
+power to control both.
+2.  STTR Eligibility Requirements
+ a. Organized for profit, with a place of business located in the United States, which operates primarily within the United States or which makes a significant contribution to the United States economy through payment of taxes or use of American products, materials;
+ b. In the legal form of an individual proprietorship, partnership, limited liability company, corporation, joint venture, association, trust or cooperative, except that where the form is a joint venture, there must be less than 50 percent participation by foreign business entities in the joint
+venture;
+(GPS page IIB-133)
+
+c.
+ i. Be a concern which is more than 50% directly owned and controlled by one or more individuals (who are citizens or permanent resident aliens of the United States), other business concerns (each of which is more than 50% directly owned and controlled by
+individuals who are citizens or permanent resident aliens of the United States), an Indian
+tribe, ANC (Alaska Native Corporation) or NHO (Native Hawaiian Organization) (or a
+wholly owned business entity of such tribe, ANC or NHO), or any combination of these;
+OR
+ ii. Be a joint venture in which each entity to the joint venture must meet the requirements
+set forth in paragraph c(i) of this section.
+ d. Has, including its affiliates, not more than 500 employees and meets the other regulatory requirements found in 13 CFR Part 121. Business concerns, other than investment companies licensed,
+or state development companies qualifying under the Small Business Investment Act of 1958, 15
+U.S.C. 661, et seq., are affiliates of one another when either directly or indirectly, (a) one concern controls or has the power to control the other; or (b) a third-party/parties controls or has the
+power to control both.
+Control can be exercised through common ownership, common management, and contractual relationships. The term "affiliates" is defined in greater detail in 13 CFR Part 121.3-2(a). The term "number
+of employees" is defined in 13 CFR Part 121.3-2(t).
+Business concerns include, but are not limited to, any individual (sole proprietorship), partnership, corporation, joint venture, association, or cooperative. Further information may be obtained by contacting
+the Small Business Administration Size District Office.
+18.5.2.1 Place of Performance
+For both Phase I and Phase II SBIR/STTR awards, the research or R&D project activity must be performed in its entirety in the United States. (The United States is defined as the 50 States, the territories
+and possessions of the United States, the Commonwealth of Puerto Rico, the Federated States of
+Micronesia, the Republic of Palau, the Republic of the Marshall Islands, and the District of Columbia.)
+In those rare instances where the study design requires use of a foreign site (e.g., to conduct testing of
+specific patient populations or if a supply or material is not available in the United States), the investigator must provide compelling scientific justification in the application that it is not possible to perform
+the R&D project activity in the United States and for the need / use of a foreign site. NIH no longer
+recognizes foreign subawards. Therefore, the only arrangements that will be considered are foreign consultants, foreign vendors or non-monetary international collaborations. NIH will consider these instances
+on a case-by-case basis, and they should be discussed with cognizant NIH staff before submitting an
+application. Approval will not be considered unless the application is being considered for an award and
+applicants may be required to provide additional justification. IC GMOs have the authority to approve
+these waiver requests. Whether the request is approved or disapproved, it will be explicitly addressed in
+the NoA if an award is made. Whenever possible, work outside the United States, which is necessary to
+the completion of the project, should be supported by funding other than SBIR / STTR.
+18.5.2.2 Change in Organization Size & Change of Recipient Institution Actions
+Applicant organization eligibility is determined at the time of the initial SBIR / STTR award. In the case
+where an organization grows to be other than small, NIH may exercise its ability to perform a review to
+determine whether the SBIR / STTR award will continue. At the time of continuation award, the size and
+eligibility status of the small business organization for the SBIR/STTR program will be reassessed and
+no new or continuation awards will be issued to ineligible organizations.
+(GPS page IIB-134)
+
+In alignment with NIH GPS Section 8.1.2.8 Change in Recipient Organizational Status and NIHGPS Section 8.1.3 Requests for Prior Approval, recipients must give NIH advance notice for legal actions such as
+merger, acquisition, and successor-in-interest as soon as possible, but no later than 30 days before the
+proposed change, so that NIH can determine if the organization will continue to meet the SBIR /STTR
+program eligibility requirements.
+In the case of a legal action such as a merger, acquisition, or successor-in-interest action for a small business organization, the transferee organization must recertify its small business status in order for NIH to
+revise currently active SBIR / STTR awards to reflect the transferee as the recipient of record.  However,
+if the legal action changes the organization size so that they cannot recertify its small business status, rendering it ineligible for the SBIR / STTR programs, existing SBIR / STTR awards cannot be awarded
+additional funds, including noncompeting continuation awards and supplements to awards. NIH will not
+issue change in organization status award to the transferee organization for any SBIR/STTR awards, as
+the organization is ineligible for the SBIR/STTR program.  Additionally, all existing SBIR/STTR awards
+issued to the original recipient will be terminated.
+When there is a desire to transfer an SBIR/STTR grant to a different organization, the new organization
+must continue to meet the SBIR / STTR program eligibility requirements. Recipients should contact the
+NIH awarding office to discuss options when considering a move to a new organization.
+18.5.2.3 Minimum Level of Effort
+Generally, under SBIR Phase I awards, a minimum of two-thirds or 67 percent of the research or analytical effort must be carried out by the SBC. Payments, in the aggregate, to consultants, consortium participants and contractors for portions of the scientific/technical effort generally may not exceed 33
+percent of the total requested amount.
+Generally, under SBIR Phase II awards a minimum of one-half or 50 percent of the research or analytical effort must be carried out by the SBC. In addition, payments, in the aggregate, to consultants, consortium participants, and contractors for portions of the scientific/technical effort generally may not
+exceed 50 percent of the total requested amount.
+Deviations from these requirements may be considered on a case-by-case basis for SBIR only and must
+be approved in writing by the awarding IC.
+For CRP awards, a SBC may subcontract a substantial portion of its CRP award to third parties through
+consultant and contractual arrangements. The SBC must perform a substantive role in planned research
+and not merely serve as a conduit of funds to another party or parties. At minimum (depending on the
+nature of out-sourced effort), this includes being able to provide appropriate oversight of all scientific,
+programmatic, financial, and administrative matters related to the grant.
+For STTR awards (both Phase I and Phase II), at least 40 percent of the work must be performed by the
+SBC and at least 30 percent of the work must be performed by the single, non-profit research institution.
+These percentages are Congressionally mandated and waivers are not permitted. The basis for determining the percentage of work to be performed by each of the cooperating parties is the total cost (direct
+and indirect costs, and fee) attributable to each party, unless otherwise described and justified in the
+“Consortium/Contractual Arrangements” portion of the of the grant application.
+18.5.2.4 Multiple Program Director/Principal Investigator Applications and Awards
+The Multiple Program Director/Principal Investigator (multiple PD/PI) option is available for NIH SBIR
+/ STTR applicants for team science efforts. All of the policy and requirements described in Multi PD/PI
+apply to SBIR/STTR projects, with the exception of sections that are not relevant to the SBIR/STTR pro-
+(GPS page IIB-135)
+
+gram (e.g., new investigators, multi-project applications). In addition, the following criteria apply to multiple PD/PI SBC applicants and awards:
+ l The small business concern (SBC) is always the applicant/awardee organization. Organizations
+other than the SBC with PD/PIs participating in the multiple PD/PI project, including the STTR
+non-profit research institution partner, are subcontractors to the SBC.
+ l For Phase I  SBIR projects, the Contact PD / PI must meet the primary employment requirement;
+other PD / PIs are not required to meet the requirement. Primary employment means that more
+than one half of the PD/PI's time is spent in the employ of the SBC at the time of award and during the conduct of the proposed project. However, deviations from this requirement are allowable under exceptional circumstances (such as unexpected loss of a PD/PI or to mitigate negative
+effects on employment benefits) and must be approved in writing by the awarding IC. To receive
+a deviation a small business must show:
+ l Significant PI employment at the company;
+ l Significant commitment of the PI to the project;
+ l Commitment to transition the PI to 51% or more employment in the Phase II.
+ l For Phase II SBIR and CRP projects, the Contact PD/PI must meet the primary employment
+requirement; other PD/PIs are not required to meet the requirement. Deviations from this requirement in Phase II are extremely rare (e.g., the unexpected passing of a PD/PI) and must be
+approved in writing by the awarding IC.
+ l For Phase I and Phase II STTR projects, the PD/PI is not required to be employed by the SBC.
+However, the Contact PD/PI, the first PD/PI listed, must have a formal appointment with, or
+commitment to, the SBC, which must be in the form of an official relationship between the
+parties, but need not include a salary or other form of remuneration. Each PD/PI on a multiple
+PD/PI award must commit a minimum of 1.2 calendar months (10% effort) to the project.
+ l An STTR applicant organization must officially affiliate a PD/PI with the SBC in the eRA Commons if the PD/PI is not an employee of the SBC.
+ l A Phase IIB Competing Renewal or CRP submitted as a multiple PD/PI application requesting
+support for a project previously supported through a single PD/PI award should state the changes
+in the Project's direct and management that led to the proposed multiple PD/PI model.
+18.5.3 Public Policy Requirements and Objectives
+For-profit organizations receiving SBIR/STTR awards generally are subject to the same public policy
+requirements as non-profit organizations. However, the requirements concerning reporting of financial
+conflicts of interest (see Public Policy Requirements, Objectives, and Other Appropriation Mandates—
+Financial Conflict of Interest in IIA) do not apply to applications or awards under Phase I of the
+SBIR/STTR programs. The requirements do, however, apply to Phase II, Phase IIB and CRP applications and awards.
+Consistent with SBA program policy directives and NIH’s omnibus NOFOs for SBIR and STTR, when
+purchasing equipment or a product under the SBIR/STTR award, the small business concern should purchase only American-made items whenever possible.
+18.5.3.1 Required Disclosures of Foreign Affiliations or Relationships to Foreign
+Countries
+As required under the SBIR and STTR Extension Act of 2022, NIH has implemented a due diligence program designed to assess security risks and deny funding of an award when foreign relationships or
+(GPS page IIB-136)
+
+commitments with countries of concern pose a significant risk. The due diligence program assesses the
+cybersecurity practices, patent analysis, employee analysis, and foreign ownership of an SBC seeking an
+award, including the financial ties and obligations of the SBC and employees of the SBC to a foreign
+country, foreign person, or foreign entity. Applicants to the SBIR/STTR programs, as well as active
+SBIR/STTR awards, are subject to review under this due diligence program.
+Each SBC applying for SBIR/STTR awards is required to disclose all funded and unfunded relationships
+with foreign countries for all owners and covered individuals. A covered individual is defined as all
+senior key personnel identified by the SBC in the application (i.e., individuals who contribute to the scientific development or execution of a project in a substantive, measurable way). Upon request, applicants
+will submit the completed Required Disclosures of Foreign Affiliations or Relationships to Foreign Countries form  via the Just-In-Time (JIT) process described in NIHGPS section 2.5.1 Just-in-Time Procedures
+. Prior to issuing an award, NIH will assess the  application, including JIT elements and the disclosure
+form. Based on the outcomes of the assessment, , NIH may request additional documentation (e.g., copy
+of contractual or financial obligation or other agreement) specific to an arrangement with an enterprise
+owned by a foreign state or any foreign entity in effect during the 5-year period (calendar year) preceding submission of the proposal. Based on the security risks identified during the assessment, NIH
+may decline to move forward with an award.  Generally, SBC applicants will not have the opportunity to
+address any identified security risks prior to award.
+Recipients with active SBIR/STTR awards that did not undergo foreign risk assessment at the time of
+their original application may be required to disclose all funded and unfunded relationships with foreign
+countries using the Required Disclosures of Foreign Affiliations or Relationships to Foreign Countries
+form. If a recipient reports a covered foreign relationship that meets any of the risk criteria prohibiting
+funding, NIH may deem it necessary to terminate the award for material failure to comply with the federal statutes, regulations, or terms and conditions of the federal award (see NIHGPS Section 8.5.2 Remedies for Noncompliance or Enforcement Actions: Suspension, Termination, and Withholding of
+Support) .
+For additional information on the due diligence program, see the Foreign Disclosure and Risk Management webpage , which contains foreign risk review areas and foreign risk case studies.
+18.5.4 Allowable Costs and Fee
+18.5.4.1 Program Levels (Total Costs)
+The SBA SBIR and STTR Policy Directive provides program levels for SBIR and STTR programs based
+on statutory guidelines. Agencies have the discretion to issue awards up to the SBA  guideline  when the
+proposed budget and requested period of support are fully justified and scientifically appropriate in relation to the proposed research.  The Small Business Administration may adjust award guidelines annually.
+The current SBA budget levels can be found on NIH's SBIR web page.
+As written in the statute and under appropriate circumstances, NIH has received waivers from SBA to
+issue an award exceeding the SBA budget levels for Phase I or  for Phase II if this cap will interfere with
+NIH’s ability to meet its mission. See NIH's SBIR web page for a current list of waiver topics.
+Applicants must request an appropriate level in the competing application; applications will not be adjusted after submission.
+18.5.4.2 Profit or Fee
+A reasonable profit or fee may be paid to an SBC receiving an award under Phase I, Phase II or CRP of
+the SBIR and STTR programs. However, this profit or fee must be included in the budget request at the
+(GPS page IIB-137)
+
+time of application. The profit or fee is not considered a “cost” for purposes of determining allowable
+use, program income accountability, or audit thresholds. The profit or fee may be used by the SBC for
+any purpose, including additional effort under the SBIR/STTR award. It is intended to provide a reasonable profit consistent with normal profit margins for for-profit organizations for R&D work; however,
+the amount of the profit or fee normally will not exceed seven (7) percent of total costs (direct and indirect) for each phase of the project. The profit or fee should be drawn from PMS in increments proportional to the drawdown of funds for direct and indirect costs. The profit or fee applies solely to the
+SBC receiving the SBIR/STTR award and not to any other participant; however, in accordance with normal commercial practice, the SBC may pay a profit or fee to a contractor providing routine goods or services to the SBC under the grant.
+18.5.4.3 Indirect Costs
+18.5.4.3.1 Phase I
+If the applicant SBC has a currently effective indirect cost rate(s) with a Federal agency, such rate(s)
+should be used when calculating proposed indirect costs for an NIH application.  (However, the rates(s)
+must be adjusted for IR&D expenses, which are not allowable under HHS awards.) If the applicant SBC
+does not have a currently effective negotiated indirect cost rate with a Federal agency, the applicant
+should propose estimated indirect costs at a rate not to exceed 40 percent of the total direct costs.
+However, SBCs are reminded that only actual indirect costs are to be charged to projects. (If awarded at
+a rate of 40 percent or less, the rate used to charge actual indirect costs to projects cannot exceed the
+awarded rate unless the SBC negotiates an indirect cost rate(s) with a Federal agency.) NIH will not
+negotiate indirect cost rates for Phase I awards.
+18.5.4.3.2 Phase II and CRP
+If the applicant SBC has a currently effective negotiated indirect cost rate(s) with a Federal agency, such
+rate(s) should be used when calculating proposed indirect costs for an NIH application. (However, the
+rates(s) must be adjusted for IR&D expenses, which are not allowable under HHS awards.) If the applicant SBC does not have a currently effective negotiated indirect cost rate with a Federal agency, the
+applicant should propose an estimated indirect cost rate in the application. If the requested indirect cost
+rate is 40 percent of total direct costs or less, no further justification is required at the time of award, and
+indirect costs will be awarded at the requested rate. However, SBCs are reminded that only actual indirect costs may be charged to projects. If awarded at a rate of 40 percent or less of total direct costs, the
+rate used to charge actual indirect costs to projects cannot exceed the awarded rate unless the SBC negotiates an indirect cost rate(s) with DFAS. DFAS—the office authorized to negotiate indirect cost rates
+with SBC’s receiving NIH SBIR/STTR awards—will negotiate indirect cost rates for SBCs receiving
+Phase II or CRP awards that requested a rate greater than 40 percent of total direct costs.
+Upon request, the applicant SBC should provide DFAS with an indirect cost proposal and supporting financial data for its most recently completed fiscal year. If financial data is not available for the most
+recently completed fiscal year, the applicant should submit a proposal showing estimated rates with supporting documentation. Further information about DFAS is available at its web site or by telephone (see
+Part III).
+18.5.5 Administrative Requirements
+For-profit organizations that receive SBIR/STTR awards generally are subject to the same administrative
+requirements as non-profit organizations. (See 2 CFR Part 200.)
+(GPS page IIB-138)
+
+18.5.5.1 Market Research
+NIH will not support market research, including studies of the literature that lead to a new or expanded
+statement of work, under the grant except for the Technical and Business Assistance (TABA) funds or
+with the Commercialization Readiness Pilot (CRP). No SBIR/STTR funds (direct or indirect costs) can
+be used to support commercialization. For purposes of the SBIR/STTR programs, “market research” is
+the systematic gathering, editing, recording, computing, and analyzing of data about problems relating to
+the sale and distribution of the subject of the proposed research. It includes various types of research,
+such as the size of potential markets and potential sales volume, the identification of consumers most apt
+to purchase the products, and the advertising media most likely to stimulate their purchases. However,
+“market research” does not include activities under a research plan or protocol that include a survey of
+the public as part of the objectives of the project to determine the impact of the subject of the research
+on the behavior of individuals.
+18.5.5.2 Intellectual Property
+Rights to data, including software developed under the terms of any funding agreement resulting from an
+NIH award, shall remain with the recipient except that any such copyrighted material shall be subject to
+a royalty-free, nonexclusive and irrevocable license to the Federal government to reproduce, publish or
+otherwise use the material, and to authorize others to do so for Federal purposes. In addition, under the
+SBIR/STTR programs, in contrast to awards to for-profit organizations under other support mechanisms,
+such data shall not be released outside the Federal government without the recipient’s permission for a
+period of 20 years from completion of the project.
+Rights in Data Developed Under SBIR Funding Agreement. Section 9 of the Small Business Act, as
+amended (15 U.S.C. 638) provides for “retention by a small business concern of the rights to data generated by the concern in the performance of an [SBIR/STTR] award for a period of not less than 4
+years.”
+ 1. The Act provides for retention by a small business concern (SBC) award recipient of the rights
+to data generated by the concern in the performance of an SBIR/STTR award. These data rights
+provide an incentive for SBCs to participate in Federally-funded research projects and contribute
+to the ability of small business recipients to commercialize the technology developed under the
+program. The central purpose of SBIR/STTR data rights is to provide the Federal Government
+with the degree of access to a recipient’s SBIR/STTR data needed to evaluate the work and
+effectively utilize the results and at the same time ensure that the Federal Government or other
+concerns cannot use SBIR/STTR data in ways (e.g., for commercial purposes or to produce
+future technical procurement specifications) that would inappropriately diminish the rights or
+associated economic opportunities of the small business that developed the data. The
+SBIR/STTR data rights provisions and definitions are designed to ensure that, for properly
+marked SBIR/STTR data, during the SBIR/STTR protection period, the Federal Government
+provides effective protection of the data that is comparable to and at least as strong as the protection the Federal Government gives to delivered proprietary data that is developed exclusively
+at private expense.
+(GPS page IIB-139)
+
+2.  SBIR/STTR participating agencies must ensure that recipients of an SBIR/STTR funding agreement retain appropriate proprietary rights for all SBIR/STTR data generated in the performance
+of the award. In general, this results in the Government receiving SBIR/STTR data rights in all
+SBIR/STTR data during the SBIR/STTR protection period, except for certain types of data that
+are not subject to such data rights restrictions due to the nature of the data (e.g., Form, Fit, and
+Function Data or OMIT Data). SBIR/STTR data rights apply to all SBIR/STTR awards, including subcontracts or subgrants to such awards, that fall within the statutory definition of Phase I,
+II, or III of the SBIR/STTR programs, as described in § 4 of the SBA Policy Directive effective
+May 2, 2019. The scope and extent of the SBIR/STTR data rights applicable to Federally-funded
+Phase III awards are identical to the SBIR/STTR data rights applicable to Phases I and II
+SBIR/STTR awards. SBIR/STTR data rights provide license rights to the Federal Government.
+SBIR/STTR data rights restrict the Federal Government’s use and release of properly marked
+SBIR/STTR data only during the SBIR/STTR protection period; after the protection period, the
+Federal Government has a royalty-free license to use, and to authorize others to use on its behalf,
+these data for government purposes, and is relieved of disclosure prohibitions related to such government purposes, and assumes no liability for unauthorized use of these data by third parties.
+The Federal Government receives unlimited rights in Form, Fit, and Function Data, OMIT Data,
+and all unmarked SBIR/STTR data.
+ 3. 3. SBIR/STTR Data Rights – Main Elements:
+ a. An SBC retains title and ownership of all SBIR/STTR data it develops or generates in
+the performance of an SBIR/STTR award. The SBC retains all rights in SBIR/STTR
+data that are not granted to the Government in accordance with the SBA Policy Directive. These rights of the SBC do not expire.
+ b. The Government receives SBIR/STTR data rights during the SBIR/STTR protection
+period on all appropriately marked SBIR/STTR data. These rights enable the Federal
+Government to use SBIR/STTR data in limited ways within the Government, such as for
+project evaluation purposes, but are intended to prohibit uses and disclosures of the
+SBIR/STTR data that may undermine the SBC’s future commercialization of the associated technology. The Government receives unlimited rights in Form, Fit, and Function
+Data, OMIT Data, and all unmarked SBIR/STTR data.
+ c. After the SBIR/STTR protection period has expired, the Federal Government may use,
+and authorize others to use on its behalf, for government purposes, SBIR/STTR data that
+was subject to SBIR/STTR data rights during the SBIR/STTR protection period.
+ 4. The SBIR/STTR protection period begins with award of an SBIR/STTR funding agreement and
+ends twenty years, or longer at the discretion of the participating agency, from the date of award
+of an SBIR/STTR funding agreement (either Phase I, Phase II, or Federally-funded SBIR/STTR
+Phase III) unless subsequent to the award, the agency and the SBC negotiate for some other protection period for the SBIR/STTR data.
+(GPS page IIB-140)
+
+5. To receive the protections accorded to SBIR/STTR data pursuant to SBIR/STTR data rights, any
+SBIR/STTR data that is delivered must be marked with the appropriate SBIR/STTR data rights
+legend or notice, in accordance with agency procedures. The Government assumes no liability
+for the access, use, modification, reproduction, release, performance, display, disclosure, or distribution of SBIR/STTR data without markings. If SBIR/STTR data is delivered without the
+required legend or notice, the SBIR/STTR recipient may, within 6 months of such delivery (or a
+longer period approved by the agency for good cause shown), request to have an omitted
+SBIR/STTR data legend or notice, as applicable, placed on qualifying data. If SBIR/STTR data
+is delivered with an incorrect or nonconforming legend or notice, the agency may correct or permit correction at the recipient’s expense of such incorrect or nonconforming notice(s).
+ 6. Negotiated Rights:
+ a. An agency must not, in any way, make issuance of an SBIR/STTR award conditional
+upon the recipient negotiating or consenting to negotiate a specially negotiated license or
+other agreement regarding SBIR/STTR data. The negotiation of any such specially negotiated license agreements shall be permitted only after award.
+ b. Following issuance of an SBIR/STTR award, the recipient may enter into a written agreement with the awarding agency to modify the license rights that would otherwise be granted to the agency during the SBIR/STTR protection period. However, any such
+agreement must be entered into voluntarily and by mutual agreement of the SBIR/STTR
+recipient and agency, and not a condition for additional work under the funding agreement or the exercise of options. Such a bilateral data rights agreement must be entered
+into only after the subject SBIR/STTR award (which award must include an appropriate
+SBIR/STTR data rights clause) has been signed. Any such specially negotiated license
+must be in writing under a separate agreement after the SBIR/STTR funding agreement
+is signed. A decision by the recipient to relinquish, transfer, or modify in any way its
+rights in SBIR/STTR data must be made without pressure or coercion by the agency or
+any other party. Any provision in a competitive non-SBIR or SBIR solicitation that
+would have the effect of diminishing SBIR/STTR data rights shall have no effect on the
+provision of SBIR/STTR data rights in a resulting Phase I, Phase II, or Phase III award.
+ 7. To ensure that SBIR/STTR recipients receive the applicable data rights, all SBIR and STTR solicitations and resulting funding agreements must fully implement all of the policies, procedures,
+and requirements set forth in the SBA Policy Directive in appropriate provisions and clauses
+incorporated into the SBIR/STTR solicitations and awards. Paragraph (5)(d)(3) of Appendix I:
+Instructions for Preparation of SBIR/STTR Program Solicitations in the SBA Policy Directive
+provides a sample SBIR/STTR data rights clause containing the key elements that must be reflected in the clause used in Federal Agency solicitations. SBA will report to the Congress any
+attempt or action by an agency, that it is aware of, to condition an SBIR or STTR award on the
+negotiation of lesser data rights or to exclude the appropriate data rights clause from the award.
+The STTR program requires that the small business recipient and the single, non-profit research institution execute an agreement allocating between the parties intellectual property rights and rights, if any,
+to carry out follow-on research, development, or commercialization of the subject research. By signing
+the face page of the grant application, the SBC’s AOR certifies that the agreement with the research institution is satisfactory to the SBC and will be effective at the time the grant award is made. Prior to award
+a copy of the agreement must be furnished to the NIH awarding IC.
+SBIR/STTR recipients are covered by 35 U.S.C. 200-212 and 37 CFR Part 401 with respect to inventions and patents (see Grants to For-Profit Organizations—Administrative Requirements—Intellectual
+Property in this chapter).
+(GPS page IIB-141)
+
+18.5.5.3 Data Sharing
+SBIR and STTR applicants must comply with NIH DMS policy as modified by the Small Business Act.
+If the final data would not be amenable to sharing, e.g., proprietary data, the SBC should explain that in
+the application. In addition, as indicated under Intellectual Property in this chapter, whether or not the
+award meets the threshold for data sharing, NIH will not release data outside the Federal government
+without the recipient’s permission for a period of 20 years from completion of the project.
+18.5.5.4 SBIR Life Cycle Certification
+All SBIR Phase I and Phase II recipients must complete a Life Cycle Certification at all times set forth
+in the Notice of Award (see §8(j) of the SBIR Policy Directive). This includes checking all of the boxes
+and having an authorized officer of the recipient sign and date the certification each time it is required.
+A certification is required at the following times:
+ l For SBIR Phase I Recipients: At the time of receiving final payment or disbursement from the
+Payment Management System.
+ l For SBIR Phase II Recipients: prior to receiving more than 50% of the total award amount and
+prior to final payment or disbursement from the Payment Management System.
+SBIR grant recipients are required to submit the Life Cycle Certifications within the I-RPPR and the F-
+RPPR under Section G.1: Special Notice of Award and Notice of Funding Opportunity Reporting
+Requirements.  SBIR recipients should not select the “Nothing to Report” box in this section.  The F-
+RPPR and I-RPPR must be submitted via eRA Commons no later than 120 calendar days from the
+period of performance end date.  I-RPPR or F-RPPR will not be accepted unless all completed Life Cycle
+Certification(s) are received.  Failure to provide all required completed certification(s) may cause NIH to
+take one or more actions that may include, but are not limited to, corrective actions, withholding of further awards, suspension or termination.
+This does not impact the SBIR Funding Agreement Certification required by all SBIR applicants for new
+or renewal grants that is required prior to award of a new award or a competing renewal award.
+In addition, SBIR recipients indicate compliance with these certification requirements by drawing or
+requesting funds from the Payment Management System.  If the recipient cannot complete the certification or cannot ensure compliance with the certification process, it should notify the GMO immediately.  If resolution cannot be reached, the GMO will void or terminate the grant, as appropriate.
+The certification form is available in fillable format.  However, the requirements are outlined below.
+Overview Certification Information. The Federal government relies on this information ensure compliance with specific program requirements during the life of the award.  The definitions for the terms
+used in the certification are set forth in the Small Business Act, the SBIR Policy Directive and also any
+statutory and regulatory provisions referenced in those authorities.
+If the Grants Management Officer believes, after award, that the business is not meeting certain funding
+agreement requirements, the agency may request further clarification and supporting documentation in
+order to assist in the verification of any of the information provided.
+Even if correct information has been included in other materials submitted to the Federal government,
+any action taken with respect to the certification does not affect the Government’s right to pursue criminal, civil, or administrative remedies for incorrect or incomplete information given in the certification.
+Each person signing a certification may be prosecuted if they have provided false information.
+Recipients will verify and certify the following provisions:
+(GPS page IIB-142)
+
+1. The principal investigator spent more than half of their time (based on a 40-hour work week) as
+an employee of the recipient or has requested and received a written deviation from this requirement from the Grants Management Officer.  When a deviation has been approved by NIH, the
+certification will also document the adjusted percentage of time approved.
+ 2. All, essentially equivalent work, or a portion of the work performed under this project:
+ a. Has not been submitted for funding to NIH or another Federal agency.
+ b. Has been submitted for funding to NIH or another Federal agency but has not been funded under any other grant, contract, subcontract, or other transaction.
+ c. A portion has been funded by another grant, contract, or subcontract as described in
+detail in the proposal and approved in writing by the Grants Management Officer.
+ 3. Upon completion of the award the recipient will have performed the applicable percentage of
+work, unless a deviation from this requirement is approved in writing by the Grants Management
+Officer. Options on the certification document will include:
+ a. SBIR Phase I: at least two-thirds (66 2/3%) of the research
+ b. SBIR Phase II: at least half (50%) of the research
+ c. Percent deviation approved in writing by the Grants Management Officer
+ 4. The work is completed and the small business recipient has performed the applicable percentage
+of work, unless a deviation from this requirement is approved in writing by the Grants Management Officer. Options on the certification document will include:
+ a. SBIR Phase I: at least two-thirds (66 2/3%) of the research
+ b. SBIR Phase II: at least half (50%) of the research
+ c. Percent deviation approved in writing by the Grants Management Officer
+ d. N/A because work is not completed
+ 5. The research / research and development is performed in the United States unless a deviation is
+approved in writing by the Grants Management Officer.
+ 6. The research / research and development is performed at recipient's facilities with the recipient's
+employees, except as otherwise indicated in the SBIR application and approved in the Notice of
+Award.
+The recipient will notify the Federal agency immediately if all or a portion of the work authorized and
+funded under the award is subsequently funded by another Federal agency.
+The recipient will further certify that they understand that the information submitted may be given to
+Federal, State and local agencies for determining violations of law and other purposes.
+Finally, the individual certifying on behalf of the recipient will certify they are:
+ 1. An officer of the business concern authorized to represent it and sign the certification on its
+behalf.
+ 2. Representing on their own behalf, and on behalf of the business concern, that the information
+provided in the certification, the application, and all other information submitted in connection
+with the award, is true and correct as of the date of submission.
+(GPS page IIB-143)
+
+3. Acknowledging that any intentional or negligent misrepresentation of the information contained
+in the certification may result in criminal, civil or administrative sanctions, including but not limited to: (1) fines, restitution and/or imprisonment under 18 U.S.C. § 1001; (2) treble damages
+and civil penalties under the False Claims Act (31 U.S.C. § 3729 et seq.); (3) double damages
+and civil penalties under the Program Fraud Civil Remedies Act (31 U.S.C. §3801 et seq.); (4)
+civil recovery of award funds; (5) suspension and/or debarment from all Federal procurement
+and nonprocurement transactions (FAR Subpart 9.4 or 2 C.F.R. part 180); and (6) other administrative penalties including termination of SBIR/STTR awards.
+18.5.5.5 STTR Life Cycle Certification
+All STTR Phase I and Phase II recipients must complete a Life Cycle Certification at all times set forth
+in the Notice of Award (see §8(j) of the SBIR Policy Directive). This includes checking all  the boxes on
+the actual certification document and having an authorized officer of the recipient sign and date the certification each time it is required.
+A certification is required at the following times:
+ l For STTR Phase I Recipients: At the time of receiving final payment or disbursement from the
+Payment Management System.
+ l For STTR Phase II Recipients: prior to receiving more than 50% of the total award amount and
+prior to final payment or disbursement from the Payment Management System.
+STTR grant recipients are required to submit the Life Cycle Certifications within the I-RPPR and the F-
+RPPR under Section G.1: Special Notice of Award and Notice of Funding Opportunity Reporting
+Requirements.  STTR recipients should not select the “Nothing to Report” box in this section.  The F-
+RPPR and I-RPPR must be submitted via eRA Commons no later than 120 calendar days from the
+period of performance end date.  I-RPPR or F-RPPR will not be accepted unless all completed Life Cycle
+Certification(s) are received.  Failure to provide all required completed certification(s) may cause NIH to
+take one or more actions that may include, but are not limited to, corrective actions, withholding of further awards, suspension or termination.
+This does not impact the STTR Funding Agreement Certification required by all STTR applicants for
+new or renewal grants that is required prior to award of a new award or a competing renewal award.
+In addition, STTR recipients indicate compliance with these certification requirements by drawing or
+requesting funds from the Payment Management System.  If the recipient cannot complete the certification or cannot ensure compliance with the certification process, it should notify the GMO immediately.  If resolution cannot be reached, the GMO will void or terminate the grant, as appropriate.
+The certification is available in fillable format, however, the requirements are outlined below.
+Overview Certification Information. Please read carefully the following certification statements.  The
+Federal government relies on this information to determine whether the business is eligible for a Small
+Business Technology Transfer Research (STTR) Program award.  The definitions for the terms used in
+the certification are set forth in the Small Business Act, SBA regulations (13 C.F.R. Part 121), the STTR
+Policy Directive and also any statutory and regulatory provisions references in those authorities.
+If the Grants Management Officer believes, after award, that the business is not meeting certain funding
+agreement requirements, the agency may request further clarification and supporting documentation in
+order to assist in the verification of any of the information provided.
+Even if correct information has been included in other materials submitted to the Federal government,
+any action taken with respect to the certification does not affect the Government’s right to pursue
+(GPS page IIB-144)
+
+criminal, civil, or administrative remedies for incorrect or incomplete information given in the certification.  Each person signing a certification may be prosecuted if they have provided false information.
+Recipients will verify and certify the following provisions:
+ 1. The principal investigator spent more than half of their time as an employee of the recipient or
+the research institution, or the recipient has requested and received a written deviation from this
+requirement from the Grants Management Officer.  When a deviation has been approved by NIH,
+the certification will also document the adjusted percentage of time approved.
+ 2. All, essentially equivalent work, or a portion of the work performed under this project:
+ a. Has not been submitted for funding by another Federal agency.
+ b. Has been submitted for funding by another Federal agency but has not been funded
+under any other Federal grant, contract, subcontract, or other transaction.
+ c. A portion has been funded by another grant, contract, or subcontract as described in
+detail in the proposal and approved in writing by the Grants Management Officer.
+ 3. Upon completion of the award it will have performed the applicable percentage of work, unless a
+deviation from this requirement is approved in writing by the Grants Management Officer.
+Options on the certification document will include:
+ a. STTR Phase I: at least forty (40%) of the research
+ b. STTR Phase II: at least forty (40%) of the research
+ c. Percent deviation approved in writing by the Grants Management Officer
+ 4. The small business concern, and not the single, partnering Research Institution, is exercising
+management direction and control of the performance of the STTR funding agreement.
+ 5. The work is completed and it has performed the applicable percentage of work, unless a deviation from this requirement is approved in writing by the Grants Management Officer. Options
+on the certification document will include:
+ a. STTR Phase I: at least forty (40%) of the research
+ b. STTR Phase II: at least forty (40%) of the research
+ c. Percent deviation approved in writing by the Grants Management Officer
+ d. N/A because work is not completed
+ 6. The research / research and development is performed in the United States unless a deviation is
+approved in writing by the Grants Management Officer.
+ 7. The research / research and development is performed at Recipient's facilities with Recipient's
+employees, except as otherwise indicated in the STTR application and approved in the Notice of
+Award.
+The recipient will notify the Federal agency immediately if all or a portion of the work proposed is subsequently funded by another Federal agency.
+The recipient will further certify that they understand that the information submitted may be given to
+Federal, State and local agencies for determining violations of law and other purposes.
+Finally, the individual certifying on behalf of the recipient will certify they are:
+ 1. An officer of the business concern authorized to represent it and sign the certification on its
+behalf.
+(GPS page IIB-145)
+
+2. Representing on their own behalf, and on behalf of the business concern, that the information
+provided in the certification, the application, and all other information submitted in connection
+with the award, is true and correct as of the date of submission.
+ 3. Acknowledging that any intentional or negligent misrepresentation of the information contained
+in the certification may result in criminal, civil or administrative sanctions, including but not limited to: (1) fines, restitution and/or imprisonment under 18 U.S.C. § 1001; (2) treble damages
+and civil penalties under the False Claims Act (31 U.S.C. § 3729 et seq.); (3) double damages
+and civil penalties under the Program Fraud Civil Remedies Act (31 U.S.C. §3801 et seq.); (4)
+civil recovery of award funds; (5) suspension and/or debarment from all Federal procurement
+and nonprocurement transactions (FAR Subpart 9.4 or 2 C.F.R. part 180); and (6) other administrative penalties including termination of SBIR/STTR awards.
+18.5.5.6 Prior Approval of New Subawards
+SBIR  and STTR recipients are required to seek prior approval when adding a new subaward  to a project
+post award, where the arrangement was not originally a part of the peer reviewed and approved application. All prior approval requests for SBIR and STTR awards must be submitted through the eRA Commons Prior Approval Module in accordance with NIHGPS section 8.1.3. Per the Foreign Disclosure
+Form policy (see NIHGPS Section 18.5.3.1 Foreign Disclosure Pre-Award and Post-Award Requirements), the recipient must either submit an updated SBIR STTR Foreign Disclosure Form or include a
+statement in the prior approval request noting that there are no updates to the SBIR STTR Foreign Disclosure Form.  A foreign risk assessment is required for the entity selected for the subaward when the
+prior approval request is submitted through submission of an updated SBIR STTR Foreign Disclosure
+Form via the “SBIR STTR Foreign Disclosure Request for Additional Materials” (RAM) feature in eRA
+Commons. The recipient must receive official written approval notification from the NIH Grants Management Official prior to signing a subaward agreement.
+An SBC will be required to repay all amounts received from NIH under the award if either of the following determinations are made upon assessment of a change to their disclosure:
+ l the SBC makes a material misstatement that NIH determines poses a risk to national security; or
+ l there is a change in ownership, change in entity structure, or other substantial change in circumstances of the SBC that NIH determines poses a risk to national security.
+As a general reminder, SBIR and STTR recipients are strongly encouraged to consult with their designated Grants Management Official identified on the Notice of Award as early as possible when considering changes to the project that require prior approval as outlined in NIHGPS Section 8.1.2. Prior
+Approval Requirements.
+NIH no longer recognizes foreign subawards. All international research collaborations must use the collaborative international research award mechanism.
+18.5.5.7 Monitoring Requirements for Relationships with Foreign Countries of Concern Post-Award
+SBIR/STTR recipients are responsible for monitoring their relationships with foreign countries of concern post-award for any changes that may impact previous disclosures and are required to submit an
+updated disclosure form to report any of the following changes to NIH throughout the duration of the
+award:
+• any change to a disclosure on the disclosure form;
+• any material misstatement that poses a risk to national security; and
+(GPS page IIB-146)
+
+• any change of ownership, change to entity structure, or other substantial change in circumstances of the
+SBC that NIH determines poses a risk to national security.
+Regular, annual updates are required at the time of all SBIR/STTR annual, interim, and final Research
+Performance Progress Reports (RPPRs). For changes that occur between RPPR submissions, updated disclosure forms are required within 30 days of any change in ownership, entity structure, covered individual, or other substantive changes in circumstance, as described above. Recipients will be required to
+upload these updated disclosures using the Foreign Disclosure Request for Additional Materials (RAM)
+feature in eRA Commons.
+If the recipient reports a covered foreign relationship that meets any of the risk criteria prohibiting funding described in this guidance, NIH may deem it necessary to terminate the award for material failure to
+comply with the federal statutes, regulations, or terms and conditions of the federal award. Refer to
+NIHGPS Section 8.5.2 Remedies for Noncompliance or Enforcement Actions: Suspension, Termination,
+and Withholding of Support for more information. Recipients are encouraged to monitor their covered
+foreign relationships post-award and avoid entering into relationships, both funded and unfunded, that
+may pose a security risk and jeopardize their ability to retain their award.
+Recovery Authority and Repayment of Funds
+SBIR/STTR recipients will be required to repay all amounts received from NIH under the award if either
+of the following determinations are made upon assessment of a change to their disclosure:
+ l the recipient makes a material misstatement that NIH determines poses a risk to national security; or
+ l there is a change in ownership, change in entity structure, or other substantial change in circumstances of the recipient SBC that NIH determines poses a risk to national security.
+The repayment requirements and procedures provided in NIHGPS Section 8.5.4 Recovery of Funds
+apply and may also be subject to additional noncompliance and enforcement actions as described in
+NIHGPS Section 8.5.2. Recipients are required to follow the repayment procedures provided in the Guidance for Repayment of Grant Funds to the NIH.
+18.5.5.8 Final RPPR
+Phase I Final RPPR: If a Phase I recipient does not intend to submit a Phase II application within four
+months of the Phase I project period end date, then Phase I Final RPPR must be submitted to the Grants
+Management Office of the Awarding Component within 120 days of the completion date of the Phase I
+grant period. An Interim-RPPR is required if an application for a Phase II or Phase IIB, respectively, is
+submitted before a final report for the Phase I award would otherwise be due. In the event that the Type
+2/Phase II/Phase IIB application is funded, NIH will treat the Interim –RPPR as the annual performance
+report for the final year of the previous competitive segment. If the Type 2 is not funded, the Interim-
+RPPR will be treated by NIH staff as the institution’s Final-RPPR.
+Final RPPR Phase I, Phase II, Phase IIB, CRP: Instructions for the Final RPPR are found on NIH's
+web site. See in particular, Chapter 7.3, SBIR/STTR RPPRs.
+18.5.5.9 Phase II Data Collection Requirement for Government SBIR Reporting
+Database
+Phase II Data Collection Requirement for Government SBIR Reporting Database:  The SBA maintains
+a Database System on SBIR.gov to track and report on statistics regarding the SBIR and the STTR programs.  Each small business concern applying for a Phase II award is required to update the appropriate
+information in the reporting database on SBIR.gov for any of its prior Phase II awards.
+(GPS page IIB-147)
+
+In meeting this requirement, the small business concern may apportion sales or additional investment
+information relating to more than one Phase II award among those awards, if it notes the apportionment
+for each award. Each Phase II recipient is required to update the appropriate information in the SBIR.gov
+database on that award upon completion of the last deliverable (e.g., Final RPPR, Federal Financial
+Report, Final Invention Statement) under the funding agreement. In addition, the recipient is requested to
+voluntarily update the appropriate information on that award in the SBIR.gov database annually thereafter for a minimum period of 5 years.
+Questions about this requirement may be submitted to SBA directly through the Contact Us/Send Feedback link on SBIR.gov. To register on and use the database system, visit SBIR.gov. Online help is available. SBA will minimize the data reporting requirements of small business concerns, make updating
+available electronically, and provide standardized procedures.
+Project commercialization and sales data can only be viewed by authorized Government Officials, with
+the approval of the SBA. This includes Congress, General Accounting Office (GAO), SBIR/STTR Participating Agencies, Office of Management and Budget (OMB), Office of Science and Technology
+Policy (OSTP), Office of Federal Procurement Policy (OFPP), and other authorized persons (for
+example, authorized contractors) who are subject to a non-disclosure  agreement (NDA) with the Federal
+Government covering the use of the databases. These databases are used for the purposes of evaluating
+and determining eligibility for the SBIR/STTR program, in accordance with Policy Directives issued by
+SBA. Pursuant to 15 U.S.C. 638(k)(4), information provided to the SBIR.gov database is privileged and
+confidential and not subject to disclosure pursuant to 5 U.S.C. 552 (Government Organization and
+Employees); nor must it be considered to be publication for purposes of 35 U.S.C. 102 (a) or (b).
+Examples of the data to be entered by applicants into SBIR.gov include revenue from the sale of new
+products or services resulting from the research conducted under each Phase II award or additional investment from any source, other than Phase I or Phase II awards, to further the research and development
+conducted under each Phase II award.
+(GPS page IIB-148)

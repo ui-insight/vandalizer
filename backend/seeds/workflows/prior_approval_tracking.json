@@ -50,8 +50,34 @@
       ],
       "input_config": {},
       "output_config": {},
-      "validation_plan": [],
-      "validation_inputs": []
+      "validation_plan": [
+        {
+          "id": "ce694d26-5179-5cd8-b11f-c192c5832d44",
+          "name": "Figures match the source",
+          "category": "accuracy",
+          "description": "Every threshold, percentage, dollar amount and day count in the output appears in the source document with the same value, unit and (for dates) year. A figure the output calculated says how it was calculated and the arithmetic is right. FAIL if any value differs from the source, or appears with no basis in it."
+        },
+        {
+          "id": "6e25f95a-aeb3-56a5-97a0-d803d659d616",
+          "name": "Every prior-approval requirement is listed",
+          "category": "completeness",
+          "description": "Each activity the award says needs prior written approval (rebudgeting, equipment, PI or key personnel change, effort reduction, foreign travel, no-cost extension, subawards) is listed with its threshold or timing as stated. FAIL for each requirement omitted."
+        },
+        {
+          "id": "3d4e3042-9c97-5150-be70-8a755298d747",
+          "name": "Says when the document is silent",
+          "category": "content",
+          "description": "For each approval requirement or procedure that the source document does not state, the output says it is not stated (or not found) instead of filling in a typical value, a common practice or a figure from memory, and instead of leaving it out without comment. FAIL if a missing item is given a value the document does not contain."
+        }
+      ],
+      "validation_inputs": [
+        {
+          "id": "746b6a3c-1e36-51aa-ae59-bca5ebd05840",
+          "type": "text",
+          "label": "Fictional notice of award. Answer key: award EXA-2027-0412; project period July 1, 2027 to June 30, 2029; budget period 1 July 1, 2027 to June 30, 2028; this action $250,000 ($200,000 direct, $50,000 indirect); total anticipated $510,000; indirect 25% of MTDC; no cost sharing; annual progress report and SF-425 due 90 days after each budget period (September 28, 2028 for period 1); final reports and invention statement due 120 days after the project end (October 28, 2029); prior approval for a PI change, foreign travel, rebudgeting participant support, equipment over $10,000 per item, and a PI effort reduction over 25%; one no-cost extension, requested at least 10 days before the end (by June 20, 2029); records kept 3 years from the final SF-425. Not stated: a data management plan requirement.",
+          "text": "FICTIONAL QA MATERIAL — NOT A REAL AWARD\nNotice of Award — Example Science Agency\nAward Number: EXA-2027-0412\nFederal Award Identification Number (FAIN): EXA20270412\nRecipient: Example State University\nPrincipal Investigator: Jordan Sample\nProject Title: Watershed Sensor Network Pilot\nProject period: July 1, 2027 through June 30, 2029\nBudget period 1: July 1, 2027 through June 30, 2028\nAmount of this action (budget period 1): $250,000, of which direct costs $200,000 and indirect costs $50,000.\nTotal anticipated award for both budget periods, subject to the availability of funds: $510,000.\nIndirect costs: 25% of modified total direct costs (MTDC), per the recipient's negotiated rate agreement dated March 3, 2026.\nCost sharing: none required.\n\nReporting\n- An annual progress report is due 90 days after the end of each budget period.\n- An annual Federal Financial Report (SF-425) is due 90 days after the end of each budget period.\n- The final progress report, final SF-425 and final invention statement are due 120 days after the end of the project period.\n\nPrior approval\nPrior written approval from the agency is required for (a) a change of principal investigator, (b) foreign travel, and (c) rebudgeting of participant support costs.\nEquipment purchases over $10,000 per item require prior approval.\nThe principal investigator commits 1.2 calendar months per year; a reduction of more than 25% requires prior approval.\nOne no-cost extension may be requested, at least 10 days before the end of the project period.\n\nRecords\nRecords must be kept for 3 years from the date the final SF-425 is submitted."
+        }
+      ]
     }
   ]
 }

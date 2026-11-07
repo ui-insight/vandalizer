@@ -156,6 +156,8 @@ export interface VerifiedItemMetadata {
 }
 
 export interface VerifiedCatalogItem {
+  set_type?: string | null
+  usage?: { input: string; output: string; output_names: string[]; notes: string[] }
   id: string
   item_id: string
   kind: LibraryItemKind

@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useState } from 'react'
-import { CircleHelp } from 'lucide-react'
+import { CircleHelp, Activity } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
 import { TeamsDropdown } from './TeamsDropdown'
 import { NotificationBell } from './NotificationBell'
 import { SupportChatPanel } from '../support/SupportChatPanel'
 import { TrialVerifyBanner } from '../trial/TrialVerifyBanner'
+import { TrialUsageBanner } from '../trial/TrialUsageBanner'
 import { FeedbackPromptCard } from '../support/FeedbackPromptCard'
 import { useOptionalWorkspace } from '../../contexts/WorkspaceContext'
 import { useBranding } from '../../contexts/BrandingContext'
 import { useFeedbackPrompt } from '../../hooks/useFeedbackPrompt'
 
-export function Header() {
+export function Header({ onOpenActivity }: { onOpenActivity?: () => void } = {}) {
   const navigate = useNavigate()
   const workspace = useOptionalWorkspace()
   const branding = useBranding()
@@ -83,36 +84,39 @@ export function Header() {
     <>
       <header
         role="banner"
-        className="flex items-center justify-between bg-white shrink-0"
+        className="workspace-header flex items-center justify-between bg-white shrink-0"
         style={{
-          height: 69,
+          height: 56,
           borderBottom: '2px solid #F4F4F6',
-          padding: '0 30px',
+          padding: '0 20px',
         }}
       >
         {/* Left: Logo images */}
-        <div className="flex items-center">
+        <div className="workspace-brand flex items-center">
           <button onClick={handleLogoClick} aria-label="Go to home page" className="flex items-center" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
             {brandIcon && (
-              <img src={brandIcon} alt="" style={{ width: 25, height: 40, marginTop: 4, objectFit: 'contain' }} />
+              <img src={brandIcon} alt="" style={{ width: 22, height: 34, marginTop: 4, objectFit: 'contain' }} />
             )}
             <img
+              className="brand-wordmark"
               src={branding.logoUrl}
               alt={branding.orgName}
-              style={{ height: 50, maxWidth: 240, objectFit: 'contain', marginLeft: brandIcon ? 4 : 0 }}
+              style={{ height: 40, maxWidth: 200, objectFit: 'contain', marginLeft: brandIcon ? 4 : 0 }}
             />
           </button>
         </div>
 
         {/* Right: Notifications + Support + Teams dropdown */}
-        <div className="flex items-center gap-4">
+        <div className="header-actions flex items-center gap-4">
+          {onOpenActivity && <button type="button" className="header-activity" aria-label="Open activity" onClick={onOpenActivity}><Activity size={16} /></button>}
           <NotificationBell />
           <button
             onClick={handleSupportClick}
+            aria-label="Support"
             className="relative flex items-center gap-1.5 rounded-[30px] border border-gray-300 px-3 py-1.5 text-sm font-medium text-[#555] hover:bg-gray-100 transition-all"
           >
             <CircleHelp className="h-3.5 w-3.5" />
-            Support
+            <span className="header-action-label">Support</span>
             {feedbackPrompt.pendingPrompt && !supportOpen && (
               <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
@@ -127,6 +131,9 @@ export function Header() {
       {/* Renders only for a trial account that hasn't confirmed its email —
           otherwise the spend gate is silent until something fails mid-task. */}
       <TrialVerifyBanner />
+      {/* A trial account at 80% of its AI tokens or more: the warning and the
+          in-app top-up, which the chat's out-of-tokens notice also opens. */}
+      <TrialUsageBanner />
 
       <SupportChatPanel
         open={supportOpen}

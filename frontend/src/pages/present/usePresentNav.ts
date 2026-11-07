@@ -17,6 +17,7 @@ export function usePresentNav({
 }) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' && e.target instanceof Element && e.target.closest('button,a,input,select,textarea,[contenteditable=true]')) return
       switch (e.key) {
         case 'ArrowRight':
         case ' ':

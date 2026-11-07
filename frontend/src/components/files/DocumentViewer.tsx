@@ -15,6 +15,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
 interface DocumentViewerProps {
   docUuid: string
+  unavailableHelp?: string
   highlightTerms?: string[]
   // 1-based page hint for highlightTerms (extraction source tracking). Used
   // to prefer matches on that page, and to still jump the viewer there when
@@ -26,6 +27,7 @@ interface DocumentViewerProps {
   onClearHighlights?: () => void
   processing?: boolean
   taskStatus?: string | null
+  hideHighlightNavBar?: boolean
 }
 
 const ZOOM_LEVELS = [0.5, 0.75, 1, 1.25, 1.5, 2]
@@ -138,7 +140,7 @@ export function highlightMissLabel(
     : `passage not matched — showing page ${page}`
 }
 
-export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = null, highlightPageApproximate = false, onClearHighlights, processing, taskStatus }: DocumentViewerProps) {
+export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = null, highlightPageApproximate = false, onClearHighlights, processing, taskStatus, hideHighlightNavBar, unavailableHelp = 'The saved citation preview may describe an earlier version. Return to Chat to continue your conversation.' }: DocumentViewerProps) {
   const [zoom, setZoom] = useState(2) // index into ZOOM_LEVELS, default 100%
   const [isPdf, setIsPdf] = useState<boolean | null>(null) // null = loading
   const [isSpreadsheet, setIsSpreadsheet] = useState(false)
@@ -148,9 +150,20 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
   // False when the file itself is the problem: no Retry is offered then.
   const [extractionRetryable, setExtractionRetryable] = useState(true)
   const [retrying, setRetrying] = useState(false)
+  const retryGeneration = useRef(0)
+  const retryPending = useRef(false)
+  const retryTimer = useRef<number | null>(null)
+  const cancelRetryPolling = useCallback(() => {
+    retryGeneration.current++
+    retryPending.current = false
+    if (retryTimer.current !== null) window.clearTimeout(retryTimer.current)
+    retryTimer.current = null
+  }, [])
   const [lowQuality, setLowQuality] = useState(false)
   const [blobUrl, setBlobUrl] = useState<string | null>(null) // for non-PDF iframe fallback
   const [previewUnavailable, setPreviewUnavailable] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [loadAttempt, setLoadAttempt] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null)
   const renderingRef = useRef(false)
@@ -208,7 +221,11 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
   useEffect(() => {
     let cancelled = false
     let createdBlobUrl: string | null = null
+    cancelRetryPolling()
+    setRetrying(false)
     setIsPdf(null)
+    setLoadError(null)
+    setExtractionError(null)
     setIsSpreadsheet(false)
     setIsDocx(false)
     setDocxText(null)
@@ -221,6 +238,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
     fetch(inlineUrl, { method: 'HEAD', credentials: 'include' })
       .then(async (resp) => {
         if (cancelled) return
+        if (!resp.ok) throw new Error(resp.status === 401 || resp.status === 403 ? 'This source is not accessible with your current account. Ask its owner for access, then retry.' : resp.status === 404 ? 'This source is no longer available. It may have been removed or access may have changed.' : 'The source could not be loaded. Check your connection and retry.')
         const ct = resp.headers.get('content-type') || ''
         if (ct.includes('csv') || ct.includes('spreadsheet') || ct.includes('excel') || ct.includes('ms-excel')) {
           setIsSpreadsheet(true)
@@ -248,13 +266,14 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
               setDocxText(res.raw_text || '')
             }
           }).catch(() => {
-            if (!cancelled) setDocxText('')
+            if (!cancelled) setLoadError('The source text could not be loaded. Retry to reconnect.')
           })
         } else if (ct.startsWith('image/')) {
           // Fetch into a blob URL so the iframe inherits browser-side
           // caching and doesn't need a second auth round-trip.
           const fullResp = await fetch(inlineUrl, { credentials: 'include' })
           if (cancelled) return
+          if (!fullResp.ok) throw new Error('The source image could not be loaded. Retry to reconnect.')
           const blob = await fullResp.blob()
           if (cancelled) return
           createdBlobUrl = URL.createObjectURL(blob)
@@ -268,18 +287,19 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
           setIsPdf(false)
         }
       })
-      .catch(() => {
+      .catch((error) => {
         if (!cancelled) {
-          setPreviewUnavailable(true)
+          setLoadError(error instanceof Error && !(error instanceof TypeError) ? error.message : 'The source could not be loaded. Check your connection and retry.')
           setIsPdf(false)
         }
       })
 
     return () => {
       cancelled = true
+      cancelRetryPolling()
       if (createdBlobUrl) URL.revokeObjectURL(createdBlobUrl)
     }
-  }, [inlineUrl, docUuid])
+  }, [inlineUrl, docUuid, loadAttempt, cancelRetryPolling])
 
   // Re-fetch docx text when processing completes
   useEffect(() => {
@@ -301,35 +321,40 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
   }, [isDocx, processing, docUuid])
 
   const handleRetryExtraction = useCallback(async () => {
+    if (retryPending.current) return
+    retryPending.current = true
+    const generation = retryGeneration.current
     setRetrying(true)
     setExtractionError(null)
+    const finish = () => { retryPending.current = false; setRetrying(false) }
+    const poll = async () => {
+      try {
+        const res = await pollStatus(docUuid)
+        if (generation !== retryGeneration.current) return
+        if (res.complete || (!res.processing && res.status !== 'extracting' && res.status !== 'readying')) {
+          setLowQuality(Boolean(res.extraction_low_quality))
+          if (res.status === 'error' || (res.complete && !res.raw_text)) {
+            setExtractionError(res.error_message || "We couldn't extract any text from this document.")
+            setExtractionRetryable(res.error_retryable !== false)
+            setDocxText('')
+          } else { setDocxText(res.raw_text || ''); setExtractionError(null) }
+          finish()
+        } else retryTimer.current = window.setTimeout(poll, 3000)
+      } catch {
+        if (generation !== retryGeneration.current) return
+        setLoadError('Processing status could not be loaded. Retry the source to reconnect; the extraction may still finish.')
+        finish()
+      }
+    }
     try {
       await retryExtraction(docUuid)
-      setDocxText(null) // back to loading state
-      // Poll for completion every 3s.
-      const interval = window.setInterval(async () => {
-        try {
-          const res = await pollStatus(docUuid)
-          if (res.complete || (!res.processing && res.status !== 'extracting' && res.status !== 'readying')) {
-            window.clearInterval(interval)
-            setLowQuality(Boolean(res.extraction_low_quality))
-            if (res.status === 'error' || (res.complete && !res.raw_text)) {
-              setExtractionError(res.error_message || "We couldn't extract any text from this document.")
-              setExtractionRetryable(res.error_retryable !== false)
-              setDocxText('')
-            } else {
-              setDocxText(res.raw_text || '')
-            }
-            setRetrying(false)
-          }
-        } catch {
-          window.clearInterval(interval)
-          setRetrying(false)
-        }
-      }, 3000)
+      if (generation !== retryGeneration.current) return
+      setDocxText(null)
+      retryTimer.current = window.setTimeout(poll, 3000)
     } catch (err) {
+      if (generation !== retryGeneration.current) return
       setExtractionError(err instanceof Error ? err.message : 'Retry failed.')
-      setRetrying(false)
+      finish()
     }
   }, [docUuid])
 
@@ -373,7 +398,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
         renderAllPages(doc)
       })
       .catch(() => {
-        if (!cancelled) setIsPdf(false)
+        if (!cancelled) { setLoadError('The PDF preview could not be loaded. Retry the preview or open the original file.'); setIsPdf(false) }
       })
 
     return () => {
@@ -813,9 +838,9 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
 
   const btnStyle: React.CSSProperties = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    width: 32, height: 32, borderRadius: 6, border: '1px solid #d1d5db',
+    width: 32, height: 32, borderRadius: 'var(--workspace-radius-small)', border: "1px solid var(--workspace-border)",
     background: '#fff', cursor: 'pointer', color: '#374151',
-    fontSize: 13, fontWeight: 500,
+    fontSize: 'var(--workspace-font-control)', fontWeight: 500,
   }
 
   // Processing overlay - shown when document is still being processed
@@ -830,32 +855,32 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
         zIndex: 50,
         display: 'flex',
         justifyContent: 'center',
-        padding: '20px 24px',
+        padding: "var(--workspace-space-20) var(--workspace-space-24)",
       }}
     >
       <div style={{
         width: '100%',
         maxWidth: 420,
-        padding: '20px 24px',
+        padding: "var(--workspace-space-20) var(--workspace-space-24)",
         borderRadius: 'var(--ui-radius, 12px)',
         background: 'linear-gradient(135deg, var(--highlight-complement, #6a11cb), color-mix(in srgb, var(--highlight-color, #f1b300) 70%, #ffffff 30%))',
         color: '#fff',
         boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)' }}>
           <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white shrink-0" />
           <div>
-            <div style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.3 }}>
+            <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, lineHeight: 1.3 }}>
               {stageCopy(taskStatus).title}
             </div>
-            <div style={{ fontSize: 12, opacity: 0.8, marginTop: 3 }}>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', opacity: 0.8, marginTop: 'var(--workspace-space-4)' }}>
               {stageCopy(taskStatus).message}
             </div>
           </div>
         </div>
         {/* Progress bar */}
         <div style={{
-          marginTop: 14,
+          marginTop: 'var(--workspace-space-16)',
           height: 4,
           borderRadius: 2,
           backgroundColor: 'rgba(255,255,255,0.2)',
@@ -882,6 +907,18 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
     return DOMPurify.sanitize(marked.parse(docxText) as string)
   }, [docxText])
 
+  if (loadError) {
+    return <div role="alert" style={{ padding: 'var(--workspace-space-24)', color: '#374151', fontSize: 'var(--workspace-font-body)', lineHeight: 1.6, overflowWrap: 'anywhere' }}>
+      <h3 style={{ fontWeight: 600, marginBottom: 'var(--workspace-space-8)' }}>Source unavailable</h3>
+      <p>{loadError}</p>
+      <p style={{ marginTop: 'var(--workspace-space-8)' }}>{unavailableHelp}</p>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-12)', marginTop: 'var(--workspace-space-16)' }}>
+        <button type="button" onClick={() => setLoadAttempt(value => value + 1)} style={{ padding: "var(--workspace-space-8) var(--workspace-space-16)", borderRadius: 'var(--workspace-radius-small)', border: '1px solid #9ca3af', background: '#fff', color: '#1f2937' }}>Retry source</button>
+        <a href={inlineUrl} target="_blank" rel="noreferrer" style={{ padding: "var(--workspace-space-8) 0", color: '#1d4ed8' }}>Open original in new tab</a>
+      </div>
+    </div>
+  }
+
   // Spreadsheet viewer for CSV / Excel
   if (isSpreadsheet) {
     return <SpreadsheetViewer docUuid={docUuid} processing={processing} taskStatus={taskStatus} />
@@ -893,20 +930,20 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
       <div ref={rootRef} style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
         {processingOverlay}
         <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-          padding: '6px 12px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb',
+          display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 'var(--workspace-space-6)',
+          padding: "var(--workspace-space-6) var(--workspace-space-12)", borderBottom: "1px solid var(--workspace-border)", backgroundColor: '#f9fafb',
           flexShrink: 0,
         }}>
           <button type="button" onClick={zoomOut} style={btnStyle} title="Zoom out" aria-label="Zoom out" disabled={zoom <= 0}>
             <ZoomOut size={16} />
           </button>
-          <button type="button" onClick={resetZoom} style={{ ...btnStyle, width: 'auto', padding: '0 10px' }} title="Reset zoom" aria-label="Reset zoom">
+          <button type="button" onClick={resetZoom} style={{ ...btnStyle, width: 'auto', padding: "0 var(--workspace-space-12)" }} title="Reset zoom" aria-label="Reset zoom">
             {Math.round(zoomLevel * 100)}%
           </button>
           <button type="button" onClick={zoomIn} style={btnStyle} title="Zoom in" aria-label="Zoom in" disabled={zoom >= ZOOM_LEVELS.length - 1}>
             <ZoomIn size={16} />
           </button>
-          <div style={{ width: 1, height: 20, backgroundColor: '#d1d5db', margin: '0 4px' }} />
+          <div style={{ width: 1, height: 20, backgroundColor: '#d1d5db', margin: "0 var(--workspace-space-4)" }} />
           <button type="button" onClick={openSearch} style={btnStyle} title="Find in document (⌘F / Ctrl+F)" aria-label="Find in document">
             <Search size={16} />
           </button>
@@ -931,8 +968,8 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
             role="status"
             aria-live="polite"
             style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              padding: '8px 12px', fontSize: 13, color: '#92400e',
+              display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)',
+              padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-control)', color: '#92400e',
               backgroundColor: '#fffbeb', borderBottom: '1px solid #fde68a',
               flexShrink: 0,
             }}
@@ -946,15 +983,15 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
                 type="button"
                 onClick={onClearHighlights}
                 aria-label="Dismiss"
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#92400e', display: 'flex', padding: 2 }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#92400e', display: 'flex', padding: 'var(--workspace-space-2)' }}
               >
                 <X size={15} />
               </button>
             )}
           </div>
         )}
-        <div style={{
-          flex: 1, overflow: 'auto', backgroundColor: '#fff', position: 'relative',
+        <div role="region" aria-label="Extracted document text" tabIndex={0} style={{
+          flex: 1, minHeight: 0, overflow: 'auto', backgroundColor: '#fff', position: 'relative',
         }}>
           {docxText === null ? (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
@@ -963,13 +1000,13 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
           ) : extractionError ? (
             <div style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              gap: 16, padding: 32, height: '100%', textAlign: 'center',
+              gap: 'var(--workspace-space-16)', padding: 'var(--workspace-space-32)', height: '100%', textAlign: 'center',
             }}>
               <AlertCircle style={{ width: 40, height: 40, color: '#dc2626' }} />
-              <div style={{ fontSize: 15, fontWeight: 600, color: '#111' }}>
+              <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: '#111' }}>
                 Text extraction failed
               </div>
-              <div style={{ fontSize: 14, color: '#555', maxWidth: 480, lineHeight: 1.5 }}>
+              <div style={{ fontSize: 'var(--workspace-font-body)', color: '#555', maxWidth: 480, lineHeight: 1.5 }}>
                 {extractionError}
               </div>
               {extractionRetryable && (
@@ -978,10 +1015,10 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
                 onClick={handleRetryExtraction}
                 disabled={retrying}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '8px 14px', fontSize: 14, fontWeight: 500,
+                  display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+                  padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-body)', fontWeight: 500,
                   backgroundColor: retrying ? '#9ca3af' : 'var(--highlight-color)',
-                  color: '#fff', border: 'none', borderRadius: 6,
+                  color: 'var(--highlight-text-color, #000)', border: 'none', borderRadius: 'var(--workspace-radius-small)',
                   cursor: retrying ? 'not-allowed' : 'pointer',
                 }}
               >
@@ -997,10 +1034,10 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
             </div>
           ) : (
             <div style={{
-              padding: '32px 48px',
+              padding: "var(--workspace-space-24) clamp(12px, 4vw, 48px)",
               maxWidth: 800,
               margin: '0 auto',
-              fontSize: `${14 * zoomLevel}px`,
+              fontSize: `calc(var(--workspace-font-body) * ${zoomLevel})`,
               lineHeight: 1.7,
               color: '#333',
             }}>
@@ -1009,11 +1046,11 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
                   was only reachable from that branch. */}
               {lowQuality && (
                 <div style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '10px 12px', marginBottom: 16,
-                  fontSize: 13, lineHeight: 1.4, color: '#92400e',
+                  display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-12)',
+                  padding: "var(--workspace-space-12) var(--workspace-space-12)", marginBottom: 'var(--workspace-space-16)',
+                  fontSize: 'var(--workspace-font-control)', lineHeight: 1.4, color: '#92400e',
                   backgroundColor: '#fffbeb', border: '1px solid #fcd34d',
-                  borderRadius: 6,
+                  borderRadius: 'var(--workspace-radius-small)',
                 }}>
                   <AlertCircle style={{ width: 16, height: 16, flexShrink: 0 }} />
                   <span style={{ flex: 1 }}>
@@ -1024,10 +1061,10 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
                     onClick={handleRetryExtraction}
                     disabled={retrying}
                     style={{
-                      display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
-                      padding: '5px 10px', fontSize: 13, fontWeight: 500,
+                      display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', flexShrink: 0,
+                      padding: "var(--workspace-space-6) var(--workspace-space-12)", fontSize: 'var(--workspace-font-control)', fontWeight: 500,
                       backgroundColor: retrying ? '#9ca3af' : 'var(--highlight-color)',
-                      color: '#fff', border: 'none', borderRadius: 6,
+                      color: 'var(--highlight-text-color, #000)', border: 'none', borderRadius: 'var(--workspace-radius-small)',
                       cursor: retrying ? 'not-allowed' : 'pointer',
                     }}
                   >
@@ -1059,7 +1096,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
         {processingOverlay}
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#525659' }}>
-          <div role="status" aria-live="polite" style={{ color: '#9ca3af', fontSize: 14 }}>Loading document...</div>
+          <div role="status" aria-live="polite" style={{ color: '#9ca3af', fontSize: 'var(--workspace-font-body)' }}>Loading document...</div>
         </div>
       </div>
     )
@@ -1072,24 +1109,24 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
         {processingOverlay}
         <div style={{
           flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-          justifyContent: 'center', gap: 16, padding: 32, textAlign: 'center',
+          justifyContent: 'center', gap: 'var(--workspace-space-16)', padding: 'var(--workspace-space-32)', textAlign: 'center',
           backgroundColor: '#f9fafb',
         }}>
           <FileText style={{ width: 40, height: 40, color: '#9ca3af' }} />
-          <div style={{ fontSize: 15, fontWeight: 600, color: '#111' }}>
+          <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: '#111' }}>
             No preview available
           </div>
-          <div style={{ fontSize: 14, color: '#555', maxWidth: 420, lineHeight: 1.5 }}>
+          <div style={{ fontSize: 'var(--workspace-font-body)', color: '#555', maxWidth: 420, lineHeight: 1.5 }}>
             This file is in a format the viewer can&rsquo;t display. You can download
             the original to open it in another application.
           </div>
           <a
             href={downloadUrl}
             style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '8px 14px', fontSize: 14, fontWeight: 500,
+              display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+              padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-body)', fontWeight: 500,
               backgroundColor: 'var(--highlight-color)', color: 'var(--highlight-text-color, #fff)',
-              borderRadius: 6, textDecoration: 'none',
+              borderRadius: 'var(--workspace-radius-small)', textDecoration: 'none',
             }}
           >
             <Download style={{ width: 14, height: 14 }} />
@@ -1106,20 +1143,20 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
         {processingOverlay}
         <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-          padding: '6px 12px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb',
+          display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 'var(--workspace-space-6)',
+          padding: "var(--workspace-space-6) var(--workspace-space-12)", borderBottom: "1px solid var(--workspace-border)", backgroundColor: '#f9fafb',
           flexShrink: 0,
         }}>
           <button type="button" onClick={zoomOut} style={btnStyle} title="Zoom out" aria-label="Zoom out" disabled={zoom <= 0}>
             <ZoomOut size={16} />
           </button>
-          <button type="button" onClick={resetZoom} style={{ ...btnStyle, width: 'auto', padding: '0 10px' }} title="Reset zoom" aria-label="Reset zoom">
+          <button type="button" onClick={resetZoom} style={{ ...btnStyle, width: 'auto', padding: "0 var(--workspace-space-12)" }} title="Reset zoom" aria-label="Reset zoom">
             {Math.round(zoomLevel * 100)}%
           </button>
           <button type="button" onClick={zoomIn} style={btnStyle} title="Zoom in" aria-label="Zoom in" disabled={zoom >= ZOOM_LEVELS.length - 1}>
             <ZoomIn size={16} />
           </button>
-          <div style={{ width: 1, height: 20, backgroundColor: '#d1d5db', margin: '0 4px' }} />
+          <div style={{ width: 1, height: 20, backgroundColor: '#d1d5db', margin: "0 var(--workspace-space-4)" }} />
           <button
             type="button"
             onClick={() => { if (blobUrl) window.open(blobUrl, '_blank') }}
@@ -1149,7 +1186,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
                 title="Document viewer"
               />
             ) : (
-              <div role="status" aria-live="polite" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#9ca3af', fontSize: 13 }}>
+              <div role="status" aria-live="polite" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#9ca3af', fontSize: 'var(--workspace-font-control)' }}>
                 Loading...
               </div>
             )}
@@ -1165,20 +1202,20 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
 
       {/* Toolbar */}
       <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-        padding: '6px 12px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb',
+        display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 'var(--workspace-space-6)',
+        padding: "var(--workspace-space-6) var(--workspace-space-12)", borderBottom: "1px solid var(--workspace-border)", backgroundColor: '#f9fafb',
         flexShrink: 0,
       }}>
         <button type="button" onClick={zoomOut} style={btnStyle} title="Zoom out" aria-label="Zoom out" disabled={zoom <= 0}>
           <ZoomOut size={16} />
         </button>
-        <button type="button" onClick={resetZoom} style={{ ...btnStyle, width: 'auto', padding: '0 10px' }} title="Reset zoom" aria-label="Reset zoom">
+        <button type="button" onClick={resetZoom} style={{ ...btnStyle, width: 'auto', padding: "0 var(--workspace-space-12)" }} title="Reset zoom" aria-label="Reset zoom">
           {Math.round(zoomLevel * 100)}%
         </button>
         <button type="button" onClick={zoomIn} style={btnStyle} title="Zoom in" aria-label="Zoom in" disabled={zoom >= ZOOM_LEVELS.length - 1}>
           <ZoomIn size={16} />
         </button>
-        <div style={{ width: 1, height: 20, backgroundColor: '#d1d5db', margin: '0 4px' }} />
+        <div style={{ width: 1, height: 20, backgroundColor: '#d1d5db', margin: "0 var(--workspace-space-4)" }} />
         <button type="button" onClick={openSearch} style={btnStyle} title="Find in document (⌘F / Ctrl+F)" aria-label="Find in document">
           <Search size={16} />
         </button>
@@ -1201,28 +1238,28 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
       )}
 
       {/* PDF pages container */}
-      <div style={{
-        flex: 1, overflow: 'auto', backgroundColor: '#525659',
+      <div role="region" aria-label="PDF document pages" tabIndex={0} style={{
+        flex: 1, minHeight: 0, overflow: 'auto', backgroundColor: '#525659',
         position: 'relative',
       }}>
-        <div ref={containerRef} style={{ paddingBottom: 20 }} />
+        <div ref={containerRef} style={{ paddingBottom: 'var(--workspace-space-20)' }} />
 
         {/* Highlight navigation bar — also shown in a "not found" state so a
             failed source lookup gives explicit feedback instead of nothing. */}
-        {!searchOpen && (totalHighlights > 0 || (highlightMiss && highlightTerms.length > 0)) && (
+        {!searchOpen && !hideHighlightNavBar && (totalHighlights > 0 || (highlightMiss && highlightTerms.length > 0)) && (
           <div style={{
             position: 'sticky',
             bottom: 12,
             left: 0,
             right: 0,
-            margin: '0 24px',
+            margin: "0 var(--workspace-space-24)",
             height: 48,
             display: 'flex',
             alignItems: 'center',
-            gap: 8,
-            padding: '0 8px',
-            borderRadius: 10,
-            border: '1px solid #e5e7eb',
+            gap: 'var(--workspace-space-8)',
+            padding: "0 var(--workspace-space-8)",
+            borderRadius: 'var(--workspace-radius-large)',
+            border: "1px solid var(--workspace-border)",
             backdropFilter: 'blur(12px)',
             backgroundColor: 'rgba(255,255,255,0.85)',
             boxShadow: '0 2px 12px rgba(0,0,0,0.12)',
@@ -1250,7 +1287,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
               style={{
                 flex: 1,
                 textAlign: 'center',
-                fontSize: 14,
+                fontSize: 'var(--workspace-font-body)',
                 color: '#374151',
                 overflow: 'hidden',
                 whiteSpace: 'nowrap',
@@ -1261,11 +1298,11 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
                 &ldquo;{effectiveTerms[0]}&rdquo;
               </span>
               {totalHighlights > 0 ? (
-                <span style={{ marginLeft: 6, color: '#6b7280', fontWeight: 400 }}>
+                <span style={{ marginLeft: 'var(--workspace-space-6)', color: '#6b7280', fontWeight: 400 }}>
                   {currentHighlight + 1} of {totalHighlights}
                 </span>
               ) : (
-                <span style={{ marginLeft: 6, color: '#b45309', fontWeight: 500 }}>
+                <span style={{ marginLeft: 'var(--workspace-space-6)', color: '#b45309', fontWeight: 500 }}>
                   {highlightMissLabel(effectivePage, highlightPageApproximate)}
                 </span>
               )}

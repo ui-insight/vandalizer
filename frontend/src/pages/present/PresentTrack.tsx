@@ -27,7 +27,7 @@ export function PresentTrack({ track, onPresent, onPrint, pitchHighlight }: Pres
             <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
               {track.label}
             </h1>
-            <p className="text-gray-500">{track.tagline}</p>
+            <p className="text-gray-400">{track.tagline}</p>
           </div>
         </div>
 
