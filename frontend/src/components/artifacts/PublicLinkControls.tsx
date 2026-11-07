@@ -65,11 +65,11 @@ export function LinkAccessFields({ draft, onChange, disabled, idPrefix, name = '
     {draft.expiry === 'custom' && <label>Expiry date<input type="date" aria-label={`${name} expiry date`} min={today} value={draft.customDate} onChange={e => onChange({ ...draft, customDate: e.target.value })} /></label>}
     <div role="radiogroup" aria-label={`Who can open the ${name.toLowerCase()}`} className="page-link-audience">
       <label><input type="radio" name={`${idPrefix}-audience`} checked={draft.audience === 'anyone'} onChange={() => onChange({ ...draft, audience: 'anyone' })} /><Globe2 size={14} aria-hidden /> Anyone with the link</label>
-      <label><input type="radio" name={`${idPrefix}-audience`} checked={draft.audience === 'signed_in'} onChange={() => onChange({ ...draft, audience: 'signed_in' })} /><LockKeyhole size={14} aria-hidden /> Only people signed in to Vandalizer with a verified account</label>
+      <label><input type="radio" name={`${idPrefix}-audience`} checked={draft.audience === 'signed_in'} onChange={() => onChange({ ...draft, audience: 'signed_in' })} /><LockKeyhole size={14} aria-hidden /> Only people signed in to Vandalizer</label>
     </div>
     {draft.audience === 'signed_in' && <label>Only these people (optional)
       <textarea aria-label={`${name}: only these email addresses`} rows={2} placeholder="name@uidaho.edu, another@uidaho.edu" value={draft.emails} onChange={e => onChange({ ...draft, emails: e.target.value })} />
-      <span className="page-link-hint">Leave empty to allow any verified account on this Vandalizer. You'll see who opened it.</span>
+      <span className="page-link-hint">Leave empty to allow anyone signed in to this Vandalizer. Named people must have verified that email address. You'll see who opened it.</span>
     </label>}
   </fieldset>
 }

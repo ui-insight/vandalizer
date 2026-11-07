@@ -37,7 +37,10 @@ def _user(email="ra@uidaho.edu", verified=True):
     ({"expires_at": NOW - datetime.timedelta(seconds=1), "audience": "anyone", "emails": []}, None, 410),
     ({"expires_at": None, "audience": "anyone", "emails": []}, None, None),
     ({"expires_at": None, "audience": "signed_in", "emails": []}, None, 401),
-    ({"expires_at": None, "audience": "signed_in", "emails": []}, _user(verified=False), 403),
+    # Any signed-in account: local password accounts are unverified, so not gated.
+    ({"expires_at": None, "audience": "signed_in", "emails": []}, _user(verified=False), None),
+    # Named people: the address is the identity, so it must be verified.
+    ({"expires_at": None, "audience": "signed_in", "emails": ["ra@uidaho.edu"]}, _user(verified=False), 403),
     ({"expires_at": None, "audience": "signed_in", "emails": []}, _user(), None),
     ({"expires_at": None, "audience": "signed_in", "emails": ["grants@uidaho.edu"]}, _user(), 403),
     ({"expires_at": None, "audience": "signed_in", "emails": ["ra@uidaho.edu"]}, _user(email="RA@uidaho.edu"), None),
@@ -95,3 +98,19 @@ async def test_feedback_routes_see_the_signed_in_viewer_of_a_sign_in_link(monkey
     settings = SimpleNamespace(artifact_public_sharing_enabled=True)
     out = await feedback_router.public_feedback("tok", SimpleNamespace(cookies={}), settings)
     assert out["shared_by"] == "Shared by Owner"
+
+
+def test_the_owner_opening_their_own_link_is_not_a_view():
+    class Col:
+        def __init__(self):
+            self.calls = []
+
+        def update_one(self, *args, **kwargs):
+            self.calls.append(args)
+
+    db = SimpleNamespace(html_artifacts=Col(), page_link_viewers=Col())
+    doc = {"uuid": "p1", "user_id": "u1"}
+    access.record_view(db, doc, "tok", "main", _user())  # _user() is u1, the owner
+    assert db.html_artifacts.calls == [] and db.page_link_viewers.calls == []
+    access.record_view(db, {**doc, "user_id": "someone-else"}, "tok", "main", _user())
+    assert len(db.html_artifacts.calls) == 1 and len(db.page_link_viewers.calls) == 1

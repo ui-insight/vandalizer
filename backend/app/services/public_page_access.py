@@ -101,15 +101,26 @@ def check(settings: dict, user: Any | None) -> None:
     if user is None:
         # The client refreshes an expired session on exactly this detail.
         raise HTTPException(401, "Not authenticated")
+    emails = settings.get("emails") or []
+    if not emails:
+        # Any signed-in account. Not gated on a verified email: local password
+        # accounts are unverified unless they used reset or magic login, so on
+        # a deployment without SSO most team members would be refused.
+        return
+    # Named people: the address is the identity, and local sign-up lets anyone
+    # register an address they don't own, so only a verified one counts.
     if not getattr(user, "email_verified", False):
         raise HTTPException(403, UNVERIFIED)
-    emails = settings.get("emails") or []
-    if emails and (getattr(user, "email", "") or "").strip().lower() not in emails:
+    if (getattr(user, "email", "") or "").strip().lower() not in emails:
         raise HTTPException(403, NOT_INVITED)
 
 
 def record_view(db: Database[dict], doc: dict, token: str, kind: str, user: Any | None) -> None:
-    """Count an opening; for a signed-in viewer, remember who. Never raises."""
+    """Count an opening; for a signed-in viewer, remember who. Never raises.
+
+    The owner's own openings (checking the link works) are not views."""
+    if user is not None and getattr(user, "user_id", None) and user.user_id == doc.get("user_id"):
+        return
     at = now()
     try:
         if kind == "main":
@@ -119,7 +130,7 @@ def record_view(db: Database[dict], doc: dict, token: str, kind: str, user: Any 
             db.html_artifacts.update_one({"uuid": doc["uuid"]},
                                          {"$inc": {"publications.$[p].views.count": 1}, "$set": {"publications.$[p].views.last_at": at}},
                                          array_filters=[{"p.token": token}])
-        if user is not None and getattr(user, "user_id", None) and getattr(user, "user_id") != doc.get("user_id"):
+        if user is not None and getattr(user, "user_id", None):
             db.page_link_viewers.update_one(
                 {"artifact_uuid": doc["uuid"], "token": token, "user_id": user.user_id},
                 {"$inc": {"views": 1}, "$set": {"last_at": at, "name": getattr(user, "name", None) or "",
