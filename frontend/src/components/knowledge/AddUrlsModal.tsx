@@ -2,11 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FocusTrap } from 'focus-trap-react'
 import { ChevronDown, ChevronRight, Loader2, X } from 'lucide-react'
 import {
+  addUrlsToKB,
   cancelUrlPreview,
   commitUrlPreview,
   getUrlPreview,
   getUrlPreviewPageText,
   previewUrlsForKB,
+  type AddUrlsResult,
   type UrlPreview,
   type UrlPreviewPage,
   type UrlPreviewVerdict,
@@ -16,6 +18,8 @@ interface AddUrlsModalProps {
   kbUuid: string
   /** Called once the kept pages are queued for indexing. */
   onCommitted: (added: number) => void
+  /** Called once URLs added without a preview are queued for fetching. */
+  onAddedDirectly: (result: AddUrlsResult, crawling: boolean) => void
   onClose: () => void
 }
 
@@ -32,7 +36,7 @@ const VERDICT_BADGE: Record<UrlPreviewVerdict, { label: string; color: string; b
 
 const plural = (n: number, word: string) => `${n.toLocaleString()} ${word}${n === 1 ? '' : 's'}`
 
-export function AddUrlsModal({ kbUuid, onCommitted, onClose }: AddUrlsModalProps) {
+export function AddUrlsModal({ kbUuid, onCommitted, onAddedDirectly, onClose }: AddUrlsModalProps) {
   const [text, setText] = useState('')
   const [crawlEnabled, setCrawlEnabled] = useState(false)
   const [maxCrawlPages, setMaxCrawlPages] = useState(5)
@@ -59,6 +63,7 @@ export function AddUrlsModal({ kbUuid, onCommitted, onClose }: AddUrlsModalProps
   // Add, two commits) — the duplicate-source support ticket.
   const busyRef = useRef(false)
   const [busy, setBusy] = useState(false)
+  const [adding, setAdding] = useState(false)
 
   const absorb = useCallback((next: UrlPreview) => {
     setPreview(next)
@@ -119,9 +124,34 @@ export function AddUrlsModal({ kbUuid, onCommitted, onClose }: AddUrlsModalProps
     void handlePreview()
   }
 
+  const enteredUrls = () => text.split('\n').map(u => u.trim()).filter(u => u.length > 0)
+
+  // Skip the preview: the URLs are fetched and indexed in the background, as
+  // they were before previews existed. Also the way out of a preview that is
+  // slow or stuck.
+  const handleAddDirectly = async () => {
+    if (busyRef.current) return
+    const urls = enteredUrls()
+    if (urls.length === 0) return
+    busyRef.current = true
+    setBusy(true)
+    setAdding(true)
+    setRequestError(null)
+    try {
+      const result = await addUrlsToKB(kbUuid, urls, crawlEnabled, maxCrawlPages, allowedDomains)
+      stopPreview()
+      onAddedDirectly(result, crawlEnabled)
+    } catch (err) {
+      setRequestError(err instanceof Error ? err.message : 'Could not add the URLs')
+      busyRef.current = false
+      setBusy(false)
+      setAdding(false)
+    }
+  }
+
   const handlePreview = async () => {
     if (busyRef.current) return
-    const urls = text.split('\n').map(u => u.trim()).filter(u => u.length > 0)
+    const urls = enteredUrls()
     if (urls.length === 0) return
     busyRef.current = true
     setBusy(true)
@@ -177,6 +207,9 @@ export function AddUrlsModal({ kbUuid, onCommitted, onClose }: AddUrlsModalProps
 
   const canPreview = text.trim().length > 0 && !busy
   const canAdd = !busy && preview?.status === 'ready' && keptPages.length > 0
+  // A preview that hasn't produced a reviewable list yet (still fetching,
+  // stuck, failed or canceled) shouldn't hold the links hostage.
+  const canSkipPreview = step === 'review' && preview?.status !== 'ready' && text.trim().length > 0
 
   return (
     <div
@@ -259,13 +292,32 @@ export function AddUrlsModal({ kbUuid, onCommitted, onClose }: AddUrlsModalProps
               Cancel
             </button>
             {step === 'enter' ? (
+              <>
+                <button
+                  type="button"
+                  onClick={handlePreview}
+                  disabled={!canPreview}
+                  style={{ ...secondaryButton, cursor: canPreview ? 'pointer' : 'default', opacity: canPreview ? 1 : 0.5 }}
+                >
+                  {busy && !adding ? 'Starting…' : 'Preview pages'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddDirectly}
+                  disabled={!canPreview}
+                  style={{ ...primaryButton, cursor: canPreview ? 'pointer' : 'default', opacity: canPreview ? 1 : 0.5 }}
+                >
+                  {adding ? 'Adding…' : 'Add'}
+                </button>
+              </>
+            ) : canSkipPreview ? (
               <button
                 type="button"
-                onClick={handlePreview}
-                disabled={!canPreview}
-                style={{ ...primaryButton, cursor: canPreview ? 'pointer' : 'default', opacity: canPreview ? 1 : 0.5 }}
+                onClick={handleAddDirectly}
+                disabled={busy}
+                style={{ ...primaryButton, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}
               >
-                {busy ? 'Starting…' : 'Preview pages'}
+                {adding ? 'Adding…' : 'Add without preview'}
               </button>
             ) : (
               <button
@@ -313,8 +365,10 @@ function EnterStep(props: {
   return (
     <>
       <div style={{ fontSize: 13, color: '#aaa' }}>
-        Paste one URL per line. Each page is fetched and shown to you first — its text,
-        how many chunks it would add, and how it looks — and nothing is added until you confirm.
+        Paste one URL per line. <strong style={{ color: '#ddd' }}>Add</strong> fetches and indexes
+        them straight away. <strong style={{ color: '#ddd' }}>Preview pages</strong> shows you each
+        page first — its text, how many chunks it would add, and how it looks — and adds nothing
+        until you confirm.
       </div>
       <textarea
         value={text}
@@ -338,7 +392,7 @@ function EnterStep(props: {
       {crawlEnabled && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 4 }}>
           <div style={{ fontSize: 12, color: '#888', lineHeight: 1.5 }}>
-            The crawler will follow links on each page — including links embedded in PDFs — and the pages it finds are included in the preview.
+            The crawler will follow links on each page — including links embedded in PDFs. With Preview pages, the pages it finds are listed for you to check first.
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <label htmlFor="add-urls-max-pages" style={{ fontSize: 13, color: '#aaa', minWidth: 80 }}>Max pages</label>

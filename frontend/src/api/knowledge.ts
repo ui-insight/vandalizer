@@ -123,6 +123,34 @@ export interface UrlPreview {
   pages: UrlPreviewPage[]
 }
 
+export interface AddUrlsResult {
+  ok: boolean
+  /** URLs queued for fetching. */
+  added: number
+  /** URLs the KB already holds — not re-fetched (refresh the source for that). */
+  skipped?: number
+  skipped_urls?: string[]
+}
+
+/** Add URLs straight away, without the preview step; fetched in the background. */
+export function addUrlsToKB(
+  uuid: string,
+  urls: string[],
+  crawlEnabled = false,
+  maxCrawlPages = 5,
+  allowedDomains = '',
+) {
+  return apiFetch<AddUrlsResult>(`/api/knowledge/${uuid}/add_urls`, {
+    method: 'POST',
+    body: JSON.stringify({
+      urls,
+      crawl_enabled: crawlEnabled,
+      max_crawl_pages: maxCrawlPages,
+      allowed_domains: allowedDomains,
+    }),
+  })
+}
+
 /** Fetch (and crawl) URLs for review; nothing is added until commitUrlPreview. */
 export function previewUrlsForKB(
   uuid: string,

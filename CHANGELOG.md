@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Add URLs can skip the preview.** The Add URLs dialog now has **Add** beside **Preview pages**, so links you trust are fetched and indexed straight away. A preview that is slow or stuck offers **Add without preview** instead of leaving the links stranded.
 - **A written reference for running workflows through the API.** The only guidance for `POST /api/workflows/run-integrated` and `GET /api/workflows/status` was the editor's **Run this workflow via API** panel, which showed only the `queued` reply. API users logging runs for evaluation had no description of the status fields or of the `run_metadata` block added in v4.15.0, and nothing saying how far that record can be relied on (#1039). `docs/api.md` now covers key expiry, multi-file runs, every status value, each response and `run_metadata` field, what the record does not capture (provider-side model updates, sampling variation above temperature 0), and a Python script that writes one evaluation-log row per run. The editor panel links to it.
 
 ### Fixed
