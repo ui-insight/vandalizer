@@ -65,18 +65,51 @@ def test_word_roundtrip_preserves_headings_tables_code_links_and_sources():
 
 def test_excel_has_all_tables_numeric_cells_and_literal_formulas_and_identifiers():
     wb = load_workbook(io.BytesIO(render_chat_export(request("xlsx"))))
-    assert wb.sheetnames == ["Conversation", "Table 1", "Table 2"]
+    assert wb.sheetnames == ["Table 1", "Table 2", "Conversation"]
     assert wb["Conversation"]["D3"].value == CONTENT
     assert "Award.pdf · p. 3" in wb["Conversation"]["F3"].value
-    assert "message 2" in wb["Table 1"]["A1"].value
-    assert wb["Table 1"]["B3"].value == 1250.5
-    assert wb["Table 1"]["B4"].value == -42
-    assert wb["Table 1"]["C3"].value == "00123"
-    assert wb["Table 1"]["C4"].value == "12345678901234567"
-    for sheet, address, value in [("Table 1", "A4", "=1+1"), ("Table 2", "A3", "#N/A"), ("Table 2", "B3", "@SUM(A1)")]:
+    assert "message 2" in wb["Table 1"]["A5"].value
+    assert wb["Table 1"]["B2"].value == 1250.5
+    assert wb["Table 1"]["B3"].value == -42
+    assert wb["Table 1"]["C2"].value == "00123"
+    assert wb["Table 1"]["C3"].value == "12345678901234567"
+    for sheet, address, value in [("Table 1", "A3", "=1+1"), ("Table 2", "A2", "#N/A"), ("Table 2", "B2", "@SUM(A1)")]:
         assert wb[sheet][address].value == value
         assert wb[sheet][address].data_type == "s"
     assert not any(cell.data_type == "f" for sheet in wb for row in sheet for cell in row)
+
+
+def test_excel_opens_on_the_table_laid_out_as_a_spreadsheet():
+    # Support ticket: the per-message download opened on a transcript cell of
+    # raw markdown pipes; the table itself was on a second tab under a note row.
+    content = (
+        "Workflows:\n\n| Workflow | Output | Budget | Share |\n|---|---|---|---|\n"
+        "| **Budget Generator** | Justification<br>with totals | $1,250.00 | 45% |\n"
+        "| Compliance | `a<br>b` | 3,400 | 12.5% |\n\nAttach a document to run one."
+    )
+    wb = load_workbook(io.BytesIO(render_chat_export(request("xlsx", content))))
+    table = wb.active
+    assert table.title == "Table 1"
+    assert [c.value for c in table[1]] == ["Workflow", "Output", "Budget", "Share"]
+    assert table["A1"].font.bold and table.freeze_panes == "A2"
+    assert table["A2"].value == "Budget Generator"
+    assert table["B2"].value == "Justification\nwith totals"
+    assert table["B3"].value == "a<br>b"  # code stays literal
+    assert (table["C2"].value, table["C2"].number_format) == (1250, '"$"#,##0.00')
+    assert (table["C3"].value, table["C3"].number_format) == (3400, "#,##0")
+    assert (table["D2"].value, table["D2"].number_format) == (0.45, "0%")
+    assert (table["D3"].value, table["D3"].number_format) == (0.125, "0.0%")
+    assert table.column_dimensions["A"].width == len("Budget Generator") + 2
+    assert all(10 <= table.column_dimensions[c].width <= 60 for c in "ABCD")
+
+
+def test_table_cell_line_breaks_carry_into_word_and_html():
+    content = "| A | B |\n|---|---|\n| one<br/>two | x |\n\nPlain <br> stays text."
+    doc = Document(io.BytesIO(render_chat_export(request("docx", content))))
+    assert doc.tables[0].rows[1].cells[0].text == "one\ntwo"
+    soup = BeautifulSoup(render_chat_export(request("html", content)).decode(), "html.parser")
+    assert soup.select_one("td br") is not None
+    assert "Plain <br> stays text." in soup.get_text()
 
 
 def test_long_transcripts_are_split_without_truncation_and_no_tables_is_valid():

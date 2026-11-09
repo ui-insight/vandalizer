@@ -100,22 +100,57 @@ def _docx(soup: BeautifulSoup) -> bytes:
     return out.getvalue()
 
 
+_NUMBER = re.compile(r"(-)?(\$)?((?:0|[1-9]\d{0,2}(?:,\d{3})+|[1-9]\d*)(?:\.(\d+))?)(%)?")
+
+
 def _cell(sheet: Worksheet, row: int, column: int, value: str, numeric: bool=False) -> None:
     # Force strings to literal cells: formulas and Excel error tokens remain text.
     cell = sheet.cell(row, column)
     cell.value = value
     cell.data_type = "s"
-    if numeric and re.fullmatch(r"-?(?:0|[1-9]\d*)(?:\.\d+)?", value) and len(re.sub(r"\D", "", value)) <= 15:
-        cell.value = float(value) if "." in value else int(value)
+    match = _NUMBER.fullmatch(value.strip()) if numeric else None
+    # Leading-zero identifiers and >15 digits stay text; Excel would corrupt them.
+    if match and not (match[2] and match[5]) and len(re.sub(r"\D", "", value)) <= 15:
+        sign, dollar, digits, decimals, percent = match.groups()
+        number = float(digits.replace(",", "")) * (-1 if sign else 1)
+        places = "." + "0" * len(decimals) if decimals else ""
+        if percent:
+            cell.value, cell.number_format = number / 100, f"0{places}%"
+        else:
+            cell.value = number if decimals else int(number)
+            if dollar:
+                cell.number_format = f'"$"#,##0{places}'
+            elif "," in digits:
+                cell.number_format = f"#,##0{places}"
         cell.data_type = "n"
     cell.alignment = Alignment(vertical="top", wrap_text=True)
 
 
+def _cell_text(cell: Tag) -> str:
+    return "".join("\n" if isinstance(node, Tag) else str(node) for node in cell.descendants
+                   if isinstance(node, NavigableString) or (isinstance(node, Tag) and node.name == "br"))
+
+
 def _xlsx(body: ChatExportRequest, soup: BeautifulSoup) -> bytes:
     wb = Workbook()
-    transcript = wb.active
-    if not isinstance(transcript, Worksheet):
-        raise RuntimeError("A new workbook must contain a worksheet")
+    # Tables come first and the workbook opens on the first one: a user who
+    # downloads "the table" should see it, not a transcript of raw markdown.
+    for index, table in enumerate(soup.select("table"), 1):
+        sheet = wb.create_sheet(f"Table {index}", index - 1)
+        section = table.find_parent("section")
+        if section is None:
+            raise ValueError("Export table must belong to a message")
+        message_index = len(list(section.find_previous_siblings("section"))) + 1
+        rows = table.select("tr")
+        for row_index, row in enumerate(rows, 1):
+            for col, source in enumerate(row.find_all(["th", "td"], recursive=False), 1):
+                value = _cell_text(source)
+                if len(value) > 30000:
+                    raise ValueError("A table cell is too long for Excel. Use HTML or Word for this export.")
+                _cell(sheet, row_index, col, value, numeric=source.name == "td")
+        note = sheet.cell(len(rows) + 2, 1, f"From message {message_index}; source references are on the Conversation sheet.")
+        note.font = Font(italic=True, color="64748B")
+    transcript = wb.worksheets[-1]
     transcript.title = "Conversation"
     transcript.append(["Message", "Role", "Part", "Content", "Tool summaries", "Source references and warnings"])
     for index, message in enumerate(body.messages, 1):
@@ -127,36 +162,48 @@ def _xlsx(body: ChatExportRequest, soup: BeautifulSoup) -> bytes:
             transcript.append([index, message.role.title(), part + 1])
             for col, pieces in enumerate(chunks, 4):
                 _cell(transcript, row, col, pieces[part] if part < len(pieces) else "")
-    for index, table in enumerate(soup.select("table"), 1):
-        sheet = wb.create_sheet(f"Table {index}")
-        section = table.find_parent("section")
-        if section is None:
-            raise ValueError("Export table must belong to a message")
-        message_index = len(list(section.find_previous_siblings("section"))) + 1
-        sheet.append([f"From message {message_index}; source references are on the Conversation sheet."])
-        for row_index, row in enumerate(table.select("tr"), 2):
-            for col, source in enumerate(row.find_all(["th", "td"], recursive=False), 1):
-                value = source.get_text()
-                if len(value) > 30000:
-                    raise ValueError("A table cell is too long for Excel. Use HTML or Word for this export.")
-                _cell(sheet, row_index, col, value, numeric=source.name == "td")
-        sheet.freeze_panes = "A3"
     for sheet in wb:
-        header = 1 if sheet == transcript else 2
-        for cell in sheet[header]:
+        for cell in sheet[1]:
             cell.font = Font(bold=True, color="FFFFFF")
             cell.fill = PatternFill("solid", fgColor="334155")
         for column in sheet.columns:
-            sheet.column_dimensions[column[0].column_letter].width = 42
-        sheet.freeze_panes = "A2" if sheet == transcript else "A3"
+            if sheet == transcript:
+                width = 42
+            else:
+                # Size to the longest line, skipping the provenance note.
+                lines = [line for c in column if isinstance(c.value, str) and not c.font.italic for line in c.value.split("\n")]
+                lines += [str(c.value) for c in column if isinstance(c.value, (int, float))]
+                width = min(60, max([10, *(len(line) + 2 for line in lines)]))
+            sheet.column_dimensions[column[0].column_letter].width = width
+        sheet.freeze_panes = "A2"
+    wb.active = 0
     out = io.BytesIO()
     wb.save(out)
     return out.getvalue()
 
 
+_BR = re.compile(r"<br\s*/?>", re.IGNORECASE)
+
+
+def _table_line_breaks(soup: BeautifulSoup) -> None:
+    """Models write <br> for a line break inside a markdown table cell; the
+    renderer escapes raw HTML, so restore only that tag, only in cells."""
+    for cell in soup.select("td, th"):
+        for text in list(cell.find_all(string=_BR)):
+            if text.find_parent("code"):
+                continue
+            parts = _BR.split(str(text))
+            for i, part in enumerate(parts):
+                if i:
+                    text.insert_before(soup.new_tag("br"))
+                text.insert_before(NavigableString(part))
+            text.extract()
+
+
 def render_chat_export(body: ChatExportRequest, *, title: str = 'Chat export') -> bytes:
     content = "".join(_message_html(m) for m in body.messages)
     soup = BeautifulSoup(content, "html.parser")
+    _table_line_breaks(soup)
     tables = soup.select("table")
     if len(tables) > 100 or len(soup.select("td, th")) > 20000:
         raise ValueError("Export has too many table cells. Export fewer messages.")
@@ -177,5 +224,5 @@ th,td{{border:1px solid #cbd5e1;padding:8px;text-align:left}}th{{background:#f1f
 pre{{white-space:pre-wrap;overflow-wrap:anywhere;background:#f8fafc;padding:12px}}
 .evidence,.tool{{font-size:13px;color:#475569;white-space:pre-wrap}}h1,h2,h3{{line-height:1.3}}
 @media print{{body{{padding:0}}table{{display:table}}}}
-</style></head><body><h1>{escape(title)}</h1>{content}</body></html>'''
+</style></head><body><h1>{escape(title)}</h1>{soup}</body></html>'''
     return page.encode("utf-8")
