@@ -77,6 +77,7 @@ from app.services.web_answer_grounding import (
     unconfirmed_web_facts,
 )
 from app.services.kb_answer_grounding import (
+    bare_amounts_as_money,
     expand_snippet_refs,
     tool_output_as_source,
     unsupported_citations,
@@ -2998,8 +2999,14 @@ async def chat_stream(
                     # (see attachment_segments), and a figure from a later page
                     # was checked only when a tool had happened to read it.
                     + [a.content or "" for a in file_attachments]
-                    + [message]
                 )
+                # A spreadsheet's cells reach the text as bare numbers: a
+                # currency-formatted "$53,000" reads "53000", so the figure
+                # the answer quotes from the sheet was flagged as possibly
+                # recalled (support ticket, NIH R01 budget). Read bare amounts
+                # in the files as dollars too, as the output validator already
+                # does (calculation_claims.require_calculated_figures).
+                workspace_sources += [bare_amounts_as_money(t) for t in workspace_sources if t] + [message]
                 # Same sources every turn, so the same calculation gets the
                 # same label (support ticket: flagged once, then all 16
                 # figures, then none).
