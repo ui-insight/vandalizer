@@ -5447,6 +5447,8 @@ async def propose_obligations(
             Cite one period per passage, with full dates and its period label.
             Business-day rules, exceptions, and missing period dates need clarification.
             Limits add "limit_value", "observed_value" and "unit" ("$" or "%").
+            Both values must be in the same unit: compare a rate limit (22.5% of
+            TDC) with the rate the document states, never with a dollar amount.
         project_uuid: The project; defaults to the one open in chat.
         confirmed: Must be true to save; false returns a preview.
     """

@@ -271,6 +271,56 @@ def _figures_in(text: str) -> set[float]:
     return values
 
 
+def _units_of(value: float, text: str) -> set[str]:
+    """How *text* states *value*: "%" (a percentage), "$", or "" (a bare number)."""
+    from app.services.kb_answer_grounding import _money_values, _percent_values
+
+    units = set()
+    if value in _percent_values(text):
+        units.add("%")
+    if value in _money_values(text):
+        units.add("$")
+    for m in re.finditer(r"(?<![\w.$])(\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?(?![\w%])", text or ""):
+        if float(m.group(0).replace(",", "")) == value:
+            units.add("")
+    return units
+
+
+def _limit_unit(
+    limit_value: float, limit_quote: str, observed: float, observed_quote: str, claimed: str,
+) -> tuple[Optional[str], Optional[str]]:
+    """The unit a limit and its observed value share, from how the quotes state them.
+
+    Returns ``(unit, None)`` — "%", "$" or None for plain numbers — or
+    ``(None, reason)`` when one is a percentage and the other is not.
+    Support ticket: a 22.5%-of-TDC limit was compared with the $17,550
+    indirect-cost amount and shown as "17550% exceeds the 22.5% limit"; the
+    model's "unit" was taken on trust and both figures were in their quotes.
+    """
+    def is_percent(units: set[str]) -> set[bool]:
+        return {u == "%" for u in units}
+
+    limit_units = _units_of(limit_value, limit_quote)
+    observed_units = _units_of(observed, observed_quote)
+    shared = is_percent(limit_units) & is_percent(observed_units)
+    if not shared:
+        def say(value: float, units: set[str]) -> str:
+            return f"{value:g}%" if "%" in units else f"${value:,.0f}" if "$" in units else f"{value:,g}"
+        limit_kind = "a percentage" if "%" in limit_units else "an amount"
+        observed_kind = "a percentage" if "%" in observed_units else "an amount"
+        return None, (
+            f"the limit is {limit_kind} ({say(limit_value, limit_units)}) but the observed value is "
+            f"{observed_kind} ({say(observed, observed_units)}); a limit can only be compared with a "
+            f"value in the same unit. Use the observed figure the document states in that unit "
+            f"(for a rate limit, the rate), or leave this limit out"
+        )
+    if True in shared:
+        return "%", None
+    if "$" in limit_units | observed_units or claimed.strip() == "$":
+        return "$", None
+    return None, None
+
+
 def _page_text(doc: SmartDocument, page: Optional[int]) -> tuple[Optional[str], Optional[int]]:
     """The cited page's text (widened by a page for interpolated OCR pages),
     or the whole document when it has no page markers. Returns (text, page)."""
@@ -383,11 +433,16 @@ async def check_proposal(item: dict, user: User, project: Project) -> tuple[Opti
         if limit_value is None or observed is None:
             return None, "a limit needs limit_value and observed_value as numbers"
         by_role = {s.role: s.quote for s in sources}
-        if limit_value not in _figures_in(by_role.get("limit", quotes)):
+        limit_quote = by_role.get("limit", quotes)
+        observed_quote = by_role.get("observed", quotes)
+        if limit_value not in _figures_in(limit_quote):
             return None, "the limit's quote does not state the limit value"
-        if observed not in _figures_in(by_role.get("observed", quotes)):
+        if observed not in _figures_in(observed_quote):
             return None, "the observed value is not stated in its quote"
-        clean.update(limit_value=limit_value, observed_value=observed, unit=str(item.get("unit") or "")[:20] or None)
+        unit, reason = _limit_unit(limit_value, limit_quote, observed, observed_quote, str(item.get("unit") or ""))
+        if reason:
+            return None, reason
+        clean.update(limit_value=limit_value, observed_value=observed, unit=unit)
     return clean, None
 
 
