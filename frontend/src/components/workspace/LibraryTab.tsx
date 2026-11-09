@@ -216,14 +216,17 @@ export function LibraryTab() {
     await cloneToPersonal(itemId)
     refreshItems()
   }
-  const [shareDialogItem, setShareDialogItem] = useState<{ id: string; name: string } | null>(null)
-  const handleShare = (itemId: string) => {
+  const [shareDialogItem, setShareDialogItem] = useState<{ id: string; name: string; onBack?: () => void } | null>(null)
+  // ``onBack`` is set when the share wizard handed off here, so the team
+  // dialog can return to "What do you want?" instead of being a dead end.
+  const handleShare = (itemId: string, opts?: { onBack?: () => void }) => {
     if (teams.length === 0) {
       toast('Join or create a team before sharing items.', 'info')
+      opts?.onBack?.()
       return
     }
     const item = items.find((i) => i.id === itemId)
-    setShareDialogItem({ id: itemId, name: item?.name ?? 'this item' })
+    setShareDialogItem({ id: itemId, name: item?.name ?? 'this item', onBack: opts?.onBack })
   }
   // The dialog lets the user pick any team they belong to (default: current
   // team), so the destination is always shown and never assumed.
@@ -1831,6 +1834,11 @@ export function LibraryTab() {
           itemName={shareDialogItem.name}
           teams={teams.map((t) => ({ id: t.id, name: t.name }))}
           defaultTeamId={teamId}
+          onBack={shareDialogItem.onBack && (() => {
+            const back = shareDialogItem.onBack
+            setShareDialogItem(null)
+            back?.()
+          })}
           onCancel={() => setShareDialogItem(null)}
           onConfirm={confirmShare}
         />

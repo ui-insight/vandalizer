@@ -31,7 +31,8 @@ interface Props {
   onPin: (id: string, pinned: boolean) => void
   onFavorite: (id: string, favorited: boolean) => void
   onClone: (id: string) => void
-  onShare: (id: string) => void
+  /** ``onBack`` reopens whatever led to team sharing (the share wizard). */
+  onShare: (id: string, opts?: { onBack?: () => void }) => void
   onRemove: (id: string) => void
   onOpen?: (item: LibraryItem) => void
   onEdit?: (item: LibraryItem) => void
@@ -569,7 +570,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
             setShowVerifyModal(false)
             toast('Sent to the examiners — you\'ll hear back when someone has looked', 'success')
           }}
-          onShareWithTeam={scope === 'mine' ? () => onShare(item.id) : undefined}
+          onShareWithTeam={scope === 'mine' ? () => onShare(item.id, { onBack: () => setShowVerifyModal(true) }) : undefined}
         />
       )}
     </div>

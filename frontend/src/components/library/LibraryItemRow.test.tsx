@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import { LibraryItemRow } from './LibraryItemRow'
 import type { LibraryItem } from '../../types/library'
 
@@ -131,6 +131,19 @@ describe('LibraryItemRow', () => {
     it('opens the wizard, titled for the item kind, with the team option', () => {
       openMenu(makeItem())
       fireEvent.click(screen.getByText('Share…'))
+      expect(screen.getByRole('heading', { name: 'Share this workflow' })).toBeTruthy()
+      expect(screen.getByText('Share with a team')).toBeTruthy()
+    })
+
+    it('"Share with a team" hands off with a way back to the wizard', () => {
+      openMenu(makeItem())
+      fireEvent.click(screen.getByText('Share…'))
+      fireEvent.click(screen.getByText('Share with a team'))
+      expect(screen.queryByRole('heading', { name: 'Share this workflow' })).toBeNull()
+      const [id, opts] = vi.mocked(defaultProps.onShare).mock.calls.at(-1)!
+      expect(id).toBe('item-1')
+
+      act(() => opts!.onBack!())
       expect(screen.getByRole('heading', { name: 'Share this workflow' })).toBeTruthy()
       expect(screen.getByText('Share with a team')).toBeTruthy()
     })
