@@ -235,7 +235,8 @@ async def create_graph_subscription(
         raise HTTPException(status_code=400, detail=f"Unsupported intake type: {intake.intake_type}")
 
     import os
-    base_url = os.environ.get("VANDALIZER_BASE_URL", "http://localhost:5173")
+    from app.config import Settings
+    base_url = os.environ.get("VANDALIZER_BASE_URL", "").strip().rstrip("/") or Settings().frontend_url
     notification_url = f"{base_url}/api/webhooks/graph"
     client_state = f"vandalizer:{user.user_id}:{intake.uuid}"
 

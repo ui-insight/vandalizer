@@ -17,7 +17,12 @@ class Settings(BaseSettings):
     jwt_access_expire_minutes: int = 30
     jwt_refresh_expire_days: int = 60
     upload_dir: str = "../app/static/uploads"
+    # The site's public address, used in every link Vandalizer sends out:
+    # calendar files, reminder and feedback emails, sign-in and reset links,
+    # OAuth redirects. Set FRONTEND_URL; VANDALIZER_BASE_URL (the name the
+    # deploy docs and Office/Teams use) is accepted when FRONTEND_URL is not.
     frontend_url: str = "http://localhost:5173"
+    vandalizer_base_url: str = ""
     environment: str = "development"
     # Staged rollout: enable only after enrollment rehearsal and all course
     # surfaces have passed version-aware QA. Publication alone never enables it.
@@ -256,6 +261,24 @@ class Settings(BaseSettings):
         Path(self.upload_dir).mkdir(parents=True, exist_ok=True)
         Path(self.chromadb_persist_dir).mkdir(parents=True, exist_ok=True)
         return self
+
+    @model_validator(mode="after")
+    def _resolve_frontend_url(self) -> "Settings":
+        # Support ticket: .ics deadline links on vandalizer-dev pointed at
+        # http://localhost:5173. The deploy docs name VANDALIZER_BASE_URL, but
+        # every link builder read FRONTEND_URL, which fell back to localhost.
+        if "frontend_url" not in self.model_fields_set and self.vandalizer_base_url.strip():
+            self.frontend_url = self.vandalizer_base_url.strip()
+        self.frontend_url = self.frontend_url.strip().rstrip("/") or "http://localhost:5173"
+        return self
+
+    @property
+    def frontend_url_is_local(self) -> bool:
+        """Whether links would point at this machine rather than the site."""
+        from urllib.parse import urlsplit
+
+        host = (urlsplit(self.frontend_url).hostname or "").lower()
+        return host in {"localhost", "127.0.0.1", "::1", "0.0.0.0"} or host.endswith(".localhost")
 
     @model_validator(mode="after")
     def _check_jwt_secret(self) -> "Settings":

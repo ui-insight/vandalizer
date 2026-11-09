@@ -215,6 +215,17 @@ if settings.is_production and not settings.use_secure_cookies:
         "for anything internet-facing.",
         settings.frontend_url,
     )
+if settings.environment != "development" and settings.frontend_url_is_local:
+    # Calendar files, reminder/feedback emails and sign-in links would all
+    # point at this machine and open nothing for users.
+    logger.error(
+        "FRONTEND_URL is %s in a %s deployment: links in calendar files, emails "
+        "and sign-in messages will not open for users. Set FRONTEND_URL (or "
+        "VANDALIZER_BASE_URL) in backend/.env to the site's public address, "
+        "e.g. https://vandalizer.example.edu, and restart the api and celery "
+        "containers.",
+        settings.frontend_url, settings.environment,
+    )
 _cors_origins = [settings.frontend_url]
 if not settings.is_production:
     _cors_origins.append("http://localhost:5173")
