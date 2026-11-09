@@ -70,3 +70,14 @@ def test_no_name_lists_recent_pages_and_deleted_ones_are_gone(db):
     # Punctuation is ignored, so a regex-looking name can't widen the match.
     assert _find_pages(db, "ra", [], "Page (.*)", 10)["total"] == 3
     assert _find_pages(db, "ra", [], ".*", 10)["total"] == 3  # no words: the recent list, not a regex
+
+
+def test_an_older_published_version_is_not_reported_as_the_latest(db):
+    # Support ticket: chat said version 8 was published; the public link showed 4.
+    doc = _page(db, "ra", TITLE, "pub", versions=4)
+    doc = artifacts.publish(db, doc, doc["latest_revision"])
+    for n in range(5, 9):
+        doc = artifacts.revise(db, doc, TITLE, f"<main><h1>{TITLE}</h1><p>v{n}</p></main>", doc["latest_revision"])
+    page = _find_pages(db, "ra", [], TITLE, 10)["items"][0]
+    assert (page["latest_version"], page["published_version"]) == (8, 4)
+    assert "versions 5–8 are not published yet" in page["publication_note"]

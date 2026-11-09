@@ -58,6 +58,48 @@ def name_pattern(name: str) -> str | None:
     return "".join(f"(?=.*{re.escape(word)})" for word in words[:12])
 
 
+def version_status(meta: dict) -> dict:
+    """Which version is latest, which the public link shows, and which the team sees.
+
+    Support ticket: find_pages said only "published": true, so chat told a
+    user the latest version (8) was the published one while the public link
+    still showed version 4. Each is a separate pointer; report all three.
+    """
+    numbers = {r["uuid"]: r.get("version", i) for i, r in enumerate(meta["revisions"], 1)}
+    latest = numbers.get(meta["latest_revision"], len(meta["revisions"]))
+    if not meta.get("can_manage"):
+        # A teammate's view holds only the shared version; other versions and
+        # publishing are the owner's and are not visible here.
+        return {"version": latest, "team_version": latest, "publication_note": (
+            f"Shared with your team at version {latest}. Only the owner can see other versions "
+            "or which version the public link shows.")}
+    published = numbers.get(meta.get("published_revision") or "")
+    team = numbers.get(meta.get("team_revision") or "") if meta.get("team_id") else None
+    status: dict = {"version": latest, "latest_version": latest, "published": published is not None,
+                    "published_version": published}
+    if team is not None:
+        status["team_version"] = team
+    # Versions published on their own links (Share → version links), apart
+    # from the main public link.
+    separate = sorted({numbers[p["revision"]] for p in meta.get("publications") or [] if p.get("revision") in numbers})
+    if separate:
+        status["versions_with_own_links"] = separate
+    if published is None:
+        status["publication_note"] = (
+            "No main public link." + (f" Versions with their own links: {', '.join(map(str, separate))}." if separate
+                                      else " Not published.")
+        )
+    elif published == latest:
+        status["publication_note"] = f"The public link shows version {published}, the latest."
+    else:
+        newer = f"version {latest}" if latest == published + 1 else f"versions {published + 1}–{latest}"
+        status["publication_note"] = (
+            f"The public link shows version {published}; the latest saved is version {latest}, "
+            f"so {newer} {'is' if latest == published + 1 else 'are'} not published yet."
+        )
+    return status
+
+
 def _find_pages(db: Database[dict], user_id: str, team_ids: list[str], name: str, limit: int) -> dict:
     conditions: list[dict] = [{"deleted_at": None}, {"$or": [{"user_id": user_id}, {"team_id": {"$in": team_ids}}]}]
     pipeline: list[dict] = [{"$match": {"$and": conditions}}, *artifacts.visible_metadata_stages(user_id)]
@@ -72,14 +114,13 @@ def _find_pages(db: Database[dict], user_id: str, team_ids: list[str], name: str
     items = []
     for doc in result["items"]:
         meta = artifacts.metadata(doc, doc["user_id"] == user_id)
-        latest = next((r for r in meta["revisions"] if r["uuid"] == meta["latest_revision"]), None)
         updated = meta.get("updated_at")
         items.append({
             "artifact_uuid": meta["uuid"], "title": meta["title"],
-            "version": latest["version"] if latest else len(meta["revisions"]),
+            **version_status(meta),
             "updated_at": updated.isoformat() if isinstance(updated, datetime) else updated,
             "yours": meta["can_manage"], "shared_with_team": bool(meta.get("team_id")),
-            "published": bool(meta.get("published_revision")), "link": f"/pages/{meta['uuid']}",
+            "link": f"/pages/{meta['uuid']}",
         })
     return {"items": items, "total": result["total"][0]["value"] if result["total"] else 0}
 
@@ -88,7 +129,11 @@ async def find_pages(context: RunContext[AgenticChatDeps], name: str = "", limit
     """Find the user's saved Pages (Files → Pages), and Pages shared with their team, by name.
 
     Use it whenever the user names a Page or asks to see, open, change or update
-    one, and for "show me my pages" (leave name empty for the most recent). Every
+    one, and for "show me my pages" (leave name empty for the most recent).
+    latest_version, published_version (what the public link shows; null when
+    unpublished) and team_version (what the team sees) are separate: report
+    them as given, using publication_note, and never assume the latest is the
+    published one. Every
     word of name must appear in the title, in any order. Then read a result with
     get_html_artifact(artifact_uuid) before revising it. Only Pages marked yours
     can be revised; for a team Page, say only its owner can change it and offer
@@ -147,6 +192,7 @@ async def get_html_artifact(context: RunContext[AgenticChatDeps], artifact_uuid:
                 "source_files": sources,
                 "version": next(i for i, entry in enumerate(doc["revisions"], 1) if entry["uuid"] == rev["uuid"]),
                 "is_latest": rev["uuid"] == doc["latest_revision"], "change_summary": rev.get("change_summary"),
+                **{k: v for k, v in version_status(artifacts.metadata(doc, True)).items() if k != "version"},
                 "warnings": rev["warnings"], "rendering_note": RENDERING_NOTE,
                 "source_fidelity_note": PAGE_SOURCE_FIDELITY_RULES, "language_note": PAGE_LANGUAGE_RULES}
     except HTTPException as exc:
