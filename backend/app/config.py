@@ -4,6 +4,26 @@ from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def _url_host(url: str) -> str:
+    from urllib.parse import urlsplit
+
+    try:
+        return (urlsplit(url.strip()).hostname or "").lower()
+    except ValueError:
+        return ""
+
+
+def is_local_url(url: str) -> bool:
+    """Whether *url* points at the machine it is opened on, not a site."""
+    host = _url_host(url)
+    return not host or host in {"localhost", "127.0.0.1", "::1", "0.0.0.0"} or host.endswith(".localhost")
+
+
+def is_placeholder_url(url: str) -> bool:
+    """The .env.example placeholder, which is not anyone's site."""
+    return _url_host(url) in {"your-domain.com", "example.com", "vandalizer.example.edu"}
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
@@ -267,18 +287,21 @@ class Settings(BaseSettings):
         # Support ticket: .ics deadline links on vandalizer-dev pointed at
         # http://localhost:5173. The deploy docs name VANDALIZER_BASE_URL, but
         # every link builder read FRONTEND_URL, which fell back to localhost.
-        if "frontend_url" not in self.model_fields_set and self.vandalizer_base_url.strip():
-            self.frontend_url = self.vandalizer_base_url.strip()
+        # backend/.env.example ships FRONTEND_URL=http://localhost:5173, so
+        # "unset" is rare: also take a real VANDALIZER_BASE_URL over a local
+        # FRONTEND_URL. Never the template's placeholder.
         self.frontend_url = self.frontend_url.strip().rstrip("/") or "http://localhost:5173"
+        base = self.vandalizer_base_url.strip().rstrip("/")
+        if base and not is_local_url(base) and not is_placeholder_url(base) and (
+            "frontend_url" not in self.model_fields_set or self.frontend_url_is_local
+        ):
+            self.frontend_url = base
         return self
 
     @property
     def frontend_url_is_local(self) -> bool:
         """Whether links would point at this machine rather than the site."""
-        from urllib.parse import urlsplit
-
-        host = (urlsplit(self.frontend_url).hostname or "").lower()
-        return host in {"localhost", "127.0.0.1", "::1", "0.0.0.0"} or host.endswith(".localhost")
+        return is_local_url(self.frontend_url)
 
     @model_validator(mode="after")
     def _check_jwt_secret(self) -> "Settings":

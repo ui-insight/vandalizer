@@ -917,6 +917,34 @@ class TestReadinessOcrProbe:
         assert resp.json()["item"]["status"] == "configured"
 
 
+class TestReadinessSiteAddress:
+    """GET /api/admin/readiness checks the address links use against the page's."""
+
+    @pytest.mark.asyncio
+    async def test_localhost_links_are_flagged_with_the_address_the_admin_is_on(self, client, monkeypatch):
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+        monkeypatch.setenv("FRONTEND_URL", "http://localhost:5173")
+        monkeypatch.delenv("VANDALIZER_BASE_URL", raising=False)
+        site = "https://vandalizer-dev.insight.uidaho.edu"
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.SystemConfig") as MockCfg,
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockCfg.get_config = AsyncMock(return_value=TestReadinessOcrProbe()._cfg(ocr_endpoint=""))
+            resp = await client.get(
+                "/api/admin/readiness", params={"viewed_from": site}, cookies=cookies, headers=headers,
+            )
+
+        assert resp.status_code == 200
+        row = next(i for i in resp.json()["items"] if i["key"] == "site_url")
+        assert row["status"] == "missing"
+        assert f"FRONTEND_URL={site}" in row["summary"]
+
+
 class TestOcrProviderConfig:
     """PUT /api/admin/config — OCR provider/options validation."""
 

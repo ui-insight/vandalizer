@@ -656,8 +656,10 @@ export type ReadinessReport = {
   items: ReadinessItem[]
 }
 
-export function getReadiness() {
-  return apiFetch<ReadinessReport>('/api/admin/readiness')
+/** ``viewedFrom`` (the page's origin) is checked against the address links use. */
+export function getReadiness(viewedFrom = typeof window !== 'undefined' ? window.location.origin : '') {
+  const query = viewedFrom ? `?viewed_from=${encodeURIComponent(viewedFrom)}` : ''
+  return apiFetch<ReadinessReport>(`/api/admin/readiness${query}`)
 }
 
 // Live-probes the OCR service and returns the checklist's OCR row as it stands

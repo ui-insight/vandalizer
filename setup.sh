@@ -554,6 +554,7 @@ configure_env() {
         echo -e "  ${SYM_CHECK}  JWT_SECRET_KEY generated and saved"
       fi
       check_encryption_key
+      check_site_url
       return
     fi
     echo ""
@@ -603,7 +604,12 @@ configure_env() {
     echo -e "  ${SYM_CHECK}  Environment set to ${BOLD}production${RESET}"
 
     echo ""
-    prompt "Public URL (e.g. https://vandalizer.example.edu)" "http://localhost" FRONTEND_URL
+    prompt "Public address users open (e.g. https://vandalizer.example.edu)" "" FRONTEND_URL
+    while [[ -z "$FRONTEND_URL" ]] || ! [[ "$FRONTEND_URL" =~ ^https?://[^/[:space:]]+/?$ ]]; do
+      echo -e "  ${SYM_CROSS}  ${RED}Enter the address as https://host (or http://host), with no path.${RESET}"
+      prompt "Public address users open (e.g. https://vandalizer.example.edu)" "" FRONTEND_URL
+    done
+    FRONTEND_URL="${FRONTEND_URL%/}"
     sed -i.bak "s|^FRONTEND_URL=.*|FRONTEND_URL=${FRONTEND_URL}|" "$ENV_FILE" && rm -f "${ENV_FILE}.bak"
     echo -e "  ${SYM_CHECK}  Frontend URL set to ${BOLD}${FRONTEND_URL}${RESET}"
     if [[ "$FRONTEND_URL" == http://* ]]; then
@@ -637,6 +643,74 @@ configure_env() {
 
   echo ""
   echo -e "  ${BRIGHT_GREEN}${BOLD}Environment locked in.${RESET}"
+}
+
+# ---------------------------------------------------------------------------
+# Site address for links (FRONTEND_URL)
+# ---------------------------------------------------------------------------
+# Every link Vandalizer sends out uses FRONTEND_URL: calendar (.ics) files,
+# reminder and page-feedback emails, sign-in and reset links, OAuth redirects.
+# backend/.env.example ships it as http://localhost:5173, and only a fresh
+# production setup ever asked for it, so existing and development installs
+# kept localhost links (support ticket: vandalizer-dev .ics links opened
+# nothing). Checked on every setup/repair/redeploy/upgrade path. Interactive
+# runs ask once; a blank answer records SITE_URL_LOCAL_OK=true (a laptop or
+# test box) so it isn't asked again. Non-interactive runs (auto-update/cron)
+# only warn. Must run before the api/celery containers are (re)created, which
+# is when compose re-reads backend/.env.
+_url_is_local() {
+  local host
+  host=$(printf '%s' "$1" | sed -E 's#^[a-zA-Z]+://##; s#[/:?].*$##' | tr 'A-Z' 'a-z')
+  case "$host" in
+    ""|localhost|127.0.0.1|0.0.0.0|"[::1]"|*.localhost|your-domain.com|example.com) return 0 ;;
+  esac
+  return 1
+}
+
+check_site_url() {
+  [[ -f "$ENV_FILE" ]] || return 0
+  local current base
+  current=$(grep -E "^FRONTEND_URL=" "$ENV_FILE" 2>/dev/null | tail -1 | cut -d'=' -f2-)
+  base=$(grep -E "^VANDALIZER_BASE_URL=" "$ENV_FILE" 2>/dev/null | tail -1 | cut -d'=' -f2-)
+  [[ -n "$current" ]] || current="http://localhost:5173"
+  # The app takes a real VANDALIZER_BASE_URL over a local FRONTEND_URL.
+  if ! _url_is_local "$current" || { [[ -n "$base" ]] && ! _url_is_local "$base"; }; then
+    return 0
+  fi
+  grep -q "^SITE_URL_LOCAL_OK=true" "$ENV_FILE" 2>/dev/null && return 0
+
+  echo ""
+  echo -e "  ${SYM_WARN}  ${YELLOW}Links point to ${BOLD}${current}${RESET}${YELLOW}.${RESET}"
+  echo -e "  ${DIM}     Calendar files, reminder and feedback emails, and sign-in links${RESET}"
+  echo -e "  ${DIM}     will not open for users until FRONTEND_URL in backend/.env is${RESET}"
+  echo -e "  ${DIM}     the site's public address (e.g. https://vandalizer.example.edu).${RESET}"
+  if [[ ! -t 0 ]]; then
+    echo "WARNING: FRONTEND_URL is ${current}; links in calendar files and emails will not open. Run ./setup.sh --redeploy to set it."
+    return 0
+  fi
+
+  local url=""
+  while true; do
+    prompt "Public address users open (blank = keep localhost, for a laptop or test box)" "" url
+    url="${url%/}"
+    if [[ -z "$url" ]]; then
+      set_env "SITE_URL_LOCAL_OK" "true"
+      echo -e "  ${SYM_CHECK}  Keeping ${BOLD}${current}${RESET} ${DIM}(won't ask again; delete SITE_URL_LOCAL_OK from backend/.env to be asked)${RESET}"
+      return 0
+    fi
+    if [[ "$url" =~ ^https?://[^/[:space:]]+$ ]] && ! _url_is_local "$url"; then
+      break
+    fi
+    echo -e "  ${SYM_CROSS}  ${RED}Enter the address as https://host (or http://host), with no path.${RESET}"
+  done
+  set_env "FRONTEND_URL" "$url"
+  echo -e "  ${SYM_CHECK}  Links will point to ${BOLD}${url}${RESET}"
+  if [[ "$url" == http://* ]]; then
+    echo -e "  ${SYM_WARN}  ${YELLOW}Plain HTTP:${RESET} ${DIM}in production, auth cookies are set without the Secure flag.${RESET}"
+  fi
+  # A stack that is already up keeps the old env until its containers are
+  # recreated; redeploy recreates them right after this check.
+  SITE_URL_CHANGED=true
 }
 
 check_encryption_key() {
@@ -1282,6 +1356,17 @@ repair() {
     fi
   else
     echo -e "  ${SYM_CHECK}  CONFIG_ENCRYPTION_KEY is configured"
+  fi
+
+  SITE_URL_CHANGED=false
+  check_site_url
+  if [[ "$SITE_URL_CHANGED" == true ]]; then
+    actions_taken=$((actions_taken + 1))
+    # Compose re-reads backend/.env only when a container is recreated.
+    if [[ "$(compose_state api)" == "running" ]]; then
+      echo -e "  ${SYM_PULSE}  ${DIM}Applying the site address to running services...${RESET}"
+      $COMPOSE_CMD up -d --force-recreate --no-deps api celery >> "$SETUP_LOG" 2>&1 || true
+    fi
   fi
 
   # ── Docker images ────────────────────────────────────────────────────
@@ -2000,6 +2085,9 @@ do_redeploy() {
     echo ""
     return 1
   fi
+
+  # Before the containers are recreated, so a newly set address takes effect.
+  check_site_url
 
   echo ""
   echo -e "  ${SYM_NEURAL}  ${BOLD}Restarting services...${RESET}"

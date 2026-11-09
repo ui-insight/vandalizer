@@ -357,6 +357,28 @@ describe('ConfigTab — OCR provider', () => {
     await screen.findByText('Not working')
     await screen.findByText('OCR service returned HTTP 500')
   })
+
+  // Support ticket: .ics links on vandalizer-dev went to localhost. The fix is
+  // a line in backend/.env, so the row says it and offers no jump button.
+  it('flags a localhost site address with the line to set and no dead button', async () => {
+    mockGetReadiness.mockResolvedValue({
+      ready: true,
+      blockers_remaining: 0,
+      items: [{
+        key: 'site_url', title: 'Set the site address for links', severity: 'recommended',
+        status: 'missing',
+        summary: 'Links point to http://localhost:5173. Set FRONTEND_URL=https://vz.example.edu in backend/.env.',
+        unlocks: 'Calendar files and emails that open.', action_label: '', action_target: '',
+      }],
+    })
+
+    await renderConfigTab()
+
+    const row = (await screen.findByText('Set the site address for links')).closest('div[style]')!.parentElement!.parentElement!
+    expect(row.textContent).toContain('FRONTEND_URL=https://vz.example.edu')
+    expect(row.querySelector('button')).toBeNull()
+    expect(mockGetReadiness).toHaveBeenCalled()
+  })
 })
 
 // ---------------------------------------------------------------------------

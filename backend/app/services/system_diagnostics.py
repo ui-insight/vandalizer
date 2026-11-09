@@ -662,7 +662,64 @@ async def diagnose_ocr(
     }
 
 
-def build_readiness(cfg: SystemConfig, ocr_probe: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+def _origin(url: str) -> str:
+    from urllib.parse import urlsplit
+
+    try:
+        parts = urlsplit((url or "").strip())
+    except ValueError:
+        return ""
+    if parts.scheme not in {"http", "https"} or not parts.hostname:
+        return ""
+    default = {"http": 80, "https": 443}[parts.scheme]
+    port = f":{parts.port}" if parts.port and parts.port != default else ""
+    return f"{parts.scheme}://{parts.hostname.lower()}{port}"
+
+
+def site_url_item(site_url: str, viewed_from: Optional[str] = None) -> dict[str, Any]:
+    """The checklist row for the address every outgoing link uses (FRONTEND_URL).
+
+    Support ticket: .ics deadline links on vandalizer-dev went to
+    http://localhost:5173. The setting lives in backend/.env, so the row says
+    what to set rather than jumping to a section. ``viewed_from`` is the origin
+    the admin has the page open at: links to any other address also fail.
+    """
+    from app.config import is_local_url, is_placeholder_url
+
+    here = _origin(viewed_from or "")
+    links = _origin(site_url) or site_url
+    fix_to = here if here and not is_local_url(here) else "https://<your site's address>"
+    fix = (f"Set FRONTEND_URL={fix_to} in backend/.env and restart the api and celery "
+           "containers (./setup.sh --redeploy asks for it).")
+    if is_local_url(site_url) or is_placeholder_url(site_url):
+        status = "missing"
+        summary = f"Links in calendar files, emails and sign-in messages point to {links}, which users can't open. {fix}"
+    elif here and not is_local_url(here) and here != links:
+        status = "incomplete"
+        summary = f"Links point to {links}, but this page is open at {here}. If {here} is the site, {fix[0].lower()}{fix[1:]}"
+    else:
+        status = "configured"
+        summary = f"Links in calendar files, emails and sign-in messages point to {links}."
+    return {
+        "key": "site_url",
+        "title": "Set the site address for links",
+        "severity": "recommended",
+        "status": status,
+        "summary": summary,
+        "unlocks": "Calendar files, reminder and feedback emails, and sign-in links that open for your users.",
+        # Set in backend/.env, not on this page: no section to jump to.
+        "action_label": "",
+        "action_target": "",
+    }
+
+
+def build_readiness(
+    cfg: SystemConfig,
+    ocr_probe: Optional[dict[str, Any]] = None,
+    *,
+    site_url: Optional[str] = None,
+    viewed_from: Optional[str] = None,
+) -> dict[str, Any]:
     """Aggregate the settings a fresh install needs into a graded checklist.
 
     Severity tiers, because the settings are not equal:
@@ -752,6 +809,9 @@ def build_readiness(cfg: SystemConfig, ocr_probe: Optional[dict[str, Any]] = Non
         "action_label": "Configure sign-in",
         "action_target": "auth",
     })
+
+    if site_url is not None:
+        items.append(site_url_item(site_url, viewed_from))
 
     blockers_remaining = sum(
         1 for it in items if it["severity"] == "blocker" and it["status"] != "configured"

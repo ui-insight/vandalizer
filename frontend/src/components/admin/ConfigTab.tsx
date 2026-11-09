@@ -102,7 +102,7 @@ function SetupChecklist({ report, onJump, onDismiss }: { report: ReadinessReport
                 <div style={{ fontSize: 12, color: '#4b5563', marginTop: 2 }}>{item.summary}</div>
                 {!done && <div style={{ fontSize: 12, color: '#4b5563', marginTop: 2 }}>Unlocks: {item.unlocks}</div>}
               </div>
-              {!done && (
+              {!done && item.action_label && (
                 <button
                   onClick={() => onJump(item.action_target)}
                   style={{ flexShrink: 0, padding: '5px 12px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db', background: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#111' }}

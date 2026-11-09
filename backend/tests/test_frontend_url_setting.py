@@ -63,3 +63,18 @@ def test_calendar_links_use_the_site_address(monkeypatch):
     unfolded = body.replace("\r\n ", "")
     assert f"{SITE}/?deadline=617d85c2" in unfolded
     assert "localhost" not in unfolded
+
+
+def test_a_real_vandalizer_base_url_replaces_a_localhost_frontend_url(monkeypatch):
+    # backend/.env.example ships FRONTEND_URL=http://localhost:5173, so on a
+    # setup.sh install FRONTEND_URL is always "set".
+    monkeypatch.setenv("FRONTEND_URL", "http://localhost:5173")
+    monkeypatch.setenv("VANDALIZER_BASE_URL", SITE)
+    assert _settings().frontend_url == SITE
+
+
+@pytest.mark.parametrize("base", ["https://your-domain.com", "http://localhost:8080", ""])
+def test_a_placeholder_or_local_vandalizer_base_url_is_ignored(monkeypatch, base):
+    monkeypatch.setenv("FRONTEND_URL", "http://localhost:5173")
+    monkeypatch.setenv("VANDALIZER_BASE_URL", base)
+    assert _settings().frontend_url == "http://localhost:5173"

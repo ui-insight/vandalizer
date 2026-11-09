@@ -3197,18 +3197,21 @@ async def test_model(model_id: str, user: User = Depends(get_current_user)) -> d
 
 
 @router.get("/readiness")
-async def get_readiness(user: User = Depends(get_current_user)) -> dict:
+async def get_readiness(
+    viewed_from: str | None = None, user: User = Depends(get_current_user),
+) -> dict:
     """Report whether this install is set up: a graded setup checklist.
 
     Drives the admin setup surface. ``ready`` is false while any blocker
-    (e.g. no language model) is unresolved.
+    (e.g. no language model) is unresolved. ``viewed_from`` is the origin the
+    admin has the page open at, checked against the address links use.
     """
     await _require_admin(user)
 
     from app.services.system_diagnostics import build_readiness
 
     cfg = await SystemConfig.get_config()
-    return build_readiness(cfg)
+    return build_readiness(cfg, site_url=Settings().frontend_url, viewed_from=(viewed_from or "")[:300])
 
 
 @router.get("/readiness/ocr")
