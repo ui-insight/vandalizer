@@ -112,6 +112,11 @@ RESULT_COLUMNS = [
     "expected_answer",
     "expected_sources",
     "notes",
+    # What the graded answer's prompt held. ``retrieved_sources`` above is the
+    # separate retrieval-precision search; these are the answer's own context,
+    # after rewrite, rerank and amending-source passages.
+    "context_sources",
+    "context_passages",
     "retrieved_sources",
     "retrieval_precision",
     "answer_match",
@@ -136,6 +141,51 @@ RESULT_COLUMNS = [
     "discrimination",
     "error",
 ]
+
+
+# One row per passage on the XLSX "Passages" sheet.
+PASSAGE_COLUMNS = [
+    "query_uuid",
+    "external_id",
+    "question",
+    "rank",
+    "chunk_id",
+    "source_name",
+    "added_for_amendment",
+    "amends",
+    "amended_by",
+    "similarity",
+    "text",
+    "text_truncated",
+]
+
+
+def _context_sources(passages: list[dict] | None) -> list[str]:
+    """Each source the answer's prompt drew on, once, in prompt order, with
+    how an amends link put it there."""
+    seen: dict[str, str] = {}
+    for p in passages or []:
+        name = p.get("source_name") or "Unknown"
+        notes = []
+        if p.get("added_for_amendment"):
+            notes.append("added automatically")
+        if p.get("amends"):
+            notes.append("amends " + "; ".join(p["amends"]))
+        if p.get("amended_by"):
+            notes.append("amended by " + "; ".join(p["amended_by"]))
+        label = f"{name} ({', '.join(notes)})" if notes else name
+        # Retrieved passages precede amendment additions in the prompt, so a
+        # source retrieved on its own merit keeps that label.
+        seen.setdefault(name, label)
+    return list(seen.values())
+
+
+def _passages_text(passages: list[dict] | None) -> str:
+    return "\n\n".join(
+        f"[{p.get('rank')}] {p.get('source_name')} · chunk {p.get('chunk_id')}"
+        f"{' (added automatically)' if p.get('added_for_amendment') else ''}\n{p.get('text') or ''}"
+        for p in passages or []
+    )
 
 
 def _answer_model(snap: dict, vr) -> str | None:
@@ -190,6 +240,11 @@ def build_kb_validation_results_export(
                 or (list(getattr(tq, "expected_source_labels", []) or []) if tq else []),
             "notes": det.get("notes")
                 or (getattr(tq, "notes", None) if tq else None) or "",
+            # None on runs recorded before the prompt's passages were kept,
+            # so "nothing was retrieved" ([]) stays distinguishable.
+            "context_sources": _context_sources(det.get("context_passages"))
+                if "context_passages" in det else None,
+            "context_passages": det.get("context_passages"),
             "retrieved_sources": det.get("retrieved_sources") or [],
             "retrieval_precision": det.get("precision"),
             "answer_match": det.get("answer_match"),
@@ -332,16 +387,18 @@ def render_results_csv(run_meta: dict, rows: list[dict]) -> str:
     writer.writerow(RUN_META_CSV_COLUMNS + RESULT_COLUMNS)
     meta_cells = [_flatten_cell(run_meta.get(k)) for k in RUN_META_CSV_COLUMNS]
     for row in rows:
-        writer.writerow(
-            meta_cells + [_flatten_cell(row.get(k)) for k in RESULT_COLUMNS]
-        )
+        writer.writerow(meta_cells + [
+            _passages_text(row.get(k)) if k == "context_passages" else _flatten_cell(row.get(k))
+            for k in RESULT_COLUMNS
+        ])
     return out.getvalue()
 
 
 def render_results_xlsx(run_meta: dict, rows: list[dict], kb_sources: dict | None = None) -> bytes:
     """Workbook: Summary (run metadata as key/value), Results (one row per
-    test query), and — when the run recorded any — Sources (one row per KB
-    source as the run found it)."""
+    test query), Passages (one row per passage each graded answer's prompt
+    held, when the run recorded them) and — when the run recorded any —
+    Sources (one row per KB source as the run found it)."""
     import io
 
     from openpyxl import Workbook
@@ -384,8 +441,29 @@ def render_results_xlsx(run_meta: dict, rows: list[dict], kb_sources: dict | Non
     for c in results[1]:
         c.font = bold
     for row in rows:
-        results.append([_cell(row.get(k)) for k in RESULT_COLUMNS])
+        passages = row.get("context_passages")
+        results.append([
+            # Excel caps a cell at 32,767 characters; the text is one row per
+            # passage on the Passages sheet instead.
+            (f"{len(passages)} passages: see Passages sheet" if passages else _cell(passages))
+            if k == "context_passages" else _cell(row.get(k))
+            for k in RESULT_COLUMNS
+        ])
     results.freeze_panes = "A2"
+
+    if any(row.get("context_passages") for row in rows):
+        sheet = wb.create_sheet("Passages")
+        sheet.append(PASSAGE_COLUMNS)
+        for c in sheet[1]:
+            c.font = bold
+        for row in rows:
+            for p in row.get("context_passages") or []:
+                values = {**p, "query_uuid": row.get("query_uuid"),
+                          "external_id": row.get("external_id"), "question": row.get("question")}
+                sheet.append([_cell(values.get(k)) for k in PASSAGE_COLUMNS])
+        sheet.column_dimensions["C"].width = 40
+        sheet.column_dimensions["K"].width = 100
+        sheet.freeze_panes = "A2"
 
     if kb_sources and kb_sources.get("sources"):
         sheet = wb.create_sheet("Sources")
