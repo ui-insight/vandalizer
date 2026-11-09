@@ -1376,25 +1376,25 @@ export const MODULES: ModuleDefinition[] = [
         id: 'advanced_nodes.running-tasks-in-parallel',
         revision: 2,
         title: 'Running tasks in parallel',
-        content: "Tasks within a step can run concurrently. They normally receive the same step input; an explicit task override can select a different source. They do not automatically receive a sibling task’s newly produced answer. Inspect the configuration and combined output rather than assuming a dependency because tasks appear next to one another.\n\nParallel work fits independent operations. For example, a source-based narrative draft and a separate list of unresolved source questions may both use the same document. If the narrative must incorporate a completed calculation, however, it depends on that calculation and belongs after it or after a separate reconciliation step.\n\nThe current engine collects task results in their listed order and combines their outputs for the next step. Output shape can vary with what each task returns. Preserve clear labels and inspect that each downstream value, warning and citation is associated with the intended task. Position alone is a weak substitute for meaning.\n\nConsider effects as well as data. If one task sends or updates something while a sibling fails, the completed external effect may already exist. A failed step is not a guarantee that every sibling’s work was undone. Review what actually happened before retrying an operation with effects.\n\n**Practice:** One task checks a budget and another sends a memo stating the budget passed. Explain the dependency and where an actual approval boundary belongs.",
+        content: "Tasks within a step can run concurrently. They normally receive the same step input; an explicit task override can select a different source. They do not automatically receive a sibling task’s newly produced answer. Inspect the configuration and combined output rather than assuming a dependency because tasks appear next to one another.\n\nParallel work fits independent operations. For example, a source-based narrative draft and a separate list of unresolved source questions may both use the same document. If the narrative must incorporate a completed calculation, however, it depends on that calculation and belongs after it or after a separate reconciliation step.\n\nThe current engine collects task results in their listed order and combines their outputs for the next step. Output shape can vary with what each task returns. Preserve clear labels and inspect that each downstream value, warning and citation is associated with the intended task. Position alone is a weak substitute for meaning.\n\nConsider effects as well as data. If one task sends or updates something while a sibling fails, the completed external effect may already exist. A failed step is not a guarantee that every sibling’s work was undone. Review what actually happened before retrying an operation with effects.\n\n**Practice:** One task checks a budget and another emails a memo saying the budget passed. Explain why the email depends on the check, and which step it belongs in.",
         variant: 'concept',
         knowledgeCheck: {
-          "question": "Can a send task run in parallel with the check whose successful result must authorize the send?",
+          "question": "A step has two tasks side by side. One checks a budget; the other emails a memo saying the budget passed. Should both tasks be in the same step?",
           "options": [
             {
-              "text": "Yes, because tasks in one step exchange their new answers automatically.",
+              "text": "Yes. Tasks in the same step see each other’s results, so the email waits for the check.",
               "correct": false,
-              "explanation": "Sibling tasks receive their configured inputs and do not establish that dependency automatically."
+              "explanation": "Tasks in the same step run at the same time and don’t see each other’s results. The email would go out without waiting to learn whether the budget passed."
             },
             {
-              "text": "No; the send must wait for the required result and any applicable approval.",
+              "text": "No. Put the email in a later step, so it goes out only after the check passes (and after any required approval).",
               "correct": true,
-              "explanation": "An action depending on a check needs a verified sequential boundary."
+              "explanation": "A task that depends on another task’s result belongs in a later step. Here, the email should go out only once the check has passed."
             },
             {
-              "text": "Yes, because a sibling failure always undoes external actions.",
+              "text": "Yes. If the check fails, the step fails and the email is cancelled.",
               "correct": false,
-              "explanation": "A completed external effect may remain after another task fails."
+              "explanation": "A sent email can’t be unsent. When one task fails, the step doesn’t undo what the other tasks already did."
             }
           ]
         },
