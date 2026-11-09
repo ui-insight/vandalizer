@@ -21,7 +21,8 @@ import re
 from typing import Optional
 
 from fastapi import HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
+from bson.errors import InvalidId
 from pydantic_ai.tools import RunContext, ToolFuncContext
 
 from app.models.document import SmartDocument
@@ -2863,8 +2864,12 @@ async def run_workflow(
     document_uuids = _resolve_doc_uuids(context, document_uuids) if not (text_input or "").strip() else list(document_uuids or [])
     text = (text_input or "").strip()
 
-    # Look up workflow and verify access
-    wf = await Workflow.get(workflow_id)
+    # Look up workflow and verify access. A workflow's name in place of its
+    # id fails Beanie's id validation; treat it as not found, with the fix.
+    try:
+        wf = await Workflow.get(workflow_id)
+    except (ValidationError, InvalidId, TypeError):
+        wf = None
     if not wf:
         return _err(
             f"Workflow '{workflow_id}' not found.",

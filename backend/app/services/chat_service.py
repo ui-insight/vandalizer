@@ -34,6 +34,7 @@ from pydantic_ai.messages import (
     ModelResponse,
     PartDeltaEvent,
     PartStartEvent,
+    RetryPromptPart,
     TextPart,
     TextPartDelta,
     ThinkingPart,
@@ -1614,6 +1615,28 @@ def _suggest_model_for_overflow(
     }
 
 
+def _retry_as_error(part: RetryPromptPart) -> dict:
+    """A tool call pydantic-ai sent back for a retry, as the failed result it was.
+
+    Arguments that failed validation, a ModelRetry, or a pydantic
+    ValidationError raised inside the tool all come back as a RetryPromptPart,
+    not a return value. Streamed as-is (a string or a list of validation
+    errors, no "error" key), the card showed it as succeeded: support ticket,
+    "Running workflow · Completed · Started" for a run_workflow call given a
+    workflow's name as its id, which never started anything.
+    """
+    content = part.content
+    if isinstance(content, str):
+        reason = content.strip()
+    else:
+        problems = []
+        for err in content:
+            where = ".".join(str(x) for x in err.get("loc") or ()) or "input"
+            problems.append(f"{where}: {err.get('msg') or 'invalid'}")
+        reason = "Invalid request — " + "; ".join(problems[:3])
+    return {"error": reason or "The call failed and was sent back to the assistant to correct."}
+
+
 async def chat_stream(
     message: str,
     document_uuids: list[str],
@@ -2805,7 +2828,11 @@ async def chat_stream(
                                 # we strip it here so it goes to the frontend but
                                 # NOT back into the LLM context.
                                 quality = None
-                                result_content = tool_event.result.content
+                                result_content = (
+                                    _retry_as_error(tool_event.result)
+                                    if isinstance(tool_event.result, RetryPromptPart)
+                                    else tool_event.result.content
+                                )
                                 if isinstance(result_content, dict) and "quality" in result_content:
                                     quality = result_content.pop("quality")
                                 # Also check the deps annotations dict (future-proof)
