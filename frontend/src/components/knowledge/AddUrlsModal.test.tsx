@@ -4,6 +4,7 @@ import { AddUrlsModal } from './AddUrlsModal'
 import type { UrlPreview, UrlPreviewPage } from '../../api/knowledge'
 
 vi.mock('../../api/knowledge', () => ({
+  addUrlsToKB: vi.fn(),
   previewUrlsForKB: vi.fn(),
   cancelUrlPreview: vi.fn(),
   getUrlPreview: vi.fn(),
@@ -11,7 +12,7 @@ vi.mock('../../api/knowledge', () => ({
   commitUrlPreview: vi.fn(),
 }))
 
-import { cancelUrlPreview, commitUrlPreview, getUrlPreview, getUrlPreviewPageText, previewUrlsForKB } from '../../api/knowledge'
+import { addUrlsToKB, cancelUrlPreview, commitUrlPreview, getUrlPreview, getUrlPreviewPageText, previewUrlsForKB } from '../../api/knowledge'
 
 function page(overrides: Partial<UrlPreviewPage>): UrlPreviewPage {
   return {
@@ -55,11 +56,12 @@ describe('AddUrlsModal', () => {
     vi.mocked(getUrlPreviewPageText).mockReset()
     vi.mocked(commitUrlPreview).mockReset().mockResolvedValue({ ok: true, queued: 2 })
     vi.mocked(cancelUrlPreview).mockReset().mockResolvedValue({ ok: true, canceled: true })
+    vi.mocked(addUrlsToKB).mockReset().mockResolvedValue({ ok: true, added: 2, skipped: 0, skipped_urls: [] })
   })
   afterEach(() => { vi.useRealTimers() })
 
   it('previews before adding anything, and a double-click starts one preview', async () => {
-    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onClose={vi.fn()} />)
+    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onAddedDirectly={vi.fn()} onClose={vi.fn()} />)
     fireEvent.change(screen.getByLabelText('URLs to add, one per line'), {
       target: { value: 'https://example.gov/policy' },
     })
@@ -71,13 +73,70 @@ describe('AddUrlsModal', () => {
     expect(commitUrlPreview).not.toHaveBeenCalled()
   })
 
-  it('does not preview with no URLs entered', () => {
-    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onClose={vi.fn()} />)
+  it('does not preview or add with no URLs entered', () => {
+    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onAddedDirectly={vi.fn()} onClose={vi.fn()} />)
     expect(screen.getByRole('button', { name: 'Preview pages' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled()
+  })
+
+  // Ticket: every user was forced through the preview step. Add sits beside
+  // Preview pages and queues the links straight away.
+  it('Add skips the preview and adds the URLs, once, with the crawl settings', async () => {
+    const onAddedDirectly = vi.fn()
+    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onAddedDirectly={onAddedDirectly} onClose={vi.fn()} />)
+    fireEvent.change(screen.getByLabelText('URLs to add, one per line'), {
+      target: { value: 'https://example.gov/policy\n\n  https://example.gov/short  ' },
+    })
+    fireEvent.click(screen.getByLabelText('Enable crawling'))
+    const add = screen.getByRole('button', { name: 'Add' })
+    await act(async () => { fireEvent.click(add); fireEvent.click(add) })
+
+    expect(addUrlsToKB).toHaveBeenCalledTimes(1)
+    expect(addUrlsToKB).toHaveBeenCalledWith(
+      'kb-1', ['https://example.gov/policy', 'https://example.gov/short'], true, 5, '',
+    )
+    expect(previewUrlsForKB).not.toHaveBeenCalled()
+    expect(onAddedDirectly).toHaveBeenCalledWith({ ok: true, added: 2, skipped: 0, skipped_urls: [] }, true)
+  })
+
+  it('a failed Add says why and lets the user try again', async () => {
+    vi.mocked(addUrlsToKB).mockRejectedValueOnce(new Error('Rate limit exceeded'))
+    const onAddedDirectly = vi.fn()
+    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onAddedDirectly={onAddedDirectly} onClose={vi.fn()} />)
+    fireEvent.change(screen.getByLabelText('URLs to add, one per line'), { target: { value: 'https://example.gov/policy' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Add' })) })
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Rate limit exceeded')
+    expect(onAddedDirectly).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Add' })).not.toBeDisabled()
+  })
+
+  // oauthdev: a preview spun 5+ minutes with 0 pages and nothing could be added.
+  it('a preview that is still fetching can be skipped: the links are added directly', async () => {
+    vi.mocked(getUrlPreview).mockResolvedValue(preview('running', []))
+    const onAddedDirectly = vi.fn()
+    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onAddedDirectly={onAddedDirectly} onClose={vi.fn()} />)
+    await enterAndPreview()
+    await poll()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Add without preview' })) })
+
+    expect(addUrlsToKB).toHaveBeenCalledWith(
+      'kb-1', ['https://example.gov/policy', 'https://example.gov/short'], false, 5, '',
+    )
+    expect(cancelUrlPreview).toHaveBeenCalledWith('kb-1', 'pv-1')
+    expect(onAddedDirectly).toHaveBeenCalledTimes(1)
+  })
+
+  it('once the preview is ready, only the reviewed pages can be added', async () => {
+    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onAddedDirectly={vi.fn()} onClose={vi.fn()} />)
+    await enterAndPreview()
+    await poll()
+    expect(screen.queryByRole('button', { name: 'Add without preview' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add 2 pages' })).toBeInTheDocument()
   })
 
   it('shows what each page adds: good kept, low unticked with its reason, empty not addable', async () => {
-    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onClose={vi.fn()} />)
+    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onAddedDirectly={vi.fn()} onClose={vi.fn()} />)
     await enterAndPreview()
     await poll()
 
@@ -93,19 +152,21 @@ describe('AddUrlsModal', () => {
     expect(screen.getByText('2 pages kept · 7 chunks')).toBeTruthy()
   })
 
-  it('cannot add while pages are still being fetched', async () => {
+  it('cannot add a half-fetched page list; only skipping the preview is offered', async () => {
     vi.mocked(getUrlPreview).mockResolvedValue(preview('running', PAGES.slice(0, 1)))
-    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onClose={vi.fn()} />)
+    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onAddedDirectly={vi.fn()} onClose={vi.fn()} />)
     await enterAndPreview()
     await poll()
 
     expect(screen.getByText(/Fetching pages… 1 page so far/)).toBeTruthy()
-    expect(screen.getByRole('button', { name: /^Add / })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /^Add \d/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add without preview' })).toBeEnabled()
+    expect(commitUrlPreview).not.toHaveBeenCalled()
   })
 
   it('adds only the kept pages, once, and reports the count', async () => {
     const onCommitted = vi.fn()
-    render(<AddUrlsModal kbUuid="kb-1" onCommitted={onCommitted} onClose={vi.fn()} />)
+    render(<AddUrlsModal kbUuid="kb-1" onCommitted={onCommitted} onAddedDirectly={vi.fn()} onClose={vi.fn()} />)
     await enterAndPreview()
     await poll()
 
@@ -121,7 +182,7 @@ describe('AddUrlsModal', () => {
 
   it('shows a page\'s text, and loads the rest on request', async () => {
     vi.mocked(getUrlPreviewPageText).mockResolvedValue({ page_id: 'good', text: 'The whole policy text.' })
-    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onClose={vi.fn()} />)
+    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onAddedDirectly={vi.fn()} onClose={vi.fn()} />)
     await enterAndPreview()
     await poll()
 
@@ -133,7 +194,7 @@ describe('AddUrlsModal', () => {
   })
 
   it('Back returns to the URLs as typed', async () => {
-    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onClose={vi.fn()} />)
+    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onAddedDirectly={vi.fn()} onClose={vi.fn()} />)
     await enterAndPreview()
     fireEvent.click(screen.getByRole('button', { name: 'Back' }))
     expect((screen.getByLabelText('URLs to add, one per line') as HTMLTextAreaElement).value)
@@ -149,7 +210,7 @@ describe('AddUrlsModal', () => {
 
   it('says a stuck preview is taking longer than expected, with Retry and Cancel', async () => {
     vi.mocked(getUrlPreview).mockResolvedValue(preview('running', []))
-    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onClose={vi.fn()} />)
+    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onAddedDirectly={vi.fn()} onClose={vi.fn()} />)
     await enterAndPreview()
     await poll()
     expect(screen.queryByText(/taking longer than expected/)).not.toBeInTheDocument()
@@ -169,7 +230,7 @@ describe('AddUrlsModal', () => {
       stall_message: "The server's background workers aren't running, so the preview can't start.",
       workers_down: true,
     })
-    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onClose={vi.fn()} />)
+    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onAddedDirectly={vi.fn()} onClose={vi.fn()} />)
     await enterAndPreview()
     await poll()
     expect(screen.getByText(/background workers aren't running/)).toBeInTheDocument()
@@ -179,7 +240,7 @@ describe('AddUrlsModal', () => {
 
   it('Retry stops the stuck preview and starts a new one with the same URLs', async () => {
     vi.mocked(getUrlPreview).mockResolvedValue(stalled())
-    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onClose={vi.fn()} />)
+    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onAddedDirectly={vi.fn()} onClose={vi.fn()} />)
     await enterAndPreview()
     await poll()
     vi.mocked(previewUrlsForKB).mockResolvedValue({ preview_uuid: 'pv-2', status: 'running' })
@@ -194,7 +255,7 @@ describe('AddUrlsModal', () => {
 
   it('Cancel stops the preview and returns to the URLs as typed', async () => {
     vi.mocked(getUrlPreview).mockResolvedValue(stalled())
-    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onClose={vi.fn()} />)
+    render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onAddedDirectly={vi.fn()} onClose={vi.fn()} />)
     await enterAndPreview()
     await poll()
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Cancel preview' })) })
@@ -207,7 +268,7 @@ describe('AddUrlsModal', () => {
 
   it('closing the dialog stops a preview that is still fetching', async () => {
     vi.mocked(getUrlPreview).mockResolvedValue(preview('running', []))
-    const { unmount } = render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onClose={vi.fn()} />)
+    const { unmount } = render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onAddedDirectly={vi.fn()} onClose={vi.fn()} />)
     await enterAndPreview()
     await poll()
     unmount()
@@ -215,7 +276,7 @@ describe('AddUrlsModal', () => {
   })
 
   it('closing after the preview finished cancels nothing', async () => {
-    const { unmount } = render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onClose={vi.fn()} />)
+    const { unmount } = render(<AddUrlsModal kbUuid="kb-1" onCommitted={vi.fn()} onAddedDirectly={vi.fn()} onClose={vi.fn()} />)
     await enterAndPreview()
     await poll()
     unmount()

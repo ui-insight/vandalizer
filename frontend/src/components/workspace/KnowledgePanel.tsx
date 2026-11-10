@@ -405,6 +405,30 @@ export function KnowledgePanel() {
     refresh()
   }
 
+  const handleUrlsAddedDirectly = (result: api.AddUrlsResult, crawling: boolean) => {
+    if (!selectedKB) return
+    setShowUrlModal(false)
+    const added = result.added ?? 0
+    const skipped = result.skipped ?? 0
+    const urls = (c: number) => `${c} URL${c === 1 ? '' : 's'}`
+    const doing = crawling ? 'fetching and crawling in the background' : 'fetching in the background'
+    if (added === 0 && skipped > 0) {
+      // Re-adding a URL the KB holds fetches nothing; a silent "Added" here
+      // once sent a user on a fruitless refresh loop.
+      toast(`${urls(skipped)} already in this knowledge base — nothing was fetched. Use the ↻ button on a source to re-fetch its page.`, 'info')
+      return
+    }
+    setSelectedKB(prev => prev ? { ...prev, status: 'building' } : prev)
+    toast(
+      skipped > 0
+        ? `Adding ${urls(added)} — ${doing}. ${urls(skipped)} already in this knowledge base and not re-fetched.`
+        : `Adding ${urls(added)} — ${doing}`,
+      'success',
+    )
+    loadDetail(selectedKB.uuid)
+    refresh()
+  }
+
   const sourceName = (source: KnowledgeBaseSource) =>
     source.custom_name || source.document_title || source.url_title || source.url || 'Source'
 
@@ -1766,6 +1790,7 @@ export function KnowledgePanel() {
           <AddUrlsModal
             kbUuid={selectedKB.uuid}
             onCommitted={handleUrlsCommitted}
+            onAddedDirectly={handleUrlsAddedDirectly}
             onClose={() => setShowUrlModal(false)}
           />
         )}
