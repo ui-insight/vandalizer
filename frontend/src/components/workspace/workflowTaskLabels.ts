@@ -5,6 +5,8 @@ const labels: Record<string, string> = {
   DocumentRenderer: 'Create a document', FormFiller: 'Fill a form', DataExport: 'Export data',
   Approval: 'Request approval', Browser: 'Browser automation', DescribeImage: 'Describe an image',
   CodeNode: 'Run code', PackageBuilder: 'Build a package',
+  // Support ticket: without these the Add a task list showed the code names.
+  CreateProject: 'Create project', InboxDeadlines: 'Add deadlines to RA inbox', AwardSnapshotPage: 'Award snapshot page',
 }
 
 export function workflowTaskLabel(type: string): string { return labels[type] ?? type }
