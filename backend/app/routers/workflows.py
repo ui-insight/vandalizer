@@ -1034,6 +1034,12 @@ async def add_task(step_id: str, req: AddTaskRequest, user: User = Depends(get_c
     if not task:
         status_code, detail = await _diagnose_step_mutation_failure(step_id, user)
         raise HTTPException(status_code=status_code, detail=detail)
+    # A new task arrives with its details now (the editor creates it on Save,
+    # not on pick), so flag a verified workflow as stale here, as update_task does.
+    from app.services.verification_service import check_and_flag_stale_verification
+    wf = await svc._get_workflow_for_step(PydanticObjectId(step_id))
+    if wf:
+        await check_and_flag_stale_verification("workflow", str(wf.id))
     return task
 
 
