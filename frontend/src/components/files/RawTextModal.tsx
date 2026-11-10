@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import DOMPurify from 'dompurify'
 import { FocusTrap } from 'focus-trap-react'
-import { X, Loader2, AlertCircle, RefreshCw } from 'lucide-react'
+import { X, Loader2, AlertCircle, RefreshCw, Download } from 'lucide-react'
 import { marked } from 'marked'
 import { pollStatus, retryExtraction } from '../../api/documents'
 
@@ -14,7 +14,7 @@ interface RawTextModalProps {
 
 type LoadState =
   | { kind: 'loading' }
-  | { kind: 'ok'; text: string; lowQuality: boolean; isPdf: boolean }
+  | { kind: 'ok'; text: string; lowQuality: boolean; isPdf: boolean; title: string }
   | { kind: 'error'; message: string; canRetry: boolean }
   | { kind: 'processing'; status: string | null }
 
@@ -50,6 +50,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
             text: res.raw_text || '',
             lowQuality: Boolean(res.extraction_low_quality),
             isPdf: (res.extension || '').toLowerCase() === 'pdf',
+            title: res.title || '',
           })
         }
       })
@@ -111,6 +112,19 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
     void handleRetry(true)
   }, [handleRetry])
 
+  const handleExportMarkdown = useCallback(() => {
+    if (state.kind !== 'ok') return
+    const base = (state.title || 'document').replace(/\.[^./\\]+$/, '').replace(/[\\/:*?"<>|]+/g, '_').trim() || 'document'
+    const blob = new Blob([state.text], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${base}.md`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  }, [state])
 
   return (
     <div
@@ -157,6 +171,28 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
         >
           <span id="raw-text-modal-title" style={{ fontWeight: 600, fontSize: 16 }}>Extracted Text</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {state.kind === 'ok' && state.text && (
+            <button
+              onClick={handleExportMarkdown}
+              title="Download the extracted text as a Markdown file"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '5px 10px',
+                fontSize: 13,
+                fontWeight: 500,
+                backgroundColor: 'transparent',
+                color: '#333',
+                border: '1px solid #d1d5db',
+                borderRadius: 6,
+                cursor: 'pointer',
+              }}
+            >
+              <Download style={{ width: 13, height: 13 }} />
+              Export Markdown
+            </button>
+          )}
           {state.kind === 'ok' && state.isPdf && (
             <button
               onClick={handleRerunOcr}

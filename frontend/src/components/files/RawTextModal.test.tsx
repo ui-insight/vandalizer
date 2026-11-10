@@ -120,3 +120,38 @@ describe('RawTextModal Re-run OCR', () => {
   })
 })
 
+describe('RawTextModal Export Markdown', () => {
+  beforeEach(() => {
+    vi.mocked(pollStatus).mockReset()
+  })
+
+  it('downloads the extracted text as a .md file named after the document', async () => {
+    vi.mocked(pollStatus).mockResolvedValue(pollResponse({ raw_text: '# Heading\n\nBody', title: 'Report.pdf' }))
+    const createObjectURL = vi.fn((_blob: Blob) => 'blob:md')
+    const revokeObjectURL = vi.fn()
+    Object.assign(URL, { createObjectURL, revokeObjectURL })
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      expect(this.download).toBe('Report.md')
+      expect(this.href).toBe('blob:md')
+    })
+
+    render(<RawTextModal docUuid="doc-1" onClose={vi.fn()} />)
+    fireEvent.click(await screen.findByRole('button', { name: /export markdown/i }))
+
+    expect(clickSpy).toHaveBeenCalledTimes(1)
+    const blob = createObjectURL.mock.calls[0][0]
+    expect(await blob.text()).toBe('# Heading\n\nBody')
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:md')
+    clickSpy.mockRestore()
+  })
+
+  it('is not offered when there is no text', async () => {
+    vi.mocked(pollStatus).mockResolvedValue(pollResponse({
+      status: 'error', raw_text: '', error_message: 'failed',
+    }))
+    render(<RawTextModal docUuid="doc-1" onClose={vi.fn()} />)
+    await screen.findByText('failed')
+    expect(screen.queryByRole('button', { name: /export markdown/i })).toBeNull()
+  })
+})
+
