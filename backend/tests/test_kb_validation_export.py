@@ -623,3 +623,71 @@ def test_an_older_run_exports_no_conflict_count():
     _, run_meta, _ = _build()
     assert run_meta["num_expected_conflicts"] is None
     assert run_meta["avg_judge_score_excluding_conflicts"] is None
+
+
+def _vr_with_passages():
+    vr = _make_vr()
+    det = vr.result_snapshot["retrieval_precision"]["details"][0]
+    det["context_passages"] = [
+        {"rank": 1, "chunk_id": "ch-a", "source_id": "s-a", "source_name": "PAPPG Ch. IV",
+         "similarity": 0.8, "added_for_amendment": False, "amends": [],
+         "amended_by": ["PAPPG Supplement 1"], "text": "Reconsideration is available.", "text_truncated": False},
+        {"rank": 2, "chunk_id": "ch-b", "source_id": "s-a", "source_name": "PAPPG Ch. IV",
+         "similarity": 0.7, "added_for_amendment": False, "amends": [],
+         "amended_by": ["PAPPG Supplement 1"], "text": "Second passage.", "text_truncated": False},
+        {"rank": 3, "chunk_id": "ch-c", "source_id": "s-b", "source_name": "PAPPG Supplement 1",
+         "similarity": 0.4, "added_for_amendment": True, "amends": ["PAPPG Ch. IV"],
+         "amended_by": [], "text": "Section 9 removes reconsideration for SBIR.", "text_truncated": False},
+    ]
+    # Judged, but retrieval found nothing and the answer abstained.
+    vr.result_snapshot["retrieval_precision"]["details"][1]["context_passages"] = []
+    return vr
+
+
+def test_rows_list_every_source_and_passage_the_answer_was_given():
+    _payload, _meta, rows = _build(_vr_with_passages())
+    assert rows[0]["context_sources"] == [
+        "PAPPG Ch. IV (amended by PAPPG Supplement 1)",
+        "PAPPG Supplement 1 (added automatically, amends PAPPG Ch. IV)",
+    ]
+    assert [p["chunk_id"] for p in rows[0]["context_passages"]] == ["ch-a", "ch-b", "ch-c"]
+    assert rows[1]["context_sources"] == [] and rows[1]["context_passages"] == []
+    # A row from a run recorded before passages were kept says so with None,
+    # not an empty list that would read as "nothing was retrieved".
+    assert rows[2]["context_sources"] is None and rows[2]["context_passages"] is None
+
+
+def test_csv_carries_passages_with_chunk_id_source_and_text():
+    _payload, meta, rows = _build(_vr_with_passages())
+    parsed = list(csv.DictReader(io.StringIO(render_results_csv(meta, rows))))
+    cell = parsed[0]["context_passages"]
+    assert "[1] PAPPG Ch. IV · chunk ch-a\nReconsideration is available." in cell
+    assert "[3] PAPPG Supplement 1 · chunk ch-c (added automatically)\nSection 9 removes" in cell
+    assert parsed[0]["context_sources"].startswith("PAPPG Ch. IV (amended by")
+
+
+def test_xlsx_has_one_passages_row_per_passage():
+    from openpyxl import load_workbook
+
+    _payload, meta, rows = _build(_vr_with_passages())
+    wb = load_workbook(io.BytesIO(render_results_xlsx(meta, rows)))
+    sheet = wb["Passages"]
+    header = [c.value for c in sheet[1]]
+    data = [dict(zip(header, (c.value for c in r))) for r in sheet.iter_rows(min_row=2)]
+    assert [(d["question"], d["chunk_id"], d["source_name"]) for d in data] == [
+        ("What is the deadline?", "ch-a", "PAPPG Ch. IV"),
+        ("What is the deadline?", "ch-b", "PAPPG Ch. IV"),
+        ("What is the deadline?", "ch-c", "PAPPG Supplement 1"),
+    ]
+    assert data[2]["text"] == "Section 9 removes reconsideration for SBIR."
+    assert data[2]["added_for_amendment"] is True and data[2]["amends"] == "PAPPG Ch. IV"
+    results = wb["Results"]
+    col = [c.value for c in results[1]].index("context_passages")
+    assert results.cell(2, col + 1).value == "3 passages: see Passages sheet"
+
+
+def test_an_older_run_exports_no_passages_sheet():
+    _payload, meta, rows = _build()
+    from openpyxl import load_workbook
+    wb = load_workbook(io.BytesIO(render_results_xlsx(meta, rows)))
+    assert "Passages" not in wb.sheetnames

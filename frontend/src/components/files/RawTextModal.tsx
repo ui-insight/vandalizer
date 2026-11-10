@@ -1,9 +1,10 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import DOMPurify from 'dompurify'
 import { FocusTrap } from 'focus-trap-react'
-import { X, Loader2, AlertCircle, RefreshCw } from 'lucide-react'
+import { X, Loader2, AlertCircle, RefreshCw, Download, Square } from 'lucide-react'
 import { marked } from 'marked'
-import { pollStatus, retryExtraction } from '../../api/documents'
+import { cancelExtraction, pollStatus, retryExtraction } from '../../api/documents'
+import { ApiError } from '../../api/client'
 
 marked.setOptions({ breaks: true, gfm: true })
 
@@ -14,13 +15,15 @@ interface RawTextModalProps {
 
 type LoadState =
   | { kind: 'loading' }
-  | { kind: 'ok'; text: string; lowQuality: boolean }
+  | { kind: 'ok'; text: string; lowQuality: boolean; isPdf: boolean; title: string }
   | { kind: 'error'; message: string; canRetry: boolean }
   | { kind: 'processing'; status: string | null }
 
 export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
   const [state, setState] = useState<LoadState>({ kind: 'loading' })
   const [retrying, setRetrying] = useState(false)
+  const [stopping, setStopping] = useState(false)
+  const [stopError, setStopError] = useState<string | null>(null)
 
   const renderedHtml = useMemo(() => {
     if (state.kind !== 'ok' || !state.text) return ''
@@ -49,6 +52,8 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
             kind: 'ok',
             text: res.raw_text || '',
             lowQuality: Boolean(res.extraction_low_quality),
+            isPdf: (res.extension || '').toLowerCase() === 'pdf',
+            title: res.title || '',
           })
         }
       })
@@ -71,10 +76,10 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
     return cleanup
   }, [load])
 
-  const handleRetry = useCallback(async () => {
+  const handleRetry = useCallback(async (forceOcr = false) => {
     setRetrying(true)
     try {
-      await retryExtraction(docUuid)
+      await retryExtraction(docUuid, { forceOcr })
       setState({ kind: 'processing', status: 'extracting' })
       // Poll for completion every 3s until done.
       const interval = setInterval(async () => {
@@ -98,6 +103,55 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
       setRetrying(false)
     }
   }, [docUuid, load])
+
+  const handleRerunOcr = useCallback(() => {
+    if (
+      !window.confirm(
+        'Re-run OCR on this document? Its current text will be replaced with a fresh OCR reading, and it will be re-indexed for search.',
+      )
+    ) {
+      return
+    }
+    void handleRetry(true)
+  }, [handleRetry])
+
+  const handleStop = useCallback(async () => {
+    if (
+      !window.confirm(
+        'Stop reading this document? You can retry the extraction afterwards.',
+      )
+    ) {
+      return
+    }
+    setStopping(true)
+    setStopError(null)
+    try {
+      await cancelExtraction(docUuid)
+    } catch (err) {
+      // A 409 means it finished or failed on its own meanwhile — reloading
+      // shows whichever it was.
+      if (!(err instanceof ApiError && err.status === 409)) {
+        setStopError(err instanceof Error ? err.message : 'Failed to stop extraction.')
+      }
+    } finally {
+      setStopping(false)
+    }
+    load()
+  }, [docUuid, load])
+
+  const handleExportMarkdown = useCallback(() => {
+    if (state.kind !== 'ok') return
+    const base = (state.title || 'document').replace(/\.[^./\\]+$/, '').replace(/[\\/:*?"<>|]+/g, '_').trim() || 'document'
+    const blob = new Blob([state.text], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${base}.md`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  }, [state])
 
   return (
     <div
@@ -143,6 +197,58 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
           }}
         >
           <span id="raw-text-modal-title" style={{ fontWeight: 600, fontSize: 16 }}>Extracted Text</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {state.kind === 'ok' && state.text && (
+            <button
+              onClick={handleExportMarkdown}
+              title="Download the extracted text as a Markdown file"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '5px 10px',
+                fontSize: 13,
+                fontWeight: 500,
+                backgroundColor: 'transparent',
+                color: '#333',
+                border: '1px solid #d1d5db',
+                borderRadius: 6,
+                cursor: 'pointer',
+              }}
+            >
+              <Download style={{ width: 13, height: 13 }} />
+              Export Markdown
+            </button>
+          )}
+          {state.kind === 'ok' && state.isPdf && (
+            <button
+              onClick={handleRerunOcr}
+              disabled={retrying}
+              title="Read this document again with OCR and replace its stored text"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '5px 10px',
+                fontSize: 13,
+                fontWeight: 500,
+                backgroundColor: 'transparent',
+                color: retrying ? '#9ca3af' : '#333',
+                border: '1px solid #d1d5db',
+                borderRadius: 6,
+                cursor: retrying ? 'not-allowed' : 'pointer',
+              }}
+            >
+              <RefreshCw
+                style={{
+                  width: 13,
+                  height: 13,
+                  animation: retrying ? 'spin 1s linear infinite' : undefined,
+                }}
+              />
+              {retrying ? 'Starting...' : 'Re-run OCR'}
+            </button>
+          )}
           <button
             onClick={onClose}
             aria-label="Close"
@@ -157,6 +263,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
           >
             <X style={{ width: 20, height: 20 }} />
           </button>
+          </div>
         </div>
 
         {/* Body */}
@@ -179,6 +286,32 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
                   ? 'Indexing document...'
                   : 'Extracting text from your document...'}
               </div>
+              <button
+                onClick={() => void handleStop()}
+                disabled={stopping}
+                title="Stop this extraction so it can be restarted"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '5px 10px',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  backgroundColor: 'transparent',
+                  color: stopping ? '#9ca3af' : '#b91c1c',
+                  border: '1px solid #fca5a5',
+                  borderRadius: 6,
+                  cursor: stopping ? 'not-allowed' : 'pointer',
+                }}
+              >
+                <Square style={{ width: 12, height: 12 }} />
+                {stopping ? 'Stopping...' : 'Stop'}
+              </button>
+              {stopError && (
+                <div role="alert" style={{ fontSize: 13, color: '#b91c1c' }}>
+                  {stopError}
+                </div>
+              )}
             </div>
           )}
 
@@ -193,7 +326,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
               </div>
               {state.canRetry && (
                 <button
-                  onClick={handleRetry}
+                  onClick={() => void handleRetry()}
                   disabled={retrying}
                   style={{
                     display: 'flex',
@@ -248,7 +381,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
                     Text extracted poorly &mdash; most of the stored text is unreadable.
                   </span>
                   <button
-                    onClick={handleRetry}
+                    onClick={() => void handleRetry()}
                     disabled={retrying}
                     style={{
                       display: 'flex',
