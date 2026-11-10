@@ -1233,6 +1233,44 @@ def _xlsx_sheet_markers(text: str) -> list[dict]:
     return markers
 
 
+#: Page boundary an OCR service writes into its output: ``<!-- page N -->`` on
+#: its own line. Invisible when rendered; parsed here into exact markers.
+_OCR_PAGE_MARKER_RE = re.compile(r"^[ \t]*<!--\s*page\s+(\d+)\s*-->[ \t]*(?:\r?\n)*", re.MULTILINE)
+
+
+def split_ocr_page_markers(text: str) -> tuple[str, list[dict] | None]:
+    """Strip ``<!-- page N -->`` boundaries from OCR output.
+
+    Returns the text without them and one exact page marker per page
+    (``char_offset`` into the returned text). Markers is ``None`` when the
+    service wrote no boundaries, so the caller falls back to interpolation.
+    A service that sanitizes its output (the dgx-stack OCR service escapes
+    every comment the page itself contains) guarantees these are its own.
+    """
+    if not text or "<!--" not in text:
+        return text, None
+    parts: list[str] = []
+    markers: list[dict] = []
+    pos = 0
+    length = 0
+    for m in _OCR_PAGE_MARKER_RE.finditer(text):
+        chunk = text[pos:m.start()]
+        parts.append(chunk)
+        length += len(chunk)
+        markers.append({"char_offset": length, "kind": "page", "value": int(m.group(1))})
+        pos = m.end()
+    if not markers:
+        return text, None
+    parts.append(text[pos:])
+    clean = "".join(parts)
+    # A blank trailing page puts its marker past the last character; clamp so
+    # every marker points into the text like interpolated ones do.
+    last = max(0, len(clean) - 1)
+    for mk in markers:
+        mk["char_offset"] = min(mk["char_offset"], last)
+    return clean, markers
+
+
 def _interpolate_page_markers(text: str, num_pages: int) -> list[dict]:
     """Approximate page boundaries by spreading them evenly across the text.
 
@@ -1524,7 +1562,9 @@ def _fast_path_with_page_ocr(
                 one_page = os.path.join(tmp, f"page-{n + 1}.pdf")
                 try:
                     _single_page_pdf(pdf_path, n, one_page)
-                    ocr_text = ocr_extract_text_from_pdf(one_page, report={})
+                    ocr_text, _ = split_ocr_page_markers(
+                        ocr_extract_text_from_pdf(one_page, report={})
+                    )
                 except ocr_client.OcrUnavailableError:
                     if not local_on_ocr_outage:
                         raise
@@ -1896,6 +1936,9 @@ def _read_pdf_text_and_markers(
             ) from e
         logger.warning("OCR raised, falling back to PyMuPDF: %s", e)
         ocr_text = ""
+    # An OCR service that writes page boundaries gives exact page markers;
+    # otherwise they are interpolated below.
+    ocr_text, exact_markers = split_ocr_page_markers(ocr_text or "")
     if ocr_text and len(ocr_text.strip()) >= MIN_PDF_TEXT_LENGTH:
         # Interpolation spreads the *source PDF's* page count uniformly over
         # whatever text OCR returned. When the conversion was partial, the
@@ -1914,6 +1957,8 @@ def _read_pdf_text_and_markers(
             missing = _pages_missing_from_ocr(file_path, ocr_text)
             if missing:
                 report["unread_pages"] = missing
+        if exact_markers:
+            return ocr_text, exact_markers
         num_pages = pdf_page_count(file_path)
         return ocr_text, _interpolate_page_markers(ocr_text, num_pages)
     untrustworthy = _text_layer_untrustworthy(classification)
@@ -1989,7 +2034,7 @@ def _read_pdf_text_and_markers(
                 report["partial"] = True
                 report["errors"] = ocr_report_errors
                 return ocr_text, []
-            return ocr_text, _interpolate_page_markers(
+            return ocr_text, exact_markers or _interpolate_page_markers(
                 ocr_text, pdf_page_count(file_path)
             )
         raise
