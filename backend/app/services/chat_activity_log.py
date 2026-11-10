@@ -58,8 +58,10 @@ def _iso(value: Any) -> Optional[str]:
         # Messages are stamped with naive server-local time; say which.
         if value.tzinfo is None:
             value = value.astimezone()
-        return value.astimezone(datetime.timezone.utc).isoformat()
-    return value if isinstance(value, str) else None
+        return str(value.astimezone(datetime.timezone.utc).isoformat())
+    if isinstance(value, str):
+        return value
+    return None
 
 
 def _unique(items: Iterable[dict]) -> list[dict]:

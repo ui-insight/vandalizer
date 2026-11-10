@@ -6940,9 +6940,10 @@ async def save_certification_position(
                 "lesson card's Save my place. Don't say it was saved, and don't call this again."
             ),
         }
-    return await _save_certification_position_versioned(
+    # A CourseToolError is a TypedDict: a plain dict to the agent.
+    return dict(await _save_certification_position_versioned(
         context, module_id, lesson_id, expected_revision, enrollment_id,
-    )
+    ))
 
 
 @course_operation(write=True, tool=True)

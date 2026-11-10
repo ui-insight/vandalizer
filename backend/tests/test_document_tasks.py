@@ -2280,8 +2280,6 @@ class TestExtractionOwnership:
     def test_result_is_dropped_once_the_run_no_longer_owns_the_document(
         self, mock_extract, MockSettings, mock_get_db, mock_notify,
     ):
-        from celery.exceptions import Ignore
-
         from app.tasks.document_tasks import perform_extraction_and_update
 
         db = MagicMock()
@@ -2296,8 +2294,8 @@ class TestExtractionOwnership:
 
         db.smart_document.update_one.side_effect = update_one
 
-        with pytest.raises(Ignore):
-            perform_extraction_and_update(document_uuid="doc-1", extension="pdf")
+        # Dropped quietly: the rest of the chain is fenced by the revision.
+        assert perform_extraction_and_update(document_uuid="doc-1", extension="pdf") == ""
 
         lock_set = db.smart_document.update_one.call_args_list[0][0][1]["$set"]
         assert "task_id" in lock_set
@@ -2318,8 +2316,6 @@ class TestExtractionOwnership:
     def test_error_from_a_stopped_run_does_not_overwrite_the_stop(
         self, mock_extract, MockSettings, mock_get_db, mock_notify,
     ):
-        from celery.exceptions import Ignore
-
         from app.tasks.document_tasks import perform_extraction_and_update
 
         db = MagicMock()
@@ -2330,6 +2326,6 @@ class TestExtractionOwnership:
             lambda f, u: MagicMock(matched_count=0 if "task_id" in f else 1)
         )
 
-        with pytest.raises(Ignore):
-            perform_extraction_and_update(document_uuid="doc-1", extension="pdf")
+        # Dropped quietly: the rest of the chain is fenced by the revision.
+        assert perform_extraction_and_update(document_uuid="doc-1", extension="pdf") == ""
         mock_notify.assert_not_called()

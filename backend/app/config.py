@@ -16,7 +16,8 @@ def _url_host(url: str) -> str:
 def is_local_url(url: str) -> bool:
     """Whether *url* points at the machine it is opened on, not a site."""
     host = _url_host(url)
-    return not host or host in {"localhost", "127.0.0.1", "::1", "0.0.0.0"} or host.endswith(".localhost")
+    # Recognising a local address, not binding to one.
+    return not host or host in {"localhost", "127.0.0.1", "::1", "0.0.0.0"} or host.endswith(".localhost")  # nosec B104
 
 
 def is_placeholder_url(url: str) -> bool:

@@ -115,7 +115,7 @@ def _stacked_dates(text: str) -> dict[str, datetime.date] | None:
         values = lines[i + len(labels): i + 2 * len(labels)]
         dates = [_cell_date(v) for v in values]
         if len(dates) == len(labels) and all(dates):
-            return dict(zip(labels, dates))
+            return {kind: d for kind, d in zip(labels, dates) if d is not None}
     return None
 
 
