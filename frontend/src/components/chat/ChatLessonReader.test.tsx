@@ -78,26 +78,37 @@ it('does not start teaching from a module card with mismatched course bytes', ()
 
 it('navigates by stable ID with duplicate titles and focuses the new lesson without saving', () => {
   render(<ChatLessonReader content={content} />)
-  expect(screen.getByRole('button', { name: 'Previous lesson' })).toBeDisabled()
-  fireEvent.click(screen.getByRole('button', { name: 'Next lesson' }))
+  expect(screen.getByRole('button', { name: /^Previous lesson/ })).toBeDisabled()
+  fireEvent.click(screen.getByRole('button', { name: /^Next lesson/ }))
   expect(screen.getByText('Second immutable lesson.')).toBeInTheDocument()
   expect(screen.getByRole('heading', { name: 'Same title' })).toHaveFocus()
   expect(screen.queryByText('First objective.')).not.toBeInTheDocument()
   fireEvent.change(screen.getByRole('combobox'), { target: { value: lessons[2].id } })
   expect(screen.getByText('Third immutable lesson.')).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Next lesson' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: /^Next lesson/ })).toBeDisabled()
   fireEvent.click(screen.getByRole('button', { name: 'Return to saved lesson' }))
   expect(screen.getByRole('combobox')).toHaveValue(lessons[1].id)
-  fireEvent.click(screen.getByRole('button', { name: 'Previous lesson' }))
+  fireEvent.click(screen.getByRole('button', { name: /^Previous lesson/ }))
   expect(screen.getByText('First immutable lesson.')).toBeInTheDocument()
   expect(state.save).not.toHaveBeenCalled()
+})
+
+it('numbers the Previous and Next lesson buttons (support ticket: they had no number)', () => {
+  render(<ChatLessonReader content={content} />)
+  expect(screen.getByRole('button', { name: 'Previous lesson' })).toBeDisabled()
+  fireEvent.click(screen.getByRole('button', { name: 'Next lesson 2' }))
+  expect(screen.getByRole('button', { name: 'Previous lesson 1' })).toBeEnabled()
+  expect(screen.getByRole('button', { name: 'Next lesson 3' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Next lesson 3' }))
+  expect(screen.getByRole('button', { name: 'Previous lesson 2' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Next lesson' })).toBeDisabled()
 })
 
 it('uses authored order and identities even when the original numeric position is different', () => {
   state.value = { ...context(), course: { ...identity, modules: [{ id: 'module', lessons: [lessons[2], lessons[0], lessons[1]] }] } }
   render(<ChatLessonReader content={content} />)
   expect(screen.getByText('Lesson 2/3 · Module')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Previous lesson' }))
+  fireEvent.click(screen.getByRole('button', { name: /^Previous lesson/ }))
   expect(screen.getByText('Third immutable lesson.')).toBeInTheDocument()
 })
 
@@ -105,7 +116,7 @@ it('saves only the explicitly selected stable ID and blocks duplicate saves whil
   let resolve!: () => void
   state.save.mockReturnValue(new Promise<void>(done => { resolve = done }))
   render(<ChatLessonReader content={content} />)
-  fireEvent.click(screen.getByRole('button', { name: 'Next lesson' }))
+  fireEvent.click(screen.getByRole('button', { name: /^Next lesson/ }))
   fireEvent.click(screen.getByRole('button', { name: 'Save my place' }))
   fireEvent.click(screen.getByRole('button', { name: 'Save my place' }))
   expect(state.save).toHaveBeenCalledExactlyOnceWith('module', 'module.beta')
@@ -117,7 +128,7 @@ it('saves only the explicitly selected stable ID and blocks duplicate saves whil
 it('keeps reading after a failed save and refreshes without retrying the write', async () => {
   state.save.mockRejectedValue(new Error('conflict'))
   render(<ChatLessonReader content={content} />)
-  fireEvent.click(screen.getByRole('button', { name: 'Next lesson' }))
+  fireEvent.click(screen.getByRole('button', { name: /^Next lesson/ }))
   fireEvent.click(screen.getByRole('button', { name: 'Save my place' }))
   fireEvent.click(await screen.findByRole('button', { name: 'Refresh progress' }))
   expect(state.refresh).toHaveBeenCalledOnce()
@@ -145,7 +156,7 @@ it.each(['enrollment', 'manifest', 'revision', 'missing_id', 'duplicate_id', 'ch
 
 it('removes navigation immediately when course selection changes', () => {
   const { rerender } = render(<ChatLessonReader content={content} />)
-  fireEvent.click(screen.getByRole('button', { name: 'Next lesson' }))
+  fireEvent.click(screen.getByRole('button', { name: /^Next lesson/ }))
   state.value = { ...context(), progress: { enrollment_id: 'another', modules: {} } }
   rerender(<ChatLessonReader content={content} />)
   expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
@@ -159,7 +170,7 @@ it('preserves legacy browser positions and never calls the enrolled position end
   render(<ChatLessonReader content={{ module_id: module.id, module_title: module.title, ...lesson, lesson_id: lesson.id, lesson_revision: lesson.revision, lesson_number: 1, lesson_count: module.lessons.length }} />)
   fireEvent.click(screen.getByRole('button', { name: 'Return to saved lesson' }))
   expect(screen.getByRole('combobox')).toHaveValue(module.lessons[2].id)
-  fireEvent.click(screen.getByRole('button', { name: 'Next lesson' }))
+  fireEvent.click(screen.getByRole('button', { name: /^Next lesson/ }))
   fireEvent.click(screen.getByRole('button', { name: 'Save my place' }))
   await waitFor(() => expect(localStorage.getItem(`cert-lesson::${module.id}`)).toBe('3'))
   expect(state.save).not.toHaveBeenCalled()
@@ -175,6 +186,6 @@ it('honors a read-only card boundary even when lesson identity otherwise matches
 
 it('records a lesson opened with Next lesson as read, so chat does not send it again', () => {
   render(<ChatLessonReader content={content} />)
-  fireEvent.click(screen.getByRole('button', { name: 'Next lesson' }))
+  fireEvent.click(screen.getByRole('button', { name: /^Next lesson/ }))
   expect(markLessonRead).toHaveBeenCalledWith('module', lessons[1].id, 'enrollment-a')
 })

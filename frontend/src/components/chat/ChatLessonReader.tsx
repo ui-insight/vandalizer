@@ -103,9 +103,9 @@ export function ChatLessonReader({ content, readOnly = false }: { content: Recor
         </select>
       </label>
       <div className="flex flex-wrap gap-2">
-        <button type="button" className={button} disabled={index === 0 || status === 'saving'} onClick={() => navigate(lessons[index - 1].id!)}>Previous lesson</button>
+        <button type="button" className={button} disabled={index === 0 || status === 'saving'} onClick={() => navigate(lessons[index - 1].id!)}>{index > 0 ? `Previous lesson ${index}` : 'Previous lesson'}</button>
         <button type="button" className={button} disabled={index === lessons.length - 1 || status === 'saving' || !gate.canOpen(index + 1)}
-          title={gate.canOpen(index + 1) ? undefined : 'Pass this lesson’s knowledge check first'} onClick={() => navigate(lessons[index + 1].id!)}>Next lesson</button>
+          title={gate.canOpen(index + 1) ? undefined : 'Pass this lesson’s knowledge check first'} onClick={() => navigate(lessons[index + 1].id!)}>{index < lessons.length - 1 ? `Next lesson ${index + 2}` : 'Next lesson'}</button>
         {savedId && lessons.some(item => item.id === savedId) && <button type="button" className={button} disabled={status === 'saving'} onClick={() => navigate(savedId)}>Return to saved lesson</button>}
         <button type="button" className={button} disabled={status === 'saving'} onClick={() => void save()}>Save my place</button>
       </div>
