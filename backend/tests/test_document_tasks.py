@@ -2302,7 +2302,10 @@ class TestExtractionOwnership:
         lock_set = db.smart_document.update_one.call_args_list[0][0][1]["$set"]
         assert "task_id" in lock_set
         owned_filter = db.smart_document.update_one.call_args_list[-1][0][0]
-        assert owned_filter == {"uuid": "doc-1", "task_id": lock_set["task_id"]}
+        # Owned by this run's task id, within this extraction's revision.
+        assert owned_filter["uuid"] == "doc-1"
+        assert owned_filter["task_id"] == lock_set["task_id"]
+        assert "_extraction_restart_revision" in str(owned_filter)
         mock_notify.assert_not_called()
 
     @patch("app.tasks.document_tasks._notify_document_processing_failed")

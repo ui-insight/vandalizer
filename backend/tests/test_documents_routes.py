@@ -509,7 +509,7 @@ class TestRetryExtractionRoute:
         even though its stored text looks fine."""
         doc = _make_document(doc_uuid="doc-1", user_id="owner1", task_status="complete")
         doc.ingestion_warnings = []
-        resp, mock_dispatch, mock_log_event = await self._post(client, doc, "?force_ocr=true")
+        resp, mock_dispatch, mock_log_event = await self._post(client, doc, query="?force_ocr=true")
 
         assert resp.status_code == 200
         assert mock_dispatch.call_args.kwargs["force_ocr"] is True
@@ -520,7 +520,7 @@ class TestRetryExtractionRoute:
         doc = _make_document(doc_uuid="doc-1", user_id="owner1", task_status="complete")
         doc.ingestion_warnings = []
         doc.extension = "docx"
-        resp, mock_dispatch, mock_log_event = await self._post(client, doc, "?force_ocr=true")
+        resp, mock_dispatch, mock_log_event = await self._post(client, doc, query="?force_ocr=true")
 
         assert resp.status_code == 200
         assert mock_dispatch.call_args.kwargs["force_ocr"] is False
@@ -785,6 +785,9 @@ class TestCancelExtractionRoute:
         # Clearing task_id is what makes a worker the revoke missed drop its result.
         assert update["$set"]["task_id"] is None
         assert update["$set"]["error_retryable"] is True
+        # Like a restart, Stop bumps the revision: the stopped run's later
+        # steps (update, ingestion, cleanup) are filtered on it.
+        assert update["$inc"] == {"_extraction_restart_revision": 1}
         mock_revoke.assert_called_once_with("extract-task-1", terminate=True, signal="SIGTERM")
         assert mock_log_event.call_args.kwargs["action"] == "document.cancel_extraction"
 
