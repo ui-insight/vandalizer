@@ -1635,3 +1635,58 @@ async def test_run_kb_validation_records_a_grader_fallback():
     assert result["judge_model"] == "openai/gpt-oss-120b"
     assert result["judge_model_fallback"] == note
     assert persisted["model_settings"]["judge_model_fallback"] == note
+
+
+@pytest.mark.asyncio
+async def test_judge_test_queries_records_the_passages_the_answer_was_given():
+    chunks = [
+        {"content": "  Indirect costs are 52%.  ", "chunk_id": "c-1", "similarity": 0.81,
+         "metadata": {"source_id": "s-1", "source_name": "Rate agreement.pdf"}},
+        {"content": "", "chunk_id": "c-empty", "metadata": {"source_name": "Blank.pdf"}},
+        {"content": "x" * 5000, "chunk_id": "c-2", "added_for_amendment": True,
+         "amends": ["Rate agreement"], "metadata": {"source_id": "s-2", "source_name": "Rate memo.pdf"}},
+    ]
+
+    async def fake_kb_answer(kb_uuid, query, model_name, k=8, config=None):
+        return ("52%", chunks, 0)
+
+    with patch.object(kb_validation_service, "_generate_kb_answer", side_effect=fake_kb_answer), \
+         patch.object(kb_validation_service, "_judge_answer", side_effect=_pass_judge):
+        out = await kb_validation_service.judge_test_queries("kb-1", [_tq()], "test-model", mode="judge")
+
+    passages = out["details"][0]["context_passages"]
+    # The empty chunk never reached the prompt, so it is not reported.
+    assert [p["chunk_id"] for p in passages] == ["c-1", "c-2"]
+    assert passages[0] == {
+        "rank": 1, "chunk_id": "c-1", "source_id": "s-1", "source_name": "Rate agreement.pdf",
+        "similarity": 0.81, "added_for_amendment": False, "amends": [], "amended_by": [],
+        "text": "Indirect costs are 52%.", "text_truncated": False,
+    }
+    assert passages[1]["added_for_amendment"] is True and passages[1]["amends"] == ["Rate agreement"]
+    assert len(passages[1]["text"]) == kb_validation_service.CONTEXT_PASSAGE_CHARS
+    assert passages[1]["text_truncated"] is True
+
+
+@pytest.mark.asyncio
+async def test_run_kb_validation_carries_passages_and_truncation_flags_to_the_export_rows():
+    """The export reads only the merged retrieval rows; a judge field the
+    merge does not copy is silently blank there."""
+    fake_kb = MagicMock()
+    fake_kb.uuid, fake_kb.title = "kb-1", "2 CFR 200"
+    fake_kb.rag_config_override = None
+    passages = [{"rank": 1, "chunk_id": "c-1", "source_name": "2 CFR 200.pdf", "text": "..."}]
+    judge_payload = {
+        "details": [{"query_uuid": "q1", "judge": {"score": 1.0, "verdict": "PASS"},
+                     "actual_answer": "A", "context_passages": passages,
+                     "actual_answer_truncated": True, "generation_truncated": True,
+                     "baseline_answer_truncated": False, "baseline_generation_truncated": True}],
+        "avg_judge_score": 1.0, "num_queries_judged": 1,
+    }
+
+    result, _persisted, _judge = await _run_with(fake_kb, judge_payload)
+
+    row = result["retrieval_precision"]["details"][0]
+    assert row["context_passages"] == passages
+    assert row["actual_answer_truncated"] is True
+    assert row["generation_truncated"] is True
+    assert row["baseline_generation_truncated"] is True
