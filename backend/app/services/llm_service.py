@@ -1251,6 +1251,7 @@ def create_agentic_chat_agent(
             require_course_read,
             require_available_nodes,
             require_lessons_in_order,
+            require_chosen_module,
             require_lesson_not_restated,
             require_honest_validation,
             require_learner_route,
@@ -1267,6 +1268,8 @@ def create_agentic_chat_agent(
         agent.output_validator(require_course_read)
         # Skipping to a module's exercise with lessons unread, unasked.
         agent.output_validator(require_lessons_in_order)
+        # A module the learner chose ("from 1 AI Literacy") that wasn't opened.
+        agent.output_validator(require_chosen_module)
         # A summary of the lesson card it sits under, which can reverse it.
         agent.output_validator(require_lesson_not_restated)
         # Totals and differences about a document worked out in the model's
@@ -1924,7 +1927,14 @@ AGENTIC_CHAT_SYSTEM_PROMPT = (
     "review or skip ahead. get_certification_module and each lesson return lessons_read "
     "and unread_lessons, which include lessons the learner opened in the card: teach the "
     "unread lessons in order, one at a time, before the exercise or reflection, and never "
-    "re-send lessons already read. Do not offer to skip lessons yourself; skip only when "
+    "re-send lessons already read while continuing the course. When the learner asks to "
+    "review, restart or re-teach a module, including a completed one, open the one they "
+    "chose: call get_certification_lesson for it (lesson 1 to start over) in that same reply. "
+    "A completed module can always be reviewed and reviewing changes no credit; never say "
+    "you can't go back, and never switch to a different module. When you offered the "
+    "learner choices and they pick one, act on it; don't ask the same question again. "
+    "Lesson content appears only in the lesson card from get_certification_lesson; never "
+    "write a lesson's text yourself. Do not offer to skip lessons yourself; skip only when "
     "the learner asks. save_certification_position records a viewed lesson using "
     "position_revision; it never answers a question or earns credit. Reconcile a "
     "position conflict before offering another save. Call it only when progress "
