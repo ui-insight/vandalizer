@@ -10,6 +10,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Upgrade audited frontend and Python dependencies, including the compatible MSAL/cryptography and FastAPI/Starlette stacks. Replace unmaintained PyPDF2 with pypdf and verify saved PDF form values. Chroma's development port now binds to localhost. Three Chroma advisories still have no published fix; see `docs/v5-release-readiness.md` for residual risk and release gates.
 
 ### Added
+- **Chat Activity: what you approved, and what it did.** In a long chat you couldn't tell what you had approved, how many times, or whether it ran. Each card showed only its own result, and Admin → Audit recorded only "chat deleted" (support ticket: NIFA subaward setup test, where Files and Projects had to be checked by hand to learn whether "Move files" and "Add to inbox" had run).
+  - **Activity** in the chat toolbar opens one timeline: Time · What you did · What happened (✅ done, ❌ not run, ⚠️ partly done, with the result's own message).
+  - Cards still waiting are listed first, with their approve and **Cancel action** buttons. Each button decides only that card, exactly like the card's own.
+  - Repeated approvals are flagged on each row, for example "Approved twice, ran once."
+  - **Export log** downloads the timeline as text to attach to a support ticket.
+  - Admin → Audit records each approval or cancellation as `chat.action_approved` / `chat.action_cancelled`, with who, when, the action, how it was approved (button or typed reply), the outcome and the result.
+
+  API: `GET /api/chat/history/{uuid}/activity`. The log is read from the stored transcript, so it covers earlier chats too. Audit entries start with this release.
 - **Pages know which file they were built from, and say when it changes.** A Page built from a spreadsheet gave no sign it was out of date after a revised budget was uploaded. Users had to remember which pages used the file and update each one by hand, even though chat updates a page from the new file accurately when asked (support ticket: NIH R01 Budget Dashboard still showed $1.25M after a v2 moved Equipment Y2 from $15k to $20k). The pieces:
   - **Upload new version.** Files have **Upload new version** and **Version history** in their **⋯** menu. The new file goes into the same folder, is read like any upload, and shows a **v2** badge. The old version drops out of the file list and search, but stays in Version history for download. Deleting the current version makes the previous one current again.
   - **Built from.** Each Page saved from chat records the files that turn attached or read. A Page made from a template records the file it filled, and a workflow Page records its run's input files. The Page screen shows "Built from: NIH R01 Budget Table.xlsx".
