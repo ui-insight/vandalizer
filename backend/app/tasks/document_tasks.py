@@ -636,7 +636,15 @@ def perform_extraction_and_update(
                 # branch sees it, so "nothing usable" may be one page of
                 # three: the advice has to leave a retry open rather than
                 # send the user straight to re-upload.
-                if ocr_report.get("text_layer_rejected_reason") == "ocr_required":
+                if ocr_report.get("text_layer_rejected_reason") == "ocr_all_pdfs":
+                    message = (
+                        "OCR read this document's pages and returned no text. "
+                        "This deployment requires OCR for every PDF, so no "
+                        "lower-quality reading was stored. Retry extraction in "
+                        "case the OCR service was degraded; if it keeps "
+                        "failing, the pages may be blank or unreadable."
+                    )
+                elif ocr_report.get("text_layer_rejected_reason") == "ocr_required":
                     message = (
                         "OCR read this document's pages and found nothing "
                         "usable, and its own text layer was already refused "

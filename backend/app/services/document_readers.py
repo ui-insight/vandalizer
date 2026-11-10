@@ -1378,6 +1378,21 @@ def _classify_pdf(pdf_path: str):
         return None
 
 
+def _ocr_all_pdfs() -> bool:
+    """Whether the deployment set ``OCR_ALL_PDFS``: every PDF goes to OCR, with
+    no local fallback. An environment setting, read without touching the
+    database, so it costs nothing per document."""
+    try:
+        from app.config import Settings
+
+        # "is True": only a real, parsed setting turns this on — never a
+        # mocked or malformed value that merely happens to be truthy.
+        return Settings().ocr_all_pdfs is True
+    except Exception as e:  # noqa: BLE001 — a settings hiccup keeps the default flow
+        logger.warning("Could not read OCR_ALL_PDFS setting: %s", e)
+        return False
+
+
 def _local_markdown_extract_from_pdf(
     pdf_path: str, classification,
 ) -> tuple[str, list[dict]] | None:
@@ -1868,6 +1883,16 @@ def _read_pdf_text_and_markers(
 
     classification = _classify_pdf(file_path)
 
+    # ocr_all_pdfs: every PDF is read by OCR and nothing else. It rides on
+    # ocr_required — no fast path, no local reading on an outage, a failure to
+    # ask OCR raises for the task's retry — and closes the one hole
+    # ocr_required leaves open (OCR never looked at the pages: unconfigured
+    # endpoint, a permanent 4xx), which below fails the document loudly
+    # instead of storing PyMuPDF text.
+    strict_ocr = _ocr_all_pdfs()
+    if strict_ocr:
+        ocr_required = True
+
     fast_path = None
     if not (force_ocr or ocr_required):
         fast_path = _local_markdown_extract_from_pdf(file_path, classification)
@@ -1939,7 +1964,22 @@ def _read_pdf_text_and_markers(
     # An OCR service that writes page boundaries gives exact page markers;
     # otherwise they are interpolated below.
     ocr_text, exact_markers = split_ocr_page_markers(ocr_text or "")
-    if ocr_text and len(ocr_text.strip()) >= MIN_PDF_TEXT_LENGTH:
+    if strict_ocr and not report.get("ocr_completed"):
+        # OCR never read the pages — unconfigured, a key that won't decrypt, or
+        # a permanent rejection (400/413/415/422, an HTML error page). Under
+        # ocr_all_pdfs there is no lesser reading to fall back to: fail with
+        # the reason so an admin sees it, rather than storing text-layer text.
+        reason = report.get("ocr_skipped") or "the OCR service rejected the request"
+        raise DocumentReadError(
+            "OCR is required for every PDF on this deployment, but the OCR "
+            f"service did not read this document ({reason}). Check the OCR "
+            "endpoint in Admin -> System Config, then retry extraction."
+        )
+    # A short page is still a real reading when OCR produced it: under
+    # ocr_all_pdfs there is no better reader to defer to, so only an empty
+    # result counts as "nothing usable".
+    min_len = 1 if strict_ocr else MIN_PDF_TEXT_LENGTH
+    if ocr_text and len(ocr_text.strip()) >= min_len:
         # Interpolation spreads the *source PDF's* page count uniformly over
         # whatever text OCR returned. When the conversion was partial, the
         # text covers some unknown fraction of those pages, so every marker —
@@ -1994,7 +2034,11 @@ def _read_pdf_text_and_markers(
         # Which half of the gate fired. The task's message may only claim the
         # fonts don't map to characters when the classifier is what refused
         # the layer; under ocr_required nothing established that.
-        report["text_layer_rejected_reason"] = "classifier" if untrustworthy else "ocr_required"
+        report["text_layer_rejected_reason"] = (
+            "classifier" if untrustworthy
+            else "ocr_all_pdfs" if strict_ocr
+            else "ocr_required"
+        )
         return "", []
     # Falling back means the partial OCR text is not what we return, so the
     # partial-conversion warning must not survive onto the PyMuPDF result.
