@@ -438,6 +438,144 @@ def require_course_read(ctx: RunContext["AgenticChatDeps"], output: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# The module the learner chose
+# ---------------------------------------------------------------------------
+# Support ticket: a learner who had completed Modules 1-4 said "I want to start
+# certification from beginning", was offered two options, and replied "from 1
+# AI Literacy". Chat repeated the options, then opened Extraction Engine
+# (Module 5), said it could not skip backward, and pasted that lesson as plain
+# text with no card; AI Literacy opened on the fifth message. Every lesson of
+# a completed module is read, and "never re-send read lessons" left no way to
+# review one. A reply to a learner who picks a module must open that module's
+# lesson card; otherwise it is sent back once.
+
+_CHOOSES = re.compile(
+    r"\b(?:from|start|starting|begin|beginning|restart|re-?start|review|re-?teach|redo|re-?do|repeat|"
+    r"go\s+back|back\s+to|open|teach|take\s+me|study|learn|pick|choose|want|let'?s|please)\b",
+    re.IGNORECASE,
+)
+_COURSE_WORDS = re.compile(r"\b(?:certification|course|module|lesson)s?\b", re.IGNORECASE)
+_MODULE_NUMBER = re.compile(r"\bmodule\s+(\d{1,2})\b", re.IGNORECASE)
+_LESSON_NUMBER = re.compile(r"\blesson\s+(\d{1,2})\b", re.IGNORECASE)
+# Asking for the module's exercise or standing is not asking to open a lesson.
+_NOT_A_LESSON = re.compile(
+    r"\b(?:exercise|reflection|assessment|self-assessment|challenge|lab|quiz|check|progress|xp|"
+    r"complete|completion|certificate|credit|score|stars?)\b",
+    re.IGNORECASE,
+)
+
+
+def _course_modules(messages: Sequence[ModelMessage] | None) -> list[tuple[str, str]]:
+    """(module_id, title) in course order: from this conversation's latest
+    progress read (the learner's own enrollment), else the original course."""
+    for message in reversed(list(messages or [])):
+        for part in getattr(message, "parts", []):
+            if isinstance(part, ToolReturnPart) and part.tool_name == "get_certification_progress":
+                content = part.content
+                rows = content.get("modules") if isinstance(content, dict) else None
+                if isinstance(rows, list) and rows:
+                    return [(str(r["module_id"]), str(r.get("title") or r["module_id"]))
+                            for r in rows if isinstance(r, dict) and r.get("module_id")]
+    from app.services import certification_service as cert_svc
+
+    return [(mid, cert_svc.MODULE_TITLES.get(mid, mid)) for mid in cert_svc.MODULE_ORDER]
+
+
+def _in_course_conversation(message: str, messages: Sequence[ModelMessage] | None) -> bool:
+    """Module titles are ordinary words ("Foundations", "Workflow Design"), so
+    only a conversation already about the course counts."""
+    from pydantic_ai.messages import ToolCallPart
+
+    if _COURSE_WORDS.search(message):
+        return True
+    return any(
+        isinstance(part, ToolCallPart) and "certification" in part.tool_name
+        for m in messages or [] for part in getattr(m, "parts", [])
+    )
+
+
+def chosen_module(message: str, modules: list[tuple[str, str]]) -> tuple[str, str, int, int | None] | None:
+    """(module_id, title, number, lesson) when *message* picks one module to
+    open ("from 1 AI Literacy", "review module 2"), else None.
+
+    A module is picked by its title or "module N" (numbered from 1 in course
+    order); a title wins over a number. A bare number is not a module: "1" in
+    reply to a list of options means the first option.
+    """
+    text = " ".join((message or "").replace("’", "'").split())
+    if not text or len(text) > 200 or not modules or _NOT_A_LESSON.search(text):
+        return None
+    lowered = text.lower()
+    by_title = [i for i, (_mid, title) in enumerate(modules)
+                if re.search(rf"(?<!\w){re.escape(title.lower())}(?!\w)", lowered)]
+    if len(by_title) > 1:
+        return None
+    index: int | None = by_title[0] if by_title else None
+    if index is None:
+        number = _MODULE_NUMBER.search(text)
+        if number and 1 <= int(number.group(1)) <= len(modules):
+            index = int(number.group(1)) - 1
+    if index is None:
+        return None
+    # "What does Foundations cover?" names a module without choosing it.
+    if not _CHOOSES.search(text) and ("?" in text or len(text.split()) > 4):
+        return None
+    lesson = _LESSON_NUMBER.search(text)
+    module_id, title = modules[index]
+    return module_id, title, index + 1, int(lesson.group(1)) if lesson else None
+
+
+def _lessons_opened_this_turn(messages: Sequence[ModelMessage] | None) -> set[str]:
+    """module_ids of get_certification_lesson calls since the user's latest message."""
+    from pydantic_ai.messages import ModelRequest, ModelResponse, ToolCallPart, UserPromptPart
+
+    opened: set[str] = set()
+    for message in messages or []:
+        if isinstance(message, ModelRequest) and any(isinstance(p, UserPromptPart) for p in message.parts):
+            opened = set()
+        elif isinstance(message, ModelResponse):
+            for part in message.parts:
+                if isinstance(part, ToolCallPart) and part.tool_name == "get_certification_lesson":
+                    try:
+                        args = part.args_as_dict()
+                    except Exception:
+                        continue
+                    if args.get("module_id"):
+                        opened.add(str(args["module_id"]))
+    return opened
+
+
+CHOSEN_MODULE_RETRY_INSTRUCTION = (
+    "The learner chose Module {number}, {title} (module_id \"{module_id}\"). Open it now: call "
+    "get_certification_lesson with module_id \"{module_id}\" and lesson_number {lesson}, and add one "
+    "framing sentence. A completed module can always be reviewed from any lesson; reviewing it "
+    "changes no credit. Do not ask again which module, do not open a different module, and do "
+    "not write the lesson's content yourself: the lesson card shows it."
+)
+
+
+def require_chosen_module(ctx: RunContext["AgenticChatDeps"], output: str) -> str:
+    """Output validator: send back, once per turn, a reply to a learner who
+    chose a module that doesn't open that module's lesson card."""
+    deps = ctx.deps
+    if ctx.partial_output or deps is None or getattr(deps, "chosen_module_retry_used", False):
+        return output
+    message = getattr(deps, "user_message", "") or ""
+    if not _in_course_conversation(message, ctx.messages):
+        return output
+    choice = chosen_module(message, _course_modules(ctx.messages))
+    if choice is None:
+        return output
+    module_id, title, number, lesson = choice
+    if module_id in _lessons_opened_this_turn(ctx.messages):
+        return output
+    deps.chosen_module_retry_used = True
+    raise ModelRetry(CHOSEN_MODULE_RETRY_INSTRUCTION.format(
+        number=number, title=title, module_id=module_id, lesson=lesson or 1,
+    ))
+
+
+# ---------------------------------------------------------------------------
 # Lessons before the exercise
 # ---------------------------------------------------------------------------
 # Support ticket: after Module 0's first lesson chat went straight to the

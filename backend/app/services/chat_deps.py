@@ -126,3 +126,5 @@ class AgenticChatDeps:
     lesson_skip_retry_used: bool = False
     # Once-only flag for approval_claims.require_lesson_not_restated.
     lesson_restated_retry_used: bool = False
+    # Once-only flag for approval_claims.require_chosen_module.
+    chosen_module_retry_used: bool = False
