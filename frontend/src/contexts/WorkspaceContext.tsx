@@ -1,4 +1,5 @@
 import type { DocumentReadiness } from '../utils/documentReadiness'
+import { forgetProjectOrigin, openedFromProjects } from '../lib/projectOrigin'
 import { validPanelSplit } from '../utils/workspaceLayout'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode, type Dispatch, type SetStateAction } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
@@ -149,6 +150,9 @@ interface ChatStateContextValue {
   activeProjectRole: string | null // owner|editor|viewer — gates mutating UI
   activateProject: (uuid: string, title: string) => void
   deactivateProject: () => void
+  // Exit project: back to the Projects list when the project was opened from
+  // it, otherwise Home (deactivateProject).
+  exitProject: () => void
   // Re-pull the active project's metadata (title/role/team) into the context
   // bar after an in-workspace edit (rename, share, make-personal) — without
   // resetting the chat the way activateProject does.
@@ -546,6 +550,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setStoredRaw(KB_STORAGE_KEY, null)
     setActiveKBs([])
     setStoredRaw(PROJECT_STORAGE_KEY, null)
+    forgetProjectOrigin()
     setActiveProjectUuid(null)
     setActiveProjectTitle(null)
     setActiveProjectRootFolder(null)
@@ -624,6 +629,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     // We store only the uuid — title/role/root are re-fetched on rehydrate so a
     // renamed or re-shared project never shows stale chrome.
     setStoredRaw(PROJECT_STORAGE_KEY, uuid)
+    forgetProjectOrigin()
     setActiveProjectUuid(uuid)
     setActiveProjectTitle(title)
     // Entering a project starts a fresh, project-scoped chat.
@@ -639,6 +645,16 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     if (activeProjectUuid || search.project || getStoredRaw(PROJECT_STORAGE_KEY)) resetToHome()
     else projectScopeVersion.current += 1
   }, [activeProjectUuid, search.project, resetToHome])
+
+  const exitProject = useCallback(() => {
+    const backToList = openedFromProjects(activeProjectUuid)
+    deactivateProject()
+    if (!backToList) return
+    // Back to the list it was opened from: the same clean slate as Home, with
+    // the Projects list showing instead of chat.
+    setStoredRaw('workspace:mode', 'projects')
+    updateSearch(() => ({ ...emptyWorkspaceSearch(), mode: 'projects' }))
+  }, [activeProjectUuid, deactivateProject, updateSearch])
 
   const refreshActiveProject = useCallback(() => {
     if (!activeProjectUuid || activeProjectUuidRef.current !== activeProjectUuid) return
@@ -719,6 +735,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const projectParam = search.project
     if (!projectParam) return
+    // Opened from the Projects list only when the list marked this project.
+    forgetProjectOrigin(projectParam)
     const version = ++projectScopeVersion.current
     let cancelled = false
     const isCurrent = () => !cancelled && projectScopeVersion.current === version
@@ -971,7 +989,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     focusChatSignal, focusChat,
     pendingChatMessage, sendChatMessage, clearPendingChatMessage,
     activeKBs, activeKBUuid, activeKBTitle, activateKB, attachKBs, replaceKBs, detachKB, deactivateKB,
-    activeProjectUuid, activeProjectTitle, activeProjectRootFolder, activeProjectTeamId, activeProjectRole, activateProject, deactivateProject, refreshActiveProject,
+    activeProjectUuid, activeProjectTitle, activeProjectRootFolder, activeProjectTeamId, activeProjectRole, activateProject, deactivateProject, exitProject, refreshActiveProject,
     processingDoc, setProcessingDoc,
     selectedDocsProcessing, setSelectedDocsProcessing,
     documentReadiness, updateDocumentReadiness,
@@ -981,7 +999,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     focusChatSignal, focusChat,
     pendingChatMessage, sendChatMessage, clearPendingChatMessage,
     activeKBs, activeKBUuid, activeKBTitle, activateKB, attachKBs, replaceKBs, detachKB, deactivateKB,
-    activeProjectUuid, activeProjectTitle, activeProjectRootFolder, activeProjectTeamId, activeProjectRole, activateProject, deactivateProject, refreshActiveProject,
+    activeProjectUuid, activeProjectTitle, activeProjectRootFolder, activeProjectTeamId, activeProjectRole, activateProject, deactivateProject, exitProject, refreshActiveProject,
     processingDoc,
     selectedDocsProcessing, setSelectedDocsProcessing,
     documentReadiness, updateDocumentReadiness,

@@ -1,4 +1,5 @@
 import { FieldLabel, FieldMessage } from '../shared/FormField'
+import { rememberOpenedFromProjects } from '../../lib/projectOrigin'
 import { WorkspaceSectionHeader } from '../shared/WorkspaceSectionHeader'
 import { usePanelVisible } from '../shared/PanelVisibility'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -63,6 +64,8 @@ export function ProjectsPanel() {
   // localStorage fallback while the (async) project scope resolves.
   const openProject = (uuid: string) => {
     try { localStorage.setItem('workspace:mode', 'chat') } catch { /* URL navigation remains available. */ }
+    // Exit project brings the user back here.
+    rememberOpenedFromProjects(uuid)
     navigate({
       to: '/',
       search: {

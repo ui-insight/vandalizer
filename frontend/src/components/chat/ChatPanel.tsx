@@ -24,6 +24,7 @@ import { ContextMeter } from './ContextMeter'
 import { ContextLimitDialog } from './ContextLimitDialog'
 import { PlanChecklist } from './PlanChecklist'
 import { MemoryPanel } from './MemoryPanel'
+import { ChatActivityPanel } from './ChatActivityPanel'
 import { ProjectChatBadge } from './ProjectChatBadge'
 import { ProjectSuggestedActions } from '../projects/ProjectSuggestedActions'
 import { AttachKBModal } from './AttachKBModal'
@@ -114,7 +115,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     announceChatWrite(result)
   } })
 
-  const { setWorkspaceMode, openWorkflow, openExtraction, workspaceMode, activeRightTab, openWorkflowId, openExtractionId, openAutomationId, bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, setSelectedFolderUuids, selectedFolderNames, setSelectedFolderNames, activeKBs, activeKBUuid, activeKBTitle, activateKB, attachKBs, replaceKBs, detachKB, activeProjectUuid, activeProjectTitle, activeProjectRole, deactivateProject, setCurrentConversationUuid, focusChatSignal, focusChat, triggerNewChat } = useWorkspace()
+  const { setWorkspaceMode, openWorkflow, openExtraction, workspaceMode, activeRightTab, openWorkflowId, openExtractionId, openAutomationId, bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, setSelectedFolderUuids, selectedFolderNames, setSelectedFolderNames, activeKBs, activeKBUuid, activeKBTitle, activateKB, attachKBs, replaceKBs, detachKB, activeProjectUuid, activeProjectTitle, activeProjectRole, exitProject, setCurrentConversationUuid, focusChatSignal, focusChat, triggerNewChat } = useWorkspace()
 
   // When scoped to a project, surface its file/index status so the empty state
   // reflects the project (not a generic assistant) and sets honest expectations.
@@ -986,6 +987,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           hasMessages={messages.length > 0}
           hasDocuments={fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0 || selectedFolderUuids.length > 0}
           memoryControl={<MemoryPanel />}
+          activityControl={<ChatActivityPanel conversationUuid={conversationUuid ?? null} refreshKey={`${messages.length}:${pendingApprovals.join(',')}`} busy={isStreaming || isLoadingHistory} onDecide={(m, pageApproval, decision) => handleSend(m, undefined, pageApproval, decision)} />}
           navigationControl={showScrollDown ? <button type="button" onClick={scrollToBottom} aria-label="Scroll to bottom" title="Latest message" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-700 hover:bg-gray-100"><ArrowDown size={18} /></button> : null}
           focusSignal={focusChatSignal}
           contextMeter={
@@ -1647,7 +1649,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         <ProjectChatBadge
           projectUuid={activeProjectUuid}
           fallbackTitle={activeProjectTitle}
-          onExit={deactivateProject}
+          onExit={exitProject}
         />
       )}
 

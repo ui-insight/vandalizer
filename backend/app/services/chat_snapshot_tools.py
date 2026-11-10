@@ -97,6 +97,9 @@ async def get_award_snapshot(
         "status": v["project"]["state"],
         "facts_read_from_documents": [_fact(f) for f in v["facts"]],
         "budget_by_year": [_fact(f) for f in v["budget_years"]],
+        # Not in the award documents read. Say so; don't fill them from a
+        # summary or another file (support ticket).
+        **({"not_stated_in_documents": v["not_found"]} if v.get("not_found") else {}),
         "facts_built_at": v.get("built_at"),
         "ra_inbox_deadlines": {
             "overdue": [_deadline(d) for d in dl["overdue"]],

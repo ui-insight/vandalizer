@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { WorkspaceProvider, useWorkspace } from './WorkspaceContext'
 import type { ProjectOverview } from '../types/project'
+import { openedFromProjects, rememberOpenedFromProjects } from '../lib/projectOrigin'
 
 const mocks = vi.hoisted(() => ({ search: {} as Record<string, string>, navigate: vi.fn(), getProject: vi.fn(), toast: vi.fn(), team: { uuid: 'team-1' }, teamsLoading: false }))
 vi.mock('@tanstack/react-router', () => ({ useNavigate: () => mocks.navigate, useSearch: () => mocks.search }))
@@ -162,4 +163,52 @@ it('retains a page source workflow run until the editor consumes it once', () =>
   const { result } = setup()
   expect(result.current.consumeWorkflowSession()).toBe('run-a')
   expect(result.current.consumeWorkflowSession()).toBeNull()
+})
+
+// Support ticket: Exit project on a project opened from the Projects list went
+// to Home in chat (Files on the left, a new empty chat), not back to the list.
+describe('Exit project returns to where the project was opened from', () => {
+  beforeEach(() => { sessionStorage.clear(); mocks.getProject.mockImplementation((uuid: string) => Promise.resolve(project(uuid))) })
+  const exitMode = () => mocks.navigate.mock.lastCall![0].search({}).mode
+
+  it('goes back to the Projects list when the list opened it', async () => {
+    rememberOpenedFromProjects('a')
+    mocks.search = { project: 'a' }
+    const { result } = setup()
+    await waitFor(() => expect(result.current.activeProjectUuid).toBe('a'))
+    act(() => result.current.exitProject())
+    expect(result.current.activeProjectUuid).toBeNull()
+    expect(exitMode()).toBe('projects')
+    expect(mocks.navigate.mock.lastCall![0].search({ workflow: 'w1', mode: 'chat' }).workflow).toBeUndefined()
+    expect(localStorage.getItem('workspace:mode')).toBe('projects')
+    expect(openedFromProjects('a')).toBe(false)
+  })
+
+  it('still goes back to the list after a reload of the open project', async () => {
+    rememberOpenedFromProjects('a')
+    localStorage.setItem('workspace:project', 'a')
+    const { result } = setup()
+    await waitFor(() => expect(result.current.activeProjectUuid).toBe('a'))
+    act(() => result.current.exitProject())
+    expect(exitMode()).toBe('projects')
+  })
+
+  it('goes Home when the project was opened from a chat or a link', async () => {
+    mocks.search = { project: 'a' }
+    const { result } = setup()
+    await waitFor(() => expect(result.current.activeProjectUuid).toBe('a'))
+    act(() => result.current.exitProject())
+    expect(result.current.activeProjectUuid).toBeNull()
+    expect(exitMode()).toBe('chat')
+  })
+
+  it('a list visit to one project does not carry over to another opened by link', async () => {
+    rememberOpenedFromProjects('a')
+    mocks.search = { project: 'b' }
+    const { result } = setup()
+    await waitFor(() => expect(result.current.activeProjectUuid).toBe('b'))
+    act(() => result.current.exitProject())
+    expect(exitMode()).toBe('chat')
+    expect(openedFromProjects('a')).toBe(false)
+  })
 })
