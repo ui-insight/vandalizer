@@ -46,6 +46,9 @@ export const TOOL_META: Record<string, { label: string; category: ToolCategory }
   find_pages:            { label: 'Finding pages',        category: 'read' },
   get_html_artifact:     { label: 'Reading page',         category: 'read' },
   compare_page_versions: { label: 'Comparing page versions', category: 'read' },
+  // Support ticket: these titled their cards "find page templates".
+  find_page_templates:   { label: 'Finding page templates', category: 'read' },
+  get_page_template:     { label: 'Reading page template',  category: 'read' },
   create_project:        { label: 'Creating project',         category: 'write' },
   list_projects:         { label: 'Finding projects',         category: 'read' },
   move_documents_to_project: { label: 'Moving files into project', category: 'write' },
