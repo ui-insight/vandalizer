@@ -44,7 +44,7 @@ describe('RawTextModal low-quality notice', () => {
     expect(screen.getByText(/most of the stored text is unreadable/i)).toBeTruthy()
 
     fireEvent.click(button)
-    await waitFor(() => expect(retryExtraction).toHaveBeenCalledWith('doc-1'))
+    await waitFor(() => expect(retryExtraction).toHaveBeenCalledWith('doc-1', { forceOcr: false }))
   })
 
   it('shows no notice for a document that extracted cleanly', async () => {
@@ -81,3 +81,42 @@ describe('RawTextModal extraction failure', () => {
     expect(await screen.findByRole('button', { name: /retry extraction/i })).toBeTruthy()
   })
 })
+
+describe('RawTextModal Re-run OCR', () => {
+  beforeEach(() => {
+    vi.mocked(pollStatus).mockReset()
+    vi.mocked(retryExtraction).mockReset()
+    vi.restoreAllMocks()
+  })
+
+  it('re-runs OCR on a healthy PDF after confirmation', async () => {
+    vi.mocked(pollStatus).mockResolvedValue(pollResponse({ extension: 'pdf' }))
+    vi.mocked(retryExtraction).mockResolvedValue({} as never)
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    render(<RawTextModal docUuid="doc-1" onClose={vi.fn()} />)
+    fireEvent.click(await screen.findByRole('button', { name: /re-run ocr/i }))
+
+    await waitFor(() => expect(retryExtraction).toHaveBeenCalledWith('doc-1', { forceOcr: true }))
+  })
+
+  it('does nothing when the confirmation is cancelled', async () => {
+    vi.mocked(pollStatus).mockResolvedValue(pollResponse({ extension: 'pdf' }))
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+
+    render(<RawTextModal docUuid="doc-1" onClose={vi.fn()} />)
+    fireEvent.click(await screen.findByRole('button', { name: /re-run ocr/i }))
+
+    expect(retryExtraction).not.toHaveBeenCalled()
+  })
+
+  it('is not offered for non-PDF documents', async () => {
+    vi.mocked(pollStatus).mockResolvedValue(pollResponse({ extension: 'docx', path: 'uploads/doc.docx' }))
+
+    render(<RawTextModal docUuid="doc-1" onClose={vi.fn()} />)
+    await screen.findByText('Some extracted text.')
+
+    expect(screen.queryByRole('button', { name: /re-run ocr/i })).toBeNull()
+  })
+})
+

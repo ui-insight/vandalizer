@@ -14,7 +14,7 @@ interface RawTextModalProps {
 
 type LoadState =
   | { kind: 'loading' }
-  | { kind: 'ok'; text: string; lowQuality: boolean }
+  | { kind: 'ok'; text: string; lowQuality: boolean; isPdf: boolean }
   | { kind: 'error'; message: string; canRetry: boolean }
   | { kind: 'processing'; status: string | null }
 
@@ -49,6 +49,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
             kind: 'ok',
             text: res.raw_text || '',
             lowQuality: Boolean(res.extraction_low_quality),
+            isPdf: (res.extension || '').toLowerCase() === 'pdf',
           })
         }
       })
@@ -71,10 +72,10 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
     return cleanup
   }, [load])
 
-  const handleRetry = useCallback(async () => {
+  const handleRetry = useCallback(async (forceOcr = false) => {
     setRetrying(true)
     try {
-      await retryExtraction(docUuid)
+      await retryExtraction(docUuid, { forceOcr })
       setState({ kind: 'processing', status: 'extracting' })
       // Poll for completion every 3s until done.
       const interval = setInterval(async () => {
@@ -98,6 +99,18 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
       setRetrying(false)
     }
   }, [docUuid, load])
+
+  const handleRerunOcr = useCallback(() => {
+    if (
+      !window.confirm(
+        'Re-run OCR on this document? Its current text will be replaced with a fresh OCR reading, and it will be re-indexed for search.',
+      )
+    ) {
+      return
+    }
+    void handleRetry(true)
+  }, [handleRetry])
+
 
   return (
     <div
@@ -143,6 +156,36 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
           }}
         >
           <span id="raw-text-modal-title" style={{ fontWeight: 600, fontSize: 16 }}>Extracted Text</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {state.kind === 'ok' && state.isPdf && (
+            <button
+              onClick={handleRerunOcr}
+              disabled={retrying}
+              title="Read this document again with OCR and replace its stored text"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '5px 10px',
+                fontSize: 13,
+                fontWeight: 500,
+                backgroundColor: 'transparent',
+                color: retrying ? '#9ca3af' : '#333',
+                border: '1px solid #d1d5db',
+                borderRadius: 6,
+                cursor: retrying ? 'not-allowed' : 'pointer',
+              }}
+            >
+              <RefreshCw
+                style={{
+                  width: 13,
+                  height: 13,
+                  animation: retrying ? 'spin 1s linear infinite' : undefined,
+                }}
+              />
+              {retrying ? 'Starting...' : 'Re-run OCR'}
+            </button>
+          )}
           <button
             onClick={onClose}
             aria-label="Close"
@@ -157,6 +200,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
           >
             <X style={{ width: 20, height: 20 }} />
           </button>
+          </div>
         </div>
 
         {/* Body */}
@@ -193,7 +237,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
               </div>
               {state.canRetry && (
                 <button
-                  onClick={handleRetry}
+                  onClick={() => void handleRetry()}
                   disabled={retrying}
                   style={{
                     display: 'flex',
@@ -248,7 +292,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
                     Text extracted poorly &mdash; most of the stored text is unreadable.
                   </span>
                   <button
-                    onClick={handleRetry}
+                    onClick={() => void handleRetry()}
                     disabled={retrying}
                     style={{
                       display: 'flex',

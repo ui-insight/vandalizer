@@ -13,9 +13,12 @@ export function pollStatus(docid: string) {
   return apiFetch<PollStatusResponse>(`/api/documents/poll_status?docid=${docid}`)
 }
 
-export function retryExtraction(docUuid: string) {
+/** Re-run text extraction. `forceOcr` re-reads a PDF with OCR even when its
+ *  current text looks healthy (the "Re-run OCR" action). */
+export function retryExtraction(docUuid: string, opts: { forceOcr?: boolean } = {}) {
+  const query = opts.forceOcr ? '?force_ocr=true' : ''
   return apiFetch<{ uuid: string; task_id: string; status: string }>(
-    `/api/documents/${docUuid}/retry-extraction`,
+    `/api/documents/${docUuid}/retry-extraction${query}`,
     { method: 'POST' }
   )
 }

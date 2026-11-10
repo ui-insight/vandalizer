@@ -430,9 +430,9 @@ class TestRetryExtractionRoute:
     way — an OCR round-trip to get back text that was already fine is pure
     cost, and on a busy deployment it is cost per impatient click."""
 
-    async def _post(self, client, doc):
+    async def _post(self, client, doc, query=""):
         user = _make_user("owner1")
-        doc.path = "uploads/doc-1.pdf"
+        doc.path = doc.path if isinstance(getattr(doc, "path", None), str) else "uploads/doc-1.pdf"
         cookies, headers = _auth("owner1")
 
         with patch("app.dependencies.decode_token", return_value={"sub": "owner1", "type": "access"}), \
@@ -444,7 +444,7 @@ class TestRetryExtractionRoute:
             mock_get_doc.return_value = doc
 
             resp = await client.post(
-                "/api/documents/doc-1/retry-extraction",
+                "/api/documents/doc-1/retry-extraction" + query,
                 cookies=cookies,
                 headers=headers,
             )
@@ -485,6 +485,32 @@ class TestRetryExtractionRoute:
 
         assert resp.status_code == 200
         assert mock_dispatch.call_args.kwargs["force_ocr"] is False
+
+    @pytest.mark.asyncio
+    async def test_rerun_ocr_forces_ocr_on_a_healthy_pdf(self, client):
+        """The "Re-run OCR" action: ?force_ocr=true re-reads a PDF with OCR
+        even though its stored text looks fine."""
+        doc = _make_document(doc_uuid="doc-1", user_id="owner1", task_status="complete")
+        doc.ingestion_warnings = []
+        resp, mock_dispatch, mock_log_event = await self._post(client, doc, "?force_ocr=true")
+
+        assert resp.status_code == 200
+        assert mock_dispatch.call_args.kwargs["force_ocr"] is True
+        assert mock_log_event.call_args.kwargs["detail"]["requested_ocr"] is True
+
+    @pytest.mark.asyncio
+    async def test_rerun_ocr_is_a_no_op_flag_for_non_pdfs(self, client):
+        doc = _make_document(doc_uuid="doc-1", user_id="owner1", task_status="complete")
+        doc.ingestion_warnings = []
+        doc.extension = "docx"
+        resp, mock_dispatch, mock_log_event = await self._post(client, doc, "?force_ocr=true")
+
+        assert resp.status_code == 200
+        assert mock_dispatch.call_args.kwargs["force_ocr"] is False
+        # The audit log keeps the request apart from the decision.
+        detail = mock_log_event.call_args.kwargs["detail"]
+        assert detail["requested_ocr"] is True
+        assert detail["force_ocr"] is False
 
     @pytest.mark.asyncio
     async def test_low_quality_document_is_re_read_with_ocr(self, client):
@@ -540,6 +566,7 @@ class TestRetryExtractionRoute:
             "force_ocr": True,
             "ocr_required": True,
             "previous_task_status": "error",
+            "requested_ocr": False,
         }
 
     @pytest.mark.asyncio
@@ -560,6 +587,7 @@ class TestRetryExtractionRoute:
             "force_ocr": False,
             "ocr_required": False,
             "previous_task_status": "error",
+            "requested_ocr": False,
         }
         assert doc.text_layer_rejected is False
 
@@ -653,6 +681,7 @@ class TestRetryExtractionRoute:
             "force_ocr": True,
             "ocr_required": False,
             "previous_task_status": "error",
+            "requested_ocr": False,
         }
 
     @pytest.mark.asyncio
@@ -672,6 +701,7 @@ class TestRetryExtractionRoute:
             "force_ocr": True,
             "ocr_required": True,
             "previous_task_status": "complete",
+            "requested_ocr": False,
         }
 
 

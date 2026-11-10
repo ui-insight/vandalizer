@@ -294,6 +294,7 @@ async def poll_status(doc_uuid: str, user: User) -> dict | None:
         "error_message": doc.error_message,
         "error_retryable": doc.error_retryable,
         "processing": doc.processing,
+        "extension": (doc.extension or "").lower().lstrip(".") or None,
         "title": doc.title,
         "extraction_low_quality": is_extraction_low_quality(doc),
         "ingestion_warnings": ingestion_warnings(doc),
@@ -310,7 +311,9 @@ def extraction_in_flight(doc: SmartDocument) -> bool:
     return bool(doc.processing) or doc.task_status in _IN_PROGRESS_TASK_STATUSES
 
 
-async def restart_extraction(doc: SmartDocument, user_id: str) -> dict:
+async def restart_extraction(
+    doc: SmartDocument, user_id: str, *, request_ocr: bool = False,
+) -> dict:
     """Clear a document's extracted text and re-dispatch the upload chain.
 
     Shared by the document's Retry extraction and a knowledge-base source's
@@ -318,7 +321,8 @@ async def restart_extraction(doc: SmartDocument, user_id: str) -> dict:
     ``extraction_in_flight`` and authorization first.
 
     A retry re-reads the pages with OCR when the previous extraction failed or
-    produced unreadable text; a healthy document is re-read the ordinary way.
+    produced unreadable text; a healthy document is re-read the ordinary way,
+    unless ``request_ocr`` asks for OCR explicitly (the "Re-run OCR" action).
     Returns the dispatched task id and the OCR decisions, for the audit log.
     """
     import datetime as _datetime
@@ -349,7 +353,9 @@ async def restart_extraction(doc: SmartDocument, user_id: str) -> dict:
     # Pages no reader got text from are exactly what a retry is for: without
     # OCR first it would take the same local reading and miss them again.
     missed_pages = "unread_pages" in (doc.ingestion_warnings or [])
-    force_ocr = is_pdf and (doc.task_status == "error" or low_quality or missed_pages)
+    force_ocr = is_pdf and (
+        request_ocr or doc.task_status == "error" or low_quality or missed_pages
+    )
     ocr_required = is_pdf and (low_quality or doc.text_layer_rejected)
     if ocr_required:
         doc.text_layer_rejected = True
