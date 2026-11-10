@@ -394,3 +394,39 @@ async def test_export_carries_uuid_and_amends():
     exported = out["sources"][0]
     assert exported["uuid"] == "supp"
     assert exported["amends_source_uuids"] == ["base"]
+
+
+@pytest.mark.asyncio
+async def test_headless_answer_records_which_passages_amends_added():
+    """Support ticket: a validation export must list every source sent to the
+    model, including a supplement the amends link added automatically."""
+    run = MagicMock(output="All SBIR/STTR proposals.")
+    run.usage = MagicMock(return_value=None)
+    agent = MagicMock()
+    agent.run = AsyncMock(return_value=run)
+    dm = MagicMock()
+    dm.query_kb.return_value = [SUPP_LINE]
+    pool = _general_pool()[:4]
+
+    with patch.object(kb_validation_service, "retrieve_kb_chunks",
+                      new=AsyncMock(return_value=(pool, RAGConfig(k=4), 0))), \
+         patch.object(kb_validation_service, "load_amendment_links", new=AsyncMock(return_value=LINKS)), \
+         patch.object(kb_validation_service, "_get_dm", return_value=dm), \
+         patch.object(kb_validation_service, "_get_or_build_agent", return_value=agent):
+        _, results, _ = await kb_validation_service._generate_kb_answer(
+            "kb-1", "Which proposal types are excluded from reconsideration?", "test-model",
+            config=RAGConfig(k=4),
+        )
+
+    passages = kb_validation_service.context_passages(results)
+    assert [p["rank"] for p in passages] == [1, 2, 3, 4]
+    assert [p["added_for_amendment"] for p in passages] == [False, False, False, True]
+    supp = passages[-1]
+    assert supp["chunk_id"] == SUPP_LINE["chunk_id"]
+    assert supp["source_name"] == "NSF_PAPPG_24-1_Supplement_1_consolidated.pdf"
+    assert supp["amends"] == ["NSF PAPPG 24-1 Chapter IV"]
+    assert supp["text"] == SUPP_LINE["content"]
+    assert passages[0]["amended_by"] == ["NSF PAPPG 24-1 Supplement 1"]
+    # Every passage in the record is in the prompt the model saw.
+    prompt = agent.run.await_args.args[0]
+    assert all(p["text"] in prompt for p in passages)

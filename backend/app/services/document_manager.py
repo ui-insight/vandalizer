@@ -4,6 +4,7 @@ import hashlib
 import logging
 import re
 import threading
+import time
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -28,18 +29,66 @@ _DM_LOCK = threading.Lock()
 _SHARED_DM: "DocumentManager | None" = None
 
 
+_EMBED_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+_EMBED_CELL_END_RE = re.compile(r"</t[dh]\s*>", re.IGNORECASE)
+_EMBED_ROW_END_RE = re.compile(r"</tr\s*>|<br\s*/?>", re.IGNORECASE)
+# Only known formatting tags, never prose such as "< $5,000 and a >" or "x<y and y>z".
+_EMBED_TAG_RE = re.compile(
+    r"</?(?:table|thead|tbody|tfoot|tr|td|th|caption|colgroup|col|br|p|div|span|b|strong|"
+    r"i|em|u|s|sub|sup|small|mark|del|ins|code|pre|ul|ol|li|h[1-6]|a|img)\b[^<>]*>",
+    re.IGNORECASE,
+)
+
+
+def embedding_text(text: str) -> str:
+    """The words of a chunk, without markup, for the embedder to read.
+
+    Stored chunks keep their HTML (tables as ``<table>``) because the LLM
+    reads the structure. The embedder only needs the words, and the default
+    model reads just its first ~256 tokens — tags spent half of that on a
+    table, so most of its rows never reached the vector. Cells become
+    ``a | b``, rows and ``<br>`` become line breaks, comments are dropped.
+    """
+    if "<" not in text:
+        return text
+    import html as _html
+
+    t = _EMBED_COMMENT_RE.sub(" ", text)
+    t = _EMBED_CELL_END_RE.sub(" | ", t)
+    t = _EMBED_ROW_END_RE.sub("\n", t)
+    t = _html.unescape(_EMBED_TAG_RE.sub(" ", t))
+    return "\n".join(" ".join(line.split()) for line in t.splitlines() if line.strip())
+
+
+def _markup_stripping(inner: Any) -> Any:
+    """Wrap an embedding function so documents and queries are embedded as
+    :func:`embedding_text`. Stored documents are unchanged."""
+    from chromadb.api.types import Documents, EmbeddingFunction, Embeddings
+
+    class MarkupStrippingEmbeddingFunction(EmbeddingFunction[Documents]):
+        def __init__(self, wrapped: Any) -> None:
+            self._wrapped = wrapped
+
+        def __call__(self, input: Documents) -> Embeddings:
+            return self._wrapped([embedding_text(d) for d in input])
+
+    return MarkupStrippingEmbeddingFunction(inner)
+
+
 def get_default_embedding_function() -> Any:
     """Return a process-wide cached ChromaDB default embedding function.
 
     Lazily initialized on first call (inside the Celery worker process, after
-    fork) so model download/extraction happens once per process.
+    fork) so model download/extraction happens once per process. Markup is
+    stripped before embedding (see :func:`embedding_text`); the model and
+    vector size are unchanged, so existing collections stay compatible.
     """
     global _DEFAULT_EF
     if _DEFAULT_EF is None:
         with _EF_LOCK:
             if _DEFAULT_EF is None:
                 from chromadb.utils import embedding_functions
-                _DEFAULT_EF = embedding_functions.DefaultEmbeddingFunction()
+                _DEFAULT_EF = _markup_stripping(embedding_functions.DefaultEmbeddingFunction())
     return _DEFAULT_EF
 
 
@@ -56,6 +105,19 @@ def get_document_manager() -> "DocumentManager":
             if _SHARED_DM is None:
                 _SHARED_DM = DocumentManager()
     return _SHARED_DM
+
+
+def _is_already_exists(exc: BaseException) -> bool:
+    """A collection create that lost a race with another writer."""
+    try:
+        from chromadb.errors import UniqueConstraintError
+
+        if isinstance(exc, UniqueConstraintError):
+            return True
+    except ImportError:  # pragma: no cover — older/newer chromadb layouts
+        pass
+    text = f"{type(exc).__name__}: {exc}"
+    return "UniqueConstraintError" in text or "already exists" in text
 
 
 def get_chroma_client(persist_directory: str | None = None) -> chromadb.ClientAPI:
@@ -142,6 +204,49 @@ def _find_table_spans(text: str) -> list[tuple[int, int, str]]:
     return spans
 
 
+#: An HTML table may grow its chunk to this many characters rather than be
+#: split. Past it (a whole ledger), the table is split at row boundaries with
+#: its header repeated on every piece, and a warning is logged.
+HTML_TABLE_MAX_CHARS = 40_000
+# The header carried onto each piece of an oversized table: its opening tag
+# plus <thead> (or first row), capped so it can't crowd out the rows.
+_HTML_TABLE_HEADER_MAX_CHARS = 2_000
+_HTML_TABLE_TAG_RE = re.compile(r"<(/?)table\b[^>]*>", re.IGNORECASE)
+_HTML_THEAD_RE = re.compile(r"<thead\b[^>]*>.*?</thead\s*>", re.IGNORECASE | re.DOTALL)
+_HTML_TR_RE = re.compile(r"<tr\b[^>]*>.*?</tr\s*>", re.IGNORECASE | re.DOTALL)
+
+
+def _find_html_table_spans(text: str) -> list[tuple[int, int, str]]:
+    """Locate top-level ``<table>…</table>`` blocks (nesting-aware).
+
+    OCR output keeps tables as HTML — merged cells survive there and not in
+    pipe tables — and writes each one on a single line, so the line-based
+    pipe-table logic never sees it and the size-based split cut tables
+    mid-cell. Returns ``(start, end, header_html)`` per table; the header is
+    the opening tag plus ``<thead>`` (or the first row), used only when an
+    oversized table has to be split. An unclosed table is not a span.
+    """
+    spans: list[tuple[int, int, str]] = []
+    depth = 0
+    start = 0
+    for m in _HTML_TABLE_TAG_RE.finditer(text):
+        if not m.group(1):
+            if depth == 0:
+                start = m.start()
+            depth += 1
+        elif depth:
+            depth -= 1
+            if depth == 0:
+                table = text[start:m.end()]
+                opening = table[: table.index(">") + 1]
+                head = _HTML_THEAD_RE.search(table) or _HTML_TR_RE.search(table)
+                header = opening + (head.group(0) if head else "")
+                if len(header) > _HTML_TABLE_HEADER_MAX_CHARS:
+                    header = opening
+                spans.append((start, m.end(), header))
+    return spans
+
+
 def _split_text_with_offsets(
     text: str, chunk_size: int, chunk_overlap: int,
 ) -> list[tuple[str, int]]:
@@ -155,6 +260,13 @@ def _split_text_with_offsets(
     so its numbers keep their column labels. The header prefix is decoration
     only — the returned offset still points at the chunk's original position,
     so page/sheet marker mapping is unaffected.
+
+    HTML tables (OCR output) are never split: a chunk boundary is never
+    placed inside ``<table>…</table>``. A window that ends inside one either
+    breaks before the table (when it starts late in the window) or grows to
+    the table's end, up to ``HTML_TABLE_MAX_CHARS``. Only a table longer than
+    that is split, at ``</tr>`` boundaries, each piece re-wrapped with the
+    table's opening tag and header so it stays a valid, labelled table.
     """
     normalized = text.strip()
     if not normalized:
@@ -168,6 +280,15 @@ def _split_text_with_offsets(
                 return span
         return None
 
+    html_spans = _find_html_table_spans(normalized) if "<table" in normalized.lower() else []
+    lowered = normalized.lower() if html_spans else ""
+
+    def _html_span_containing(pos: int) -> tuple[int, int, str] | None:
+        for span in html_spans:
+            if span[0] < pos < span[1]:
+                return span
+        return None
+
     chunks: list[tuple[str, int]] = []
     start = 0
     step = max(1, chunk_size - chunk_overlap)
@@ -175,7 +296,25 @@ def _split_text_with_offsets(
 
     while start < text_length:
         end = min(text_length, start + chunk_size)
-        if end < text_length:
+        hspan = _html_span_containing(end) if end < text_length else None
+        if hspan is not None:
+            if hspan[0] > start + chunk_size // 2:
+                # The table starts late in the window: end the chunk before
+                # it so the next chunk starts with the whole table.
+                end = hspan[0]
+            elif hspan[1] - start <= HTML_TABLE_MAX_CHARS:
+                # Grow the chunk to the end of the table.
+                end = hspan[1]
+            else:
+                limit = start + HTML_TABLE_MAX_CHARS
+                row_end = lowered.rfind("</tr>", max(start, hspan[0]), limit)
+                end = row_end + len("</tr>") if row_end > start else limit
+                logger.warning(
+                    "HTML table of %d chars exceeds %d — splitting it at row "
+                    "boundaries with the header repeated",
+                    hspan[1] - hspan[0], HTML_TABLE_MAX_CHARS,
+                )
+        elif end < text_length:
             span = _span_containing(end)
             if span is not None and span[0] > start + chunk_size // 2:
                 # The window ends mid-table and the table starts late enough in
@@ -209,6 +348,13 @@ def _split_text_with_offsets(
                 and not chunk.startswith(span[2])
             ):
                 chunk = f"{span[2]}\n{chunk}"
+            # A piece of an oversized HTML table: re-wrap it so every piece
+            # is a complete table carrying the header row.
+            hs = _html_span_containing(offset)
+            if hs is not None and offset > hs[0]:
+                chunk = hs[2] + chunk
+            if _html_span_containing(end) is not None:
+                chunk += "</table>"
             chunks.append((chunk, offset))
 
         if end >= text_length:
@@ -220,6 +366,10 @@ def _split_text_with_offsets(
         # were silently dropped from ingestion.
         next_start = min(max(start + step, end - chunk_overlap), end)
         if next_start <= start:
+            next_start = end
+        # The overlap never restarts inside an HTML table: the table was
+        # emitted whole (or, oversized, up to a row boundary at ``end``).
+        if _html_span_containing(next_start) is not None:
             next_start = end
         # Don't let the overlap restart mid-row: snap to the start of the row
         # (or the next row when snapping back would stall the loop).
@@ -292,11 +442,37 @@ class DocumentManager:
         # so Chroma doesn't construct a fresh ONNXMiniLM_L6_V2 per collection.
         self.embedding_function = embedding_function or get_default_embedding_function()
 
+    def _get_or_create_collection(self, name: str) -> chromadb.Collection:
+        """``get_or_create_collection`` that survives a concurrent create.
+
+        Chroma's get-or-create is not atomic across clients: when several
+        workers ingest a user's first batch of uploads at once, each sees no
+        collection and tries to create it, and every one but the first fails
+        with ``UniqueConstraintError: Collection … already exists`` — which
+        left those documents saved but unsearchable. Losing that race just
+        means the collection now exists, so open it.
+        """
+        for attempt in range(3):
+            try:
+                return self.client.get_or_create_collection(
+                    name=name, embedding_function=self.embedding_function,
+                )
+            except Exception as e:  # noqa: BLE001 — narrowed by _is_already_exists
+                if not _is_already_exists(e):
+                    raise
+                logger.info("Collection %s was created concurrently; opening it", name)
+                try:
+                    return self.client.get_collection(
+                        name=name, embedding_function=self.embedding_function,
+                    )
+                except Exception:  # noqa: BLE001 — not visible yet; retry the create
+                    if attempt == 2:
+                        raise
+                    time.sleep(0.2 * (attempt + 1))
+        raise RuntimeError(f"could not open collection {name}")  # unreachable
+
     def get_user_collection(self, user_id: str) -> chromadb.Collection:
-        return self.client.get_or_create_collection(
-            name=_user_collection_name(user_id),
-            embedding_function=self.embedding_function,
-        )
+        return self._get_or_create_collection(_user_collection_name(user_id))
 
     def add_document(
         self,
@@ -448,11 +624,7 @@ class DocumentManager:
         against a read-only Chroma store raises "attempt to write a readonly
         database" where the user only wanted to retrieve.
         """
-        collection_name = f"kb_{kb_uuid}"
-        return self.client.get_or_create_collection(
-            name=collection_name,
-            embedding_function=self.embedding_function,
-        )
+        return self._get_or_create_collection(f"kb_{kb_uuid}")
 
     def get_kb_collection_readonly(self, kb_uuid: str) -> Optional["chromadb.Collection"]:
         """Fetch an existing KB collection for reads, never creating it.

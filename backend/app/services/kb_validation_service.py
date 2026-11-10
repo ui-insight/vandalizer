@@ -757,6 +757,44 @@ AMENDMENT_INSTRUCTION = (
 )
 
 
+# Chunks are split at 1,000 characters; the cap only guards a run document
+# against an oversized chunk from an older or custom ingest.
+CONTEXT_PASSAGE_CHARS = 4000
+
+
+def context_passages(results: list[dict]) -> list[dict]:
+    """The passages a KB answer's prompt held, in prompt order.
+
+    Recorded on each judged row so an export shows what the model was given,
+    not a separate search: the answer path rewrites, reranks and adds amending
+    sources' passages, and the retrieval-precision search does none of that.
+    Mirrors ``_format_context_for_config``, which skips empty chunks.
+    """
+    out: list[dict] = []
+    for r in results:
+        if not isinstance(r, dict):
+            continue
+        text = (r.get("content") or "").strip()
+        if not text:
+            continue
+        meta = r.get("metadata")
+        if not isinstance(meta, dict):
+            meta = {}
+        out.append({
+            "rank": len(out) + 1,
+            "chunk_id": r.get("chunk_id"),
+            "source_id": meta.get("source_id"),
+            "source_name": meta.get("source_name") or "Unknown",
+            "similarity": r.get("similarity"),
+            "added_for_amendment": bool(r.get("added_for_amendment")),
+            "amends": list(r.get("amends") or []),
+            "amended_by": list(r.get("amended_by") or []),
+            "text": text[:CONTEXT_PASSAGE_CHARS],
+            "text_truncated": len(text) > CONTEXT_PASSAGE_CHARS,
+        })
+    return out
+
+
 async def _generate_kb_answer(
     kb_uuid: str,
     query: str,
@@ -794,7 +832,9 @@ async def _generate_kb_answer(
     )
     if extra:
         present = {r.get("chunk_id") for r in results}
-        extra = [r for r in extra if r.get("chunk_id") not in present]
+        # Marked so the run can report which passages the model saw only
+        # because an amends link pulled them in.
+        extra = [{**r, "added_for_amendment": True} for r in extra if r.get("chunk_id") not in present]
         results = results[: max(0, cfg.k - len(extra))] + extra
     results = annotate_amendments(results, links)
     # Empty *or* gated-empty: nothing cleared the relevance floor, so abstain
@@ -1301,6 +1341,9 @@ async def judge_test_queries(
                     "query": tq.query,
                     "category": getattr(tq, "category", None),
                     "actual_answer": stored_answer,
+                    # What the answer's prompt held, amending passages included.
+                    # [] when retrieval found nothing and the answer abstained.
+                    "context_passages": context_passages(retrieved or []),
                     # Storage cap hit: the judge saw more than this row holds.
                     "actual_answer_truncated": answer_cut,
                     # Model hit its output cap: the judge scored an incomplete answer.
@@ -2183,6 +2226,15 @@ async def run_kb_validation(
                 det["category"] = judge_det.get("category")
                 det["actual_answer"] = judge_det.get("actual_answer")
                 det["baseline_answer"] = judge_det.get("baseline_answer")
+                # Copied by name: a key missing here never reaches the export,
+                # which reads only these merged rows.
+                for key in (
+                    "context_passages",
+                    "actual_answer_truncated", "generation_truncated",
+                    "baseline_answer_truncated", "baseline_generation_truncated",
+                ):
+                    if key in judge_det:
+                        det[key] = judge_det[key]
                 det["judge"] = judge_det.get("judge")
                 det["baseline_judge"] = judge_det.get("baseline_judge")
                 det["lift"] = judge_det.get("lift")

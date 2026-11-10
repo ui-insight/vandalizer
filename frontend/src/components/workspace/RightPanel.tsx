@@ -27,14 +27,15 @@ export function RightPanel() {
     <div className="flex h-full flex-col" style={{ boxShadow: '-7px 20px 25px -16px rgb(211, 211, 211)' }}>
       {editor && <div className="flex min-h-0 flex-1 flex-col">{editor}</div>}
       <div className={cn('flex min-h-0 flex-1 flex-col', editor && 'hidden')}>
-        {/* Tab bar - matches Flask .tab-menu */}
-        <div className="flex bg-panel-dark border-b border-[#cccccc48]">
+        {/* Tab bar - matches Flask .tab-menu. 50px including the border, the
+            same height as LeftPanel's header bar, so the two line up. */}
+        <div className="flex h-[50px] shrink-0 bg-panel-dark border-b border-[#cccccc48]">
           {TABS.map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveRightTab(tab)}
               className={cn(
-                'flex-1 flex items-center justify-center gap-2 py-4 text-sm cursor-pointer transition-colors',
+                'flex-1 flex h-full items-center justify-center gap-2 text-sm cursor-pointer transition-colors',
                 activeRightTab === tab
                   ? 'bg-highlight text-highlight-text font-black'
                   : 'text-white font-black hover:bg-[#363636]',

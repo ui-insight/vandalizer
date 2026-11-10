@@ -91,3 +91,13 @@ async def client():
             base_url="http://test",
         ) as ac:
             yield ac
+
+
+@pytest.fixture(autouse=True)
+def _ocr_all_pdfs_off(monkeypatch):
+    """Keep a developer's ``backend/.env`` from switching every PDF read to
+    OCR-only under test. Settings reads that file, so a box deployed with
+    OCR_ALL_PDFS=true failed every reader test that expects the local fast
+    path. An environment variable outranks the file; tests that exercise the
+    setting patch ``document_readers._ocr_all_pdfs`` directly."""
+    monkeypatch.setenv("OCR_ALL_PDFS", "false")

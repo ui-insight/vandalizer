@@ -412,7 +412,7 @@ export function LibraryTab() {
         refreshItems()
         openWorkflow(wf.id)
       } else {
-        const ss = await importSearchSet(file)
+        const ss = await importSearchSet(file, undefined, { title: createName, kind: createModalType })
         if (personalLib) {
           await addItemToLibrary(personalLib.id, { item_id: ss.id, kind: 'search_set' })
         }

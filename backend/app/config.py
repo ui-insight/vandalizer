@@ -41,6 +41,13 @@ class Settings(BaseSettings):
     # Required when multiple processes (FastAPI workers + Celery) share Chroma —
     # PersistentClient is not process-safe for concurrent writers.
     chromadb_host: str = ""
+    # OCR_ALL_PDFS=true: every PDF is read by the OCR endpoint and nothing
+    # else — no pdf-inspector/text-layer fast path and no PyMuPDF fallback.
+    # A PDF's embedded text layer can be a stale prior OCR pass, glyph-ID
+    # mojibake, or a flattened table, and nothing local can grade it. When OCR
+    # cannot read a document it fails with a stated reason instead of storing
+    # lower-quality text.
+    ocr_all_pdfs: bool = False
     max_upload_size_mb: int = 500
 
     # Where this process looks for model vocabularies, in the standard

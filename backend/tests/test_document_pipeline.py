@@ -334,3 +334,123 @@ class TestTableAwareChunking:
         text = ("Sentence about grants and budgets. " * 40).strip()
         for chunk, offset in _split_text_with_offsets(text, 200, 40):
             assert text[offset:offset + len(chunk)] == chunk
+
+
+def _html_table(rows: int, cols: int = 4) -> str:
+    head = "<thead><tr>" + "".join(f"<td>Col {c}</td>" for c in range(cols)) + "</tr></thead>"
+    body = "".join(
+        "<tr>" + "".join(f"<td>r{r}c{c} $1,{r:03d}</td>" for c in range(cols)) + "</tr>"
+        for r in range(rows)
+    )
+    return f"<table>{head}<tbody>{body}</tbody></table>"
+
+
+class TestHtmlTableChunking:
+    """OCR output keeps tables as single-line HTML; a chunk boundary must
+    never fall inside one."""
+
+    @staticmethod
+    def _inside_table(text: str, pos: int) -> bool:
+        from app.services.document_manager import _find_html_table_spans
+
+        return any(s < pos < e for s, e, _ in _find_html_table_spans(text))
+
+    def test_boundaries_never_inside_a_table(self):
+        from app.services.document_manager import _split_text_with_offsets
+
+        prose = "Narrative about the budget and its justification. " * 12
+        text = f"{prose}\n\n{_html_table(20)}\n\n{prose}\n\n{_html_table(8)}\n\n{prose}"
+        for chunk, offset in _split_text_with_offsets(text, 1000, 200):
+            assert not self._inside_table(text, offset), chunk[:60]
+            assert not self._inside_table(text, offset + len(chunk)), chunk[-60:]
+
+    def test_whole_table_lands_in_one_chunk(self):
+        from app.services.document_manager import _split_text_with_offsets
+
+        table = _html_table(20)
+        assert len(table) > 1000
+        text = "Intro.\n\n" + table + "\n\nAfter."
+        holders = [c for c, _ in _split_text_with_offsets(text, 1000, 200) if "<table" in c]
+        assert len(holders) == 1
+        assert table in holders[0]
+
+    def test_table_late_in_window_moves_to_next_chunk(self):
+        from app.services.document_manager import _split_text_with_offsets
+
+        prose = ("Sentence about effort and salary. " * 25).strip()   # ~850 chars
+        text = prose + "\n\n" + _html_table(10)
+        chunks = _split_text_with_offsets(text, 1000, 200)
+        assert "<table" not in chunks[0][0]
+        assert any(c.startswith("<table") or "\n<table" in c or c.startswith("Sentence") for c, _ in chunks[1:])
+        assert sum(c.count("<table") for c, _ in chunks) == 1
+
+    def test_no_text_lost(self):
+        from app.services.document_manager import _split_text_with_offsets
+
+        prose = "Words about subawards and indirect costs. " * 30
+        text = f"{prose}\n\n{_html_table(15)}\n\n{prose}"
+        joined = "".join(c for c, _ in _split_text_with_offsets(text, 1000, 200))
+        for r in range(15):
+            assert f"r{r}c3 $1,{r:03d}" in joined
+        assert joined.count("Words about subawards") >= 60
+
+    def test_oversized_table_split_at_rows_with_header(self, monkeypatch):
+        from app.services import document_manager as dm
+
+        monkeypatch.setattr(dm, "HTML_TABLE_MAX_CHARS", 3000)
+        text = "Ledger:\n\n" + _html_table(80)
+        chunks = dm._split_text_with_offsets(text, 1000, 200)
+        pieces = [c for c, _ in chunks if "<table" in c]
+        assert len(pieces) >= 3
+        for piece in pieces:
+            assert piece.count("<table") == 1 and piece.endswith("</table>")
+            assert "<td>Col 0</td>" in piece                      # header on every piece
+            assert len(piece) <= 3000 + 2500
+        joined = "".join(pieces)
+        for r in range(80):
+            assert f"r{r}c0 $1,{r:03d}" in joined
+
+    def test_unclosed_table_is_not_atomic(self):
+        from app.services.document_manager import _find_html_table_spans
+
+        assert _find_html_table_spans("<table><tr><td>x</td></tr>") == []
+
+    def test_nested_table_is_one_span(self):
+        from app.services.document_manager import _find_html_table_spans
+
+        text = "<table><tr><td><table><tr><td>in</td></tr></table></td></tr></table>"
+        spans = _find_html_table_spans(text)
+        assert len(spans) == 1 and spans[0][:2] == (0, len(text))
+
+    def test_offsets_still_index_source(self):
+        from app.services.document_manager import _split_text_with_offsets
+
+        text = "Intro.\n\n" + _html_table(30) + "\n\nTail text."
+        for chunk, offset in _split_text_with_offsets(text, 1000, 200):
+            assert text[offset:offset + len(chunk)] == chunk
+
+
+class TestEmbeddingText:
+    def test_table_becomes_cells_and_rows(self):
+        from app.services.document_manager import embedding_text
+
+        out = embedding_text("<table><tr><td>Name</td><td>Yr1</td></tr>"
+                             "<tr><td>PI</td><td>$39,600</td></tr></table>")
+        assert out == "Name | Yr1 |\nPI | $39,600 |"
+
+    def test_entities_and_comments(self):
+        from app.services.document_manager import embedding_text
+
+        assert embedding_text("F&amp;A <!-- page 2 --> costs<br>next") == "F&A costs\nnext"
+
+    def test_plain_text_untouched(self):
+        from app.services.document_manager import embedding_text
+
+        for s in ("Costs < $5,000 and a > b", "x<y and y>z", "Plain text."):
+            assert embedding_text(s) == s
+
+    def test_much_shorter_than_html(self):
+        from app.services.document_manager import embedding_text
+
+        html = _html_table(20)
+        assert len(embedding_text(html)) < 0.8 * len(html)
