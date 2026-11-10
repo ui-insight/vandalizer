@@ -31,7 +31,10 @@ _COMPLIANCE_TOPIC = re.compile(
 )
 _MARKS = r"[\s*_`✅❌✔️✓✗✘❎☑️🟢🔴]*"
 # A status cell: the mark alone, or the mark then its reason ("✅ Pass — cited").
-_REST = r"(?P<rest>(?:\s*[—–:(-].*)?)$"
+# A hyphen separates a reason only with a space beside it ("Pass - cited"):
+# glued to the next word it is part of that word. Support ticket: the
+# "Pass-through / PI" cell read "✓ Stated in document -through / PI".
+_REST = r"(?P<rest>(?:\s*[—–:(].*|\s+-.*|-\s.*)?)$"
 _PASS_CELL = re.compile(rf"^{_MARKS}(?:pass(?:ed)?|compliant|met|✅|✔️|✓){_MARKS}{_REST}", re.IGNORECASE)
 _FAIL_CELL = re.compile(
     rf"^{_MARKS}(?:fail(?:ed)?|non-?compliant|not met|❌|✗|✘){_MARKS}{_REST}", re.IGNORECASE,

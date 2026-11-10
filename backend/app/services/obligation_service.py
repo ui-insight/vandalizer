@@ -350,8 +350,61 @@ async def _readable_document(document_uuid: str, user: User, project: Project) -
     return await access_control.get_authorized_document(document_uuid, user)
 
 
+# Table markup, blanked to spaces of the same length so offsets still line up:
+# Markdown separator rows, HTML tags, and cell pipes.
+_TABLE_MARKUP = re.compile(r"^[ \t]*\|[ \t|:\-]*-[ \t|:\-]*$|<[^>]+>|\|", re.M)
+_PERIOD_ROLES = {"period_of_performance", "budget_period"}
+
+
+def _blank_markup(text: str) -> str:
+    return _TABLE_MARKUP.sub(lambda m: " " * len(m.group()), text)
+
+
+def _document_span(text: str, quote: str, role: str) -> Optional[str]:
+    """The document's own text for *quote*, or None when it isn't there.
+
+    A quote that matches as written is returned unchanged. Otherwise the
+    match ignores table markup: a model reading "| End Date | Aug 31, 2027 |"
+    quotes "End Date Aug 31, 2027" (support ticket: every deadline anchored on
+    a subaward's table End Date was refused as unverifiable). The document's
+    span is returned instead, markup included, so the period's columns can be
+    read; for a period quote it is widened to whole table lines so a header
+    row and its values keep the same columns.
+    """
+    from app.services.extraction_sources import find_quote_offset, normalize_with_map
+
+    if find_quote_offset(text, quote) is not None:
+        return quote
+    norm_doc, index_map = normalize_with_map(_blank_markup(text))
+    norm_quote, _ = normalize_with_map(_blank_markup(quote))
+    i = norm_doc.find(norm_quote) if norm_quote else -1
+    if i == -1:
+        return None
+    start, end = index_map[i], index_map[i + len(norm_quote) - 1] + 1
+    if role in _PERIOD_ROLES:
+        start, end = _whole_rows(text, start, end)
+    return text[start:end].strip()
+
+
+def _whole_rows(text: str, start: int, end: int) -> tuple[int, int]:
+    """Widen a matched span to the whole table rows it touches."""
+    lowered = text.lower()
+    row_start = lowered.rfind("<tr", 0, start)
+    row_end = lowered.find("</tr>", end)
+    if row_start != -1 and row_end != -1 and "</tr>" not in lowered[row_start:start]:
+        row_end += len("</tr>")
+        if row_end - row_start <= 2000:
+            return row_start, row_end
+    line_start = text.rfind("\n", 0, start) + 1
+    line_end = text.find("\n", end)
+    line_end = len(text) if line_end == -1 else line_end
+    span = text[line_start:line_end]
+    if ("|" in span or "\t" in span) and len(span) <= 2000:
+        return line_start, line_end
+    return start, end
+
+
 async def _check_source(raw: dict, user: User, project: Project) -> tuple[Optional[ObligationSource], str | None]:
-    from app.services.extraction_sources import find_quote_offset
 
     if not isinstance(raw, dict):
         return None, "a source must be an object with document_uuid, page and quote"
@@ -369,12 +422,14 @@ async def _check_source(raw: dict, user: User, project: Project) -> tuple[Option
             f'"{doc.title}" has page numbers; give the page the quote is on'
             if page is None else f'"{doc.title}" has no page {page}'
         )
-    if find_quote_offset(text, quote) is None:
+    role = str(raw.get("role") or "evidence")
+    found = _document_span(text, quote, role)
+    if found is None:
         where = f"page {page} of " if page is not None else ""
         return None, f'the quote was not found on {where}"{doc.title}"'
     return ObligationSource(
         document_uuid=doc.uuid, document_title=doc.title or "", page=page,
-        quote=quote, role=str(raw.get("role") or "evidence"),
+        quote=found, role=role,
     ), None
 
 

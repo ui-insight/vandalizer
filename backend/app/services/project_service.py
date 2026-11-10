@@ -265,6 +265,8 @@ async def copy_project_contents(
             classification_confidence=doc.classification_confidence,
             classified_at=doc.classified_at,
             classified_by=doc.classified_by,
+            # A copy of a file Vandalizer wrote is still one.
+            generated_by=getattr(doc, "generated_by", None),
             valid=doc.valid,
             processing=False,
             chromadb_ready=False,
