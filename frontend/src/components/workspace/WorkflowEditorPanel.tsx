@@ -112,7 +112,7 @@ interface TaskTypeDef {
   description: string
 }
 
-const TASK_TYPES: TaskTypeDef[] = [
+export const TASK_TYPES: TaskTypeDef[] = [
   { name: 'Extraction', label: 'Extractions', icon: Filter, color: '#b91c1c', categories: ['all', 'text'], enabled: true,
     description: 'Pulls structured fields out of the step input (names, dates, amounts, etc.) using prompts you define per field.' },
   { name: 'Prompt', label: 'Prompts', icon: MousePointerClick, color: '#1d4ed8', categories: ['all', 'text'], enabled: true,
