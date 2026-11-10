@@ -60,6 +60,37 @@ def test_other_replies_are_untouched(reply):
     assert relabel_presence_checks(reply, []) == reply
 
 
+
+def test_words_containing_pass_are_left_unchanged():
+    """Support ticket: "Pass-through / PI" read "✓ Stated in document -through / PI",
+    in chat and in the Excel download."""
+    reply = (
+        "Subaward compliance summary (2 CFR 200)\n"
+        "| Party | Role | Status |\n|---|---|---|\n"
+        "| University of Idaho | Pass-through / PI | ✅ Pass |\n"
+        "| Oregon State | Subrecipient | Fail-safe clause noted |\n"
+        "| Sponsor | Met-Life rider | Passing review |"
+    )
+    out = relabel_presence_checks(reply, NO_RULES)
+    assert "| Pass-through / PI |" in out
+    assert "| Fail-safe clause noted |" in out
+    assert "| Met-Life rider |" in out and "| Passing review |" in out
+    assert "| University of Idaho | Pass-through / PI | ✓ Stated in document |" in out
+
+
+@pytest.mark.parametrize("cell,expected", [
+    ("✅ Pass - cited in §4", "✓ Stated in document - cited in §4"),
+    ("Pass -cited", "✓ Stated in document -cited"),
+    ("Pass- cited", "✓ Stated in document - cited"),
+    ("Pass—cited", "✓ Stated in document —cited"),
+    ("Pass: p. 4", "✓ Stated in document : p. 4"),
+    ("❌ Fail - missing", "✗ Not confirmed - missing"),
+])
+def test_a_status_with_its_reason_is_still_relabelled(cell, expected):
+    out = relabel_presence_checks(f"Compliance review\n| Item | Result |\n|---|---|\n| Clause | {cell} |", NO_RULES)
+    assert f"| Clause | {expected} |" in out
+
+
 def test_header_relabel_applies_to_the_header_row_only():
     reply = "Compliance review\n| Item | Pass/Fail |\n|---|---|\n| Overall | Pass/Fail |"
     out = relabel_presence_checks(reply, [])

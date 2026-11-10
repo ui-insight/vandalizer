@@ -42,3 +42,37 @@ describe('pane editor focus', () => {
     expect(screen.getByTestId('base').inert).not.toBe(true)
   })
 })
+
+describe('editors mounted in one render', () => {
+  // Support ticket: after picking a task its details were frozen until a
+  // browser refresh. Reloading the workflow re-mounted the step and task
+  // editors together; the step editor made the task editor inert.
+  function Reloaded({ loading }: { loading: boolean }) {
+    if (loading) return <div>Loading workflow…</div>
+    return <div>
+      <div data-testid="base"><button>Run</button></div>
+      <PanelEditorSurface label="Step" onClose={() => {}} layer={1000}><button>Add a task</button></PanelEditorSurface>
+      <PanelEditorSurface label="Task" onClose={() => {}} layer={1002}><input aria-label="Prompt" /></PanelEditorSurface>
+    </div>
+  }
+
+  it('never makes the editor on top inert', () => {
+    const { rerender } = render(<StrictMode><Reloaded loading={false} /></StrictMode>)
+    rerender(<StrictMode><Reloaded loading /></StrictMode>)
+    rerender(<StrictMode><Reloaded loading={false} /></StrictMode>)
+    const task = screen.getByRole('region', { name: 'Task' })
+    expect(task.inert).not.toBe(true)
+    expect(screen.getByLabelText('Prompt').closest('[inert]')).toBeNull()
+    expect(screen.getByRole('region', { name: 'Step' }).inert).toBe(true)
+    expect(screen.getByTestId('base').inert).toBe(true)
+  })
+
+  it('treats a later editor on the same layer as the one on top', () => {
+    render(<div>
+      <PanelEditorSurface label="First" onClose={() => {}}><button>A</button></PanelEditorSurface>
+      <PanelEditorSurface label="Second" onClose={() => {}}><button>B</button></PanelEditorSurface>
+    </div>)
+    expect(screen.getByRole('region', { name: 'Second' }).inert).not.toBe(true)
+    expect(screen.getByRole('region', { name: 'First' }).inert).toBe(true)
+  })
+})

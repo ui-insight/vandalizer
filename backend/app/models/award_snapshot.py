@@ -40,6 +40,8 @@ class AwardSnapshot(Document):
     # The project documents the facts were read from, and a fingerprint of
     # their state, so a changed document set shows as out of date.
     documents: list[dict] = []
+    # Files Vandalizer wrote (summaries) left unread because originals exist.
+    skipped_documents: list[dict] = []
     fingerprint: Optional[str] = None
     model: Optional[str] = None
     error: Optional[str] = None

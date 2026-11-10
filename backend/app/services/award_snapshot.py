@@ -86,9 +86,51 @@ def extract_keys() -> list[str]:
 # Documents
 # ---------------------------------------------------------------------------
 
-def _rank(doc: dict) -> tuple[int, str]:
+_ORIGINAL_FORMATS = ("pdf", "docx", "doc")
+# Formats Vandalizer saves summaries in. A file in one of these whose name
+# reads like a summary, saved before ``generated_by`` existed, is treated as
+# Vandalizer's too.
+_TEXT_FORMATS = ("md", "markdown", "txt", "html", "htm")
+_SUMMARY_WORDS = ("snapshot", "summary")
+# Fields the reader needs to see Vandalizer-written files and the read order.
+DOC_FIELDS = {"uuid": 1, "title": 1, "token_count": 1, "updated_at": 1,
+              "extension": 1, "generated_by": 1, "origin_workflow_id": 1}
+
+
+def is_generated(doc: dict) -> bool:
+    """Whether *doc* is a file Vandalizer wrote (a summary or report), not an original.
+
+    Support ticket: with the award PDF and a chat-saved "Award Snapshot —
+    ….md" in one project, every key fact cited the summary. A summary citing
+    a summary isn't a source an RA can review.
+    """
+    if doc.get("generated_by") or doc.get("origin_workflow_id"):
+        return True
+    ext = (doc.get("extension") or "").lower().lstrip(".")
     title = (doc.get("title") or "").lower()
-    return (0 if any(w in title for w in _AWARD_WORDS) else 1, title)
+    return ext in _TEXT_FORMATS and any(w in title for w in _SUMMARY_WORDS)
+
+
+def _rank(doc: dict) -> tuple[int, int, str]:
+    """Award-like titles first, then the formats awards come in."""
+    title = (doc.get("title") or "").lower()
+    ext = (doc.get("extension") or "").lower().lstrip(".")
+    return (0 if any(w in title for w in _AWARD_WORDS) else 1, 0 if ext in _ORIGINAL_FORMATS else 1, title)
+
+
+def source_documents(docs: list[dict]) -> tuple[list[dict], list[dict]]:
+    """``(read, skipped)``: the documents facts are read from, in order.
+
+    The originals, when the project has any; files Vandalizer wrote are then
+    skipped, so a fact missing from the award is reported missing, never
+    filled from a summary. Only when the project holds nothing but such files
+    are they read.
+    """
+    ordered = sorted(docs, key=_rank)
+    originals = [d for d in ordered if not is_generated(d)]
+    if not originals:
+        return ordered, []
+    return originals, [d for d in ordered if is_generated(d)]
 
 
 def fingerprint(docs: list[dict]) -> str:
@@ -107,7 +149,7 @@ async def project_documents(project: Project) -> list[dict]:
     folders = await _project_folder_uuids(project.root_folder_uuid)
     rows = await SmartDocument.get_motor_collection().find(
         {"folder": {"$in": folders}, "soft_deleted": {"$ne": True}, "token_count": {"$gt": 0}},
-        {"uuid": 1, "title": 1, "token_count": 1, "updated_at": 1},
+        DOC_FIELDS,
     ).to_list(length=500)
     return sorted(rows, key=_rank)
 
@@ -183,13 +225,13 @@ def build_sync(project_uuid: str, build_token: str) -> str:
         return fields.get("status", "ready") if result.matched_count else "superseded"
 
     folders = _folder_uuids_sync(db, project["root_folder_uuid"])
-    docs = sorted(db.smart_document.find(
+    docs, skipped = source_documents(list(db.smart_document.find(
         {"folder": {"$in": folders}, "soft_deleted": {"$ne": True}, "token_count": {"$gt": 0}},
-        {"uuid": 1, "title": 1, "token_count": 1, "updated_at": 1, "raw_text": 1, "text_markers": 1},
-    ), key=_rank)
+        {**DOC_FIELDS, "raw_text": 1, "text_markers": 1},
+    )))
     if not docs:
         return finish({"status": "empty", "facts": [], "budget_years": [], "documents": [],
-                       "fingerprint": fingerprint([]), "error": None,
+                       "skipped_documents": [], "fingerprint": fingerprint([]), "error": None,
                        "built_at": datetime.datetime.now(datetime.timezone.utc)})
     used = docs[:MAX_DOCUMENTS]
     user_id = snap.get("requested_by") or project.get("owner_user_id")
@@ -213,7 +255,8 @@ def build_sync(project_uuid: str, build_token: str) -> str:
         "status": "ready",
         "facts": [f.model_dump() for f in facts],
         "budget_years": [f.model_dump() for f in budget],
-        "documents": [{"uuid": d["uuid"], "title": d.get("title")} for d in used],
+        "documents": [{"uuid": d["uuid"], "title": d.get("title"), "generated": is_generated(d)} for d in used],
+        "skipped_documents": [{"uuid": d["uuid"], "title": d.get("title")} for d in skipped],
         "fingerprint": fingerprint(docs),
         "model": model,
         "error": None,
@@ -281,6 +324,15 @@ def queue_rebuild_for_document_sync(db: Any, document: dict) -> bool:
 
         project = _find_project_for_folder(db, document.get("folder"))
         if not project:
+            return False
+        if is_generated(document) and db.smart_document.find_one(
+            {"folder": {"$in": _folder_uuids_sync(db, project["root_folder_uuid"])},
+             "soft_deleted": {"$ne": True}, "token_count": {"$gt": 0},
+             "generated_by": None, "origin_workflow_id": None,
+             "extension": {"$nin": list(_TEXT_FORMATS)}},
+            {"_id": 1},
+        ):
+            # A summary saved next to the award isn't read, so it can't change the facts.
             return False
         snap = db.award_snapshot.find_one({"project_uuid": project["uuid"]}, {"built_at": 1})
         if not snap or not snap.get("built_at"):
@@ -366,14 +418,20 @@ async def view(project: Project, user: User) -> dict[str, Any]:
 
     snap = await AwardSnapshot.find_one(AwardSnapshot.project_uuid == project.uuid)
     docs = await project_documents(project)
-    current = fingerprint(docs)
+    current = fingerprint(source_documents(docs)[0])
     built = snap is not None and snap.built_at is not None
+    found = {f.key for f in snap.facts} if snap else set()
     return {
         "project": {"uuid": project.uuid, "title": project.title, "state": project.state},
         "status": snap.status if snap else "not_built",
         "facts": [f.model_dump() for f in snap.facts] if snap else [],
         "budget_years": [f.model_dump() for f in snap.budget_years] if snap else [],
         "documents_read": snap.documents if snap else [],
+        "documents_skipped": snap.skipped_documents if snap else [],
+        # Key facts the documents read don't state: shown as not stated,
+        # never filled from elsewhere.
+        "not_found": [label for key, label, _ in FACT_FIELDS if key not in found]
+        if snap and snap.status == "ready" else [],
         "document_count": len(docs),
         "built_at": _iso(snap.built_at) if snap else None,
         "error": snap.error if snap else None,
@@ -422,6 +480,9 @@ def page_html(v: dict[str, Any]) -> str:
         f"<tr><th scope='row'>{e(f['label'])}</th><td>{e(f['value'])}{e(_SUPPORT_NOTE.get(f['support'], ''))}</td>"
         f"<td>{e(_where(f))}</td></tr>"
         for f in v["facts"]
+    ) + "".join(
+        f"<tr><th scope='row'>{e(label)}</th><td>Not stated in the documents read</td><td></td></tr>"
+        for label in v.get("not_found", [])
     ) or "<tr><td colspan='3'>No key facts read yet.</td></tr>"
     budget = "".join(
         f"<tr><th scope='row'>{e(f['label'])}</th><td>{e(f['value'])}{e(_SUPPORT_NOTE.get(f['support'], ''))}</td><td>{e(_where(f))}</td></tr>"
