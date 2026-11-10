@@ -469,7 +469,17 @@ HELP_TOPICS: list[dict] = [
             "Your original work stays with its course. Use the offered saved-course controls "
             "to return or resume without resetting either history. Preserved certificates "
             "keep their recorded name, course and issue date; they are not relabeled as "
-            "proof of a newer course's outcomes."
+            "proof of a newer course's outcomes.\n\n"
+            "**Resetting progress:** certification progress can't be reset, by you or by "
+            "an administrator. There is no reset button anywhere in Vandalizer. Completed "
+            "modules, XP and stars stay. **Resume** continues from where you left off; "
+            "completed modules stay complete. You can retake a completed module to improve "
+            "its stars: you keep the credit and XP already earned, and the higher star "
+            "count is kept. Only a different account starts with no progress.\n\n"
+            "**What administrators can do** (Admin → Certifications): **Unlock prerequisite "
+            "access** or **Re-lock** it for a learner, **Review recovery** after a technical "
+            "grading failure, and record **grading corrections**. They can't clear or reset "
+            "a learner's progress."
         ),
     },
     {
