@@ -156,6 +156,49 @@ def _find_table_spans(text: str) -> list[tuple[int, int, str]]:
     return spans
 
 
+#: An HTML table may grow its chunk to this many characters rather than be
+#: split. Past it (a whole ledger), the table is split at row boundaries with
+#: its header repeated on every piece, and a warning is logged.
+HTML_TABLE_MAX_CHARS = 40_000
+# The header carried onto each piece of an oversized table: its opening tag
+# plus <thead> (or first row), capped so it can't crowd out the rows.
+_HTML_TABLE_HEADER_MAX_CHARS = 2_000
+_HTML_TABLE_TAG_RE = re.compile(r"<(/?)table\b[^>]*>", re.IGNORECASE)
+_HTML_THEAD_RE = re.compile(r"<thead\b[^>]*>.*?</thead\s*>", re.IGNORECASE | re.DOTALL)
+_HTML_TR_RE = re.compile(r"<tr\b[^>]*>.*?</tr\s*>", re.IGNORECASE | re.DOTALL)
+
+
+def _find_html_table_spans(text: str) -> list[tuple[int, int, str]]:
+    """Locate top-level ``<table>…</table>`` blocks (nesting-aware).
+
+    OCR output keeps tables as HTML — merged cells survive there and not in
+    pipe tables — and writes each one on a single line, so the line-based
+    pipe-table logic never sees it and the size-based split cut tables
+    mid-cell. Returns ``(start, end, header_html)`` per table; the header is
+    the opening tag plus ``<thead>`` (or the first row), used only when an
+    oversized table has to be split. An unclosed table is not a span.
+    """
+    spans: list[tuple[int, int, str]] = []
+    depth = 0
+    start = 0
+    for m in _HTML_TABLE_TAG_RE.finditer(text):
+        if not m.group(1):
+            if depth == 0:
+                start = m.start()
+            depth += 1
+        elif depth:
+            depth -= 1
+            if depth == 0:
+                table = text[start:m.end()]
+                opening = table[: table.index(">") + 1]
+                head = _HTML_THEAD_RE.search(table) or _HTML_TR_RE.search(table)
+                header = opening + (head.group(0) if head else "")
+                if len(header) > _HTML_TABLE_HEADER_MAX_CHARS:
+                    header = opening
+                spans.append((start, m.end(), header))
+    return spans
+
+
 def _split_text_with_offsets(
     text: str, chunk_size: int, chunk_overlap: int,
 ) -> list[tuple[str, int]]:
@@ -169,6 +212,13 @@ def _split_text_with_offsets(
     so its numbers keep their column labels. The header prefix is decoration
     only — the returned offset still points at the chunk's original position,
     so page/sheet marker mapping is unaffected.
+
+    HTML tables (OCR output) are never split: a chunk boundary is never
+    placed inside ``<table>…</table>``. A window that ends inside one either
+    breaks before the table (when it starts late in the window) or grows to
+    the table's end, up to ``HTML_TABLE_MAX_CHARS``. Only a table longer than
+    that is split, at ``</tr>`` boundaries, each piece re-wrapped with the
+    table's opening tag and header so it stays a valid, labelled table.
     """
     normalized = text.strip()
     if not normalized:
@@ -182,6 +232,15 @@ def _split_text_with_offsets(
                 return span
         return None
 
+    html_spans = _find_html_table_spans(normalized) if "<table" in normalized.lower() else []
+    lowered = normalized.lower() if html_spans else ""
+
+    def _html_span_containing(pos: int) -> tuple[int, int, str] | None:
+        for span in html_spans:
+            if span[0] < pos < span[1]:
+                return span
+        return None
+
     chunks: list[tuple[str, int]] = []
     start = 0
     step = max(1, chunk_size - chunk_overlap)
@@ -189,7 +248,25 @@ def _split_text_with_offsets(
 
     while start < text_length:
         end = min(text_length, start + chunk_size)
-        if end < text_length:
+        hspan = _html_span_containing(end) if end < text_length else None
+        if hspan is not None:
+            if hspan[0] > start + chunk_size // 2:
+                # The table starts late in the window: end the chunk before
+                # it so the next chunk starts with the whole table.
+                end = hspan[0]
+            elif hspan[1] - start <= HTML_TABLE_MAX_CHARS:
+                # Grow the chunk to the end of the table.
+                end = hspan[1]
+            else:
+                limit = start + HTML_TABLE_MAX_CHARS
+                row_end = lowered.rfind("</tr>", max(start, hspan[0]), limit)
+                end = row_end + len("</tr>") if row_end > start else limit
+                logger.warning(
+                    "HTML table of %d chars exceeds %d — splitting it at row "
+                    "boundaries with the header repeated",
+                    hspan[1] - hspan[0], HTML_TABLE_MAX_CHARS,
+                )
+        elif end < text_length:
             span = _span_containing(end)
             if span is not None and span[0] > start + chunk_size // 2:
                 # The window ends mid-table and the table starts late enough in
@@ -223,6 +300,13 @@ def _split_text_with_offsets(
                 and not chunk.startswith(span[2])
             ):
                 chunk = f"{span[2]}\n{chunk}"
+            # A piece of an oversized HTML table: re-wrap it so every piece
+            # is a complete table carrying the header row.
+            hs = _html_span_containing(offset)
+            if hs is not None and offset > hs[0]:
+                chunk = hs[2] + chunk
+            if _html_span_containing(end) is not None:
+                chunk += "</table>"
             chunks.append((chunk, offset))
 
         if end >= text_length:
@@ -234,6 +318,10 @@ def _split_text_with_offsets(
         # were silently dropped from ingestion.
         next_start = min(max(start + step, end - chunk_overlap), end)
         if next_start <= start:
+            next_start = end
+        # The overlap never restarts inside an HTML table: the table was
+        # emitted whole (or, oversized, up to a row boundary at ``end``).
+        if _html_span_containing(next_start) is not None:
             next_start = end
         # Don't let the overlap restart mid-row: snap to the start of the row
         # (or the next row when snapping back would stall the loop).
