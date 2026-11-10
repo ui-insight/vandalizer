@@ -74,6 +74,7 @@ function ActionLog() {
     'folder.delete': '#fee2e2', 'knowledge_base.delete': '#fee2e2',
     'credential.delete': '#fee2e2', 'extraction.delete': '#fee2e2',
     'automation.delete': '#fee2e2', 'chat.delete': '#fee2e2',
+    'chat.action_approved': '#dcfce7', 'chat.action_cancelled': '#f3f4f6',
     'library_item.remove': '#fee2e2',
   }
   const totalPages = Math.ceil(total / limit)

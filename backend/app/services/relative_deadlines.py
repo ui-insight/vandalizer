@@ -18,6 +18,133 @@ _PERIOD_NAMES = {
 }
 
 
+_LABEL_PREFIX = r"(?:(?:sub)?award\s+|project\s+|performance\s+|period\s+of\s+performance\s+)?"
+_TABLE_LABELS = {
+    "start": re.compile(_LABEL_PREFIX + r"(?:start|begin(?:ning)?)\s+date", re.I),
+    "end": re.compile(_LABEL_PREFIX + r"end\s+date", re.I),
+}
+_MD_SEPARATOR = re.compile(r"^[\s|:\-]*-[\s|:\-]*$")
+
+
+def _split_cells(line: str) -> list[str]:
+    """One table row's cells, from Markdown pipes or PyMuPDF's tab-joined rows."""
+    if "|" in line:
+        line = line.strip()
+        line = line[1:] if line.startswith("|") else line
+        line = line[:-1] if line.endswith("|") else line
+        return [c.strip() for c in line.split("|")]
+    return [c.strip() for c in line.split("\t")]
+
+
+def _table_rows(text: str) -> list[list[str]] | None:
+    """The quote as rows of cells, or None when it isn't laid out as a table.
+
+    Covers the layouts the document readers produce: HTML cells (OCR/Docling),
+    Markdown pipe tables (pdf-inspector) and tab-joined rows (PyMuPDF). A
+    quote may start or end mid-row; the caller checks column alignment.
+    """
+    from app.services.obligation_service import plain_quote
+
+    if re.search(r"</?t[dh]\b", text, re.I):
+        rows = []
+        for chunk in re.split(r"</?tr\b[^>]*>", text, flags=re.I):
+            pieces = re.split(r"<t[dh]\b[^>]*>", chunk, flags=re.I)
+            # Text before the first opening tag is a cell only when the
+            # quote starts mid-cell ("End Date</td><td>Aug 31, 2027").
+            head, cells = plain_quote(pieces[0]), pieces[1:]
+            row = ([head] if head else []) + [plain_quote(c) for c in cells]
+            if any(row):
+                rows.append(row)
+        return rows
+    lines = [ln for ln in text.splitlines() if ln.strip()]
+    if not any("|" in ln or "\t" in ln for ln in lines):
+        return None
+    return [_split_cells(ln) for ln in lines if not _MD_SEPARATOR.fullmatch(ln)]
+
+
+def _cell_date(cell: str) -> datetime.date | None:
+    from app.services.obligation_service import _DATE_IN_TEXT, _dates_in
+
+    match = _DATE_IN_TEXT.fullmatch(cell.strip().rstrip("."))
+    if not match:
+        return None
+    year, month, day = next(iter(_dates_in(match.group())))
+    if year is None:
+        raise ValueError("period dates must include their years")
+    return datetime.date(year, month, day)
+
+
+def _labeled_dates(rows: list[list[str]], label: re.Pattern) -> set[datetime.date]:
+    """Dates a table gives for *label*: in the label's own cell ("End Date:
+    Aug 31, 2027"), in the next cell of its row, or in its column below."""
+    found: set[datetime.date] = set()
+    for r, row in enumerate(rows):
+        for c, cell in enumerate(row):
+            m = re.fullmatch(r"(?:" + label.pattern + r")\s*:?\s*(?P<rest>.*)", cell, re.I | re.S)
+            if not m:
+                continue
+            if m["rest"]:
+                if (own := _cell_date(m["rest"])):
+                    found.add(own)
+                continue
+            beside = next((x for x in row[c + 1:] if x), None)
+            if beside is not None and (value := _cell_date(beside)):
+                found.add(value)
+                continue
+            # Header row: the value sits in the same column below. Only when
+            # the rows line up, so a quote cut mid-row can't shift a column.
+            below = rows[r + 1:]
+            if below and all(len(b) == len(row) for b in below):
+                found.update(d for b in below if (d := _cell_date(b[c])))
+    return found
+
+
+def _stacked_dates(text: str) -> dict[str, datetime.date] | None:
+    """PyMuPDF's one-cell-per-line table: "Start Date / End Date" headers,
+    then their values in the same order."""
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    for i in range(len(lines)):
+        labels: list[str] = []
+        for ln in lines[i:]:
+            kind = next((k for k, p in _TABLE_LABELS.items() if p.fullmatch(ln.rstrip(":"))), None)
+            if kind is None or kind in labels:
+                break
+            labels.append(kind)
+        if len(labels) < 2:
+            continue
+        values = lines[i + len(labels): i + 2 * len(labels)]
+        dates = [_cell_date(v) for v in values]
+        if len(dates) == len(labels) and all(dates):
+            return dict(zip(labels, dates))
+    return None
+
+
+def _table_period(text: str) -> tuple[datetime.date | None, datetime.date] | None:
+    """Start and End Date read from a table, or None when the quote isn't one.
+
+    Support ticket: a NIFA subaward gave "Start Date | End Date" in a page-1
+    table, and every deadline anchored on the End Date was refused.
+    """
+    rows = _table_rows(text)
+    if rows is not None:
+        found = {kind: _labeled_dates(rows, label) for kind, label in _TABLE_LABELS.items()}
+    elif (stacked := _stacked_dates(text)) is not None:
+        found = {kind: {stacked[kind]} if kind in stacked else set() for kind in _TABLE_LABELS}
+    else:
+        return None
+    if not found["end"]:
+        if found["start"]:
+            raise ValueError("the period quote gives a Start Date but no End Date; include the End Date cell")
+        return None
+    if len(found["end"]) > 1 or len(found["start"]) > 1:
+        raise ValueError("the table gives more than one Start or End Date; cite the row for this period only")
+    start = next(iter(found["start"]), None)
+    end = next(iter(found["end"]))
+    if start and start > end:
+        raise ValueError("the quoted period start must precede its end")
+    return start, end
+
+
 def _period(source: ObligationSource, role: str) -> tuple[datetime.date | None, datetime.date]:
     from app.services.obligation_service import _DATE_IN_TEXT, _dates_in, _times_in
 
@@ -26,6 +153,9 @@ def _period(source: ObligationSource, role: str) -> tuple[datetime.date | None, 
         raise ValueError(f"the {role} quote must identify that period explicitly")
     if _times_in(text):
         raise ValueError("period anchors with a time of day need clarification before calendar-date calculation")
+    table = _table_period(text)
+    if table is not None:
+        return table
     matches = list(_DATE_IN_TEXT.finditer(text))
     if len(matches) not in (1, 2):
         raise ValueError(f"cite one {role} per source, with its full start and end dates")
@@ -54,7 +184,10 @@ def calculate_deadlines(sources: list[ObligationSource]) -> list[dict]:
     timing = [s for s in sources if s.role == "timing"]
     if len(timing) != 1:
         raise ValueError("relative deadlines need exactly one source with role 'timing'")
-    rule = timing[0].quote
+    # A rule copied from a reporting table keeps its cell markup; read it as words.
+    from app.services.obligation_service import plain_quote
+
+    rule = plain_quote(timing[0].quote.replace("|", " "))
     if re.search(r"\b(business|working|holiday|weekend|unless|except)\b", rule, re.I) or _times_in(rule):
         raise ValueError("this calculator supports calendar-day rules without time-of-day or business-day exceptions; clarify this rule before adding it")
     offsets = list(_OFFSET.finditer(rule))

@@ -1377,6 +1377,8 @@ export function ToolStatusLine({
     : obj?.still_waiting === true ? 'Waiting for its own approval'
     : canceled ? 'Canceled' : certificationIssue ? 'Result needs review' : isError ? 'Failed' : unconfirmed ? 'Completion not confirmed' : isActive ? 'Running'
     : name === 'run_workflow' && typeof obj?.session_id === 'string' ? 'Run accepted'
+    // The older course keeps no server-side place: not an error (support ticket).
+    : name === 'save_certification_position' && obj?.status === 'not_supported' ? 'Not available on this course'
     : name === 'select_skill' ? selectedSkill === null ? 'Skill removed' : selectedSkill ? 'Skill selected' : 'Change not confirmed'
     : name === 'create_automation' && obj?.id && obj?.enabled === false ? 'Paused'
     : obj?.status === 'queued' || obj?.status === 'pending' ? 'Queued'

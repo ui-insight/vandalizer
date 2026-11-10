@@ -23,7 +23,12 @@ export interface AwardSnapshot {
   status: 'not_built' | 'empty' | 'building' | 'ready' | 'error'
   facts: SnapshotFact[]
   budget_years: SnapshotFact[]
-  documents_read: { uuid: string; title: string }[]
+  /** `generated`: a file Vandalizer wrote, read only because the project has no original. */
+  documents_read: { uuid: string; title: string; generated?: boolean }[]
+  /** Files Vandalizer wrote (summaries) left unread because the originals were read. */
+  documents_skipped?: { uuid: string; title: string }[]
+  /** Key facts the documents read don't state. */
+  not_found?: string[]
   document_count: number
   built_at: string | null
   error: string | null
