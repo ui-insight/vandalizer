@@ -4,6 +4,7 @@ import hashlib
 import logging
 import re
 import threading
+import time
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -56,6 +57,19 @@ def get_document_manager() -> "DocumentManager":
             if _SHARED_DM is None:
                 _SHARED_DM = DocumentManager()
     return _SHARED_DM
+
+
+def _is_already_exists(exc: BaseException) -> bool:
+    """A collection create that lost a race with another writer."""
+    try:
+        from chromadb.errors import UniqueConstraintError
+
+        if isinstance(exc, UniqueConstraintError):
+            return True
+    except ImportError:  # pragma: no cover — older/newer chromadb layouts
+        pass
+    text = f"{type(exc).__name__}: {exc}"
+    return "UniqueConstraintError" in text or "already exists" in text
 
 
 def get_chroma_client(persist_directory: str | None = None) -> chromadb.ClientAPI:
@@ -292,11 +306,37 @@ class DocumentManager:
         # so Chroma doesn't construct a fresh ONNXMiniLM_L6_V2 per collection.
         self.embedding_function = embedding_function or get_default_embedding_function()
 
+    def _get_or_create_collection(self, name: str) -> chromadb.Collection:
+        """``get_or_create_collection`` that survives a concurrent create.
+
+        Chroma's get-or-create is not atomic across clients: when several
+        workers ingest a user's first batch of uploads at once, each sees no
+        collection and tries to create it, and every one but the first fails
+        with ``UniqueConstraintError: Collection … already exists`` — which
+        left those documents saved but unsearchable. Losing that race just
+        means the collection now exists, so open it.
+        """
+        for attempt in range(3):
+            try:
+                return self.client.get_or_create_collection(
+                    name=name, embedding_function=self.embedding_function,
+                )
+            except Exception as e:  # noqa: BLE001 — narrowed by _is_already_exists
+                if not _is_already_exists(e):
+                    raise
+                logger.info("Collection %s was created concurrently; opening it", name)
+                try:
+                    return self.client.get_collection(
+                        name=name, embedding_function=self.embedding_function,
+                    )
+                except Exception:  # noqa: BLE001 — not visible yet; retry the create
+                    if attempt == 2:
+                        raise
+                    time.sleep(0.2 * (attempt + 1))
+        raise RuntimeError(f"could not open collection {name}")  # unreachable
+
     def get_user_collection(self, user_id: str) -> chromadb.Collection:
-        return self.client.get_or_create_collection(
-            name=_user_collection_name(user_id),
-            embedding_function=self.embedding_function,
-        )
+        return self._get_or_create_collection(_user_collection_name(user_id))
 
     def add_document(
         self,
@@ -448,11 +488,7 @@ class DocumentManager:
         against a read-only Chroma store raises "attempt to write a readonly
         database" where the user only wanted to retrieve.
         """
-        collection_name = f"kb_{kb_uuid}"
-        return self.client.get_or_create_collection(
-            name=collection_name,
-            embedding_function=self.embedding_function,
-        )
+        return self._get_or_create_collection(f"kb_{kb_uuid}")
 
     def get_kb_collection_readonly(self, kb_uuid: str) -> Optional["chromadb.Collection"]:
         """Fetch an existing KB collection for reads, never creating it.
