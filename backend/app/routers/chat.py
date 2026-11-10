@@ -334,6 +334,12 @@ async def chat(
             approval_for=body.approval_for, decline_for=body.decline_for,
         )
 
+    # A turn that could decide an approval card is recorded in Admin → Audit
+    # once it ends (support ticket: the audit had only "chat deleted").
+    audit_approvals = bool(
+        body.approval_for or body.decline_for or conversation.pending_confirmations
+    )
+
     async def generate() -> AsyncGenerator[str, None]:
         try:
             if page_preview is not None:
@@ -365,6 +371,16 @@ async def chat(
             ):
                 yield chunk
         finally:
+            if audit_approvals:
+                with anyio.CancelScope(shield=True):
+                    from app.services.chat_activity_log import audit_turn
+
+                    try:
+                        fresh = await ChatConversation.find_one(ChatConversation.uuid == conversation.uuid)
+                        if fresh is not None:
+                            await audit_turn(fresh, user)
+                    except Exception:
+                        logger.exception("Failed to audit chat approvals for %s", conversation.uuid)
             # Safety net: chat_service handles normal completion, client
             # disconnects, and LLM errors. This catches anything that slips
             # through (early-return paths, save failures inside the exception
@@ -944,6 +960,25 @@ async def get_chat_history(
         ),
         "scope": await _restore_scope(conversation, messages, user),
     }
+
+
+@router.get("/history/{conversation_uuid}/activity", response_model=None)
+async def get_chat_activity(
+    conversation_uuid: str,
+    user: User = Depends(get_current_user),
+) -> dict[str, object]:
+    """What the user approved in this chat, and what each approval did."""
+    conversation = await ChatConversation.find_one(
+        ChatConversation.uuid == conversation_uuid,
+        ChatConversation.user_id == user.user_id,
+    )
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    from app.services.chat_activity_log import load_activity_log
+
+    log = await load_activity_log(conversation)
+    log.pop("latest_turn", None)
+    return {"conversation_uuid": conversation.uuid, "title": conversation.title, **log}
 
 
 @router.delete("/history/{conversation_uuid}", response_model=None)

@@ -4934,6 +4934,7 @@ async def save_to_folder(
         team_id=team_id,
         folder=target_folder,
         token_count=len(content) // 4,
+        generated_by="chat",
     )
     await doc.insert()
 
@@ -6641,7 +6642,7 @@ async def get_certification_progress(
         "next_module_id": next_module_id,
         "modules": modules,
         **({'progression_policy': policy} if policy is not None else {}),
-        **({"learning_position": prog.get("learning_position"), "position_revision": prog.get("position_revision", 0), "pending_completions": prog.get("pending_completions", [])} if prog.get("enrollment_id") else {}),
+        **({"learning_position": prog.get("learning_position"), "position_revision": prog.get("position_revision", 0), "pending_completions": prog.get("pending_completions", [])} if prog.get("enrollment_id") else _BROWSER_ONLY_POSITION),
     }
 
 
@@ -6867,8 +6868,68 @@ async def get_certification_lesson(
     }
 
 
-@course_operation(write=True, tool=True)
+# Support ticket: on the older, unversioned course chat called
+# save_certification_position after Next lesson; it failed ("This saved course
+# requires versioned certification support") with a Review recovery options
+# button, and chat then said the place was "still saved automatically". On
+# that course the server keeps no lesson position: the lesson card's Save my
+# place keeps it in this browser only.
+_BROWSER_ONLY_POSITION = {
+    "position_saving": "this_browser_only",
+    "position_note": (
+        "This course doesn't save the learner's place on the server. Don't call "
+        "save_certification_position. The lesson card's Save my place keeps the place in "
+        "this browser only; say so plainly. Lessons opened in the card still count as read."
+    ),
+}
+
+
 async def save_certification_position(
+    context: RunContext[AgenticChatDeps],
+    module_id: str,
+    lesson_id: str,
+    expected_revision: int,
+    enrollment_id: str,
+) -> dict:
+    """Save the lesson being viewed for resume in chat or the learning panel.
+
+    Only for a course whose progress returns position_revision. When progress
+    returns position_saving "this_browser_only", don't call this: the place is
+    kept only by the lesson card's Save my place, in that browser.
+
+    This stores navigation only; it never awards credit or records an answer.
+    Use the lesson_id returned by the lesson tool and enrollment_id plus
+    position_revision from progress. If another session changed the position,
+    reload and explain the conflict rather than overwriting it automatically.
+
+    Args:
+        context: The call context.
+        module_id: Module of the lesson being viewed.
+        lesson_id: Exact stable identity returned by get_certification_lesson.
+        expected_revision: Most recently read or saved position_revision.
+        enrollment_id: Exact enrollment returned by get_certification_progress.
+    """
+    from app.services.certification_versions.runtime import versioning_enabled
+
+    if not versioning_enabled():
+        return {
+            "saved": False,
+            "status": "not_supported",
+            "module_id": module_id,
+            **_BROWSER_ONLY_POSITION,
+            "assistant_instruction": (
+                "Nothing was saved and nothing failed: this course has no server-side place. "
+                "Tell the learner plainly that their place is kept only in this browser, with the "
+                "lesson card's Save my place. Don't say it was saved, and don't call this again."
+            ),
+        }
+    return await _save_certification_position_versioned(
+        context, module_id, lesson_id, expected_revision, enrollment_id,
+    )
+
+
+@course_operation(write=True, tool=True)
+async def _save_certification_position_versioned(
     context: RunContext[AgenticChatDeps],
     module_id: str,
     lesson_id: str,

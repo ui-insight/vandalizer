@@ -171,12 +171,24 @@ export function AwardSnapshotPanel({ railWidth }: { railWidth?: number }) {
       <div className="award-snapshot__columns">
         <div>
           <h3>Key facts</h3>
-          {snapshot.facts.length ? <dl>{snapshot.facts.map(f => <FactRow key={f.key} f={f} />)}</dl>
+          {snapshot.facts.length ? <dl>
+            {snapshot.facts.map(f => <FactRow key={f.key} f={f} />)}
+            {/* Support ticket: a fact the award doesn't state is said to be missing, never filled from a summary. */}
+            {(snapshot.not_found ?? []).map(label => <div key={label} className="award-snapshot__fact award-snapshot__fact--missing">
+              <dt>{label}</dt><dd><span className="award-snapshot__meta">Not stated in the documents read</span></dd>
+            </div>)}
+          </dl>
             : <p>{snapshot.status === 'not_built'
               ? (snapshot.can_manage ? 'Build the snapshot to read the sponsor, award numbers, PI(s), period, total and F&A rate from this project’s documents.' : 'Not built yet. A project owner or editor can build it.')
               : snapshot.status === 'building' ? 'Reading the documents…' : 'None of the key facts were found in this project’s documents.'}</p>}
           {snapshot.budget_years.length > 0 && <><h3>Budget by year</h3><dl>{snapshot.budget_years.map(f => <FactRow key={f.key} f={f} />)}</dl></>}
           {snapshot.built_at && <p className="award-snapshot__meta">Read from {snapshot.documents_read.map(d => d.title).join(', ') || 'the project’s documents'} on {day(snapshot.built_at)}.</p>}
+          {snapshot.built_at && (snapshot.documents_skipped?.length ?? 0) > 0 && <p className="award-snapshot__meta">
+            Not used as a source: {snapshot.documents_skipped!.map(d => d.title).join(', ')}. Files Vandalizer created aren’t read when the original documents are in the project.
+          </p>}
+          {snapshot.built_at && snapshot.documents_read.length > 0 && snapshot.documents_read.every(d => d.generated) && <p role="status" className="award-snapshot__note">
+            These facts come from a file Vandalizer created, not an original award document. Add the award agreement to this project and Refresh to read it from the source.
+          </p>}
         </div>
         <div>
           <h3>Deadlines <span className="award-snapshot__meta">from the RA inbox</span></h3>

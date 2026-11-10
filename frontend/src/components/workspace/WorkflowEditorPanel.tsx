@@ -43,6 +43,7 @@ import { WorkflowVersionsTab } from './WorkflowVersionsTab'
 import { useOnWorkflowEdited } from '../../lib/workflowEdits'
 import { StalePlanBanner } from './StalePlanBanner'
 import { WorkflowAutovalidatePanel } from './WorkflowAutovalidatePanel'
+import { isTaskDraft, newTaskDraft, saveTaskEdit, type TaskEdit } from './taskDraft'
 import type { ValidationCheck, ValidationCheckDefinition, ValidationInputDefinition, QualityHistoryRun, BatchStatus, WorkflowQualityStatus, PromptImprovement } from '../../api/workflows'
 import { ItemPickerModal } from './ItemPickerModal'
 import { getFeatureFlags, getModels } from '../../api/config'
@@ -111,7 +112,7 @@ interface TaskTypeDef {
   description: string
 }
 
-const TASK_TYPES: TaskTypeDef[] = [
+export const TASK_TYPES: TaskTypeDef[] = [
   { name: 'Extraction', label: 'Extractions', icon: Filter, color: '#b91c1c', categories: ['all', 'text'], enabled: true,
     description: 'Pulls structured fields out of the step input (names, dates, amounts, etc.) using prompts you define per field.' },
   { name: 'Prompt', label: 'Prompts', icon: MousePointerClick, color: '#1d4ed8', categories: ['all', 'text'], enabled: true,
@@ -271,7 +272,7 @@ export function WorkflowEditorPanel() {
   const [editingDesc, setEditingDesc] = useState(false)
   const [descValue, setDescValue] = useState('')
   const [showDownloadPopup, setShowDownloadPopup] = useState(false)
-  const [editingTask, setEditingTask] = useState<WorkflowTask | null>(null)
+  const [editingTask, setEditingTask] = useState<TaskEdit | null>(null)
   const runner = useWorkflowRunner()
   // Set by a restore (which clears the Output box) until the next run starts.
   const [restoredSinceRun, setRestoredSinceRun] = useState(false)
@@ -516,33 +517,23 @@ export function WorkflowEditorPanel() {
     refresh()
   }
 
-  const handleAddTask = async (taskType: TaskTypeDef) => {
+  const handleAddTask = (taskType: TaskTypeDef) => {
     if (!editingStepId) return
     if (confirmCopyOnEdit()) {
       setShowTaskPicker(false)
       return
     }
-    try {
-      // New KB Query steps default to answer mode (the intuitive behavior);
-      // pre-existing steps without a mode keep returning raw passages.
-      const created = await addTask(editingStepId, {
-        name: taskType.name,
-        ...(taskType.name === 'KnowledgeBaseQuery' ? { data: { mode: 'answer' } } : {}),
-      })
-      setShowTaskPicker(false)
-      await refresh()
-      if (created?.id) {
-        setEditingTask({ id: created.id, name: created.name, data: { ...(created.data || {}) } })
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to add task'
-      toast(msg, 'error')
-      // Recover: close the picker, drop the (likely stale) step selection,
-      // and reload the workflow so the editor matches server state.
-      setShowTaskPicker(false)
-      setEditingStepId(null)
-      refresh()
-    }
+    // Nothing is saved yet: the task is created when its details are saved
+    // (support ticket: an abandoned pick left an empty task in the step).
+    setShowTaskPicker(false)
+    setEditingTask(newTaskDraft(editingStepId, taskType.name))
+  }
+
+  // X on a new task goes back to the task list, with nothing added.
+  const handleCloseTaskEditor = () => {
+    const draft = isTaskDraft(editingTask)
+    setEditingTask(null)
+    if (draft) setShowTaskPicker(true)
   }
 
   const handleDeleteTask = async (taskId: string) => {
@@ -554,11 +545,13 @@ export function WorkflowEditorPanel() {
     setEditingTask({ ...task, data: { ...task.data } })
   }
 
-  const handleSaveTask = async (taskId: string, data: Record<string, unknown>) => {
+  const handleSaveTask = async (_taskId: string, data: Record<string, unknown>) => {
+    if (!editingTask) return
     try {
-      await updateTask(taskId, { data })
+      await saveTaskEdit(editingTask, data, { addTask, updateTask })
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Failed to save task', 'error')
+      const fallback = isTaskDraft(editingTask) ? 'Failed to add task' : 'Failed to save task'
+      toast(err instanceof Error ? err.message : fallback, 'error')
       return
     }
     setEditingTask(null)
@@ -1425,7 +1418,8 @@ export function WorkflowEditorPanel() {
           selectedDocUuids={selectedDocUuids}
           workflow={workflow}
           workflowId={openWorkflowId}
-          onClose={() => setEditingTask(null)}
+          isNew={isTaskDraft(editingTask)}
+          onClose={handleCloseTaskEditor}
           onSave={handleSaveTask}
           onRefreshWorkflow={refresh}
           canManage={canManage}
@@ -3049,8 +3043,10 @@ function PdfTemplatePicker({ value, onChange }: {
   )
 }
 
-function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onClose, onSave, onRefreshWorkflow, canManage }: {
+function TaskEditModal({ task, isNew = false, step, selectedDocUuids, workflow, workflowId, onClose, onSave, onRefreshWorkflow, canManage }: {
   task: WorkflowTask
+  /** Not saved yet: Save creates it, and closing adds nothing. */
+  isNew?: boolean
   /** The step this task belongs to — it owns the input the task will receive. */
   step: WorkflowStep | null
   selectedDocUuids: string[]
@@ -3522,7 +3518,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
   }
 
   return (
-    <PanelEditorSurface label={`Edit task: ${workflowTaskTitle(task)}`} onClose={onClose} layer={1002}>
+    <PanelEditorSurface label={`${isNew ? 'New task' : 'Edit task'}: ${workflowTaskTitle(task)}`} onClose={onClose} layer={1002}>
       <p style={{ margin: 0, padding: '12px 20px 0', color: '#59616b', fontSize: 12, overflowWrap: 'anywhere' }}>Step: {step?.name || 'Current step'} → Task settings</p>
       {documentPickerOpen && <DocumentPickerDialog single title="Choose a document" zIndex={1003} excludeUuids={[]} onClose={() => setDocumentPickerOpen(false)} onSelect={docs => {
         const doc = docs[0]
@@ -5304,7 +5300,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
               opacity: saving || promptMissing ? 0.6 : 1,
             }}
           >
-            {saving ? 'Saving…' : 'Save task'}
+            {saving ? 'Saving…' : isNew ? 'Add task' : 'Save task'}
           </button>
         ) : (
           <div style={{

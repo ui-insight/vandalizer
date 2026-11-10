@@ -31,6 +31,8 @@ interface Props {
   hasDocuments?: boolean
   contextMeter?: ReactNode
   memoryControl?: ReactNode
+  /** The chat's Activity button (approvals and what they did). */
+  activityControl?: ReactNode
   navigationControl?: ReactNode
   // Bumped by the workspace to pull focus into the composer (e.g. the file
   // browser's "Ask about folder" action).
@@ -43,7 +45,7 @@ export function ChatInput({
   onSend, onAttachFile, onAddExistingFiles, onAttachLink, onAddKnowledge, disabled, sendDisabled,
   isStreaming, onStop,
   selectedModel, onModelChange, onModelsLoaded, exportActions, onNewChat, hasMessages, hasDocuments,
-  contextMeter, memoryControl, navigationControl, focusSignal, initialDraft = '', onDraftChange, draftInsertion,
+  contextMeter, memoryControl, activityControl, navigationControl, focusSignal, initialDraft = '', onDraftChange, draftInsertion,
 }: Props) {
   const branding = useBranding()
   const uploadPolicy = useUploadPolicy()
@@ -358,6 +360,8 @@ export function ChatInput({
 
           {/* Spacer */}
           <div className="flex-1" />
+
+          {hasMessages && activityControl}
 
           {/* Assistant memory */}
           {memoryControl}
