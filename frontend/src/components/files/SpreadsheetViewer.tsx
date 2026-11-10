@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ZoomIn, ZoomOut, Maximize2, Search, AlertCircle, RefreshCw, Download } from 'lucide-react'
+import { ZoomIn, ZoomOut, Search, AlertCircle, RefreshCw, Download } from 'lucide-react'
 import { downloadFileUrl, fetchSheetJson, type SheetJsonResponse } from '../../api/files'
 import { pollStatus, retryExtraction } from '../../api/documents'
 import { DocumentSearchBar, useFindInDocumentHotkey } from './DocumentSearchBar'
+import { FullViewButton, useFullView } from './viewerFullView'
 
 type ServerSheet = SheetJsonResponse['sheets'][number]
 
@@ -35,6 +36,7 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
 
   // Find-in-document state
   const rootRef = useRef<HTMLDivElement>(null)
+  const fullView = useFullView()
   const tableScrollRef = useRef<HTMLDivElement>(null)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -268,7 +270,7 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
   }
 
   return (
-    <div ref={rootRef} style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+    <div ref={rootRef} {...fullView.rootProps} style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative', ...fullView.style }}>
       {/* Processing overlay */}
       {processing && (
         <div role="status" aria-live="polite" style={{
@@ -324,9 +326,7 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
         <button type="button" onClick={openSearch} style={btnStyle} title="Find in document (⌘F / Ctrl+F)" aria-label="Find in document">
           <Search size={16} />
         </button>
-        <button type="button" onClick={() => window.open(url, '_blank')} style={btnStyle} title="Open in new tab" aria-label="Open in new tab">
-          <Maximize2 size={16} />
-        </button>
+        <FullViewButton expanded={fullView.expanded} onOpen={fullView.open} onClose={fullView.close} style={btnStyle} />
       </div>
 
       {/* Sheet tabs */}
