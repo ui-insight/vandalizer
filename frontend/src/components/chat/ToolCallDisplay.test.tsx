@@ -294,3 +294,17 @@ it('surfaces recorded grades with their sample size but never attaches them to a
   expect(screen.queryByRole('button', { name: /Grade A/ })).not.toBeInTheDocument()
   expect(screen.getByRole('status')).toHaveTextContent('Failed')
 })
+
+describe('lesson position on a course without server-side places', () => {
+  // Support ticket: on the older course, saving the lesson position showed
+  // "Failed" with Review recovery options although nothing had gone wrong.
+  it('is not shown as a failure', () => {
+    render(<ToolStatusLine call={{ tool_name: 'save_certification_position', tool_call_id: 'pos', args: { module_id: 'ai_literacy' } }}
+      result={{ tool_name: 'save_certification_position', tool_call_id: 'pos', quality: null, content: {
+        saved: false, status: 'not_supported', module_id: 'ai_literacy', position_saving: 'this_browser_only',
+      } }} onConfirm={vi.fn()} />)
+    expect(screen.getByText(/Not available on this course/)).toBeTruthy()
+    expect(screen.queryByText(/Failed/)).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Review recovery options' })).toBeNull()
+  })
+})

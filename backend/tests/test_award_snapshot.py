@@ -114,3 +114,120 @@ async def test_chat_tool_without_a_project():
     ctx = SimpleNamespace(deps=SimpleNamespace(user=SimpleNamespace(user_id="u"), active_project_uuid=None, inbox_read=False))
     out = await chat_snapshot_tools.get_award_snapshot(ctx)
     assert "No project is open" in out["error"]
+
+
+# ---------------------------------------------------------------------------
+# Support ticket: the snapshot cited a saved summary instead of the award.
+# With the award PDF and a chat-saved "Award Snapshot — ….md" in one project,
+# every key fact cited the summary; the PI read "Not confirmed by the passage".
+# ---------------------------------------------------------------------------
+
+from app.services.award_snapshot import is_generated, source_documents  # noqa: E402
+
+PDF = {"uuid": "pdf", "title": "UI-OSU NIFA Subaward Agreement", "extension": "pdf", "token_count": 900, "updated_at": "t"}
+SUMMARY = {"uuid": "md", "title": "Award Snapshot — UI-OSU-NIFA-2026-0412", "extension": "md",
+           "generated_by": "chat", "token_count": 200, "updated_at": "t"}
+
+
+def test_files_vandalizer_wrote_are_recognized():
+    assert is_generated(SUMMARY)
+    assert is_generated({"title": "Run output.csv", "extension": "csv", "origin_workflow_id": "wf"})
+    assert is_generated({"title": "Report", "extension": "docx", "generated_by": "automation"})
+    # Saved before generated_by existed: a summary's name in a text format.
+    assert is_generated({"title": "Award Snapshot — UI-OSU-NIFA-2026-0412", "extension": "md"})
+    assert not is_generated(PDF)
+    assert not is_generated({"title": "Award Summary from sponsor", "extension": "pdf"})
+    assert not is_generated({"title": "Budget justification", "extension": "md"})
+
+
+def test_the_original_is_read_and_the_summary_skipped():
+    # The summary's title is award-like too and sorts first alphabetically.
+    read, skipped = source_documents([SUMMARY, PDF])
+    assert [d["uuid"] for d in read] == ["pdf"]
+    assert [d["uuid"] for d in skipped] == ["md"]
+
+
+def test_only_summaries_are_read_when_there_is_no_original():
+    read, skipped = source_documents([SUMMARY])
+    assert [d["uuid"] for d in read] == ["md"] and skipped == []
+
+
+def test_original_formats_are_read_before_text_files():
+    notes = {"uuid": "txt", "title": "Award notes", "extension": "txt", "token_count": 5, "updated_at": "t"}
+    read, _ = source_documents([notes, PDF])
+    assert [d["uuid"] for d in read] == ["pdf", "txt"]
+
+
+class _Coll:
+    def __init__(self, rows=(), one=None):
+        self.rows, self.one, self.updates = list(rows), one, []
+
+    def find(self, *_a, **_k):
+        return list(self.rows)
+
+    def find_one(self, *_a, **_k):
+        return self.one
+
+    def update_one(self, flt, update):
+        self.updates.append(update)
+        return SimpleNamespace(matched_count=1)
+
+
+def test_build_reads_only_the_award_pdf_and_records_the_skipped_summary():
+    from contextlib import nullcontext
+
+    from app.services import award_snapshot
+
+    db = SimpleNamespace(
+        award_snapshot=_Coll(one={"project_uuid": "p", "build_token": "tok", "requested_by": "u"}),
+        project=_Coll(one={"uuid": "p", "root_folder_uuid": "f", "owner_user_id": "u", "team_id": None}),
+        smart_document=_Coll(rows=[{**SUMMARY, "raw_text": "PI: someone"}, {**PDF, "raw_text": "PI: Dr. Lee"}]),
+        system_config=_Coll(one={}),
+    )
+    engine = SimpleNamespace(extract=lambda *a, **k: engine.calls.append(k) or [{}])
+    engine.calls = []
+    with patch("app.tasks.get_sync_db", return_value=db), \
+         patch("app.services.award_snapshot._folder_uuids_sync", return_value=["f"]), \
+         patch("app.services.extraction_engine.ExtractionEngine", return_value=engine), \
+         patch("app.services.metering.metered", return_value=nullcontext()), \
+         patch("app.tasks.extraction_tasks._get_user_model_name", return_value="m"):
+        assert award_snapshot.build_sync("p", "tok") == "ready"
+    [call] = engine.calls
+    assert call["doc_texts"] == ["PI: Dr. Lee"]
+    assert [m["uuid"] for m in call["doc_metadata"]] == ["pdf"]
+    saved = db.award_snapshot.updates[-1]["$set"]
+    assert saved["documents"] == [{"uuid": "pdf", "title": PDF["title"], "generated": False}]
+    assert saved["skipped_documents"] == [{"uuid": "md", "title": SUMMARY["title"]}]
+
+
+def test_a_summary_saved_next_to_the_award_does_not_queue_a_rebuild():
+    from app.services import award_snapshot
+
+    db = SimpleNamespace(
+        award_snapshot=_Coll(one={"built_at": "t"}),
+        smart_document=_Coll(one={"_id": 1}),  # the project has an original
+    )
+    project = {"uuid": "p", "root_folder_uuid": "f"}
+    with patch("app.tasks.document_tasks._find_project_for_folder", return_value=project), \
+         patch("app.services.award_snapshot._folder_uuids_sync", return_value=["f"]), \
+         patch("app.services.award_snapshot._dispatch") as dispatch:
+        assert award_snapshot.queue_rebuild_for_document_sync(db, {**SUMMARY, "folder": "f"}) is False
+        assert award_snapshot.queue_rebuild_for_document_sync(db, {**PDF, "folder": "f"}) is True
+    dispatch.assert_called_once()
+
+
+def test_page_says_which_facts_the_documents_do_not_state():
+    page = page_html(_view(not_found=["PI(s)"]))
+    assert "<th scope='row'>PI(s)</th><td>Not stated in the documents read</td>" in page
+
+
+@pytest.mark.asyncio
+async def test_chat_tool_says_which_facts_are_not_stated():
+    from app.services import chat_snapshot_tools
+
+    deps = SimpleNamespace(user=SimpleNamespace(user_id="u"), active_project_uuid="p", inbox_read=False)
+    project = SimpleNamespace(uuid="p", title="NIH Subaward")
+    with patch("app.services.chat_tools._resolve_active_project", new=AsyncMock(return_value=project)), \
+         patch("app.services.award_snapshot.view", new=AsyncMock(return_value=_view(status="ready", not_found=["F&A rate"]))):
+        out = await chat_snapshot_tools.get_award_snapshot(SimpleNamespace(deps=deps))
+    assert out["not_stated_in_documents"] == ["F&A rate"]
