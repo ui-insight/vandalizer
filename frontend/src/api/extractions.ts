@@ -1024,10 +1024,20 @@ export async function downloadValidationResults(uuid: string, runUuid?: string):
   URL.revokeObjectURL(url)
 }
 
-export async function importSearchSet(file: File, targetUuid?: string): Promise<SearchSet> {
+/**
+ * `kind: 'extraction'` lets a new extraction come from a plain JSON field list
+ * (as chat writes one), not only from an export file; `title` names it.
+ */
+export async function importSearchSet(
+  file: File,
+  targetUuid?: string,
+  options: { title?: string; kind?: 'extraction' | 'prompt' | 'formatter' } = {},
+): Promise<SearchSet> {
   const form = new FormData()
   form.append('file', file)
   if (targetUuid) form.append('target_uuid', targetUuid)
+  if (options.title?.trim()) form.append('title', options.title.trim())
+  if (options.kind) form.append('kind', options.kind)
   const res = await rawFetch('/api/extractions/search-sets/import', {
     method: 'POST',
     body: form,

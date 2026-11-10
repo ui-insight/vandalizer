@@ -202,6 +202,7 @@ def _extraction_is_stale(doc: SmartDocument) -> bool:
 async def retry_extraction(
     request: Request,
     doc_uuid: str,
+    force_ocr: bool = False,
     user: User = Depends(get_current_user),
 ) -> dict[str, object]:
     """Re-run text extraction (and downstream ingestion) for a document.
@@ -217,6 +218,9 @@ async def retry_extraction(
     document's text layer was refused before, the re-read also *requires*
     OCR: rather than fall back to the local reading it is replacing, it fails
     and is retried once OCR is back.
+
+    ``?force_ocr=true`` (the "Re-run OCR" action) re-reads a PDF with OCR
+    even when its current text looks healthy.
     """
     doc = await access_control.get_authorized_document(
         doc_uuid, user, manage=True, allow_admin=True
@@ -231,8 +235,13 @@ async def retry_extraction(
         )
 
     from app.services.extraction_restarts import ExtractionRestartConflict
+    # What the user asked for, kept apart from what the service decided:
+    # force_ocr below is overwritten with the effective decision.
+    requested_ocr = force_ocr
     try:
-        restart = await document_service.restart_extraction(doc, user.user_id)
+        restart = await document_service.restart_extraction(
+            doc, user.user_id, request_ocr=requested_ocr,
+        )
     except ExtractionRestartConflict as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
     task_id = restart["task_id"]
@@ -250,10 +259,47 @@ async def retry_extraction(
             "force_ocr": force_ocr,
             "ocr_required": ocr_required,
             "previous_task_status": previous_task_status,
+            "requested_ocr": requested_ocr,
         },
     )
 
     return {"uuid": doc_uuid, "task_id": task_id, "status": "extracting"}
+
+
+@router.post("/{doc_uuid}/cancel-extraction")
+@limiter.limit("30/minute")
+async def cancel_extraction(
+    request: Request,
+    doc_uuid: str,
+    user: User = Depends(get_current_user),
+):
+    """Stop a document's in-flight text extraction (e.g. an OCR read that is
+    stuck). The document is left in a retryable error state, so
+    ``retry-extraction`` restarts it right away rather than waiting out the
+    staleness window.
+    """
+    doc = await access_control.get_authorized_document(
+        doc_uuid, user, manage=True, allow_admin=True
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    if not await document_service.cancel_extraction(doc):
+        raise HTTPException(
+            status_code=409,
+            detail="No extraction is in progress for this document",
+        )
+
+    await audit_service.log_event(
+        action="document.cancel_extraction",
+        actor_user_id=user.user_id,
+        resource_type="document",
+        resource_id=doc_uuid,
+        resource_name=doc.title,
+        detail={"previous_task_status": doc.task_status},
+    )
+
+    return {"uuid": doc_uuid, "status": "error"}
 
 
 # ---------------------------------------------------------------------------

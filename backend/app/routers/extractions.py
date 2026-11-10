@@ -11,6 +11,7 @@ from app.schemas.extractions import ValidationPortability
 import asyncio
 import datetime
 import json
+import re
 import logging
 from typing import TYPE_CHECKING, Optional
 
@@ -604,28 +605,46 @@ async def download_validation_results(
 async def import_search_set(
     file: UploadFile = File(...),
     target_uuid: Optional[str] = Form(None),
+    title: Optional[str] = Form(None),
+    kind: Optional[str] = Form(None),
     user: User = Depends(get_current_user),
 ) -> SearchSetResponse:
     """Import an extraction from an exported JSON file.
 
     If *target_uuid* is provided, items are appended to that existing SearchSet
-    and its extraction_config is replaced. Otherwise a new SearchSet is created.
+    and its extraction_config is replaced. Otherwise a new SearchSet is created,
+    named *title* when given.
+
+    An upload into an extraction (``kind=extraction``, or a target that is
+    one) also accepts a plain JSON field list, as chat writes it.
     """
     from app.services import export_import_service as eis
 
     content = await file.read()
     try:
         data = json.loads(content)
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid JSON file")
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        # JSON copied out of a chat answer can bring its ```json fence along.
+        text = content.decode("utf-8-sig", errors="replace").strip()
+        fenced = re.fullmatch(r"```[a-zA-Z]*\s*\n(.*?)\n?```", text, re.DOTALL)
+        try:
+            data = json.loads(fenced.group(1)) if fenced else None
+        except json.JSONDecodeError:
+            data = None
+        if data is None:
+            raise HTTPException(status_code=400, detail="Invalid JSON file")
 
     target = None
     if target_uuid:
         target = await _get_search_set_or_404(target_uuid, user, manage=True)
+    accept_plain = (target.set_type == "extraction") if target is not None else kind == "extraction"
 
     team_id = str(user.current_team) if user.current_team else None
     try:
-        ss = await eis.import_search_set(data, user.user_id, team_id=team_id, target=target)
+        ss = await eis.import_search_set(
+            data, user.user_id, team_id=team_id, target=target,
+            title=(title or "").strip()[:100] or None, accept_plain=accept_plain,
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

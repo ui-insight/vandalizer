@@ -58,6 +58,102 @@ def validate_export_data(data: dict) -> str | None:
 
 
 # ---------------------------------------------------------------------------
+# Plain extraction definitions
+# ---------------------------------------------------------------------------
+# Chat writes extraction field lists as plain JSON, and users paste them into a
+# file and upload it. That JSON has no export envelope, so it used to fail with
+# "missing vandalizer_export flag", which tells the user nothing they can act on.
+
+NOT_AN_EXTRACTION_FILE = (
+    "This file isn't an extraction definition. Upload a file from an "
+    "extraction's Export button, or JSON listing the fields to extract: for "
+    'example [{"name": "Award number", "description": "The sponsor\'s award ID"}].'
+)
+
+_LIST_KEYS = ("items", "fields", "extraction_fields", "extractions", "search_phrases", "searchphrases")
+_TITLE_KEYS = ("title", "name", "extraction_name", "extraction_set_name", "set_name")
+_FIELD_NAME_KEYS = ("searchphrase", "search_phrase", "name", "field_name", "field", "title", "label", "key")
+_DESCRIPTION_KEYS = ("description", "instructions", "instruction", "definition", "guidance", "prompt")
+_ENUM_KEYS = ("enum_values", "allowed_values", "options", "enum", "choices")
+
+MAX_PLAIN_FIELDS = 500
+
+
+def _first_str(obj: dict, keys: tuple[str, ...]) -> str | None:
+    for k in keys:
+        v = obj.get(k)
+        if isinstance(v, str) and v.strip():
+            return v.strip()
+    return None
+
+
+def _plain_field(entry: object) -> dict | None:
+    if isinstance(entry, str):
+        return {"searchphrase": entry.strip()} if entry.strip() else None
+    if not isinstance(entry, dict):
+        return None
+    name = _first_str(entry, _FIELD_NAME_KEYS)
+    if not name:
+        return None
+    field: dict = {"searchphrase": name}
+    description = _first_str(entry, _DESCRIPTION_KEYS)
+    if description:
+        field["description"] = description
+    for k in _ENUM_KEYS:
+        values = entry.get(k)
+        if isinstance(values, list) and values and all(isinstance(v, (str, int, float)) for v in values):
+            field["enum_values"] = [str(v) for v in values]
+            break
+    if isinstance(entry.get("is_optional"), bool):
+        field["is_optional"] = entry["is_optional"]
+    elif isinstance(entry.get("optional"), bool):
+        field["is_optional"] = entry["optional"]
+    elif isinstance(entry.get("required"), bool):
+        field["is_optional"] = not entry["required"]
+    return field
+
+
+def plain_extraction_export(data: object, title: str | None = None) -> dict | None:
+    """A search_set export envelope built from a plain field list, or None.
+
+    Accepts a list of field names or field objects, an object holding such a
+    list under a common key (``fields``, ``items`` …), or an object mapping
+    each field name to its description. Field objects take their name from
+    ``name``/``field_name``/``searchphrase``/… and their description, allowed
+    values and optional flag from the usual spellings. Every entry must yield
+    a field: a half-recognised file is refused rather than imported partly.
+    """
+    entries: object = None
+    found_title = None
+    if isinstance(data, list):
+        entries = data
+    elif isinstance(data, dict):
+        found_title = _first_str(data, _TITLE_KEYS)
+        for k in _LIST_KEYS:
+            if isinstance(data.get(k), list):
+                entries = data[k]
+                break
+        else:
+            if data and all(isinstance(k, str) and isinstance(v, str) for k, v in data.items()):
+                entries = [{"name": k, "description": v} for k, v in data.items()]
+    if not isinstance(entries, list) or not entries or len(entries) > MAX_PLAIN_FIELDS:
+        return None
+    fields = [_plain_field(e) for e in entries]
+    if any(f is None for f in fields):
+        return None
+    return {
+        "vandalizer_export": True,
+        "schema_version": SCHEMA_VERSION,
+        "export_type": "search_set",
+        "items": [{
+            "title": (title or found_title or "Uploaded extraction").strip(),
+            "set_type": "extraction",
+            "items": fields,
+        }],
+    }
+
+
+# ---------------------------------------------------------------------------
 # Workflow export / import
 # ---------------------------------------------------------------------------
 
@@ -481,13 +577,27 @@ async def import_search_set(
     user_id: str,
     team_id: str | None = None,
     target: SearchSet | None = None,
+    *,
+    title: str | None = None,
+    accept_plain: bool = False,
 ) -> SearchSet:
     """Import a search set from export data.
 
     If *target* is provided, items and test cases are appended to it and its
     extraction_config is replaced with the imported one. Otherwise a new
-    SearchSet is created. Returns the target or newly-created SearchSet.
+    SearchSet is created, named *title* when given. Returns the target or
+    newly-created SearchSet.
+
+    ``accept_plain`` also takes a plain field list (see
+    ``plain_extraction_export``); only an extraction upload sets it, so a
+    Skill or Formatter upload never turns into an extraction.
     """
+    plain = False
+    if accept_plain and not (isinstance(data, dict) and data.get("vandalizer_export")):
+        converted = plain_extraction_export(data, title)
+        if converted is None:
+            raise ValueError(NOT_AN_EXTRACTION_FILE)
+        data, plain = converted, True
     err = validate_export_data(data)
     if err:
         raise ValueError(err)
@@ -497,15 +607,18 @@ async def import_search_set(
     item = data["items"][0]
 
     if target is not None:
-        target.extraction_config = item.get("extraction_config", {})
-        await target.save()
+        # A plain field list carries no extraction settings; it adds fields
+        # and leaves the extraction's own settings alone.
+        if not plain:
+            target.extraction_config = item.get("extraction_config", {})
+            await target.save()
         ss_uuid = target.uuid
         result = target
     else:
         ss_uuid = str(uuid_mod.uuid4())
         set_type = item.get("set_type", "extraction")
         imported_title = await name_conflicts.next_available_name(
-            f"{item['title']} (Imported)",
+            title.strip() if title and title.strip() else f"{item['title']} (Imported)",
             lambda t: name_conflicts.search_set_title_taken(t, set_type, user_id, team_id),
         )
         result = SearchSet(

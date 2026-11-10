@@ -19,6 +19,8 @@ if TYPE_CHECKING:
     from celery import Task
     from app.services.document_manager import DocumentManager
 
+from celery.exceptions import Ignore
+
 from app.celery_app import celery_app
 from app.services.document_readers import DocumentReadError, UnreadableFileError
 from app.services.extraction_generations import extraction_generation_filter
@@ -515,6 +517,28 @@ def perform_extraction_and_update(
 
     extension = (extension or "").lower().lstrip(".")
 
+    # This run owns the document from its lock write on: every later write
+    # is filtered on its task id. A user who stops the extraction clears
+    # task_id, and a newer run that takes the lock replaces it, so a worker
+    # that outlives either (a revoke that arrived late, a retry already in
+    # flight) cannot write a stale reading or error over what replaced it.
+    # Also this extraction's revision: a restart or Stop bumps it, which
+    # leaves the rest of the chain (update, ingestion) with nothing to write.
+    owned = {**generation_query, "task_id": self.request.id}
+
+    def _owned_update(update: dict) -> None:
+        if not db.smart_document.update_one(owned, update).matched_count:
+            logger.info(
+                "Extraction %s no longer owns document %s (stopped or "
+                "superseded) — dropping its result",
+                self.request.id, document_uuid,
+            )
+            # Ignore, not a return: returning would run the rest of the
+            # chain (update → "complete") against a document this run no
+            # longer owns, and raising an error would fire cleanup's error
+            # write over it.
+            raise Ignore()
+
     try:
         result = db.smart_document.update_one(
             generation_query,
@@ -524,6 +548,7 @@ def perform_extraction_and_update(
             {"$set": {
                 "processing": True,
                 "task_status": "extracting",
+                "task_id": self.request.id,
                 "updated_at": datetime.datetime.now(),
             }},
         )
@@ -657,7 +682,15 @@ def perform_extraction_and_update(
                 # branch sees it, so "nothing usable" may be one page of
                 # three: the advice has to leave a retry open rather than
                 # send the user straight to re-upload.
-                if ocr_report.get("text_layer_rejected_reason") == "ocr_required":
+                if ocr_report.get("text_layer_rejected_reason") == "ocr_all_pdfs":
+                    message = (
+                        "OCR read this document's pages and returned no text. "
+                        "This deployment requires OCR for every PDF, so no "
+                        "lower-quality reading was stored. Retry extraction in "
+                        "case the OCR service was degraded; if it keeps "
+                        "failing, the pages may be blank or unreadable."
+                    )
+                elif ocr_report.get("text_layer_rejected_reason") == "ocr_required":
                     message = (
                         "OCR read this document's pages and found nothing "
                         "usable, and its own text layer was already refused "
@@ -700,12 +733,9 @@ def perform_extraction_and_update(
                 # makes the next retry require OCR rather than fall back to
                 # the layer this run just refused.
                 error_fields["text_layer_rejected"] = True
-            result = db.smart_document.update_one(
-                generation_query,
+            _owned_update(
                 {"$set": error_fields},
             )
-            if not result.matched_count:
-                return ""
             # Every other terminal-error branch notifies; this one silently
             # relied on the user noticing the row state — which the file list
             # didn't render either. Same coalesced bell as the rest.
@@ -733,12 +763,14 @@ def perform_extraction_and_update(
         if num_pages is not None:
             update_fields["num_pages"] = num_pages
 
-        result = db.smart_document.update_one(
-            generation_query,
+        _owned_update(
             {"$set": update_fields},
         )
 
-        return raw_text if result.matched_count else ""
+        return raw_text
+
+    except Ignore:
+        raise
 
     except FileNotFoundError as e:
         # The source file vanished between upload and extraction — a document
@@ -753,8 +785,7 @@ def perform_extraction_and_update(
             "The uploaded file is no longer available "
             "(it may have been deleted during processing)."
         )
-        result = db.smart_document.update_one(
-            generation_query,
+        _owned_update(
             {
                 "$set": {
                     "raw_text": "",
@@ -768,8 +799,7 @@ def perform_extraction_and_update(
                 }
             },
         )
-        if result.matched_count:
-            _notify_document_processing_failed(db, document_uuid, message)
+        _notify_document_processing_failed(db, document_uuid, message)
         return ""
 
     except OcrUnavailableError as e:
@@ -798,8 +828,7 @@ def perform_extraction_and_update(
             "retry once the service is back, or contact your administrator if "
             "it keeps happening."
         )
-        result = db.smart_document.update_one(
-            generation_query,
+        _owned_update(
             {
                 "$set": {
                     "raw_text": "",
@@ -811,8 +840,7 @@ def perform_extraction_and_update(
                 }
             },
         )
-        if result.matched_count:
-            _notify_document_processing_failed(db, document_uuid, message)
+        _notify_document_processing_failed(db, document_uuid, message)
         return ""
 
     except DocumentReadError as e:
@@ -823,8 +851,7 @@ def perform_extraction_and_update(
         # file, the way FileNotFoundError and OCR outages already don't.
         logger.warning("Document %s is not readable text: %s", document_uuid, e)
         message = str(e)
-        result = db.smart_document.update_one(
-            generation_query,
+        _owned_update(
             {
                 "$set": {
                     "raw_text": "",
@@ -839,15 +866,13 @@ def perform_extraction_and_update(
                 }
             },
         )
-        if result.matched_count:
-            _notify_document_processing_failed(db, document_uuid, message)
+        _notify_document_processing_failed(db, document_uuid, message)
         return ""
 
     except Exception as e:
         logger.exception("Error extracting text from document %s", document_uuid)
         message = f"Text extraction failed: {str(e)[:300]}"
-        result = db.smart_document.update_one(
-            generation_query,
+        _owned_update(
             {
                 "$set": {
                     "raw_text": "",
@@ -859,8 +884,7 @@ def perform_extraction_and_update(
                 }
             },
         )
-        if result.matched_count:
-            _notify_document_processing_failed(db, document_uuid, message)
+        _notify_document_processing_failed(db, document_uuid, message)
         return ""
 
 

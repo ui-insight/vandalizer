@@ -62,4 +62,6 @@ export interface PollStatusResponse {
   processing: boolean
   title: string
   extraction_low_quality?: boolean
+  /** File extension without the dot ("pdf"), when known. */
+  extension?: string | null
 }

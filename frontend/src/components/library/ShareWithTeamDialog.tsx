@@ -20,11 +20,13 @@ interface Props {
   defaultTeamId?: string
   createsIndependentCopy?: boolean
   busy?: boolean
+  /** Opened from another step (the share wizard): show Back to return there. */
+  onBack?: () => void
   onCancel: () => void
   onConfirm: (comment: string, teamId?: string) => void | Promise<void>
 }
 
-export function ShareWithTeamDialog({ itemName, teamName, teams, defaultTeamId, createsIndependentCopy = false, busy, onCancel, onConfirm }: Props) {
+export function ShareWithTeamDialog({ itemName, teamName, teams, defaultTeamId, createsIndependentCopy = false, busy, onBack, onCancel, onConfirm }: Props) {
   const dialogRef = useRef<HTMLDivElement>(null)
   const [comment, setComment] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -134,6 +136,15 @@ export function ShareWithTeamDialog({ itemName, teamName, teams, defaultTeamId, 
 
         {error && <p ref={errorRef} tabIndex={-1} role="alert" className="text-sm text-red-800 mt-3">{error}</p>}
         <div className="flex flex-wrap justify-end gap-2 mt-4">
+          {onBack && (
+            <button
+              onClick={onBack}
+              disabled={isBusy}
+              className="mr-auto px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg disabled:opacity-50"
+            >
+              Back
+            </button>
+          )}
           <button
             onClick={onCancel}
             disabled={isBusy}

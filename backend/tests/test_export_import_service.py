@@ -241,3 +241,114 @@ class TestReconstructTaskReferences:
         )
         assert result["prompt"] == "Extract the dates"
         assert "format_template" not in result
+
+
+# ---------------------------------------------------------------------------
+# Plain extraction definitions (support ticket: chat-written JSON uploaded to
+# "Name the extraction" failed with "missing vandalizer_export flag")
+# ---------------------------------------------------------------------------
+
+from app.services import export_import_service as eis  # noqa: E402
+
+CHAT_JSON = {
+    "extraction_set_name": "NSF Award Setup",
+    "fields": [
+        {"field_name": "Award Number", "description": "The NSF award ID", "required": True},
+        {"field_name": "Award Type", "allowed_values": ["Standard", "Continuing"], "required": False},
+        {"name": "Start Date"},
+    ],
+}
+
+
+class TestPlainExtractionExport:
+    def test_chat_style_object_with_fields_becomes_a_search_set_export(self):
+        env = eis.plain_extraction_export(CHAT_JSON)
+        assert validate_export_data(env) is None
+        item = env["items"][0]
+        assert item["title"] == "NSF Award Setup" and item["set_type"] == "extraction"
+        assert item["items"] == [
+            {"searchphrase": "Award Number", "description": "The NSF award ID", "is_optional": False},
+            {"searchphrase": "Award Type", "enum_values": ["Standard", "Continuing"], "is_optional": True},
+            {"searchphrase": "Start Date"},
+        ]
+
+    def test_typed_title_wins_over_the_files(self):
+        assert eis.plain_extraction_export(CHAT_JSON, "My name")["items"][0]["title"] == "My name"
+
+    @pytest.mark.parametrize("data, names", [
+        (["Award Number", "PI Name"], ["Award Number", "PI Name"]),
+        ([{"searchphrase": "Sponsor"}, {"label": "Amount", "options": [1, 2]}], ["Sponsor", "Amount"]),
+        ({"items": [{"title": "Budget period"}]}, ["Budget period"]),
+        ({"Award Number": "The sponsor's ID", "PI": "Lead investigator"}, ["Award Number", "PI"]),
+    ])
+    def test_accepted_shapes(self, data, names):
+        env = eis.plain_extraction_export(data)
+        assert [f["searchphrase"] for f in env["items"][0]["items"]] == names
+
+    @pytest.mark.parametrize("data", [
+        {}, [], "text", 42,
+        {"fields": []},
+        {"fields": [{"name": "ok"}, {"description": "no name"}]},  # partly recognised: refused
+        {"workflow": {"steps": [1, 2]}},
+        {"a": 1},
+        ["x"] * (eis.MAX_PLAIN_FIELDS + 1),
+    ])
+    def test_unrecognised_shapes_are_refused(self, data):
+        assert eis.plain_extraction_export(data) is None
+
+
+def _import_patches():
+    ss_cls = MagicMock()
+    ss_cls.return_value.insert = AsyncMock()
+    item_cls = MagicMock()
+    item_cls.return_value.insert = AsyncMock()
+    return ss_cls, item_cls, [
+        patch.object(eis, "SearchSet", ss_cls),
+        patch.object(eis, "SearchSetItem", item_cls),
+        patch.object(eis, "_bookmark", AsyncMock()),
+        patch.object(eis.name_conflicts, "next_available_name", AsyncMock(side_effect=lambda name, taken: name)),
+    ]
+
+
+class TestImportPlainDefinitions:
+    @pytest.mark.asyncio
+    async def test_an_extraction_upload_imports_a_plain_field_list_under_the_typed_name(self):
+        from contextlib import ExitStack
+        ss_cls, item_cls, cms = _import_patches()
+        with ExitStack() as stack:
+            for cm in cms:
+                stack.enter_context(cm)
+            await eis.import_search_set(CHAT_JSON, "u1", title="NSF GRANTED Extraction V2", accept_plain=True)
+        assert ss_cls.call_args.kwargs["title"] == "NSF GRANTED Extraction V2"
+        assert ss_cls.call_args.kwargs["set_type"] == "extraction"
+        assert [c.kwargs["searchphrase"] for c in item_cls.call_args_list] == ["Award Number", "Award Type", "Start Date"]
+        assert item_cls.call_args_list[1].kwargs["enum_values"] == ["Standard", "Continuing"]
+        assert item_cls.call_args_list[1].kwargs["is_optional"] is True
+
+    @pytest.mark.asyncio
+    async def test_unrecognised_json_says_what_an_extraction_file_looks_like(self):
+        with pytest.raises(ValueError) as e:
+            await eis.import_search_set({"hello": 1}, "u1", accept_plain=True)
+        assert str(e.value) == eis.NOT_AN_EXTRACTION_FILE
+        assert "vandalizer_export" not in str(e.value)
+
+    @pytest.mark.asyncio
+    async def test_without_accept_plain_a_field_list_is_still_refused(self):
+        # Skill and Formatter uploads must never become extractions.
+        with pytest.raises(ValueError, match="missing vandalizer_export"):
+            await eis.import_search_set(CHAT_JSON, "u1")
+
+    @pytest.mark.asyncio
+    async def test_a_field_list_added_to_an_existing_extraction_keeps_its_settings(self):
+        from contextlib import ExitStack
+        _ss_cls, item_cls, cms = _import_patches()
+        target = MagicMock(uuid="ss-1", extraction_config={"mode": "two_pass"})
+        target.save = AsyncMock()
+        with ExitStack() as stack:
+            for cm in cms:
+                stack.enter_context(cm)
+            result = await eis.import_search_set(["PI Name"], "u1", target=target, accept_plain=True)
+        assert result is target
+        assert target.extraction_config == {"mode": "two_pass"}
+        target.save.assert_not_awaited()
+        assert item_cls.call_args.kwargs["searchset"] == "ss-1"
