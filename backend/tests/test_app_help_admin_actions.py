@@ -92,3 +92,41 @@ async def test_viewer_access_reports_a_system_admin_and_team_owner():
 async def test_viewer_access_without_a_team():
     result = await get_app_help(_ctx(is_admin=False, team_role=None), "teams")
     assert result["viewer_access"]["current_team_role"] == "none"
+
+
+# Support ticket: asked how an admin resets their certification, chat
+# described an Administration tab with a Reset progress button (and drafted an
+# email asking for one). There is no reset. The help said so only implicitly,
+# and chat answered from memory instead of looking it up.
+
+@pytest.mark.parametrize("query", [
+    "Can we reset the certification by requesting admin?",
+    "How does an admin reset my certification?",
+    "certification reset progress start over",
+])
+def test_certification_reset_questions_reach_the_certification_topic(query):
+    assert find_topics(query)[0]["id"] == "certification"
+
+
+def test_certification_help_says_progress_cannot_be_reset_and_what_admins_can_do():
+    body = find_topics("certification")[0]["body"]
+    assert "can't be reset, by you or by an administrator" in body
+    assert "review any completed module's lessons again" in body
+    # Only some course versions award stars (5.0 has one completion threshold).
+    assert "On a course that awards stars, you can retake a completed module" in body
+    assert "completed modules stay complete" in body
+    for action in ("Unlock prerequisite access", "Re-lock", "Review recovery", "grading corrections"):
+        assert action in body
+    assert "can't clear or reset" in body
+
+
+def test_password_questions_still_match_no_certification_topic():
+    assert [t["id"] for t in find_topics("reset password")] == []
+
+
+def test_chat_looks_up_help_before_describing_vandalizer_features():
+    from app.services.llm_service import AGENTIC_CHAT_SYSTEM_PROMPT as prompt
+
+    assert "BEFORE your first answer that names a Vandalizer screen" in prompt
+    assert "Describe only features the help content or your tools confirm exist" in prompt
+    assert "Progress can't be reset, by the learner" in prompt

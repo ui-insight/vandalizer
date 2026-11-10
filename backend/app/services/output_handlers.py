@@ -130,6 +130,7 @@ def save_results_to_folder(result_doc: dict, storage_config: dict) -> str:
         "origin_workflow_id": workflow_id_str,
         "origin_workflow_run_id": run_id_str,
         "origin_run_at": now,
+        "generated_by": "workflow",
         "updated_at": now,
     }
 
@@ -574,6 +575,7 @@ def save_extraction_results_to_folder(
         "folder": folder.get("uuid", ""),
         "raw_text": "",
         "processing": False,
+        "generated_by": "automation",
         "created_at": datetime.now(timezone.utc),
         "updated_at": datetime.now(timezone.utc),
     })

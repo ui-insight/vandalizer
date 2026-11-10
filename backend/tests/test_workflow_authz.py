@@ -716,3 +716,32 @@ class TestWorkflowShareToken:
         assert resp.status_code == 200
         kwargs = mock_svc.duplicate_workflow.await_args.kwargs
         assert kwargs.get("share_token") == "tok-abc"
+
+
+class TestAddTaskFlagsStaleVerification:
+    @pytest.mark.asyncio
+    async def test_adding_a_task_flags_its_workflow_stale(self, client):
+        """The editor creates a task on Save with its details, not on pick then
+        update, so the add route flags a verified workflow stale itself."""
+        user = _make_user("user1")
+        cookies, headers = _auth("user1")
+        wf = _mock_workflow(wf_id="507f1f77bcf86cd799439011", user_id="user1")
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.workflows.svc") as mock_svc, \
+             patch("app.services.verification_service.check_and_flag_stale_verification",
+                   new_callable=AsyncMock, return_value=True) as flag:
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.add_task = AsyncMock(return_value={"id": "t1", "name": "Prompt", "data": {"prompt": "Summarize"}})
+            mock_svc._get_workflow_for_step = AsyncMock(return_value=wf)
+
+            resp = await client.post(
+                "/api/workflows/steps/507f1f77bcf86cd799439012/tasks",
+                json={"name": "Prompt", "data": {"prompt": "Summarize"}},
+                cookies=cookies, headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert mock_svc.add_task.await_args.kwargs["data"] == {"prompt": "Summarize"}
+        flag.assert_awaited_once_with("workflow", str(wf.id))
