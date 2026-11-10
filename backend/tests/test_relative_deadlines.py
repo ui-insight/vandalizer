@@ -238,3 +238,105 @@ def test_approval_card_evidence_drops_table_markup_but_keeps_the_stored_quote():
     assert "<td>" not in line
     assert period.quote == quote
     assert service.plain_quote("Costs &amp; fees<br/>\n  apply") == "Costs & fees apply"
+
+
+# ── Period dates in a table (support ticket) ────────────────────────────────
+# A NIFA subaward gave Start Date / End Date (Aug 31, 2027) in a page-1 table;
+# both final reports, due 120 days after the End Date, were refused as
+# "supporting passage could not be verified".
+
+FINAL_120 = source("Final technical and financial reports are due 120 days after the End Date.", "timing")
+CLOSEOUT = datetime.datetime(2027, 12, 29)
+
+
+@pytest.mark.parametrize("quote", [
+    # Markdown (pdf-inspector), header row over a value row.
+    "| Award No. | Start Date | End Date |\n| --- | --- | --- |\n| 2025-67019 | Sep 1, 2025 | Aug 31, 2027 |",
+    # Markdown key/value rows.
+    "| Start Date | September 1, 2025 |\n| End Date | August 31, 2027 |",
+    # HTML cells (OCR / Docling), header over values.
+    "<table><tr><th>Start Date</th><th>End Date</th></tr><tr><td>09/01/2025</td><td>08/31/2027</td></tr></table>",
+    # HTML, one row of label/value pairs.
+    "<tr><td>Start Date</td><td>Sep 1, 2025</td><td>End Date</td><td>Aug 31, 2027</td></tr>",
+    # PyMuPDF tab-joined row.
+    "Subaward Period\tStart Date\tEnd Date\n\tSep 1, 2025\tAug 31, 2027",
+    # PyMuPDF one cell per line.
+    "Start Date\nEnd Date\nSeptember 1, 2025\nAugust 31, 2027",
+    # A labeled cell holding its own date.
+    "| Start Date: Sep 1, 2025 | End Date: Aug 31, 2027 |",
+])
+def test_end_date_in_a_table_anchors_the_final_reports(quote):
+    (row,) = calculate_deadlines([FINAL_120, source(quote, "period_of_performance")])
+    assert row["due_at"] == CLOSEOUT
+    assert row["deadline_calculation"].anchor_date == "2027-08-31"
+
+
+@pytest.mark.parametrize("quote,reason", [
+    ("| Period | Start Date | End Date |\n| --- | --- | --- |\n| Year 1 | Sep 1, 2025 | Aug 31, 2026 |\n| Year 2 | Sep 1, 2026 | Aug 31, 2027 |",
+     "more than one"),
+    ("| Start Date | End Date |\n| --- | --- |\n| Aug 31, 2027 | Sep 1, 2025 |", "precede"),
+    ("| Start Date | End Date |\n| --- | --- |\n| Sep 1, 2025 | Aug 31 |", "years"),
+])
+def test_a_table_period_still_needs_one_complete_row(quote, reason):
+    with pytest.raises(ValueError, match=reason):
+        calculate_deadlines([FINAL_120, source(quote, "period_of_performance")])
+
+
+def test_a_cut_off_header_cannot_shift_columns():
+    """"End Date |" over a full value row would pair End Date with the start."""
+    quote = "End Date |\n| Sep 1, 2025 | Aug 31, 2027 |"
+    with pytest.raises(ValueError):
+        calculate_deadlines([FINAL_120, source(quote, "period_of_performance")])
+
+
+def test_a_rule_quoted_from_a_reporting_table_keeps_its_anchor():
+    rule = source("<td>Final technical report</td><td>120 days after the End Date</td>", "timing")
+    period = source("| Start Date | End Date |\n| --- | --- |\n| Sep 1, 2025 | Aug 31, 2027 |", "period_of_performance")
+    (row,) = calculate_deadlines([rule, period])
+    assert row["due_at"] == CLOSEOUT
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("page_table,model_quote", [
+    ("| Start Date | End Date |\n| --- | --- |\n| Sep 1, 2025 | Aug 31, 2027 |", "Start Date End Date Sep 1, 2025 Aug 31, 2027"),
+    ("| Start Date | End Date |\n|---|---|\n| Sep 1, 2025 | Aug 31, 2027 |", "| Sep 1, 2025 | Aug 31, 2027 |\nEnd Date"),
+    ("| Start Date | Sep 1, 2025 |\n| End Date | Aug 31, 2027 |", "End Date Aug 31, 2027"),
+    ("<table><tr><td>Start Date</td><td>Sep 1, 2025</td><td>End Date</td><td>Aug 31, 2027</td></tr></table>", "End Date Aug 31, 2027"),
+])
+async def test_a_quote_read_from_a_table_verifies_and_stores_the_documents_text(monkeypatch, page_table, model_quote):
+    project = SimpleNamespace(uuid="project", title="NIFA Subaward", team_id=None)
+    user = SimpleNamespace(user_id="user1")
+    text = f"SUBAWARD AGREEMENT\n{page_table}\nReporting\n{FINAL_120.quote}\n"
+    doc = SimpleNamespace(uuid="subaward", title="Subaward.pdf", raw_text=text, text_markers=None)
+    monkeypatch.setattr(service, "_readable_document", AsyncMock(return_value=doc))
+    monkeypatch.setattr(service, "Obligation", fake_model([]))
+    item = {"kind": "deadline", "deadline_type": "report_due", "title": "Final technical report",
+            "relative_deadline": True, "sources": [
+                FINAL_120.model_dump(),
+                {**source(model_quote, "period_of_performance").model_dump(), "page": None},
+            ]}
+    if model_quote.startswith("| Sep"):
+        # Not contiguous in the document, so it must not verify.
+        checked = await service.propose(project, user, [item])
+        assert checked["accepted"] == [] and "not found" in checked["rejected"][0]["reason"]
+        return
+    checked = await service.propose(project, user, [item])
+    assert checked["rejected"] == []
+    (accepted,) = checked["accepted"]
+    assert accepted["clean"]["due_at"] == CLOSEOUT
+    stored = accepted["clean"]["sources"][1].quote
+    assert stored in text and "Aug 31, 2027" in stored
+
+
+@pytest.mark.asyncio
+async def test_a_table_quote_with_a_date_the_document_lacks_is_still_refused(monkeypatch):
+    project = SimpleNamespace(uuid="project", title="NIFA Subaward", team_id=None)
+    text = "| Start Date | End Date |\n| --- | --- |\n| Sep 1, 2025 | Aug 31, 2027 |\n" + FINAL_120.quote
+    doc = SimpleNamespace(uuid="subaward", title="Subaward.pdf", raw_text=text, text_markers=None)
+    monkeypatch.setattr(service, "_readable_document", AsyncMock(return_value=doc))
+    monkeypatch.setattr(service, "Obligation", fake_model([]))
+    item = {"kind": "deadline", "deadline_type": "report_due", "title": "Final report", "relative_deadline": True,
+            "sources": [FINAL_120.model_dump(),
+                        {**source("Start Date End Date Sep 1, 2025 Aug 31, 2028", "period_of_performance").model_dump(), "page": None}]}
+    checked = await service.propose(project, SimpleNamespace(user_id="user1"), [item])
+    assert checked["accepted"] == [] and "not found" in checked["rejected"][0]["reason"]
