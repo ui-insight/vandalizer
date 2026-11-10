@@ -111,7 +111,9 @@ def test_certification_reset_questions_reach_the_certification_topic(query):
 def test_certification_help_says_progress_cannot_be_reset_and_what_admins_can_do():
     body = find_topics("certification")[0]["body"]
     assert "can't be reset, by you or by an administrator" in body
-    assert "retake a completed module to improve its stars" in body
+    assert "review any completed module's lessons again" in body
+    # Only some course versions award stars (5.0 has one completion threshold).
+    assert "On a course that awards stars, you can retake a completed module" in body
     assert "completed modules stay complete" in body
     for action in ("Unlock prerequisite access", "Re-lock", "Review recovery", "grading corrections"):
         assert action in body
