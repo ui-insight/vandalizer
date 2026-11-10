@@ -20,6 +20,14 @@ export function planSummary(tasks: PlanTask[], waitingApprovals = 0): string {
   return parts.join(' · ')
 }
 
+/** "Done: project created, 3 deadlines added, 2 need your help, Page saved."
+ * One finish line from each step's result, or its name when the step didn't
+ * report one (support ticket: no clear finish to a multi-step setup). */
+export function planFinishLine(tasks: readonly PlanTask[]): string {
+  const outcomes = tasks.map(t => (t.result?.trim() || t.content).replace(/[.\s]+$/, ''))
+  return `Done: ${outcomes.join(', ')}.`
+}
+
 /** Pinned live checklist for multi-step agent work (uplift plan Phase 8).
  * Driven by plan_update stream chunks from the update_plan tool. Collapses
  * to a single done-line once every task is completed and nothing waits. */
@@ -35,9 +43,11 @@ export function PlanChecklist({ tasks, isStreaming = true, waitingApprovals = 0 
       <div role="status" className="mt-2 flex items-center gap-2 rounded-md bg-emerald-50 px-3 py-2 text-xs text-emerald-800 border border-emerald-200">
         <Check size={14} className="shrink-0" />
         <span>
-          {tasks.length === 1
-            ? 'Task completed'
-            : `All ${tasks.length} steps completed`}
+          {tasks.some(t => t.result?.trim())
+            ? planFinishLine(tasks)
+            : tasks.length === 1
+              ? 'Task completed'
+              : `All ${tasks.length} steps completed`}
         </span>
       </div>
     )
@@ -70,6 +80,7 @@ export function PlanChecklist({ tasks, isStreaming = true, waitingApprovals = 0 
               }
             >
               {task.status === 'in_progress' && isStreaming ? task.active_form : task.content}
+              {task.status === 'completed' && task.result && <span className="text-gray-500"> · {task.result}</span>}
             </span>
             <span className="text-gray-600">{task.status === 'completed' ? 'Completed' : task.status === 'awaiting_approval' ? 'Waiting for your approval' : !isStreaming ? 'Not confirmed' : task.status === 'in_progress' ? 'Running' : 'Planned'}</span>
           </li>

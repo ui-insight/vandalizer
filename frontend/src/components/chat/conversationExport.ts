@@ -1,7 +1,7 @@
 import type { ChatMessage } from '../../types/chat'
 import { conversationEvidence } from './conversationEvidence'
 import { toolResultExportText, toolResultToText } from './ToolCallDisplay'
-import { THINK_BLOCK_RE, THINK_TRAILING_RE } from './markdown'
+import { detailsAsText, THINK_BLOCK_RE, THINK_TRAILING_RE } from './markdown'
 import type { ExportMessage } from '../../api/chat'
 
 /** "User" or "Assistant", as the export labels a message. */
@@ -20,7 +20,7 @@ export function exportMessageParts(message: ChatMessage, names: Record<string, s
   const rawTexts = segs && segs.length > 0
     ? segs.flatMap((seg) => (seg.kind === 'text' && seg.content.trim() ? [seg.content.trim()] : []))
     : [message.content]
-  const texts = rawTexts.map(text => message.role === 'user' ? text : text.replace(THINK_BLOCK_RE, '').replace(THINK_TRAILING_RE, '').trim()).filter(Boolean)
+  const texts = rawTexts.map(text => message.role === 'user' ? text : detailsAsText(text.replace(THINK_BLOCK_RE, '').replace(THINK_TRAILING_RE, '')).trim()).filter(Boolean)
   const toolResults = segs && segs.length > 0
     ? segs.flatMap((seg) => (seg.kind === 'tool_result' ? [seg.result] : []))
     : message.tool_results ?? []
@@ -41,7 +41,7 @@ export function copyMessages(messages: ChatMessage[], names: Record<string, stri
     const parts = message.segments?.length
       ? message.segments.flatMap(segment => segment.kind === 'text' ? [segment.content] : segment.kind === 'tool_result' ? [toolResultToText(segment.result.tool_name, segment.result.content)] : [])
       : [message.content, ...(message.tool_results ?? []).map(result => toolResultToText(result.tool_name, result.content))]
-    const content = parts.map(text => message.role === 'user' ? text : text.replace(THINK_BLOCK_RE, '').replace(THINK_TRAILING_RE, '').trim()).filter(Boolean).join('\n\n')
+    const content = parts.map(text => message.role === 'user' ? text : detailsAsText(text.replace(THINK_BLOCK_RE, '').replace(THINK_TRAILING_RE, '')).trim()).filter(Boolean).join('\n\n')
     return `${includeRoles ? exportRoleLabel(message) + ':\n' : ''}${[content, conversationEvidence(message, names)].filter(Boolean).join('\n\n')}`
   }).join('\n\n---\n\n')
 }

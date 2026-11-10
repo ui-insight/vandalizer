@@ -243,6 +243,8 @@ export interface PlanTask {
   active_form: string
   /** awaiting_approval: its approval card is shown, nothing is saved yet. */
   status: 'pending' | 'in_progress' | 'awaiting_approval' | 'completed'
+  /** Completed steps: what it did, in a few words ("3 deadlines added"). */
+  result?: string
 }
 
 /** Transient UI status, never model reasoning or persisted transcript content. */

@@ -31,3 +31,14 @@
 .agent-obligation-review ul { list-style: disc; padding-left: 20px; margin: 10px 0 16px; }
 .agent-obligation-review li { margin-bottom: 10px; }
 .agent-obligation-item { white-space: pre-line; }
+
+/* One step at a time: a card waiting behind the current step. */
+.agent-approval.agent-approval-queued {
+  opacity: 0.75;
+  border-style: dashed;
+}
+.agent-approval.agent-approval-queued p { margin: 2px 0 0; }
+
+/* Short replies: details the reply tucked under "Show details". */
+.chat-reply-details { margin-top: 8px; }
+.chat-reply-details > summary { cursor: pointer; color: #475569; font-size: 0.9em; }
