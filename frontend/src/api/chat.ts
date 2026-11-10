@@ -246,6 +246,38 @@ export function getHistory(conversationUuid: string) {
   return apiFetch<ChatHistory>(`/api/chat/history/${conversationUuid}`)
 }
 
+/** One row of a chat's approval timeline (backend: chat_activity_log). */
+export interface ChatActivityEntry {
+  id: string
+  call_id: string
+  action: string
+  tool: string
+  summary: string
+  time: string | null
+  decision: 'approved' | 'cancelled' | 'waiting'
+  via: 'button' | 'typed' | null
+  said?: string
+  outcome: 'done' | 'partial' | 'not_run' | 'cancelled' | 'waiting' | 'no_result'
+  detail: string
+  approvals: number
+  runs: number
+  repeated: boolean
+  preview_id?: string | null
+}
+
+export interface ChatActivityLog {
+  conversation_uuid: string
+  title: string | null
+  entries: ChatActivityEntry[]
+  waiting: number
+  repeated: string[]
+}
+
+/** What the user approved in a chat, and what each approval did. */
+export function getChatActivity(conversationUuid: string) {
+  return apiFetch<ChatActivityLog>(`/api/chat/history/${encodeURIComponent(conversationUuid)}/activity`)
+}
+
 export function previewSkill(skillUuid: string) {
   return apiFetch<SkillSnapshot>(`/api/chat/skills/${encodeURIComponent(skillUuid)}`)
 }
