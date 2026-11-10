@@ -4934,6 +4934,7 @@ async def save_to_folder(
         team_id=team_id,
         folder=target_folder,
         token_count=len(content) // 4,
+        generated_by="chat",
     )
     await doc.insert()
 
