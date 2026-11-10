@@ -55,7 +55,7 @@ vi.mock('../../hooks/useProjects', () => ({ useProject: () => ({ project: null }
 vi.mock('../../hooks/useOnboarding', () => ({ useOnboarding: () => ({ pills: [], isFirstSession: true, loading: false, status: null }) }))
 vi.mock('../../hooks/useChat', () => ({ useChat: () => ({
   activity: mocks.activity, streamingContent: mocks.streamingContent, toolResults: mocks.toolResults,
-  messages: mocks.messages, activityId: mocks.activityId, segments: mocks.segments, thinkingContent: mocks.thinkingContent, activeToolCalls: mocks.activeToolCalls, queuedMessages: mocks.queuedMessages, awaitingPageApproval: mocks.awaitingPageApproval, error: mocks.error, planTasks: [], contextNotices: [],
+  messages: mocks.messages, activityId: mocks.activityId, segments: mocks.segments, thinkingContent: mocks.thinkingContent, activeToolCalls: mocks.activeToolCalls, queuedMessages: mocks.queuedMessages, awaitingPageApproval: mocks.awaitingPageApproval, error: mocks.error, planTasks: [], pendingApprovals: [], contextNotices: [],
   activeSkill: mocks.activeSkill, isSelectingSkill: mocks.isSelectingSkill,
   projectSkillBlocked: mocks.blocked, conversationUuid: mocks.conversationUuid, isStreaming: mocks.isStreaming, loadHistory: mocks.loadHistory, contextTokens: 0, initializeProjectSkill: vi.fn(), send: mocks.send, selectSkill: mocks.selectSkill, resumeQueuedMessages: mocks.resumeQueuedMessages,
 }) }))
