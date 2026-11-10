@@ -428,3 +428,29 @@ class TestHtmlTableChunking:
         text = "Intro.\n\n" + _html_table(30) + "\n\nTail text."
         for chunk, offset in _split_text_with_offsets(text, 1000, 200):
             assert text[offset:offset + len(chunk)] == chunk
+
+
+class TestEmbeddingText:
+    def test_table_becomes_cells_and_rows(self):
+        from app.services.document_manager import embedding_text
+
+        out = embedding_text("<table><tr><td>Name</td><td>Yr1</td></tr>"
+                             "<tr><td>PI</td><td>$39,600</td></tr></table>")
+        assert out == "Name | Yr1 |\nPI | $39,600 |"
+
+    def test_entities_and_comments(self):
+        from app.services.document_manager import embedding_text
+
+        assert embedding_text("F&amp;A <!-- page 2 --> costs<br>next") == "F&A costs\nnext"
+
+    def test_plain_text_untouched(self):
+        from app.services.document_manager import embedding_text
+
+        for s in ("Costs < $5,000 and a > b", "x<y and y>z", "Plain text."):
+            assert embedding_text(s) == s
+
+    def test_much_shorter_than_html(self):
+        from app.services.document_manager import embedding_text
+
+        html = _html_table(20)
+        assert len(embedding_text(html)) < 0.8 * len(html)

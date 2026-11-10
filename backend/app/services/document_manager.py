@@ -29,18 +29,66 @@ _DM_LOCK = threading.Lock()
 _SHARED_DM: "DocumentManager | None" = None
 
 
+_EMBED_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+_EMBED_CELL_END_RE = re.compile(r"</t[dh]\s*>", re.IGNORECASE)
+_EMBED_ROW_END_RE = re.compile(r"</tr\s*>|<br\s*/?>", re.IGNORECASE)
+# Only known formatting tags, never prose such as "< $5,000 and a >" or "x<y and y>z".
+_EMBED_TAG_RE = re.compile(
+    r"</?(?:table|thead|tbody|tfoot|tr|td|th|caption|colgroup|col|br|p|div|span|b|strong|"
+    r"i|em|u|s|sub|sup|small|mark|del|ins|code|pre|ul|ol|li|h[1-6]|a|img)\b[^<>]*>",
+    re.IGNORECASE,
+)
+
+
+def embedding_text(text: str) -> str:
+    """The words of a chunk, without markup, for the embedder to read.
+
+    Stored chunks keep their HTML (tables as ``<table>``) because the LLM
+    reads the structure. The embedder only needs the words, and the default
+    model reads just its first ~256 tokens — tags spent half of that on a
+    table, so most of its rows never reached the vector. Cells become
+    ``a | b``, rows and ``<br>`` become line breaks, comments are dropped.
+    """
+    if "<" not in text:
+        return text
+    import html as _html
+
+    t = _EMBED_COMMENT_RE.sub(" ", text)
+    t = _EMBED_CELL_END_RE.sub(" | ", t)
+    t = _EMBED_ROW_END_RE.sub("\n", t)
+    t = _html.unescape(_EMBED_TAG_RE.sub(" ", t))
+    return "\n".join(" ".join(line.split()) for line in t.splitlines() if line.strip())
+
+
+def _markup_stripping(inner: Any) -> Any:
+    """Wrap an embedding function so documents and queries are embedded as
+    :func:`embedding_text`. Stored documents are unchanged."""
+    from chromadb.api.types import Documents, EmbeddingFunction, Embeddings
+
+    class MarkupStrippingEmbeddingFunction(EmbeddingFunction[Documents]):
+        def __init__(self, wrapped: Any) -> None:
+            self._wrapped = wrapped
+
+        def __call__(self, input: Documents) -> Embeddings:
+            return self._wrapped([embedding_text(d) for d in input])
+
+    return MarkupStrippingEmbeddingFunction(inner)
+
+
 def get_default_embedding_function() -> Any:
     """Return a process-wide cached ChromaDB default embedding function.
 
     Lazily initialized on first call (inside the Celery worker process, after
-    fork) so model download/extraction happens once per process.
+    fork) so model download/extraction happens once per process. Markup is
+    stripped before embedding (see :func:`embedding_text`); the model and
+    vector size are unchanged, so existing collections stay compatible.
     """
     global _DEFAULT_EF
     if _DEFAULT_EF is None:
         with _EF_LOCK:
             if _DEFAULT_EF is None:
                 from chromadb.utils import embedding_functions
-                _DEFAULT_EF = embedding_functions.DefaultEmbeddingFunction()
+                _DEFAULT_EF = _markup_stripping(embedding_functions.DefaultEmbeddingFunction())
     return _DEFAULT_EF
 
 
