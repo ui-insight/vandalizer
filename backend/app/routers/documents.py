@@ -272,7 +272,7 @@ async def cancel_extraction(
     request: Request,
     doc_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, str]:
     """Stop a document's in-flight text extraction (e.g. an OCR read that is
     stuck). The document is left in a retryable error state, so
     ``retry-extraction`` restarts it right away rather than waiting out the

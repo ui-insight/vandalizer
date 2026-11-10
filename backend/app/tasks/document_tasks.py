@@ -19,7 +19,6 @@ if TYPE_CHECKING:
     from celery import Task
     from app.services.document_manager import DocumentManager
 
-from celery.exceptions import Ignore
 
 from app.celery_app import celery_app
 from app.services.document_readers import DocumentReadError, UnreadableFileError
@@ -526,18 +525,21 @@ def perform_extraction_and_update(
     # leaves the rest of the chain (update, ingestion) with nothing to write.
     owned = {**generation_query, "task_id": self.request.id}
 
-    def _owned_update(update: dict) -> None:
-        if not db.smart_document.update_one(owned, update).matched_count:
-            logger.info(
-                "Extraction %s no longer owns document %s (stopped or "
-                "superseded) — dropping its result",
-                self.request.id, document_uuid,
-            )
-            # Ignore, not a return: returning would run the rest of the
-            # chain (update → "complete") against a document this run no
-            # longer owns, and raising an error would fire cleanup's error
-            # write over it.
-            raise Ignore()
+    def _owned_update(update: dict) -> bool:
+        """Write only while this run owns the document; False when it doesn't.
+
+        A restart or Stop bumps the extraction revision, so the rest of the
+        chain (update, ingestion, cleanup) matches nothing either: the run
+        just returns, with no notification and no error write.
+        """
+        if db.smart_document.update_one(owned, update).matched_count:
+            return True
+        logger.info(
+            "Extraction %s no longer owns document %s (stopped or "
+            "superseded) — dropping its result",
+            self.request.id, document_uuid,
+        )
+        return False
 
     try:
         result = db.smart_document.update_one(
@@ -733,9 +735,10 @@ def perform_extraction_and_update(
                 # makes the next retry require OCR rather than fall back to
                 # the layer this run just refused.
                 error_fields["text_layer_rejected"] = True
-            _owned_update(
+            if not _owned_update(
                 {"$set": error_fields},
-            )
+            ):
+                return ""
             # Every other terminal-error branch notifies; this one silently
             # relied on the user noticing the row state — which the file list
             # didn't render either. Same coalesced bell as the rest.
@@ -763,14 +766,12 @@ def perform_extraction_and_update(
         if num_pages is not None:
             update_fields["num_pages"] = num_pages
 
-        _owned_update(
+        if not _owned_update(
             {"$set": update_fields},
-        )
+        ):
+            return ""
 
         return raw_text
-
-    except Ignore:
-        raise
 
     except FileNotFoundError as e:
         # The source file vanished between upload and extraction — a document
@@ -785,7 +786,7 @@ def perform_extraction_and_update(
             "The uploaded file is no longer available "
             "(it may have been deleted during processing)."
         )
-        _owned_update(
+        if not _owned_update(
             {
                 "$set": {
                     "raw_text": "",
@@ -798,7 +799,8 @@ def perform_extraction_and_update(
                     "error_retryable": False,
                 }
             },
-        )
+        ):
+            return ""
         _notify_document_processing_failed(db, document_uuid, message)
         return ""
 
@@ -828,7 +830,7 @@ def perform_extraction_and_update(
             "retry once the service is back, or contact your administrator if "
             "it keeps happening."
         )
-        _owned_update(
+        if not _owned_update(
             {
                 "$set": {
                     "raw_text": "",
@@ -839,7 +841,8 @@ def perform_extraction_and_update(
                     "error_message": message,
                 }
             },
-        )
+        ):
+            return ""
         _notify_document_processing_failed(db, document_uuid, message)
         return ""
 
@@ -851,7 +854,7 @@ def perform_extraction_and_update(
         # file, the way FileNotFoundError and OCR outages already don't.
         logger.warning("Document %s is not readable text: %s", document_uuid, e)
         message = str(e)
-        _owned_update(
+        if not _owned_update(
             {
                 "$set": {
                     "raw_text": "",
@@ -865,14 +868,15 @@ def perform_extraction_and_update(
                     "error_retryable": not isinstance(e, UnreadableFileError),
                 }
             },
-        )
+        ):
+            return ""
         _notify_document_processing_failed(db, document_uuid, message)
         return ""
 
     except Exception as e:
         logger.exception("Error extracting text from document %s", document_uuid)
         message = f"Text extraction failed: {str(e)[:300]}"
-        _owned_update(
+        if not _owned_update(
             {
                 "$set": {
                     "raw_text": "",
@@ -883,7 +887,8 @@ def perform_extraction_and_update(
                     "error_message": message,
                 }
             },
-        )
+        ):
+            return ""
         _notify_document_processing_failed(db, document_uuid, message)
         return ""
 

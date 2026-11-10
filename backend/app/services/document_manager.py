@@ -73,7 +73,8 @@ def _markup_stripping(inner: Any) -> Any:
             self._wrapped = wrapped
 
         def __call__(self, input: Documents) -> Embeddings:
-            return self._wrapped([embedding_text(d) for d in input])
+            embeddings: Embeddings = self._wrapped([embedding_text(d) for d in input])
+            return embeddings
 
     return MarkupStrippingEmbeddingFunction(inner)
 
