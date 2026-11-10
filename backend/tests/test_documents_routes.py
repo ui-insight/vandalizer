@@ -715,3 +715,56 @@ class TestTextLayerRejectedField:
         from app.models.document import SmartDocument
 
         assert SmartDocument.model_fields["text_layer_rejected"].default is False
+
+
+class TestCancelExtractionRoute:
+    """Stop on a stuck OCR read: the document is flipped to a retryable error
+    and its worker revoked, so Retry extraction restarts it right away."""
+
+    async def _post(self, client, doc, matched=1):
+        user = _make_user("owner1")
+        cookies, headers = _auth("owner1")
+        collection = MagicMock()
+        collection.update_one = AsyncMock(return_value=MagicMock(matched_count=matched))
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "owner1", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.documents.access_control.get_authorized_document", new_callable=AsyncMock) as mock_get_doc, \
+             patch("app.services.document_service.SmartDocument.get_motor_collection", return_value=collection), \
+             patch("app.celery_app.celery_app.control.revoke") as mock_revoke, \
+             patch("app.services.audit_service.log_event", new_callable=AsyncMock) as mock_log_event:
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_get_doc.return_value = doc
+
+            resp = await client.post(
+                "/api/documents/doc-1/cancel-extraction",
+                cookies=cookies,
+                headers=headers,
+            )
+        return resp, collection, mock_revoke, mock_log_event
+
+    @pytest.mark.asyncio
+    async def test_stops_an_in_flight_extraction(self, client):
+        doc = _make_document(doc_uuid="doc-1", user_id="owner1", task_status="ocr")
+        doc.task_id = "extract-task-1"
+        resp, collection, mock_revoke, mock_log_event = await self._post(client, doc)
+
+        assert resp.status_code == 200
+        filter_, update = collection.update_one.call_args[0]
+        assert update["$set"]["task_status"] == "error"
+        assert update["$set"]["processing"] is False
+        # Clearing task_id is what makes a worker the revoke missed drop its result.
+        assert update["$set"]["task_id"] is None
+        assert update["$set"]["error_retryable"] is True
+        mock_revoke.assert_called_once_with("extract-task-1", terminate=True, signal="SIGTERM")
+        assert mock_log_event.call_args.kwargs["action"] == "document.cancel_extraction"
+
+    @pytest.mark.asyncio
+    async def test_nothing_in_flight_is_a_409(self, client):
+        doc = _make_document(doc_uuid="doc-1", user_id="owner1", task_status="complete")
+        doc.task_id = None
+        resp, _, mock_revoke, mock_log_event = await self._post(client, doc, matched=0)
+
+        assert resp.status_code == 409
+        mock_revoke.assert_not_called()
+        mock_log_event.assert_not_awaited()

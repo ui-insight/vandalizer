@@ -1,9 +1,10 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import DOMPurify from 'dompurify'
 import { FocusTrap } from 'focus-trap-react'
-import { X, Loader2, AlertCircle, RefreshCw, Download } from 'lucide-react'
+import { X, Loader2, AlertCircle, RefreshCw, Download, Square } from 'lucide-react'
 import { marked } from 'marked'
-import { pollStatus, retryExtraction } from '../../api/documents'
+import { cancelExtraction, pollStatus, retryExtraction } from '../../api/documents'
+import { ApiError } from '../../api/client'
 
 marked.setOptions({ breaks: true, gfm: true })
 
@@ -21,6 +22,8 @@ type LoadState =
 export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
   const [state, setState] = useState<LoadState>({ kind: 'loading' })
   const [retrying, setRetrying] = useState(false)
+  const [stopping, setStopping] = useState(false)
+  const [stopError, setStopError] = useState<string | null>(null)
 
   const renderedHtml = useMemo(() => {
     if (state.kind !== 'ok' || !state.text) return ''
@@ -111,6 +114,30 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
     }
     void handleRetry(true)
   }, [handleRetry])
+
+  const handleStop = useCallback(async () => {
+    if (
+      !window.confirm(
+        'Stop reading this document? You can retry the extraction afterwards.',
+      )
+    ) {
+      return
+    }
+    setStopping(true)
+    setStopError(null)
+    try {
+      await cancelExtraction(docUuid)
+    } catch (err) {
+      // A 409 means it finished or failed on its own meanwhile — reloading
+      // shows whichever it was.
+      if (!(err instanceof ApiError && err.status === 409)) {
+        setStopError(err instanceof Error ? err.message : 'Failed to stop extraction.')
+      }
+    } finally {
+      setStopping(false)
+    }
+    load()
+  }, [docUuid, load])
 
   const handleExportMarkdown = useCallback(() => {
     if (state.kind !== 'ok') return
@@ -259,6 +286,32 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
                   ? 'Indexing document...'
                   : 'Extracting text from your document...'}
               </div>
+              <button
+                onClick={() => void handleStop()}
+                disabled={stopping}
+                title="Stop this extraction so it can be restarted"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '5px 10px',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  backgroundColor: 'transparent',
+                  color: stopping ? '#9ca3af' : '#b91c1c',
+                  border: '1px solid #fca5a5',
+                  borderRadius: 6,
+                  cursor: stopping ? 'not-allowed' : 'pointer',
+                }}
+              >
+                <Square style={{ width: 12, height: 12 }} />
+                {stopping ? 'Stopping...' : 'Stop'}
+              </button>
+              {stopError && (
+                <div role="alert" style={{ fontSize: 13, color: '#b91c1c' }}>
+                  {stopError}
+                </div>
+              )}
             </div>
           )}
 

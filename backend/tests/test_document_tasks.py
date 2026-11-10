@@ -2193,3 +2193,70 @@ class TestExtractionStalenessIsOneDefinition:
         assert extraction_is_stale(None, old, now=now) is True
         assert extraction_is_stale(None, recent, now=now) is False
         assert extraction_is_stale(None, None, now=now) is True
+
+
+class TestExtractionOwnership:
+    """A stopped (or superseded) extraction must not write its result over the
+    document: the user's Stop clears task_id, and every write after the lock is
+    filtered on the run's own task id."""
+
+    @patch("app.tasks.document_tasks._notify_document_processing_failed")
+    @patch("app.tasks.document_tasks.get_sync_db")
+    @patch("app.config.Settings")
+    @patch(
+        "app.services.document_readers.extract_text_with_markers",
+        return_value=("Late text", []),
+    )
+    def test_result_is_dropped_once_the_run_no_longer_owns_the_document(
+        self, mock_extract, MockSettings, mock_get_db, mock_notify,
+    ):
+        from celery.exceptions import Ignore
+
+        from app.tasks.document_tasks import perform_extraction_and_update
+
+        db = MagicMock()
+        mock_get_db.return_value = db
+        db.smart_document.find_one.return_value = {"uuid": "doc-1", "path": "test.pdf"}
+        MockSettings.return_value = MagicMock(upload_dir="/uploads")
+
+        def update_one(filter_, update):
+            # The lock write is by uuid alone; an owned write finds the task
+            # id cleared by Stop and matches nothing.
+            return MagicMock(matched_count=0 if "task_id" in filter_ else 1)
+
+        db.smart_document.update_one.side_effect = update_one
+
+        with pytest.raises(Ignore):
+            perform_extraction_and_update(document_uuid="doc-1", extension="pdf")
+
+        lock_set = db.smart_document.update_one.call_args_list[0][0][1]["$set"]
+        assert "task_id" in lock_set
+        owned_filter = db.smart_document.update_one.call_args_list[-1][0][0]
+        assert owned_filter == {"uuid": "doc-1", "task_id": lock_set["task_id"]}
+        mock_notify.assert_not_called()
+
+    @patch("app.tasks.document_tasks._notify_document_processing_failed")
+    @patch("app.tasks.document_tasks.get_sync_db")
+    @patch("app.config.Settings")
+    @patch(
+        "app.services.document_readers.extract_text_with_markers",
+        side_effect=RuntimeError("worker torn down"),
+    )
+    def test_error_from_a_stopped_run_does_not_overwrite_the_stop(
+        self, mock_extract, MockSettings, mock_get_db, mock_notify,
+    ):
+        from celery.exceptions import Ignore
+
+        from app.tasks.document_tasks import perform_extraction_and_update
+
+        db = MagicMock()
+        mock_get_db.return_value = db
+        db.smart_document.find_one.return_value = {"uuid": "doc-1", "path": "test.pdf"}
+        MockSettings.return_value = MagicMock(upload_dir="/uploads")
+        db.smart_document.update_one.side_effect = (
+            lambda f, u: MagicMock(matched_count=0 if "task_id" in f else 1)
+        )
+
+        with pytest.raises(Ignore):
+            perform_extraction_and_update(document_uuid="doc-1", extension="pdf")
+        mock_notify.assert_not_called()

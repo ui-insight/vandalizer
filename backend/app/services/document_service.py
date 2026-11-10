@@ -311,6 +311,61 @@ def extraction_in_flight(doc: SmartDocument) -> bool:
     return bool(doc.processing) or doc.task_status in _IN_PROGRESS_TASK_STATUSES
 
 
+EXTRACTION_STOPPED_MESSAGE = (
+    "Text extraction was stopped. Retry to read this document again."
+)
+
+
+async def cancel_extraction(doc: SmartDocument) -> bool:
+    """Stop a document's in-flight extraction so it can be restarted.
+
+    Flips the document to a retryable error first, then revokes the worker.
+    The DB write is the source of truth: clearing ``task_id`` is what makes
+    the extraction task drop its result if the revoke does not reach it (a
+    pool that cannot terminate, a worker mid-write), since every write that
+    task makes is filtered on its own task id. Callers check authorization.
+
+    Returns False when nothing was in flight by the time the write landed.
+    """
+    import logging
+
+    # Lazy: the tasks module and the Celery app pull in the worker stack.
+    from app.celery_app import celery_app
+    from app.tasks.document_tasks import _IN_PROGRESS_TASK_STATUSES
+
+    task_id = doc.task_id
+    result = await SmartDocument.get_motor_collection().update_one(
+        {
+            "_id": doc.id,
+            "$or": [
+                {"processing": True},
+                {"task_status": {"$in": _IN_PROGRESS_TASK_STATUSES}},
+            ],
+        },
+        {"$set": {
+            "processing": False,
+            "task_status": "error",
+            "task_id": None,
+            "error_message": EXTRACTION_STOPPED_MESSAGE,
+            "error_retryable": True,
+        }},
+    )
+    if not result.matched_count:
+        return False
+
+    # SIGTERM the prefork child reading it; a task still queued (or waiting
+    # out an OCR retry backoff under the same id) is dropped when it arrives.
+    if task_id:
+        try:
+            celery_app.control.revoke(task_id, terminate=True, signal="SIGTERM")
+        except Exception:
+            logging.getLogger(__name__).warning(
+                "Failed to revoke extraction task %s for document %s",
+                task_id, doc.uuid, exc_info=True,
+            )
+    return True
+
+
 async def restart_extraction(
     doc: SmartDocument, user_id: str, *, request_ocr: bool = False,
 ) -> dict:
@@ -362,6 +417,9 @@ async def restart_extraction(
 
     doc.task_status = "extracting"
     doc.processing = True
+    # Takes ownership away from any earlier extraction still running (a
+    # stale lock being retried past): its writes are filtered on its task id.
+    doc.task_id = None
     doc.updated_at = _datetime.datetime.now()
     doc.error_message = None
     doc.error_retryable = None

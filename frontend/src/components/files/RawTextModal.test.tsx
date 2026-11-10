@@ -6,9 +6,11 @@ import type { PollStatusResponse } from '../../types/document'
 vi.mock('../../api/documents', () => ({
   pollStatus: vi.fn(),
   retryExtraction: vi.fn(),
+  cancelExtraction: vi.fn(),
 }))
 
-import { pollStatus, retryExtraction } from '../../api/documents'
+import { cancelExtraction, pollStatus, retryExtraction } from '../../api/documents'
+import { ApiError } from '../../api/client'
 
 function pollResponse(overrides: Partial<PollStatusResponse> = {}): PollStatusResponse {
   return {
@@ -155,3 +157,51 @@ describe('RawTextModal Export Markdown', () => {
   })
 })
 
+describe('RawTextModal Stop', () => {
+  beforeEach(() => {
+    vi.mocked(pollStatus).mockReset()
+    vi.mocked(cancelExtraction).mockReset()
+  })
+
+  it('stops an in-flight extraction and then offers Retry', async () => {
+    vi.mocked(pollStatus)
+      .mockResolvedValueOnce(pollResponse({ status: 'ocr', processing: true, complete: false, raw_text: '' }))
+      .mockResolvedValueOnce(pollResponse({
+        status: 'error', processing: false, raw_text: '',
+        error_message: 'Text extraction was stopped. Retry to read this document again.',
+        error_retryable: true,
+      }))
+    vi.mocked(cancelExtraction).mockResolvedValue({ uuid: 'doc-1', status: 'error' })
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    render(<RawTextModal docUuid="doc-1" onClose={vi.fn()} />)
+    expect(await screen.findByText(/Extracting text from your document/i)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /^stop$/i }))
+
+    await waitFor(() => expect(cancelExtraction).toHaveBeenCalledWith('doc-1'))
+    expect(await screen.findByText(/extraction was stopped/i)).toBeTruthy()
+    expect(screen.getByRole('button', { name: /retry extraction/i })).toBeTruthy()
+  })
+
+  it('does nothing when the confirmation is cancelled', async () => {
+    vi.mocked(pollStatus).mockResolvedValue(pollResponse({ status: 'ocr', processing: true, complete: false, raw_text: '' }))
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+
+    render(<RawTextModal docUuid="doc-1" onClose={vi.fn()} />)
+    fireEvent.click(await screen.findByRole('button', { name: /^stop$/i }))
+    expect(cancelExtraction).not.toHaveBeenCalled()
+  })
+
+  it('treats a 409 (finished meanwhile) as no error and just reloads', async () => {
+    vi.mocked(pollStatus)
+      .mockResolvedValueOnce(pollResponse({ status: 'ocr', processing: true, complete: false, raw_text: '' }))
+      .mockResolvedValueOnce(pollResponse({ raw_text: 'Done text' }))
+    vi.mocked(cancelExtraction).mockRejectedValue(new ApiError(409, 'No extraction is in progress'))
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    render(<RawTextModal docUuid="doc-1" onClose={vi.fn()} />)
+    fireEvent.click(await screen.findByRole('button', { name: /^stop$/i }))
+    expect(await screen.findByText('Done text')).toBeTruthy()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+})

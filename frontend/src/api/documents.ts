@@ -13,6 +13,15 @@ export function pollStatus(docid: string) {
   return apiFetch<PollStatusResponse>(`/api/documents/poll_status?docid=${docid}`)
 }
 
+/** Stop an in-flight extraction (e.g. a stuck OCR read). The document is
+ *  left in a retryable error state, so `retryExtraction` restarts it. */
+export function cancelExtraction(docUuid: string) {
+  return apiFetch<{ uuid: string; status: string }>(
+    `/api/documents/${docUuid}/cancel-extraction`,
+    { method: 'POST' }
+  )
+}
+
 /** Re-run text extraction. `forceOcr` re-reads a PDF with OCR even when its
  *  current text looks healthy (the "Re-run OCR" action). */
 export function retryExtraction(docUuid: string, opts: { forceOcr?: boolean } = {}) {
