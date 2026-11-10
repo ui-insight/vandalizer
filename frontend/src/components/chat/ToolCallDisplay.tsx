@@ -4,6 +4,7 @@ import { qualityPresentation } from '../../lib/qualityLabels'
 import { completedSkillSelection } from '../../lib/skillSelection'
 import { ChatPageCard } from '../artifacts/ChatPageCard'
 import type { ApprovalRecord } from './approvalHistory'
+import { approvalStep, cardActionLabel, useApprovalQueue } from './approvalSteps'
 import { certificationPayloadIssue } from '../../lib/certificationPayload'
 import { useEffect, useRef, useState } from 'react'
 import { AutomationSettings } from './AutomationSettings'
@@ -1349,6 +1350,10 @@ export function ToolStatusLine({
     if (editedWorkflowId) announceWorkflowEdited(editedWorkflowId, result?.tool_call_id)
   }, [editedWorkflowId, result?.tool_call_id])
   const [decision, setDecision] = useState<'approved' | 'canceled' | null>(null)
+  // One step at a time: only the first waiting card has buttons.
+  const queue = useApprovalQueue()
+  const step = needsConfirmation && !approvalHistory ? approvalStep(call?.tool_call_id ?? result?.tool_call_id, queue) : null
+  const upNext = step !== null && !step.current
   const decisionRef = useRef(false)
   const [decisionError, setDecisionError] = useState<string | null>(null)
   const decide = (value: 'approved' | 'canceled') => {
@@ -1386,9 +1391,7 @@ export function ToolStatusLine({
   // Assistant's "click X" agree. The map is for chats saved before previews
   // carried one: the two used to drift, and a reject card read "Approve reject
   // workflow step" (support ticket).
-  const actionLabel = typeof obj?.approval_label === 'string' && obj.approval_label ? obj.approval_label
-    : name === 'select_skill' ? args.skill_uuid === null || obj?.skill_uuid === null ? 'Remove Skill' : 'Use Skill'
-    : ({ propose_obligations: 'Add to inbox', create_project: 'Create project', move_documents_to_project: 'Move files', create_workflow: 'Create workflow', update_workflow: 'Update workflow', create_automation: 'Create automation', create_extraction_from_document: 'Create extraction', run_workflow: 'Run workflow', run_validation: 'Run validation', approve_workflow_step: 'Approve and continue', reject_workflow_step: 'Reject run', complete_certification_module: 'Complete module' } as Record<string, string>)[name] ?? approveLabel(name)
+  const actionLabel = cardActionLabel(name, obj, args, approveLabel)
   const target = args.name ?? args.title ?? obj?.default_title
   const artifact = !isActive && !needsConfirmation && !isError && obj
     ? (name === 'create_workflow' || name === 'update_workflow') && typeof obj.workflow_id === 'string' ? { label: 'Open workflow', open: () => openWorkflow(obj.workflow_id as string) }
@@ -1464,7 +1467,7 @@ export function ToolStatusLine({
       uuid={uuid} revision={revision} running={isActive} error={isError ? summaryText || 'The page could not be saved. Ask the assistant to check the result before retrying.' : undefined}
       unconfirmed={unconfirmed || (!isActive && !needsConfirmation && !isError && !canceled && (!uuid || !revision))}
       canceled={canceled} needsApproval={needsConfirmation} history={approvalHistory} decision={decision} decisionError={decisionError}
-      onDecide={onConfirm ? decide : undefined} revising={name === 'revise_html_artifact'} />
+      onDecide={onConfirm && !upNext ? decide : undefined} upNext={upNext} stepHeading={step?.heading} revising={name === 'revise_html_artifact'} />
   }
 
   return (
@@ -1535,9 +1538,17 @@ export function ToolStatusLine({
         <strong>{approvalHistory.label}</strong><p>{approvalHistory.detail}</p>
         {name === 'propose_obligations' && !!obj?.obligation_review && typeof obj.obligation_review === 'object' && <ObligationReview review={obj.obligation_review as Record<string, unknown>} />}
       </section>}
-      {needsConfirmation && !approvalHistory && (
+      {needsConfirmation && !approvalHistory && upNext && (
+        <section className="agent-approval agent-approval-queued" aria-label="Upcoming step">
+          <strong>{step?.heading ? `${step.heading} · Up next` : 'Up next'}: {actionLabel}</strong>
+          <p>{typeof obj?.preview === 'string' ? obj.preview : 'Waiting for the current step.'}</p>
+          <p>Approve or skip the current step first; this one comes next.</p>
+        </section>
+      )}
+      {needsConfirmation && !approvalHistory && !upNext && (
         <section className="agent-approval" aria-label="Review proposed action">
-          <strong>{decision === 'approved' ? 'Approval requested' : decision === 'canceled' ? 'Cancellation requested' : 'Your approval is needed'}</strong>
+          <strong>{decision === 'approved' ? 'Approval requested' : decision === 'canceled' ? (step?.heading ? 'Skip requested' : 'Cancellation requested')
+            : step?.heading ? `${step.heading}: ${actionLabel}` : 'Your approval is needed'}</strong>
           {name === 'select_skill' && typeof obj?.skill_instructions === 'string' && <details>
             <summary>Inspect Skill instructions</summary>
             <pre className="max-h-60 overflow-auto whitespace-pre-wrap break-words text-sm">{obj.skill_instructions}</pre>
@@ -1551,7 +1562,7 @@ export function ToolStatusLine({
           {!decision && !onConfirm && <p>Continue from the latest Assistant response to make a decision about this preview.</p>}
           {!decision && onConfirm && <div className="agent-approval-actions">
             <button type="button" onClick={() => decide('approved')}>{actionLabel}</button>
-            <button type="button" onClick={() => decide('canceled')}>Cancel action</button>
+            <button type="button" onClick={() => decide('canceled')}>{step?.heading ? 'Skip' : 'Cancel action'}</button>
           </div>}
         </section>
       )}

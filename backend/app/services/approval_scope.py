@@ -68,6 +68,73 @@ def pending_call_ids(pending: list | None) -> list[str]:
     return [p["call_id"] for p in _entries(pending) if isinstance(p.get("call_id"), str)]
 
 
+def _label(entry: dict) -> str:
+    """A waiting card as the user sees it: its button, and what it does."""
+    label = entry.get("label") or str(entry.get("tool") or "action").replace("_", " ")
+    summary = entry.get("summary")
+    return f'"{label}" ({summary})' if summary else f'"{label}"'
+
+
+_SHORT_REPLY = (
+    "Reply in one or two short sentences: what happened, then the next step. "
+    "Put tables, notes and caveats in a :::details block."
+)
+
+
+def approval_reminder(
+    decision: TurnApproval, pending: list | None, *,
+    approval_for: str | None = None, decline_for: str | None = None,
+) -> str:
+    """What this turn decided, named by card, for the model.
+
+    Support ticket: "Yes, go ahead" didn't say which card it approved, so chat
+    sometimes ran it and sometimes explained again. Empty when nothing waits.
+    """
+    entries = _entries(pending)
+    if not entries:
+        return ""
+
+    def still_waiting(after: dict | None) -> str:
+        rest = [_label(p) for p in entries if p is not after]
+        return f" Still waiting after it, in order: {', '.join(rest)}." if rest else ""
+
+    if decision.mode == "card":
+        chosen = next((p for p in entries if p.get("call_id") == approval_for), None)
+        if chosen is None:
+            return ""
+        return (
+            f"The user approved the card {_label(chosen)}. Run exactly that action now: call "
+            f"{chosen.get('tool')} with the same arguments as its preview and confirmed=true. "
+            f"Do not run any other waiting action.{still_waiting(chosen)} {_SHORT_REPLY}"
+        )
+    if decision.mode == "declined":
+        skipped = next((p for p in entries if p.get("call_id") == decline_for), None)
+        what = _label(skipped) if skipped else "a waiting step"
+        return (
+            f"The user skipped {what}; it will not run. Say so in a few words and move on to "
+            f"the next step.{still_waiting(skipped)} {_SHORT_REPLY}"
+        )
+    if decision.mode == "typed_single":
+        only = next((p for p in entries if p["fp"] in decision.approved), None)
+        if only is None:
+            return ""
+        return (
+            f"One step is waiting for approval: {_label(only)}. If the user's message approves "
+            f"it, run it now (call {only.get('tool')} with the same arguments and confirmed=true). "
+            f"Otherwise answer them and end by pointing to that card as the next step. {_SHORT_REPLY}"
+        )
+    if decision.mode == "typed_ambiguous":
+        latest = max(int(p.get("turn", 0) or 0) for p in entries)
+        labels = [_label(p) for p in entries if int(p.get("turn", 0) or 0) == latest]
+        return (
+            f"{len(labels)} steps are waiting for approval: {', '.join(labels)}. The user's "
+            "message names none of them, so run none. If it is an approval (yes, go ahead, do "
+            "it), reply with only the question \"Which one: <button> or <button>?\" using those "
+            "button names, and nothing else. Otherwise answer briefly and point to the first card."
+        )
+    return ""
+
+
 def blocked_instruction(mode: str, waiting: int) -> str:
     """What the model is told when it tries to run an action this turn didn't approve."""
     if mode == "card":

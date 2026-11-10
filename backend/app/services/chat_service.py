@@ -2309,6 +2309,22 @@ async def chat_stream(
             logger.warning("Could not clear resume_pending: %s", e)
         reminder_blocks.append(RESUME_INSTRUCTION_REMINDER)
 
+    # Name the card this turn decides (support ticket: a typed or clicked
+    # "Yes, go ahead" didn't say which card it approved, so the model
+    # sometimes ran it and sometimes explained again). decide() is pure; the
+    # agent setup below calls it again to enforce the same decision.
+    if user and team_access:
+        from app.services.approval_scope import approval_reminder, decide
+
+        approval_note = approval_reminder(
+            decide(getattr(conversation, "pending_confirmations", None),
+                   approval_for=approval_for, decline_for=decline_for),
+            getattr(conversation, "pending_confirmations", None),
+            approval_for=approval_for, decline_for=decline_for,
+        )
+        if approval_note:
+            reminder_blocks.append(approval_note)
+
     # Instruction base. First-session keeps its own conversation-stable base
     # (the whole conversation is a distinct behavioral mode); everything else
     # uses ONE base per agent type so the cached prefix never shifts when the

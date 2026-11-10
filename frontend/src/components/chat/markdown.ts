@@ -63,9 +63,26 @@ function docLinkButton(label: string, uuid: string): string {
   return `<button type="button" data-doc-uuid="${uuid}" class="chat-doc-link">${escapeHtml(clean)}</button>`
 }
 
+// Short replies (support ticket: the next action was buried in tables, notes
+// and disclaimers). The reply says what happened and what's next; the rest
+// goes in a ":::details" block, closed by ":::" or the end of the reply, and
+// shows collapsed under "Show details".
+const DETAILS_BLOCK_RE = /(^|\n):::details[ \t]*\n([\s\S]*?)(?:\n:::[ \t]*(?=\n|(?![\s\S]))|(?![\s\S]))/g
+
+/** Copy and export have no "Show details" toggle: the block reads as a plain
+ * "Details:" section instead of raw ":::details" markers. */
+export function detailsAsText(text: string): string {
+  return text.replace(DETAILS_BLOCK_RE, (_match, before: string, body: string) => `${before}\nDetails:\n${body.trim()}\n`)
+}
+
+export function collapseDetails(text: string): string {
+  return text.replace(DETAILS_BLOCK_RE, (_match, before: string, body: string) =>
+    `${before}<details class="chat-reply-details"><summary>Show details</summary>\n\n${body.trim()}\n\n</details>\n`)
+}
+
 /** Render a markdown string to sanitized HTML. */
 export function renderMarkdown(text: string): string {
-  let cleaned = normalizeCitationMarkup(text.replace(THINK_BLOCK_RE, '').replace(THINK_TRAILING_RE, ''))
+  let cleaned = collapseDetails(normalizeCitationMarkup(text.replace(THINK_BLOCK_RE, '').replace(THINK_TRAILING_RE, '')))
   // Canonical (and escaped/backticked/spaced variants): [ACTION:type]Label[/ACTION]
   cleaned = cleaned.replace(ACTION_RE, (_match, type: string, label: string) =>
     actionButton(type, label)

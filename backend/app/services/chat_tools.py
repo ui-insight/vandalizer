@@ -492,6 +492,13 @@ async def _confirm_gate(
             if not (isinstance(p, dict) and p.get("fp") == fp)
         ]
         entry = {"fp": fp, "turn": marker, "tool": tool_name}
+        # What the card's button says and what it will do, so the next turn
+        # can tell the model which card the user approved or skipped.
+        label = preview.get("approval_label") if isinstance(preview.get("approval_label"), str) else None
+        entry["label"] = label or approve_button_label(tool_name)
+        summary = " ".join(str(preview.get("preview") or "").split())
+        if summary:
+            entry["summary"] = summary[:160]
         # The preview's tool call id: the id its card's button sends back.
         call_id = getattr(context, "tool_call_id", None)
         if isinstance(call_id, str) and call_id:
@@ -6415,6 +6422,7 @@ def _cards_waiting_this_turn(deps: AgenticChatDeps) -> list[str]:
     return [str(p.get("tool") or "") for p in (getattr(conversation, "pending_confirmations", None) or [])
             if isinstance(p, dict) and int(p.get("turn", -1)) == marker]
 _PLAN_MAX_TASKS = 20
+_PLAN_RESULT_MAX = 100
 
 
 async def update_plan(
@@ -6445,6 +6453,10 @@ async def update_plan(
     - Every task needs both forms: content (imperative: "Run extraction on
       FY24 proposals") and active_form (present continuous: "Running
       extraction on FY24 proposals").
+    - When a task is completed, add result: what it did, in a few words,
+      past tense ("project created", "3 deadlines added, 2 need your help",
+      "Page saved"). The finished checklist reads "Done: " followed by
+      these, so the user sees one clear finish line.
 
     <example>
     User: "Extract budgets from these 6 proposals, check them against the
@@ -6464,7 +6476,8 @@ async def update_plan(
         context: The call context.
         tasks: Full task list. Each task: {"content": str (imperative),
             "active_form": str (present continuous),
-            "status": "pending" | "in_progress" | "awaiting_approval" | "completed"}.
+            "status": "pending" | "in_progress" | "awaiting_approval" | "completed",
+            "result": str (optional; completed tasks only, a few words)}.
     """
     if not isinstance(tasks, list) or not tasks:
         return _err(
@@ -6498,9 +6511,13 @@ async def update_plan(
                 f"Task {i} has invalid status {status!r}.",
                 hint="Status must be pending, in_progress, awaiting_approval, or completed.",
             )
-        normalized.append(
-            {"content": content, "active_form": active_form, "status": status}
-        )
+        entry = {"content": content, "active_form": active_form, "status": status}
+        # Only a finished step has a result; the finish line must not
+        # report one the step hasn't reached.
+        result = " ".join(str(task.get("result") or "").split())[:_PLAN_RESULT_MAX]
+        if result and status == "completed":
+            entry["result"] = result
+        normalized.append(entry)
 
     in_progress = sum(1 for t in normalized if t["status"] == "in_progress")
     completed = sum(1 for t in normalized if t["status"] == "completed")

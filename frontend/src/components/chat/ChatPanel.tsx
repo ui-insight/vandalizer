@@ -2,7 +2,8 @@ import { isPagePreparation } from '../../lib/chatProgress'
 import { ChatActivityIndicator } from './ChatActivityIndicator'
 import { conversationNearMemoryLimit } from '../../lib/contextNudge'
 import { approvalHistoryFor, hasWaitingCard } from './approvalHistory'
-import { useEffect, useLayoutEffect, useRef, useState, useCallback, type DragEvent } from 'react'
+import { ApprovalQueueContext, typedApprovalTarget, whichOneQuestion, type WaitingAction } from './approvalSteps'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback, type DragEvent } from 'react'
 import { Loader2, BookOpen, X, ArrowDown, Upload, Zap, Sparkles, FolderKanban } from 'lucide-react'
 import { useQueryClient, useQueries } from '@tanstack/react-query'
 import { ChatMessage } from './ChatMessage'
@@ -187,6 +188,10 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   useEffect(() => () => { Object.values(readyTimers.current).forEach(clearTimeout) }, [])
   // A message sent while attached docs are still processing; auto-fires once ready.
   const [heldMessage, setHeldMessage] = useState<{ message: string; includeOnboardingContext?: boolean } | null>(null)
+  // A typed yes with several cards waiting: ask which one instead of sending it.
+  const [whichOne, setWhichOne] = useState<WaitingAction[] | null>(null)
+  const approvalQueue = useMemo(() => ({ pending: pendingApprovals, plan: planTasks }), [pendingApprovals, planTasks])
+  useEffect(() => { setWhichOne(null) }, [pendingApprovals])
   const lastLoadedConvo = useRef<string | null>(null)
   const prevStreamingRef = useRef(false)
   const [showScrollDown, setShowScrollDown] = useState(false)
@@ -580,6 +585,21 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     return true
   }
 
+  /** A bare "yes" approves the current step, exactly as if its button were
+   * clicked (typedApprovalTarget). Returns true when handled here. */
+  const sendTypedApproval = (message: string): boolean => {
+    const target = typedApprovalTarget(message, messages, pendingApprovals)
+    if (target === null) return false
+    if ('ask' in target) {
+      setWhichOne(target.ask)
+      return true
+    }
+    if (!handleSend(message, undefined, target.approve.pageApproval, { approve: target.approve.id })) {
+      throw new Error('Message was not sent. Check the current conversation and attachments, then try again.')
+    }
+    return true
+  }
+
   // Keep the latest handleSend in a ref so the auto-fire effect can call it
   // without re-subscribing on every render (handleSend isn't memoized).
   const handleSendRef = useRef(handleSend)
@@ -927,11 +947,26 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         {modelPreference.error && <div role="alert" className="px-4 py-2 text-sm text-red-800">{modelPreference.error} <button type="button" onClick={modelPreference.retry} className="underline">Retry model preference</button></div>}
         {modelPreference.saving && <p role="status" className="px-4 py-1 text-xs text-gray-600">Saving default model…</p>}
         {!showHome && <CertificationRefreshNotice />}
+        {whichOne && whichOne.length > 1 && (
+          <div role="alert" className="chat-which-one" style={{ margin: '0 16px 8px', padding: '8px 12px', border: '1px solid #fcd34d', background: '#fffbeb', borderRadius: 6, fontSize: 13 }}>
+            <p style={{ margin: '0 0 6px' }}>{whichOne.length} steps are waiting. {whichOneQuestion(whichOne)}</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {whichOne.map(action => (
+                <button key={action.id} type="button" className="chat-action-btn" title={action.detail}
+                  onClick={() => { setWhichOne(null); handleSend('Yes, go ahead', undefined, action.pageApproval, { approve: action.id }) }}>
+                  {action.label}
+                </button>
+              ))}
+              <button type="button" className="chat-action-btn" onClick={() => setWhichOne(null)}>Not now</button>
+            </div>
+          </div>
+        )}
         <ChatInput
           initialDraft={initialDraft}
           draftInsertion={draftInsertion}
           onDraftChange={onDraftChange}
           onSend={async (msg) => {
+            if (!isStreaming && sendTypedApproval(msg)) return
             if (isStreaming) await queueMessage(msg, selectedDocUuids, selectedModel || undefined, activeKBs.map(kb => kb.uuid), undefined, selectedFolderUuids, undefined, undefined, activeProjectUuid || undefined)
             else if (!handleSend(msg)) throw new Error('Message was not sent. Check the current conversation and attachments, then try again.')
           }}
@@ -1279,6 +1314,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                   </div>
                 )}
                 <div style={isExcluded ? { opacity: 0.5 } : undefined}>
+                  <ApprovalQueueContext.Provider value={approvalQueue}>
                   <ChatMessage
                 artifactSource={{ conversation_uuid: conversationUuid ?? undefined, project_uuid: activeProjectUuid ?? undefined }}
                     message={msg}
@@ -1290,6 +1326,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                     onSendMessage={msg.role === 'assistant' && !isStreaming && (i === messages.length - 1 || hasWaitingCard(msg, pendingApprovals))
                       ? (m, pageApproval, cardDecision) => handleSend(m, undefined, pageApproval, cardDecision) : undefined}
                   />
+                  </ApprovalQueueContext.Provider>
                 </div>
               </div>
             )
