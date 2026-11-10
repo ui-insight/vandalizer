@@ -12,6 +12,23 @@ const TEAMS = [
 ]
 
 describe('ShareWithTeamDialog', () => {
+  // Ticket: opened from the share wizard, this dialog had no way back.
+  it('shows Back only when opened from another step, and Back is not Cancel', () => {
+    const onBack = vi.fn()
+    const onCancel = vi.fn()
+    const { rerender } = render(
+      <ShareWithTeamDialog itemName="Award intake" teams={TEAMS} onCancel={onCancel} onConfirm={vi.fn()} />,
+    )
+    expect(screen.queryByRole('button', { name: 'Back' })).toBeNull()
+
+    rerender(
+      <ShareWithTeamDialog itemName="Award intake" teams={TEAMS} onBack={onBack} onCancel={onCancel} onConfirm={vi.fn()} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    expect(onBack).toHaveBeenCalledTimes(1)
+    expect(onCancel).not.toHaveBeenCalled()
+  })
+
   it('shows a team picker defaulting to the current team, and sends the choice', async () => {
     const onConfirm = vi.fn()
     render(

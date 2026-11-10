@@ -18,11 +18,13 @@ interface Props {
   teams?: ShareTeamOption[]
   defaultTeamId?: string
   busy?: boolean
+  /** Opened from another step (the share wizard): show Back to return there. */
+  onBack?: () => void
   onCancel: () => void
   onConfirm: (comment: string, teamId?: string) => void | Promise<void>
 }
 
-export function ShareWithTeamDialog({ itemName, teamName, teams, defaultTeamId, busy, onCancel, onConfirm }: Props) {
+export function ShareWithTeamDialog({ itemName, teamName, teams, defaultTeamId, busy, onBack, onCancel, onConfirm }: Props) {
   const [comment, setComment] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [teamId, setTeamId] = useState<string | undefined>(
@@ -114,6 +116,15 @@ export function ShareWithTeamDialog({ itemName, teamName, teams, defaultTeamId, 
         </div>
 
         <div className="flex justify-end gap-2 mt-4">
+          {onBack && (
+            <button
+              onClick={onBack}
+              disabled={isBusy}
+              className="mr-auto px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg disabled:opacity-50"
+            >
+              Back
+            </button>
+          )}
           <button
             onClick={onCancel}
             disabled={isBusy}
