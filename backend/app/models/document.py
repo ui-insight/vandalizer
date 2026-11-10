@@ -117,6 +117,11 @@ class SmartDocument(Document):
     origin_workflow_id: Optional[str] = None
     origin_workflow_run_id: Optional[str] = None
     origin_run_at: Optional[datetime.datetime] = None
+    # Set on files Vandalizer wrote itself ("chat", "workflow", "automation"):
+    # summaries and reports, not originals. The award snapshot reads facts
+    # only from originals when the project has one (support ticket: a saved
+    # summary was cited as the award's source).
+    generated_by: Optional[str] = None
 
     # The restart CAS owns this raw database field. Ordinary worker save()
     # calls must not serialize an older copy back over the current revision.

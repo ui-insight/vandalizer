@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ZoomIn, ZoomOut, Maximize2, ChevronLeft, ChevronRight, Loader2, X, Search, AlertCircle, RefreshCw, FileText, Download } from 'lucide-react'
+import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, Loader2, X, Search, AlertCircle, RefreshCw, FileText, Download } from 'lucide-react'
 import { downloadFileUrl } from '../../api/files'
+import { FullViewButton, useFullView } from './viewerFullView'
 import { pollStatus, retryExtraction } from '../../api/documents'
 import { SpreadsheetViewer } from './SpreadsheetViewer'
 import { DocumentSearchBar, useFindInDocumentHotkey } from './DocumentSearchBar'
@@ -175,6 +176,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
 
   // In-document find (Cmd/Ctrl+F)
   const rootRef = useRef<HTMLDivElement>(null)
+  const fullView = useFullView()
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const docxContentRef = useRef<HTMLDivElement>(null)
@@ -830,11 +832,6 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
     setZoom(2)
   }, [])
 
-  // The download endpoint serves `inline` disposition when `?inline=1` is set,
-  // so the browser renders the PDF in the new tab instead of downloading it.
-  const openPdfInNewTab = useCallback(() => {
-    window.open(inlineUrl, '_blank')
-  }, [inlineUrl])
 
   const btnStyle: React.CSSProperties = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -927,7 +924,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
   // DOCX rendered markdown viewer
   if (isDocx) {
     return (
-      <div ref={rootRef} style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+      <div ref={rootRef} {...fullView.rootProps} style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative', ...fullView.style }}>
         {processingOverlay}
         <div style={{
           display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 'var(--workspace-space-6)',
@@ -947,9 +944,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
           <button type="button" onClick={openSearch} style={btnStyle} title="Find in document (⌘F / Ctrl+F)" aria-label="Find in document">
             <Search size={16} />
           </button>
-          <button type="button" onClick={() => window.open(downloadUrl, '_blank')} style={btnStyle} title="Download original" aria-label="Download original">
-            <Maximize2 size={16} />
-          </button>
+          <FullViewButton expanded={fullView.expanded} onOpen={fullView.open} onClose={fullView.close} style={btnStyle} />
         </div>
         {searchOpen && (
           <DocumentSearchBar
@@ -1140,7 +1135,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
   // Non-PDF fallback: iframe
   if (!isPdf) {
     return (
-      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+      <div {...fullView.rootProps} style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative', ...fullView.style }}>
         {processingOverlay}
         <div style={{
           display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 'var(--workspace-space-6)',
@@ -1157,16 +1152,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
             <ZoomIn size={16} />
           </button>
           <div style={{ width: 1, height: 20, backgroundColor: '#d1d5db', margin: "0 var(--workspace-space-4)" }} />
-          <button
-            type="button"
-            onClick={() => { if (blobUrl) window.open(blobUrl, '_blank') }}
-            style={btnStyle}
-            title="Open in new tab"
-            aria-label="Open in new tab"
-            disabled={!blobUrl}
-          >
-            <Maximize2 size={16} />
-          </button>
+          <FullViewButton expanded={fullView.expanded} onOpen={fullView.open} onClose={fullView.close} style={btnStyle} />
         </div>
         <div style={{
           flex: 1, overflow: 'auto', display: 'flex', justifyContent: 'center',
@@ -1197,7 +1183,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
   }
 
   return (
-    <div ref={rootRef} style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+    <div ref={rootRef} {...fullView.rootProps} style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative', ...fullView.style }}>
       {processingOverlay}
 
       {/* Toolbar */}
@@ -1219,9 +1205,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
         <button type="button" onClick={openSearch} style={btnStyle} title="Find in document (⌘F / Ctrl+F)" aria-label="Find in document">
           <Search size={16} />
         </button>
-        <button type="button" onClick={openPdfInNewTab} style={btnStyle} title="Open in new tab" aria-label="Open in new tab">
-          <Maximize2 size={16} />
-        </button>
+        <FullViewButton expanded={fullView.expanded} onOpen={fullView.open} onClose={fullView.close} style={btnStyle} />
       </div>
 
       {searchOpen && (
