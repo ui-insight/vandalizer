@@ -47,12 +47,17 @@ function daysUntil(item: Obligation): number | null {
 
 function money(value: number | null, unit: string | null): string {
   if (value == null) return ''
-  return unit === '%' ? `${value}%` : `${unit === '$' ? '$' : ''}${value.toLocaleString('en-US')}`
+  if (unit === '%') return `${value}%`
+  if (unit !== '$') return value.toLocaleString('en-US')
+  // Whole dollars as "$9,555"; anything with cents as "$9,555.50".
+  return `$${value.toLocaleString('en-US', Number.isInteger(value) ? undefined : { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 function summary(item: Obligation): string {
   if (item.kind === 'deadline') return dueLabel(item)
   if (item.kind === 'limit') {
+    // A limit with nothing to compare it with is just the limit.
+    if (item.observed_value == null) return `${money(item.limit_value, item.unit)} limit`
     const verdict = item.in_conflict ? 'exceeds' : 'within'
     return `${money(item.observed_value, item.unit)} ${verdict} the ${money(item.limit_value, item.unit)} limit`
   }
