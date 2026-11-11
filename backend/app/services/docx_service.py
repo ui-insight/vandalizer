@@ -306,7 +306,7 @@ def data_to_docx_bytes(data) -> bytes:
         # A list that isn't all objects (plain values, or objects mixed with
         # text) has no columns to share, so it goes out as a bullet list.
         doc = markdown_to_docx("\n".join(
-            f"- {json.dumps(item, default=str) if isinstance(item, (dict, list)) else item}"
+            f"- {json.dumps(item, default=str, ensure_ascii=False) if isinstance(item, (dict, list)) else item}"
             for item in data
         ))
     else:
