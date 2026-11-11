@@ -20,6 +20,12 @@ You can still ask the chat free-form questions. The difference shows up when the
 
 ---
 
+## Choosing what chat can use
+
+The **Assistant** page lists what chat can use, in groups such as **Search the web**, **Knowledge bases**, **Workflows**, **Pages**, **Projects** and **RA inbox**. Open it from the sliders button in the chat composer or from **Assistant** in the account menu. Each group has a switch. Turning one off removes it from your chats from your next message, and chat tells you it is off if a request needs it. Reading your files, Skills, the plan checklist, help and certification are always on, and chat still asks for approval before it creates, changes or shares anything.
+
+Administrators see **Allowed for everyone** on the same page. Turning a group off there removes it for every person on the deployment; people see it as locked.
+
 ## Reusing instructions with Skills
 
 Library **Skills** replace the former Library Prompts. Existing saved instructions keep their content, links, and sharing. Workflow **Prompt** nodes remain reasoning steps in the workflow editor.

@@ -4,7 +4,7 @@ import { conversationNearMemoryLimit } from '../../lib/contextNudge'
 import { approvalHistoryFor, hasWaitingCard } from './approvalHistory'
 import { ApprovalQueueContext, typedApprovalTarget, whichOneQuestion, type WaitingAction } from './approvalSteps'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback, type DragEvent } from 'react'
-import { Loader2, BookOpen, X, ArrowDown, Upload, Zap, Sparkles, FolderKanban } from 'lucide-react'
+import { Loader2, BookOpen, X, ArrowDown, Upload, Zap, Sparkles, FolderKanban, SlidersHorizontal } from 'lucide-react'
 import { useQueryClient, useQueries } from '@tanstack/react-query'
 import { ChatMessage } from './ChatMessage'
 import { ChatScrollRegion } from './ChatScrollRegion'
@@ -986,7 +986,13 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           onNewChat={() => { triggerNewChat(); focusChat() }}
           hasMessages={messages.length > 0}
           hasDocuments={fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0 || selectedFolderUuids.length > 0}
-          memoryControl={<MemoryPanel />}
+          memoryControl={<>
+            <MemoryPanel />
+            <a href="/assistant" title="What chat can use: turn capabilities on or off" aria-label="Assistant settings: what chat can use"
+              className="flex items-center justify-center rounded-[var(--ui-radius)] p-1.5 text-gray-600 hover:text-gray-800 transition-colors">
+              <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+            </a>
+          </>}
           activityControl={<ChatActivityPanel conversationUuid={conversationUuid ?? null} refreshKey={`${messages.length}:${pendingApprovals.join(',')}`} busy={isStreaming || isLoadingHistory} onDecide={(m, pageApproval, decision) => handleSend(m, undefined, pageApproval, decision)} />}
           navigationControl={showScrollDown ? <button type="button" onClick={scrollToBottom} aria-label="Scroll to bottom" title="Latest message" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-700 hover:bg-gray-100"><ArrowDown size={18} /></button> : null}
           focusSignal={focusChatSignal}

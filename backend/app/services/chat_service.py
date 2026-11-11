@@ -2339,6 +2339,15 @@ async def chat_stream(
     # Branding is deployment-stable, so branded instructions stay byte-stable.
     _org_name = (sys_config_doc or {}).get("org_name") or ""
     instructions_text = _brand_org_text(instruction_base, _org_name)
+    # Capabilities the person or an admin switched off (Assistant page). The
+    # note changes only when a switch does, so the cached prefix stays stable.
+    from app.services import assistant_capabilities
+
+    capabilities_off = (
+        assistant_capabilities.off_for(user, sys_config_doc) if user and team_access else frozenset()
+    )
+    capability_note = assistant_capabilities.instructions(capabilities_off)
+    instructions_text += capability_note
     from app.services.skill_service import skill_instructions
 
     instructions_text += skill_instructions(active_skill)
@@ -2639,6 +2648,7 @@ async def chat_stream(
             context_document_uuids=effective_doc_uuids,
             active_kb_uuid=active_kbs[0][0] if active_kbs else None,
             active_project_uuid=project_uuid,
+            capabilities_off=capabilities_off,
             conversation=conversation,
             # Monotonic per-turn marker: the current user message is already
             # persisted (router add_message) before chat_stream runs, so this
@@ -2749,7 +2759,9 @@ async def chat_stream(
             # in force until the next user turn. Initial budgeting above still
             # counts the same base plus the initial selected snapshot.
             from app.services.chat_skill_tools import conversation_instructions
-            iter_kwargs["instructions"] = conversation_instructions(_brand_org_text(instruction_base, _org_name))
+            iter_kwargs["instructions"] = conversation_instructions(
+                _brand_org_text(instruction_base, _org_name) + capability_note
+            )
 
         async with agent.iter(prompt, **iter_kwargs) as agent_run:
             async for node in agent_run:

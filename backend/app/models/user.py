@@ -65,6 +65,9 @@ class User(Document):
     # Deadline reminders for RA inbox items. Missing keys take the defaults in
     # app.services.deadline_reminders.DEFAULT_SETTINGS (bell on, email off).
     deadline_reminders: dict = {}
+    # Chat capabilities this person switched off on the Assistant page
+    # (ids from app.services.assistant_capabilities). Empty: everything on.
+    assistant_capabilities_off: list[str] = []
 
     # v5.0 launch — one-time announcement send tracking
     v5_announcement_sent_at: Optional[datetime.datetime] = None

@@ -1235,8 +1235,13 @@ def create_agentic_chat_agent(
             ) or None,
             capabilities=[ProcessHistory(_inject_queued_user_parts)],
         )
+        from app.services import assistant_capabilities
+
         for tool_fn in TOOLS:
             agent.tool(
+                # Per request: a capability the person or an admin switched
+                # off is withheld, without a per-user agent cache entry.
+                prepare=assistant_capabilities.gate,
                 sequential=(
                     not parallel_enabled
                     or tool_fn.__name__ not in PARALLEL_SAFE_TOOLS

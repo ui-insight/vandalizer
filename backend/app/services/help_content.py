@@ -22,6 +22,25 @@ import re
 
 HELP_TOPICS: list[dict] = [
     {
+        "id": "assistant-settings",
+        "title": "Assistant settings: what chat can use",
+        "aliases": ["assistant settings", "what can chat use", "turn off web search", "turn on web search",
+                    "disable tools", "enable tools", "chat permissions", "stop chat from"],
+        "body": (
+            "The **Assistant** page lists what chat can use, such as searching the web, knowledge "
+            "bases, workflows, Pages, projects and the RA inbox, with a switch for each. Open it "
+            "from the sliders button in the chat composer, from **Assistant** in the account menu, "
+            "or at [Assistant settings](/assistant).\n\n"
+            "Turning a capability off removes it from your own chats from your next message. "
+            "Chat then says the capability is off instead of working around it. Reading your "
+            "files, Skills, the plan checklist, help and certification are always on. "
+            "Approval cards are unaffected: chat still asks before it creates, changes or shares anything.\n\n"
+            "An administrator can turn a capability off for everyone under **Allowed for everyone** "
+            "on the same page. A capability an administrator turned off shows as locked, and only "
+            "an administrator can turn it back on."
+        ),
+    },
+    {
         "id": "skills",
         "title": "Skills, extraction templates, and workflows",
         "aliases": ["skill", "skills", "library skills", "use skill", "reusable instructions",

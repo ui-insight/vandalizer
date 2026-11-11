@@ -1,7 +1,7 @@
 import { adminAccess } from '../../lib/adminAccess'
 import { useState, useRef, useEffect } from 'react'
 import type { KeyboardEvent } from 'react'
-import { Award, User, Users, Settings, LogOut, IdCard, Shield, ClipboardCheck, ChevronDown, MessageSquare, KeyRound, Inbox } from 'lucide-react'
+import { Award, User, Users, Settings, LogOut, IdCard, Shield, ClipboardCheck, ChevronDown, MessageSquare, KeyRound, Inbox, SlidersHorizontal } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { useTeams } from '../../hooks/useTeams'
 import { useAuth } from '../../hooks/useAuth'
@@ -197,6 +197,18 @@ export function TeamsDropdown() {
             <IdCard className="h-4 w-4 shrink-0" style={{ width: 18 }} />
             <span>My Account</span>
           </Link>
+
+          {/* Assistant: what chat can use */}
+          <a
+            href="/assistant"
+            role="menuitem"
+            tabIndex={-1}
+            onClick={() => closeMenu()}
+            className="flex items-center gap-2.5 rounded-md px-3.5 py-2.5 text-sm text-[#111] hover:bg-black/[.04] transition-colors"
+          >
+            <SlidersHorizontal className="h-4 w-4 shrink-0" style={{ width: 18 }} />
+            <span>Assistant</span>
+          </a>
 
           {/* Credentials */}
           <Link
