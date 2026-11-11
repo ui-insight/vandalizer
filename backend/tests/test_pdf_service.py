@@ -137,3 +137,39 @@ class TestFormatInline:
         md = "**DATES**\n\n***REQUIRED Components***\n\nMore body text."
         pdf = render_workflow_pdf(md, title="Workflow Results")
         assert pdf.startswith(b"%PDF-")
+
+
+class TestWorkflowPdfOversizedTables:
+    """Tables reportlab can't fit on a page used to fail the whole export."""
+
+    def test_table_with_many_columns_renders(self):
+        # 22 columns left each one about a word wide; the header row alone
+        # grew taller than the page and reportlab raised LayoutError.
+        rows = [
+            {f"column_{i}": "agency name and a fairly long description " * 3 for i in range(22)}
+            for _ in range(8)
+        ]
+        pdf = render_workflow_pdf(rows, title="Wide")
+        assert pdf.startswith(b"%PDF-")
+
+    def test_markdown_table_with_many_columns_renders(self):
+        md = (
+            "| " + " | ".join(f"h{i}" for i in range(22)) + " |\n"
+            + "|" + "---|" * 22 + "\n"
+            + "| " + " | ".join("some longer cell text here " * 4 for _ in range(22)) + " |\n"
+        )
+        pdf = render_workflow_pdf(md, title="Wide markdown")
+        assert pdf.startswith(b"%PDF-")
+
+    def test_cell_longer_than_a_page_renders(self):
+        long_text = "word " * 6000
+        assert render_workflow_pdf({"summary": long_text}).startswith(b"%PDF-")
+        assert render_workflow_pdf([{"a": long_text, "b": "x"}]).startswith(b"%PDF-")
+
+    def test_wide_table_keeps_columns_with_repeated_headers(self):
+        from app.services.pdf_service import _styles, _table_flowables
+
+        headers = ["a", "a"] + [f"h{i}" for i in range(9)]
+        (block,) = _table_flowables(headers, [[str(i) for i in range(11)]], _styles(), 470.0)
+        # Header row + one row per column.
+        assert len(block._cellvalues) == 12

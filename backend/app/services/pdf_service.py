@@ -468,6 +468,33 @@ def _split_table_row(line: str) -> list[str]:
     return cells
 
 
+# Past this many columns a portrait page leaves each one too narrow to read
+# (22 columns wrapped one word per line and overflowed the page), so the table
+# is laid out as one Field/Value block per row instead.
+_MAX_TABLE_COLUMNS = 8
+
+
+def _table_flowables(headers: list[str], rows: list[list[str]], styles: dict, usable_width: float) -> list:
+    """Flowables for a table: a grid, or one Field/Value block per row when too wide."""
+    from reportlab.platypus import Spacer
+
+    col_count = max(len(headers), max((len(r) for r in rows), default=0))
+    if col_count <= _MAX_TABLE_COLUMNS:
+        return [_build_table_flowable(headers, rows, styles, usable_width)]
+    names: list[str] = []
+    for n, h in enumerate(headers + [""] * (col_count - len(headers)), start=1):
+        name = h or f"Column {n}"
+        # Rows become dicts below; a repeated header would drop a column.
+        names.append(f"{name} ({n})" if name in names else name)
+    flow: list = []
+    for row in rows:
+        if flow:
+            flow.append(Spacer(1, 10))
+        flow.append(_kv_table_flowable(dict(zip(names, row + [""] * (col_count - len(row)))), styles, usable_width))
+    # No rows: keep the header visible rather than dropping the table.
+    return flow or [_kv_table_flowable(dict.fromkeys(names, ""), styles, usable_width)]
+
+
 def _build_table_flowable(headers: list[str], rows: list[list[str]], styles: dict, usable_width: float):
     from reportlab.platypus import Table, TableStyle
     from reportlab.lib import colors
@@ -497,7 +524,9 @@ def _build_table_flowable(headers: list[str], rows: list[list[str]], styles: dic
     for row in rows:
         data.append([_safe_paragraph(cell, styles["table_cell"]) for cell in row])
 
-    table = Table(data, colWidths=col_widths, repeatRows=1)
+    # splitInRow lets a row taller than a page break across pages; without it
+    # reportlab raises LayoutError and the whole export fails.
+    table = Table(data, colWidths=col_widths, repeatRows=1, splitInRow=1)
     row_count = len(data)
     table.setStyle(TableStyle([
         # Vandalizer brand gold header (#eab308) with black text.
@@ -558,7 +587,7 @@ def _markdown_to_story(text: str, styles: dict, usable_width: float) -> list:
                     break
                 rows.append(_split_table_row(body))
                 i += 1
-            story.append(_build_table_flowable(headers, rows, styles, usable_width))
+            story.extend(_table_flowables(headers, rows, styles, usable_width))
             story.append(Spacer(1, 8))
             continue
 
@@ -705,7 +734,7 @@ def _kv_table_flowable(data: dict, styles: dict, usable_width: float):
         ])
 
     col_widths = [usable_width * 0.3, usable_width * 0.7]
-    table = Table(data_rows, colWidths=col_widths, repeatRows=1)
+    table = Table(data_rows, colWidths=col_widths, repeatRows=1, splitInRow=1)
     row_count = len(data_rows)
     table.setStyle(TableStyle([
         # Vandalizer brand gold header (#eab308) with black text.
@@ -769,7 +798,7 @@ def render_workflow_pdf(data, title: str = "Workflow Results", subtitle: str | N
                 else:
                     cells.append("" if val is None else str(val))
             rows.append(cells)
-        story.append(_build_table_flowable(headers, rows, styles, usable))
+        story.extend(_table_flowables(headers, rows, styles, usable))
     elif isinstance(parsed_data, dict):
         story.append(_kv_table_flowable(parsed_data, styles, usable))
     elif isinstance(parsed_data, str):
