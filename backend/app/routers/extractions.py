@@ -170,6 +170,7 @@ async def create_search_set(req: CreateSearchSetRequest, user: User = Depends(ge
             req.set_type,
             extraction_config=req.extraction_config,
             team_id=team_id,
+            when_to_use=req.when_to_use,
         )
     except DuplicateNameError as e:
         raise HTTPException(status_code=409, detail=str(e))
@@ -211,7 +212,9 @@ async def get_search_set(uuid: str, user: User = Depends(get_current_user)) -> S
 async def update_search_set(uuid: str, req: UpdateSearchSetRequest, user: User = Depends(get_current_user)) -> SearchSetResponse:
     await _get_search_set_or_404(uuid, user, manage=True)
     try:
-        ss = await svc.update_search_set(uuid, title=req.title, extraction_config=req.extraction_config)
+        ss = await svc.update_search_set(
+            uuid, title=req.title, extraction_config=req.extraction_config, when_to_use=req.when_to_use,
+        )
     except DuplicateNameError as e:
         raise HTTPException(status_code=409, detail=str(e))
     if not ss:

@@ -9,6 +9,8 @@ export interface SkillSnapshot {
   title: string
   version: string
   instructions: string
+  /** The author's line on which tasks the Skill is for; absent on older pins. */
+  when_to_use?: string
 }
 
 /** Which approval card a user turn decided (its preview's tool call id). */

@@ -1516,3 +1516,19 @@ class TestApplyRunBasedLastUsed:
 
         MockAE.get_motor_collection.assert_not_called()
         assert items[0]["last_used_at"] == "2026-09-20T00:00:00+00:00"
+
+
+@pytest.mark.asyncio
+async def test_library_search_matches_a_skills_when_to_use_line():
+    from unittest.mock import AsyncMock, patch
+
+    from app.services import library_service
+
+    items = [
+        {"id": "a", "name": "Intake checklist", "tags": [], "note": None, "when_to_use": "Reviewing a new award notice"},
+        {"id": "b", "name": "Budget tone", "tags": [], "note": None, "when_to_use": None},
+    ]
+    with patch.object(library_service, "list_libraries", AsyncMock(return_value=[{"id": "lib", "scope": "personal"}])), \
+         patch.object(library_service, "get_library_items", AsyncMock(return_value=items)):
+        found = await library_service.search_libraries(object(), "award notice", kind="search_set")
+    assert [item["id"] for item in found] == ["a"]

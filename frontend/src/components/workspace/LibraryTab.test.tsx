@@ -101,7 +101,7 @@ vi.mock('../../api/extractions', () => ({
   addItem: vi.fn(),
 }))
 
-import { listItems as listSearchSetItems } from '../../api/extractions'
+import { listItems as listSearchSetItems, updateSearchSet } from '../../api/extractions'
 import { touchItem } from '../../api/library'
 
 function makePrompt(overrides: Partial<LibraryItem> = {}): LibraryItem {
@@ -159,6 +159,22 @@ describe('LibraryTab Skills', () => {
     expect(await screen.findByText('Edit Skill')).toBeTruthy()
     await waitFor(() => expect(screen.getByPlaceholderText('Write your Skill instructions here')).toHaveValue('Summarize the key terms of this award.'))
     expect(sendChatMessage).not.toHaveBeenCalled()
+  })
+
+  it('loads a Skill\'s "When to use" line into the editor and saves the edited line', async () => {
+    mockItems.current = [makePrompt({ when_to_use: 'Reviewing a new award notice' })]
+    vi.mocked(updateSearchSet).mockResolvedValue({} as Awaited<ReturnType<typeof updateSearchSet>>)
+    render(<LibraryTab />)
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
+    fireEvent.click(screen.getByText('Edit'))
+    const line = await screen.findByLabelText('When to use (optional)')
+    expect(line).toHaveValue('Reviewing a new award notice')
+    await waitFor(() => expect(screen.getByPlaceholderText('Write your Skill instructions here')).toHaveValue('Summarize the key terms of this award.'))
+    fireEvent.change(line, { target: { value: '  Checking a subaward against intake  ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Update' }))
+    await waitFor(() => expect(updateSearchSet).toHaveBeenCalledWith('ss-uuid-1', {
+      title: 'Summarize Award', when_to_use: 'Checking a subaward against intake',
+    }))
   })
 
   it('still opens the workflow editor directly for workflow items', async () => {

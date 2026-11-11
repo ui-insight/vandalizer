@@ -13,6 +13,7 @@ from beanie import PydanticObjectId
 from app.models.document import SmartDocument
 from app.models.search_set import SearchSet, SearchSetItem
 from app.models.system_config import SystemConfig
+from app.schemas.skills import clean_when_to_use
 from app.services import name_conflicts
 from app.services.config_service import get_user_model_name
 from app.services.extraction_engine import ExtractionEngine
@@ -33,8 +34,11 @@ async def create_search_set(
     set_type: str,
     extraction_config: dict | None = None,
     team_id: str | None = None,
+    when_to_use: str | None = None,
 ) -> SearchSet:
     await name_conflicts.ensure_search_set_title_available(title, set_type, user_id, team_id)
+    if when_to_use is not None:
+        extraction_config = _with_when_to_use(extraction_config, set_type, when_to_use)
     ss = SearchSet(
         title=title,
         uuid=str(uuid_mod.uuid4()),
@@ -140,7 +144,24 @@ async def get_search_set_item(item_id: str) -> SearchSetItem | None:
         return None
 
 
-async def update_search_set(search_set_uuid: str, title: str | None = None, extraction_config: dict | None = None) -> SearchSet | None:
+def _with_when_to_use(config: dict | None, set_type: str, when_to_use: str) -> dict:
+    """A Skill's "when to use" line lives in its config beside the creation
+    text, so cloning, sharing and export carry it. Other kinds have none."""
+    merged = dict(config or {})
+    if set_type != "prompt":
+        return merged
+    line = clean_when_to_use(when_to_use)
+    if line:
+        merged["when_to_use"] = line
+    else:
+        merged.pop("when_to_use", None)
+    return merged
+
+
+async def update_search_set(
+    search_set_uuid: str, title: str | None = None, extraction_config: dict | None = None,
+    when_to_use: str | None = None,
+) -> SearchSet | None:
     ss = await get_search_set(search_set_uuid)
     if not ss:
         return None
@@ -152,6 +173,8 @@ async def update_search_set(search_set_uuid: str, title: str | None = None, extr
         ss.title = title
     if extraction_config is not None:
         ss.extraction_config = extraction_config
+    if when_to_use is not None:
+        ss.extraction_config = _with_when_to_use(ss.extraction_config, ss.set_type, when_to_use)
     await ss.save()
     return ss
 

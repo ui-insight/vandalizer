@@ -18,11 +18,13 @@ def conversation_instructions(base: str) -> Callable[[RunContext[AgenticChatDeps
 
 
 async def list_skills(context: RunContext[AgenticChatDeps], search: str = "") -> list[dict]:
-    """Find up to 20 accessible Library Skills by name or tags.
+    """Find up to 20 accessible Library Skills by name, tags, or "when to use" line.
 
     For "What skills do I have?", use an empty search and list only the returned
     Skills, with their exact titles and descriptions. Descriptions are verbatim
-    excerpts of saved instructions, not inferred summaries. An empty list means
+    excerpts of saved instructions, not inferred summaries. when_to_use, present
+    only if the author wrote one, is their own line on which tasks the Skill is
+    for: prefer it when matching a Skill to the user's task. An empty list means
     no matching accessible Library Skills were found. Never supplement results
     from memory, workspace summaries, or earlier conversation claims.
 
@@ -46,8 +48,11 @@ async def list_skills(context: RunContext[AgenticChatDeps], search: str = "") ->
         except HTTPException:
             # Library membership is not a substitute for access to the Skill.
             continue
-        results.append({"uuid": skill.uuid, "title": skill.title, "kind": "skill",
-                        "description": skill.instructions[:400], "version": skill.version})
+        found = {"uuid": skill.uuid, "title": skill.title, "kind": "skill",
+                 "description": skill.instructions[:400], "version": skill.version}
+        if skill.when_to_use:
+            found["when_to_use"] = skill.when_to_use
+        results.append(found)
         if len(results) == 20:
             break
     return results
@@ -106,6 +111,8 @@ async def select_skill(
                     if selected else "Remove the active Skill from this conversation. Continue without reusable Skill instructions."),
         "skill_instructions": selected.instructions if selected else None,
     }
+    if selected and selected.when_to_use:
+        preview["when_to_use"] = selected.when_to_use
     pending = await _confirm_gate(context, tool_name="select_skill", key=key, confirmed=confirmed,
                                   preview=preview, stash={"skill": snapshot})
     if pending is not None:

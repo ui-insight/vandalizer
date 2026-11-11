@@ -56,6 +56,7 @@ export function ChatSkillDialog({ mode, skill, disabled, onSelect, onClose }: Pr
           <div className="space-y-3 overflow-y-auto p-5 text-sm">
             {mode === 'inspect' ? <>
               <p className="break-words text-gray-600">Selected version: {skill.version}</p>
+              {skill.when_to_use && <p className="break-words"><strong>When to use:</strong> {skill.when_to_use}</p>}
               <pre className="whitespace-pre-wrap break-words font-sans">{skill.instructions}</pre>
             </> : <>
               <p className="text-gray-600">Choose the Skill for subsequent messages in this chat.</p>

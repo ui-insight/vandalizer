@@ -53,6 +53,9 @@ type ViewFilter = 'all' | 'favorites' | 'pinned' | string  // string allows fold
 // Tasks/Prompts/Formatters are all stored as `search_set` items, distinguished
 // by the underlying set_type. The filter chips split them out so each is
 // browsable on its own (set_type defaults to 'extraction' when absent).
+// Matches WHEN_TO_USE_MAX in backend/app/schemas/skills.py.
+const WHEN_TO_USE_MAX = 500
+
 type KindFilter = 'all' | 'workflow' | 'extraction' | 'prompt' | 'formatter'
 
 function matchesKindFilter(item: { kind: string; set_type: string | null }, filter: KindFilter): boolean {
@@ -421,6 +424,7 @@ export function LibraryTab() {
   const [createModalType, setCreateModalType] = useState<ModalType>(null)
   const [createName, setCreateName] = useState('')
   const [createDesc, setCreateDesc] = useState('')
+  const [createWhen, setCreateWhen] = useState('')
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
 
@@ -428,6 +432,7 @@ export function LibraryTab() {
     setCreateModalType(type)
     setCreateName('')
     setCreateDesc('')
+    setCreateWhen('')
     setCreateError(null)
   }
 
@@ -435,6 +440,7 @@ export function LibraryTab() {
     setCreateModalType(null)
     setCreateName('')
     setCreateDesc('')
+    setCreateWhen('')
     setCreateError(null)
   }
 
@@ -482,6 +488,7 @@ export function LibraryTab() {
   const [editMode, setEditMode] = useState<'preview' | 'edit'>('preview')
   const [editTitle, setEditTitle] = useState('')
   const [editContent, setEditContent] = useState('')
+  const [editWhen, setEditWhen] = useState('')
   const [editItemId, setEditItemId] = useState<string | null>(null) // SearchSetItem ID
   const [editLoading, setEditLoading] = useState(false)
   const [editSaving, setEditSaving] = useState(false)
@@ -499,6 +506,7 @@ export function LibraryTab() {
     // SearchSetItem.searchphrase. Show the description while the
     // authoritative searchphrase loads.
     setEditContent(item.description || '')
+    setEditWhen(item.when_to_use || '')
     setEditError(null)
     setEditLoadError(null)
     setEditItemId(null)
@@ -524,6 +532,7 @@ export function LibraryTab() {
     setEditingItem(null)
     setEditTitle('')
     setEditContent('')
+    setEditWhen('')
     setEditItemId(null)
     setEditError(null)
   }
@@ -567,7 +576,7 @@ export function LibraryTab() {
     setEditSaving(true)
     setEditError(null)
     try {
-      await updateSearchSet(editingItem.item_uuid, { title: cleanTitle })
+      await updateSearchSet(editingItem.item_uuid, editKind === 'prompt' ? { title: cleanTitle, when_to_use: editWhen.trim() } : { title: cleanTitle })
       if (editItemId) {
         await updateSearchSetItem(editItemId, { searchphrase: editContent, title: cleanTitle })
       } else {
@@ -614,7 +623,8 @@ export function LibraryTab() {
       } else {
         // extraction, Skill, or formatter — all stored as SearchSets
         const config = createDesc.trim() ? { content: createDesc.trim() } : undefined
-        const ss = await createSearchSet({ title: cleanName, set_type: createModalType ?? 'extraction', extraction_config: config })
+        const when = createModalType === 'prompt' && createWhen.trim() ? { when_to_use: createWhen.trim() } : {}
+        const ss = await createSearchSet({ title: cleanName, set_type: createModalType ?? 'extraction', extraction_config: config, ...when })
         if (personalLib) {
           await addItemToLibrary(personalLib.id, { item_id: ss.id, kind: 'search_set' })
         }
@@ -1634,6 +1644,32 @@ export function LibraryTab() {
                 {createName.length}/{MAX_NAME_LENGTH}
               </div>
             </div>
+            {createModalType === 'prompt' && (
+              <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
+              <label className="library-field-label" htmlFor="library-create-when">When to use (optional)</label>
+              <input id="library-create-when"
+                type="text"
+                value={createWhen}
+                onChange={(e) => setCreateWhen(e.target.value)}
+                placeholder="For example: reviewing a new award notice against our intake checklist"
+                maxLength={WHEN_TO_USE_MAX}
+                aria-describedby="library-create-when-help"
+                style={{
+                  width: '100%',
+                  padding: "var(--workspace-space-12) var(--workspace-space-16)",
+                  fontSize: 'var(--workspace-font-body)',
+                  fontFamily: 'inherit',
+                  border: "1px solid var(--workspace-border)",
+                  borderRadius: 'var(--workspace-radius-medium)',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+              />
+              <div id="library-create-when-help" style={{ marginTop: 'var(--workspace-space-4)', fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>
+                The Assistant reads this line to decide whether the Skill fits a task, and searches it when you ask for a Skill.
+              </div>
+              </div>
+            )}
             {modalConfig[createModalType].showDesc && (
               <div style={{ marginBottom: 'var(--workspace-space-20)' }}>
                 <textarea
@@ -1783,6 +1819,11 @@ export function LibraryTab() {
                 <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#70757a', marginBottom: 'var(--workspace-space-16)' }}>
                   {editingItem.set_type === 'formatter' ? 'Formatter · Shape the structure of an answer' : 'Skill · Reusable instructions that guide the Assistant'}
                 </div>
+                {editingItem.set_type === 'prompt' && editingItem.when_to_use && (
+                  <p style={{ margin: "0 0 var(--workspace-space-16)", fontSize: 'var(--workspace-font-body)', color: '#3c4043', overflowWrap: 'anywhere' }}>
+                    <strong>When to use:</strong> {editingItem.when_to_use}
+                  </p>
+                )}
                 <div
                   role="region"
                   aria-label="Library item content"
@@ -1888,6 +1929,33 @@ export function LibraryTab() {
                 }}
               />
             </div>
+            {editingItem.set_type === 'prompt' && (
+              <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
+              <label className="library-field-label" htmlFor="library-edit-when">When to use (optional)</label>
+              <input id="library-edit-when"
+                type="text"
+                value={editWhen}
+                onChange={(e) => setEditWhen(e.target.value)}
+                placeholder="For example: reviewing a new award notice against our intake checklist"
+                maxLength={WHEN_TO_USE_MAX}
+                disabled={editLoading || !!editLoadError || editSaving}
+                aria-describedby="library-edit-when-help"
+                style={{
+                  width: '100%',
+                  padding: "var(--workspace-space-12) var(--workspace-space-16)",
+                  fontSize: 'var(--workspace-font-body)',
+                  fontFamily: 'inherit',
+                  border: "1px solid var(--workspace-border)",
+                  borderRadius: 'var(--workspace-radius-medium)',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+              />
+              <div id="library-edit-when-help" style={{ marginTop: 'var(--workspace-space-4)', fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>
+                The Assistant reads this line to decide whether the Skill fits a task, and searches it when you ask for a Skill.
+              </div>
+              </div>
+            )}
             <div style={{ marginBottom: 'var(--workspace-space-20)' }}>
               <label className="library-field-label" htmlFor="library-edit-content">{editingItem.set_type === 'formatter' ? 'Formatting instructions' : 'Instructions'}</label>
               <textarea id="library-edit-content"

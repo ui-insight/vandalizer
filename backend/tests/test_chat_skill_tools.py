@@ -246,3 +246,15 @@ def test_guidance_help_and_registry_distinguish_the_three_capabilities():
     assert {"list_skills", "get_skill", "select_skill"} <= names
     assert {"list_skills", "get_skill"} <= chat_tools.PARALLEL_SAFE_TOOLS
     assert "select_skill" not in chat_tools.PARALLEL_SAFE_TOOLS
+
+
+@pytest.mark.asyncio
+async def test_discovery_returns_the_authors_when_to_use_line_only_when_written():
+    items = [{"set_type": "prompt", "item_uuid": "s1"}, {"set_type": "prompt", "item_uuid": "s2"}]
+    scoped = snapshot(when_to_use="Reviewing a new award notice")
+    plain = snapshot(uuid="s2", title="Plain")
+    with patch("app.services.library_service.search_libraries", AsyncMock(return_value=items)), \
+         patch.object(skill_service, "snapshot_skill", AsyncMock(side_effect=[scoped, plain])):
+        result = await tools.list_skills(_make_context(), "award")
+    assert result[0]["when_to_use"] == "Reviewing a new award notice"
+    assert "when_to_use" not in result[1]

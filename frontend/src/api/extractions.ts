@@ -4,7 +4,7 @@ import type { SearchSet, SearchSetItem } from '../types/workflow'
 
 // SearchSet CRUD
 
-export function createSearchSet(data: { title: string; set_type?: string; extraction_config?: Record<string, unknown> }) {
+export function createSearchSet(data: { title: string; set_type?: string; extraction_config?: Record<string, unknown>; when_to_use?: string }) {
   return apiFetch<SearchSet>('/api/extractions/search-sets', {
     method: 'POST',
     body: JSON.stringify({ set_type: 'extraction', ...data }),
@@ -23,7 +23,7 @@ export function getSearchSet(uuid: string) {
   return apiFetch<SearchSet>(`/api/extractions/search-sets/${uuid}`)
 }
 
-export function updateSearchSet(uuid: string, data: { title?: string; extraction_config?: Record<string, unknown> }) {
+export function updateSearchSet(uuid: string, data: { title?: string; extraction_config?: Record<string, unknown>; when_to_use?: string }) {
   return apiFetch<SearchSet>(`/api/extractions/search-sets/${uuid}`, {
     method: 'PATCH',
     body: JSON.stringify(data),

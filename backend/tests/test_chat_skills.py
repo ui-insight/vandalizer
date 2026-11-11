@@ -220,3 +220,38 @@ async def test_new_project_chat_uses_default_unless_explicitly_disabled(client, 
         assert route_env.calls[0]['active_skill'].instructions == 'Review the award.'
     else:
         route_env.access.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_when_to_use_is_pinned_and_only_changes_the_version_once_written():
+    plain = library_skill()
+    scoped = library_skill()
+    scoped.extraction_config["when_to_use"] = "  Reviewing a new\naward notice  "
+    with patch.object(skill_service.access_control, "get_authorized_search_set", AsyncMock(side_effect=[plain, scoped])):
+        before = await skill_service.snapshot_skill("skill-1", _make_user())
+        after = await skill_service.snapshot_skill("skill-1", _make_user())
+    # A Skill saved before the field existed keeps the version chats pinned.
+    assert before.when_to_use == ""
+    assert after.when_to_use == "Reviewing a new award notice"
+    assert after.version != before.version
+    assert '"when_to_use"' not in skill_service.skill_instructions(before)
+    assert '"when_to_use": "Reviewing a new award notice"' in skill_service.skill_instructions(after)
+
+
+def test_version_of_a_skill_without_the_line_is_the_title_and_instructions_hash():
+    import hashlib
+    import json
+    canonical = json.dumps({"title": "Award review", "instructions": "Review the award."}, sort_keys=True, ensure_ascii=False)
+    source = library_skill()
+    import asyncio
+    with patch.object(skill_service.access_control, "get_authorized_search_set", AsyncMock(return_value=source)):
+        pinned = asyncio.run(skill_service.snapshot_skill("skill-1", _make_user()))
+    assert pinned.version == hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def test_when_to_use_is_saved_only_on_skills_and_an_empty_line_clears_it():
+    from app.services.search_set_service import _with_when_to_use
+    assert _with_when_to_use({"content": "x"}, "prompt", " Award\n intake ") == {"content": "x", "when_to_use": "Award intake"}
+    assert _with_when_to_use({"content": "x", "when_to_use": "old"}, "prompt", "  ") == {"content": "x"}
+    assert _with_when_to_use({"mode": "two_pass"}, "extraction", "Award intake") == {"mode": "two_pass"}
+    assert len(_with_when_to_use(None, "prompt", "y" * 900)["when_to_use"]) == 500

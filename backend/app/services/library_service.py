@@ -1020,7 +1020,8 @@ async def search_libraries(
             name_lower = item.get("name", "").lower()
             tags_str = " ".join(item.get("tags", [])).lower()
             note_str = (item.get("note") or "").lower()
-            if query.lower() in name_lower or query.lower() in tags_str or query.lower() in note_str:
+            when_str = (item.get("when_to_use") or "").lower()
+            if query.lower() in name_lower or query.lower() in tags_str or query.lower() in note_str or query.lower() in when_str:
                 seen_item_ids.add(item["id"])
                 results.append(item)
 
@@ -1108,6 +1109,7 @@ async def _dereference_item(
     description = None
 
     set_type = None
+    when_to_use: str | None = None
     item_uuid = None
     creator_user_id: str | None = None
     can_delete_underlying = False
@@ -1129,6 +1131,9 @@ async def _dereference_item(
         name = ss.title
         description = ss.extraction_config.get("content") if ss.extraction_config else None
         set_type = ss.set_type
+        if set_type == "prompt":
+            from app.schemas.skills import clean_when_to_use
+            when_to_use = clean_when_to_use((ss.extraction_config or {}).get("when_to_use")) or None
         item_uuid = ss.uuid
         if user is not None:
             can_delete_underlying = access_control.can_manage_search_set(
@@ -1143,6 +1148,7 @@ async def _dereference_item(
         "name": name,
         "description": description,
         "set_type": set_type,
+        "when_to_use": when_to_use,
         "tags": item.tags,
         "note": item.note,
         "folder": item.folder,

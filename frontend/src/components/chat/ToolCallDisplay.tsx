@@ -1551,6 +1551,7 @@ export function ToolStatusLine({
         <section className="agent-approval" aria-label="Review proposed action">
           <strong>{decision === 'approved' ? 'Approval requested' : decision === 'canceled' ? (step?.heading ? 'Skip requested' : 'Cancellation requested')
             : step?.heading ? `${step.heading}: ${actionLabel}` : 'Your approval is needed'}</strong>
+          {name === 'select_skill' && typeof obj?.when_to_use === 'string' && obj.when_to_use && <p className="break-words text-sm"><strong>When to use:</strong> {obj.when_to_use}</p>}
           {name === 'select_skill' && typeof obj?.skill_instructions === 'string' && <details>
             <summary>Inspect Skill instructions</summary>
             <pre className="max-h-60 overflow-auto whitespace-pre-wrap break-words text-sm">{obj.skill_instructions}</pre>

@@ -29,6 +29,8 @@ export interface LibraryItem {
   name: string
   description: string | null
   set_type: string | null
+  /** Skills only: the author's line on which tasks the Skill is for. */
+  when_to_use?: string | null
   tags: string[]
   note: string | null
   folder: string | null
