@@ -413,6 +413,15 @@ def process_scheduled_automations(self) -> dict:
 # ---------------------------------------------------------------------------
 
 
+class _InputTooLarge(Exception):
+    """The run's documents don't fit the model's input budget (pre-flight)."""
+
+
+def _is_context_length_error(exc: Exception) -> bool:
+    """True when a model provider rejected a request as longer than its window."""
+    return "maximum context length" in str(exc).lower()
+
+
 @celery_app.task(
     bind=True,
     name="tasks.passive.execute_workflow_passive",
@@ -518,6 +527,25 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
             or default_model_for_owner(db, sys_config, workflow.get("user_id"))
         )
 
+        # Same oversize pre-flight as a run someone starts by hand. Without it
+        # the provider rejected the request ("Input length exceeds model's
+        # maximum context length"), the event was retried with the same
+        # documents, and each attempt logged an error (Sentry 7761609315).
+        from app.tasks.workflow_tasks import context_overflow_failure
+
+        try:
+            overflow_failure = context_overflow_failure(db, steps_data, model, sys_config)
+        except Exception:
+            # Best-effort, as in execute_workflow_task: never block a valid run.
+            logger.exception("Pre-flight oversize check failed for event %s", event.get("uuid"))
+            overflow_failure = None
+        if overflow_failure:
+            overflow_msg, overflow_payload = overflow_failure
+            db.workflow_result.update_one(
+                {"_id": result_id}, {"$set": {"error_payload": overflow_payload}},
+            )
+            raise _InputTooLarge(overflow_msg)
+
         # Check if the workflow owner is an admin (gates code execution)
         wf_user_id = workflow.get("user_id")
         wf_user_doc = db.user.find_one({"user_id": wf_user_id}) if wf_user_id else None
@@ -621,7 +649,13 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
         # level every scheduled run of a misconfigured automation paged Sentry
         # (Sentry 7761609315). execute_workflow_task logs the same failure at
         # warning.
-        _deterministic = isinstance(e, (WorkflowStepError, TrialSpendBlockedError))
+        # So are documents too large for the model: the pre-flight above, or
+        # the provider's own rejection when a step's input grew past the
+        # window mid-run. The same documents overflow on every retry.
+        _deterministic = (
+            isinstance(e, (WorkflowStepError, TrialSpendBlockedError, _InputTooLarge))
+            or _is_context_length_error(e)
+        )
         (logger.warning if _deterministic else logger.error)(
             "Passive execution failed for event %s: %s", event.get("uuid"), e,
         )

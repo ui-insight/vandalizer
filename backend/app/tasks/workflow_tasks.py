@@ -491,6 +491,68 @@ def _document_token_counts(db, uuids: set[str]) -> dict[str, dict]:
     }
 
 
+def context_overflow_failure(
+    db, steps_data: list[dict], model: str | None, sys_config: dict,
+) -> tuple[str, dict] | None:
+    """The message and ``error_payload`` for a run whose documents can't fit.
+
+    Returns None when every step's documents fit the model's input budget.
+    Shared by the interactive run and the automation run (passive_tasks), so
+    both refuse an oversize run the same way before any model call is made.
+    """
+    from app.services.context_budget import find_context_overflow
+
+    # Resolve the actual model config so context_window and
+    # response_reserve_tokens overrides are honored.
+    model_cfg = None
+    for m in (sys_config.get("available_models") or []):
+        if m.get("name") == model:
+            model_cfg = m
+            break
+
+    groups = _document_context_groups(steps_data)
+    token_counts = _document_token_counts(db, set().union(*groups) if groups else set())
+
+    # Score every group; report the worst. Groups are per-step, so docs that
+    # never share a prompt are never summed together.
+    overflow = None
+    for group in groups:
+        candidate = find_context_overflow(
+            documents=[token_counts[u] for u in sorted(group) if u in token_counts],
+            model_name=model,
+            model_config=model_cfg,
+        )
+        if candidate and (overflow is None or candidate.total_tokens > overflow.total_tokens):
+            overflow = candidate
+    if not overflow:
+        return None
+
+    docs = overflow.documents
+    titles = ", ".join(o.title for o in docs[:3])
+    if len(docs) > 3:
+        titles += f", and {len(docs) - 3} more"
+    if overflow.kind == "single":
+        error_msg = (
+            f"{titles} is too large to read inline with the selected model. "
+            "Convert it to a Knowledge Base and use a Knowledge Base Query step instead."
+        )
+    else:
+        error_msg = (
+            f"These {len(docs)} documents total {overflow.total_tokens:,} tokens, "
+            f"which exceeds the {overflow.budget:,} tokens the selected model can "
+            f"read in one step ({titles}). Convert them to a Knowledge Base and use "
+            "a Knowledge Base Query step instead, or run them one at a time."
+        )
+    return error_msg, {
+        "code": "context_over_budget_convertible",
+        "suggested_action": "convert_to_kb",
+        "oversize_documents": [o.to_dict() for o in docs],
+        "overflow_kind": overflow.kind,
+        "total_tokens": overflow.total_tokens,
+        "input_budget": overflow.budget,
+    }
+
+
 def _accumulate_activity_usage(db, workflow_result_id, engine, activity_id=None) -> None:
     """Fold one execution pass's token usage into the run's ActivityEvent.
 
@@ -1198,64 +1260,18 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
     # guided "Convert to Knowledge Base" affordance instead of a mid-step 400
     # from the LLM gateway.
     try:
-        from app.services.context_budget import find_context_overflow
-
-        # Resolve the actual model config so context_window and
-        # response_reserve_tokens overrides are honored.
-        model_cfg = None
-        for m in (sys_config.get("available_models") or []):
-            if m.get("name") == model:
-                model_cfg = m
-                break
-
-        groups = _document_context_groups(steps_data)
-        token_counts = _document_token_counts(db, set().union(*groups) if groups else set())
-
-        # Score every group; report the worst. Groups are per-step, so docs that
-        # never share a prompt are never summed together.
-        overflow = None
-        for group in groups:
-            candidate = find_context_overflow(
-                documents=[token_counts[u] for u in sorted(group) if u in token_counts],
-                model_name=model,
-                model_config=model_cfg,
-            )
-            if candidate and (overflow is None or candidate.total_tokens > overflow.total_tokens):
-                overflow = candidate
-
-        if overflow:
-            docs = overflow.documents
-            titles = ", ".join(o.title for o in docs[:3])
-            if len(docs) > 3:
-                titles += f", and {len(docs) - 3} more"
-            if overflow.kind == "single":
-                error_msg = (
-                    f"{titles} is too large to read inline with the selected model. "
-                    "Convert it to a Knowledge Base and use a Knowledge Base Query step instead."
-                )
-            else:
-                error_msg = (
-                    f"These {len(docs)} documents total {overflow.total_tokens:,} tokens, "
-                    f"which exceeds the {overflow.budget:,} tokens the selected model can "
-                    f"read in one step ({titles}). Convert them to a Knowledge Base and use "
-                    "a Knowledge Base Query step instead, or run them one at a time."
-                )
-            error_payload = {
-                "code": "context_over_budget_convertible",
-                "suggested_action": "convert_to_kb",
-                "oversize_documents": [o.to_dict() for o in docs],
-                "overflow_kind": overflow.kind,
-                "total_tokens": overflow.total_tokens,
-                "input_budget": overflow.budget,
-            }
+        overflow_failure = context_overflow_failure(db, steps_data, model, sys_config)
+        if overflow_failure:
+            error_msg, error_payload = overflow_failure
             _mark_workflow_failed(
                 db, workflow_result_id, activity_id, error_msg,
                 error_payload=error_payload,
             )
             logger.warning(
                 "Workflow %s aborted pre-flight: %s overflow, docs %s total=%s budget=%s model=%s",
-                workflow_id, overflow.kind, [o.uuid for o in docs],
-                overflow.total_tokens, overflow.budget, model,
+                workflow_id, error_payload["overflow_kind"],
+                [o["uuid"] for o in error_payload["oversize_documents"]],
+                error_payload["total_tokens"], error_payload["input_budget"], model,
             )
             return
     except Exception:
