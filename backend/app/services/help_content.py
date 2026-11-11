@@ -22,6 +22,46 @@ import re
 
 HELP_TOPICS: list[dict] = [
     {
+        "id": "assistant-settings",
+        "title": "Assistant settings: Core Skills and what chat can use",
+        "aliases": ["assistant settings", "what can chat use", "turn off web search", "turn on web search",
+                    "disable tools", "enable tools", "chat permissions", "stop chat from",
+                    "core skills", "core skill", "always use a skill", "default skills"],
+        "body": (
+            "The **Assistant settings** page lists what chat can use, such as searching the web, knowledge "
+            "bases, workflows, Pages, projects and the RA inbox, with a switch for each. Open it "
+            "from **Settings** beside the sliders icon in the chat composer, from **Assistant settings** in the account menu, "
+            "or at [Assistant settings](/assistant).\n\n"
+            "Under **What chat can use for you**, switches show your saved choices. Turning one off "
+            "removes that feature from your own chats from your next message. Chat says it is off "
+            "instead of working around it. These switches control chat's direct actions: workflows "
+            "you run still follow their saved steps, including web searches. Existing automations "
+            "and work already running are not stopped by these switches. Reading your "
+            "files, Skills, the plan checklist, help and certification are always on, though the "
+            "certification exercises need **Extractions and compliance checks** and **Workflows** on. A switch also covers what chat "
+            "does through another group: a project's pinned workflow needs Workflows on, and adding a "
+            "URL to a knowledge base needs Read a web page on. "
+            "Chat still asks before it creates, changes or shares anything. A waiting approval card "
+            "is cancelled if its feature is turned off.\n\n"
+            "**Core Skills**, at the top of the page, are up to five Library Skills chat keeps on "
+            "hand in every conversation. Chat reads each one's name and When to use line and follows "
+            "the Skill's instructions when a request matches, then says which Skill it used. A Skill "
+            "needs a When to use line to be added (Library → the Skill's More actions → Edit). The "
+            "picker shows the instructions before you choose **Add this core Skill**. It accepts only "
+            "the version you reviewed. If anyone edits the Skill, it pauses and chat shows a notice "
+            "linking to settings. Open **Review updated instructions**, then choose **Use this version** "
+            "to accept the new text. The used-Skill step in chat has **View instructions** and a link "
+            "to manage core Skills. A team's Skill is used only "
+            "while you are working in that team. A Skill selected for a conversation, including a "
+            "project's default Skill, takes the place of core Skills in that conversation.\n\n"
+            "Administrators can expand **Settings for all users — administrators** to block a feature "
+            "for everyone on this Vandalizer site. Allowing it again restores each person's saved "
+            "choice. A blocked or unavailable feature says why beside your switch; you can still "
+            "change your saved choice, but only an administrator can remove the block or set it up. "
+            "If saved settings cannot be confirmed, refresh them before making another change."
+        ),
+    },
+    {
         "id": "skills",
         "title": "Skills, extraction templates, and workflows",
         "aliases": ["skill", "skills", "library skills", "use skill", "reusable instructions",

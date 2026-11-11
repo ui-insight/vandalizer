@@ -1666,7 +1666,7 @@ export function LibraryTab() {
                 }}
               />
               <div id="library-create-when-help" style={{ marginTop: 'var(--workspace-space-4)', fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>
-                The Assistant reads this line to decide whether the Skill fits a task, and searches it when you ask for a Skill.
+                Describe the task this Skill is for. Chat uses this description to find a matching Skill. Required to add the Skill to Core Skills in Assistant settings; optional when choosing it for one conversation.
               </div>
               </div>
             )}
@@ -1952,7 +1952,7 @@ export function LibraryTab() {
                 }}
               />
               <div id="library-edit-when-help" style={{ marginTop: 'var(--workspace-space-4)', fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>
-                The Assistant reads this line to decide whether the Skill fits a task, and searches it when you ask for a Skill.
+                Describe the task this Skill is for. Chat uses this description to find a matching Skill. Required to add the Skill to Core Skills in Assistant settings; optional when choosing it for one conversation.
               </div>
               </div>
             )}

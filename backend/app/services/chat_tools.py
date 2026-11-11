@@ -37,7 +37,7 @@ from app.models.workflow import Workflow
 from app.services.chat_deps import AgenticChatDeps
 from app.services.chat_page_templates import find_page_templates, get_page_template
 from app.services.chat_artifact_tools import compare_page_versions, create_html_artifact, find_pages, get_html_artifact, revise_html_artifact
-from app.services.chat_skill_tools import get_skill, list_skills, select_skill
+from app.services.chat_skill_tools import get_skill, list_skills, select_skill, use_core_skill
 from app.services.chat_file_tools import list_projects, move_documents_to_project
 from app.services.chat_calculator import calculate
 from app.services.certification_versions.runtime import course_operation
@@ -2107,6 +2107,12 @@ async def _execute_extraction(
     model, field metadata and source tracking, and the same History record.
     """
     from app.routers.extractions import run_recorded_extraction
+    from app.services import assistant_capabilities
+
+    # A project pin is a Projects tool doing an extraction's work.
+    refused = assistant_capabilities.refusal(context, "extractions")
+    if refused:
+        return refused
 
     team_id = context.deps.team_id
     user_id = context.deps.user_id
@@ -2988,7 +2994,12 @@ async def _execute_workflow(
     ``run_pin_on_project``. Caps at 10 documents (the workflow_service limit).
     Returns a session_id for polling via get_workflow_status.
     """
-    from app.services import workflow_service
+    from app.services import assistant_capabilities, workflow_service
+
+    # A project pin is a Projects tool doing a workflow's work.
+    refused = assistant_capabilities.refusal(context, "workflows")
+    if refused:
+        return refused
 
     workflow_id = str(wf.id)
     team_id = context.deps.team_id
@@ -5066,6 +5077,13 @@ async def run_pin_on_project(
             )
         }
 
+    # Checked before the approval card, so nobody approves a run that is off.
+    from app.services import assistant_capabilities
+
+    refused = assistant_capabilities.refusal(context, "workflows" if pin_type == "workflow" else "extractions")
+    if refused:
+        return refused
+
     from app.services import project_service
 
     # Running is a manage action — keep it to owners/editors. Viewers can chat
@@ -5721,6 +5739,13 @@ async def create_automation(
 
     if action_type not in ("workflow", "extraction"):
         return {"error": "action_type must be 'workflow' or 'extraction'."}
+    # An automation runs a workflow or an extraction on its own, so it needs
+    # that capability too.
+    from app.services import assistant_capabilities
+
+    refused = assistant_capabilities.refusal(context, "workflows" if action_type == "workflow" else "extractions")
+    if refused:
+        return refused
     normalized_types = sorted({extension.strip().lower().removeprefix(".") for extension in (file_types or [])})
     unsupported = set(normalized_types) - ALLOWED_EXTS
     if unsupported:
@@ -7303,6 +7328,7 @@ TOOLS: list[ToolFuncContext[AgenticChatDeps, ...]] = [
     list_skills,
     get_skill,
     select_skill,
+    use_core_skill,
     find_page_templates,
     get_page_template,
     create_html_artifact,
@@ -7395,6 +7421,9 @@ TOOLS: list[ToolFuncContext[AgenticChatDeps, ...]] = [
 COMPACTABLE_TOOLS: frozenset[str] = frozenset({
     "list_skills",
     "get_skill",
+    # Returns the same payload as get_skill and can be loaded again, so an old
+    # copy must not replay in every later request.
+    "use_core_skill",
     "search_documents",
     "list_documents",
     "list_folders",

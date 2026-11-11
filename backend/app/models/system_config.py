@@ -265,6 +265,11 @@ class SystemConfig(Document):
     # OUTBOUND_URL_ALLOWED_HOSTS env list; see app.utils.url_validation.
     outbound_url_allowed_hosts: list[str] = []
 
+    # Chat capabilities an admin switched off for the whole deployment (ids
+    # from app.services.assistant_capabilities). A person can switch more off
+    # for themselves on the Assistant page, never back on past this.
+    assistant_capabilities_off: list[str] = []
+
     # Default team for new user auto-assignment
     default_team_id: Optional[str] = None
 

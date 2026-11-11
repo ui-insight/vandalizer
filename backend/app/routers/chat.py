@@ -216,8 +216,14 @@ async def chat(
     if body.page_approval:
         if not conversation:
             raise HTTPException(404, "Conversation not found")
-        from app.services import chat_page_previews
+        from app.models.system_config import SystemConfig
+        from app.services import assistant_capabilities, chat_page_previews
         from app.services.chat_artifact_tools import _call
+        # Save on a Page preview runs without the model, so the Pages switch
+        # is checked here: the tool gate never sees this path.
+        config = await SystemConfig.get_config()
+        if "pages" in assistant_capabilities.off_for(user, config.model_dump()):
+            raise HTTPException(409, "Pages are turned off in Assistant settings, so this page was not saved.")
         page_preview = await _call(chat_page_previews.get, user_id, conversation.uuid, body.page_approval)
     current_skill = getattr(conversation, "active_skill", None)
     requested_skill = body.skill_uuid

@@ -1976,6 +1976,26 @@ async def chat_stream(
             len(skipped_no_text),
         )
 
+    # Capabilities the person or an admin switched off (Assistant settings).
+    # A switch covers the work, not only the tools: knowledge-base retrieval
+    # below runs before the model does, so it is checked here too.
+    from app.services import assistant_capabilities
+
+    capabilities_off = (
+        assistant_capabilities.off_for(user, sys_config_doc) if user and team_access else frozenset()
+    )
+    if "knowledge_bases" in capabilities_off and (kbs or kb_uuid):
+        kbs, kb_uuid = [], None
+        yield json.dumps({
+            "kind": "context_notice",
+            "content": (
+                "Knowledge bases are turned off in Assistant settings, so the attached "
+                "knowledge base was not searched for this reply."
+            ),
+            "action": "knowledge_bases_off",
+            "tokens_dropped": 0,
+        }) + "\n"
+
     # Built-in regulation knowledge bases (support ticket): with nothing
     # attached, a question about 2 CFR 200, the PAPPG, the NIH GPS… consults
     # the matching catalog KB for this turn, with the same retrieval, citation
@@ -1985,6 +2005,7 @@ async def chat_stream(
     if (
         not kbs and not kb_uuid and not document_uuids and not attachment_segments
         and not include_onboarding_context and not is_first_session and not run_demo
+        and "knowledge_bases" not in capabilities_off
     ):
         try:
             routed = await builtin_kbs.route(message)
@@ -2202,7 +2223,10 @@ async def chat_stream(
         reminder_blocks.append(builtin_note)
     # With no knowledge base in play, say which built-in ones the agent can
     # search by kb_uuid: follow-ups and questions the topic list misses.
-    if not active_kbs and not is_first_session and not include_onboarding_context and not run_demo:
+    if (
+        not active_kbs and not is_first_session and not include_onboarding_context and not run_demo
+        and "knowledge_bases" not in capabilities_off
+    ):
         try:
             available = [builtin_kbs.describe(kb) for kb in await builtin_kbs.builtin_kbs()]
         except Exception as e:
@@ -2316,6 +2340,28 @@ async def chat_stream(
     if user and team_access:
         from app.services.approval_scope import approval_reminder, decide
 
+        # A waiting card whose capability has since been switched off cannot
+        # run: its tool is withheld. Retire it and say so, instead of telling
+        # the model it was approved while withholding the tool.
+        stranded = assistant_capabilities.stranded(
+            getattr(conversation, "pending_confirmations", None), capabilities_off,
+        )
+        if stranded:
+            conversation.pending_confirmations = [
+                p for p in conversation.pending_confirmations if p not in stranded
+            ]
+            try:
+                await conversation.set({"pending_confirmations": conversation.pending_confirmations})
+            except Exception as e:
+                logger.warning("Could not retire approval cards for switched-off capabilities: %s", e)
+            reminder_blocks.append(
+                "Approval cards for these actions were waiting, but their capability has been turned "
+                "off in Assistant settings, so they were cancelled and cannot run: "
+                + "; ".join(str(p.get("label") or p.get("tool") or "action") for p in stranded)
+                + ". If the user approved or asks about one, say it was cancelled because that "
+                "capability is turned off, and do not call the tool."
+            )
+
         approval_note = approval_reminder(
             decide(getattr(conversation, "pending_confirmations", None),
                    approval_for=approval_for, decline_for=decline_for),
@@ -2339,8 +2385,22 @@ async def chat_stream(
     # Branding is deployment-stable, so branded instructions stay byte-stable.
     _org_name = (sys_config_doc or {}).get("org_name") or ""
     instructions_text = _brand_org_text(instruction_base, _org_name)
-    from app.services.skill_service import skill_instructions
+    # The note changes only when a switch does, so the cached prefix stays stable.
+    capability_note = assistant_capabilities.instructions(
+        assistant_capabilities.own_off(user) if user and team_access else frozenset(),
+        assistant_capabilities.admin_off(sys_config_doc) if user and team_access else frozenset(),
+    )
+    instructions_text += capability_note
+    from app.services.skill_service import core_skill_instructions, core_skills, skill_instructions
 
+    # Core Skills (Assistant settings): listed by name and "When to use" only,
+    # so five Skills cost a few lines until one matches and is loaded.
+    # Nothing is read while a Skill is selected: it takes precedence.
+    core_skill_note = (
+        core_skill_instructions(await core_skills(user, team_access), None)
+        if user and team_access and active_skill is None else ""
+    )
+    instructions_text += core_skill_note
     instructions_text += skill_instructions(active_skill)
     reminder_bundle = "\n\n".join(
         _wrap_system_reminder(b) for b in reminder_blocks if b and b.strip()
@@ -2639,6 +2699,7 @@ async def chat_stream(
             context_document_uuids=effective_doc_uuids,
             active_kb_uuid=active_kbs[0][0] if active_kbs else None,
             active_project_uuid=project_uuid,
+            capabilities_off=capabilities_off,
             conversation=conversation,
             # Monotonic per-turn marker: the current user message is already
             # persisted (router add_message) before chat_stream runs, so this
@@ -2749,7 +2810,9 @@ async def chat_stream(
             # in force until the next user turn. Initial budgeting above still
             # counts the same base plus the initial selected snapshot.
             from app.services.chat_skill_tools import conversation_instructions
-            iter_kwargs["instructions"] = conversation_instructions(_brand_org_text(instruction_base, _org_name))
+            iter_kwargs["instructions"] = conversation_instructions(
+                _brand_org_text(instruction_base, _org_name) + capability_note, core_skill_note,
+            )
 
         async with agent.iter(prompt, **iter_kwargs) as agent_run:
             async for node in agent_run:

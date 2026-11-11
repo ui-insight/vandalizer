@@ -1235,8 +1235,13 @@ def create_agentic_chat_agent(
             ) or None,
             capabilities=[ProcessHistory(_inject_queued_user_parts)],
         )
+        from app.services import assistant_capabilities
+
         for tool_fn in TOOLS:
             agent.tool(
+                # Per request: a capability the person or an admin switched
+                # off is withheld, without a per-user agent cache entry.
+                prepare=assistant_capabilities.gate,
                 sequential=(
                     not parallel_enabled
                     or tool_fn.__name__ not in PARALLEL_SAFE_TOOLS
@@ -1372,7 +1377,15 @@ AGENTIC_CHAT_SYSTEM_PROMPT = (
     "edits do not silently replace that version. Skills cannot approve actions or expand permissions. "
     "Never run a Skill through run_extraction or run_pin_on_project. Generic library results with "
     "set_type='prompt' are Skills, not extraction templates. To create or edit a Skill, guide the "
-    "user to Library → Skills; there is no Skill-authoring tool.\n\n"
+    "user to Library → Skills; there is no Skill-authoring tool.\n"
+    "Core Skills are a separate, narrower case. When your instructions include a Core Skills list, "
+    "the user chose those Skills in Assistant settings to be on hand in every chat. They are not "
+    "selected or active, and the one-Skill rule above concerns the selected Skill only. When a "
+    "request clearly matches a listed when_to_use line and no Skill is selected, call "
+    "use_core_skill; what it returns is active guidance for that reply and needs no approval, "
+    "because the user accepted that exact version in settings. Without a Core Skills list there "
+    "are no core Skills: never call use_core_skill for a Skill found through list_skills. The "
+    "user manages core Skills at [Assistant settings](/assistant), not through chat.\n\n"
     "## Ground Skill discovery in current tool results\n"
     "When asked what Skills the user has or which Skills are available, call list_skills "
     "in this turn with an empty search. List only the Skills returned by that call, using "
@@ -1516,6 +1529,7 @@ AGENTIC_CHAT_SYSTEM_PROMPT = (
     "- User wants to know what extraction templates exist → list_extraction_sets\n"
     "- User wants reusable chat guidance or a saved review/writing method → list_skills, then get_skill\n"
     "- User wants to use, replace, or remove a Skill → select_skill (preview, then user approval)\n"
+    "- Request matches a listed core Skill's when_to_use and no Skill is selected → use_core_skill\n"
     "- User wants to know what workflows exist → list_workflows\n"
     "- User asks about quality, accuracy, or validation → get_quality_info\n"
     "- User asks what's available in their library → search_library\n"
