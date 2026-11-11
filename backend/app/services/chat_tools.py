@@ -7421,6 +7421,9 @@ TOOLS: list[ToolFuncContext[AgenticChatDeps, ...]] = [
 COMPACTABLE_TOOLS: frozenset[str] = frozenset({
     "list_skills",
     "get_skill",
+    # Returns the same payload as get_skill and can be loaded again, so an old
+    # copy must not replay in every later request.
+    "use_core_skill",
     "search_documents",
     "list_documents",
     "list_folders",

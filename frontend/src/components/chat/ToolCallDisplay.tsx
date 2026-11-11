@@ -381,6 +381,14 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
       return { text: 'Skill instructions inspected; selection unchanged', qualityHint: '' }
     case 'select_skill':
       return { text: typeof obj.message === 'string' ? obj.message : 'Skill selection', qualityHint: '' }
+    case 'use_core_skill': {
+      // Name the Skill and the version used, so the record does not rest on
+      // the model's own sentence.
+      const used = obj.skill as { title?: unknown; version?: unknown } | undefined
+      if (!used || typeof used.title !== 'string') return { text: typeof obj.error === 'string' ? obj.error : 'Core Skill not used', qualityHint: '' }
+      const version = typeof used.version === 'string' ? ` (version ${used.version.slice(0, 8)})` : ''
+      return { text: `Used core Skill "${used.title.slice(0, 60)}"${version}`, qualityHint: '' }
+    }
     case 'save_to_folder': {
       const t = obj.title ? `"${String(obj.title).slice(0, 40)}"` : 'document'
       return { text: `Saved ${t}`, qualityHint }

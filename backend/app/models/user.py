@@ -68,10 +68,11 @@ class User(Document):
     # Chat capabilities this person switched off on the Assistant page
     # (ids from app.services.assistant_capabilities). Empty: everything on.
     assistant_capabilities_off: list[str] = []
-    # Core Skills: Library Skills (uuids) this person keeps available in every
-    # chat. Chat sees each one's name and "When to use" line and loads the
-    # instructions when a task matches (skill_service.core_skills).
-    core_skill_uuids: list[str] = []
+    # Core Skills: Library Skills this person keeps available in every chat,
+    # as ``{"uuid", "version"}``. The version is the Skill's text as the
+    # person accepted it: an edit by anyone stops chat using the Skill until
+    # they accept the new text (skill_service.core_skill_states).
+    core_skills: list[dict] = []
 
     # v5.0 launch — one-time announcement send tracking
     v5_announcement_sent_at: Optional[datetime.datetime] = None

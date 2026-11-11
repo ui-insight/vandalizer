@@ -6,13 +6,20 @@ from pydantic import BaseModel, Field
 from app.dependencies import get_current_user
 from app.models.system_config import SystemConfig
 from app.models.user import User
+from app.schemas.skills import SkillSnapshot
 from app.services import assistant_capabilities, skill_service
 
 router = APIRouter()
 
 
-class CoreSkills(BaseModel):
-    uuids: list[str] = Field(max_length=20)
+class CoreSkillRef(BaseModel):
+    uuid: str = Field(min_length=1, max_length=200)
+
+
+class AcceptedVersion(BaseModel):
+    # The version the page showed, so a second edit made while the person was
+    # reading is never accepted unseen.
+    version: str = Field(min_length=1, max_length=128)
 
 
 class Switch(BaseModel):
@@ -74,3 +81,87 @@ async def set_capability_limit(capability_id: str, body: Switch, user: User = De
             payload={"capability": capability_id, "on": body.on, "before": before, "after": after},
         ).insert()
     return await _page(user, config)
+
+
+# ── Core Skills ─────────────────────────────────────────────────────────────
+
+async def _core_skill_page(user: User) -> dict:
+    """The person's list, including entries chat is not using and why."""
+    rows = []
+    for state in await skill_service.core_skill_states(user):
+        skill = state.skill
+        rows.append({
+            "uuid": state.uuid, "title": state.title, "status": state.status,
+            "version": skill.version if skill else None,
+            "usable": state.status == "ok", "problem": state.problem,
+            "when_to_use": skill.when_to_use if skill else "",
+            # Sent only for an edited Skill, so the person can read the new
+            # text before accepting it.
+            "instructions": skill.instructions if skill and state.status == "changed" else None,
+        })
+    return {"skills": rows, "max": skill_service.MAX_CORE_SKILLS}
+
+
+async def _addable(skill_uuid: str, user: User) -> SkillSnapshot:
+    skill = await skill_service.snapshot_skill(skill_uuid, user)
+    if not skill.when_to_use:
+        raise HTTPException(
+            status_code=422,
+            detail=f'Add a When to use line to "{skill.title}" in the Library first, so chat knows when to use it.',
+        )
+    return skill
+
+
+@router.get("/core-skills", response_model=None)
+async def get_core_skills(user: User = Depends(get_current_user)) -> dict:
+    return await _core_skill_page(user)
+
+
+@router.get("/core-skills/choices", response_model=None)
+async def core_skill_choices(search: str = "", user: User = Depends(get_current_user)) -> dict:
+    """Skills the person could add: the same Library search chat's list_skills uses."""
+    from app.services.library_service import search_libraries
+
+    team_id = str(user.current_team) if user.current_team else None
+    listed = {entry["uuid"] for entry in skill_service.core_skill_entries(user)}
+    choices: list[dict] = []
+    seen: set[str] = set()
+    for item in await search_libraries(user, search.strip()[:200], team_id=team_id, kind="search_set"):
+        skill_uuid = item.get("item_uuid")
+        if item.get("set_type") != "prompt" or not skill_uuid or skill_uuid in seen or skill_uuid in listed:
+            continue
+        seen.add(skill_uuid)
+        choices.append({"uuid": skill_uuid, "title": item.get("name") or "Untitled Skill",
+                        "when_to_use": item.get("when_to_use") or ""})
+    choices.sort(key=lambda choice: str(choice["title"]).lower())
+    return {"choices": choices[:50], "more": len(choices) > 50}
+
+
+@router.post("/core-skills", response_model=None)
+async def add_core_skill(body: CoreSkillRef, user: User = Depends(get_current_user)) -> dict:
+    """Add a Skill and pin the text the person is accepting."""
+    skill = await _addable(body.uuid, user)
+    outcome = await skill_service.add_core_skill(user, skill)
+    if outcome == "full":
+        raise HTTPException(status_code=422, detail=f"You can keep up to {skill_service.MAX_CORE_SKILLS} core Skills. Remove one to add another.")
+    await skill_service.reload_core_skills(user)
+    return await _core_skill_page(user)
+
+
+@router.post("/core-skills/{skill_uuid}/accept", response_model=None)
+async def accept_core_skill(skill_uuid: str, body: AcceptedVersion, user: User = Depends(get_current_user)) -> dict:
+    """Accept an edited Skill's current text, after the page showed it."""
+    skill = await _addable(skill_uuid, user)
+    if skill.version != body.version:
+        raise HTTPException(status_code=409, detail="This Skill was edited again. Review the latest text before accepting it.")
+    if not await skill_service.accept_core_skill(user, skill):
+        raise HTTPException(status_code=404, detail="That Skill is not one of your core Skills.")
+    await skill_service.reload_core_skills(user)
+    return await _core_skill_page(user)
+
+
+@router.delete("/core-skills/{skill_uuid}", response_model=None)
+async def remove_core_skill(skill_uuid: str, user: User = Depends(get_current_user)) -> dict:
+    await skill_service.remove_core_skill(user, skill_uuid)
+    await skill_service.reload_core_skills(user)
+    return await _core_skill_page(user)

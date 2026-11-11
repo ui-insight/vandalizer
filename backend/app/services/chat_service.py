@@ -2395,8 +2395,10 @@ async def chat_stream(
 
     # Core Skills (Assistant settings): listed by name and "When to use" only,
     # so five Skills cost a few lines until one matches and is loaded.
+    # Nothing is read while a Skill is selected: it takes precedence.
     core_skill_note = (
-        core_skill_instructions(await core_skills(user), active_skill) if user and team_access else ""
+        core_skill_instructions(await core_skills(user, team_access), None)
+        if user and team_access and active_skill is None else ""
     )
     instructions_text += core_skill_note
     instructions_text += skill_instructions(active_skill)
@@ -2809,7 +2811,7 @@ async def chat_stream(
             # counts the same base plus the initial selected snapshot.
             from app.services.chat_skill_tools import conversation_instructions
             iter_kwargs["instructions"] = conversation_instructions(
-                _brand_org_text(instruction_base, _org_name) + capability_note + core_skill_note
+                _brand_org_text(instruction_base, _org_name) + capability_note, core_skill_note,
             )
 
         async with agent.iter(prompt, **iter_kwargs) as agent_run:

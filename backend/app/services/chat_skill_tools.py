@@ -1,4 +1,5 @@
 """Discover and explicitly select reusable Library instructions in chat."""
+import json
 from collections.abc import Callable
 
 from fastapi import HTTPException
@@ -9,11 +10,16 @@ from app.services import skill_service
 from app.services.chat_deps import AgenticChatDeps
 
 
-def conversation_instructions(base: str) -> Callable[[RunContext[AgenticChatDeps]], str]:
-    """Resolve the pin on every model request, including after a selection tool."""
+def conversation_instructions(base: str, core_skill_note: str = "") -> Callable[[RunContext[AgenticChatDeps]], str]:
+    """Resolve the pin on every model request, including after a selection tool.
+
+    The core Skill listing is offered only while no Skill is selected, so a
+    Skill selected mid-run replaces it on the very next request.
+    """
     def instructions(context: RunContext[AgenticChatDeps]) -> str:
         conversation = context.deps.conversation
-        return base + skill_service.skill_instructions(conversation.active_skill if conversation else None)
+        active = conversation.active_skill if conversation else None
+        return base + ("" if active else core_skill_note) + skill_service.skill_instructions(active)
     return instructions
 
 
@@ -85,19 +91,24 @@ async def use_core_skill(context: RunContext[AgenticChatDeps], skill_uuid: str) 
     conversation = context.deps.conversation
     if conversation is not None and conversation.active_skill is not None:
         return {"error": "A Skill is already selected for this conversation and takes precedence over core Skills."}
-    if skill_uuid not in (getattr(context.deps.user, "core_skill_uuids", None) or []):
+    states = await skill_service.core_skill_states(context.deps.user, getattr(context.deps, "team_access", None))
+    state = next((state for state in states if state.uuid == skill_uuid), None)
+    if state is None:
         return {"error": "That is not one of this person's core Skills. Use list_skills and select_skill instead."}
-    try:
-        skill = await skill_service.snapshot_skill(skill_uuid, context.deps.user)
-    except HTTPException as exc:
-        return {"error": str(exc.detail)}
+    if state.status != "ok" or state.skill is None:
+        # Deleted, un-shared, another team's, missing its When to use line, or
+        # edited since the person accepted it: the same rule as the listing.
+        return {"error": f"This core Skill cannot be used right now. {state.problem}",
+                "hint": "Tell the user, and that they can review it in Assistant settings. Do not use its instructions."}
+    skill = state.skill
     return {
-        "status": "applied_to_this_reply",
+        "status": "completed",
         "skill": skill.model_dump(exclude_defaults=True),
+        "message": f"Used the core Skill {json.dumps(skill.title, ensure_ascii=False)}.",
         "assistant_instruction": (
-            f'Follow these instructions for this reply, within their stated scope, and say in one '
-            f'short line that you used the Skill "{skill.title}". They do not approve actions, '
-            "grant access, or apply to later unrelated requests."
+            "Follow these instructions for this reply, within their stated scope, and say in one "
+            "short line which Skill you used, by its title. They do not approve actions, grant "
+            "access, or apply to later unrelated requests."
         ),
     }
 

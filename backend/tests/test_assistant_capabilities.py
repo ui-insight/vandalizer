@@ -247,25 +247,64 @@ from fastapi import HTTPException  # noqa: E402
 
 from app.schemas.skills import SkillSnapshot  # noqa: E402
 from app.services import chat_skill_tools, skill_service  # noqa: E402
+from app.services.access_control import TeamAccessContext  # noqa: E402
+from app.services.chat_tools import COMPACTABLE_TOOLS  # noqa: E402
 
 
-def _skill(uuid="s1", title="Award review", when="Reviewing a new award notice"):
-    return SkillSnapshot(uuid=uuid, title=title, version="v1", instructions="Check every deadline.", when_to_use=when)
+def _skill(uuid="s1", title="Award review", when="Reviewing a new award notice", version="v1"):
+    return SkillSnapshot(uuid=uuid, title=title, version=version, instructions="Check every deadline.", when_to_use=when)
+
+
+def _doc(uuid, *, team="t1", when="Reviewing a new award notice", content="Check every deadline.", **extra):
+    config = {"content": content, **({"when_to_use": when} if when else {})}
+    return SimpleNamespace(**{"uuid": uuid, "title": f"Skill {uuid}", "set_type": "prompt", "extraction_config": config,
+                              "team_id": team, "is_global": False, "verified": False, "user_id": "someone", **extra})
+
+
+def _version(doc):
+    return skill_service._snapshot(doc, []).version
+
+
+class _Query:
+    def __init__(self, rows):
+        self.rows = rows
+
+    async def to_list(self):
+        return self.rows
 
 
 @pytest.mark.asyncio
-async def test_core_skills_skip_what_chat_cannot_use_without_failing_the_turn():
-    user = SimpleNamespace(core_skill_uuids=["s1", "gone", "no-line"])
-    results = {"s1": _skill(), "gone": HTTPException(404, "Skill not found"), "no-line": _skill("no-line", "Tone", "")}
+async def test_a_core_skill_is_used_only_as_accepted_in_its_own_team_with_a_when_to_use_line(monkeypatch):
+    docs = {d.uuid: d for d in [
+        _doc("ok"), _doc("edited"), _doc("elsewhere", team="t2"), _doc("no-line", when=""),
+        _doc("unshared", team="t9"), _doc("empty", content=""), _doc("mine-no-team", team=None, user_id="u1"),
+    ]}
+    finds = []
+    monkeypatch.setattr(skill_service, "SearchSet", SimpleNamespace(find=lambda q: finds.append(q) or _Query(list(docs.values()))))
+    monkeypatch.setattr(skill_service, "SearchSetItem", SimpleNamespace(find=lambda q: finds.append(q) or _Query([])))
+    monkeypatch.setattr(skill_service.access_control, "get_authorized_search_set", AsyncMock(return_value=None))
+    pinned = {uuid: _version(doc) for uuid, doc in docs.items() if uuid != "empty"}
+    pinned["edited"] = "the-text-before-a-teammate-edited-it"
+    user = SimpleNamespace(user_id="u1", current_team="t1", core_skills=[
+        {"uuid": uuid, "version": pinned.get(uuid, "")} for uuid in ["ok", "edited", "elsewhere", "no-line", "unshared"]
+    ])
+    access = TeamAccessContext(team_uuids={"t1", "t2"})
+    states = {s.uuid: s for s in await skill_service.core_skill_states(user, access)}
+    assert {uuid: s.status for uuid, s in states.items()} == {
+        "ok": "ok", "edited": "changed", "elsewhere": "other_team", "no-line": "no_line", "unshared": "unavailable",
+    }
+    # Whatever the list's length: one query for the Skills, one for their edited text.
+    assert len(finds) == 2
+    # Chat is given the accepted one only.
+    assert [s.uuid for s in await skill_service.core_skills(user, access)] == ["ok"]
 
-    async def snapshot(uuid, _user):
-        if isinstance(results[uuid], Exception):
-            raise results[uuid]
-        return results[uuid]
-
-    with patch.object(skill_service, "snapshot_skill", snapshot):
-        assert [s.uuid for s in await skill_service.core_skills(user)] == ["s1"]
-    assert await skill_service.core_skills(SimpleNamespace()) == []
+    user.core_skills = [{"uuid": "empty", "version": "x"}, {"uuid": "deleted", "version": "x"},
+                        {"uuid": "mine-no-team", "version": pinned["mine-no-team"]}]
+    more = {s.uuid: s for s in await skill_service.core_skill_states(user, access)}
+    assert (more["empty"].status, more["empty"].title) == ("unavailable", "Skill empty")
+    assert more["deleted"].status == "unavailable" and more["deleted"].title is None
+    assert more["mine-no-team"].status == "ok"
+    assert await skill_service.core_skill_states(SimpleNamespace(), access) == []
 
 
 def test_chat_sees_names_and_when_to_use_but_not_the_instructions():
@@ -277,54 +316,143 @@ def test_chat_sees_names_and_when_to_use_but_not_the_instructions():
     assert skill_service.core_skill_instructions([], None) == ""
 
 
-def _core_context(core=("s1",), active=None):
-    conversation = SimpleNamespace(active_skill=active)
-    return SimpleNamespace(deps=SimpleNamespace(user=SimpleNamespace(core_skill_uuids=list(core)), conversation=conversation))
+def test_the_core_list_disappears_the_moment_a_skill_is_selected_mid_run():
+    make = chat_skill_tools.conversation_instructions("BASE", "\nCORE LIST")
+    conversation = SimpleNamespace(active_skill=None)
+    context = SimpleNamespace(deps=SimpleNamespace(conversation=conversation))
+    assert make(context) == "BASE\nCORE LIST"
+    conversation.active_skill = _skill("pinned")
+    assert "CORE LIST" not in make(context) and "Selected Skill (JSON)" in make(context)
+
+
+def _core_context(active=None):
+    return SimpleNamespace(deps=SimpleNamespace(
+        user=SimpleNamespace(), team_access=None, conversation=SimpleNamespace(active_skill=active),
+    ))
 
 
 @pytest.mark.asyncio
-async def test_use_core_skill_loads_only_a_listed_skill_and_yields_to_a_selected_one():
-    with patch.object(skill_service, "snapshot_skill", AsyncMock(return_value=_skill())) as read:
+async def test_use_core_skill_follows_the_same_rules_as_the_listing():
+    State = skill_service.CoreSkillState
+    states = [State("s1", "ok", skill=_skill(title='Award "review"'), title='Award "review"'),
+              State("s2", "changed", skill=_skill("s2"), title="Edited", problem="This Skill was edited after you added it.")]
+    with patch.object(skill_service, "core_skill_states", AsyncMock(return_value=states)) as read:
         loaded = await chat_skill_tools.use_core_skill(_core_context(), "s1")
+        edited = await chat_skill_tools.use_core_skill(_core_context(), "s2")
         other = await chat_skill_tools.use_core_skill(_core_context(), "someone-elses")
         pinned = await chat_skill_tools.use_core_skill(_core_context(active=_skill("pinned")), "s1")
-    assert loaded["status"] == "applied_to_this_reply"
+    assert loaded["status"] == "completed"
     assert loaded["skill"]["instructions"] == "Check every deadline." and loaded["skill"]["version"] == "v1"
-    assert "error" in other and "error" in pinned
-    # Only the listed Skill was ever read; access is rechecked on that read.
-    assert read.await_count == 1
+    # The title is data in the result, never spliced into the instruction sentence.
+    assert 'Award "review"' not in loaded["assistant_instruction"]
+    # An edit nobody accepted is not loaded, even if the model still has the uuid.
+    assert "edited after you added it" in edited["error"] and "skill" not in edited
+    assert "error" in other
+    assert "error" in pinned and read.await_count == 3
+
+
+def test_a_loaded_core_skill_can_be_cleared_from_old_history():
+    assert "use_core_skill" in COMPACTABLE_TOOLS
+
+
+class _Users:
+    def __init__(self, modified=1, matched=1, stored=()):
+        self.calls, self.modified, self.matched, self.stored = [], modified, matched, list(stored)
+
+    async def update_one(self, query, update):
+        self.calls.append((query, update))
+        return SimpleNamespace(modified_count=self.modified, matched_count=self.matched)
+
+    async def find_one(self, query, projection=None):
+        return {"core_skills": [{"uuid": uuid, "version": "v"} for uuid in self.stored]}
 
 
 @pytest.mark.asyncio
-async def test_use_core_skill_reports_lost_access_instead_of_instructions():
-    with patch.object(skill_service, "snapshot_skill", AsyncMock(side_effect=HTTPException(404, "Skill not found or no longer accessible"))):
-        result = await chat_skill_tools.use_core_skill(_core_context(), "s1")
-    assert result == {"error": "Skill not found or no longer accessible"}
+async def test_core_skill_writes_are_single_conditional_updates(monkeypatch):
+    user = SimpleNamespace(id="user-id", core_skills=[])
+    users = _Users()
+    monkeypatch.setattr(skill_service, "_users", lambda: users)
+    assert await skill_service.add_core_skill(user, _skill()) == "added"
+    query, update = users.calls[0]
+    # Not already listed, and under the cap, checked by the database in the same write.
+    assert query == {"_id": "user-id", "core_skills.uuid": {"$ne": "s1"}, "core_skills.4": {"$exists": False}}
+    assert update == {"$push": {"core_skills": {"uuid": "s1", "version": "v1"}}}
+
+    full = _Users(modified=0, stored=["a", "b", "c", "d", "e"])
+    monkeypatch.setattr(skill_service, "_users", lambda: full)
+    assert await skill_service.add_core_skill(user, _skill()) == "full"
+    present = _Users(modified=0, stored=["s1"])
+    monkeypatch.setattr(skill_service, "_users", lambda: present)
+    assert await skill_service.add_core_skill(user, _skill()) == "present"
+
+    monkeypatch.setattr(skill_service, "_users", lambda: users)
+    assert await skill_service.accept_core_skill(user, _skill(version="v2")) is True
+    assert users.calls[-1] == ({"_id": "user-id", "core_skills.uuid": "s1"}, {"$set": {"core_skills.$.version": "v2"}})
+    await skill_service.remove_core_skill(user, "s1")
+    assert users.calls[-1] == ({"_id": "user-id"}, {"$pull": {"core_skills": {"uuid": "s1"}}})
 
 
 @pytest.mark.asyncio
-async def test_core_skill_routes_require_a_when_to_use_line_and_cap_the_list(client):  # noqa: F811
+async def test_core_skill_routes_pin_on_add_and_accept_only_the_text_that_was_shown(client):  # noqa: F811
     cookies, headers = _auth()
     user = _signed_in()
-    user.core_skill_uuids = ["old"]
+    user.core_skills = []
+    user.current_team = None
+    State = skill_service.CoreSkillState
+    page = [State("s1", "changed", skill=_skill(version="v2"), title="Award review", problem="Edited.")]
 
     async def snapshot(uuid, _user):
-        if uuid == "old":
+        if uuid == "gone":
             raise HTTPException(404, "Skill not found or no longer accessible")
-        return _skill(uuid, "Tone" if uuid == "no-line" else "Award review", "" if uuid == "no-line" else "Reviewing a new award notice")
+        return _skill(uuid, "Tone" if uuid == "no-line" else "Award review", "" if uuid == "no-line" else "Reviewing", version="v2")
 
-    with _as(user, _config()), patch.object(skill_service, "snapshot_skill", snapshot):
-        refused = await client.put("/api/assistant/core-skills", json={"uuids": ["no-line"]}, cookies=cookies, headers=headers)
-        too_many = await client.put("/api/assistant/core-skills", json={"uuids": list("abcdef")}, cookies=cookies, headers=headers)
-        # "old" lost access but is already listed, so it does not block adding s1.
-        saved = await client.put("/api/assistant/core-skills", json={"uuids": ["old", "s1", "s1"]}, cookies=cookies, headers=headers)
-    assert refused.status_code == 422 and "When to use" in refused.json()["detail"]
-    assert too_many.status_code == 422
-    assert saved.status_code == 200
-    user.set.assert_awaited_once_with({"core_skill_uuids": ["old", "s1"]})
-    rows = saved.json()["skills"]
-    assert [(r["uuid"], r["usable"]) for r in rows] == [("old", False), ("s1", True)]
-    assert rows[0]["problem"] == "Skill not found or no longer accessible"
+    with _as(user, _config()), patch.object(skill_service, "snapshot_skill", snapshot), \
+         patch.object(skill_service, "core_skill_states", AsyncMock(return_value=page)), \
+         patch.object(skill_service, "reload_core_skills", AsyncMock()), \
+         patch.object(skill_service, "add_core_skill", AsyncMock(side_effect=["added", "full"])) as add, \
+         patch.object(skill_service, "accept_core_skill", AsyncMock(return_value=True)) as accept, \
+         patch.object(skill_service, "remove_core_skill", AsyncMock()) as remove:
+        no_line = await client.post("/api/assistant/core-skills", json={"uuid": "no-line"}, cookies=cookies, headers=headers)
+        gone = await client.post("/api/assistant/core-skills", json={"uuid": "gone"}, cookies=cookies, headers=headers)
+        added = await client.post("/api/assistant/core-skills", json={"uuid": "s1"}, cookies=cookies, headers=headers)
+        full = await client.post("/api/assistant/core-skills", json={"uuid": "s1"}, cookies=cookies, headers=headers)
+        stale = await client.post("/api/assistant/core-skills/s1/accept", json={"version": "v1"}, cookies=cookies, headers=headers)
+        accepted = await client.post("/api/assistant/core-skills/s1/accept", json={"version": "v2"}, cookies=cookies, headers=headers)
+        removed = await client.delete("/api/assistant/core-skills/s1", cookies=cookies, headers=headers)
+    assert no_line.status_code == 422 and "When to use" in no_line.json()["detail"]
+    assert gone.status_code == 404
+    assert added.status_code == 200 and add.await_args_list[0].args[1].version == "v2"
+    assert full.status_code == 422 and "up to 5" in full.json()["detail"]
+    # A second edit made while the person was reading is not accepted unseen.
+    assert stale.status_code == 409 and accept.await_count == 1
+    assert accepted.status_code == 200 and removed.status_code == 200
+    remove.assert_awaited_once()
+    row = added.json()["skills"][0]
+    assert (row["status"], row["usable"], row["version"]) == ("changed", False, "v2")
+    # The new text is shown for review only on an edited Skill.
+    assert row["instructions"] == "Check every deadline."
+
+
+@pytest.mark.asyncio
+async def test_the_picker_offers_library_skills_that_are_not_already_core(client):  # noqa: F811
+    cookies, headers = _auth()
+    user = _signed_in()
+    user.core_skills = [{"uuid": "s1", "version": "v1"}]
+    user.current_team = None
+    items = [
+        {"item_uuid": "s1", "set_type": "prompt", "name": "Award review", "when_to_use": "Reviewing"},
+        {"item_uuid": "s2", "set_type": "prompt", "name": "subaward intake", "when_to_use": "Checking a subaward"},
+        {"item_uuid": "s2", "set_type": "prompt", "name": "subaward intake", "when_to_use": "Checking a subaward"},
+        {"item_uuid": "s3", "set_type": "prompt", "name": "House tone", "when_to_use": None},
+        {"item_uuid": "x1", "set_type": "extraction", "name": "Budget fields"},
+    ]
+    with _as(user, _config()), patch("app.services.library_service.search_libraries", AsyncMock(return_value=items)) as search:
+        response = await client.get("/api/assistant/core-skills/choices?search=a", cookies=cookies, headers=headers)
+    assert response.json() == {"more": False, "choices": [
+        {"uuid": "s3", "title": "House tone", "when_to_use": ""},
+        {"uuid": "s2", "title": "subaward intake", "when_to_use": "Checking a subaward"},
+    ]}
+    assert search.await_args.args[1] == "a" and search.await_args.kwargs["kind"] == "search_set"
 
 
 # ── A whole chat turn (tests.test_chat_output.chat_harness) ──────────────────
@@ -416,3 +544,20 @@ async def test_a_card_waiting_on_a_switched_off_capability_is_retired_and_explai
     assert [p["call_id"] for p in chat_harness.conversation.pending_confirmations] == ["c2"]
     chat_harness.conversation.set.assert_awaited_once()
     assert "Run workflow" in seen["prompt"] and "cancelled" in seen["prompt"]
+
+
+async def test_a_chat_turn_lists_core_skills_only_while_no_skill_is_selected(chat_harness, monkeypatch):  # noqa: F811
+    read = AsyncMock(return_value=[_skill()])
+    monkeypatch.setattr(skill_service, "core_skills", read)
+    seen: dict = {}
+    await _turn(monkeypatch, _recording_agent(seen))
+    assert "Core Skills (JSON)" in seen["instructions"] and '"title": "Award review"' in seen["instructions"]
+    assert "Check every deadline." not in seen["instructions"]
+    read.assert_awaited_once()
+
+    # A selected Skill takes precedence, and nothing is read for the discarded list.
+    read.reset_mock()
+    chat_harness.conversation.active_skill = _skill("pinned", "Pinned")
+    await _turn(monkeypatch, _recording_agent(seen), active_skill=_skill("pinned", "Pinned"))
+    assert "Core Skills (JSON)" not in seen["instructions"] and "Selected Skill (JSON)" in seen["instructions"]
+    read.assert_not_awaited()
