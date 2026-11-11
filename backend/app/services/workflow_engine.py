@@ -2257,7 +2257,7 @@ class DataExportNode(Node):
         if fmt == "csv":
             buf = io.StringIO()
             input_data = _json_rows(input_data)
-            if isinstance(input_data, list) and input_data and isinstance(input_data[0], dict):
+            if isinstance(input_data, list) and input_data and all(isinstance(r, dict) for r in input_data):
                 headers = list(input_data[0].keys())
                 writer = csv.DictWriter(buf, fieldnames=headers)
                 writer.writeheader()
