@@ -506,7 +506,7 @@ def _render_workflow_output(status: dict, format: str, parse_structured: bool) -
                     if parsed is not None:
                         data = parsed
         if isinstance(data, list):
-            if data and isinstance(data[0], dict):
+            if data and all(isinstance(row, dict) for row in data):
                 # Collect keys from ALL items so no columns are missing
                 headers = list(dict.fromkeys(k for row in data for k in row.keys()))
                 writer.writerow(headers)
