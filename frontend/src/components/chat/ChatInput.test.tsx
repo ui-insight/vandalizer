@@ -146,3 +146,35 @@ it('shows the hand cursor on New chat (v5 retest ticket)', () => {
   render(<ChatInput onSend={vi.fn()} onNewChat={vi.fn()} hasMessages />)
   expect(screen.getByRole('button', { name: 'New chat' })).toHaveClass('cursor-pointer')
 })
+
+describe('composer toolbar grouping (support ticket)', () => {
+  const bar = (hasMessages: boolean) => render(
+    <ChatInput
+      onSend={vi.fn()} onModelChange={vi.fn()} onNewChat={vi.fn()} hasMessages={hasMessages}
+      memoryControl={<button type="button">Memory</button>}
+      exportActions={<><button type="button">Copy chat</button><button type="button">Download chat</button></>}
+    />,
+  )
+  // Buttons and dividers in the order they are laid out.
+  const layout = (root: HTMLElement) => Array.from(root.querySelectorAll('.chat-composer-controls button, .chat-composer-controls [role="separator"]'))
+    .map(el => el.getAttribute('role') === 'separator' ? '|' : (el.getAttribute('aria-label') ?? el.textContent ?? '').trim())
+
+  it('puts Add, model and Memory on the left, and New chat, copy, download, a divider, then Send on the right', () => {
+    const { container } = bar(true)
+    const order = layout(container)
+    expect(order.map(name => name.replace(/^Add a source.*/, 'Add').replace(/^Choose chat model.*/, 'Model'))).toEqual(
+      ['Add', 'Model', 'Memory', 'New chat', 'Copy chat', 'Download chat', '|', 'Send message'],
+    )
+    const actions = screen.getByRole('group', { name: 'Conversation actions' })
+    for (const name of ['New chat', 'Copy chat', 'Download chat', 'Send message']) {
+      expect(actions).toContainElement(screen.getByRole('button', { name }))
+    }
+    expect(actions).not.toContainElement(screen.getByRole('button', { name: 'Memory' }))
+  })
+
+  it('draws no divider when Send is the only action', () => {
+    bar(false)
+    expect(screen.queryByRole('separator')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Memory' })).toBeInTheDocument()
+  })
+})

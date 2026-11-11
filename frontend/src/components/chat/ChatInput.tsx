@@ -355,17 +355,25 @@ export function ChatInput({
             </div>
           )}
 
+          {/* Assistant memory: with Add and the model, what the chat works from */}
+          {memoryControl}
+
           {/* Context meter */}
           {contextMeter}
 
           {/* Spacer */}
           <div className="flex-1" />
 
-          {hasMessages && activityControl}
-
-          {/* Assistant memory */}
-          {memoryControl}
+          {/* Everything that acts on this conversation sits together on the
+              right, with Send set apart at the end (support ticket: Memory
+              floated alone mid-bar and New chat, copy and download ran
+              straight into Send). The scroll-down slot keeps its width when
+              empty so the buttons don't shift; here it opens onto the spacer
+              rather than leaving a hole between two buttons. */}
+          <div role="group" aria-label="Conversation actions" className="chat-composer-actions flex shrink-0 items-center gap-1.5">
           {hasMessages && <div className="flex h-8 w-8 shrink-0 items-center justify-center">{navigationControl}</div>}
+
+          {hasMessages && activityControl}
 
           {/* The rail's New chat is an unlabeled icon when the rail is
               collapsed, so the chat offers its own (support ticket). */}
@@ -382,6 +390,8 @@ export function ChatInput({
           )}
 
           {hasMessages && exportActions}
+
+          {hasMessages && <span role="separator" aria-orientation="vertical" className="mx-1 h-5 w-px shrink-0 bg-gray-300" />}
 
           {/* A queued message is also available to touch users while Stop stays reachable. */}
           {isStreaming && onStop && message.trim() && <button type="button" onClick={() => void handleSend()} disabled={disabled || sendDisabled || submitting} aria-label="Queue message" title="Queue message" className="shrink-0 rounded border border-gray-400 bg-white p-2 text-xs text-gray-800 disabled:opacity-50">Queue</button>}
@@ -407,6 +417,7 @@ export function ChatInput({
               <Send className="h-4 w-4" />
             </button>
           )}
+          </div>
         </div>
       </div>
     </div>

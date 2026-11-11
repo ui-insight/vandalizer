@@ -128,18 +128,19 @@ export function MemoryPanel() {
         aria-haspopup="dialog"
         title={paused ? 'Assistant memory is off' : 'Assistant memory is on: what the assistant remembers about you'}
         aria-label={`Assistant memory: ${paused ? 'off' : 'on'}`}
-        className="flex items-center justify-center gap-1 rounded-[var(--ui-radius)] p-1.5 text-gray-600 hover:text-gray-800 transition-colors"
+        className="flex shrink-0 cursor-pointer items-center gap-1 rounded-[30px] border border-gray-300 px-2.5 py-1 text-xs font-medium text-[#555] hover:bg-gray-100 transition-all"
       >
-        <Brain className="h-4 w-4" style={paused ? { opacity: 0.55 } : undefined} />
-        {paused && <span aria-hidden="true" style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600 }}>Off</span>}
+        <Brain className="h-3.5 w-3.5 shrink-0" aria-hidden="true" style={paused ? { opacity: 0.55 } : undefined} />
+        Memory
+        {paused && <span aria-hidden="true" style={{ fontWeight: 700 }}>Off</span>}
       </button>
 
       {open && (
         <div
           role="dialog"
           aria-label="Assistant memory"
-          className="absolute right-0 z-[1000] rounded-[var(--ui-radius)] border bg-white"
-          style={{ bottom: 'calc(100% + 8px)', width: 320, borderColor: 'rgba(0,0,0,0.14)', boxShadow: '0 10px 28px rgba(0,0,0,0.16)' }}
+          className="absolute left-0 z-[1000] rounded-[var(--ui-radius)] border bg-white"
+          style={{ bottom: 'calc(100% + 8px)', width: 320, maxWidth: 'calc(100vw - 32px)', borderColor: 'rgba(0,0,0,0.14)', boxShadow: '0 10px 28px rgba(0,0,0,0.16)' }}
           onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false) }}
         >
           <div style={{ padding: "var(--workspace-space-12) var(--workspace-space-16)", borderBottom: '1px solid #f3f4f6' }}>
