@@ -53,6 +53,8 @@ describe('Assistant settings page', () => {
     expect(locked).not.toBeDisabled()
     expect(locked).toHaveAttribute('aria-checked', 'true')
     expect(locked).toHaveAccessibleDescription(/Currently blocked for all users by an administrator/)
+    // A saved On that is not in effect is captioned, not shown as live.
+    expect(screen.getByText('Blocked')).toBeTruthy()
     fireEvent.click(locked)
     await waitFor(() => expect(setAssistantCapability).toHaveBeenCalledWith('workflows', false))
     expect(screen.getByText('Read your files')).toBeTruthy()

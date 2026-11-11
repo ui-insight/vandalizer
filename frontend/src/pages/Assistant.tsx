@@ -7,8 +7,8 @@ import {
   type AssistantCapability, type AssistantPage,
 } from '../api/assistant'
 
-function Switch({ on, busy, unavailable, label, describedBy, onChange }: {
-  on: boolean; busy?: boolean; unavailable?: boolean; label: string; describedBy?: string; onChange: (next: boolean) => void
+function Switch({ on, busy, unavailable, muted, label, describedBy, onChange }: {
+  on: boolean; busy?: boolean; unavailable?: boolean; muted?: boolean; label: string; describedBy?: string; onChange: (next: boolean) => void
 }) {
   return <button type="button" role="switch" aria-checked={on} aria-label={label} aria-describedby={describedBy}
     aria-busy={busy || undefined} aria-disabled={busy || unavailable || undefined}
@@ -16,7 +16,7 @@ function Switch({ on, busy, unavailable, label, describedBy, onChange }: {
     className="flex min-h-11 shrink-0 items-center gap-2 rounded-md px-1 aria-disabled:cursor-not-allowed"
   >
     <span aria-hidden="true" className="text-sm font-medium text-gray-700">{on ? 'On' : 'Off'}</span>
-    <span aria-hidden="true" className="relative block h-6 w-11 rounded-full transition-colors" style={{ backgroundColor: on ? '#15803d' : '#6b7280' }}>
+    <span aria-hidden="true" className="relative block h-6 w-11 rounded-full transition-colors" style={{ backgroundColor: !on ? '#6b7280' : muted ? '#9ca3af' : '#15803d' }}>
       <span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: on ? 22 : 2 }} />
     </span>
   </button>
@@ -126,8 +126,8 @@ export default function Assistant() {
                 {note && <p id={`assistant-note-${c.id}`} className="mt-2 text-sm text-amber-800"><LockKeyhole className="mr-1 inline h-3.5 w-3.5" aria-hidden="true" />{note}</p>}
               </div>
               <div className="shrink-0 text-right">
-                <span className="block text-xs text-gray-600">{saving === `own:${c.id}` ? 'Saving…' : !verified ? 'Unconfirmed' : 'Saved choice'}</span>
-                <Switch on={c.enabled} busy={busy} unavailable={!verified} label={c.label}
+                <span className="block text-xs text-gray-600">{saving === `own:${c.id}` ? 'Saving…' : !verified ? 'Unconfirmed' : !c.allowed ? 'Blocked' : !c.available ? 'Not set up' : 'Saved choice'}</span>
+                <Switch on={c.enabled} busy={busy} unavailable={!verified} muted={!c.allowed || !c.available} label={c.label}
                   describedBy={[`assistant-description-${c.id}`, note ? `assistant-note-${c.id}` : '', loadError ? 'assistant-settings-unconfirmed' : '', busy ? 'assistant-settings-status' : ''].filter(Boolean).join(' ')}
                   onChange={next => void save(c, next, false)} />
               </div>
@@ -142,7 +142,7 @@ export default function Assistant() {
         <ul className="mt-3 divide-y divide-gray-200 rounded-md border border-gray-200">
           {page.capabilities.map(c => <li key={c.id} className="flex items-center gap-3 px-3 py-2">
             <span className="min-w-0 flex-1 text-sm font-medium text-gray-900">{c.label}</span>
-            <div className="shrink-0 text-right"><span className="block text-xs text-gray-600">{saving === `limit:${c.id}` ? 'Saving…' : !verified ? 'Unconfirmed' : 'Allowed'}</span>
+            <div className="shrink-0 text-right"><span className="block text-xs text-gray-600">{saving === `limit:${c.id}` ? 'Saving…' : !verified ? 'Unconfirmed' : c.allowed ? 'Allowed' : 'Blocked'}</span>
               <Switch on={c.allowed} busy={busy} unavailable={!verified} label={`Allow ${c.label} for everyone`} describedBy={`assistant-limits-help${loadError ? ' assistant-settings-unconfirmed' : ''}${busy ? ' assistant-settings-status' : ''}`} onChange={next => void save(c, next, true)} />
             </div>
           </li>)}
