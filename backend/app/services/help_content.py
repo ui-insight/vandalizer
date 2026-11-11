@@ -27,9 +27,9 @@ HELP_TOPICS: list[dict] = [
         "aliases": ["assistant settings", "what can chat use", "turn off web search", "turn on web search",
                     "disable tools", "enable tools", "chat permissions", "stop chat from"],
         "body": (
-            "The **Assistant** page lists what chat can use, such as searching the web, knowledge "
+            "The **Assistant settings** page lists what chat can use, such as searching the web, knowledge "
             "bases, workflows, Pages, projects and the RA inbox, with a switch for each. Open it "
-            "from the sliders button in the chat composer, from **Assistant** in the account menu, "
+            "from the sliders button in the chat composer, from **Assistant settings** in the account menu, "
             "or at [Assistant settings](/assistant).\n\n"
             "Turning a capability off removes it from your own chats from your next message. "
             "Chat then says the capability is off instead of working around it. Reading your "

@@ -207,7 +207,7 @@ export function TeamsDropdown() {
             className="flex items-center gap-2.5 rounded-md px-3.5 py-2.5 text-sm text-[#111] hover:bg-black/[.04] transition-colors"
           >
             <SlidersHorizontal className="h-4 w-4 shrink-0" style={{ width: 18 }} />
-            <span>Assistant</span>
+            <span>Assistant settings</span>
           </a>
 
           {/* Credentials */}

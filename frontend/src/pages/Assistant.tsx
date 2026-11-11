@@ -20,8 +20,8 @@ function Switch({ on, disabled, label, onChange }: { on: boolean; disabled?: boo
     >
       <span
         aria-hidden="true"
-        className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all"
-        style={{ left: on ? 22 : 2 }}
+        className="absolute top-1/2 h-5 w-5 -translate-y-1/2 rounded-full bg-white shadow transition-all"
+        style={{ left: on ? 'calc(100% - 22px)' : 2 }}
       />
     </button>
   )
@@ -34,7 +34,8 @@ function status(c: AssistantCapability): string | null {
 }
 
 /**
- * Assistant: what chat can use, and the switches for it.
+ * Assistant settings: what chat can use, and the switches for it. (The
+ * workspace's chat tab is itself called "Assistant", hence "settings".)
  *
  * Reached from the chat composer, the account menu and the link chat gives
  * when a request needs something that is off. Deliberately not a left-bar
@@ -80,7 +81,7 @@ export default function Assistant() {
     <PageLayout>
       <div style={{ maxWidth: 820, margin: '0 auto' }}>
         <header style={{ marginBottom: 20 }}>
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: '#111827', margin: 0 }}>Assistant</h1>
+          <h1 style={{ fontSize: 24, fontWeight: 700, color: '#111827', margin: 0 }}>Assistant settings</h1>
           <p style={{ fontSize: 14, color: '#4b5563', margin: '6px 0 0', maxWidth: 640 }}>
             What chat can use when it works for you. Turn off anything you would rather it left alone.
             Changes apply from your next message, and chat still asks before it creates, changes or shares anything.
