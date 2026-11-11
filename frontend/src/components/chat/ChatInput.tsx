@@ -365,7 +365,7 @@ export function ChatInput({
 
           {/* Assistant memory */}
           {memoryControl}
-          {hasMessages && <div className="flex h-8 w-8 shrink-0 items-center justify-center">{navigationControl}</div>}
+          {hasMessages && navigationControl && <div className="flex h-8 w-8 shrink-0 items-center justify-center">{navigationControl}</div>}
 
           {/* The rail's New chat is an unlabeled icon when the rail is
               collapsed, so the chat offers its own (support ticket). */}

@@ -1,4 +1,13 @@
 import { apiFetch } from './client'
+import type { SkillSnapshot } from '../types/chat'
+
+export const CORE_SKILLS_CHANGED = 'assistant-core-skills-changed'
+
+/** Refresh retained chat panels and other tabs after a settings change. */
+export function notifyCoreSkillsChanged() {
+  window.dispatchEvent(new Event(CORE_SKILLS_CHANGED))
+  try { localStorage.setItem(CORE_SKILLS_CHANGED, `${Date.now()}:${Math.random()}`) } catch { /* Storage may be unavailable. */ }
+}
 
 export interface AssistantCapability {
   id: string
@@ -71,9 +80,19 @@ export function getCoreSkillChoices(search: string) {
   return apiFetch<{ choices: CoreSkillChoice[]; more: boolean }>(`/api/assistant/core-skills/choices${query}`)
 }
 
-/** Add a Skill; the server pins the text being accepted. */
-export function addCoreSkill(uuid: string) {
-  return apiFetch<CoreSkillsPage>('/api/assistant/core-skills', { method: 'POST', body: JSON.stringify({ uuid }) })
+/** Core Skills the person has to act on. One that belongs to another team is
+ * working as designed, so it is not counted or announced in chat. */
+export function coreSkillsNeedingAttention(page: CoreSkillsPage | null): CoreSkill[] {
+  return page?.skills.filter(skill => !skill.usable && skill.status !== 'other_team') ?? []
+}
+
+export function getCoreSkillPreview(uuid: string) {
+  return apiFetch<SkillSnapshot>(`/api/assistant/core-skills/${encodeURIComponent(uuid)}/preview`)
+}
+
+/** Add only the instruction version the person reviewed. */
+export function addCoreSkill(uuid: string, version: string) {
+  return apiFetch<CoreSkillsPage>('/api/assistant/core-skills', { method: 'POST', body: JSON.stringify({ uuid, version }) })
 }
 
 /** Accept an edited Skill's text, naming the version the page showed. */

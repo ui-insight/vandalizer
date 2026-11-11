@@ -2,6 +2,8 @@ import './tool-calls.css'
 import { getToolMeta as getMeta, TOOL_META, toolTarget, activeToolLabel } from './toolActivity'
 import { qualityPresentation } from '../../lib/qualityLabels'
 import { completedSkillSelection } from '../../lib/skillSelection'
+import { SkillInstructions } from '../assistant/SkillInstructions'
+import { AssistantSettingsAnchor } from '../assistant/AssistantSettingsLink'
 import { ChatPageCard } from '../artifacts/ChatPageCard'
 import type { ApprovalRecord } from './approvalHistory'
 import { approvalStep, cardActionLabel, useApprovalQueue } from './approvalSteps'
@@ -54,6 +56,24 @@ function CertificationResponseRecovery() {
 }
 
 const CATEGORY_ICON = { read: Search, extract: ScanText, write: Hammer, workflow: Workflow } satisfies Record<ToolCategory, typeof Search>
+
+function CoreSkillDetails({ value }: { value: unknown }) {
+  if (!value || typeof value !== 'object') return null
+  const skill = value as Record<string, unknown>
+  return <div className="mt-3 space-y-2 text-sm text-gray-700">
+    {typeof skill.instructions === 'string' && <details>
+      <summary className="cursor-pointer font-medium underline">View instructions</summary>
+      {typeof skill.when_to_use === 'string' && <p className="my-2"><strong>When to use:</strong> {skill.when_to_use}</p>}
+      <SkillInstructions instructions={skill.instructions} label="Instructions used for this reply" />
+      {typeof skill.version === 'string' && <details className="mt-2">
+        <summary className="cursor-pointer text-gray-600">Version details</summary>
+        <p className="mt-1 text-gray-600">The instruction version recorded for this reply:</p>
+        <code className="break-all text-xs">{skill.version}</code>
+      </details>}
+    </details>}
+    <AssistantSettingsAnchor coreSkills className="inline-block font-medium underline">Manage core Skills</AssistantSettingsAnchor>
+  </div>
+}
 
 // ---------------------------------------------------------------------------
 // Context hints for ACTIVE (in-progress) tools
@@ -382,12 +402,11 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
     case 'select_skill':
       return { text: typeof obj.message === 'string' ? obj.message : 'Skill selection', qualityHint: '' }
     case 'use_core_skill': {
-      // Name the Skill and the version used, so the record does not rest on
-      // the model's own sentence.
+      // Name the Skill from the tool result; the recorded instructions and
+      // version can be inspected below without relying on the model's claim.
       const used = obj.skill as { title?: unknown; version?: unknown } | undefined
       if (!used || typeof used.title !== 'string') return { text: typeof obj.error === 'string' ? obj.error : 'Core Skill not used', qualityHint: '' }
-      const version = typeof used.version === 'string' ? ` (version ${used.version.slice(0, 8)})` : ''
-      return { text: `Used core Skill "${used.title.slice(0, 60)}"${version}`, qualityHint: '' }
+      return { text: `Used “${used.title}” for this reply.`, qualityHint: '' }
     }
     case 'save_to_folder': {
       const t = obj.title ? `"${String(obj.title).slice(0, 40)}"` : 'document'
@@ -1494,6 +1513,7 @@ export function ToolStatusLine({
         </div>
       </div>
       {!(needsConfirmation && name === 'propose_obligations') && (!isActive || activeHint) && (summaryText || unconfirmed) && <p className="agent-tool-summary">{unconfirmed ? 'No result was received for this call.' : summaryText}</p>}
+      {result && name === 'use_core_skill' && !isError && <CoreSkillDetails value={obj?.skill} />}
       {result && !isActive && !isError && !needsConfirmation && !canceled && result.quality && (
         <div className="agent-tool-evaluation"><QualityBadge quality={result.quality} showGrade /></div>
       )}

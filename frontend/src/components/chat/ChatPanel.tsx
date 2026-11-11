@@ -12,6 +12,9 @@ import { ChatInput } from './ChatInput'
 import { AttachmentList } from './AttachmentList'
 import { ChatSkillDialog } from './ChatSkillDialog'
 import { AssistantSettingsLink } from '../assistant/AssistantSettingsLink'
+import { CoreSkillsNotice } from '../assistant/CoreSkillsNotice'
+import { useCoreSkills } from '../../hooks/useCoreSkills'
+import { coreSkillsNeedingAttention } from '../../api/assistant'
 import { ExistingFilesDialog } from '../files/ExistingFilesDialog'
 import { FileProcessingCell, type ProcessingCellDoc } from './FileProcessingCell'
 import { ChatExportActions } from './ChatExportActions'
@@ -63,6 +66,7 @@ interface ChatPanelProps {
 }
 
 export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessageConsumed, initialDraft, onDraftChange, workspaceLabel }: ChatPanelProps) {
+  const coreSkills = useCoreSkills()
   const certification = useCertificationPanelOptional()
   const announceChatWrite = useChatWriteAnnouncer()
   const branding = useBranding()
@@ -963,6 +967,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
             </div>
           </div>
         )}
+        <CoreSkillsNotice page={coreSkills.page} error={coreSkills.error} selectedSkill={activeSkill?.title} />
         <ChatInput
           initialDraft={initialDraft}
           draftInsertion={draftInsertion}
@@ -989,7 +994,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           hasDocuments={fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0 || selectedFolderUuids.length > 0}
           memoryControl={<>
             <MemoryPanel />
-            <AssistantSettingsLink />
+            <AssistantSettingsLink pausedCount={coreSkillsNeedingAttention(coreSkills.page).length} unavailable={!!coreSkills.error} />
           </>}
           activityControl={<ChatActivityPanel conversationUuid={conversationUuid ?? null} refreshKey={`${messages.length}:${pendingApprovals.join(',')}`} busy={isStreaming || isLoadingHistory} onDecide={(m, pageApproval, decision) => handleSend(m, undefined, pageApproval, decision)} />}
           navigationControl={showScrollDown ? <button type="button" onClick={scrollToBottom} aria-label="Scroll to bottom" title="Latest message" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-700 hover:bg-gray-100"><ArrowDown size={18} /></button> : null}

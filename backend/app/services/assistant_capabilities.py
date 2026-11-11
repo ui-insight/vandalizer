@@ -50,7 +50,7 @@ ALWAYS_ON: tuple[Capability, ...] = (
     Capability(
         "guidance", "Plans, help and certification",
         "Keeps a checklist for multi-step requests, answers how-to questions about the app, and runs the "
-        "certification course. The course's exercises also need Extractions and Workflows on.",
+        "certification course. The course's exercises also need “Extractions and compliance checks” and “Workflows” turned on.",
         ("update_plan", "get_app_help", "get_certification_progress", "get_certification_module",
          "get_certification_lesson", "save_certification_position", "provision_certification_lab",
          "check_certification_module", "complete_certification_module", "submit_certification_assessment"),
@@ -75,7 +75,7 @@ CAPABILITIES: tuple[Capability, ...] = (
     ),
     Capability(
         "extractions", "Extractions and compliance checks",
-        "Pulls named fields out of a document with a saved extraction, and checks a document against requirements.",
+        "Pulls details such as sponsor names and award amounts from documents using a saved extraction, and checks requirements.",
         ("list_extraction_sets", "run_extraction", "check_compliance", "create_extraction_from_document"),
     ),
     Capability(
@@ -90,8 +90,8 @@ CAPABILITIES: tuple[Capability, ...] = (
         ("create_automation",),
     ),
     Capability(
-        "validation", "Testing and tuning",
-        "Builds test cases, runs validation, and suggests or applies setting changes that improve accuracy.",
+        "validation", "Check accuracy",
+        "Tests saved extractions, knowledge bases and workflows, and can apply changes to improve their results.",
         ("list_test_cases", "propose_test_case", "run_validation", "list_optimization_recommendations",
          "get_optimization_run", "start_optimization", "apply_optimization", "regenerate_validation_plan"),
     ),
@@ -108,7 +108,7 @@ CAPABILITIES: tuple[Capability, ...] = (
     ),
     Capability(
         "projects", "Projects",
-        "Creates projects, moves files into them, pins tools to them, and builds an award snapshot.",
+        "Creates projects, organizes their files, adds saved workflows and other resources, and summarizes an award.",
         ("create_project", "list_projects", "move_documents_to_project", "list_project_documents",
          "run_pin_on_project", "pin_to_project", "unpin_from_project", "set_project_status", "get_award_snapshot"),
     ),

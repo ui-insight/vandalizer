@@ -5,6 +5,8 @@ import { ChatPanel } from './ChatPanel'
 import type { ChatActivity, ChatMessage, StreamSegment, SkillSnapshot, ToolResultInfo } from '../../types/chat'
 import { pollStatus, searchDocuments, type SearchResult } from '../../api/documents'
 
+vi.mock('../../hooks/useCoreSkills', () => ({ useCoreSkills: () => ({ page: null, error: '' }) }))
+
 const mocks = vi.hoisted(() => ({
   send: vi.fn(),
   resumeQueuedMessages: vi.fn(),

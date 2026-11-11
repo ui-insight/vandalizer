@@ -12,14 +12,14 @@ from app.services import assistant_capabilities, skill_service
 router = APIRouter()
 
 
-class CoreSkillRef(BaseModel):
-    uuid: str = Field(min_length=1, max_length=200)
-
-
 class AcceptedVersion(BaseModel):
     # The version the page showed, so a second edit made while the person was
     # reading is never accepted unseen.
     version: str = Field(min_length=1, max_length=128)
+
+
+class CoreSkillRef(AcceptedVersion):
+    uuid: str = Field(min_length=1, max_length=200)
 
 
 class Switch(BaseModel):
@@ -137,10 +137,18 @@ async def core_skill_choices(search: str = "", user: User = Depends(get_current_
     return {"choices": choices[:50], "more": len(choices) > 50}
 
 
+@router.get("/core-skills/{skill_uuid}/preview", response_model=None)
+async def preview_core_skill(skill_uuid: str, user: User = Depends(get_current_user)) -> dict:
+    """Read the authorized instructions before accepting their exact version."""
+    return (await _addable(skill_uuid, user)).model_dump()
+
+
 @router.post("/core-skills", response_model=None)
 async def add_core_skill(body: CoreSkillRef, user: User = Depends(get_current_user)) -> dict:
     """Add a Skill and pin the text the person is accepting."""
     skill = await _addable(body.uuid, user)
+    if skill.version != body.version:
+        raise HTTPException(status_code=409, detail="This Skill changed while you were reviewing it. Review the updated instructions before adding it.")
     outcome = await skill_service.add_core_skill(user, skill)
     if outcome == "full":
         raise HTTPException(status_code=422, detail=f"You can keep up to {skill_service.MAX_CORE_SKILLS} core Skills. Remove one to add another.")
@@ -153,7 +161,7 @@ async def accept_core_skill(skill_uuid: str, body: AcceptedVersion, user: User =
     """Accept an edited Skill's current text, after the page showed it."""
     skill = await _addable(skill_uuid, user)
     if skill.version != body.version:
-        raise HTTPException(status_code=409, detail="This Skill was edited again. Review the latest text before accepting it.")
+        raise HTTPException(status_code=409, detail="This Skill changed while you were reviewing it. Review the updated instructions below.")
     if not await skill_service.accept_core_skill(user, skill):
         raise HTTPException(status_code=404, detail="That Skill is not one of your core Skills.")
     await skill_service.reload_core_skills(user)

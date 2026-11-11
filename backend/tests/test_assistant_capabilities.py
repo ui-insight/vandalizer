@@ -412,14 +412,22 @@ async def test_core_skill_routes_pin_on_add_and_accept_only_the_text_that_was_sh
          patch.object(skill_service, "add_core_skill", AsyncMock(side_effect=["added", "full"])) as add, \
          patch.object(skill_service, "accept_core_skill", AsyncMock(return_value=True)) as accept, \
          patch.object(skill_service, "remove_core_skill", AsyncMock()) as remove:
-        no_line = await client.post("/api/assistant/core-skills", json={"uuid": "no-line"}, cookies=cookies, headers=headers)
-        gone = await client.post("/api/assistant/core-skills", json={"uuid": "gone"}, cookies=cookies, headers=headers)
-        added = await client.post("/api/assistant/core-skills", json={"uuid": "s1"}, cookies=cookies, headers=headers)
-        full = await client.post("/api/assistant/core-skills", json={"uuid": "s1"}, cookies=cookies, headers=headers)
+        previewed = await client.get("/api/assistant/core-skills/s1/preview", cookies=cookies)
+        missing_preview = await client.get("/api/assistant/core-skills/gone/preview", cookies=cookies)
+        unseen = await client.post("/api/assistant/core-skills", json={"uuid": "s1"}, cookies=cookies, headers=headers)
+        changed_before_add = await client.post("/api/assistant/core-skills", json={"uuid": "s1", "version": "v1"}, cookies=cookies, headers=headers)
+        no_line = await client.post("/api/assistant/core-skills", json={"uuid": "no-line", "version": "v2"}, cookies=cookies, headers=headers)
+        gone = await client.post("/api/assistant/core-skills", json={"uuid": "gone", "version": "v2"}, cookies=cookies, headers=headers)
+        added = await client.post("/api/assistant/core-skills", json={"uuid": "s1", "version": "v2"}, cookies=cookies, headers=headers)
+        full = await client.post("/api/assistant/core-skills", json={"uuid": "s1", "version": "v2"}, cookies=cookies, headers=headers)
         stale = await client.post("/api/assistant/core-skills/s1/accept", json={"version": "v1"}, cookies=cookies, headers=headers)
         accepted = await client.post("/api/assistant/core-skills/s1/accept", json={"version": "v2"}, cookies=cookies, headers=headers)
         removed = await client.delete("/api/assistant/core-skills/s1", cookies=cookies, headers=headers)
     assert no_line.status_code == 422 and "When to use" in no_line.json()["detail"]
+    assert previewed.status_code == 200 and previewed.json()["instructions"] == "Check every deadline."
+    assert previewed.json()["version"] == "v2" and missing_preview.status_code == 404
+    assert unseen.status_code == 422 and changed_before_add.status_code == 409
+    assert add.await_count == 2  # Neither an unseen version nor a concurrent edit is accepted.
     assert gone.status_code == 404
     assert added.status_code == 200 and add.await_args_list[0].args[1].version == "v2"
     assert full.status_code == 422 and "up to 5" in full.json()["detail"]
