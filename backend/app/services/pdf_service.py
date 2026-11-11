@@ -154,7 +154,8 @@ def generate_extraction_pdf(
         ])
 
     col_widths = [2.5 * inch, 4.5 * inch]
-    table = Table(table_data, colWidths=col_widths, repeatRows=1)
+    # splitInRow: a value longer than a page continues on the next one.
+    table = Table(table_data, colWidths=col_widths, repeatRows=1, splitInRow=1)
 
     row_count = len(table_data)
     table_style_cmds = [
@@ -468,31 +469,44 @@ def _split_table_row(line: str) -> list[str]:
     return cells
 
 
-# Past this many columns a portrait page leaves each one too narrow to read
-# (22 columns wrapped one word per line and overflowed the page), so the table
-# is laid out as one Field/Value block per row instead.
-_MAX_TABLE_COLUMNS = 8
+# A grid is the right layout until its columns get too narrow to read. Up to
+# _GRID_ALWAYS_COLUMNS it is always a grid. Past _GRID_NEVER_COLUMNS a
+# portrait page leaves each column about a word wide (22 columns wrapped one
+# word per line and overflowed the page). In between it depends on the
+# content: short values still fit, so the grid is kept unless a row comes out
+# taller than _GRID_MAX_ROW_HEIGHT. Tables that don't get a grid are laid out
+# as one Field/Value block per row.
+_GRID_ALWAYS_COLUMNS = 8
+_GRID_NEVER_COLUMNS = 12
+_GRID_MAX_ROW_HEIGHT = 200.0  # points; a page body is about 650
 
 
 def _table_flowables(headers: list[str], rows: list[list[str]], styles: dict, usable_width: float) -> list:
     """Flowables for a table: a grid, or one Field/Value block per row when too wide."""
-    from reportlab.platypus import Spacer
+    from reportlab.platypus import Paragraph, Spacer
 
     col_count = max(len(headers), max((len(r) for r in rows), default=0))
-    if col_count <= _MAX_TABLE_COLUMNS:
+    if col_count <= _GRID_ALWAYS_COLUMNS:
         return [_build_table_flowable(headers, rows, styles, usable_width)]
-    names: list[str] = []
-    for n, h in enumerate(headers + [""] * (col_count - len(headers)), start=1):
-        name = h or f"Column {n}"
-        # Rows become dicts below; a repeated header would drop a column.
-        names.append(f"{name} ({n})" if name in names else name)
+    if col_count <= _GRID_NEVER_COLUMNS:
+        grid = _build_table_flowable(headers, rows, styles, usable_width)
+        grid.wrap(usable_width, 10_000)
+        if max(grid._rowHeights, default=0) <= _GRID_MAX_ROW_HEIGHT:
+            return [grid]
+
+    names = [h or f"Column {n}" for n, h in enumerate(headers + [""] * (col_count - len(headers)), start=1)]
+    if not rows:
+        # Keep the header visible rather than dropping the table.
+        return [_kv_table_flowable([(name, "") for name in names], styles, usable_width)]
     flow: list = []
-    for row in rows:
+    for n, row in enumerate(rows, start=1):
         if flow:
             flow.append(Spacer(1, 10))
-        flow.append(_kv_table_flowable(dict(zip(names, row + [""] * (col_count - len(row)))), styles, usable_width))
-    # No rows: keep the header visible rather than dropping the table.
-    return flow or [_kv_table_flowable(dict.fromkeys(names, ""), styles, usable_width)]
+        flow.append(Paragraph(f"Row {n} of {len(rows)}", styles["meta"]))
+        # Pairs, not a dict: two columns can share a header.
+        pairs = list(zip(names, row + [""] * (col_count - len(row))))
+        flow.append(_kv_table_flowable(pairs, styles, usable_width))
+    return flow
 
 
 def _build_table_flowable(headers: list[str], rows: list[list[str]], styles: dict, usable_width: float):
@@ -710,11 +724,11 @@ def _header_flowables(title: str, subtitle: str | None, styles: dict) -> list:
     return flow
 
 
-def _kv_table_flowable(data: dict, styles: dict, usable_width: float):
-    """Render a flat dict as a two-column Field/Value table."""
+def _kv_table_flowable(data: dict | list[tuple], styles: dict, usable_width: float):
+    """Render a flat dict (or a list of name/value pairs) as a two-column Field/Value table."""
     headers = ["Field", "Value"]
     rows = []
-    for k, v in data.items():
+    for k, v in (data.items() if isinstance(data, dict) else data):
         if isinstance(v, (dict, list)):
             v_text = json.dumps(v, default=str, indent=2)
         else:
