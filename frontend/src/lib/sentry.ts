@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/react'
+import { NETWORK_ERROR_MESSAGE } from '../api/client'
 
 export function initSentry() {
   const dsn = import.meta.env.VITE_SENTRY_DSN
@@ -36,6 +37,11 @@ export function initSentry() {
       // rejection. UI-facing callers still catch these to show a toast.
       'Request failed',
       'Request timed out',
+      // The same kind of event one step earlier: no response at all (wifi or
+      // VPN drop, laptop waking from sleep). apiFetch turns the browser's
+      // "Failed to fetch" into this message, and a background poll with no
+      // .catch() reported it as an unhandled rejection.
+      NETWORK_ERROR_MESSAGE,
       // pdf.js throws this when an in-flight page render is cancelled
       // (component unmount, doc close, zoom change). Normal behavior.
       'Rendering cancelled',

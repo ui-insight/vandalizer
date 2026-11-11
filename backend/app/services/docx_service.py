@@ -275,7 +275,7 @@ def data_to_docx_bytes(data: object) -> bytes:
 
     if isinstance(data, str):
         doc = markdown_to_docx(data)
-    elif isinstance(data, list) and data and isinstance(data[0], dict):
+    elif isinstance(data, list) and data and all(isinstance(row, dict) for row in data):
         doc = Document()
         for section in doc.sections:
             section.top_margin = section.bottom_margin = Inches(1)
@@ -310,7 +310,12 @@ def data_to_docx_bytes(data: object) -> bytes:
             cells[1].text = json.dumps(v, default=str) if isinstance(v, (dict, list)) else str(v)
         _apply_docx_table_theme(table)
     elif isinstance(data, list):
-        doc = markdown_to_docx("\n".join(f"- {item}" for item in data))
+        # A list that isn't all objects (plain values, or objects mixed with
+        # text) has no columns to share, so it goes out as a bullet list.
+        doc = markdown_to_docx("\n".join(
+            f"- {json.dumps(item, default=str, ensure_ascii=False) if isinstance(item, (dict, list)) else item}"
+            for item in data
+        ))
     else:
         doc = markdown_to_docx("" if data is None else str(data))
 

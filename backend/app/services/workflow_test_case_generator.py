@@ -146,6 +146,10 @@ async def propose_from_history(
     candidates: list[dict] = []
 
     for wr in recent:
+        if not wr.session_id:
+            # A run from before runs had a session_id: a proposal built on it
+            # could not be saved, since saving looks the run up by that id.
+            continue
         if wr.session_id in already_saved_session_ids:
             skipped["duplicates"] += 1
             continue

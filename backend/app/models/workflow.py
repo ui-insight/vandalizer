@@ -162,7 +162,10 @@ class WorkflowResult(Document):
     # Schema: {"code": "context_over_budget", "suggested_action": "convert_to_kb",
     #          "oversize_documents": [{"uuid": ..., "title": ..., "token_count": ...}]}
     error_payload: Optional[dict] = None
-    session_id: str
+    # Every run created today gets one. Rows from before the field existed
+    # (2025) don't have it, and a required field made any query that loaded
+    # one of them raise, so they read back as "".
+    session_id: str = ""
     # LLM model this run started on, snapshotted at dispatch. The model is
     # resolved once per run (user config → system default) and passed to the
     # execution task; a run that pauses at an approval gate loses that argument,
