@@ -83,8 +83,11 @@ async def test_page_approval_saves_the_stored_version_without_calling_the_model(
         patch('app.routers.chat.chat_stream', side_effect=AssertionError('Approval must not invoke the model')),
         patch('app.services.chat_artifact_tools.get_sync_db', return_value=db),
         patch('app.services.chat_service._finalize', new_callable=AsyncMock) as finalized,
+        patch('app.models.system_config.SystemConfig.get_config', new=AsyncMock(return_value=MagicMock(model_dump=lambda: {}))),
     ):
-        users.find_one = AsyncMock(return_value=_make_user('owner'))
+        owner = _make_user('owner')
+        owner.assistant_capabilities_off = []
+        users.find_one = AsyncMock(return_value=owner)
         conversations.find_one = AsyncMock(return_value=conversation)
         for retry in (False, True):
             response = await client.post('/api/chat', json={
@@ -102,6 +105,13 @@ async def test_page_approval_saves_the_stored_version_without_calling_the_model(
             'message': 'Yes, go ahead', 'activity_id': str(activity.id), 'page_approval': preview['_id'],
         }, cookies=cookies, headers=headers)
         assert denied.status_code == 404
+        # Save runs without the model, so the Pages switch is checked on this path too.
+        conversation.uuid = 'chat'
+        owner.assistant_capabilities_off = ['pages']
+        off = await client.post('/api/chat', json={
+            'message': 'Yes, go ahead', 'activity_id': str(activity.id), 'page_approval': preview['_id'],
+        }, cookies=cookies, headers=headers)
+        assert off.status_code == 409 and 'turned off' in off.json()['detail']
     saved = artifacts.get(db, doc['uuid'])
     assert len(saved['revisions']) == 2
     assert artifacts.revision(saved)['html'] == preview['prepared_html']

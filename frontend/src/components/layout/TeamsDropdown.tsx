@@ -199,8 +199,8 @@ export function TeamsDropdown() {
           </Link>
 
           {/* Assistant: what chat can use */}
-          <a
-            href="/assistant"
+          <Link
+            to="/assistant"
             role="menuitem"
             tabIndex={-1}
             onClick={() => closeMenu()}
@@ -208,7 +208,7 @@ export function TeamsDropdown() {
           >
             <SlidersHorizontal className="h-4 w-4 shrink-0" style={{ width: 18 }} />
             <span>Assistant settings</span>
-          </a>
+          </Link>
 
           {/* Credentials */}
           <Link

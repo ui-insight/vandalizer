@@ -49,7 +49,8 @@ ALWAYS_ON: tuple[Capability, ...] = (
     ),
     Capability(
         "guidance", "Plans, help and certification",
-        "Keeps a checklist for multi-step requests, answers how-to questions about the app, and runs the certification course.",
+        "Keeps a checklist for multi-step requests, answers how-to questions about the app, and runs the "
+        "certification course. The course's exercises also need Extractions and Workflows on.",
         ("update_plan", "get_app_help", "get_certification_progress", "get_certification_module",
          "get_certification_lesson", "save_certification_position", "provision_certification_lab",
          "check_certification_module", "complete_certification_module", "submit_certification_assessment"),
@@ -128,34 +129,83 @@ def clean_ids(ids: object) -> list[str]:
     return [c.id for c in CAPABILITIES if c.id in wanted]
 
 
+# A tool that also does another capability's work is withheld when either is
+# off: adding a URL to a knowledge base fetches the page.
+ALSO_REQUIRES: dict[str, tuple[str, ...]] = {
+    "add_url_to_kb": ("web_pages",),
+}
+
+
+def admin_off(system_config_doc: dict | None) -> frozenset[str]:
+    """Capabilities an administrator switched off for the whole deployment."""
+    return frozenset(clean_ids((system_config_doc or {}).get("assistant_capabilities_off")))
+
+
+def own_off(user: Any) -> frozenset[str]:
+    """Capabilities this person switched off for themselves."""
+    return frozenset(clean_ids(getattr(user, "assistant_capabilities_off", None)))
+
+
 def off_for(user: Any, system_config_doc: dict | None) -> frozenset[str]:
     """Capabilities this person's chat goes without: the admin's limit plus their own."""
-    admin = clean_ids((system_config_doc or {}).get("assistant_capabilities_off"))
-    own = clean_ids(getattr(user, "assistant_capabilities_off", None))
-    return frozenset(admin) | frozenset(own)
+    return admin_off(system_config_doc) | own_off(user)
+
+
+def tool_is_off(tool_name: str, off: frozenset[str] | None) -> bool:
+    if not off:
+        return False
+    needed = (_CAPABILITY_OF.get(tool_name), *ALSO_REQUIRES.get(tool_name, ()))
+    return any(capability in off for capability in needed)
 
 
 async def gate(context: RunContext[Any], tool_def: ToolDefinition) -> ToolDefinition | None:
     """Withhold a tool whose capability is off for this request."""
-    off = getattr(context.deps, "capabilities_off", None)
-    if off and _CAPABILITY_OF.get(tool_def.name) in off:
+    if tool_is_off(tool_def.name, getattr(context.deps, "capabilities_off", None)):
         return None
     return tool_def
 
 
-def instructions(off: frozenset[str]) -> str:
-    """Tell chat what is off, so it says so instead of improvising."""
-    names = [c.label for c in CAPABILITIES if c.id in off]
-    if not names:
+def refusal(context: RunContext[Any], capability_id: str) -> dict | None:
+    """For work one tool does on another capability's behalf, where which one
+    is known only from its arguments (a project's pinned workflow, an
+    automation's action): the same answer as if that tool had been withheld."""
+    if capability_id not in (getattr(context.deps, "capabilities_off", None) or ()):
+        return None
+    label = _BY_ID[capability_id].label
+    return {
+        "error": f"{label} is turned off in Assistant settings, so this was not run.",
+        "hint": "Tell the user it is turned off and where to turn it on. Do not try another way.",
+    }
+
+
+def stranded(pending: list | None, off: frozenset[str]) -> list[dict]:
+    """Approval cards that can no longer run: their tool's capability went off."""
+    return [p for p in (pending or []) if isinstance(p, dict) and tool_is_off(str(p.get("tool") or ""), off)]
+
+
+def instructions(own: frozenset[str], admin: frozenset[str] = frozenset()) -> str:
+    """Tell chat what is off and who switched it off, so it says so instead of improvising."""
+    locked = [c.label for c in CAPABILITIES if c.id in admin]
+    personal = [c.label for c in CAPABILITIES if c.id in own and c.id not in admin]
+    if not locked and not personal:
         return ""
-    return (
-        "\n\nThese capabilities are turned off for this person, so their tools are not available to you: "
-        + "; ".join(names)
-        + ". If a request needs one, say that it is turned off and that it can be turned on at "
-        "[Assistant settings](/assistant), unless an administrator has turned it off for everyone. "
+    parts = ["\n\nSome capabilities are turned off, so their tools are not available to you."]
+    if personal:
+        parts.append(
+            " Turned off by this person: " + "; ".join(personal)
+            + ". They can turn these back on at [Assistant settings](/assistant)."
+        )
+    if locked:
+        parts.append(
+            " Turned off for everyone by an administrator: " + "; ".join(locked)
+            + ". This person cannot turn these on; only an administrator can."
+        )
+    parts.append(
+        " If a request needs one, say that it is turned off and who can turn it on. "
         "Do not attempt the task another way, claim you did it, or answer from memory in its place. "
         "Other requests are unaffected."
     )
+    return "".join(parts)
 
 
 def describe(user: Any, system_config_doc: dict | None) -> dict:

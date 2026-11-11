@@ -22,7 +22,9 @@ You can still ask the chat free-form questions. The difference shows up when the
 
 ## Choosing what chat can use
 
-The **Assistant settings** page lists what chat can use, in groups such as **Search the web**, **Knowledge bases**, **Workflows**, **Pages**, **Projects** and **RA inbox**. Open it from the sliders button in the chat composer or from **Assistant settings** in the account menu. Each group has a switch. Turning one off removes it from your chats from your next message, and chat tells you it is off if a request needs it. Reading your files, Skills, the plan checklist, help and certification are always on, and chat still asks for approval before it creates, changes or shares anything.
+The **Assistant settings** page lists what chat can use, in groups such as **Search the web**, **Knowledge bases**, **Workflows**, **Pages**, **Projects** and **RA inbox**. Open it from the sliders button in the chat composer or from **Assistant settings** in the account menu. Each group has a switch. Turning one off removes it from your chats from your next message, and chat tells you it is off if a request needs it. Reading your files, Skills, the plan checklist, help and certification are always on, and chat still asks for approval before it creates, changes or shares anything. The certification exercises need **Extractions** and **Workflows** on.
+
+A switch covers the work, not only the tool. With **Knowledge bases** off, chat does not look up attached or built-in knowledge bases. A project's pinned workflow and a new automation need **Workflows** (or **Extractions**) on, adding a URL to a knowledge base needs **Read a web page** on, and **Save** on a Page preview needs **Pages** on. An approval card that was waiting when its group was turned off is cancelled. A workflow you run still follows its own steps, including any web search step.
 
 Administrators see **Allowed for everyone** on the same page. Turning a group off there removes it for every person on the deployment; people see it as locked.
 

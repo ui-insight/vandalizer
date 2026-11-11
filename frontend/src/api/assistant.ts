@@ -24,12 +24,12 @@ export function getAssistantCapabilities() {
   return apiFetch<AssistantPage>('/api/assistant/capabilities')
 }
 
-/** A person's own switches: the ids to turn off. */
-export function setAssistantCapabilities(off: string[]) {
-  return apiFetch<AssistantPage>('/api/assistant/capabilities', { method: 'PUT', body: JSON.stringify({ off }) })
+/** A person's own switch for one capability. */
+export function setAssistantCapability(id: string, on: boolean) {
+  return apiFetch<AssistantPage>(`/api/assistant/capabilities/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify({ on }) })
 }
 
-/** Admin only: the ids switched off for everyone on this deployment. */
-export function setAssistantCapabilityLimits(off: string[]) {
-  return apiFetch<AssistantPage>('/api/assistant/capabilities/limits', { method: 'PUT', body: JSON.stringify({ off }) })
+/** Admin only: whether one capability is allowed for everyone on this deployment. */
+export function setAssistantCapabilityLimit(id: string, on: boolean) {
+  return apiFetch<AssistantPage>(`/api/assistant/capabilities/${encodeURIComponent(id)}/limit`, { method: 'PUT', body: JSON.stringify({ on }) })
 }
