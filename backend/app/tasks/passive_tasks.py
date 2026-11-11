@@ -414,12 +414,45 @@ def process_scheduled_automations(self) -> dict:
 
 
 class _InputTooLarge(Exception):
-    """The run's documents don't fit the model's input budget (pre-flight)."""
+    """A model provider rejected the run's input as longer than its window."""
 
 
 def _is_context_length_error(exc: Exception) -> bool:
-    """True when a model provider rejected a request as longer than its window."""
-    return "maximum context length" in str(exc).lower()
+    """True when a model provider rejected a request as longer than its window.
+
+    Same wording test as extraction_errors and chat_service.
+    """
+    return "context length" in str(exc).lower()
+
+
+def _explain_context_length_error(db, result_id, steps_data, model, sys_config) -> str:
+    """The message an automation's owner sees after a context-length rejection.
+
+    The interactive run refuses oversize documents before any model call
+    (workflow_tasks.context_overflow_failure). That estimate is deliberately
+    cautious (it sums documents an Extraction step reads one at a time, and
+    pads stored counts), so here it never refuses a run. It is only asked
+    which documents were too large once the provider has already said no.
+    """
+    try:
+        from app.tasks.workflow_tasks import context_overflow_failure
+
+        overflow = context_overflow_failure(db, steps_data, model, sys_config)
+    except Exception:
+        logger.exception("Could not work out which documents overflowed the model")
+        overflow = None
+    if overflow:
+        message, payload = overflow
+        if result_id is not None:
+            db.workflow_result.update_one(
+                {"_id": result_id}, {"$set": {"error_payload": payload}},
+            )
+        return message
+    return (
+        "A step sent the model more text than it can read at once. Give the step "
+        "less to read (fewer or shorter documents, or a Knowledge Base Query step "
+        "in place of whole documents), or choose a model with a larger context window."
+    )
 
 
 @celery_app.task(
@@ -448,6 +481,9 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
     # Bound before the try so the failure handler can reference it even when the
     # run dies before the result document is created.
     result_id = None
+    # Read by the failure path below, which can run before either is built.
+    steps_data: list = []
+    model = None
 
     try:
         # Mark running
@@ -526,25 +562,6 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
             (workflow.get("input_config") or {}).get("default_model")
             or default_model_for_owner(db, sys_config, workflow.get("user_id"))
         )
-
-        # Same oversize pre-flight as a run someone starts by hand. Without it
-        # the provider rejected the request ("Input length exceeds model's
-        # maximum context length"), the event was retried with the same
-        # documents, and each attempt logged an error (Sentry 7761609315).
-        from app.tasks.workflow_tasks import context_overflow_failure
-
-        try:
-            overflow_failure = context_overflow_failure(db, steps_data, model, sys_config)
-        except Exception:
-            # Best-effort, as in execute_workflow_task: never block a valid run.
-            logger.exception("Pre-flight oversize check failed for event %s", event.get("uuid"))
-            overflow_failure = None
-        if overflow_failure:
-            overflow_msg, overflow_payload = overflow_failure
-            db.workflow_result.update_one(
-                {"_id": result_id}, {"$set": {"error_payload": overflow_payload}},
-            )
-            raise _InputTooLarge(overflow_msg)
 
         # Check if the workflow owner is an admin (gates code execution)
         wf_user_id = workflow.get("user_id")
@@ -649,12 +666,16 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
         # level every scheduled run of a misconfigured automation paged Sentry
         # (Sentry 7761609315). execute_workflow_task logs the same failure at
         # warning.
-        # So are documents too large for the model: the pre-flight above, or
-        # the provider's own rejection when a step's input grew past the
-        # window mid-run. The same documents overflow on every retry.
-        _deterministic = (
-            isinstance(e, (WorkflowStepError, TrialSpendBlockedError, _InputTooLarge))
-            or _is_context_length_error(e)
+        # So is input too long for the model: a retry restarts at step 0 on
+        # the same model, was rejected again, and logged an error per attempt
+        # ("Input length (164007) exceeds model's maximum context length").
+        # The owner gets a message they can act on, not the provider's.
+        if _is_context_length_error(e):
+            e = _InputTooLarge(_explain_context_length_error(
+                db, result_id, steps_data, model, sys_config,
+            ))
+        _deterministic = isinstance(
+            e, (WorkflowStepError, TrialSpendBlockedError, _InputTooLarge),
         )
         (logger.warning if _deterministic else logger.error)(
             "Passive execution failed for event %s: %s", event.get("uuid"), e,

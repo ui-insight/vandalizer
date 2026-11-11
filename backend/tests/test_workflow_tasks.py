@@ -1952,3 +1952,43 @@ class TestBudgetHookPassesInFlightSpend:
 
         assert _spend_block_code(TrialUnverifiedError("confirm")) == "email_unverified"
         assert _spend_block_code(TrialBudgetExceededError("spent")) == "budget_exhausted"
+
+
+# ---------------------------------------------------------------------------
+# context_overflow_failure — the oversize pre-flight's message and payload
+# ---------------------------------------------------------------------------
+
+
+class TestContextOverflowFailure:
+    MODELS = {"available_models": [{"name": "qwen3.8", "context_window": 131072}]}
+
+    def _check(self, count, tokens):
+        from app.tasks.workflow_tasks import context_overflow_failure
+
+        db = MagicMock()
+        db.smart_document.find.return_value = [
+            {"uuid": f"d{i}", "title": f"Doc {i}", "token_count": tokens} for i in range(count)
+        ]
+        steps = [
+            {"name": "Document", "data": {"doc_uuids": [f"d{i}" for i in range(count)]}},
+            {"name": "Ask", "tasks": [{"name": "Prompt", "data": {"prompt": "Summarise"}}], "data": {}},
+        ]
+        return context_overflow_failure(db, steps, "qwen3.8", self.MODELS)
+
+    def test_documents_that_fit_return_none(self):
+        assert self._check(2, 1000) is None
+
+    def test_one_oversize_document_is_named(self):
+        message, payload = self._check(1, 200_000)
+
+        assert message.startswith("Doc 0 is too large to read inline")
+        assert payload["code"] == "context_over_budget_convertible"
+        assert payload["overflow_kind"] == "single"
+        assert [d["uuid"] for d in payload["oversize_documents"]] == ["d0"]
+
+    def test_a_package_that_only_overflows_together_reports_the_total(self):
+        message, payload = self._check(4, 40_000)
+
+        assert message.startswith("These 4 documents total ")
+        assert payload["overflow_kind"] == "combined"
+        assert payload["total_tokens"] > payload["input_budget"]

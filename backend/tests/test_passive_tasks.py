@@ -4,6 +4,7 @@ Mocks pymongo DB and service functions to test workflow trigger evaluation logic
 """
 
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -726,9 +727,15 @@ class TestExecuteWorkflowPassiveLogLevel:
 
 
 class TestExecuteWorkflowPassiveOversizeInput:
-    """Documents too large for the model fail an automation run once, with
-    the reason (Sentry 7761609315: "Input length (164007) exceeds model's
-    maximum context length (131072)", retried and logged at error each time)."""
+    """Input too long for the model fails an automation run once, with a
+    reason the owner can act on (Sentry 7761609315: "Input length (164007)
+    exceeds model's maximum context length (131072)", retried and logged at
+    error each time)."""
+
+    REJECTION = RuntimeError(
+        "status_code: 400, model_name: openai/gpt-oss-120b, body: {'detail': {'error': "
+        "{'message': \"Input length (164007) exceeds model's maximum context length (131072).\"}}}"
+    )
 
     def _run(self, *, overflow=None, engine_error=None):
         from app.tasks.passive_tasks import execute_workflow_passive
@@ -751,45 +758,63 @@ class TestExecuteWorkflowPassiveOversizeInput:
 
         with patch("app.tasks.passive_tasks.get_sync_db", return_value=db), \
              patch("app.services.workflow_engine.build_workflow_engine", return_value=engine), \
-             patch("app.tasks.workflow_tasks.context_overflow_failure", return_value=overflow), \
+             patch("app.tasks.workflow_tasks.context_overflow_failure", return_value=overflow) as check, \
              patch("app.tasks.passive_tasks.process_outputs"), \
+             patch("app.services.failure_notifications.notify_workflow_failed") as notify, \
              patch("app.tasks.passive_tasks.logger") as log:
             execute_workflow_passive(str(event_id))
 
         def failed(calls):
             return [c for c in calls if "Passive execution failed" in str(c)]
 
-        event_sets = [c[0][1]["$set"] for c in db.workflow_trigger_event.update_one.call_args_list]
-        result_sets = [c[0][1]["$set"] for c in db.workflow_result.update_one.call_args_list]
-        return failed(log.error.call_args_list), failed(log.warning.call_args_list), event_sets, result_sets, engine
+        return SimpleNamespace(
+            errors=failed(log.error.call_args_list),
+            warnings=failed(log.warning.call_args_list),
+            event_sets=[c[0][1]["$set"] for c in db.workflow_trigger_event.update_one.call_args_list],
+            result_sets=[c[0][1]["$set"] for c in db.workflow_result.update_one.call_args_list],
+            engine=engine, check=check, notify=notify,
+        )
 
-    def test_oversize_documents_fail_before_any_model_call(self):
+    def test_provider_rejection_fails_once_and_names_the_documents(self):
         payload = {"code": "context_over_budget_convertible", "overflow_kind": "combined"}
-        errors, warnings, event_sets, result_sets, engine = self._run(
+        run = self._run(
+            engine_error=self.REJECTION,
             overflow=("These 4 documents total 164,007 tokens", payload),
         )
 
-        engine.execute.assert_not_called()
-        assert errors == [] and len(warnings) == 1
-        assert any(s.get("status") == "failed" for s in event_sets)
-        assert not any(s.get("status") == "pending" for s in event_sets)
-        assert {"error_payload": payload} in result_sets
+        assert run.errors == [] and len(run.warnings) == 1
+        assert any(s.get("status") == "failed" for s in run.event_sets)
+        assert not any(s.get("status") == "pending" for s in run.event_sets)
+        assert {"error_payload": payload} in run.result_sets
         assert any(
-            s.get("status") == "error" and "164,007 tokens" in s.get("error", "")
-            for s in result_sets
+            s.get("status") == "error" and s.get("error") == "These 4 documents total 164,007 tokens"
+            for s in run.result_sets
         )
+        # The owner is told the same thing, not the provider's wording.
+        assert str(run.notify.call_args.kwargs["error"]) == "These 4 documents total 164,007 tokens"
 
-    def test_provider_context_rejection_is_not_retried(self):
-        errors, warnings, event_sets, _result_sets, _engine = self._run(engine_error=RuntimeError(
-            "status_code: 400, model_name: openai/gpt-oss-120b, body: {'detail': {'error': "
-            "{'message': \"Input length (164007) exceeds model's maximum context length (131072).\"}}}"
-        ))
+    def test_provider_rejection_without_oversize_documents_still_explains(self):
+        # A step's input can outgrow the window from earlier steps' output.
+        run = self._run(engine_error=self.REJECTION, overflow=None)
 
-        assert errors == [] and len(warnings) == 1
-        assert not any(s.get("status") == "pending" for s in event_sets)
+        assert run.errors == [] and len(run.warnings) == 1
+        assert not any(s.get("status") == "pending" for s in run.event_sets)
+        errors = [s["error"] for s in run.result_sets if s.get("status") == "error"]
+        assert errors and all("more text than it can read" in e for e in errors)
+        assert not any("status_code" in e for e in errors)
 
-    def test_a_run_that_fits_still_executes(self):
-        _errors, _warnings, event_sets, _result_sets, engine = self._run()
+    def test_the_size_estimate_never_refuses_a_run(self):
+        # The estimate over-counts (it sums documents an Extraction step reads
+        # one at a time), so a run it would flag must still execute.
+        run = self._run(overflow=("These 4 documents total 150,000 tokens", {"code": "x"}))
 
-        engine.execute.assert_called_once()
-        assert any(s.get("status") == "completed" for s in event_sets)
+        run.engine.execute.assert_called_once()
+        run.check.assert_not_called()
+        assert any(s.get("status") == "completed" for s in run.event_sets)
+
+    def test_other_failures_are_still_retried(self):
+        run = self._run(engine_error=RuntimeError("boom"))
+
+        assert len(run.errors) == 1
+        assert any(s.get("status") == "pending" for s in run.event_sets)
+        run.check.assert_not_called()
