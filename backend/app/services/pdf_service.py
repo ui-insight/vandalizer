@@ -154,7 +154,8 @@ def generate_extraction_pdf(
         ])
 
     col_widths = [2.5 * inch, 4.5 * inch]
-    table = Table(table_data, colWidths=col_widths, repeatRows=1)
+    # splitInRow: a value longer than a page continues on the next one.
+    table = Table(table_data, colWidths=col_widths, repeatRows=1, splitInRow=1)
 
     row_count = len(table_data)
     table_style_cmds = [
@@ -468,6 +469,46 @@ def _split_table_row(line: str) -> list[str]:
     return cells
 
 
+# A grid is the right layout until its columns get too narrow to read. Up to
+# _GRID_ALWAYS_COLUMNS it is always a grid. Past _GRID_NEVER_COLUMNS a
+# portrait page leaves each column about a word wide (22 columns wrapped one
+# word per line and overflowed the page). In between it depends on the
+# content: short values still fit, so the grid is kept unless a row comes out
+# taller than _GRID_MAX_ROW_HEIGHT. Tables that don't get a grid are laid out
+# as one Field/Value block per row.
+_GRID_ALWAYS_COLUMNS = 8
+_GRID_NEVER_COLUMNS = 12
+_GRID_MAX_ROW_HEIGHT = 200.0  # points; a page body is about 650
+
+
+def _table_flowables(headers: list[str], rows: list[list[str]], styles: dict, usable_width: float) -> list:
+    """Flowables for a table: a grid, or one Field/Value block per row when too wide."""
+    from reportlab.platypus import Paragraph, Spacer
+
+    col_count = max(len(headers), max((len(r) for r in rows), default=0))
+    if col_count <= _GRID_ALWAYS_COLUMNS:
+        return [_build_table_flowable(headers, rows, styles, usable_width)]
+    if col_count <= _GRID_NEVER_COLUMNS:
+        grid = _build_table_flowable(headers, rows, styles, usable_width)
+        grid.wrap(usable_width, 10_000)
+        if max(grid._rowHeights, default=0) <= _GRID_MAX_ROW_HEIGHT:
+            return [grid]
+
+    names = [h or f"Column {n}" for n, h in enumerate(headers + [""] * (col_count - len(headers)), start=1)]
+    if not rows:
+        # Keep the header visible rather than dropping the table.
+        return [_kv_table_flowable([(name, "") for name in names], styles, usable_width)]
+    flow: list = []
+    for n, row in enumerate(rows, start=1):
+        if flow:
+            flow.append(Spacer(1, 10))
+        flow.append(Paragraph(f"Row {n} of {len(rows)}", styles["meta"]))
+        # Pairs, not a dict: two columns can share a header.
+        pairs = list(zip(names, row + [""] * (col_count - len(row))))
+        flow.append(_kv_table_flowable(pairs, styles, usable_width))
+    return flow
+
+
 def _build_table_flowable(headers: list[str], rows: list[list[str]], styles: dict, usable_width: float):
     from reportlab.platypus import Table, TableStyle
     from reportlab.lib import colors
@@ -497,7 +538,9 @@ def _build_table_flowable(headers: list[str], rows: list[list[str]], styles: dic
     for row in rows:
         data.append([_safe_paragraph(cell, styles["table_cell"]) for cell in row])
 
-    table = Table(data, colWidths=col_widths, repeatRows=1)
+    # splitInRow lets a row taller than a page break across pages; without it
+    # reportlab raises LayoutError and the whole export fails.
+    table = Table(data, colWidths=col_widths, repeatRows=1, splitInRow=1)
     row_count = len(data)
     table.setStyle(TableStyle([
         # Vandalizer brand gold header (#eab308) with black text.
@@ -558,7 +601,7 @@ def _markdown_to_story(text: str, styles: dict, usable_width: float) -> list:
                     break
                 rows.append(_split_table_row(body))
                 i += 1
-            story.append(_build_table_flowable(headers, rows, styles, usable_width))
+            story.extend(_table_flowables(headers, rows, styles, usable_width))
             story.append(Spacer(1, 8))
             continue
 
@@ -681,11 +724,11 @@ def _header_flowables(title: str, subtitle: str | None, styles: dict) -> list:
     return flow
 
 
-def _kv_table_flowable(data: dict, styles: dict, usable_width: float):
-    """Render a flat dict as a two-column Field/Value table."""
+def _kv_table_flowable(data: dict | list[tuple], styles: dict, usable_width: float):
+    """Render a flat dict (or a list of name/value pairs) as a two-column Field/Value table."""
     headers = ["Field", "Value"]
     rows = []
-    for k, v in data.items():
+    for k, v in (data.items() if isinstance(data, dict) else data):
         if isinstance(v, (dict, list)):
             v_text = json.dumps(v, default=str, indent=2)
         else:
@@ -705,7 +748,7 @@ def _kv_table_flowable(data: dict, styles: dict, usable_width: float):
         ])
 
     col_widths = [usable_width * 0.3, usable_width * 0.7]
-    table = Table(data_rows, colWidths=col_widths, repeatRows=1)
+    table = Table(data_rows, colWidths=col_widths, repeatRows=1, splitInRow=1)
     row_count = len(data_rows)
     table.setStyle(TableStyle([
         # Vandalizer brand gold header (#eab308) with black text.
@@ -769,7 +812,7 @@ def render_workflow_pdf(data, title: str = "Workflow Results", subtitle: str | N
                 else:
                     cells.append("" if val is None else str(val))
             rows.append(cells)
-        story.append(_build_table_flowable(headers, rows, styles, usable))
+        story.extend(_table_flowables(headers, rows, styles, usable))
     elif isinstance(parsed_data, dict):
         story.append(_kv_table_flowable(parsed_data, styles, usable))
     elif isinstance(parsed_data, str):

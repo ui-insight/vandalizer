@@ -137,3 +137,108 @@ class TestFormatInline:
         md = "**DATES**\n\n***REQUIRED Components***\n\nMore body text."
         pdf = render_workflow_pdf(md, title="Workflow Results")
         assert pdf.startswith(b"%PDF-")
+
+
+def _pdf_text(pdf: bytes) -> str:
+    import fitz
+
+    with fitz.open(stream=pdf, filetype="pdf") as doc:
+        return "\n".join(page.get_text() for page in doc)
+
+
+class TestWorkflowPdfOversizedTables:
+    """Tables reportlab can't fit on a page used to fail the whole export."""
+
+    def _flowables(self, headers, rows):
+        from app.services.pdf_service import _styles, _table_flowables
+
+        return _table_flowables(headers, rows, _styles(), 470.0)
+
+    def _blocks(self, flowables):
+        from reportlab.platypus import Table
+
+        return [f for f in flowables if isinstance(f, Table)]
+
+    def test_table_with_many_columns_renders_every_value(self):
+        # 22 columns left each one about a word wide; the header row alone
+        # grew taller than the page and reportlab raised LayoutError.
+        rows = [{f"column_{c}": f"value-{r}-{c} " + "padding words " * 6 for c in range(22)} for r in range(8)]
+
+        text = _pdf_text(render_workflow_pdf(rows, title="Wide"))
+
+        for r in range(8):
+            for c in range(22):
+                assert f"value-{r}-{c} " in text
+        assert "Row 8 of 8" in text
+
+    def test_many_columns_become_one_block_per_row(self):
+        headers = [f"h{i}" for i in range(22)]
+        flow = self._flowables(headers, [[f"v{r}-{c}" for c in range(22)] for r in range(3)])
+
+        blocks = self._blocks(flow)
+        assert len(blocks) == 3
+        # Field/Value header + one line per column.
+        assert all(len(b._cellvalues) == 23 for b in blocks)
+
+    def test_markdown_table_with_many_columns_renders(self):
+        md = (
+            "| " + " | ".join(f"h{i}" for i in range(22)) + " |\n"
+            + "|" + "---|" * 22 + "\n"
+            + "| " + " | ".join(f"cell{i} some longer text here" for i in range(22)) + " |\n"
+        )
+
+        text = _pdf_text(render_workflow_pdf(md, title="Wide markdown"))
+
+        assert "cell0 some" in text and "cell21 some" in text
+
+    def test_nine_to_twelve_short_columns_stay_a_grid(self):
+        for cols in (9, 12):
+            headers = [f"c{i}" for i in range(cols)]
+            flow = self._flowables(headers, [[f"v{i}" for i in range(cols)] for _ in range(40)])
+            (grid,) = flow
+            assert len(grid._cellvalues) == 41  # header + 40 rows, one table
+
+    def test_nine_columns_of_long_text_become_blocks(self):
+        headers = [f"c{i}" for i in range(9)]
+        rows = [["a fairly long description of the award " * 8 for _ in range(9)] for _ in range(2)]
+
+        assert len(self._blocks(self._flowables(headers, rows))) == 2
+
+    def test_eight_columns_are_always_a_grid(self):
+        headers = [f"c{i}" for i in range(8)]
+        rows = [["a fairly long description of the award " * 8 for _ in range(8)]]
+
+        (grid,) = self._flowables(headers, rows)
+        assert len(grid._cellvalues) == 2
+
+    def test_wide_table_keeps_columns_that_share_a_header(self):
+        headers = ["a (3)", "a", "a"] + [f"h{i}" for i in range(10)]
+        (block,) = self._blocks(self._flowables(headers, [[f"v{i}" for i in range(13)]]))
+
+        names = [row[0].getPlainText() for row in block._cellvalues[1:]]
+        values = [row[1].getPlainText() for row in block._cellvalues[1:]]
+        assert names == headers
+        assert values == [f"v{i}" for i in range(13)]
+
+    def test_wide_table_with_ragged_or_no_rows(self):
+        headers = [f"h{i}" for i in range(13)]
+
+        (block,) = self._blocks(self._flowables(headers, [["only", "two"]]))
+        assert len(block._cellvalues) == 14
+
+        (empty,) = self._flowables(headers, [])
+        assert len(empty._cellvalues) == 14
+
+    def test_cell_longer_than_a_page_keeps_every_word(self):
+        words = [f"w{i}" for i in range(6000)]
+        long_text = " ".join(words)
+
+        for data in ({"summary": long_text}, [{"a": long_text, "b": "x"}]):
+            found = set(_pdf_text(render_workflow_pdf(data)).split())
+            assert set(words) <= found
+
+    def test_extraction_pdf_value_longer_than_a_page_renders(self):
+        pdf = generate_extraction_pdf(
+            "Long", [_item("summary", "Summary")], {"summary": "word " * 6000}, ["award.pdf"],
+        )
+        assert pdf.startswith(b"%PDF-")
