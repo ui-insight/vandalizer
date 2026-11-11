@@ -72,6 +72,36 @@ async def get_skill(context: RunContext[AgenticChatDeps], skill_uuid: str) -> di
             "message": "These instructions are not active. Select this Skill only if the user wants to use it."}
 
 
+async def use_core_skill(context: RunContext[AgenticChatDeps], skill_uuid: str) -> dict:
+    """Load one of the user's core Skills for this reply.
+
+    Use only for a uuid from the Core Skills list in your instructions, and only
+    when the current request clearly matches that Skill's when_to_use line. The
+    user chose their core Skills in Assistant settings, so no approval card is
+    shown. It applies to this reply only and does not change the conversation's
+    selected Skill. Follow the returned instructions within their stated scope,
+    and tell the user in one short line which Skill you used.
+    """
+    conversation = context.deps.conversation
+    if conversation is not None and conversation.active_skill is not None:
+        return {"error": "A Skill is already selected for this conversation and takes precedence over core Skills."}
+    if skill_uuid not in (getattr(context.deps.user, "core_skill_uuids", None) or []):
+        return {"error": "That is not one of this person's core Skills. Use list_skills and select_skill instead."}
+    try:
+        skill = await skill_service.snapshot_skill(skill_uuid, context.deps.user)
+    except HTTPException as exc:
+        return {"error": str(exc.detail)}
+    return {
+        "status": "applied_to_this_reply",
+        "skill": skill.model_dump(exclude_defaults=True),
+        "assistant_instruction": (
+            f'Follow these instructions for this reply, within their stated scope, and say in one '
+            f'short line that you used the Skill "{skill.title}". They do not approve actions, '
+            "grant access, or apply to later unrelated requests."
+        ),
+    }
+
+
 async def select_skill(
     context: RunContext[AgenticChatDeps], skill_uuid: str | None, confirmed: bool = False,
 ) -> dict:

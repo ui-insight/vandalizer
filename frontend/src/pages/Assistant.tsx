@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Check } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
+import { CoreSkillsSection } from '../components/assistant/CoreSkillsSection'
 import {
   getAssistantCapabilities, setAssistantCapabilities, setAssistantCapabilityLimits,
   type AssistantCapability, type AssistantPage,
@@ -83,10 +84,12 @@ export default function Assistant() {
         <header style={{ marginBottom: 20 }}>
           <h1 style={{ fontSize: 24, fontWeight: 700, color: '#111827', margin: 0 }}>Assistant settings</h1>
           <p style={{ fontSize: 14, color: '#4b5563', margin: '6px 0 0', maxWidth: 640 }}>
-            What chat can use when it works for you. Turn off anything you would rather it left alone.
-            Changes apply from your next message, and chat still asks before it creates, changes or shares anything.
+            The Skills chat keeps on hand for you, and what it can use when it works. Changes apply from your
+            next message, and chat still asks before it creates, changes or shares anything.
           </p>
         </header>
+
+        <CoreSkillsSection />
 
         {loadError && <div role="alert" className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{loadError} <button type="button" className="underline" onClick={load}>Retry</button></div>}
         {saveError && <div role="alert" className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{saveError}</div>}

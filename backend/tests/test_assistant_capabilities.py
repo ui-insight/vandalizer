@@ -189,3 +189,89 @@ async def test_the_real_chat_agent_withholds_every_tool_of_an_off_capability(mon
     every = {fn.__name__ for fn in TOOLS}
     withheld = set(caps._BY_ID["workflows"].tools) | set(caps._BY_ID["web_search"].tools)
     assert offered[0] == every - withheld
+
+
+# ── Core Skills ─────────────────────────────────────────────────────────────
+
+from fastapi import HTTPException  # noqa: E402
+
+from app.schemas.skills import SkillSnapshot  # noqa: E402
+from app.services import chat_skill_tools, skill_service  # noqa: E402
+
+
+def _skill(uuid="s1", title="Award review", when="Reviewing a new award notice"):
+    return SkillSnapshot(uuid=uuid, title=title, version="v1", instructions="Check every deadline.", when_to_use=when)
+
+
+@pytest.mark.asyncio
+async def test_core_skills_skip_what_chat_cannot_use_without_failing_the_turn():
+    user = SimpleNamespace(core_skill_uuids=["s1", "gone", "no-line"])
+    results = {"s1": _skill(), "gone": HTTPException(404, "Skill not found"), "no-line": _skill("no-line", "Tone", "")}
+
+    async def snapshot(uuid, _user):
+        if isinstance(results[uuid], Exception):
+            raise results[uuid]
+        return results[uuid]
+
+    with patch.object(skill_service, "snapshot_skill", snapshot):
+        assert [s.uuid for s in await skill_service.core_skills(user)] == ["s1"]
+    assert await skill_service.core_skills(SimpleNamespace()) == []
+
+
+def test_chat_sees_names_and_when_to_use_but_not_the_instructions():
+    note = skill_service.core_skill_instructions([_skill()], None)
+    assert '"when_to_use": "Reviewing a new award notice"' in note and "use_core_skill" in note
+    assert "Check every deadline." not in note
+    # A Skill selected for the conversation takes precedence: no core list at all.
+    assert skill_service.core_skill_instructions([_skill()], _skill("pinned")) == ""
+    assert skill_service.core_skill_instructions([], None) == ""
+
+
+def _core_context(core=("s1",), active=None):
+    conversation = SimpleNamespace(active_skill=active)
+    return SimpleNamespace(deps=SimpleNamespace(user=SimpleNamespace(core_skill_uuids=list(core)), conversation=conversation))
+
+
+@pytest.mark.asyncio
+async def test_use_core_skill_loads_only_a_listed_skill_and_yields_to_a_selected_one():
+    with patch.object(skill_service, "snapshot_skill", AsyncMock(return_value=_skill())) as read:
+        loaded = await chat_skill_tools.use_core_skill(_core_context(), "s1")
+        other = await chat_skill_tools.use_core_skill(_core_context(), "someone-elses")
+        pinned = await chat_skill_tools.use_core_skill(_core_context(active=_skill("pinned")), "s1")
+    assert loaded["status"] == "applied_to_this_reply"
+    assert loaded["skill"]["instructions"] == "Check every deadline." and loaded["skill"]["version"] == "v1"
+    assert "error" in other and "error" in pinned
+    # Only the listed Skill was ever read; access is rechecked on that read.
+    assert read.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_use_core_skill_reports_lost_access_instead_of_instructions():
+    with patch.object(skill_service, "snapshot_skill", AsyncMock(side_effect=HTTPException(404, "Skill not found or no longer accessible"))):
+        result = await chat_skill_tools.use_core_skill(_core_context(), "s1")
+    assert result == {"error": "Skill not found or no longer accessible"}
+
+
+@pytest.mark.asyncio
+async def test_core_skill_routes_require_a_when_to_use_line_and_cap_the_list(client):  # noqa: F811
+    cookies, headers = _auth()
+    user = _signed_in()
+    user.core_skill_uuids = ["old"]
+
+    async def snapshot(uuid, _user):
+        if uuid == "old":
+            raise HTTPException(404, "Skill not found or no longer accessible")
+        return _skill(uuid, "Tone" if uuid == "no-line" else "Award review", "" if uuid == "no-line" else "Reviewing a new award notice")
+
+    with _as(user, _config()), patch.object(skill_service, "snapshot_skill", snapshot):
+        refused = await client.put("/api/assistant/core-skills", json={"uuids": ["no-line"]}, cookies=cookies, headers=headers)
+        too_many = await client.put("/api/assistant/core-skills", json={"uuids": list("abcdef")}, cookies=cookies, headers=headers)
+        # "old" lost access but is already listed, so it does not block adding s1.
+        saved = await client.put("/api/assistant/core-skills", json={"uuids": ["old", "s1", "s1"]}, cookies=cookies, headers=headers)
+    assert refused.status_code == 422 and "When to use" in refused.json()["detail"]
+    assert too_many.status_code == 422
+    assert saved.status_code == 200
+    user.set.assert_awaited_once_with({"core_skill_uuids": ["old", "s1"]})
+    rows = saved.json()["skills"]
+    assert [(r["uuid"], r["usable"]) for r in rows] == [("old", False), ("s1", True)]
+    assert rows[0]["problem"] == "Skill not found or no longer accessible"

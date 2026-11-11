@@ -10,6 +10,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Upgrade audited frontend and Python dependencies, including the compatible MSAL/cryptography and FastAPI/Starlette stacks. Replace unmaintained PyPDF2 with pypdf and verify saved PDF form values. Chroma's development port now binds to localhost. Three Chroma advisories still have no published fix; see `docs/v5-release-readiness.md` for residual risk and release gates.
 
 ### Added
+- **Core Skills: Skills chat keeps on hand in every conversation.** A Skill applied only after it was picked for a conversation, so an office's standard review method had to be selected in every new chat. **Assistant settings** now starts with **Core Skills**: up to five Library Skills chat always has available.
+  - **Matched, not always loaded.** Chat sees each core Skill's name and **When to use** line. When a request matches, it loads that Skill's instructions for the reply and says which Skill it used. The chat shows a "Using a core Skill" step, which records the Skill version.
+  - **Needs a When to use line.** A Skill without one cannot be added, and the picker says how to add the line in the Library.
+  - **A selected Skill comes first.** A Skill selected in a conversation takes the place of core Skills for that conversation.
+  - **Says when one drops out.** If a core Skill is deleted, access is removed, or its When to use line is cleared, the page shows that chat is not using it and why.
 - **Assistant settings: see what chat can use and turn it on or off.** Nothing in the app showed what chat could reach, and there was no way to stop it using something, such as searching the web. The new **Assistant settings** page lists what chat can use in twelve groups, for example **Search the web**, **Knowledge bases**, **Workflows**, **Pages**, **Projects** and **RA inbox**, each with a short description and a switch. Open it from the sliders button in the chat composer or from **Assistant settings** in the account menu.
   - **Your own switches.** Turning a group off removes it from your chats from your next message. Chat is told what is off, so it says "Search the web is turned off" with a link to the page instead of working around it.
   - **Always on.** Reading your files, Skills, the plan checklist, help and certification have no switch, and approval cards are unaffected.

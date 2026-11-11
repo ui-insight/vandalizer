@@ -25,7 +25,8 @@ HELP_TOPICS: list[dict] = [
         "id": "assistant-settings",
         "title": "Assistant settings: what chat can use",
         "aliases": ["assistant settings", "what can chat use", "turn off web search", "turn on web search",
-                    "disable tools", "enable tools", "chat permissions", "stop chat from"],
+                    "disable tools", "enable tools", "chat permissions", "stop chat from",
+                    "core skills", "core skill", "always use a skill", "default skills"],
         "body": (
             "The **Assistant settings** page lists what chat can use, such as searching the web, knowledge "
             "bases, workflows, Pages, projects and the RA inbox, with a switch for each. Open it "
@@ -35,6 +36,11 @@ HELP_TOPICS: list[dict] = [
             "Chat then says the capability is off instead of working around it. Reading your "
             "files, Skills, the plan checklist, help and certification are always on. "
             "Approval cards are unaffected: chat still asks before it creates, changes or shares anything.\n\n"
+            "**Core Skills**, at the top of the page, are up to five Library Skills chat keeps on "
+            "hand in every conversation. Chat reads each one's name and When to use line and follows "
+            "the Skill's instructions when a request matches, then says which Skill it used. A Skill "
+            "needs a When to use line to be added (Library → the Skill's More actions → Edit). A "
+            "Skill you select in a conversation takes the place of core Skills for that conversation.\n\n"
             "An administrator can turn a capability off for everyone under **Allowed for everyone** "
             "on the same page. A capability an administrator turned off shows as locked, and only "
             "an administrator can turn it back on."

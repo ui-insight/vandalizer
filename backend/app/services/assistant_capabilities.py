@@ -44,8 +44,8 @@ ALWAYS_ON: tuple[Capability, ...] = (
     ),
     Capability(
         "skills", "Skills",
-        "Finds your Library Skills and applies the one you choose.",
-        ("list_skills", "get_skill", "select_skill"),
+        "Finds your Library Skills, applies the one you choose, and uses your core Skills when a task matches.",
+        ("list_skills", "get_skill", "select_skill", "use_core_skill"),
     ),
     Capability(
         "guidance", "Plans, help and certification",

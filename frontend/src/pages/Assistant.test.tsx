@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import type { AssistantPage } from '../api/assistant'
 
 vi.mock('../components/layout/PageLayout', () => ({ PageLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }))
+vi.mock('../components/assistant/CoreSkillsSection', () => ({ CoreSkillsSection: () => null }))
 vi.mock('../api/assistant', () => ({
   getAssistantCapabilities: vi.fn(),
   setAssistantCapabilities: vi.fn(),

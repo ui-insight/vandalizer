@@ -6,9 +6,59 @@ from pydantic import BaseModel, Field
 from app.dependencies import get_current_user
 from app.models.system_config import SystemConfig
 from app.models.user import User
-from app.services import assistant_capabilities
+from app.services import assistant_capabilities, skill_service
 
 router = APIRouter()
+
+
+class CoreSkills(BaseModel):
+    uuids: list[str] = Field(max_length=20)
+
+
+async def _core_skill_page(user: User) -> dict:
+    """What the person listed, including entries chat can no longer use and why."""
+    rows = []
+    for skill_uuid in list(user.core_skill_uuids or []):
+        try:
+            skill = await skill_service.snapshot_skill(skill_uuid, user)
+        except HTTPException as exc:
+            rows.append({"uuid": skill_uuid, "title": None, "when_to_use": "", "usable": False,
+                         "problem": str(exc.detail)})
+            continue
+        rows.append({
+            "uuid": skill.uuid, "title": skill.title, "when_to_use": skill.when_to_use,
+            "usable": bool(skill.when_to_use),
+            "problem": None if skill.when_to_use else "Add a When to use line in the Library so chat knows when to use it.",
+        })
+    return {"skills": rows, "max": skill_service.MAX_CORE_SKILLS}
+
+
+@router.get("/core-skills", response_model=None)
+async def get_core_skills(user: User = Depends(get_current_user)) -> dict:
+    return await _core_skill_page(user)
+
+
+@router.put("/core-skills", response_model=None)
+async def set_core_skills(body: CoreSkills, user: User = Depends(get_current_user)) -> dict:
+    """Replace the person's core Skills. Each must be a Skill they can use, with a When to use line."""
+    uuids = list(dict.fromkeys(body.uuids))
+    if len(uuids) > skill_service.MAX_CORE_SKILLS:
+        raise HTTPException(status_code=422, detail=f"You can keep up to {skill_service.MAX_CORE_SKILLS} core Skills.")
+    kept = set(user.core_skill_uuids or [])
+    for skill_uuid in uuids:
+        if skill_uuid in kept:
+            # Already listed: removing another entry must not be blocked by one
+            # that has since lost access or its When to use line.
+            continue
+        skill = await skill_service.snapshot_skill(skill_uuid, user)
+        if not skill.when_to_use:
+            raise HTTPException(
+                status_code=422,
+                detail=f'Add a When to use line to "{skill.title}" in the Library first, so chat knows when to use it.',
+            )
+    user.core_skill_uuids = uuids
+    await user.set({"core_skill_uuids": uuids})
+    return await _core_skill_page(user)
 
 
 class CapabilitySwitches(BaseModel):

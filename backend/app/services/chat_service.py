@@ -2348,8 +2348,14 @@ async def chat_stream(
     )
     capability_note = assistant_capabilities.instructions(capabilities_off)
     instructions_text += capability_note
-    from app.services.skill_service import skill_instructions
+    from app.services.skill_service import core_skill_instructions, core_skills, skill_instructions
 
+    # Core Skills (Assistant settings): listed by name and "When to use" only,
+    # so five Skills cost a few lines until one matches and is loaded.
+    core_skill_note = (
+        core_skill_instructions(await core_skills(user), active_skill) if user and team_access else ""
+    )
+    instructions_text += core_skill_note
     instructions_text += skill_instructions(active_skill)
     reminder_bundle = "\n\n".join(
         _wrap_system_reminder(b) for b in reminder_blocks if b and b.strip()
@@ -2760,7 +2766,7 @@ async def chat_stream(
             # counts the same base plus the initial selected snapshot.
             from app.services.chat_skill_tools import conversation_instructions
             iter_kwargs["instructions"] = conversation_instructions(
-                _brand_org_text(instruction_base, _org_name) + capability_note
+                _brand_org_text(instruction_base, _org_name) + capability_note + core_skill_note
             )
 
         async with agent.iter(prompt, **iter_kwargs) as agent_run:

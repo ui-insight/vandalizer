@@ -24,6 +24,8 @@ You can still ask the chat free-form questions. The difference shows up when the
 
 The **Assistant settings** page lists what chat can use, in groups such as **Search the web**, **Knowledge bases**, **Workflows**, **Pages**, **Projects** and **RA inbox**. Open it from the sliders button in the chat composer or from **Assistant settings** in the account menu. Each group has a switch. Turning one off removes it from your chats from your next message, and chat tells you it is off if a request needs it. Reading your files, Skills, the plan checklist, help and certification are always on, and chat still asks for approval before it creates, changes or shares anything.
 
+**Core Skills** sit at the top of the same page. Add up to five Library Skills you use for most of your work, such as your office's award review checklist. Chat keeps them on hand in every conversation: it reads each one's name and **When to use** line, follows the Skill's instructions when your request matches, and says which Skill it used. A Skill needs a When to use line before it can be added. A Skill you select in a conversation takes the place of core Skills for that conversation. If a core Skill is deleted, shared access is removed, or its When to use line is cleared, the page shows that chat is no longer using it.
+
 Administrators see **Allowed for everyone** on the same page. Turning a group off there removes it for every person on the deployment; people see it as locked.
 
 ## Reusing instructions with Skills

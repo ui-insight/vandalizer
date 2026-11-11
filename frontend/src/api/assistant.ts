@@ -33,3 +33,27 @@ export function setAssistantCapabilities(off: string[]) {
 export function setAssistantCapabilityLimits(off: string[]) {
   return apiFetch<AssistantPage>('/api/assistant/capabilities/limits', { method: 'PUT', body: JSON.stringify({ off }) })
 }
+
+export interface CoreSkill {
+  uuid: string
+  /** Null when the Skill can no longer be opened. */
+  title: string | null
+  when_to_use: string
+  /** False when chat cannot use it; `problem` says why. */
+  usable: boolean
+  problem: string | null
+}
+
+export interface CoreSkillsPage {
+  skills: CoreSkill[]
+  max: number
+}
+
+export function getCoreSkills() {
+  return apiFetch<CoreSkillsPage>('/api/assistant/core-skills')
+}
+
+/** Replace the person's core Skills with these, in order. */
+export function setCoreSkills(uuids: string[]) {
+  return apiFetch<CoreSkillsPage>('/api/assistant/core-skills', { method: 'PUT', body: JSON.stringify({ uuids }) })
+}

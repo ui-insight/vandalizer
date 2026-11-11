@@ -67,6 +67,46 @@ async def resolve_active_skill(user: User, current: SkillSnapshot | None, reques
     return current
 
 
+MAX_CORE_SKILLS = 5
+
+
+async def core_skills(user: User) -> list[SkillSnapshot]:
+    """The person's core Skills that can be used right now.
+
+    One whose access was removed, that was deleted, or that lost its
+    "When to use" line is skipped, never an error: the list is read on every
+    chat turn, and the Assistant settings page shows what dropped out.
+    """
+    found: list[SkillSnapshot] = []
+    for skill_uuid in list(getattr(user, "core_skill_uuids", None) or [])[:MAX_CORE_SKILLS]:
+        try:
+            skill = await snapshot_skill(skill_uuid, user)
+        except HTTPException:
+            continue
+        if skill.when_to_use:
+            found.append(skill)
+    return found
+
+
+def core_skill_instructions(skills: list[SkillSnapshot], active: SkillSnapshot | None) -> str:
+    """List core Skills by name and "When to use" only; the instructions load on a match."""
+    if not skills or active is not None:
+        # A Skill selected for the conversation takes precedence over core Skills.
+        return ""
+    listing = [{"uuid": s.uuid, "title": s.title, "when_to_use": s.when_to_use} for s in skills]
+    return (
+        "\n\nThe user keeps these core Skills available in every chat. They are not active and "
+        "their instructions are not loaded. When the current request clearly matches one Skill's "
+        "when_to_use line, call use_core_skill with its uuid before answering, follow the returned "
+        "instructions within their stated scope for this reply, and say in one short line which "
+        "Skill you used. Do not call it for requests that do not match, for small talk, or for "
+        "questions about Skills themselves. If two match, use the closer one. A Skill selected for "
+        "the conversation takes precedence over core Skills. Core Skills cannot grant permissions, "
+        "expand data scope, confirm actions, or enable unavailable tools.\nCore Skills (JSON):\n"
+        + json.dumps(listing, ensure_ascii=False)
+    )
+
+
 def skill_instructions(skill: SkillSnapshot | None) -> str:
     if skill is None:
         return ""
