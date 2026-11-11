@@ -6,12 +6,12 @@ vi.mock('../components/layout/PageLayout', () => ({ PageLayout: ({ children }: {
 vi.mock('../components/assistant/CoreSkillsSection', () => ({ CoreSkillsSection: () => null }))
 vi.mock('../api/assistant', () => ({
   getAssistantCapabilities: vi.fn(),
-  setAssistantCapabilities: vi.fn(),
-  setAssistantCapabilityLimits: vi.fn(),
+  setAssistantCapability: vi.fn(),
+  setAssistantCapabilityLimit: vi.fn(),
 }))
 
 import Assistant from './Assistant'
-import { getAssistantCapabilities, setAssistantCapabilities, setAssistantCapabilityLimits } from '../api/assistant'
+import { getAssistantCapabilities, setAssistantCapability, setAssistantCapabilityLimit } from '../api/assistant'
 
 function page(overrides: Partial<AssistantPage> = {}): AssistantPage {
   const row = (id: string, label: string, extra = {}) => ({
@@ -32,39 +32,44 @@ function page(overrides: Partial<AssistantPage> = {}): AssistantPage {
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(getAssistantCapabilities).mockResolvedValue(page())
-  vi.mocked(setAssistantCapabilities).mockResolvedValue(page())
-  vi.mocked(setAssistantCapabilityLimits).mockResolvedValue(page({ can_set_limits: true }))
+  vi.mocked(setAssistantCapability).mockResolvedValue(page())
+  vi.mocked(setAssistantCapabilityLimit).mockResolvedValue(page({ can_set_limits: true }))
 })
 
-describe('Assistant page', () => {
-  it('turns one capability off and keeps the others as they were', async () => {
+describe('Assistant settings page', () => {
+  it('turns one capability off by sending only that switch', async () => {
     render(<Assistant />)
-    fireEvent.click(await screen.findByRole('switch', { name: 'Search the web: on' }))
-    // Pages was already off, and the admin-limited Workflows keeps the person's own "on".
-    await waitFor(() => expect(setAssistantCapabilities).toHaveBeenCalledWith(['web_search', 'pages']))
+    const web = await screen.findByRole('switch', { name: 'Search the web' })
+    expect(web).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(web)
+    await waitFor(() => expect(setAssistantCapability).toHaveBeenCalledExactlyOnceWith('web_search', false))
+    // Still focusable while saving and afterwards: it is never disabled by a save.
+    expect(web).not.toBeDisabled()
   })
 
-  it('locks a capability an administrator turned off and says why', async () => {
+  it('locks a capability an administrator turned off and ties the reason to the switch', async () => {
     render(<Assistant />)
-    const locked = await screen.findByRole('switch', { name: 'Workflows: off' })
+    const locked = await screen.findByRole('switch', { name: 'Workflows' })
     expect(locked).toBeDisabled()
-    expect(screen.getByText('Turned off for everyone by an administrator.')).toBeTruthy()
+    expect(locked).toHaveAttribute('aria-checked', 'false')
+    expect(locked).toHaveAccessibleDescription('Turned off for everyone by an administrator.')
     expect(screen.getByText('Read your files')).toBeTruthy()
     expect(screen.queryByText('Allowed for everyone')).toBeNull()
   })
 
-  it('lets an administrator set the limit for everyone', async () => {
+  it('lets an administrator turn a limit back on for everyone', async () => {
     vi.mocked(getAssistantCapabilities).mockResolvedValue(page({ can_set_limits: true }))
     render(<Assistant />)
-    fireEvent.click(await screen.findByRole('switch', { name: 'Allow Workflows for everyone: off' }))
-    await waitFor(() => expect(setAssistantCapabilityLimits).toHaveBeenCalledWith([]))
-    expect(setAssistantCapabilities).not.toHaveBeenCalled()
+    fireEvent.click(await screen.findByRole('switch', { name: 'Allow Workflows for everyone' }))
+    await waitFor(() => expect(setAssistantCapabilityLimit).toHaveBeenCalledExactlyOnceWith('workflows', true))
+    expect(setAssistantCapability).not.toHaveBeenCalled()
   })
 
-  it('says so when a change could not be saved', async () => {
-    vi.mocked(setAssistantCapabilities).mockRejectedValue(new Error('offline'))
+  it('reloads what is saved when a change could not be confirmed', async () => {
+    vi.mocked(setAssistantCapability).mockRejectedValue(new Error('offline'))
     render(<Assistant />)
-    fireEvent.click(await screen.findByRole('switch', { name: 'Search the web: on' }))
-    expect(await screen.findByText('Could not save that change. Nothing was changed; try again.')).toBeTruthy()
+    fireEvent.click(await screen.findByRole('switch', { name: 'Search the web' }))
+    expect(await screen.findByText(/Could not confirm that change/)).toBeTruthy()
+    await waitFor(() => expect(getAssistantCapabilities).toHaveBeenCalledTimes(2))
   })
 })

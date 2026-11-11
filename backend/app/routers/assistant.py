@@ -15,62 +15,20 @@ class CoreSkills(BaseModel):
     uuids: list[str] = Field(max_length=20)
 
 
-async def _core_skill_page(user: User) -> dict:
-    """What the person listed, including entries chat can no longer use and why."""
-    rows = []
-    for skill_uuid in list(user.core_skill_uuids or []):
-        try:
-            skill = await skill_service.snapshot_skill(skill_uuid, user)
-        except HTTPException as exc:
-            rows.append({"uuid": skill_uuid, "title": None, "when_to_use": "", "usable": False,
-                         "problem": str(exc.detail)})
-            continue
-        rows.append({
-            "uuid": skill.uuid, "title": skill.title, "when_to_use": skill.when_to_use,
-            "usable": bool(skill.when_to_use),
-            "problem": None if skill.when_to_use else "Add a When to use line in the Library so chat knows when to use it.",
-        })
-    return {"skills": rows, "max": skill_service.MAX_CORE_SKILLS}
+class Switch(BaseModel):
+    on: bool
 
 
-@router.get("/core-skills", response_model=None)
-async def get_core_skills(user: User = Depends(get_current_user)) -> dict:
-    return await _core_skill_page(user)
-
-
-@router.put("/core-skills", response_model=None)
-async def set_core_skills(body: CoreSkills, user: User = Depends(get_current_user)) -> dict:
-    """Replace the person's core Skills. Each must be a Skill they can use, with a When to use line."""
-    uuids = list(dict.fromkeys(body.uuids))
-    if len(uuids) > skill_service.MAX_CORE_SKILLS:
-        raise HTTPException(status_code=422, detail=f"You can keep up to {skill_service.MAX_CORE_SKILLS} core Skills.")
-    kept = set(user.core_skill_uuids or [])
-    for skill_uuid in uuids:
-        if skill_uuid in kept:
-            # Already listed: removing another entry must not be blocked by one
-            # that has since lost access or its When to use line.
-            continue
-        skill = await skill_service.snapshot_skill(skill_uuid, user)
-        if not skill.when_to_use:
-            raise HTTPException(
-                status_code=422,
-                detail=f'Add a When to use line to "{skill.title}" in the Library first, so chat knows when to use it.',
-            )
-    user.core_skill_uuids = uuids
-    await user.set({"core_skill_uuids": uuids})
-    return await _core_skill_page(user)
-
-
-class CapabilitySwitches(BaseModel):
-    # Ids to switch off; anything not listed is on.
-    off: list[str] = Field(max_length=50)
-
-
-def _checked(ids: list[str]) -> list[str]:
-    cleaned = assistant_capabilities.clean_ids(ids)
-    if len(cleaned) != len(set(ids)):
+def _known(capability_id: str) -> str:
+    if assistant_capabilities.clean_ids([capability_id]) != [capability_id]:
         raise HTTPException(status_code=422, detail="Unknown capability.")
-    return cleaned
+    return capability_id
+
+
+def _toggle(capability_id: str, on: bool) -> dict:
+    # One capability per request, applied in the database: two tabs, or two
+    # administrators, changing different switches never overwrite each other.
+    return {"$pull" if on else "$addToSet": {"assistant_capabilities_off": capability_id}}
 
 
 async def _page(user: User, config: SystemConfig) -> dict:
@@ -84,31 +42,35 @@ async def get_capabilities(user: User = Depends(get_current_user)) -> dict:
     return await _page(user, await SystemConfig.get_config())
 
 
-@router.put("/capabilities", response_model=None)
-async def set_capabilities(body: CapabilitySwitches, user: User = Depends(get_current_user)) -> dict:
-    """A person's own switches. They apply from their next message."""
-    user.assistant_capabilities_off = _checked(body.off)
-    await user.set({"assistant_capabilities_off": user.assistant_capabilities_off})
+@router.put("/capabilities/{capability_id}", response_model=None)
+async def set_capability(capability_id: str, body: Switch, user: User = Depends(get_current_user)) -> dict:
+    """A person's own switch. It applies from their next message."""
+    await user.update(_toggle(_known(capability_id), body.on))
     return await _page(user, await SystemConfig.get_config())
 
 
-@router.put("/capabilities/limits", response_model=None)
-async def set_capability_limits(body: CapabilitySwitches, user: User = Depends(get_current_user)) -> dict:
+@router.put("/capabilities/{capability_id}/limit", response_model=None)
+async def set_capability_limit(capability_id: str, body: Switch, user: User = Depends(get_current_user)) -> dict:
     """An admin's limit for everyone on this deployment."""
     if not user.is_admin:
         raise HTTPException(status_code=403, detail="Only an administrator can change what chat may use for everyone.")
+    capability_id = _known(capability_id)
     config = await SystemConfig.get_config()
-    off = _checked(body.off)
     before = assistant_capabilities.clean_ids(config.assistant_capabilities_off)
-    if off != before:
-        await config.set({"assistant_capabilities_off": off, "updated_by": user.user_id})
-        config.assistant_capabilities_off = off
+    if (capability_id not in before) != body.on:
+        import datetime
+
         from app.models.audit_log import AdminAuditLog
 
-        labels = [c.label for c in assistant_capabilities.CAPABILITIES if c.id in off]
+        await config.update({
+            **_toggle(capability_id, body.on),
+            "$set": {"updated_by": user.user_id, "updated_at": datetime.datetime.now(tz=datetime.timezone.utc)},
+        })
+        after = assistant_capabilities.clean_ids(config.assistant_capabilities_off)
+        label = next(c.label for c in assistant_capabilities.CAPABILITIES if c.id == capability_id)
         await AdminAuditLog(
             user_id=user.user_id, action="update_assistant_capability_limits",
-            detail="Chat capabilities switched off for everyone: " + (", ".join(labels) or "(none)"),
-            payload={"before": before, "after": off},
+            detail=f"{label} turned {'on' if body.on else 'off'} in chat for everyone",
+            payload={"capability": capability_id, "on": body.on, "before": before, "after": after},
         ).insert()
     return await _page(user, config)

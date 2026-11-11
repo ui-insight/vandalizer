@@ -3,19 +3,26 @@ import { Check } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
 import { CoreSkillsSection } from '../components/assistant/CoreSkillsSection'
 import {
-  getAssistantCapabilities, setAssistantCapabilities, setAssistantCapabilityLimits,
+  getAssistantCapabilities, setAssistantCapability, setAssistantCapabilityLimit,
   type AssistantCapability, type AssistantPage,
 } from '../api/assistant'
 
-function Switch({ on, disabled, label, onChange }: { on: boolean; disabled?: boolean; label: string; onChange: (next: boolean) => void }) {
+function Switch({ on, locked, busy, label, describedBy, onChange }: {
+  on: boolean; locked?: boolean; busy?: boolean; label: string; describedBy?: string; onChange: (next: boolean) => void
+}) {
+  // The name stays the same in both states; aria-checked carries the state.
+  // While a save is in flight the switch ignores clicks but stays focusable,
+  // so keyboard focus is not dropped after every change.
   return (
     <button
       type="button"
       role="switch"
       aria-checked={on}
       aria-label={label}
-      disabled={disabled}
-      onClick={() => onChange(!on)}
+      aria-describedby={describedBy}
+      aria-busy={busy || undefined}
+      disabled={locked}
+      onClick={() => { if (!busy) onChange(!on) }}
       className="relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50"
       style={{ backgroundColor: on ? '#15803d' : '#9ca3af' }}
     >
@@ -60,23 +67,16 @@ export default function Assistant() {
     try {
       setPage(await request)
     } catch {
-      setSaveError('Could not save that change. Nothing was changed; try again.')
+      // The request may have reached the server before failing, so show what is stored.
+      setSaveError('Could not confirm that change. The switches below show what is saved; try again if one is wrong.')
+      load()
     } finally {
       setSaving(null)
     }
   }
 
-  const toggleOwn = (c: AssistantCapability, next: boolean) => {
-    if (!page) return
-    const off = page.capabilities.filter(x => (x.id === c.id ? !next : !x.enabled)).map(x => x.id)
-    void save(`own:${c.id}`, setAssistantCapabilities(off))
-  }
-
-  const toggleLimit = (c: AssistantCapability, next: boolean) => {
-    if (!page) return
-    const off = page.capabilities.filter(x => (x.id === c.id ? !next : !x.allowed)).map(x => x.id)
-    void save(`limit:${c.id}`, setAssistantCapabilityLimits(off))
-  }
+  const toggleOwn = (c: AssistantCapability, next: boolean) => void save(`own:${c.id}`, setAssistantCapability(c.id, next))
+  const toggleLimit = (c: AssistantCapability, next: boolean) => void save(`limit:${c.id}`, setAssistantCapabilityLimit(c.id, next))
 
   return (
     <PageLayout>
@@ -106,12 +106,14 @@ export default function Assistant() {
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-semibold text-gray-900">{c.label}</div>
                       <div className="mt-0.5 text-sm text-gray-600">{c.description}</div>
-                      {note && <div className="mt-1 text-sm text-amber-800">{note}</div>}
+                      {note && <div id={`assistant-note-${c.id}`} className="mt-1 text-sm text-amber-800">{note}</div>}
                     </div>
                     <Switch
                       on={c.enabled && c.allowed && c.available}
-                      disabled={!!note || saving !== null}
-                      label={`${c.label}: ${c.active ? 'on' : 'off'}`}
+                      locked={!!note}
+                      busy={saving !== null}
+                      label={c.label}
+                      describedBy={note ? `assistant-note-${c.id}` : undefined}
                       onChange={next => toggleOwn(c, next)}
                     />
                   </li>
@@ -140,6 +142,7 @@ export default function Assistant() {
               <h2 id="assistant-limits" className="mb-1 text-base font-semibold text-gray-900">Allowed for everyone</h2>
               <p className="mb-2 text-sm text-gray-600">
                 Administrators only. Turning one off removes it from chat for every person on this deployment, whatever they chose above.
+                The certification course's exercises need Extractions and Workflows.
               </p>
               <ul className="divide-y divide-gray-200 rounded-lg border border-gray-200 bg-white">
                 {page.capabilities.map(c => (
@@ -147,8 +150,8 @@ export default function Assistant() {
                     <div className="min-w-0 flex-1 text-sm font-medium text-gray-900">{c.label}</div>
                     <Switch
                       on={c.allowed}
-                      disabled={saving !== null}
-                      label={`Allow ${c.label} for everyone: ${c.allowed ? 'on' : 'off'}`}
+                      busy={saving !== null}
+                      label={`Allow ${c.label} for everyone`}
                       onChange={next => toggleLimit(c, next)}
                     />
                   </li>
