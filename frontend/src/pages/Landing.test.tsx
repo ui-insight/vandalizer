@@ -68,6 +68,21 @@ describe('Landing — trial signup form', () => {
     expect(screen.getByRole('button', { name: 'Create account' })).toBeInTheDocument()
   })
 
+  it('greets a new user on the Create account form, not with "Welcome back" (support ticket)', async () => {
+    mockGetAuthConfig.mockResolvedValue(config({ auth_methods: ['password'] }))
+    render(<Landing />)
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog).toHaveTextContent('Welcome back')
+    expect(dialog).toHaveTextContent('Continue with Vandalizer.')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Create account' }))
+    await waitFor(() => expect(document.querySelector('#landing-register-email')).not.toBeNull())
+    expect(dialog).toHaveTextContent('Get started')
+    expect(screen.getByRole('heading', { name: 'Create your Vandalizer account.' })).toBeInTheDocument()
+    expect(dialog).not.toHaveTextContent('Welcome back')
+  })
+
   it('opens in register mode when the URL carries register=1', async () => {
     mockSearch = { register: '1' }
     mockGetAuthConfig.mockResolvedValue(config({ auth_methods: ['password'] }))
@@ -191,5 +206,17 @@ describe('Landing — phone menu', () => {
     // Focus goes back to the button, not lost with the unmounted link.
     expect(screen.getByRole('button', { name: 'Open menu' })).toHaveFocus()
     await waitFor(() => expect(mockGetAuthConfig).toHaveBeenCalled())
+  })
+})
+
+describe('Landing — sign-in dialog heading', () => {
+  it('does not promise account creation where there is no form to create one', async () => {
+    // Single sign-on only, trial system off: /register still deep-links here.
+    mockSearch = { register: '1' }
+    mockGetAuthConfig.mockResolvedValue({ auth_methods: ['oauth'], oauth_providers: [], trial_system_enabled: false } as AuthConfig)
+    render(<Landing />)
+    await waitFor(() => expect(mockGetAuthConfig).toHaveBeenCalled())
+    await waitFor(() => expect(screen.getByRole('heading', { name: /Continue with/ })).toBeInTheDocument())
+    expect(screen.queryByRole('heading', { name: /Create your/ })).not.toBeInTheDocument()
   })
 })

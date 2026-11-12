@@ -49,7 +49,7 @@ export function TrialVerifyBanner() {
   return (
     <div
       role="status"
-      className="flex flex-wrap items-center gap-3 border-b border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-200"
+      className="flex flex-wrap items-center gap-3 border-b border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-950"
     >
       <MailCheck className="h-4 w-4 shrink-0" aria-hidden="true" />
       <span className="flex-1 min-w-[16rem]">
@@ -63,13 +63,13 @@ export function TrialVerifyBanner() {
           type="button"
           onClick={resend}
           disabled={sending}
-          className="inline-flex items-center gap-1.5 rounded-md border border-amber-400/40 px-3 py-1 font-semibold hover:bg-amber-500/20 disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-md border border-amber-700 bg-white px-3 py-1 font-semibold text-amber-950 hover:bg-amber-100 disabled:opacity-50"
         >
           {sending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
           Resend link
         </button>
       )}
-      {error && <span role="alert" className="basis-full text-red-300">{error}</span>}
+      {error && <span role="alert" className="basis-full text-red-800">{error}</span>}
     </div>
   )
 }
