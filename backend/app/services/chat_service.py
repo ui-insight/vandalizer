@@ -2704,6 +2704,7 @@ async def chat_stream(
             system_config_doc=sys_config_doc,
             model_name=model_name,
             context_document_uuids=effective_doc_uuids,
+            attachment_texts=[a.content for a in file_attachments if a.content],
             active_kb_uuid=active_kbs[0][0] if active_kbs else None,
             active_project_uuid=project_uuid,
             capabilities_off=capabilities_off,

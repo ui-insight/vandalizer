@@ -48,11 +48,24 @@ _AMOUNT_THEN_YEAR = re.compile(rf"({_MONEY})\s*(?:\(|in\s+|for\s+|during\s+)?\s*
 # "Year 1: $8,000", "Y4 $12k".
 _YEAR_THEN_AMOUNT = re.compile(rf"\b{_YEAR}\s*(?::|=|–|—|-|is|was|of)?\s*({_MONEY})", re.I)
 # A sentence about a change pairs a year with a difference, not with a cell.
+# Whole words: a bare prefix here ("per", "over", "up") would also match
+# Personnel, overhead and update, and skip the very sentences worth checking.
 _CHANGE = re.compile(
-    r"\b(?:increas|decreas|ris(?:e|es|ing)|rose|drop|fell|falls?|grow|grew|more|less|"
-    r"higher|lower|differ|change|up|down|by|over|under|short|above|below|exceed|average|per)\w*\b",
+    r"\b(?:increas\w*|decreas\w*|ris(?:e|es|ing)|rose|drop\w*|fell|falls?|grow\w*|grew|more|less|"
+    r"higher|lower|differ\w*|chang\w*|up|down|by|over|under|short|above|below|exceed\w*|averag\w*|per)\b",
     re.I,
 )
+# Rows whose years are not meant to add up to their total column.
+_NON_ADDITIVE = re.compile(
+    r"\b(?:average|avg|mean|median|rate|ratio|percent\w*|pct|fte|effort|headcount|months?|"
+    r"cumulative|running|balance|per)\b|%",
+    re.I,
+)
+# Row labels too general to tie a sentence to one row ("among other things").
+_VAGUE_LABELS = frozenset({"other", "others", "misc", "miscellaneous"})
+#: Above this many labelled rows the sentence check is skipped: it compares
+#: every sentence with every row.
+MAX_PROSE_ROWS = 500
 
 
 @dataclass(frozen=True)
@@ -61,9 +74,13 @@ class _Stated:
 
     value: Decimal
     tolerance: Decimal = Decimal(0)
+    # The unit of the last digit written: "$53,045" for a cell holding
+    # 53,045.27 is the same figure, shown without its cents.
+    unit: Decimal = Decimal(1)
 
     def matches(self, cell: Decimal) -> bool:
-        return abs(self.value - cell) <= self.tolerance
+        difference = abs(self.value - cell)
+        return difference <= self.tolerance or difference < self.unit
 
 
 def _stated(text: str) -> _Stated | None:
@@ -82,7 +99,7 @@ def _stated(text: str) -> _Stated | None:
     if raw.startswith(("-", "(")):
         value = -value
     if not scale:
-        return _Stated(value)
+        return _Stated(value, unit=Decimal(1) / (Decimal(10) ** (len(fraction) - 1 if fraction else 0)))
     unit = Decimal(_SCALES[scale.lower()])
     places = len(fraction) - 1 if fraction else 0
     return _Stated(value * unit, unit / (Decimal(10) ** places) / 2)
@@ -98,7 +115,13 @@ def _period(cell: str) -> str | None:
     year = _YEAR_CELL.match(text)
     if year:
         return str(int(year.group(1)))
-    return TOTAL if re.search(r"\btotal\b", text, re.I) else None
+    # "Cumulative Total", "Running total", "Subtotal" and "% of total" are
+    # not the sum of the year columns beside them.
+    if re.search(r"\btotal\b", text, re.I) and not re.search(
+        r"\b(?:cumulative|running|average|avg|mean|sub\s?total|to\s+date|percent\w*)\b|%", text, re.I,
+    ):
+        return TOTAL
+    return None
 
 
 def _pipe_tables(text: str) -> list[list[list[str]]]:
@@ -186,6 +209,7 @@ class Sheet:
     values: dict[str, dict[str, Decimal]] = field(default_factory=dict)
     labels: dict[str, str] = field(default_factory=dict)
     ambiguous: set[str] = field(default_factory=set)
+    _patterns: "list[tuple[str, str, str, re.Pattern[str]]] | None" = field(default=None, repr=False)
 
     def add(self, cell: Cell) -> None:
         if cell.key in self.ambiguous or cell.stated.tolerance:
@@ -206,6 +230,24 @@ class Sheet:
 
     def years(self, key: str) -> set[str]:
         return {p for p in self.values.get(key, {}) if p != TOTAL}
+
+    def has_cents(self, keys: "set[str] | list[str]") -> bool:
+        """Whether any of these rows holds a figure that isn't a whole number."""
+        return any(
+            value != value.to_integral_value()
+            for key in keys for value in self.values.get(key, {}).values()
+        )
+
+    def label_patterns(self) -> list[tuple[str, str, str, "re.Pattern[str]"]]:
+        """(key, label, normalised label, whole-phrase pattern) per row, built once."""
+        if self._patterns is None:
+            built = []
+            for key, label in self.labels.items():
+                norm = re.sub(r"[^a-z0-9&]+", " ", _plain(label).lower()).strip()
+                if norm and norm not in _VAGUE_LABELS:
+                    built.append((key, label, norm, re.compile(rf"(?<![a-z0-9]){re.escape(norm)}(?![a-z0-9])")))
+            self._patterns = built
+        return self._patterns
 
 
 def read_sheet(texts: list[str]) -> Sheet:
@@ -234,8 +276,14 @@ def _table_issues(answer: str, sheet: Sheet, *, across_categories: bool) -> list
     for table in _pipe_tables(answer):
         cells = _table_cells(table)
         rows: dict[str, dict[str, Cell]] = {}
+        # Two rows of this table that reduce to one label ("Personnel (PI)",
+        # "Personnel (Postdoc)"): which one a sum should use can't be told.
+        collided: set[str] = set()
         for cell in cells:
-            rows.setdefault(cell.key, {})[cell.period] = cell
+            row = rows.setdefault(cell.key, {})
+            if cell.period in row and row[cell.period].label != cell.label:
+                collided.add(cell.key)
+            row[cell.period] = cell
             expected = sheet.cell(cell.key, cell.period)
             if expected is not None and not cell.stated.matches(expected):
                 issues.append(Issue("cell", (
@@ -247,22 +295,32 @@ def _table_issues(answer: str, sheet: Sheet, *, across_categories: bool) -> list
             years = sorted((p for p in row if p != TOTAL), key=int)
             if TOTAL not in row or len(years) < 2:
                 continue
+            if key in collided or _NON_ADDITIVE.search(row[TOTAL].label):
+                continue  # An average, a rate, a running balance: not a sum of its years.
             if any(cell.stated.tolerance for cell in row.values()):
                 continue  # "$1.2M" is a rounding, not a sum to hold to the dollar.
             if sheet.years(key) - set(years):
                 continue  # The table shows some years; its total covers them all.
             shown = sum((row[p].stated.value for p in years), Decimal(0))
-            if shown != row[TOTAL].stated.value:
+            # Whole dollars shown for cells that hold cents can each be off by
+            # under a dollar, and so can their sum.
+            allowed = Decimal(len(years)) if sheet.has_cents([key]) else Decimal(0)
+            if abs(shown - row[TOTAL].stated.value) > allowed:
                 issues.append(Issue("sum", (
                     f"{row[TOTAL].label}: Year {years[0]} to Year {years[-1]} as shown add up to "
                     f"{_amount(shown)}, not the {row[TOTAL].text} total shown."
                 )))
-        if not across_categories or TOTAL not in rows:
+        if not across_categories or TOTAL not in rows or collided:
             continue
         # The categories shown for a year must add up to the Total row.
-        details = [row for key, row in rows.items() if key != TOTAL and not _subtotal(key)]
+        detail_keys = [
+            key for key, row in rows.items()
+            if key != TOTAL and not _subtotal(key) and not _NON_ADDITIVE.search(next(iter(row.values())).label)
+        ]
+        details = [rows[key] for key in detail_keys]
         if len(details) < 2:
             continue
+        allowed = Decimal(len(details)) if sheet.has_cents([*detail_keys, TOTAL]) else Decimal(0)
         for period, total in rows[TOTAL].items():
             # A table of the main categories is not a full breakdown: the
             # spreadsheet has rows it leaves out, so they need not reach the total.
@@ -273,7 +331,7 @@ def _table_issues(answer: str, sheet: Sheet, *, across_categories: bool) -> list
             if any(part is None or part.stated.tolerance for part in parts) or total.stated.tolerance:
                 continue
             shown = sum((part.stated.value for part in parts if part), Decimal(0))
-            if shown != total.stated.value:
+            if abs(shown - total.stated.value) > allowed:
                 issues.append(Issue("sum", (
                     f"{_year_label(period)}: the categories shown add up to {_amount(shown)}, "
                     f"not the {total.text} in the Total row."
@@ -294,8 +352,9 @@ def _named_row(sentence: str, sheet: Sheet) -> str | None:
     """The one spreadsheet row a sentence names, or None when it names several."""
     lowered = re.sub(r"[^a-z0-9&]+", " ", sentence.lower())
     named = [
-        (key, label) for key, label in sheet.labels.items()
-        if re.search(rf"(?<![a-z0-9]){re.escape(re.sub(r'[^a-z0-9&]+', ' ', _plain(label).lower()).strip())}(?![a-z0-9])", lowered)
+        (key, label) for key, label, norm, pattern in sheet.label_patterns()
+        # The plain substring test is cheap and rules out almost every row.
+        if norm in lowered and pattern.search(lowered)
     ]
     # "Total Direct Costs" also contains "Total": keep the longest label.
     named = [
@@ -305,17 +364,42 @@ def _named_row(sentence: str, sheet: Sheet) -> str | None:
     return named[0][0] if len(named) == 1 else None
 
 
+def _year_amount_pairs(sentence: str) -> list[tuple[str, str]]:
+    """(amount, year) pairs a sentence states.
+
+    "$8,000 in Year 1 - $6,000 in Year 2" reads amount-then-year twice. The
+    year-then-amount pattern would also find "Year 1 - $6,000" there, so it
+    is only used for amounts and years the first reading left unpaired.
+    """
+    pairs: list[tuple[str, str]] = []
+    used: list[tuple[int, int]] = []
+    for match in _AMOUNT_THEN_YEAR.finditer(sentence):
+        pairs.append((match.group(1), match.group(2)))
+        used.append(match.span())
+    for match in _YEAR_THEN_AMOUNT.finditer(sentence):
+        start, end = match.span()
+        if any(start < used_end and used_start < end for used_start, used_end in used):
+            continue
+        pairs.append((match.group(2), match.group(1)))
+    return pairs
+
+
 def _prose_issues(answer: str, sheet: Sheet) -> list[Issue]:
     """"Travel … $8k in Y4" when the Travel row's Year 4 cell says otherwise."""
     issues: list[Issue] = []
+    if len(sheet.labels) > MAX_PROSE_ROWS:
+        return issues
     for sentence in _sentences(answer):
         if _CHANGE.search(sentence):
+            continue
+        # Most sentences state no figure for a year: skip them before
+        # looking for a row, which is the expensive part.
+        pairs = _year_amount_pairs(sentence)
+        if not pairs:
             continue
         key = _named_row(sentence, sheet)
         if key is None:
             continue
-        pairs = [(m.group(1), m.group(2)) for m in _AMOUNT_THEN_YEAR.finditer(sentence)]
-        pairs += [(m.group(2), m.group(1)) for m in _YEAR_THEN_AMOUNT.finditer(sentence)]
         for text, year in pairs:
             stated = _stated(text)
             expected = sheet.cell(key, str(int(year)))
@@ -396,7 +480,9 @@ async def require_spreadsheet_figures(ctx: RunContext["AgenticChatDeps"], output
         return output
     uuids = list(dict.fromkeys([*(getattr(deps, "context_document_uuids", None) or []),
                                 *(getattr(deps, "documents_read", None) or [])]))
-    texts = await _document_texts(uuids) if uuids else []
+    # Files attached to the chat itself count too: the note under the reply
+    # reads them, so the retry must see the same spreadsheet.
+    texts = [*(await _document_texts(uuids) if uuids else []), *(getattr(deps, "attachment_texts", None) or [])]
     issues = spreadsheet_figure_issues(output, texts)
     if not issues:
         return output

@@ -224,3 +224,92 @@ async def test_a_reply_that_still_disagrees_reaches_the_user_with_the_difference
 
 async def test_a_correct_reply_reaches_the_user_unmarked(chat_harness, sheet):
     assert NOTE_HEADING not in await _reply(chat_harness, sheet, CORRECT)
+
+
+# ---------------------------------------------------------------------------
+# Review follow-ups: correct replies that used to be flagged, and wrong ones
+# that used to pass
+# ---------------------------------------------------------------------------
+
+CENTS_SHEET = """| Category | Year 1 | Year 2 | Total |
+| --- | --- | --- | --- |
+| Salaries | 53045.2749 | 54636.63 | 107681.9049 |
+| Fringe | 15913.58 | 16390.99 | 32304.57 |
+| Total | 68958.8549 | 71027.62 | 139986.4749 |
+"""
+
+
+def test_whole_dollars_for_cells_that_hold_cents_are_the_same_figure():
+    reply = """| Category | Year 1 | Year 2 | Total |
+| --- | --- | --- | --- |
+| Salaries | $53,045 | $54,637 | $107,682 |
+| Fringe | $15,914 | $16,391 | $32,305 |
+| Total | $68,959 | $71,028 | $139,986 |
+"""
+    assert spreadsheet_figure_issues(reply, [CENTS_SHEET]) == []
+    # Cents written out are held to the cent.
+    assert spreadsheet_figure_issues("| Category | Year 1 | Year 2 |\n| --- | --- | --- |\n| Salaries | $53,045.27 | $54,636.63 |", [CENTS_SHEET]) == []
+    # A different dollar amount is still wrong.
+    wrong = reply.replace("$53,045", "$54,045")
+    assert any("Salaries, Year 1" in issue.text for issue in spreadsheet_figure_issues(wrong, [CENTS_SHEET]))
+
+
+@pytest.mark.parametrize("table", [
+    # An average is not the sum of its years.
+    "| Item | Year 1 | Year 2 | Total |\n| --- | --- | --- | --- |\n| Average salary | $50,000 | $52,000 | $51,000 |",
+    "| Item | Year 1 | Year 2 | Total |\n| --- | --- | --- | --- |\n| Indirect rate (%) | $26 | $26 | $26 |",
+    # Years as rows beside a running total.
+    "| Year | Costs | Cumulative Total |\n| --- | --- | --- |\n| Year 1 | $100 | $100 |\n| Year 2 | $150 | $250 |\n| Year 3 | $50 | $300 |",
+])
+def test_rows_and_columns_that_are_not_sums_are_not_added_up(table):
+    assert spreadsheet_figure_issues(table, []) == []
+
+
+def test_rows_that_differ_only_by_a_parenthetical_are_not_merged_into_one():
+    table = """| Category | Year 1 | Year 2 | Total |
+| --- | --- | --- | --- |
+| Personnel (PI) | $50 | $50 | $100 |
+| Personnel (Postdoc) | $20 | $20 | $40 |
+| Travel | $10 | $10 | $20 |
+| Total | $80 | $80 | $160 |
+"""
+    assert spreadsheet_figure_issues(table, []) == []
+
+
+def test_sentences_about_personnel_or_overhead_are_checked(sheet):
+    # "Personnel" and "overhead" used to count as change words ("per…",
+    # "over…"), which skipped the sentence.
+    wrong = "Personnel is $150,000 in Year 1."
+    assert any("Personnel, Year 1" in issue.text for issue in spreadsheet_figure_issues(wrong, [sheet]))
+    assert spreadsheet_figure_issues("Personnel is $200,000 in Year 1.", [sheet]) == []
+
+
+def test_two_amounts_joined_by_a_dash_keep_their_own_years(sheet):
+    sentence = "Travel was $8,000 in Year 1 - $6,000 in Year 2."
+    assert spreadsheet_figure_issues(sentence, [sheet]) == []
+
+
+def test_a_passing_other_does_not_name_the_other_row(sheet):
+    assert spreadsheet_figure_issues("Among other things, Year 1: $208,001.", [sheet]) == []
+
+
+def test_a_large_spreadsheet_is_checked_quickly():
+    import time
+
+    rows = "\n".join(f"| Line item {i} | {i} | {i + 1} | {2 * i + 1} |" for i in range(450))
+    big = f"| Category | Year 1 | Year 2 | Total |\n| --- | --- | --- | --- |\n{rows}\n"
+    reply = " ".join(f"Line item {i % 450} is ${i % 450} in Year 1." for i in range(300))
+    started = time.perf_counter()
+    assert spreadsheet_figure_issues(reply, [big]) == []
+    assert time.perf_counter() - started < 5
+
+
+async def test_the_retry_reads_files_attached_to_the_chat_too(sheet):
+    wrong = "| Category | Year 1 | Year 2 |\n| --- | --- | --- |\n| Travel | $9,999 | $6,000 |"
+    deps = SimpleNamespace(spreadsheet_retry_used=False, context_document_uuids=[], documents_read=[], attachment_texts=[sheet])
+    ctx = SimpleNamespace(deps=deps, partial_output=False)
+    from pydantic_ai import ModelRetry
+
+    with pytest.raises(ModelRetry) as retry:
+        await require_spreadsheet_figures(ctx, wrong)
+    assert "Travel, Year 1" in str(retry.value)
