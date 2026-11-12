@@ -5347,8 +5347,12 @@ def _describe_obligation(clean: dict) -> str:
                     f'Anchor day excluded; no weekend/holiday adjustment.\n{evidence}')
         return f'{clean["title"]}: {when} ({where})'
     if clean["kind"] == "limit":
-        unit = clean.get("unit") or ""
-        return f'{clean["title"]}: {clean["observed_value"]:,.0f}{unit} against a limit of {clean["limit_value"]:,.0f}{unit} ({where})'
+        unit = clean.get("unit")
+        limit = obligation_service.format_limit_figure(clean["limit_value"], unit)
+        if clean.get("observed_value") is None:
+            return f'{clean["title"]}: {limit} ({where})'
+        observed = obligation_service.format_limit_figure(clean["observed_value"], unit)
+        return f'{clean["title"]}: {observed} against a limit of {limit} ({where})'
     return f'{clean["title"]} ({where})'
 
 
@@ -5465,9 +5469,11 @@ async def propose_obligations(
       it replacing the old one.
     - A promised item is not a received one: a letter that is "promised" is
       still required material.
-    - For a limit, cite the limit (role "limit", e.g. the solicitation's cap)
-      and the value that exceeds or meets it (role "observed", e.g. the draft
-      budget) as two sources.
+    - For a limit, cite the limit (role "limit", e.g. the solicitation's cap).
+      Add an observed value (role "observed", e.g. the draft budget total, as
+      a second source) only when a document states a different figure to
+      compare with it. Never repeat the limit as its own observed value: a
+      limit with nothing to compare is saved as a plain limit.
 
     Args:
         context: The call context.
@@ -5490,9 +5496,10 @@ async def propose_obligations(
             When the dates are in a table, quote the header row with the
             Start/End Date labels and the row with their dates.
             Business-day rules, exceptions, and missing period dates need clarification.
-            Limits add "limit_value", "observed_value" and "unit" ("$" or "%").
-            Both values must be in the same unit: compare a rate limit (22.5% of
-            TDC) with the rate the document states, never with a dollar amount.
+            Limits add "limit_value" (the exact figure, e.g. 22.5) and "unit"
+            ("$" or "%"), plus "observed_value" only when there is a different
+            figure to compare. Both values must be in the same unit: never
+            compare a rate limit (22.5% of TDC) with a dollar amount.
         project_uuid: The project; defaults to the one open in chat.
         confirmed: Must be true to save; false returns a preview.
     """
