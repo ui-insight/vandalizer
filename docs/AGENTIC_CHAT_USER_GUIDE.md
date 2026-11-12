@@ -20,15 +20,33 @@ You can still ask the chat free-form questions. The difference shows up when the
 
 ---
 
+## Choosing what chat can use
+
+Open **Assistant settings** from **Settings** beside the sliders icon in the chat composer or from the account menu.
+
+Under **What chat can use for you**, switches show your saved choices. Turning one off removes that feature from your chats from your next message. If a feature is blocked by an administrator or has not been set up, the row explains why. You can still change your saved choice for when it becomes available. Chat still asks before it creates, changes or shares anything. **Always on: files, Skills, plans, help and certification** expands to show the features without switches. The certification exercises also need **Extractions and compliance checks** and **Workflows** on.
+
+These switches control chat's direct actions. Workflows you run still follow their saved steps, including web searches. Existing automations and work already running are not stopped. With **Knowledge bases** off, chat does not look up attached or built-in knowledge bases. A project's pinned workflow and a new automation need **Workflows** (or **Extractions**) on, adding a URL to a knowledge base needs **Read a web page** on, and **Save** on a Page preview needs **Pages** on. A waiting approval card is cancelled when its feature is turned off.
+
+**Core Skills** are your usual checklists and writing instructions from Library. Add up to five, such as your office's award review checklist. Chat uses one when your request matches its **When to use** description. A Skill needs that description before it can be added. Choose a Skill in the picker, review its instructions, then choose **Add this core Skill**. Only the version you reviewed is accepted. A Skill selected for a conversation, including a project's default Skill, replaces all core Skills for that conversation.
+
+If anyone edits a core Skill, it pauses. Chat shows a notice and the Settings button shows a count of paused Skills. Follow the notice, open **Review updated instructions**, and choose **Use this version** after reviewing the changes. If it changes again during review, load and review the latest instructions. A team's Skill applies only in that team; its availability refreshes when you switch teams. Deleted Skills, lost sharing access and missing **When to use** descriptions are also explained in settings.
+
+The used-Skill step in chat names the Skill **for this reply**. Expand **View instructions** to inspect the exact instructions recorded for that reply; **Version details** contains its identifier. **Manage core Skills** opens settings.
+
+Administrators can expand **Settings for all users — administrators** to block a feature for everyone on this Vandalizer site. Allowing it again lets each person's saved choice apply. This does not turn it on for people who saved an Off choice.
+
+Changes show a saving message followed by confirmation. If a response is lost, the page checks what is saved. If that check also fails, the values are marked **Unconfirmed** and cannot be changed until **Refresh settings** succeeds.
+
 ## Reusing instructions with Skills
 
 Library **Skills** replace the former Library Prompts. Existing saved instructions keep their content, links, and sharing. Workflow **Prompt** nodes remain reasoning steps in the workflow editor.
 
-Open **Library → Skills** and click a Skill to run it in the current chat. The Assistant starts immediately using the Skill instructions and your selected sources. The request appears in the conversation so you can follow up naturally. To inspect or edit the instructions, use the Skill’s **More actions → Edit** menu in the Library.
+Open **Library → Skills** and click a Skill to preview it: its name, its **When to use** line and its instructions. Choose **Run Skill** to start it in the current chat with your selected sources; the request appears in the conversation so you can follow up naturally. **Edit** in the preview, or the Skill’s **More actions → Edit** menu, changes the instructions. Closing the preview runs nothing.
 
 A Skill can carry an optional **When to use** line, such as "reviewing a new award notice against our intake checklist". Add it when you create the Skill or from **More actions → Edit**. The Assistant reads the line when it lists your Skills and searches it when you ask for one, so a clear line helps it suggest the right Skill. Changing the line creates a new Skill version, like editing the instructions; existing chats keep the version they selected.
 
-One Skill can be active at a time. The conversation keeps the selected instruction version across follow-up messages and reopening. Editing the Library item does not change an existing chat's version; run it again to use the edits. New chats start without a Skill. If access is removed or the item is deleted, run another Skill or ask the Assistant to stop using it before continuing.
+One Skill can be selected for a conversation at a time. The conversation keeps the selected instruction version across follow-up messages and reopening. Editing the Library item does not change an existing chat's version; run it again to use the edits. New chats start without a selected Skill unless a project supplies a default; otherwise core Skills remain available when a request matches. If access is removed or the item is deleted, run another Skill or ask the Assistant to stop using it before continuing.
 
 Skills guide the Assistant's use of its existing tools. They do not grant access to additional documents, approve actions, or install executable scripts. Ask chat to find Skills, inspect one, and use it. Chat previews the exact instructions and shows an **Apply Skill selection** approval card before selecting, replacing, or removing the active Skill. Confirmed selection guides the rest of the response and later turns; reading a Skill alone never activates it. Create and edit Skills in the Library. Bundled resources and scripts are not supported.
 

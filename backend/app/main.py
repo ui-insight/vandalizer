@@ -18,6 +18,7 @@ from app.observability import init_sentry
 from app.routers import artifacts, page_templates
 from app.rate_limit import limiter
 from app.routers import award_snapshots, page_feedback
+from app.routers import assistant
 from app.routers import activity, admin, audit, auth, automations, browser_automation, certification, chat, config, contact, credentials, demo, documents, extractions, feedback, feedback_admin, feedback_prompt, files, folders, graph_webhooks, knowledge, library, mgmt, notifications, obligations, office, optimizer_inbox, organizations, projects, reviews, spaces, support, teams, telemetry, verification, verification_sessions, workflows
 
 
@@ -235,7 +236,10 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "X-API-Key", "X-CSRF-Token"],
-    expose_headers=["X-Conversation-UUID", "X-Activity-ID"],
+    expose_headers=[
+        "X-Conversation-UUID", "X-Activity-ID",
+        "X-Chat-Error", "X-Missing-Documents", "X-Missing-Reason",
+    ],
 )
 
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
@@ -285,6 +289,7 @@ app.include_router(spaces.router, prefix="/api/spaces", tags=["spaces"])
 app.include_router(projects.router, prefix="/api/projects", tags=["projects"])
 app.include_router(award_snapshots.router, prefix="/api/projects", tags=["projects"])
 app.include_router(obligations.router, prefix="/api/obligations", tags=["obligations"])
+app.include_router(assistant.router, prefix="/api/assistant", tags=["assistant"])
 app.include_router(support.router, prefix="/api/support", tags=["support"])
 app.include_router(mgmt.router, prefix="/api/mgmt/v1", tags=["mgmt"])
 if _boot_settings.enable_trial_system:

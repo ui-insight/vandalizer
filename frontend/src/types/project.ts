@@ -75,6 +75,8 @@ export interface ProjectPin {
   pin_type: string // workflow | extraction | automation | knowledge_base
   target_id: string
   name: string
+  /** Pinned by someone else, and not yours to open: shown by type only, so it can be unpinned. */
+  restricted?: boolean
 }
 
 export interface ProjectInviteInfo {

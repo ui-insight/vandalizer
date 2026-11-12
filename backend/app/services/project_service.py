@@ -632,6 +632,9 @@ async def add_pin(project: Project, pin_type: str, target_id: str, user: User) -
         raise ValueError("Invalid pin type")
     if pin_type in ("skill", "artifact"):
         await authorize_resource(pin_type, target_id, user)
+    elif await authorized_pin_name(pin_type, target_id, user) is None:
+        # Same answer for a missing id, so it never says whether one exists.
+        raise ValueError(pin_access_denied_message(pin_type))
     existing = await ProjectPin.find_one(
         ProjectPin.project_uuid == project.uuid,
         ProjectPin.pin_type == pin_type,
@@ -661,33 +664,63 @@ async def remove_pin(project: Project, pin_type: str, target_id: str, user: User
         )
 
 
-async def _resolve_pin_name(pin: ProjectPin) -> str | None:
-    """The display name of a pin's target, or None if it no longer exists."""
+_PIN_LABELS = {
+    "workflow": "workflow",
+    "extraction": "extraction",
+    "automation": "automation",
+    "knowledge_base": "knowledge base",
+}
+
+
+def pin_access_denied_message(pin_type: str) -> str:
+    return f"You don't have access to this {_PIN_LABELS.get(pin_type, 'item')}."
+
+
+async def authorized_pin_name(pin_type: str, target_id: str, user: User) -> str | None:
+    """The name of a workflow, extraction, automation or knowledge base pin's
+    target, or None when *user* may not open it (or it no longer exists).
+
+    A pin is a shortcut. It never grants access to what it points at, so
+    pinning, listing and running all check the person's own access to the
+    target: the same rule Skill and Page pins follow (``authorize_resource``).
+    """
+    from app.services import access_control
+
+    if pin_type == "workflow":
+        wf = await access_control.get_authorized_workflow(target_id, user)
+        return (wf.name or "Untitled workflow") if wf else None
+    if pin_type == "extraction":
+        ss = await access_control.get_authorized_search_set(target_id, user)
+        return (ss.title or "Untitled extraction") if ss else None
+    if pin_type == "automation":
+        auto = await access_control.get_authorized_automation(target_id, user)
+        return (auto.name or "Untitled automation") if auto else None
+    if pin_type == "knowledge_base":
+        kb = await access_control.get_authorized_knowledge_base(target_id, user)
+        return (kb.title or "Untitled knowledge base") if kb else None
+    return None
+
+
+async def _pin_target_exists(pin: ProjectPin) -> bool:
+    """Whether a pin still points at something (a deleted target is a stale pin)."""
     from beanie import PydanticObjectId
 
-    if pin.pin_type == "workflow":
-        from app.models.workflow import Workflow
-        try:
-            wf = await Workflow.get(PydanticObjectId(pin.target_id))
-        except Exception:
-            wf = None
-        return wf.name if wf else None
+    try:
+        if pin.pin_type == "workflow":
+            from app.models.workflow import Workflow
+            return await Workflow.get(PydanticObjectId(pin.target_id)) is not None
+        if pin.pin_type == "automation":
+            from app.models.automation import Automation
+            return await Automation.get(PydanticObjectId(pin.target_id)) is not None
+    except Exception:
+        return False
     if pin.pin_type == "extraction":
         from app.models.search_set import SearchSet
-        ss = await SearchSet.find_one(SearchSet.uuid == pin.target_id)
-        return ss.title if ss else None
-    if pin.pin_type == "automation":
-        from app.models.automation import Automation
-        try:
-            auto = await Automation.get(PydanticObjectId(pin.target_id))
-        except Exception:
-            auto = None
-        return auto.name if auto else None
+        return await SearchSet.find_one(SearchSet.uuid == pin.target_id) is not None
     if pin.pin_type == "knowledge_base":
         from app.models.knowledge import KnowledgeBase
-        kb = await KnowledgeBase.find_one(KnowledgeBase.uuid == pin.target_id)
-        return kb.title if kb else None
-    return None
+        return await KnowledgeBase.find_one(KnowledgeBase.uuid == pin.target_id) is not None
+    return False
 
 
 async def authorize_resource(pin_type: str, target_id: str, user: User) -> str:
@@ -701,7 +734,21 @@ async def authorize_resource(pin_type: str, target_id: str, user: User) -> str:
     return title
 
 
-async def list_pins(project: Project, user: User | None = None) -> list[dict]:
+def _restricted_pin_name(pin_type: str) -> str:
+    label = _PIN_LABELS.get(pin_type, "item")
+    return f"{'An' if label[0] in 'aeiou' else 'A'} {label} you don't have access to"
+
+
+async def list_pins(
+    project: Project, user: User | None = None, *, include_restricted: bool = False,
+) -> list[dict]:
+    """The project's pins that *user* can open, each with its target's name.
+
+    A pin whose target the user can't access is left out, so its name is never
+    shown and it can't be picked to run. With *include_restricted* (the pins
+    list for someone who manages the project) such a pin is still listed, as
+    its type only and marked ``restricted``, so it can be removed.
+    """
     pins = await ProjectPin.find(
         ProjectPin.project_uuid == project.uuid
     ).to_list()
@@ -719,9 +766,19 @@ async def list_pins(project: Project, user: User | None = None) -> list[dict]:
                     raise
                 continue
         else:
-            name = await _resolve_pin_name(pin)
+            # No viewer, no names: a pin's target is listed only for someone
+            # who can open it themselves.
+            name = await authorized_pin_name(pin.pin_type, pin.target_id, user) if user else None
+            if name is None and include_restricted and await _pin_target_exists(pin):
+                result.append({
+                    "pin_type": pin.pin_type,
+                    "target_id": pin.target_id,
+                    "name": _restricted_pin_name(pin.pin_type),
+                    "restricted": True,
+                })
+                continue
         if name is None:
-            continue  # target was deleted — skip stale pin
+            continue  # deleted, or not this user's to see
         result.append({
             "pin_type": pin.pin_type,
             "target_id": pin.target_id,
