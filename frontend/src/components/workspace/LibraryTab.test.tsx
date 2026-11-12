@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { LibraryTab } from './LibraryTab'
 import type { LibraryItem } from '../../types/library'
 
@@ -135,20 +135,39 @@ beforeEach(() => {
 })
 
 describe('LibraryTab Skills', () => {
-  it('runs a Skill directly from its row with the selected sources', () => {
+  it('opens a preview on click, and runs the Skill only from its Run Skill button', async () => {
+    mockItems.current = [makePrompt({ when_to_use: 'summarizing a new award notice' })]
     render(<LibraryTab />)
-    fireEvent.click(screen.getByRole('button', { name: 'Run Summarize Award' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open Summarize Award' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Preview Summarize Award' })
+    expect(within(dialog).getByText('summarizing a new award notice')).toBeTruthy()
+    expect(await within(dialog).findByText('Summarize the key terms of this award.')).toBeTruthy()
+    expect(sendChatMessage).not.toHaveBeenCalled()
+    expect(touchItem).not.toHaveBeenCalled()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Run Skill' }))
     expect(sendChatMessage).toHaveBeenCalledExactlyOnceWith('', {
       skillUuid: 'ss-uuid-1', documentUuids: ['doc-1'], folderUuids: [],
     })
     expect(touchItem).toHaveBeenCalledWith('li-1')
-    expect(listSearchSetItems).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog', { name: 'Preview Summarize Award' })).toBeNull()
   })
 
-  it('does not run a Skill with no identity', () => {
-    mockItems.current = [makePrompt({ item_uuid: null })]
+  it('closing the preview runs nothing', async () => {
+    render(<LibraryTab />)
+    fireEvent.click(screen.getByRole('button', { name: 'Open Summarize Award' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Preview Summarize Award' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
+    expect(screen.queryByRole('dialog', { name: 'Preview Summarize Award' })).toBeNull()
+    expect(sendChatMessage).not.toHaveBeenCalled()
+  })
+
+  it('does not run a Skill with no identity', async () => {
+    mockItems.current = [makePrompt({ item_uuid: null, description: 'Summarize the award.' })]
     render(<LibraryTab />)
     fireEvent.click(screen.getByText('Summarize Award'))
+    const dialog = await screen.findByRole('dialog', { name: 'Preview Summarize Award' })
+    expect(within(dialog).getByRole('button', { name: 'Run Skill' })).toBeDisabled()
     expect(sendChatMessage).not.toHaveBeenCalled()
   })
 
