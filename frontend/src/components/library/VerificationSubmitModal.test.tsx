@@ -113,6 +113,17 @@ describe('VerificationSubmitModal', () => {
     expect(screen.getByRole('heading', { name: 'Share this extraction' })).toBeTruthy()
   })
 
+  it.each([
+    ['prompt', 'Share this Skill', 'Skill', /Sharing puts this Skill where colleagues can copy it/],
+    ['formatter', 'Share this formatter', 'Formatter', /Sharing puts this formatter where colleagues can copy it/],
+    [null, 'Share this extraction', 'Extraction', /Sharing puts this extraction where colleagues can copy it/],
+  ])('names a search set by its set_type (%s) in the title, badge and text', (setType, heading, badge, sentence) => {
+    open({ itemKind: 'search_set', setType })
+    expect(screen.getByRole('heading', { name: heading })).toBeTruthy()
+    expect(screen.getByText(badge, { selector: 'span' })).toBeTruthy()
+    expect(screen.getByText(sentence)).toBeTruthy()
+  })
+
   it('says Summary is required and will not go past Basics without it', () => {
     open()
     fireEvent.click(screen.getByText(/I've already validated it/))
