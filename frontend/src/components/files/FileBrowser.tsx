@@ -1,4 +1,4 @@
-import { documentReadinessMessage, type DocumentReadiness } from '../../utils/documentReadiness'
+import { documentReadinessMessage, documentReadinessState, type DocumentReadiness } from '../../utils/documentReadiness'
 import { WorkspaceSectionHeader } from '../shared/WorkspaceSectionHeader'
 import { useCallback, useMemo, useState, useRef, useEffect, type ReactNode, type DragEvent } from 'react'
 import { Plus, Folder as FolderIcon, Upload, Trash2, Download, FolderInput } from 'lucide-react'
@@ -211,7 +211,7 @@ export function FileBrowser({ searchAction, searchField, selectedDocumentUuids, 
   }, [selectedUuids, documents, onSelectionChange, onDocNamesChange, onSelectionProcessingChange])
 
   useEffect(() => {
-    onDocumentReadinessChange?.([...documents, ...(contentMatches ?? [])].map(doc => ({ uuid: doc.uuid, title: doc.title, message: documentReadinessMessage(doc) })))
+    onDocumentReadinessChange?.([...documents, ...(contentMatches ?? [])].map(doc => ({ uuid: doc.uuid, title: doc.title, message: documentReadinessMessage(doc), state: documentReadinessState(doc) })))
   }, [documents, contentMatches, onDocumentReadinessChange])
 
   // Sync selected folder UUIDs to parent

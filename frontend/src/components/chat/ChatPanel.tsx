@@ -177,6 +177,13 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   // can show the live stage ("Reading text…", "Indexing…") and progress.
   const [dropStatusByUuid, setDropStatusByUuid] = useState<Record<string, string | null>>({})
   const [documentErrors, setDocumentErrors] = useState<Record<string, string>>({})
+  // What Files knows about each file's text, so a chip for a file whose
+  // extraction failed or was stopped does not read "Ready" (support ticket).
+  const { documentReadiness = {} } = useWorkspace()
+  const documentStates = useMemo(
+    () => Object.fromEntries(selectedDocUuids.map(uuid => [uuid, documentReadiness[uuid]?.state])),
+    [selectedDocUuids, documentReadiness],
+  )
   useEffect(() => {
     // A retry started in Files supersedes the previous processing failure.
     const resumed = selectedDocsProcessing.filter(doc => doc.status && !/error|fail/i.test(doc.status))
@@ -883,6 +890,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         selectedDocNames={selectedDocNames}
         processingByUuid={processingByUuid}
         documentErrors={documentErrors}
+        documentStates={documentStates}
         selectedFolderUuids={selectedFolderUuids}
         selectedFolderNames={selectedFolderNames}
         knowledgeBases={activeKBs}

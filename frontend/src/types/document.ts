@@ -24,6 +24,9 @@ export interface Document {
   chunk_count?: number
   ingest_error?: string | null
   error_message?: string | null
+  /** The document has no text because someone stopped its extraction, not
+   *  because reading it failed. */
+  extraction_stopped?: boolean
   extraction_low_quality?: boolean
   /** Stored ingestion-warning codes: the text is real but not the whole
    * document, or the hidden-text safety check could not run. */
@@ -59,6 +62,8 @@ export interface PollStatusResponse {
   /** False when the file itself is the problem (damaged, wrong format, gone)
    *  and a retry cannot help. Null/absent means a retry may help. */
   error_retryable?: boolean | null
+  /** Stopped by a person rather than failed. */
+  extraction_stopped?: boolean
   processing: boolean
   title: string
   extraction_low_quality?: boolean

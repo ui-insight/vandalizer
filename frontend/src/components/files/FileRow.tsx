@@ -1,5 +1,5 @@
 import { documentReadinessMessage } from '../../utils/documentReadiness'
-import { Loader2, FileText, MoreHorizontal, AlertTriangle, Shield, AlertCircle } from 'lucide-react'
+import { Loader2, FileText, MoreHorizontal, AlertTriangle, Shield, AlertCircle, CircleStop } from 'lucide-react'
 import type { Document } from '../../types/document'
 import { formatFileDate } from '../../utils/time'
 import { stageCopy, isDocReady } from '../../utils/processingStatus'
@@ -90,6 +90,15 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
               }
             >
               <AlertTriangle className="h-4 w-4 text-red-500" />
+            </span>
+          ) : doc.task_status === 'error' && doc.extraction_stopped ? (
+            <span
+              className="shrink-0 mr-2.5 inline-flex items-center"
+              role="img"
+              aria-label="Text extraction was stopped, so this document has no text yet. Open Extracted text and choose Retry extraction."
+              title="Text extraction was stopped, so this document has no text yet. Open Extracted text and choose Retry extraction."
+            >
+              <CircleStop className="h-4 w-4 text-gray-500" />
             </span>
           ) : doc.task_status === 'error' ? (
             <span

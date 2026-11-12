@@ -15,3 +15,19 @@ describe('document input caveats', () => {
     expect(documentReadinessMessage({ ...ready, extraction_low_quality: true })).toContain('Inspect the original')
   })
 })
+
+describe('a stopped extraction', () => {
+  it('is reported as stopped, apart from a failed one', async () => {
+    const { documentReadinessMessage, documentReadinessState } = await import('./documentReadiness')
+    const base = { processing: false, valid: true }
+    const stopped = { ...base, task_status: 'error', extraction_stopped: true }
+    const failed = { ...base, task_status: 'error' }
+    expect(documentReadinessState(stopped)).toBe('stopped')
+    expect(documentReadinessMessage(stopped)).toMatch(/was stopped/)
+    expect(documentReadinessState(failed)).toBe('failed')
+    expect(documentReadinessMessage(failed)).toMatch(/failed/)
+    expect(documentReadinessState({ ...base, task_status: 'complete' })).toBeUndefined()
+    // Still being read: not failed yet, whatever the last status said.
+    expect(documentReadinessState({ ...stopped, processing: true })).toBeUndefined()
+  })
+})

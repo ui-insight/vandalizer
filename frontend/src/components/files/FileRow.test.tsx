@@ -43,6 +43,12 @@ function renderFileRow(props: Partial<Parameters<typeof FileRow>[0]> = {}) {
 }
 
 describe('FileRow', () => {
+  it('marks a stopped extraction as stopped, not as a red failure', () => {
+    renderFileRow({ doc: makeDoc({ task_status: 'error', extraction_stopped: true, error_message: 'Text extraction was stopped. Retry to read this document again.' }) })
+    expect(screen.getByRole('img', { name: /Text extraction was stopped/ })).toBeTruthy()
+    expect(screen.queryByRole('img', { name: /Text extraction failed/ })).toBeNull()
+  })
+
   it('renders document title', () => {
     renderFileRow({ doc: makeDoc({ title: 'Annual Report 2025.pdf' }) })
     expect(screen.getByText('Annual Report 2025.pdf')).toBeTruthy()
