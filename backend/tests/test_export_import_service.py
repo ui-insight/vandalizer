@@ -178,10 +178,13 @@ class TestResolveTaskReferences:
         kb.title = "NIH Policies"
         kb.description = "Official policy docs"
 
-        with patch("app.models.knowledge.KnowledgeBase") as MockKB:
+        # Exported by someone who can open the knowledge base: its name goes
+        # into the file. (Without that it is exported as "Unknown".)
+        with patch("app.models.knowledge.KnowledgeBase") as MockKB, \
+             patch("app.services.access_control.get_authorized_knowledge_base", AsyncMock(return_value=kb)):
             MockKB.find_one = AsyncMock(return_value=kb)
             result = await _resolve_task_references(
-                {"kb_uuid": "kb-1"}, "KnowledgeBaseQuery",
+                {"kb_uuid": "kb-1"}, "KnowledgeBaseQuery", MagicMock(),
             )
 
         assert result["_embedded_knowledge_base"] == {
@@ -193,14 +196,15 @@ class TestResolveTaskReferences:
     async def test_selected_document_marked_non_portable_with_title(self):
         doc = MagicMock()
         doc.title = "Proposal.pdf"
-        with patch("app.models.document.SmartDocument") as MockDoc:
+        with patch("app.models.document.SmartDocument") as MockDoc, \
+             patch("app.services.access_control.get_authorized_document", AsyncMock(return_value=doc)):
             MockDoc.find_one = AsyncMock(return_value=doc)
             result = await _resolve_task_references(
                 {
                     "input_source": "select_document",
                     "selected_document_uuid": "doc-1",
                 },
-                "Extraction",
+                "Extraction", MagicMock(),
             )
 
         ref = result["_embedded_document_ref"]

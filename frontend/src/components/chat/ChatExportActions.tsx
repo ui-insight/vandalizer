@@ -29,6 +29,9 @@ export function ChatExportActions({ messages, scope = 'message', names = {}, dis
   disabled?: boolean
 }) {
   const canExport = scope === 'conversation' || messages.some(message => message.role !== 'user')
+  const actionClass = scope === 'conversation'
+    ? 'chat-composer-tool chat-composer-icon disabled:opacity-50'
+    : 'rounded p-1.5 hover:bg-black/10 disabled:opacity-50'
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -93,7 +96,7 @@ export function ChatExportActions({ messages, scope = 'message', names = {}, dis
     } finally { running.current = false; setBusy(false) }
   }
   return <div className="relative flex flex-wrap items-center gap-1 text-inherit">
-    <button type="button" className="rounded p-1.5 hover:bg-black/10 disabled:opacity-50" aria-label={`Copy ${scope}`} title={`Copy ${scope}`} disabled={disabled || busy} onClick={async () => {
+    <button type="button" className={actionClass} aria-label={`Copy ${scope}`} title={`Copy ${scope}`} disabled={disabled || busy} onClick={async () => {
       setError('')
       try {
         await navigator.clipboard.writeText(copyMessages(messages, names, scope === 'conversation'))
@@ -101,7 +104,7 @@ export function ChatExportActions({ messages, scope = 'message', names = {}, dis
         setTimeout(() => setCopied(false), 2000)
       } catch { setError('Could not copy. Select the text to copy it, or try again.') }
     }}>{copied ? <Check size={16} /> : <Copy size={16} />}</button>
-    {canExport && <button ref={button} type="button" className="rounded p-1.5 hover:bg-black/10 disabled:opacity-50" aria-label={`Export ${scope}`} title={`Export ${scope}`} aria-haspopup="menu" aria-expanded={open} disabled={disabled || busy} onClick={() => setOpen(!open)}><Download size={16} /></button>}
+    {canExport && <button ref={button} type="button" className={actionClass} aria-label={`Export ${scope}`} title={`Export ${scope}`} aria-haspopup="menu" aria-expanded={open} disabled={disabled || busy} onClick={() => setOpen(!open)}><Download size={16} /></button>}
     {busy && <span role="status" className="text-xs">Preparing export…</span>}
     {canExport && open && createPortal(<div ref={menu} role="menu" style={position} className="fixed z-[1000] w-[236px] max-h-[90vh] overflow-auto rounded-lg border bg-white p-1.5 text-gray-800 shadow-lg" aria-label={`Export ${scope} format`} onBlur={e => {
       // A pointer click in Safari can blur without focusing the selected

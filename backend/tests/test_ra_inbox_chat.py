@@ -198,3 +198,27 @@ async def test_a_different_deliverable_on_the_same_date_is_not_a_duplicate(proje
                                      **{**row, "deadline_calculation": None, "deadline_type": "report_due"})
     monkeypatch.setattr(service, "Obligation", fake_model([old]))
     assert not await service.is_duplicate(project.uuid, {**row, "title": "Invention disclosure", "deadline_type": "other"})
+
+
+@pytest.mark.asyncio
+async def test_a_rerun_that_finds_only_done_items_says_nothing_new_instead_of_failing(project_env):
+    """Support ticket: after "Greenhouse trial dataset due" was marked Done,
+    the same request offered it again. With it recognised, the tool must not
+    answer "couldn't be checked" (which sends the model off to re-quote it)
+    or count the call towards the retry stop."""
+    project, user, _ = project_env
+    ctx = _ctx(user)
+    only_done = {"accepted": [], "rejected": [
+        {"title": "Greenhouse trial dataset", "reason": "already in this project's inbox, marked done"},
+    ]}
+    with patch.object(chat_tools, "_resolve_active_project", AsyncMock(return_value=project)), \
+         patch("app.services.project_service.can_manage_project", AsyncMock(return_value=True)), \
+         patch.object(service, "propose", AsyncMock(return_value=only_done)):
+        result = await chat_tools.propose_obligations(ctx, [{"kind": "deadline"}])
+    assert "error" not in result and "needs_confirmation" not in result
+    assert result["added"] == []
+    assert result["already_in_inbox"] == [
+        {"title": "Greenhouse trial dataset", "explanation": "Already marked done in this inbox."},
+    ]
+    assert "Nothing new to add" in result["message"]
+    assert getattr(ctx.deps, "obligation_failures", 0) == 0

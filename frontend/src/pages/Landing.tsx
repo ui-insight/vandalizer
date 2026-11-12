@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, Navigate, useSearch } from '@tanstack/react-router'
 import { useAuth } from '../hooks/useAuth'
 import { getAuthConfig, type AuthConfig } from '../api/auth'
@@ -15,6 +15,7 @@ import {
   FileInput,
   GitMerge,
   Lock,
+  Menu,
   MessageSquare,
   PenTool,
   PlayCircle,
@@ -23,6 +24,7 @@ import {
   ShieldCheck,
   Sparkles,
   Users,
+  X,
 } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
@@ -295,7 +297,12 @@ function AccessDialog({ config, orgName, onClose }: { config: AuthConfig | null;
   // the /register redirect deep-link here; without it a would-be signup
   // landed on the login form and had to find the small "Create account" toggle.
   const [mode, setMode] = useState<AuthMode>(search?.register === '1' ? 'register' : 'login')
-  const creating = mode === 'register'
+  // The heading only promises account creation when the register form can
+  // show: on a sign-in-with-SSO-only site there is no form to fill in.
+  const canRegister = !!config && (
+    config.auth_methods.includes('password') || search?.admin === '1' || !!config.trial_system_enabled
+  )
+  const creating = mode === 'register' && canRegister
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose()
@@ -327,7 +334,35 @@ function AccessDialog({ config, orgName, onClose }: { config: AuthConfig | null;
   )
 }
 
+const EMAIL_HELP = 'Please enter a valid email address (like name@university.edu).'
+const DEMO_FIELD_NAMES: Record<string, string> = {
+  name: 'your name', institution: 'your institution', role: 'your role', message: 'your message',
+}
+
+/** The server's rule: something before the @, and a dot in what follows it.
+ * A browser's own email check lets "a@b" through. */
+function looksLikeEmail(value: string): boolean {
+  const [local, domain, ...rest] = value.trim().split('@')
+  return rest.length === 0 && !!local && !!domain && /^[^.\s]+(\.[^.\s]+)+$/.test(domain)
+}
+
+/** What a failed walkthrough request should say, and whether it is about the
+ * email field. A rejected field comes back as a list of objects, which used
+ * to be shown as "[object Object]" (support ticket). */
+function demoRequestProblem(detail: unknown): { email?: string; form?: string } {
+  if (typeof detail === 'string' && detail) return { form: detail }
+  if (!Array.isArray(detail)) return { form: 'Could not submit request. Please try again.' }
+  const fields = detail.map(item => {
+    const loc = (item as { loc?: unknown })?.loc
+    return Array.isArray(loc) ? String(loc[loc.length - 1]) : ''
+  })
+  if (fields.includes('email')) return { email: EMAIL_HELP }
+  const named = [...new Set(fields.map(field => DEMO_FIELD_NAMES[field]).filter(Boolean))]
+  return { form: named.length ? `Please check ${named.join(' and ')}, then try again.` : 'Please check the form, then try again.' }
+}
+
 function DemoRequestForm() {
+  const [emailError, setEmailError] = useState('')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [institution, setInstitution] = useState('')
@@ -341,6 +376,13 @@ function DemoRequestForm() {
     e.preventDefault()
     if (submitting) return
     setError('')
+    setEmailError('')
+    // Caught here so the visitor is told before anything is sent.
+    if (!looksLikeEmail(email)) {
+      setEmailError(EMAIL_HELP)
+      document.getElementById('demo-email')?.focus()
+      return
+    }
     setSubmitting(true)
     try {
       const res = await fetch('/api/demo/request-contact', {
@@ -350,11 +392,19 @@ function DemoRequestForm() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || 'Could not submit request')
+        const problem = demoRequestProblem(data.detail)
+        if (problem.email) {
+          setEmailError(problem.email)
+          document.getElementById('demo-email')?.focus()
+        }
+        if (problem.form) setError(problem.form)
+        return
       }
       setSuccess(true)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not submit request')
+    } catch {
+      // The request never reached the server. The browser's own text for
+      // this ("Failed to fetch", "Load failed") means nothing to a visitor.
+      setError('We couldn’t send your request. Check your connection and try again.')
     } finally {
       setSubmitting(false)
     }
@@ -374,12 +424,21 @@ function DemoRequestForm() {
 
   return (
     <form onSubmit={handleSubmit} className="launch-demo-form space-y-4 text-left">
-      {error && <div className="rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-200">{error}</div>}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {error && <div role="alert" className="rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-200">{error}</div>}
+      <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
         <label className="sr-only" htmlFor="demo-name">Your name</label>
         <input id="demo-name" type="text" required placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} className="landing-auth-input" />
-        <label className="sr-only" htmlFor="demo-email">Work email</label>
-        <input id="demo-email" type="email" required placeholder="Work email" value={email} onChange={(e) => setEmail(e.target.value)} className="landing-auth-input" />
+        <div>
+          <label className="sr-only" htmlFor="demo-email">Work email</label>
+          <input
+            id="demo-email" type="email" required placeholder="Work email" value={email}
+            onChange={(e) => { setEmail(e.target.value); setEmailError('') }}
+            aria-invalid={emailError ? true : undefined}
+            aria-describedby={emailError ? 'demo-email-error' : undefined}
+            className="landing-auth-input"
+          />
+          {emailError && <p id="demo-email-error" role="alert" className="mt-1.5 text-sm text-red-200">{emailError}</p>}
+        </div>
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <label className="sr-only" htmlFor="demo-institution">Institution or organization</label>
@@ -568,6 +627,20 @@ export default function Landing() {
   const [accessOpen, setAccessOpen] = useState(() => !!(search?.register === '1' || search?.admin === '1' || search?.error || search?.invite_token || search?.next))
   const inviteToken = search?.invite_token
   const nextPath = safeNextPath(search?.next)
+  // Phones: the top-bar links don't fit, so they live behind a menu button.
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuButton = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (!menuOpen) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setMenuOpen(false)
+      // The menu's links are about to unmount; keep focus on the page.
+      menuButton.current?.focus()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [menuOpen])
 
   useEffect(() => {
     getAuthConfig()
@@ -611,8 +684,28 @@ export default function Landing() {
           <div className="flex shrink-0 items-center gap-3">
             <button type="button" onClick={() => setAccessOpen(true)} className="text-sm font-medium text-zinc-300 transition-colors hover:text-white">Sign in</button>
             <a href="#demo" className="launch-nav-cta">Request a walkthrough <span aria-hidden="true">→</span></a>
+            <button
+              ref={menuButton}
+              type="button"
+              className="launch-menu-button md:hidden"
+              aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={menuOpen}
+              aria-controls="landing-menu"
+              onClick={() => setMenuOpen(open => !open)}
+            >
+              {menuOpen ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}
+            </button>
           </div>
         </div>
+        {menuOpen && (
+          <nav id="landing-menu" aria-label="Menu" className="launch-menu md:hidden">
+            <a href="#agent" onClick={() => setMenuOpen(false)}>What&apos;s new</a>
+            <a href="#projects" onClick={() => setMenuOpen(false)}>Projects</a>
+            <a href="#trust" onClick={() => setMenuOpen(false)}>Trust</a>
+            <Link to="/docs" onClick={() => setMenuOpen(false)}>Docs</Link>
+            <a href="#demo" onClick={() => setMenuOpen(false)} className="launch-menu-cta">Request a walkthrough <span aria-hidden="true">→</span></a>
+          </nav>
+        )}
       </header>
 
       <main id="main-content">

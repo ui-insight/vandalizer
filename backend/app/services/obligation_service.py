@@ -12,7 +12,9 @@ import datetime
 import html
 import re
 import uuid as uuid_mod
-from typing import Any, Optional
+from typing import Any, Collection, Iterable, Optional
+
+from pydantic import BaseModel
 
 from app.models.document import SmartDocument
 from app.models.obligation import (
@@ -286,6 +288,18 @@ def _units_of(value: float, text: str) -> set[str]:
     return units
 
 
+def format_limit_figure(value: float, unit: Optional[str]) -> str:
+    """A limit figure as the inbox shows it: "$9,555", "22.5%", "1,200".
+
+    Exact, never rounded: the approval card must show the figure that is
+    about to be saved.
+    """
+    if unit == "$":
+        return f"${value:,.0f}" if float(value).is_integer() else f"${value:,.2f}"
+    number = f"{int(value):,}" if float(value).is_integer() else f"{value:,.6f}".rstrip("0").rstrip(".")
+    return f"{number}%" if unit == "%" else number
+
+
 def _limit_unit(
     limit_value: float, limit_quote: str, observed: float, observed_quote: str, claimed: str,
 ) -> tuple[Optional[str], Optional[str]]:
@@ -311,8 +325,8 @@ def _limit_unit(
         return None, (
             f"the limit is {limit_kind} ({say(limit_value, limit_units)}) but the observed value is "
             f"{observed_kind} ({say(observed, observed_units)}); a limit can only be compared with a "
-            f"value in the same unit. Use the observed figure the document states in that unit "
-            f"(for a rate limit, the rate), or leave this limit out"
+            f"value in the same unit. Use a different figure the document states in that unit, "
+            f"or give the limit alone, without observed_value"
         )
     if True in shared:
         return "%", None
@@ -484,20 +498,33 @@ async def check_proposal(item: dict, user: User, project: Project) -> tuple[Opti
             clean.update(**checked)
     elif kind == "limit":
         limit_value = _as_number(item.get("limit_value"))
+        if limit_value is None:
+            return None, "a limit needs limit_value as a number"
         observed = _as_number(item.get("observed_value"))
-        if limit_value is None or observed is None:
-            return None, "a limit needs limit_value and observed_value as numbers"
         by_role = {s.role: s.quote for s in sources}
         limit_quote = by_role.get("limit", quotes)
-        observed_quote = by_role.get("observed", quotes)
         if limit_value not in _figures_in(limit_quote):
             return None, "the limit's quote does not state the limit value"
-        if observed not in _figures_in(observed_quote):
-            return None, "the observed value is not stated in its quote"
-        unit, reason = _limit_unit(limit_value, limit_quote, observed, observed_quote, str(item.get("unit") or ""))
-        if reason:
-            return None, reason
-        clean.update(limit_value=limit_value, observed_value=observed, unit=unit)
+        claimed = str(item.get("unit") or "")
+        if observed is None or observed == limit_value:
+            # A plain limit. Support ticket: with observed_value required, the
+            # limit was repeated as its own observed value and every item read
+            # "$9,555 within the $9,555 limit". A comparison is only kept when
+            # the document gives a different figure to compare.
+            units = _units_of(limit_value, limit_quote)
+            unit = "%" if "%" in units else "$" if "$" in units or claimed.strip() == "$" else None
+            clean["sources"] = [
+                s.model_copy(update={"role": "evidence"}) if s.role == "observed" else s for s in sources
+            ]
+            clean.update(limit_value=limit_value, observed_value=None, unit=unit)
+        else:
+            observed_quote = by_role.get("observed", quotes)
+            if observed not in _figures_in(observed_quote):
+                return None, "the observed value is not stated in its quote"
+            unit, reason = _limit_unit(limit_value, limit_quote, observed, observed_quote, claimed)
+            if reason:
+                return None, reason
+            clean.update(limit_value=limit_value, observed_value=observed, unit=unit)
     return clean, None
 
 
@@ -576,19 +603,46 @@ def _norm_title(title: str) -> str:
     return (title or "").strip().lower()
 
 
-async def is_duplicate(project_uuid: str, clean: dict) -> bool:
+#: Statuses a proposal is checked against. A superseded item was replaced by
+#: an amendment and is not "in the inbox" any more.
+_KNOWN_STATUSES = ("open", "done")
+
+
+async def find_existing(project_uuid: str, clean: dict) -> Optional[Obligation]:
+    """The inbox item a proposal repeats, open or already marked done.
+
+    Support ticket: only open items were compared, so a deadline marked Done
+    was proposed again on the next run and would have come back as open, with
+    its reminders starting over.
+    """
     existing = await Obligation.find(
-        Obligation.project_uuid == project_uuid,
-        Obligation.kind == clean["kind"],
-        Obligation.status == "open",
+        {"project_uuid": project_uuid, "kind": clean["kind"], "status": {"$in": list(_KNOWN_STATUSES)}}
     ).to_list()
+    matches = []
     for ob in existing:
+        if ob.status not in _KNOWN_STATUSES:
+            continue
         if clean["kind"] == "deadline" and ob.due_at and clean.get("due_at"):
             if _same_deadline(ob, clean):
-                return True
+                matches.append(ob)
         elif _norm_title(ob.title) == _norm_title(clean["title"]):
-            return True
-    return False
+            matches.append(ob)
+    # An open copy is the one the inbox is showing.
+    return next((ob for ob in matches if ob.status == "open"), matches[0] if matches else None)
+
+
+async def is_duplicate(project_uuid: str, clean: dict) -> bool:
+    return await find_existing(project_uuid, clean) is not None
+
+
+def _already_reason(ob: Obligation, user: User) -> str:
+    """Why a repeated proposal is left out. Every variant keeps the words
+    "already in this project's inbox", which callers match on."""
+    if ob.status == "done":
+        return "already in this project's inbox, marked done"
+    if user.user_id in (ob.dismissed_by or []):
+        return "already in this project's inbox, dismissed by you"
+    return "already in this project's inbox or proposal"
 
 
 async def save_checked(project: Project, user: User, clean: dict) -> Obligation:
@@ -630,8 +684,12 @@ async def propose(project: Project, user: User, items: list[dict]) -> dict:
             continue
         for occurrence in occurrences:
             row = {**clean, **occurrence}
-            if any(a["clean"] == row for a in accepted) or await is_duplicate(project.uuid, row):
+            if any(a["clean"] == row for a in accepted):
                 rejected.append({"title": row["title"], "reason": "already in this project's inbox or proposal"})
+                continue
+            existing = await find_existing(project.uuid, row)
+            if existing is not None:
+                rejected.append({"title": row["title"], "reason": _already_reason(existing, user)})
                 continue
             replaced = await find_replaced(project.uuid, row)
             accepted.append({"clean": row, "replaces": serialize(replaced, user) if replaced else None})
@@ -645,7 +703,52 @@ def _sort_key(ob: Obligation) -> tuple[int, datetime.datetime, datetime.datetime
     return (rank, due, ob.created_at)
 
 
-def serialize(ob: Obligation, user: User, project_title: str | None = None) -> dict:
+class _UuidOnly(BaseModel):
+    uuid: str
+
+
+async def deleted_source_uuids(obligations: Iterable[Obligation]) -> set[str]:
+    """Cited document uuids that no longer exist (support ticket).
+
+    Deleting a project's file leaves the items taken from it in place, still
+    quoting it. Checked when the items are read rather than when a file is
+    deleted, so every way a file can go (Files, folder delete, retention,
+    account deletion) is covered without each one knowing about the inbox.
+    """
+    cited = {s.document_uuid for o in obligations for s in (o.sources or [])}
+    if not cited:
+        return set()
+    # Uuids only: this runs on every inbox load and reminder sweep, and a
+    # document carries its whole extracted text.
+    found = await SmartDocument.find(
+        {"uuid": {"$in": list(cited)}, "soft_deleted": {"$ne": True}},
+    ).project(_UuidOnly).to_list()
+    return cited - {d.uuid for d in found}
+
+
+def source_deleted(ob: Obligation, deleted: Collection[str]) -> bool:
+    return any(s.document_uuid in deleted for s in (ob.sources or []))
+
+
+def awaiting_source_decision(ob: Obligation, deleted: Collection[str]) -> bool:
+    """A cited file is gone and nobody has said to keep the item.
+
+    Such an item is flagged in the inbox ("keep or dismiss?") and sends no
+    reminders: its date can no longer be checked against the document.
+    """
+    return source_deleted(ob, deleted) and not getattr(ob, "kept_without_source", False)
+
+
+async def serialize_checked(ob: Obligation, user: User, project_title: str | None = None) -> dict:
+    """``serialize`` for one item, with its sources checked for deletion."""
+    return serialize(ob, user, project_title, await deleted_source_uuids([ob]))
+
+
+def serialize(
+    ob: Obligation, user: User, project_title: str | None = None,
+    deleted: Collection[str] = (),
+) -> dict:
+    """*deleted* is ``deleted_source_uuids`` for the items being listed."""
     return {
         "uuid": ob.uuid,
         "project_uuid": ob.project_uuid,
@@ -660,7 +763,9 @@ def serialize(ob: Obligation, user: User, project_title: str | None = None) -> d
         "observed_value": ob.observed_value,
         "unit": ob.unit,
         "in_conflict": ob.in_conflict,
-        "sources": [s.model_dump() for s in ob.sources],
+        "sources": [{**s.model_dump(), "deleted": s.document_uuid in deleted} for s in ob.sources],
+        "source_deleted": source_deleted(ob, deleted),
+        "kept_without_source": bool(getattr(ob, "kept_without_source", False)),
         "status": ob.status,
         "supersedes": ob.supersedes,
         "superseded_by": ob.superseded_by,
@@ -692,13 +797,26 @@ async def inbox(
     if not include_dismissed:
         obligations = [o for o in obligations if user.user_id not in (o.dismissed_by or [])]
     obligations.sort(key=_sort_key)
-    return [serialize(o, user, projects[o.project_uuid].title) for o in obligations]
+    deleted = await deleted_source_uuids(obligations)
+    return [serialize(o, user, projects[o.project_uuid].title, deleted) for o in obligations]
 
 
 async def project_obligations(project: Project, user: User) -> list[dict]:
     obligations = await Obligation.find(Obligation.project_uuid == project.uuid).to_list()
     obligations.sort(key=lambda o: ({"open": 0, "done": 1, "superseded": 2}.get(o.status, 3), _sort_key(o)))
-    return [serialize(o, user, project.title) for o in obligations]
+    deleted = await deleted_source_uuids(obligations)
+    return [serialize(o, user, project.title, deleted) for o in obligations]
+
+
+async def set_kept_without_source(ob: Obligation, keep: bool) -> Obligation:
+    """Keep an item whose source file was deleted, for everyone on the project.
+
+    Reminders resume; the item still says its file is gone.
+    """
+    ob.kept_without_source = keep
+    ob.updated_at = _now()
+    await ob.save()
+    return ob
 
 
 async def set_done(ob: Obligation, user: User, done: bool) -> Obligation:

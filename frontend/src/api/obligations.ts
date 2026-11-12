@@ -7,6 +7,8 @@ export interface ObligationSource {
   page: number | null
   quote: string
   role: string
+  /** The cited file no longer exists. */
+  deleted?: boolean
 }
 
 /** A deadline, required piece of material or sponsor limit from a project's documents (#999). */
@@ -36,6 +38,10 @@ export interface Obligation {
   superseded_by: string | null
   /** Hidden from this user's Home; teammates still see it. */
   dismissed: boolean
+  /** A file this item cites was deleted. */
+  source_deleted?: boolean
+  /** Someone chose to keep the item after its file was deleted; until then it sends no reminders. */
+  kept_without_source?: boolean
 }
 
 /** Home's list across your projects, or one project's when *projectUuid* is given. */
@@ -55,6 +61,11 @@ export function setObligationDone(uuid: string, done: boolean) {
 
 export function setObligationDismissed(uuid: string, dismissed: boolean) {
   return apiFetch<Obligation>(`/api/obligations/${uuid}/dismiss`, { method: 'POST', body: JSON.stringify({ dismissed }) })
+}
+
+/** Keep an item whose source file was deleted, for everyone on the project. */
+export function setObligationKept(uuid: string, keep: boolean) {
+  return apiFetch<Obligation>(`/api/obligations/${uuid}/keep`, { method: 'POST', body: JSON.stringify({ keep }) })
 }
 
 export function setInboxHidden(inboxHidden: boolean) {

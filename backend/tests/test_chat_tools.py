@@ -1013,11 +1013,12 @@ class TestRunPinOnProject:
                   new_callable=AsyncMock, return_value=pins),
             patch("app.services.project_service.get_project_document_uuids",
                   new_callable=AsyncMock, return_value=["d1"]),
-            patch("app.services.chat_tools.SearchSet") as MockSS,
+            # The pinned set is loaded through the caller's access check.
+            patch("app.services.access_control.get_authorized_search_set",
+                  new_callable=AsyncMock, return_value=MagicMock(uuid="ss-1")),
             patch("app.services.chat_tools._execute_extraction",
                   new_callable=AsyncMock, return_value={"entity_count": 3}) as mock_exec,
         ):
-            MockSS.find_one = AsyncMock(return_value=MagicMock(uuid="ss-1"))
             result = await run_pin_on_project(ctx, "extraction", "ss-1", confirmed=True)
 
         mock_exec.assert_awaited_once()
@@ -1040,11 +1041,11 @@ class TestRunPinOnProject:
                   new_callable=AsyncMock, return_value=pins),
             patch("app.services.project_service.get_project_document_uuids",
                   new_callable=AsyncMock, return_value=many),
-            patch("app.services.chat_tools.Workflow") as MockWf,
+            patch("app.services.access_control.get_authorized_workflow",
+                  new_callable=AsyncMock, return_value=MagicMock(id="wf-1")),
             patch("app.services.chat_tools._execute_workflow",
                   new_callable=AsyncMock, return_value={"session_id": "s1"}),
         ):
-            MockWf.get = AsyncMock(return_value=MagicMock(id="wf-1"))
             result = await run_pin_on_project(ctx, "workflow", "wf-1", confirmed=True)
 
         assert result["session_id"] == "s1"
@@ -1086,6 +1087,8 @@ class TestProjectManageTools:
                   new_callable=AsyncMock, return_value=_fake_project()),
             patch("app.services.project_service.can_manage_project",
                   new_callable=AsyncMock, return_value=True),
+            patch("app.services.project_service.authorized_pin_name",
+                  new_callable=AsyncMock, return_value="Compliance"),
             patch("app.services.project_service.add_pin",
                   new_callable=AsyncMock) as mock_add,
         ):

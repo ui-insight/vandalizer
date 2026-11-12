@@ -205,6 +205,18 @@ def _can_view_platform_role_flags(team_scope: str | None) -> bool:
     return team_scope is None
 
 
+def _email_unverified(target: User) -> bool:
+    """Whether AI features are held back until this account confirms its address.
+
+    Only trial accounts are gated (see trial_budget); everyone else's flag is
+    not consulted, so it isn't reported as a problem.
+    """
+    return bool(
+        getattr(target, "is_demo_user", False)
+        and not getattr(target, "email_verified", False)
+    )
+
+
 # ---------------------------------------------------------------------------
 # Pydantic request / response schemas
 # ---------------------------------------------------------------------------
@@ -486,6 +498,10 @@ class UserDetailResponse(BaseModel):
     is_admin: bool = False
     is_staff: bool = False
     is_examiner: bool = False
+    # True only for a trial account that hasn't confirmed its address — the
+    # one case where AI features are held back until it does. Shown to global
+    # admins and staff, who can confirm it for the user.
+    email_unverified: bool = False
     tokens_in: int = 0
     tokens_out: int = 0
     workflows_started: int = 0
@@ -1223,6 +1239,9 @@ async def user_detail(
             if show_platform_role_flags
             else False
         ),
+        email_unverified=(
+            show_platform_role_flags and _email_unverified(target_user)
+        ),
         tokens_in=tokens_in, tokens_out=tokens_out,
         workflows_started=workflows_started,
         workflows_completed=workflows_completed,
@@ -1401,6 +1420,46 @@ async def update_user_roles(
     )
 
     return {"ok": True}
+
+
+@router.post("/users/{user_id}/verify-email", response_model=None)
+async def mark_user_email_verified(
+    user_id: str,
+    user: User = Depends(get_current_user),
+) -> dict[str, object]:
+    """Confirm a trial user's address on their behalf.
+
+    The confirmation email is the only thing that switches AI features on for
+    a self-registered account, so when it never arrives the user has no way
+    forward. An admin (or staff, who run the trial programme) who knows the
+    person can vouch for the address here instead. It is a vouch: the account
+    is then treated as owning that address everywhere, not only for AI.
+    """
+    await _require_admin(user)
+
+    target = await User.find_one(User.user_id == user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Only where it unblocks something: a trial account waiting on its
+    # confirmation. ``email_verified`` is also what proves an account owns its
+    # address (links shared with named people rely on it), so it is not handed
+    # out to accounts that aren't held back by it.
+    if not target.is_demo_user:
+        raise HTTPException(
+            status_code=400,
+            detail="Only a trial account waiting on its confirmation email can be marked as verified here.",
+        )
+
+    if not target.email_verified:
+        target.email_verified = True
+        await target.save()
+        await _audit(
+            user, "verify_user_email",
+            f"Marked the email address for {user_id} as verified",
+        )
+
+    return {"ok": True, "email_unverified": False}
 
 
 # ---------------------------------------------------------------------------

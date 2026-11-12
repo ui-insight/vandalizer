@@ -1,4 +1,5 @@
 import { apiFetch, rawFetch } from './client'
+import { MissingDocumentsError } from './chatErrors'
 import type { CardDecision, ChatMessage, UrlAttachment, FileAttachment, PlanTask, StreamChunk, SkillSnapshot } from '../types/chat'
 
 function browserTimeZone(): string | undefined {
@@ -79,7 +80,15 @@ export async function streamChat(
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ detail: 'Chat request failed' }))
-    throw new Error(body.detail || 'Chat request failed')
+    const message = typeof body.detail === 'string' && body.detail ? body.detail : 'Chat request failed'
+    if (res.headers.get('X-Chat-Error') === 'document_missing') {
+      throw new MissingDocumentsError(
+        message,
+        (res.headers.get('X-Missing-Documents') || '').split(',').filter(Boolean),
+        res.headers.get('X-Missing-Reason') === 'deleted' ? 'deleted' : 'unavailable',
+      )
+    }
+    throw new Error(message)
   }
 
   const conversationUuid = res.headers.get('X-Conversation-UUID') || ''

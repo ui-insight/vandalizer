@@ -391,7 +391,7 @@ async def _deadlines(project: Project, user: User) -> dict[str, Any]:
     return {"upcoming": upcoming, "overdue": overdue, "done": done, "needed": needed}
 
 
-async def _activity(project: Project) -> dict[str, Any]:
+async def _activity(project: Project, user: User) -> dict[str, Any]:
     from app.models.activity import ActivityEvent
     from app.models.artifact import Artifact
     from app.models.project import ProjectPin
@@ -399,7 +399,19 @@ async def _activity(project: Project) -> dict[str, Any]:
     last = await ActivityEvent.find(
         {"project_uuid": project.uuid, "type": {"$in": ["workflow_run", "search_set_run"]}},
     ).sort("-started_at").first_or_none()
-    pinned = [p.target_id for p in await ProjectPin.find({"project_uuid": project.uuid, "pin_type": "artifact"}).to_list()]
+    # A pinned Page is listed only for someone who can open it: a pin never
+    # grants access to what it points at.
+    from fastapi import HTTPException
+
+    from app.services.project_service import authorize_resource
+
+    pinned = []
+    for pin in await ProjectPin.find({"project_uuid": project.uuid, "pin_type": "artifact"}).to_list():
+        try:
+            await authorize_resource("artifact", pin.target_id, user)
+        except HTTPException:
+            continue
+        pinned.append(pin.target_id)
     pages = await Artifact.find(
         {"deleted_at": None, "$or": [{"project_uuid": project.uuid}, {"uuid": {"$in": pinned}}]},
     ).sort("-updated_at").limit(5).to_list()
@@ -441,7 +453,7 @@ async def view(project: Project, user: User) -> dict[str, Any]:
         "page_uuid": snap.page_uuid if snap else None,
         "can_manage": await can_manage_project(project, user),
         "deadlines": await _deadlines(project, user),
-        **await _activity(project),
+        **await _activity(project, user),
         "generated_at": _iso(datetime.datetime.now(datetime.timezone.utc)),
     }
 

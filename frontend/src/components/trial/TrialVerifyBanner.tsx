@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { MailCheck, Loader2 } from 'lucide-react'
-import { getTrialUsage, resendVerificationEmail } from '../../api/demo'
+import { getTrialUsage } from '../../api/demo'
 import { useAuth } from '../../hooks/useAuth'
+import { useResendVerification } from '../../hooks/useResendVerification'
 
 /**
  * Tells an unconfirmed trial user why AI features aren't responding, and gives
@@ -16,9 +17,8 @@ export function TrialVerifyBanner() {
   const { user } = useAuth()
   const isTrialUser = Boolean(user?.is_demo_user)
   const [needsVerify, setNeedsVerify] = useState(false)
-  const [sending, setSending] = useState(false)
-  const [sent, setSent] = useState(false)
-  const [error, setError] = useState('')
+  const hide = useCallback(() => setNeedsVerify(false), [])
+  const { resend, sending, sent, error } = useResendVerification(hide)
 
   useEffect(() => {
     // The session already says whether this is a trial account, so only trial
@@ -46,27 +46,6 @@ export function TrialVerifyBanner() {
 
   if (!needsVerify) return null
 
-  async function handleResend() {
-    setSending(true)
-    setError('')
-    try {
-      const result = await resendVerificationEmail()
-      if (result.already_verified) {
-        setNeedsVerify(false)
-        return
-      }
-      if (result.ok) setSent(true)
-      else setError("We couldn't send it just now — please try again in a moment.")
-    } catch {
-      setError("We couldn't send it just now — please try again in a moment.")
-    } finally {
-      setSending(false)
-    }
-  }
-
-  // Colours for the light workspace this sits in. It used the landing page's
-  // dark-theme pair (pale amber text on a faint amber tint), which on a white
-  // page is pale yellow on cream (support ticket).
   return (
     <div
       role="status"
@@ -82,7 +61,7 @@ export function TrialVerifyBanner() {
       ) : (
         <button
           type="button"
-          onClick={handleResend}
+          onClick={resend}
           disabled={sending}
           className="inline-flex items-center gap-1.5 rounded-md border border-amber-700 bg-white px-3 py-1 font-semibold text-amber-950 hover:bg-amber-100 disabled:opacity-50"
         >
@@ -90,7 +69,7 @@ export function TrialVerifyBanner() {
           Resend link
         </button>
       )}
-      {error && <span role="alert" className="text-red-800">{error}</span>}
+      {error && <span role="alert" className="basis-full text-red-800">{error}</span>}
     </div>
   )
 }
