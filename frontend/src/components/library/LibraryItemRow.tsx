@@ -569,6 +569,7 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
       {showVerifyModal && (
         <VerificationSubmitModal
           itemKind={item.kind}
+          setType={item.set_type}
           itemId={item.item_id}
           itemTitle={item.name}
           onClose={() => setShowVerifyModal(false)}

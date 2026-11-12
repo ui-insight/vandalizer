@@ -6011,8 +6011,10 @@ async def _build_workflow_step_data(
             return None, "a knowledge_base_query step needs a 'kb_uuid'"
         if not query:
             return None, "a knowledge_base_query step needs a 'query'"
-        kb = await KnowledgeBase.find_one(KnowledgeBase.uuid == kb_uuid)
-        if not kb or not (kb.verified or _kb_access_ok(kb, context.deps.user_id, context.deps.team_id)):
+        # The same rule the editor and the run apply to a step's knowledge base.
+        from app.services import access_control as _access_control
+
+        if not await _access_control.get_authorized_knowledge_base(kb_uuid, context.deps.user, allow_admin=True):
             return None, f"knowledge base '{kb_uuid}' not found or not accessible"
         mode = step.get("mode") if step.get("mode") in ("passages", "answer") else "answer"
         return {"kb_uuid": kb_uuid, "query": query, "mode": mode, "model": model}, None
