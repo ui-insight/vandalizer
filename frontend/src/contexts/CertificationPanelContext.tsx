@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react'
 import { useCertification } from '../hooks/useCertification'
+import { AuthContext } from './AuthContext'
 import { certificationChatEntry } from '../lib/certificationChat'
 import type { CertificationProgress, ValidationResult, CompletionResult, CertExercise, CourseDefinition, PendingCompletion, OutcomeCompletionSelection } from '../types/certification'
 
@@ -60,8 +61,12 @@ export function CertificationPanelProvider({ children }: { children: ReactNode }
   const [isOpen, setIsOpen] = useState(false)
   const [mode, setModeState] = useState<PanelMode>(getStoredMode)
 
+  // This provider wraps public pages too. Ask for progress only once someone
+  // is signed in; with no auth provider at all (unit tests) it loads as before.
+  const auth = useContext(AuthContext)
+  const signedOut = auth != null && !auth.user
   // Single useCertification call — shared by panel and rail via context
-  const cert = useCertification()
+  const cert = useCertification(!signedOut)
   const [assessmentDestination, setAssessmentDestination] = useState<AssessmentDestination | null>(null)
   const destinationSequence = useRef(0)
   const openAssessment = useCallback((moduleId: string, enrollmentId: string, manifestSha256: string) => {
