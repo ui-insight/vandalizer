@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { listProjectPins, addProjectPin, removeProjectPin } from '../api/projects'
 import type { ProjectPin } from '../types/project'
 
@@ -21,7 +21,11 @@ export function useProjectPins(projectUuid: string | null) {
   const requestVersion = useRef(0)
   const currentProject = useRef(projectUuid)
   currentProject.current = projectUuid
-  const pins = snapshot.project === projectUuid ? snapshot.pins : EMPTY_PINS
+  const listed = snapshot.project === projectUuid ? snapshot.pins : EMPTY_PINS
+  // Everything that opens, runs or scopes by a pin uses `pins`. A pin the
+  // viewer can't open is kept apart: it can only be removed.
+  const pins = useMemo(() => (listed.some(p => p.restricted) ? listed.filter(p => !p.restricted) : listed), [listed])
+  const restrictedPins = useMemo(() => listed.filter(p => p.restricted), [listed])
   const error = failure?.project === projectUuid ? failure.message : null
 
   const load = useCallback(async () => {
@@ -70,5 +74,5 @@ export function useProjectPins(projectUuid: string | null) {
     await load()
   }, [projectUuid, load])
 
-  return { pins, loading: loading || (!!projectUuid && snapshot.project !== projectUuid && !error), error, refresh: load, idsByType, isPinned, pin, unpin }
+  return { pins, restrictedPins, loading: loading || (!!projectUuid && snapshot.project !== projectUuid && !error), error, refresh: load, idsByType, isPinned, pin, unpin }
 }

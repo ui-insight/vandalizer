@@ -6,6 +6,7 @@ import type { ModelInfo } from '../../types/workflow'
 import { ModelEffortPicker } from '../ModelEffortPicker'
 import { useBranding } from '../../contexts/BrandingContext'
 import { useUploadPolicy } from '../../hooks/useUploadPolicy'
+import './chat-composer.css'
 
 interface Props {
   initialDraft?: string
@@ -247,7 +248,7 @@ export function ChatInput({
         </div>
 
         {/* Controls toolbar — min-w-0 lets children shrink instead of overflowing on narrow screens */}
-        <div className="chat-composer-controls flex min-w-0 flex-wrap items-center gap-1.5 pt-1 px-1">
+        <div className="chat-composer-controls flex min-w-0 flex-wrap items-center gap-2 pt-1 px-1">
           {/* + Add button */}
           <div ref={addMenuRef} className="relative">
             <button
@@ -256,7 +257,7 @@ export function ChatInput({
               aria-haspopup="menu"
               aria-label="Add a source to this conversation: a document, a website or a knowledge base"
               title="Add a source: a document, a website or a knowledge base"
-              className="flex items-center gap-1 rounded-[30px] border border-gray-300 px-2.5 py-1 text-xs font-medium text-[#555] hover:bg-gray-100 transition-all"
+              className="chat-composer-tool"
             >
               <Plus className="h-3.5 w-3.5" />
               Add
@@ -331,7 +332,7 @@ export function ChatInput({
                 aria-expanded={showModelMenu}
                 aria-haspopup="dialog"
                 aria-label={`Choose chat model: ${displayModel || 'default'}`}
-                className="flex min-w-0 items-center gap-1 rounded-[30px] border border-gray-300 px-2.5 py-1 text-xs font-medium text-[#555] hover:bg-gray-100 transition-all"
+                className="chat-composer-tool min-w-0"
               >
                 <Cpu className="h-3 w-3 shrink-0" />
                 <span className="chat-model-name truncate max-w-[28vw] sm:max-w-[160px]">{displayModel || 'Model'}</span>
@@ -358,55 +359,58 @@ export function ChatInput({
           {/* Context meter */}
           {contextMeter}
 
-          {/* Spacer */}
-          <div className="flex-1" />
+          <div className="chat-composer-actions">
+            <div className="chat-composer-tool-group" role="group" aria-label="Assistant tools">
+              {hasMessages && activityControl}
+              {memoryControl}
+            </div>
 
-          {hasMessages && activityControl}
+            {hasMessages && (onNewChat || exportActions || navigationControl) && (
+              <div className="chat-composer-tool-group chat-composer-conversation-tools" role="group" aria-label="Conversation tools">
+                {/* The rail's New chat is an unlabeled icon when the rail is
+                    collapsed, so the chat offers its own (support ticket). */}
+                {onNewChat && (
+                  <button
+                    type="button"
+                    onClick={onNewChat}
+                    title="Start a new conversation"
+                    className="chat-composer-tool chat-composer-new-chat cursor-pointer"
+                  >
+                    <SquarePen className="h-3 w-3 shrink-0" aria-hidden="true" />
+                    New chat
+                  </button>
+                )}
 
-          {/* Assistant memory */}
-          {memoryControl}
-          {hasMessages && <div className="flex h-8 w-8 shrink-0 items-center justify-center">{navigationControl}</div>}
+                {exportActions}
+                {navigationControl}
+              </div>
+            )}
 
-          {/* The rail's New chat is an unlabeled icon when the rail is
-              collapsed, so the chat offers its own (support ticket). */}
-          {onNewChat && hasMessages && (
-            <button
-              type="button"
-              onClick={onNewChat}
-              title="Start a new conversation"
-              className="flex shrink-0 cursor-pointer items-center gap-1 rounded-[30px] border border-gray-300 px-2.5 py-1 text-xs font-medium text-[#555] hover:bg-gray-100 transition-all"
-            >
-              <SquarePen className="h-3 w-3 shrink-0" aria-hidden="true" />
-              New chat
-            </button>
-          )}
-
-          {hasMessages && exportActions}
-
-          {/* A queued message is also available to touch users while Stop stays reachable. */}
-          {isStreaming && onStop && message.trim() && <button type="button" onClick={() => void handleSend()} disabled={disabled || sendDisabled || submitting} aria-label="Queue message" title="Queue message" className="shrink-0 rounded border border-gray-400 bg-white p-2 text-xs text-gray-800 disabled:opacity-50">Queue</button>}
-          {/* Send / Stop button */}
-          {isStreaming && onStop ? (
-            <button
-              type="button"
-              onClick={onStop}
-              aria-label="Stop response"
-              title="Stop"
-              className="flex shrink-0 items-center justify-center rounded-[var(--ui-radius)] bg-highlight p-1.5 text-highlight-text transition-opacity"
-            >
-              <Square className="h-4 w-4 fill-current" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleSend}
-              disabled={!message.trim() || disabled || sendDisabled || submitting}
-              aria-label="Send message"
-              className="flex shrink-0 items-center justify-center rounded-[var(--ui-radius)] bg-highlight p-1.5 text-highlight-text transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Send className="h-4 w-4" />
-            </button>
-          )}
+            {/* A queued message is also available to touch users while Stop stays reachable. */}
+            {isStreaming && onStop && message.trim() && <button type="button" onClick={() => void handleSend()} disabled={disabled || sendDisabled || submitting} aria-label="Queue message" title="Queue message" className="shrink-0 rounded border border-gray-400 bg-white p-2 text-xs text-gray-800 disabled:opacity-50">Queue</button>}
+            {/* Send / Stop button */}
+            {isStreaming && onStop ? (
+              <button
+                type="button"
+                onClick={onStop}
+                aria-label="Stop response"
+                title="Stop"
+                className="chat-composer-send flex shrink-0 items-center justify-center rounded-[var(--ui-radius)] bg-highlight text-highlight-text transition-opacity"
+              >
+                <Square className="h-4 w-4 fill-current" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSend}
+                disabled={!message.trim() || disabled || sendDisabled || submitting}
+                aria-label="Send message"
+                className="chat-composer-send flex shrink-0 items-center justify-center rounded-[var(--ui-radius)] bg-highlight text-highlight-text transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Send className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

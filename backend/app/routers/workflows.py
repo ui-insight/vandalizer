@@ -52,6 +52,8 @@ from app.schemas.workflows import (
 )
 from app.rate_limit import limiter
 from app.services import workflow_service as svc
+from app.services import step_knowledge_access
+from app.services.workflow_service import FixedDocumentAccessError, ensure_step_document_readable
 from app.services.docx_service import data_to_docx_bytes
 from app.services.name_conflicts import DuplicateNameError
 from app.services.user_lookup import resolve_author, resolve_authors
@@ -532,7 +534,7 @@ def _render_workflow_output(status: dict, format: str, parse_structured: bool) -
                     if parsed is not None:
                         data = parsed
         if isinstance(data, list):
-            if data and isinstance(data[0], dict):
+            if data and all(isinstance(row, dict) for row in data):
                 # Collect keys from ALL items so no columns are missing
                 headers = list(dict.fromkeys(k for row in data for k in row.keys()))
                 # Each field's source sits beside it, when the rows are the
@@ -806,7 +808,7 @@ async def export_workflow(workflow_id: str, user: User = Depends(get_current_use
     from app.services import export_import_service as eis
 
     try:
-        data = await eis.export_workflow(workflow_id, user.email or user.user_id)
+        data = await eis.export_workflow(workflow_id, user.email or user.user_id, user)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -835,6 +837,11 @@ async def import_workflow(
 
     try:
         team_id = str(user.current_team) if user.current_team else None
+        # What the file points at is added to a workflow by importing it, so
+        # anything the importer can't open is cleared first.
+        items = data.get("items") if isinstance(data, dict) else None
+        if isinstance(items, list) and items and isinstance(items[0], dict):
+            await eis.drop_unreadable_import_references(items[0], user)
         wf = await eis.import_workflow(data, user.user_id, team_id=team_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -867,7 +874,19 @@ async def import_into_workflow(
 
     try:
         team_id = str(user.current_team) if user.current_team else None
+        # The file replaces the workflow's input settings and steps. Anything
+        # it points at that the importer can't open is cleared first; what the
+        # workflow already uses stays.
+        items = data.get("items") if isinstance(data, dict) else None
+        if isinstance(items, list) and items and isinstance(items[0], dict):
+            await eis.drop_unreadable_import_references(
+                items[0], user, keep_fixed_documents=target.input_config,
+                keep_documents=set(await svc.step_document_uuids(target)),
+                keep_knowledge_bases=set(await step_knowledge_access.workflow_kb_uuids(target)),
+            )
         wf = await eis.import_into_workflow(workflow_id, data, user.user_id, team_id=team_id)
+    except FixedDocumentAccessError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -919,6 +938,8 @@ async def update_workflow(workflow_id: str, req: UpdateWorkflowRequest, user: Us
         )
     except DuplicateNameError as e:
         raise HTTPException(status_code=409, detail=str(e))
+    except FixedDocumentAccessError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
     # Flag stale verification if this workflow was verified
@@ -997,7 +1018,10 @@ async def remove_workflow_from_team(workflow_id: str, user: User = Depends(get_c
 
 @router.post("/{workflow_id}/steps", response_model=None)
 async def add_step(workflow_id: str, req: AddStepRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
-    step = await svc.add_step(workflow_id, req.name, user=user, data=req.data, is_output=req.is_output)
+    try:
+        step = await svc.add_step(workflow_id, req.name, user=user, data=req.data, is_output=req.is_output)
+    except FixedDocumentAccessError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     if not step:
         raise HTTPException(status_code=404, detail="Workflow not found")
     return step
@@ -1005,7 +1029,10 @@ async def add_step(workflow_id: str, req: AddStepRequest, user: User = Depends(g
 
 @router.patch("/steps/{step_id}", response_model=None)
 async def update_step(step_id: str, req: UpdateStepRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
-    step = await svc.update_step(step_id, user=user, name=req.name, data=req.data, is_output=req.is_output)
+    try:
+        step = await svc.update_step(step_id, user=user, name=req.name, data=req.data, is_output=req.is_output)
+    except FixedDocumentAccessError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     if not step:
         raise HTTPException(status_code=404, detail="Step not found")
     # Flag stale verification on parent workflow
@@ -1030,7 +1057,10 @@ async def delete_step(step_id: str, user: User = Depends(get_current_user)) -> d
 
 @router.post("/steps/{step_id}/tasks", response_model=None)
 async def add_task(step_id: str, req: AddTaskRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
-    task = await svc.add_task(step_id, req.name, user=user, data=req.data)
+    try:
+        task = await svc.add_task(step_id, req.name, user=user, data=req.data)
+    except FixedDocumentAccessError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     if not task:
         status_code, detail = await _diagnose_step_mutation_failure(step_id, user)
         raise HTTPException(status_code=status_code, detail=detail)
@@ -1093,7 +1123,10 @@ async def _diagnose_task_mutation_failure(task_id: str, user: User) -> tuple[int
 
 @router.patch("/tasks/{task_id}", response_model=None)
 async def update_task(task_id: str, req: UpdateTaskRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
-    task = await svc.update_task(task_id, user=user, name=req.name, data=req.data)
+    try:
+        task = await svc.update_task(task_id, user=user, name=req.name, data=req.data)
+    except FixedDocumentAccessError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     if not task:
         status_code, detail = await _diagnose_task_mutation_failure(task_id, user)
         raise HTTPException(status_code=status_code, detail=detail)
@@ -1198,7 +1231,9 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
     except ValueError as e:
         from app.models.activity import ActivityStatus
         await activity_service.activity_finish(activity.id, ActivityStatus.FAILED, error=str(e))
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(
+            status_code=403 if isinstance(e, FixedDocumentAccessError) else 404, detail=str(e),
+        )
 
 
 @router.post("/sessions/{session_id}/cancel", response_model=None)
@@ -1231,6 +1266,14 @@ async def cancel_batch_run(
 @limiter.limit("20/minute")
 async def test_step(request: Request, req: TestStepRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
     document_uuids = await _authorize_documents(req.document_uuids, user)
+    # A step's selected document is read by the test too, so it needs the same
+    # access as the documents passed alongside it.
+    try:
+        await ensure_step_document_readable(req.task_data, user)
+        # ...and a Knowledge Base Query test searches the knowledge base it names.
+        await step_knowledge_access.ensure_task_kb_readable(req.task_name, req.task_data, user)
+    except FixedDocumentAccessError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     if req.task_name == "Extraction":
         search_set_uuid = (req.task_data or {}).get("search_set_uuid")
         if search_set_uuid:
@@ -1388,6 +1431,18 @@ async def restore_workflow_version(
         version = None
     if not version or version.workflow_id != str(wf.id):
         raise HTTPException(status_code=404, detail="Version not found")
+    # An earlier version can name documents the workflow no longer reads;
+    # bringing them back needs the same access as adding them.
+    try:
+        await svc.ensure_definition_documents_readable(
+            version.definition, user, already_input_config=wf.input_config,
+            already_step_documents=set(await svc.step_document_uuids(wf)),
+        )
+        await step_knowledge_access.ensure_definition_kbs_readable(
+            version.definition, user, already=await step_knowledge_access.workflow_kb_uuids(wf),
+        )
+    except FixedDocumentAccessError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     restored, name_note = await workflow_versions.restore_version(wf, version, user.user_id)
     return {"id": str(restored.id), "number": restored.number, "restored_from": version.number, "name_note": name_note}
 
@@ -1894,7 +1949,9 @@ async def run_workflow_integrated(
     except ValueError as e:
         from app.models.activity import ActivityStatus
         await activity_service.activity_finish(activity.id, ActivityStatus.FAILED, error=str(e))
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(
+            status_code=403 if isinstance(e, FixedDocumentAccessError) else 404, detail=str(e),
+        )
 
 
 # ---------------------------------------------------------------------------

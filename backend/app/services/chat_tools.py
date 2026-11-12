@@ -37,7 +37,7 @@ from app.models.workflow import Workflow
 from app.services.chat_deps import AgenticChatDeps
 from app.services.chat_page_templates import find_page_templates, get_page_template
 from app.services.chat_artifact_tools import compare_page_versions, create_html_artifact, find_pages, get_html_artifact, revise_html_artifact
-from app.services.chat_skill_tools import get_skill, list_skills, select_skill
+from app.services.chat_skill_tools import get_skill, list_skills, select_skill, use_core_skill
 from app.services.chat_file_tools import list_projects, move_documents_to_project
 from app.services.chat_calculator import calculate
 from app.services.certification_versions.runtime import course_operation
@@ -2098,8 +2098,8 @@ async def _execute_extraction(
     """Run an already-authorized extraction set against documents.
 
     Shared by ``run_extraction`` (after it authorizes the set) and
-    ``run_pin_on_project`` (where the project pin is the authorization
-    boundary). Each document is still authorized against the caller. Returns
+    ``run_pin_on_project`` (after it authorizes the pinned set for the
+    caller). Each document is still authorized against the caller. Returns
     the same response shape as ``run_extraction``, including the quality
     sidecar. Caps at 10 documents and 50 entities.
 
@@ -2107,6 +2107,12 @@ async def _execute_extraction(
     model, field metadata and source tracking, and the same History record.
     """
     from app.routers.extractions import run_recorded_extraction
+    from app.services import assistant_capabilities
+
+    # A project pin is a Projects tool doing an extraction's work.
+    refused = assistant_capabilities.refusal(context, "extractions")
+    if refused:
+        return refused
 
     team_id = context.deps.team_id
     user_id = context.deps.user_id
@@ -2988,7 +2994,12 @@ async def _execute_workflow(
     ``run_pin_on_project``. Caps at 10 documents (the workflow_service limit).
     Returns a session_id for polling via get_workflow_status.
     """
-    from app.services import workflow_service
+    from app.services import assistant_capabilities, workflow_service
+
+    # A project pin is a Projects tool doing a workflow's work.
+    refused = assistant_capabilities.refusal(context, "workflows")
+    if refused:
+        return refused
 
     workflow_id = str(wf.id)
     team_id = context.deps.team_id
@@ -5066,6 +5077,13 @@ async def run_pin_on_project(
             )
         }
 
+    # Checked before the approval card, so nobody approves a run that is off.
+    from app.services import assistant_capabilities
+
+    refused = assistant_capabilities.refusal(context, "workflows" if pin_type == "workflow" else "extractions")
+    if refused:
+        return refused
+
     from app.services import project_service
 
     # Running is a manage action — keep it to owners/editors. Viewers can chat
@@ -5073,15 +5091,17 @@ async def run_pin_on_project(
     if not await project_service.can_manage_project(project, context.deps.user):
         return {"error": "You need edit access to this project to run its tools."}
 
-    # The pin must exist on this project — that's the authorization boundary for
-    # the referenced workflow/extraction (the user reaches it via the project).
-    pins = await project_service.list_pins(project)
+    # The pin must exist on this project AND be something this user can open
+    # themselves: a pin is a shortcut, never permission.
+    # list_pins leaves out pins the user can't access, so one answer covers
+    # both and the target's name is never revealed.
+    pins = await project_service.list_pins(project, context.deps.user)
     match = next(
         (p for p in pins if p["pin_type"] == pin_type and p["target_id"] == target_id),
         None,
     )
     if not match:
-        return {"error": f"That {pin_type} is not pinned to this project."}
+        return {"error": f"That {pin_type} is not pinned to this project, or you don't have access to it."}
 
     doc_uuids = await project_service.get_project_document_uuids(project)
     if not doc_uuids:
@@ -5115,15 +5135,19 @@ async def run_pin_on_project(
     if gate is not None:
         return gate
 
+    # Loaded through the access check, not by id: approval may have waited,
+    # and _execute_extraction trusts what it is handed.
+    from app.services import access_control
+
     if pin_type == "extraction":
-        ss = await SearchSet.find_one(SearchSet.uuid == target_id)
+        ss = await access_control.get_authorized_search_set(target_id, context.deps.user)
         if not ss:
-            return {"error": "The pinned extraction no longer exists."}
+            return {"error": project_service.pin_access_denied_message("extraction")}
         result = await _execute_extraction(context, ss, doc_uuids)
     else:  # workflow
-        wf = await Workflow.get(target_id)
+        wf = await access_control.get_authorized_workflow(target_id, context.deps.user)
         if not wf:
-            return {"error": "The pinned workflow no longer exists."}
+            return {"error": project_service.pin_access_denied_message("workflow")}
         project_options: WorkflowProjectOptions = {"project_context": project_context} if project_context else {}
         result = await _execute_workflow(context, wf, doc_uuids, **project_options)
         if len(doc_uuids) > 10 and "error" not in result:
@@ -5164,6 +5188,11 @@ async def pin_to_project(
         return {"error": f"Invalid pin type. Must be one of: {', '.join(PIN_TYPES)}."}
     if not await project_service.can_manage_project(project, context.deps.user):
         return {"error": "You need edit access to this project to pin items."}
+    # Refused before the approval card: there is nothing to approve.
+    if pin_type in ("workflow", "extraction", "automation", "knowledge_base") and (
+        await project_service.authorized_pin_name(pin_type, target_id, context.deps.user) is None
+    ):
+        return {"error": f"{project_service.pin_access_denied_message(pin_type)} Nothing was pinned."}
 
     gate = await _confirm_gate(
         context,
@@ -5728,6 +5757,13 @@ async def create_automation(
 
     if action_type not in ("workflow", "extraction"):
         return {"error": "action_type must be 'workflow' or 'extraction'."}
+    # An automation runs a workflow or an extraction on its own, so it needs
+    # that capability too.
+    from app.services import assistant_capabilities
+
+    refused = assistant_capabilities.refusal(context, "workflows" if action_type == "workflow" else "extractions")
+    if refused:
+        return refused
     normalized_types = sorted({extension.strip().lower().removeprefix(".") for extension in (file_types or [])})
     unsupported = set(normalized_types) - ALLOWED_EXTS
     if unsupported:
@@ -5982,8 +6018,10 @@ async def _build_workflow_step_data(
             return None, "a knowledge_base_query step needs a 'kb_uuid'"
         if not query:
             return None, "a knowledge_base_query step needs a 'query'"
-        kb = await KnowledgeBase.find_one(KnowledgeBase.uuid == kb_uuid)
-        if not kb or not (kb.verified or _kb_access_ok(kb, context.deps.user_id, context.deps.team_id)):
+        # The same rule the editor and the run apply to a step's knowledge base.
+        from app.services import access_control as _access_control
+
+        if not await _access_control.get_authorized_knowledge_base(kb_uuid, context.deps.user, allow_admin=True):
             return None, f"knowledge base '{kb_uuid}' not found or not accessible"
         mode = step.get("mode") if step.get("mode") in ("passages", "answer") else "answer"
         return {"kb_uuid": kb_uuid, "query": query, "mode": mode, "model": model}, None
@@ -6118,6 +6156,18 @@ async def create_workflow(
         return model_error
     model = requested_model or context.deps.model_name or None
 
+    # A fixed document's text goes into every run, so adding one needs read
+    # access to it. Refused before the preview: there is nothing to approve.
+    from app.services import access_control, workflow_service
+
+    fixed_document_uuids = [str(u) for u in (fixed_document_uuids or []) if u]
+    try:
+        await workflow_service.ensure_fixed_documents_readable(
+            {"fixed_documents": fixed_document_uuids}, context.deps.user,
+        )
+    except workflow_service.FixedDocumentAccessError as e:
+        return {"error": f"{e} Nothing was created."}
+
     # Validate every step up front so the preview reflects a buildable plan and
     # we never half-create a workflow because step 4 was malformed.
     plan: list[dict] = []
@@ -6237,7 +6287,8 @@ async def create_workflow(
     if fixed_document_uuids:
         fixed: list[dict] = []
         for u in fixed_document_uuids:
-            d = await SmartDocument.find_one(SmartDocument.uuid == u)
+            # Checked again here: the preview may have waited on approval.
+            d = await access_control.get_authorized_document(u, user, allow_admin=True)
             if d:
                 fixed.append({"uuid": u, "title": d.title or "Document"})
         if fixed:
@@ -7310,6 +7361,7 @@ TOOLS: list[ToolFuncContext[AgenticChatDeps, ...]] = [
     list_skills,
     get_skill,
     select_skill,
+    use_core_skill,
     find_page_templates,
     get_page_template,
     create_html_artifact,
@@ -7402,6 +7454,9 @@ TOOLS: list[ToolFuncContext[AgenticChatDeps, ...]] = [
 COMPACTABLE_TOOLS: frozenset[str] = frozenset({
     "list_skills",
     "get_skill",
+    # Returns the same payload as get_skill and can be loaded again, so an old
+    # copy must not replay in every later request.
+    "use_core_skill",
     "search_documents",
     "list_documents",
     "list_folders",

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { AlertTriangle, CalendarClock, CalendarPlus, Check, ChevronDown, ChevronRight, EyeOff, FileText, Inbox } from 'lucide-react'
-import { downloadDeadlineCalendar, getInbox, plainQuote, quoteSearchTerms, setObligationDismissed, setObligationDone } from '../../api/obligations'
+import { downloadDeadlineCalendar, getInbox, plainQuote, quoteSearchTerms, setObligationDismissed, setObligationDone, setObligationKept } from '../../api/obligations'
 import type { Obligation } from '../../api/obligations'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 
@@ -115,7 +115,7 @@ export function upcomingGroup(item: Obligation): GroupKey {
 function InboxRow({ item, focused, onChanged, onError }: {
   item: Obligation
   focused: boolean
-  onChanged: (uuid: string, change: 'done' | 'dismissed') => void
+  onChanged: (uuid: string, change: 'done' | 'dismissed' | 'kept') => void
   onError: (message: string) => void
 }) {
   const navigate = useNavigate()
@@ -128,7 +128,10 @@ function InboxRow({ item, focused, onChanged, onError }: {
   const Icon = item.kind === 'deadline' ? CalendarClock : item.kind === 'limit' ? AlertTriangle : FileText
   const alert = item.in_conflict || (soon != null && (daysUntil(item) ?? 99) <= 7)
 
-  const act = async (change: 'done' | 'dismissed', fn: () => Promise<unknown>) => {
+  // A cited file was deleted and nobody has decided what to do with the item.
+  const undecided = !!item.source_deleted && !item.kept_without_source
+
+  const act = async (change: 'done' | 'dismissed' | 'kept', fn: () => Promise<unknown>) => {
     if (busy) return
     setBusy(true)
     try {
@@ -161,6 +164,26 @@ function InboxRow({ item, focused, onChanged, onError }: {
           <p>{item.deadline_calculation.formula}</p>
           <p>Calendar days; anchor day excluded. No weekend or holiday adjustment.</p>
         </details>}
+        {undecided && <div role="group" aria-label={`Source file deleted for "${item.title}"`} style={{
+          display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-6)', marginTop: 'var(--workspace-space-4)',
+          padding: 'var(--workspace-space-4) var(--workspace-space-8)', borderRadius: 'var(--workspace-radius-small)',
+          backgroundColor: '#fffbeb', border: '1px solid #fcd34d', fontSize: 'var(--workspace-font-meta)', color: '#78350f',
+        }}>
+          <AlertTriangle size={12} aria-hidden style={{ flexShrink: 0 }} />
+          <span style={{ flex: 1, minWidth: '12rem' }}>
+            Source file deleted. {item.kind === 'deadline' && item.due_at ? 'Reminders are paused. ' : ''}Keep this item or dismiss it?
+          </span>
+          <button type="button" style={BUTTON} disabled={busy}
+            aria-label={`Keep "${item.title}" for everyone on the project`}
+            onClick={() => act('kept', () => setObligationKept(item.uuid, true))}>
+            Keep
+          </button>
+          <button type="button" style={BUTTON} disabled={busy}
+            aria-label={`Dismiss "${item.title}" from your Home`}
+            onClick={() => act('dismissed', () => setObligationDismissed(item.uuid, true))}>
+            Dismiss
+          </button>
+        </div>}
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-6)', marginTop: 'var(--workspace-space-4)' }}>
           <button type="button" style={{ ...BUTTON, border: 'none', padding: 0, color: '#2563eb', textDecoration: 'underline' }}
             onClick={() => navigate({ to: '/', search: { project: item.project_uuid } as never })}>
@@ -171,6 +194,14 @@ function InboxRow({ item, focused, onChanged, onError }: {
             // often in different documents; both open at their passage.
             const role = SOURCE_ROLES[source.role]
             const where = `${source.document_title}${source.page ? ` at page ${source.page}` : ''}`
+            // Nothing to open, and opening would attach a missing file to chat.
+            if (source.deleted) return (
+              <span key={`${source.document_uuid}-${source.page}-${i}`} title={plainQuote(source.quote)}
+                style={{ ...BUTTON, cursor: 'default', color: '#6b7280', borderStyle: 'dashed' }}>
+                {role && <span style={{ fontWeight: 600 }}>{role}:</span>}
+                <span style={{ textDecoration: 'line-through' }}>{source.document_title}</span> · file deleted
+              </span>
+            )
             return (
               <button key={`${source.document_uuid}-${source.page}-${i}`} type="button" title={plainQuote(source.quote)} style={BUTTON}
                 aria-label={role ? `Open the ${role.toLowerCase()} in ${where}` : `Open ${where}`}
@@ -303,10 +334,10 @@ export function RAInbox({ projectUuid }: { projectUuid?: string | null } = {}) {
 
   // Done leaves the inbox for everyone; Dismiss only hides it here, so it
   // stays countable under "Show dismissed".
-  const changed = (uuid: string, change: 'done' | 'dismissed') => setItems(current =>
+  const changed = (uuid: string, change: 'done' | 'dismissed' | 'kept') => setItems(current =>
     change === 'done'
       ? (current ?? []).filter(i => i.uuid !== uuid)
-      : (current ?? []).map(i => (i.uuid === uuid ? { ...i, dismissed: true } : i)))
+      : (current ?? []).map(i => (i.uuid === uuid ? { ...i, ...(change === 'kept' ? { kept_without_source: true } : { dismissed: true }) } : i)))
   const restore = async (uuid: string) => {
     try {
       await setObligationDismissed(uuid, false)

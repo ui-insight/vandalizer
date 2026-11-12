@@ -135,6 +135,13 @@ describe('LibraryItemRow', () => {
       expect(screen.getByText('Share with a team')).toBeTruthy()
     })
 
+    it('names a Skill or formatter by its real type in the wizard', () => {
+      // The row passes the item's set_type on; without it both read "extraction".
+      openMenu(makeItem({ kind: 'search_set', set_type: 'prompt' }))
+      fireEvent.click(screen.getByText('Share…'))
+      expect(screen.getByRole('heading', { name: 'Share this Skill' })).toBeTruthy()
+    })
+
     it('"Share with a team" hands off with a way back to the wizard', () => {
       openMenu(makeItem())
       fireEvent.click(screen.getByText('Share…'))

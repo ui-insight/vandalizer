@@ -14,6 +14,7 @@ export const TOOL_META: Record<string, { label: string; category: ToolCategory }
   list_skills:           { label: 'Finding Skills', category: 'read' },
   get_skill:             { label: 'Inspecting Skill', category: 'read' },
   select_skill:          { label: 'Updating active Skill', category: 'write' },
+  use_core_skill:        { label: 'Using a core Skill',   category: 'read' },
   list_workflows:        { label: 'Listing workflows',        category: 'read' },
   get_quality_info:      { label: 'Checking quality',         category: 'read' },
   search_library:        { label: 'Searching library',        category: 'read' },

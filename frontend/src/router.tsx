@@ -19,6 +19,7 @@ const Landing = lazy(() => import('./pages/Landing'))
 const WorkflowEditor = lazy(() => import('./pages/WorkflowEditor'))
 const Admin = lazy(() => import('./pages/Admin'))
 const Account = lazy(() => import('./pages/Account'))
+const Assistant = lazy(() => import('./pages/Assistant'))
 const Automation = lazy(() => import('./pages/Automation'))
 const Verification = lazy(() => import('./pages/Verification'))
 const SupportCenter = lazy(() => import('./pages/SupportCenter'))
@@ -294,6 +295,16 @@ const accountRoute = createRoute({
   ),
 })
 
+const assistantRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/assistant',
+  component: () => (
+    <ProtectedRoute>
+      <Assistant />
+    </ProtectedRoute>
+  ),
+})
+
 const automationRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/automation',
@@ -529,6 +540,7 @@ const routeTree = rootRoute.addChildren([
   libraryRoute,
   adminRoute,
   accountRoute,
+  assistantRoute,
   automationRoute,
   officeRoute,
   browserAutomationRoute,

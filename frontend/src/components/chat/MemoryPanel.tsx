@@ -121,16 +121,17 @@ export function MemoryPanel() {
     memory.kbs.length === 0
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="chat-composer-memory relative">
       <button
         onClick={handleToggle}
         aria-expanded={open}
         aria-haspopup="dialog"
         title={paused ? 'Assistant memory is off' : 'Assistant memory is on: what the assistant remembers about you'}
         aria-label={`Assistant memory: ${paused ? 'off' : 'on'}`}
-        className="flex items-center justify-center gap-1 rounded-[var(--ui-radius)] p-1.5 text-gray-600 hover:text-gray-800 transition-colors"
+        className="chat-composer-tool"
       >
-        <Brain className="h-4 w-4" style={paused ? { opacity: 0.55 } : undefined} />
+        <Brain className="h-4 w-4" aria-hidden="true" style={paused ? { opacity: 0.55 } : undefined} />
+        <span className="chat-composer-tool-label">Memory</span>
         {paused && <span aria-hidden="true" style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600 }}>Off</span>}
       </button>
 
@@ -138,7 +139,7 @@ export function MemoryPanel() {
         <div
           role="dialog"
           aria-label="Assistant memory"
-          className="absolute right-0 z-[1000] rounded-[var(--ui-radius)] border bg-white"
+          className="chat-composer-memory-dialog absolute right-0 z-[1000] rounded-[var(--ui-radius)] border bg-white"
           style={{ bottom: 'calc(100% + 8px)', width: 320, borderColor: 'rgba(0,0,0,0.14)', boxShadow: '0 10px 28px rgba(0,0,0,0.16)' }}
           onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false) }}
         >
