@@ -70,6 +70,7 @@ from app.services.page_authoring import declares_page_too_large, requests_page
 from app.services.chat_output import public_chat_text
 from app.services.chat_budget_tables import reconcile_budget_tables
 from app.services.chat_source_claims import attachment_sources, ground_source_checks
+from app.services.chat_spreadsheet_figures import spreadsheet_figures_note
 from app.services.compliance_claims import relabel_presence_checks, superseded_threshold_note
 from app.services.inbox_provenance import REPLY_NOTE as INBOX_REPLY_NOTE, credits_inbox
 from app.services.web_answer_grounding import (
@@ -2976,6 +2977,16 @@ async def chat_stream(
                 # "Mentioned in the document" is not "compliant", and a
                 # threshold the 2024 Uniform Guidance replaced is not current.
                 answer = relabel_presence_checks(answer, streamed_tool_results)
+                # The model was sent back once for yearly figures that don't
+                # match the spreadsheet's own row and year, or years that don't
+                # add up to the total beside them. If the reply still has them,
+                # list them under it: each number is in the file somewhere, so
+                # the figure check below has nothing to flag.
+                if answer:
+                    answer += spreadsheet_figures_note(agent_run.result.output, [
+                        *(getattr(d, "raw_text", None) or "" for d in documents or []),
+                        *(a.content or "" for a in file_attachments),
+                    ])
                 if not getattr(deps, "inbox_read", False) and credits_inbox(answer):
                     answer += "\n\n" + INBOX_REPLY_NOTE
                 threshold_note = superseded_threshold_note(answer)

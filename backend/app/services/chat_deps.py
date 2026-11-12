@@ -102,6 +102,9 @@ class AgenticChatDeps:
     # Once-only flag for calculation_claims.require_calculated_figures: a
     # reply stating figures about a document that it never calculated.
     calculation_retry_used: bool = False
+    # Once-only flag for chat_spreadsheet_figures.require_spreadsheet_figures:
+    # a yearly figure that contradicts the spreadsheet row and year it names.
+    spreadsheet_retry_used: bool = False
     # Once-only flag for approval_claims.require_honest_completion: a reply
     # calling work saved/finished while this turn's approval cards wait.
     completion_claim_retry_used: bool = False
