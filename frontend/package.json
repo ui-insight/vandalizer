@@ -38,7 +38,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.1",
     "@playwright/test": "^1.63.0",
-    "@sentry/vite-plugin": "^11.10.0",
+    "@sentry/vite-plugin": "^11.11.0",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^26.6.6",
