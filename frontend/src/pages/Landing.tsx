@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, Navigate, useSearch } from '@tanstack/react-router'
 import { useAuth } from '../hooks/useAuth'
 import { getAuthConfig, type AuthConfig } from '../api/auth'
@@ -15,6 +15,7 @@ import {
   FileInput,
   GitMerge,
   Lock,
+  Menu,
   MessageSquare,
   PenTool,
   PlayCircle,
@@ -23,6 +24,7 @@ import {
   ShieldCheck,
   Sparkles,
   Users,
+  X,
 } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
@@ -390,8 +392,10 @@ function DemoRequestForm() {
         return
       }
       setSuccess(true)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not submit request')
+    } catch {
+      // The request never reached the server. The browser's own text for
+      // this ("Failed to fetch", "Load failed") means nothing to a visitor.
+      setError('We couldn’t send your request. Check your connection and try again.')
     } finally {
       setSubmitting(false)
     }
@@ -614,6 +618,20 @@ export default function Landing() {
   const [accessOpen, setAccessOpen] = useState(() => !!(search?.register === '1' || search?.admin === '1' || search?.error || search?.invite_token || search?.next))
   const inviteToken = search?.invite_token
   const nextPath = safeNextPath(search?.next)
+  // Phones: the top-bar links don't fit, so they live behind a menu button.
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuButton = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (!menuOpen) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setMenuOpen(false)
+      // The menu's links are about to unmount; keep focus on the page.
+      menuButton.current?.focus()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [menuOpen])
 
   useEffect(() => {
     getAuthConfig()
@@ -657,8 +675,28 @@ export default function Landing() {
           <div className="flex shrink-0 items-center gap-3">
             <button type="button" onClick={() => setAccessOpen(true)} className="text-sm font-medium text-zinc-300 transition-colors hover:text-white">Sign in</button>
             <a href="#demo" className="launch-nav-cta">Request a walkthrough <span aria-hidden="true">→</span></a>
+            <button
+              ref={menuButton}
+              type="button"
+              className="launch-menu-button md:hidden"
+              aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={menuOpen}
+              aria-controls="landing-menu"
+              onClick={() => setMenuOpen(open => !open)}
+            >
+              {menuOpen ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}
+            </button>
           </div>
         </div>
+        {menuOpen && (
+          <nav id="landing-menu" aria-label="Menu" className="launch-menu md:hidden">
+            <a href="#agent" onClick={() => setMenuOpen(false)}>What&apos;s new</a>
+            <a href="#projects" onClick={() => setMenuOpen(false)}>Projects</a>
+            <a href="#trust" onClick={() => setMenuOpen(false)}>Trust</a>
+            <Link to="/docs" onClick={() => setMenuOpen(false)}>Docs</Link>
+            <a href="#demo" onClick={() => setMenuOpen(false)} className="launch-menu-cta">Request a walkthrough <span aria-hidden="true">→</span></a>
+          </nav>
+        )}
       </header>
 
       <main id="main-content">

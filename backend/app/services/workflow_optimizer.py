@@ -1290,6 +1290,16 @@ async def _execute_workflow_inproc(
     _u = await _User.find_one(_User.user_id == user_id)
     allow_code_execution = bool(_u and getattr(_u, "is_admin", False))
 
+    # Trials query the workflow's knowledge bases like any run does, so the
+    # same access rule applies before anything is searched.
+    from app.services import step_knowledge_access
+    from app.services.workflow_service import FixedDocumentAccessError
+
+    try:
+        await step_knowledge_access.ensure_workflow_kbs_runnable(wf_id, _u, user_id)
+    except FixedDocumentAccessError as denied:
+        raise OptimizationInputError(str(denied)) from denied
+
     # Build steps_data through the one builder every run path uses (#862).
     # The optimizer's own copy skipped step-level input, field_metadata,
     # saved Prompt/Formatter resolution, the selected-document preload and
@@ -1300,15 +1310,19 @@ async def _execute_workflow_inproc(
         from bson import ObjectId
 
         from app.tasks import get_sync_db
-        from app.tasks.workflow_tasks import build_steps_data
+        from app.tasks.workflow_tasks import FixedDocumentsDenied, build_steps_data
 
         db = get_sync_db()
         workflow_doc = db.workflow.find_one({"_id": ObjectId(wf_id)})
         if not workflow_doc:
             raise OptimizationInputError(f"Workflow {wf_id} not found")
-        steps_data, _ = build_steps_data(
-            db, workflow_doc, wf_id, {"doc_uuids": list(doc_uuids), "user_id": user_id},
-        )
+        try:
+            steps_data, _ = build_steps_data(
+                db, workflow_doc, wf_id, {"doc_uuids": list(doc_uuids), "user_id": user_id},
+            )
+        except FixedDocumentsDenied as denied:
+            # Trials read the workflow's fixed documents like any run does.
+            raise OptimizationInputError(str(denied)) from denied
         return steps_data
 
     steps_data = await asyncio.to_thread(_build)

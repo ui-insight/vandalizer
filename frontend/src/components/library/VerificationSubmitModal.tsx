@@ -22,6 +22,10 @@ const CATEGORIES = [
 
 interface Props {
   itemKind: LibraryItemKind
+  /** A search set's `set_type`: 'prompt' is a Skill and 'formatter' a
+   *  formatter. Both are stored as search sets, so without it they would be
+   *  named "extraction". */
+  setType?: string | null
   itemId: string
   itemTitle?: string
   onClose: () => void
@@ -48,7 +52,7 @@ const STEPS: { key: Step; label: string }[] = [
   { key: 'review', label: 'Review' },
 ]
 
-export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, onSubmitted, onShareWithTeam }: Props) {
+export function VerificationSubmitModal({ itemKind, setType, itemId, itemTitle, onClose, onSubmitted, onShareWithTeam }: Props) {
   const { user } = useAuth()
   const [step, setStep] = useState<Step>('intent')
   const [intent, setIntent] = useState<Intent | null>(null)
@@ -152,10 +156,17 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
     }
   }
 
-  const kindLabel = itemKind === 'workflow' ? 'Workflow' : itemKind === 'knowledge_base' ? 'Knowledge Base' : 'Extraction'
+  // Badge text, and the noun used mid-sentence ("Skill" keeps its capital,
+  // as everywhere else in the app).
+  const [kindLabel, kindNoun] =
+    itemKind === 'workflow' ? ['Workflow', 'workflow']
+      : itemKind === 'knowledge_base' ? ['Knowledge Base', 'knowledge base']
+        : setType === 'prompt' ? ['Skill', 'Skill']
+          : setType === 'formatter' ? ['Formatter', 'formatter']
+            : ['Extraction', 'extraction']
   const shareLabel = useShareLabel()
   // Neutral: the first step offers a team as well as everyone.
-  const title = `Share this ${kindLabel.toLowerCase()}`
+  const title = `Share this ${kindNoun}`
 
   return createPortal(
     // Stop propagation at the overlay: this modal is portaled to document.body, but
@@ -218,7 +229,7 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
           {step === 'intent' && (
             <div className="space-y-3">
               <p className="text-sm text-gray-700">
-                Sharing puts this {kindLabel.toLowerCase()} where colleagues can copy it. It doesn't need to be finished, and the score it carries can be low — it just has to be useful to someone and honest about what it does.
+                Sharing puts this {kindNoun} where colleagues can copy it. It doesn't need to be finished, and the score it carries can be low — it just has to be useful to someone and honest about what it does.
               </p>
               <div className="grid gap-2">
                 {onShareWithTeam && (

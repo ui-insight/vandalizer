@@ -236,7 +236,10 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "X-API-Key", "X-CSRF-Token"],
-    expose_headers=["X-Conversation-UUID", "X-Activity-ID"],
+    expose_headers=[
+        "X-Conversation-UUID", "X-Activity-ID",
+        "X-Chat-Error", "X-Missing-Documents", "X-Missing-Reason",
+    ],
 )
 
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])

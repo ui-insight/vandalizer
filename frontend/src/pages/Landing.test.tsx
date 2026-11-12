@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import Landing from './Landing'
 import type { AuthConfig } from '../api/auth'
@@ -140,5 +140,56 @@ describe('Landing — Request a walkthrough form (support ticket: "[object Objec
     fill('qa@university.edu')
     expect(await screen.findByText('Demo requests are temporarily unavailable. Please email us directly.')).toBeInTheDocument()
     expect(document.body.textContent).not.toContain('[object Object]')
+  })
+
+  it('says the request could not be sent when the network fails, not the browser\'s wording', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
+    render(<Landing />)
+    fill('qa@university.edu')
+    expect(await screen.findByText('We couldn’t send your request. Check your connection and try again.')).toBeInTheDocument()
+    expect(document.body.textContent).not.toContain('Failed to fetch')
+  })
+
+  // Leave nothing stubbed for the tests that follow.
+  afterEach(() => { vi.unstubAllGlobals() })
+})
+
+// Support ticket: on a phone only the logo and Sign in showed; the other
+// top-bar links were hidden with no menu to reach them.
+describe('Landing — phone menu', () => {
+  beforeEach(() => {
+    mockSearch = {}
+    mockGetAuthConfig.mockResolvedValue({ auth_methods: ['password'], oauth_providers: [] })
+  })
+
+  it('opens a menu with the top-bar links and the walkthrough request', async () => {
+    render(<Landing />)
+    const toggle = screen.getByRole('button', { name: 'Open menu' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('navigation', { name: 'Menu' })).not.toBeInTheDocument()
+
+    fireEvent.click(toggle)
+
+    const menu = screen.getByRole('navigation', { name: 'Menu' })
+    expect(screen.getByRole('button', { name: 'Close menu' })).toHaveAttribute('aria-expanded', 'true')
+    const links = Array.from(menu.querySelectorAll('a')).map(a => a.textContent?.replace('→', '').trim())
+    expect(links).toEqual(["What's new", 'Projects', 'Trust', 'Docs', 'Request a walkthrough'])
+    expect(menu.querySelector('a[href="#demo"]')).not.toBeNull()
+    await waitFor(() => expect(mockGetAuthConfig).toHaveBeenCalled())
+  })
+
+  it('closes when a link is chosen or Escape is pressed', async () => {
+    render(<Landing />)
+    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
+    fireEvent.click(screen.getByRole('navigation', { name: 'Menu' }).querySelector('a[href="#trust"]')!)
+    expect(screen.queryByRole('navigation', { name: 'Menu' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
+    screen.getByRole('navigation', { name: 'Menu' }).querySelector('a')!.focus()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.queryByRole('navigation', { name: 'Menu' })).not.toBeInTheDocument()
+    // Focus goes back to the button, not lost with the unmounted link.
+    expect(screen.getByRole('button', { name: 'Open menu' })).toHaveFocus()
+    await waitFor(() => expect(mockGetAuthConfig).toHaveBeenCalled())
   })
 })

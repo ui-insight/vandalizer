@@ -435,3 +435,130 @@ async def test_usage_reports_verification_even_when_uncapped(monkeypatch):
     )
     assert usage["enabled"] is False  # no meter to draw
     assert usage["email_verified"] is False  # but the gate is still on
+
+
+# ---------------------------------------------------------------------------
+# A way forward when the confirmation email never arrives
+# ---------------------------------------------------------------------------
+
+
+def test_unverified_message_points_at_the_banner_and_an_administrator():
+    message = trial_budget.UNVERIFIED_MESSAGE
+    # There is no "trial status page" for a signed-in user to find.
+    assert "trial status page" not in message
+    assert "Resend link" in message
+    assert "administrator" in message
+
+
+def test_chat_marks_an_unverified_error_so_the_client_drops_retry():
+    from app.services.chat_service import _stream_error_event
+
+    event = _stream_error_event(
+        TrialUnverifiedError(trial_budget.UNVERIFIED_MESSAGE), "m"
+    )
+    assert event["code"] == "trial_email_unverified"
+
+
+def _admin(**overrides) -> SimpleNamespace:
+    base = dict(user_id="admin-1", is_admin=True, is_staff=False)
+    base.update(overrides)
+    return SimpleNamespace(**base)
+
+
+async def test_admin_can_mark_a_trial_users_email_as_verified():
+    from app.routers import admin
+
+    target = SimpleNamespace(
+        user_id="new@example.test", is_demo_user=True, email_verified=False,
+        save=AsyncMock(),
+    )
+    audit = AsyncMock()
+    with patch.object(admin, "User", fake_model(find_one_result=target)), \
+         patch.object(admin, "_audit", audit):
+        result = await admin.mark_user_email_verified(
+            "new@example.test", user=_admin()
+        )
+
+    assert result == {"ok": True, "email_unverified": False}
+    assert target.email_verified is True
+    target.save.assert_awaited_once()
+    assert audit.await_args.args[1] == "verify_user_email"
+
+
+async def test_marking_an_already_verified_user_changes_nothing():
+    from app.routers import admin
+
+    target = SimpleNamespace(
+        user_id="done@example.test", is_demo_user=True, email_verified=True,
+        save=AsyncMock(),
+    )
+    audit = AsyncMock()
+    with patch.object(admin, "User", fake_model(find_one_result=target)), \
+         patch.object(admin, "_audit", audit):
+        result = await admin.mark_user_email_verified(
+            "done@example.test", user=_admin()
+        )
+
+    assert result["ok"] is True
+    target.save.assert_not_awaited()
+    audit.assert_not_awaited()
+
+
+async def test_only_admins_and_staff_can_mark_an_email_as_verified():
+    from fastapi import HTTPException
+
+    from app.routers import admin
+
+    with pytest.raises(HTTPException) as denied:
+        await admin.mark_user_email_verified(
+            "new@example.test", user=_admin(is_admin=False)
+        )
+    assert denied.value.status_code == 403
+
+
+def test_only_an_unconfirmed_trial_account_is_reported_as_unverified():
+    from app.routers.admin import _email_unverified
+
+    assert _email_unverified(SimpleNamespace(is_demo_user=True, email_verified=False))
+    assert not _email_unverified(SimpleNamespace(is_demo_user=True, email_verified=True))
+    # Regular accounts are never gated on this flag, whatever it holds.
+    assert not _email_unverified(SimpleNamespace(is_demo_user=False, email_verified=False))
+
+
+async def test_staff_can_mark_a_trial_users_email_as_verified():
+    from app.routers import admin
+
+    target = SimpleNamespace(
+        user_id="new@example.test", is_demo_user=True, email_verified=False,
+        save=AsyncMock(),
+    )
+    with patch.object(admin, "User", fake_model(find_one_result=target)), \
+         patch.object(admin, "_audit", AsyncMock()):
+        result = await admin.mark_user_email_verified(
+            "new@example.test", user=_admin(is_admin=False, is_staff=True)
+        )
+    assert result["ok"] is True
+    assert target.email_verified is True
+
+
+async def test_an_account_that_is_not_a_trial_cannot_be_vouched_for_here():
+    """``email_verified`` also proves an account owns its address (links shared
+    with named people rely on it), so it is only set where it unblocks AI."""
+    from fastapi import HTTPException
+
+    from app.routers import admin
+
+    target = SimpleNamespace(
+        user_id="local@example.test", is_demo_user=False, email_verified=False,
+        save=AsyncMock(),
+    )
+    audit = AsyncMock()
+    with patch.object(admin, "User", fake_model(find_one_result=target)), \
+         patch.object(admin, "_audit", audit):
+        with pytest.raises(HTTPException) as refused:
+            await admin.mark_user_email_verified("local@example.test", user=_admin())
+
+    assert refused.value.status_code == 400
+    assert target.email_verified is False
+    target.save.assert_not_awaited()
+    audit.assert_not_awaited()

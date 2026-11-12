@@ -1,5 +1,6 @@
 import { TaskHelpLink } from '../shared/TaskHelpLink'
 import { WorkspaceSectionHeader } from '../shared/WorkspaceSectionHeader'
+import { WorkspaceSearchBar } from '../shared/WorkspaceSearchBar'
 import './library-workspace.css'
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from '../shared/panelPortal'
@@ -26,7 +27,6 @@ import { MAX_NAME_LENGTH, getNameError, isDuplicateName, normalizeName } from '.
 import { createWorkflow, importWorkflow } from '../../api/workflows'
 import { createSearchSet, importSearchSet, listItems as listSearchSetItems, updateSearchSet, updateItem as updateSearchSetItem, addItem as addSearchSetItem } from '../../api/extractions'
 import {
-  Search,
   Layers,
   Star,
   Pin,
@@ -482,8 +482,8 @@ export function LibraryTab() {
     }
   }
 
-  // Formatter rows open a preview; Skill rows run immediately. Both kinds
-  // keep their instruction editor available from the row menu.
+  // Skill and formatter rows open a preview; both kinds keep their
+  // instruction editor available from the row menu.
   const [editingItem, setEditingItem] = useState<import('../../types/library').LibraryItem | null>(null)
   const [editMode, setEditMode] = useState<'preview' | 'edit'>('preview')
   const [editTitle, setEditTitle] = useState('')
@@ -821,48 +821,7 @@ export function LibraryTab() {
           </div>
         </details>}
         </div>
-        {scope !== 'explore' && <div style={{ position: 'relative', minWidth: 0 }}>
-              <Search
-                style={{
-                  position: 'absolute',
-                  left: 12,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: 16,
-                  height: 16,
-                  color: '#5f6368',
-                  pointerEvents: 'none',
-                }}
-              />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                aria-label="Search library"
-                placeholder="Search library…"
-                style={{
-                  width: '100%',
-                  background: '#f1f3f4',
-                  border: '1px solid transparent',
-                  borderRadius: 'var(--workspace-radius-medium)',
-                  padding: "var(--workspace-space-8) var(--workspace-space-16) var(--workspace-space-8) 38px",
-                  fontSize: 'var(--workspace-font-body)',
-                  outline: 'none',
-                  transition: 'all 0.2s',
-                  fontFamily: 'inherit',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.background = '#fff'
-                  e.currentTarget.style.borderColor = '#dadce0'
-                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15)'
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.background = '#f1f3f4'
-                  e.currentTarget.style.borderColor = 'transparent'
-                  e.currentTarget.style.boxShadow = 'none'
-                }}
-              />
-            </div>}
+        {scope !== 'explore' && <WorkspaceSearchBar value={search} onChange={setSearch} label="Search library" placeholder="Search library…" />}
         {/* Row 3: Filter chips + sort (Explore has its own) */}
         <div className="library-filters" style={{ display: scope === 'explore' ? 'none' : 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--workspace-space-12)', paddingBottom: 'var(--workspace-space-2)' }}>
           <select className="library-kind-select" aria-label="Filter library by type" value={kindFilter} onChange={event => setKindFilter(event.target.value as KindFilter)}>
@@ -1471,11 +1430,9 @@ export function LibraryTab() {
                     // last-used comes from its run history (server-side).
                     if (it.kind === 'workflow') {
                       openWorkflow(it.item_id)
-                    } else if (it.set_type === 'prompt') {
-                      if (!it.item_uuid) return
-                      markUsed(it.id)
-                      sendChatMessage('', { documentUuids: selectedDocUuids, folderUuids: selectedFolderUuids, skillUuid: it.item_uuid })
-                    } else if (it.set_type === 'formatter') {
+                    } else if (it.set_type === 'prompt' || it.set_type === 'formatter') {
+                      // A click shows what a Skill says before it runs; it
+                      // starts in chat only from the preview's Run Skill.
                       openPromptModal(it, 'preview')
                     } else if (it.kind === 'search_set') {
                       openExtraction(it.item_uuid || it.item_id)
@@ -1862,8 +1819,10 @@ export function LibraryTab() {
                       border: 'none',
                       backgroundColor: 'var(--highlight-color, #eab308)',
                       color: 'var(--highlight-text-color, #000)',
-                      cursor: editLoading || !editContent.trim() ? 'not-allowed' : 'pointer',
-                      opacity: editLoading || !editContent.trim() ? 0.5 : 1,
+                      // Looks disabled whenever it is: a load error or a Skill
+                      // with no identity can't run either.
+                      cursor: editLoading || !!editLoadError || !editContent.trim() || (editingItem.set_type === 'prompt' && !editingItem.item_uuid) ? 'not-allowed' : 'pointer',
+                      opacity: editLoading || !!editLoadError || !editContent.trim() || (editingItem.set_type === 'prompt' && !editingItem.item_uuid) ? 0.5 : 1,
                     }}
                   >
                     {editingItem.set_type === 'prompt' ? 'Run Skill' : 'Use in Assistant'}
