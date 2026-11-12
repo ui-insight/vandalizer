@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, Navigate, useSearch } from '@tanstack/react-router'
 import { useAuth } from '../hooks/useAuth'
 import { getAuthConfig, type AuthConfig } from '../api/auth'
@@ -568,9 +568,15 @@ export default function Landing() {
   const nextPath = safeNextPath(search?.next)
   // Phones: the top-bar links don't fit, so they live behind a menu button.
   const [menuOpen, setMenuOpen] = useState(false)
+  const menuButton = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     if (!menuOpen) return
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setMenuOpen(false) }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setMenuOpen(false)
+      // The menu's links are about to unmount; keep focus on the page.
+      menuButton.current?.focus()
+    }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [menuOpen])
@@ -618,6 +624,7 @@ export default function Landing() {
             <button type="button" onClick={() => setAccessOpen(true)} className="text-sm font-medium text-zinc-300 transition-colors hover:text-white">Sign in</button>
             <a href="#demo" className="launch-nav-cta">Request a walkthrough <span aria-hidden="true">→</span></a>
             <button
+              ref={menuButton}
               type="button"
               className="launch-menu-button md:hidden"
               aria-label={menuOpen ? 'Close menu' : 'Open menu'}

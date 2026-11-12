@@ -32,8 +32,13 @@ export function useCertification(enabled = true) {
   const pendingActions = useRef(new Map<string, { body: string; promise: Promise<unknown> }>())
   const [, setCompletionRevision] = useState(0)
 
+  // Read through a ref as well: a write that started while signed in holds an
+  // older `refresh`, and must not read progress after sign-out.
+  const enabledNow = useRef(enabled)
+  useEffect(() => { enabledNow.current = enabled }, [enabled])
+
   const refresh = useCallback(async () => {
-    if (!enabled) return
+    if (!enabled || !enabledNow.current) return
     const version = ++requestVersion.current
     setLoading(true)
     let observationIdentity: Pick<CertificationProgress, 'enrollment_id' | 'manifest_sha256'> | null = cachedCourse.current
@@ -69,6 +74,7 @@ export function useCertification(enabled = true) {
   }, [enabled])
 
   const refreshAfterWrite = useCallback(async () => {
+    if (!enabledNow.current) return
     setSavedWritePendingRefresh(true)
     await refresh()
   }, [refresh])

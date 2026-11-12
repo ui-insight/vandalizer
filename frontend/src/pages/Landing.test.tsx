@@ -116,8 +116,11 @@ describe('Landing — phone menu', () => {
     expect(screen.queryByRole('navigation', { name: 'Menu' })).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
+    screen.getByRole('navigation', { name: 'Menu' }).querySelector('a')!.focus()
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(screen.queryByRole('navigation', { name: 'Menu' })).not.toBeInTheDocument()
+    // Focus goes back to the button, not lost with the unmounted link.
+    expect(screen.getByRole('button', { name: 'Open menu' })).toHaveFocus()
     await waitFor(() => expect(mockGetAuthConfig).toHaveBeenCalled())
   })
 })

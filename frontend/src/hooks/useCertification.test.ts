@@ -450,3 +450,20 @@ it('asks for nothing while signed out, then loads once someone signs in', async 
   rerender({ enabled: false })
   await waitFor(() => expect(result.current.progress).toBeNull())
 })
+
+it('does not read progress for a write that finishes after sign-out', async () => {
+  let finish: (value: { provisioned_docs: string[] }) => void = () => {}
+  vi.mocked(api.provisionModule).mockImplementation(() => new Promise(resolve => { finish = resolve }))
+  const { result, rerender } = renderHook(({ enabled }) => useCertification(enabled), { initialProps: { enabled: true } })
+  await waitFor(() => expect(result.current.progress).toEqual(progress))
+  expect(api.getProgress).toHaveBeenCalledTimes(1)
+
+  let pending: Promise<unknown> = Promise.resolve()
+  act(() => { pending = result.current.provision('foundations') })
+  await waitFor(() => expect(api.provisionModule).toHaveBeenCalled())
+  rerender({ enabled: false })
+  await act(async () => { finish({ provisioned_docs: [] }); await pending })
+
+  expect(api.getProgress).toHaveBeenCalledTimes(1)
+  expect(observeCertificationJourney).not.toHaveBeenCalled()
+})

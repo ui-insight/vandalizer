@@ -595,7 +595,8 @@ html {
   text-align: center;
 }
 
-@media (min-width: 768px) {
+/* 48rem, not 768px: the desktop links appear at Tailwind's md (rem-based), and the two must switch together at any browser font size. */
+@media (min-width: 48rem) {
   .launch-menu-button,
   .launch-menu { display: none; }
 }
