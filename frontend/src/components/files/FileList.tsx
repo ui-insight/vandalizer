@@ -1,8 +1,9 @@
-import { ChevronUp, ChevronDown } from 'lucide-react'
+import { ChevronUp, ChevronDown, AlertCircle } from 'lucide-react'
 import type { Document, Folder } from '../../types/document'
 import type { SortColumn, SortState } from './FileBrowser'
 import { FolderRow } from './FolderRow'
 import { FileRow } from './FileRow'
+import { documentIssueSummary } from '../../utils/documentReadiness'
 import { FileBrowserTutorial } from '../workspace/FileBrowserTutorial'
 
 interface FileListProps {
@@ -21,6 +22,8 @@ interface FileListProps {
   sort?: SortState
   onSort?: (column: SortColumn) => void
   watchedFolderUuids?: Set<string>
+  onRetryDoc?: (doc: Document) => void
+  retryingUuids?: Set<string>
 }
 
 function SortIndicator({ column, sort }: { column: SortColumn; sort?: SortState }) {
@@ -46,11 +49,14 @@ export function FileList({
   sort,
   onSort,
   watchedFolderUuids,
+  onRetryDoc,
+  retryingUuids,
 }: FileListProps) {
   if (folders.length === 0 && documents.length === 0) {
     return <FileBrowserTutorial highlighted={highlighted} />
   }
 
+  const issueSummary = documentIssueSummary(documents)
   const allUuids = [...folders.map(f => f.uuid), ...documents.map(d => d.uuid)]
   const allSelected = onToggleSelect && selectedUuids && allUuids.length > 0 && allUuids.every(u => selectedUuids.has(u))
 
@@ -79,6 +85,16 @@ export function FileList({
   }
 
   return (
+    <>
+    {issueSummary && (
+      <p
+        className="flex items-center gap-1.5"
+        style={{ margin: 0, padding: 'var(--workspace-space-8) 15px', fontSize: 'var(--workspace-font-meta)', color: '#92400e', background: '#fffbeb', borderBottom: '1px solid #fde68a' }}
+      >
+        <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        <span><span className="font-semibold">Files with problems:</span> {issueSummary}. Hover a badge for the reason.</span>
+      </p>
+    )}
     <table className="file-table w-full" style={{ fontSize: 'var(--workspace-font-body)', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
       <colgroup>
         <col style={{ width: 32 }} />
@@ -166,9 +182,12 @@ export function FileList({
             selected={selectedUuids?.has(doc.uuid)}
             onToggleSelect={onToggleSelect}
             snippet={snippets?.get(doc.uuid)}
+            onRetry={onRetryDoc}
+            retrying={retryingUuids?.has(doc.uuid)}
           />
         ))}
       </tbody>
     </table>
+    </>
   )
 }

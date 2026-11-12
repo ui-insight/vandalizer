@@ -169,4 +169,47 @@ describe('FileRow', () => {
     expect(screen.getByTitle(/Text extraction failed/)).toBeTruthy()
     expect(screen.queryByTitle(/ingested with a caveat/)).toBeNull()
   })
+
+  describe('issue badge and Retry', () => {
+    it('shows a short badge with the full reason on hover, not a sentence under the name', () => {
+      renderFileRow({ doc: makeDoc({ ingest_error: 'chroma down' }) })
+      const badge = screen.getByTitle(/Could not index this document for search: chroma down/)
+      expect(badge.textContent).toMatch(/^Not indexed/)
+      expect(screen.queryByText(/Search indexing failed/)).toBeNull()
+    })
+
+    it('labels a failed extraction "No text"', () => {
+      renderFileRow({ doc: makeDoc({ task_status: 'error', error_message: 'no pages' }) })
+      expect(screen.getByTitle('Text extraction failed: no pages').textContent).toMatch(/^No text/)
+    })
+
+    it('offers Retry for a failure a retry can clear, without opening the file', () => {
+      const onRetry = vi.fn()
+      const onClick = vi.fn()
+      const doc = makeDoc({ ingest_error: 'chroma down' })
+      renderFileRow({ doc, onRetry, onClick })
+      fireEvent.click(screen.getByRole('button', { name: 'Retry Test Document.pdf' }))
+      expect(onRetry).toHaveBeenCalledWith(doc)
+      expect(onClick).not.toHaveBeenCalled()
+    })
+
+    it('offers no Retry when the file itself cannot be read, or failed its upload check', () => {
+      const onRetry = vi.fn()
+      const view = renderFileRow({ doc: makeDoc({ task_status: 'error', error_retryable: false }), onRetry })
+      expect(screen.getByText(/^No text/)).toBeTruthy()
+      expect(screen.queryByRole('button', { name: /^Retry/ })).toBeNull()
+      view.unmount()
+      renderFileRow({ doc: makeDoc({ valid: false }), onRetry })
+      expect(screen.getByText(/^Failed check/)).toBeTruthy()
+      expect(screen.queryByRole('button', { name: /^Retry/ })).toBeNull()
+    })
+
+    it('shows no badge or Retry on a healthy file, or one still processing', () => {
+      const view = renderFileRow({ onRetry: vi.fn() })
+      expect(screen.queryByRole('button', { name: /^Retry/ })).toBeNull()
+      view.unmount()
+      renderFileRow({ doc: makeDoc({ processing: true, ingest_error: 'old' }), onRetry: vi.fn() })
+      expect(screen.queryByText(/^Not indexed/)).toBeNull()
+    })
+  })
 })
