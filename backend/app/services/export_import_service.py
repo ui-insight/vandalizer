@@ -315,13 +315,22 @@ async def drop_unreadable_import_references(
 
     A file can name a fixed document, a step's document, a Form Filler
     template or a knowledge base by id. Importing is a way of adding those to
-    a workflow, so each needs the same access as adding it in the editor. One
-    the importer can't open (or that doesn't exist here, as in a file from
-    another deployment) is cleared with a note on the step, the way imports
-    already treat references that don't travel, and the import goes ahead.
+    a workflow, so each needs the same access as adding it in the editor, and
+    the import goes ahead without the ones the importer can't open:
+
+    * a step's document, template or knowledge base is cleared with a note on
+      the step, the way imports already treat references that don't travel;
+    * a fixed document that exists here but isn't the importer's to read is
+      left out. One that doesn't exist here (a file from another deployment)
+      is kept: the Input tab and the run already report it as missing, which
+      is more honest than quietly running on fewer documents.
 
     The ``keep_*`` arguments are what the target workflow already uses when
     importing into an existing one; those are left as they are.
+
+    Raises ``ValueError`` for a file whose settings aren't in the shape the
+    editor writes. Anything else could carry a reference past these checks
+    and still be read back as one when the workflow is saved or run.
     """
     from app.services import access_control
     from app.services.fixed_document_access import fixed_document_uuids
@@ -338,13 +347,29 @@ async def drop_unreadable_import_references(
             readable[doc_uuid] = bool(document and not document.soft_deleted)
         return readable[doc_uuid]
 
+    from app.models.document import SmartDocument
+
+    malformed = ValueError("This file isn't a valid workflow export: its settings are not in the expected format.")
+
     config = item.get("input_config")
-    if isinstance(config, dict) and isinstance(config.get("fixed_documents"), list):
+    if config is not None and not isinstance(config, dict):
+        raise malformed
+    if isinstance(config, dict) and config.get("fixed_documents") is not None:
+        if not isinstance(config["fixed_documents"], list):
+            raise malformed
         allowed = []
         for entry in config["fixed_documents"]:
-            doc_uuid = (entry.get("uuid") if isinstance(entry, dict) else str(entry)) or ""
-            if doc_uuid and (doc_uuid in kept_fixed or await can_read(doc_uuid)):
+            if not isinstance(entry, (dict, str)):
+                raise malformed
+            doc_uuid = (entry.get("uuid") if isinstance(entry, dict) else entry) or ""
+            if not isinstance(doc_uuid, str) or not doc_uuid:
+                continue
+            if doc_uuid in kept_fixed or await can_read(doc_uuid):
                 allowed.append(entry)
+            elif not await SmartDocument.find_one(
+                {"uuid": doc_uuid, "soft_deleted": {"$ne": True}},
+            ):
+                allowed.append(entry)  # not here at all: reported as missing
         config["fixed_documents"] = allowed
 
     async def clear_document(data: dict, key: str) -> None:
@@ -353,15 +378,28 @@ async def drop_unreadable_import_references(
             data[key] = ""
             data["_import_note"] = _IMPORT_CLEARED_NOTE.format(what="document")
 
-    for step in item.get("steps") or []:
+    steps = item.get("steps")
+    if steps is not None and not isinstance(steps, list):
+        raise malformed
+    for step in steps or []:
         if not isinstance(step, dict):
-            continue
+            raise malformed
+        if step.get("data") is not None and not isinstance(step["data"], dict):
+            raise malformed
         if isinstance(step.get("data"), dict):
             await clear_document(step["data"], "selected_document_uuid")
-        for task in step.get("tasks") or []:
-            data = task.get("data") if isinstance(task, dict) else None
-            if not isinstance(data, dict):
+        tasks = step.get("tasks")
+        if tasks is not None and not isinstance(tasks, list):
+            raise malformed
+        for task in tasks or []:
+            if not isinstance(task, dict):
+                raise malformed
+            data = task.get("data")
+            if data is None:
                 continue
+            # A list of pairs would be turned into a dict when saved.
+            if not isinstance(data, dict):
+                raise malformed
             await clear_document(data, "selected_document_uuid")
             await clear_document(data, "template_document_uuid")
             kb_uuid = data.get("kb_uuid")

@@ -259,11 +259,17 @@ async def test_an_import_clears_what_the_importer_cannot_open_and_goes_ahead():
     async def document(doc_uuid, user, **_):
         return SimpleNamespace(uuid=doc_uuid, soft_deleted=False) if doc_uuid == "doc-bob" else None
 
-    with patch.object(access_control, "get_authorized_document", AsyncMock(side_effect=document)), \
+    # "doc-a" exists here and is someone else's; "from-elsewhere" does not exist here.
+    documents = MagicMock()
+    documents.find_one = AsyncMock(side_effect=lambda query: SimpleNamespace() if query["uuid"] == "doc-a" else None)
+    with patch("app.models.document.SmartDocument", documents), \
+         patch.object(access_control, "get_authorized_document", AsyncMock(side_effect=document)), \
          patch.object(access_control, "get_authorized_knowledge_base", _can_open({"bob": {"kb-bob"}})):
         await eis.drop_unreadable_import_references(item, BOB)
 
-    assert item["input_config"]["fixed_documents"] == [{"uuid": "doc-bob", "title": "Mine"}]
+    # Someone else's file is left out; one from another deployment stays, to
+    # be reported as missing rather than silently dropped.
+    assert item["input_config"]["fixed_documents"] == [{"uuid": "doc-bob", "title": "Mine"}, "from-elsewhere"]
     step = item["steps"][0]
     assert step["data"]["selected_document_uuid"] == ""
     tasks = step["tasks"]
@@ -294,3 +300,79 @@ async def test_importing_into_a_workflow_keeps_what_it_already_uses():
     assert item["input_config"]["fixed_documents"] == [{"uuid": "owners-file"}]
     assert item["steps"][0]["tasks"][0]["data"]["kb_uuid"] == "kb-a"
     assert item["steps"][0]["tasks"][1]["data"]["selected_document_uuid"] == "owners-doc"
+
+
+@pytest.mark.parametrize("item", [
+    # Shapes the editor never writes, which would still be read back as a
+    # reference once saved: a mapping of fixed documents, task settings as a
+    # list of pairs.
+    {"input_config": {"fixed_documents": {"doc-a": 1}}},
+    {"input_config": ["fixed_documents"]},
+    {"input_config": {"fixed_documents": [["doc-a"]]}},
+    {"steps": [{"tasks": [{"name": "KnowledgeBaseQuery", "data": [["kb_uuid", "kb-a"], ["query", "q"]]}]}]},
+    {"steps": [{"data": [["selected_document_uuid", "doc-a"]], "tasks": []}]},
+    {"steps": [{"tasks": {"0": {"name": "Prompt", "data": {}}}}]},
+    {"steps": [["tasks"]]},
+    {"steps": {"0": {}}},
+])
+async def test_an_import_file_in_an_unexpected_shape_is_rejected(item):
+    from app.services import export_import_service as eis
+
+    with patch.object(access_control, "get_authorized_document", AsyncMock(return_value=None)), \
+         patch.object(access_control, "get_authorized_knowledge_base", _can_open({})):
+        with pytest.raises(ValueError, match="isn't a valid workflow export"):
+            await eis.drop_unreadable_import_references(item, BOB)
+
+
+async def test_both_import_routes_clear_references_before_saving(monkeypatch):
+    """The routes hand the file's first item to the check, with what the target
+    already uses when importing into an existing workflow."""
+    import io
+    import json
+
+    from fastapi import UploadFile
+
+    from app.routers import workflows as routes
+    from app.services import export_import_service as eis
+
+    payload = {"export_type": "workflow", "items": [{"steps": []}]}
+    calls: list[tuple] = []
+
+    async def drop(item, user, **kept):
+        calls.append((item, user, kept))
+        return item
+
+    target = SimpleNamespace(input_config={"fixed_documents": ["owners-file"]})
+    monkeypatch.setattr(eis, "drop_unreadable_import_references", drop)
+    monkeypatch.setattr(eis, "import_workflow", AsyncMock(return_value={"id": "new"}))
+    monkeypatch.setattr(eis, "import_into_workflow", AsyncMock(return_value={"id": "w1"}))
+    monkeypatch.setattr(routes, "get_authorized_workflow", AsyncMock(return_value=target))
+    monkeypatch.setattr(routes, "_workflow_response_from_dict", AsyncMock(return_value={"ok": True}))
+    monkeypatch.setattr(routes.svc, "step_document_uuids", AsyncMock(return_value=["owners-doc"]))
+    monkeypatch.setattr(kb_access, "workflow_kb_uuids", AsyncMock(return_value=["kb-a"]))
+    user = SimpleNamespace(user_id="bob", current_team=None)
+
+    def upload():
+        return UploadFile(file=io.BytesIO(json.dumps(payload).encode()), filename="wf.json")
+
+    await _call(routes.import_workflow, upload(), user)
+    await _call(routes.import_into_workflow, "w1", upload(), user)
+
+    assert [c[2] for c in calls] == [
+        {},
+        {"keep_fixed_documents": {"fixed_documents": ["owners-file"]},
+         "keep_documents": {"owners-doc"}, "keep_knowledge_bases": {"kb-a"}},
+    ]
+    assert all(c[0] == {"steps": []} and c[1] is user for c in calls)
+
+
+async def _call(route, *args):
+    """Call a route function directly, whatever its parameter names are."""
+    import inspect
+
+    target = inspect.unwrap(route)
+    names = [n for n in inspect.signature(target).parameters if n != "request"]
+    kwargs = dict(zip(names, args))
+    if "request" in inspect.signature(target).parameters:
+        kwargs["request"] = MagicMock()
+    return await target(**kwargs)
