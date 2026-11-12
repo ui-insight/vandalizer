@@ -27,7 +27,7 @@
     "dompurify": "^3.4.17",
     "focus-trap-react": "^12.0.3",
     "lucide-react": "^1.28.0",
-    "marked": "^18.0.13",
+    "marked": "^18.1.3",
     "pdfjs-dist": "^6.5.438",
     "react": "^19.2.8",
     "react-dom": "^19.3.1",
