@@ -3,6 +3,7 @@ import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, Loader2, X, Search, AlertCi
 import { downloadFileUrl } from '../../api/files'
 import { FullViewButton, useFullView } from './viewerFullView'
 import { pollStatus, retryExtraction } from '../../api/documents'
+import { ApiError } from '../../api/client'
 import { SpreadsheetViewer } from './SpreadsheetViewer'
 import { DocumentSearchBar, useFindInDocumentHotkey } from './DocumentSearchBar'
 import { stageCopy } from '../../utils/processingStatus'
@@ -16,6 +17,8 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
 interface DocumentViewerProps {
   docUuid: string
+  /** The file no longer exists (or can't be reached by this account). */
+  onMissing?: () => void
   unavailableHelp?: string
   highlightTerms?: string[]
   // 1-based page hint for highlightTerms (extraction source tracking). Used
@@ -141,7 +144,7 @@ export function highlightMissLabel(
     : `passage not matched — showing page ${page}`
 }
 
-export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = null, highlightPageApproximate = false, onClearHighlights, processing, taskStatus, hideHighlightNavBar, unavailableHelp = 'The saved citation preview may describe an earlier version. Return to Chat to continue your conversation.' }: DocumentViewerProps) {
+export function DocumentViewer({ docUuid, onMissing, highlightTerms = [], highlightPage = null, highlightPageApproximate = false, onClearHighlights, processing, taskStatus, hideHighlightNavBar, unavailableHelp = 'The saved citation preview may describe an earlier version. Return to Chat to continue your conversation.' }: DocumentViewerProps) {
   const [zoom, setZoom] = useState(2) // index into ZOOM_LEVELS, default 100%
   const [isPdf, setIsPdf] = useState<boolean | null>(null) // null = loading
   const [isSpreadsheet, setIsSpreadsheet] = useState(false)
@@ -164,6 +167,9 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
   const [blobUrl, setBlobUrl] = useState<string | null>(null) // for non-PDF iframe fallback
   const [previewUnavailable, setPreviewUnavailable] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  // Read through a ref so a new callback identity doesn't reload the file.
+  const onMissingRef = useRef(onMissing)
+  useEffect(() => { onMissingRef.current = onMissing }, [onMissing])
   const [loadAttempt, setLoadAttempt] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null)
@@ -240,6 +246,14 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
     fetch(inlineUrl, { method: 'HEAD', credentials: 'include' })
       .then(async (resp) => {
         if (cancelled) return
+        // A 404 here can also mean the stored file couldn't be read while the
+        // document and its text are intact. Only report it gone when the
+        // document itself is.
+        if (resp.status === 404) {
+          pollStatus(docUuid).catch((error: unknown) => {
+            if (!cancelled && error instanceof ApiError && error.status === 404) onMissingRef.current?.()
+          })
+        }
         if (!resp.ok) throw new Error(resp.status === 401 || resp.status === 403 ? 'This source is not accessible with your current account. Ask its owner for access, then retry.' : resp.status === 404 ? 'This source is no longer available. It may have been removed or access may have changed.' : 'The source could not be loaded. Check your connection and retry.')
         const ct = resp.headers.get('content-type') || ''
         if (ct.includes('csv') || ct.includes('spreadsheet') || ct.includes('excel') || ct.includes('ms-excel')) {
