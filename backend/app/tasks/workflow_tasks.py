@@ -392,6 +392,9 @@ def build_steps_data(db: Database[dict], workflow_doc: dict, workflow_id: str, t
                         task_data["selected_doc_meta"] = document_meta(sel_doc)
 
             if task_doc.get("name") == "FormFiller":
+                # The template's file is read for the run: same rule.
+                if (task_data.get("template_document_uuid") or "").strip() in denied_fixed:
+                    raise FixedDocumentsDenied(len(denied_fixed))
                 _preload_form_filler_template(db, task_data)
 
             tasks.append({"name": task_doc.get("name", ""), "data": task_data})
@@ -1766,6 +1769,8 @@ def execute_task_step_test(self: Task, task_name: str, task_data: dict, doc_uuid
     doc_metas = []
     for uuid in doc_uuids:
         doc = db.smart_document.find_one({"uuid": uuid})
+        if doc and doc.get("soft_deleted"):
+            doc = None  # deleted: its text is not read
         if doc and doc.get("raw_text"):
             doc_texts.append(doc["raw_text"])
             doc_metas.append(document_meta(doc))

@@ -523,7 +523,7 @@ def load_form_filler_assets(db: Database[dict], task_data: dict, *, upload_dir: 
         )
         return
     doc = db.smart_document.find_one({"uuid": doc_uuid})
-    if not doc:
+    if not doc or doc.get("soft_deleted"):
         task_data["template_load_error"] = (
             f"The template document ({doc_uuid}) no longer exists."
         )

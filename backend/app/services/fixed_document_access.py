@@ -1,9 +1,9 @@
 """Who may have a workflow read the documents it is set up with.
 
 A workflow can name documents in its own configuration: the fixed documents
-on its Input tab, which ride along on every run, and a step's selected
-document. Both follow the same access rules as a document someone selects
-for a run.
+on its Input tab, which ride along on every run, a step's selected document,
+and the PDF a Form Filler step fills. All follow the same access rules as a
+document someone selects for a run.
 
 Two rules:
 
@@ -52,7 +52,7 @@ def fixed_document_uuids(input_config: dict | None) -> list[str]:
 
 
 STEP_DOCUMENT_ACCESS_MESSAGE = (
-    "You don't have access to the document this step is set to read. Choose a "
+    "You don't have access to a document this step is set to use. Choose a "
     "file of your own or one that has been shared with you."
 )
 
@@ -68,6 +68,29 @@ def selected_document_uuid(task_data: dict | None) -> str | None:
     wants = (isinstance(sources, list) and "select_document" in sources) or data.get("input_source") == "select_document"
     uuid = data.get("selected_document_uuid")
     return uuid if wants and isinstance(uuid, str) and uuid else None
+
+
+def template_document_uuid(task_data: dict | None) -> str | None:
+    """The PDF a Form Filler task is set to fill, if it fills one.
+
+    Its file is loaded only when ``template_source`` is ``"pdf"``
+    (``form_fill.load_form_filler_assets``).
+    """
+    data = task_data if isinstance(task_data, dict) else {}
+    if (data.get("template_source") or "text") != "pdf":
+        return None
+    uuid = data.get("template_document_uuid")
+    uuid = uuid.strip() if isinstance(uuid, str) else ""
+    return uuid or None
+
+
+def task_document_uuids(task_data: dict | None) -> list[str]:
+    """Every document one task's settings will have the run load."""
+    uuids: list[str] = []
+    for uuid in (selected_document_uuid(task_data), template_document_uuid(task_data)):
+        if uuid and uuid not in uuids:
+            uuids.append(uuid)
+    return uuids
 
 
 def fixed_documents_denied_message(count: int) -> str:
@@ -148,15 +171,39 @@ class _Reader:
         return bool(document.get("team_id") and document["team_id"] in self.teams)
 
 
+def step_selected_documents(step_data: dict | None, task_datas: Iterable[dict | None]) -> list[str]:
+    """The documents one step will read, as the run builder resolves them.
+
+    Input is normally set on the step and pushed down onto each of its tasks
+    (``workflow_engine.apply_step_input_config``); a task keeps its own only
+    when the step sets none, or when it overrides the step. Resolving it the
+    same way here means a document is reported exactly when it would be
+    loaded: not missed because it is set on the step, and not reported
+    because of a leftover key the step's setting replaces.
+    """
+    from app.services.workflow_engine import apply_step_input_config
+
+    step = step_data if isinstance(step_data, dict) else {}
+    uuids: list[str] = []
+    for task_data in task_datas:
+        effective = apply_step_input_config(step, dict(task_data) if isinstance(task_data, dict) else {})
+        for uuid in task_document_uuids(effective):
+            if uuid not in uuids:
+                uuids.append(uuid)
+    return uuids
+
+
 def step_document_uuids(db: Database[dict], workflow_doc: dict) -> list[str]:
     """Documents the workflow's steps are set to read (``selected_document_uuid``)."""
     uuids: list[str] = []
     for step_id in workflow_doc.get("steps") or []:
-        step = db.workflow_step.find_one({"_id": step_id}, {"tasks": 1}) or {}
-        for task_id in step.get("tasks") or []:
-            task = db.workflow_step_task.find_one({"_id": task_id}, {"data": 1}) or {}
-            uuid = selected_document_uuid(task.get("data"))
-            if uuid and uuid not in uuids:
+        step = db.workflow_step.find_one({"_id": step_id}, {"tasks": 1, "data": 1}) or {}
+        task_datas = [
+            (db.workflow_step_task.find_one({"_id": task_id}, {"data": 1}) or {}).get("data")
+            for task_id in step.get("tasks") or []
+        ]
+        for uuid in step_selected_documents(step.get("data"), task_datas):
+            if uuid not in uuids:
                 uuids.append(uuid)
     return uuids
 

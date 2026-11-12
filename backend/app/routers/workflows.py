@@ -1010,7 +1010,10 @@ async def remove_workflow_from_team(workflow_id: str, user: User = Depends(get_c
 
 @router.post("/{workflow_id}/steps", response_model=None)
 async def add_step(workflow_id: str, req: AddStepRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
-    step = await svc.add_step(workflow_id, req.name, user=user, data=req.data, is_output=req.is_output)
+    try:
+        step = await svc.add_step(workflow_id, req.name, user=user, data=req.data, is_output=req.is_output)
+    except FixedDocumentAccessError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     if not step:
         raise HTTPException(status_code=404, detail="Workflow not found")
     return step
@@ -1018,7 +1021,10 @@ async def add_step(workflow_id: str, req: AddStepRequest, user: User = Depends(g
 
 @router.patch("/steps/{step_id}", response_model=None)
 async def update_step(step_id: str, req: UpdateStepRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
-    step = await svc.update_step(step_id, user=user, name=req.name, data=req.data, is_output=req.is_output)
+    try:
+        step = await svc.update_step(step_id, user=user, name=req.name, data=req.data, is_output=req.is_output)
+    except FixedDocumentAccessError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     if not step:
         raise HTTPException(status_code=404, detail="Step not found")
     # Flag stale verification on parent workflow

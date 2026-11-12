@@ -292,23 +292,25 @@ async def ensure_fixed_documents_readable(
 async def ensure_step_document_readable(
     task_data: dict | None, user: User, *, already: dict | None = None,
 ) -> None:
-    """Refuse a step set to read a document *user* cannot read.
+    """Refuse step or task settings that read a document *user* cannot read.
 
-    The same rule as a fixed document, for a step's selected document. A
-    document the step already read (*already*) is left alone, so editing a
-    step's other settings isn't blocked by a choice its author made.
+    The same rule as a fixed document, for a step's selected document and a
+    Form Filler's template PDF. A document the settings already read
+    (*already*) is left alone, so editing a step's other settings isn't
+    blocked by a choice its author made.
     """
     from app.services.fixed_document_access import (
         STEP_DOCUMENT_ACCESS_MESSAGE,
-        selected_document_uuid,
+        task_document_uuids,
     )
 
-    doc_uuid = selected_document_uuid(task_data)
-    if not doc_uuid or doc_uuid == selected_document_uuid(already):
-        return
-    document = await get_authorized_document(doc_uuid, user, allow_admin=True)
-    if not document or document.soft_deleted:
-        raise FixedDocumentAccessError(STEP_DOCUMENT_ACCESS_MESSAGE)
+    kept = set(task_document_uuids(already))
+    for doc_uuid in task_document_uuids(task_data):
+        if doc_uuid in kept:
+            continue
+        document = await get_authorized_document(doc_uuid, user, allow_admin=True)
+        if not document or document.soft_deleted:
+            raise FixedDocumentAccessError(STEP_DOCUMENT_ACCESS_MESSAGE)
 
 
 async def ensure_definition_documents_readable(
@@ -317,38 +319,54 @@ async def ensure_definition_documents_readable(
 ) -> None:
     """The save-time checks for a whole workflow definition being written at
     once (an import into a workflow, a restored version): its fixed documents
-    and each step's selected document.
+    and every document its steps are set to read, whether that is set on the
+    step or on one of its tasks.
     """
+    from app.services.fixed_document_access import (
+        STEP_DOCUMENT_ACCESS_MESSAGE,
+        selected_document_uuid,
+        step_selected_documents,
+    )
+
     definition = definition if isinstance(definition, dict) else {}
     await ensure_fixed_documents_readable(
         definition.get("input_config"), user, already=already_input_config,
     )
     kept = already_step_documents or set()
+    wanted: list[str] = []
     for step in definition.get("steps") or []:
-        for task in (step.get("tasks") if isinstance(step, dict) else None) or []:
-            data = task.get("data") if isinstance(task, dict) else None
-            from app.services.fixed_document_access import selected_document_uuid
-
-            if selected_document_uuid(data) in kept:
-                continue
-            await ensure_step_document_readable(data, user)
+        if not isinstance(step, dict):
+            continue
+        step_data = step.get("data")
+        task_datas = [t.get("data") for t in step.get("tasks") or [] if isinstance(t, dict)]
+        # The step's own setting counts even before it has a task to apply to.
+        for doc_uuid in [selected_document_uuid(step_data), *step_selected_documents(step_data, task_datas)]:
+            if doc_uuid and doc_uuid not in kept and doc_uuid not in wanted:
+                wanted.append(doc_uuid)
+    for doc_uuid in wanted:
+        document = await get_authorized_document(doc_uuid, user, allow_admin=True)
+        if not document or document.soft_deleted:
+            raise FixedDocumentAccessError(STEP_DOCUMENT_ACCESS_MESSAGE)
 
 
 async def step_document_uuids(wf: Workflow) -> list[str]:
-    """Documents the workflow's steps are set to read."""
-    from app.services.fixed_document_access import selected_document_uuid
+    """Documents the workflow's steps are set to read, resolved the way the
+    run builder resolves them (see ``step_selected_documents``)."""
+    from app.services.fixed_document_access import step_selected_documents
 
     if not wf.steps:
         return []
     steps = await WorkflowStep.find({"_id": {"$in": wf.steps}}).to_list()
     task_ids = [task_id for step in steps for task_id in (step.tasks or [])]
-    if not task_ids:
-        return []
+    tasks = {}
+    if task_ids:
+        tasks = {task.id: task for task in await WorkflowStepTask.find({"_id": {"$in": task_ids}}).to_list()}
     uuids: list[str] = []
-    for task in await WorkflowStepTask.find({"_id": {"$in": task_ids}}).to_list():
-        doc_uuid = selected_document_uuid(task.data)
-        if doc_uuid and doc_uuid not in uuids:
-            uuids.append(doc_uuid)
+    for step in steps:
+        task_datas = [tasks[task_id].data for task_id in (step.tasks or []) if task_id in tasks]
+        for doc_uuid in step_selected_documents(step.data, task_datas):
+            if doc_uuid not in uuids:
+                uuids.append(doc_uuid)
     return uuids
 
 
@@ -586,6 +604,8 @@ async def add_step(workflow_id: str, name: str, user: User, data: dict = {}, is_
     if not wf:
         return None
 
+    # Input (including a selected document) is set on the step.
+    await ensure_step_document_readable(data, user)
     step = WorkflowStep(name=name, data=data, is_output=is_output)
     await step.insert()
     if step.id is None:
@@ -614,6 +634,7 @@ async def update_step(step_id: str, user: User, name: str | None = None, data: d
     if name is not None:
         step.name = name
     if data is not None:
+        await ensure_step_document_readable(data, user, already=step.data)
         step.data = data
     if is_output is not None:
         step.is_output = is_output
