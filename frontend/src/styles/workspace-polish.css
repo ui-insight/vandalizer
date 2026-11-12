@@ -113,9 +113,9 @@
   .file-table th:last-child button svg { width: 18px; height: 18px; }
   .file-table td:last-child { padding: 0 !important; }
   .file-modified-label { display: none; }
-  .file-table col.file-size-col { width: 0 !important; }
-  .file-table .file-size-cell { padding: 0 !important; font-size: 0 !important; overflow: hidden; }
-  .file-table .file-size-cell button { display: none !important; }
+  /* Take the Size column out of the table entirely (its col and every cell in it). A zero-width column in a
+     fixed-layout table is not reliably collapsed, and would leave Name sharing its space with a blank gap. */
+  .file-table col.file-size-col, .file-table .file-size-cell { display: none !important; }
   .file-name { white-space: normal !important; overflow-wrap: anywhere; }
 }
 @container files (max-width: 400px) {
