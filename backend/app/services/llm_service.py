@@ -1291,6 +1291,11 @@ def create_agentic_chat_agent(
         # head (budget ticket): redo them with the calculate tool.
         from app.services.calculation_claims import require_calculated_figures
         agent.output_validator(require_calculated_figures)
+        # One year's figure shown for another, or years that don't add up to
+        # the total beside them (budget summary ticket): every number is in
+        # the file, so only a check by row and year catches it.
+        from app.services.chat_spreadsheet_figures import require_spreadsheet_figures
+        agent.output_validator(require_spreadsheet_figures)
         # "All steps completed / saved" while this reply's approval cards wait.
         from app.services.approval_claims import require_approved_action_ran, require_honest_completion
         agent.output_validator(require_honest_completion)
@@ -2342,6 +2347,11 @@ DOCUMENT_CHAT_RULES = (
     "dates) that the document itself does not state.\n"
     "- If the document states \"None\", report \"None\" — that is an answer, not an "
     "absence.\n"
+    "- **Tables and spreadsheets.** Copy each figure from its own row and its own "
+    "column: read every year's cell separately, and never repeat one year's figure for "
+    "another. State only rows, people, rates and items the table lists. Before sending "
+    "a table of your own, check with the calculate tool that the figures you show add "
+    "up to the total you show.\n"
     "- **When the sources don't address something** (a page limit, an eligibility rule, a waiver, a required form), say plainly that they don't state it and name what you checked. Never conclude from that silence that it is unlimited, allowed, not required, or prohibited: \"may be any length\" or \"does not require\" turns a gap into a rule the sponsor never gave. Recommend confirming with the sponsor or the governing guide instead.\n"
     "## Beyond these documents\n"
     "You also have tools to search the user's broader workspace — other documents, "
