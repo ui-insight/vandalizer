@@ -14,6 +14,19 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.services import workflow_service
 
+
+@pytest.fixture(autouse=True)
+def _no_step_documents():
+    """These tests run without a database, and their workflows have no step
+    that reads a selected document: skip that lookup on the run path."""
+    from unittest.mock import AsyncMock as _AsyncMock, patch as _patch
+
+    from app.services import workflow_service as _workflow_service
+
+    with _patch.object(_workflow_service, "step_document_uuids", _AsyncMock(return_value=[])):
+        yield
+
+
 pytestmark = pytest.mark.asyncio
 
 # Valid 24-hex ObjectId so ``PydanticObjectId(workflow_id)`` parses before the
