@@ -4,6 +4,8 @@ import type { AssistantPage } from '../api/assistant'
 
 vi.mock('../components/layout/PageLayout', () => ({ PageLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }))
 vi.mock('../components/assistant/CoreSkillsSection', () => ({ CoreSkillsSection: () => null }))
+const confirm = vi.fn()
+vi.mock('../components/shared/useConfirm', () => ({ useConfirm: () => confirm }))
 vi.mock('../api/assistant', () => ({
   getAssistantCapabilities: vi.fn(),
   setAssistantCapability: vi.fn(),
@@ -31,6 +33,7 @@ function page(overrides: Partial<AssistantPage> = {}): AssistantPage {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  confirm.mockResolvedValue(true)
   vi.mocked(getAssistantCapabilities).mockResolvedValue(page())
   vi.mocked(setAssistantCapability).mockResolvedValue(page())
   vi.mocked(setAssistantCapabilityLimit).mockResolvedValue(page({ can_set_limits: true }))
@@ -88,4 +91,51 @@ describe('Assistant settings page', () => {
     expect(screen.queryByText(/switches below show what is saved/)).toBeNull()
   })
 
+  it('asks before saving your own switch, and says it only changes your chats', async () => {
+    render(<Assistant />)
+    fireEvent.click(await screen.findByRole('switch', { name: 'Search the web' }))
+    await waitFor(() => expect(setAssistantCapability).toHaveBeenCalled())
+    expect(confirm).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+      title: 'Turn off “Search the web”?',
+      message: 'Are you sure you want to turn this off? This changes your own chats only, starting with your next message.',
+      confirmLabel: 'Turn off',
+    }))
+  })
+
+  it('saves nothing when the confirmation is cancelled', async () => {
+    confirm.mockResolvedValue(false)
+    render(<Assistant />)
+    const web = await screen.findByRole('switch', { name: 'Search the web' })
+    fireEvent.click(web)
+    await waitFor(() => expect(confirm).toHaveBeenCalled())
+    expect(setAssistantCapability).not.toHaveBeenCalled()
+    expect(web).toHaveAttribute('aria-checked', 'true')
+    expect(screen.queryByText(/^Saved\./)).toBeNull()
+  })
+
+  it('tells an administrator the change is for all users, and cancelling leaves it', async () => {
+    vi.mocked(getAssistantCapabilities).mockResolvedValue(page({ can_set_limits: true }))
+    confirm.mockResolvedValue(false)
+    render(<Assistant />)
+    fireEvent.click(await screen.findByText('Settings for all users — administrators'))
+    fireEvent.click(screen.getByRole('switch', { name: 'Allow Search the web for everyone' }))
+    await waitFor(() => expect(confirm).toHaveBeenCalled())
+    expect(confirm).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Block “Search the web” for all users?',
+      message: expect.stringMatching(/^This will change it for all users\./),
+      confirmLabel: 'Block for all users',
+      destructive: true,
+    }))
+    expect(setAssistantCapabilityLimit).not.toHaveBeenCalled()
+  })
+
+  it('says when turning your own switch on will not take effect yet', async () => {
+    vi.mocked(getAssistantCapabilities).mockResolvedValue(page({
+      capabilities: [{ id: 'workflows', label: 'Workflows', description: 'd', enabled: false, allowed: false, available: true, active: false }],
+    }))
+    render(<Assistant />)
+    fireEvent.click(await screen.findByRole('switch', { name: 'Workflows' }))
+    await waitFor(() => expect(confirm).toHaveBeenCalled())
+    expect(confirm.mock.calls[0][0].message).toContain('An administrator has blocked it for all users')
+  })
 })
