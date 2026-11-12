@@ -551,6 +551,8 @@ def execute_workflow_passive(self: Task, trigger_event_id: str) -> dict:
         # this run with the reason rather than covering fewer documents than
         # the workflow was set up with (same check as manual runs).
         from app.tasks.workflow_tasks import (
+            FixedDocumentsDenied,
+            _denied_fixed_documents,
             _missing_fixed_documents,
             build_steps_data,
             default_model_for_owner,
@@ -578,6 +580,23 @@ def execute_workflow_passive(self: Task, trigger_event_id: str) -> dict:
         # the wrong document and reporting success. The builder merges the
         # fixed documents itself, so only the trigger's documents go in.
         trigger_step_data = {"doc_uuids": doc_uuids, "user_id": workflow.get("user_id")}
+
+        # An automated run acts as the workflow's owner: a fixed document they
+        # can't open is never read.
+        denied_fixed = _denied_fixed_documents(db, workflow, trigger_step_data)
+        if denied_fixed:
+            msg = str(FixedDocumentsDenied(len(denied_fixed)))
+            db.workflow_result.update_one(
+                {"_id": result_id},
+                {"$set": {"status": "error", "error": msg,
+                          "error_payload": {"code": "fixed_documents_access_denied",
+                                            "count": len(denied_fixed)}}},
+            )
+            db.workflow_trigger_event.update_one(
+                {"_id": event["_id"]}, {"$set": {"status": "failed", "error": msg}},
+            )
+            return {"error": msg, "result_id": str(result_id)}
+
         steps_data, _ = build_steps_data(
             db, workflow, str(workflow["_id"]), trigger_step_data,
         )

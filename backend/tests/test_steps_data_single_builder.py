@@ -66,7 +66,8 @@ def _workflow_with_linked_prompt_and_extraction():
     ]
     smart_docs = [
         {"_id": ObjectId(), "uuid": "trigger-doc", "raw_text": "trigger text"},
-        {"_id": ObjectId(), "uuid": "fixed", "raw_text": "fixed text"},
+        # The workflow owner's own file: fixed documents are access-checked.
+        {"_id": ObjectId(), "uuid": "fixed", "raw_text": "fixed text", "user_id": "owner"},
         # Written by this very workflow: must not feed back into it.
         {"_id": ObjectId(), "uuid": "own-output", "raw_text": "loop",
          "origin_workflow_id": str(wf_id)},

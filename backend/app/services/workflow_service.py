@@ -253,6 +253,81 @@ async def get_workflow(
     }
 
 
+class FixedDocumentAccessError(ValueError):
+    """A fixed document was named that the person saving or running can't read."""
+
+
+async def ensure_fixed_documents_readable(
+    input_config: dict | None, user: User, *, already: dict | None = None,
+) -> None:
+    """Refuse fixed documents *user* cannot read.
+
+    A fixed document's text goes into every run, so adding one needs the same
+    access as reading it. Only documents not already on the workflow (*already*) are
+    checked: someone editing a shared workflow's other settings sends back
+    the fixed documents its owner chose, and those are checked when it runs.
+    A missing id is refused the same way, so the answer never says whether a
+    document exists.
+    """
+    from app.services.fixed_document_access import (
+        FIXED_DOCUMENT_ACCESS_MESSAGE,
+        fixed_document_uuids,
+    )
+
+    # Checked whatever the input mode: a saved entry outlives a mode change.
+    def _all(config: dict | None) -> list[str]:
+        return fixed_document_uuids({**(config or {}), "trigger_type": None}) if isinstance(config, dict) else []
+
+    kept = set(_all(already))
+    added = [u for u in _all(input_config) if u not in kept]
+    if not added:
+        return
+    team_access = await get_team_access_context(user)
+    for doc_uuid in added:
+        document = await get_authorized_document(doc_uuid, user, team_access=team_access, allow_admin=True)
+        if not document or document.soft_deleted:
+            raise FixedDocumentAccessError(FIXED_DOCUMENT_ACCESS_MESSAGE)
+
+
+async def ensure_fixed_documents_runnable(wf: Workflow, user: User | None, user_id: str | None) -> None:
+    """Refuse to start a run that would read a fixed document it shouldn't.
+
+    Readable means the person starting the run, or the workflow's owner, can
+    open it (see ``fixed_document_access``). The worker applies the same rule
+    again before it loads any text; this is the copy that answers the caller.
+    """
+    from app.models.user import User as _User
+    from app.services.fixed_document_access import (
+        fixed_document_uuids,
+        fixed_documents_denied_message,
+    )
+
+    uuids = fixed_document_uuids(wf.input_config)
+    if not uuids:
+        return
+    people: dict[str, User] = {}
+    if user is not None:
+        people[user.user_id] = user
+    for candidate in (user_id, wf.user_id):
+        if candidate and candidate not in people:
+            found = await _User.find_one(_User.user_id == candidate)
+            if found:
+                people[candidate] = found
+    access = {uid: await get_team_access_context(person) for uid, person in people.items()}
+    denied = 0
+    for doc_uuid in uuids:
+        exists = await SmartDocument.find_one(SmartDocument.uuid == doc_uuid)
+        if not exists or exists.soft_deleted:
+            continue  # A deleted fixed document is reported by the worker's own check.
+        for uid, person in people.items():
+            if await get_authorized_document(doc_uuid, person, team_access=access[uid], allow_admin=True):
+                break
+        else:
+            denied += 1
+    if denied:
+        raise FixedDocumentAccessError(fixed_documents_denied_message(denied))
+
+
 async def update_workflow(
     workflow_id: str,
     user: User,
@@ -273,6 +348,7 @@ async def update_workflow(
     if description is not None:
         wf.description = description
     if input_config is not None:
+        await ensure_fixed_documents_readable(input_config, user, already=wf.input_config)
         wf.input_config = input_config
     if output_config is not None:
         wf.output_config = output_config
@@ -621,6 +697,8 @@ async def run_workflow(
             "This workflow has no steps yet — add at least one step before running it.",
         )
 
+    await ensure_fixed_documents_runnable(wf, user, user_id)
+
     # No explicit model → fall back to the workflow's own default (set via the
     # canvas model selector), then to the user's configured default. The engine
     # applies this as the per-step default; steps with their own model win.
@@ -633,7 +711,9 @@ async def run_workflow(
     # It is the handle the cancel endpoint uses to revoke/terminate the run.
     celery_task_id = str(uuid_mod.uuid4())
 
-    trigger_step_data = {"doc_uuids": document_uuids, **({"project_context": project_context} if project_context else {})}
+    # "user_id" is who started the run: the worker checks fixed documents
+    # against them as well as the workflow's owner.
+    trigger_step_data = {"doc_uuids": document_uuids, "user_id": user_id, **({"project_context": project_context} if project_context else {})}
     result = WorkflowResult(
         workflow=wf.id,
         session_id=session_id,
@@ -867,6 +947,8 @@ async def run_workflow_batch(
             "This workflow has no steps yet — add at least one step before running it.",
         )
 
+    await ensure_fixed_documents_runnable(wf, user, user_id)
+
     # No explicit model → fall back to the workflow's own default (set via the
     # canvas model selector), then to the user's configured default. The engine
     # applies this as the per-step default; steps with their own model win.
@@ -888,7 +970,7 @@ async def run_workflow_batch(
         # run past that point would finish its LLM call regardless of STOP.
         celery_task_id = str(uuid_mod.uuid4())
 
-        trigger_step_data = {"doc_uuids": [doc_uuid], **({"project_context": project_context} if project_context else {})}
+        trigger_step_data = {"doc_uuids": [doc_uuid], "user_id": user_id, **({"project_context": project_context} if project_context else {})}
         result = WorkflowResult(
             workflow=wf.id,
             session_id=session_id,

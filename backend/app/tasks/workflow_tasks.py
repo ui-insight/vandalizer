@@ -249,6 +249,8 @@ def build_steps_data(db: Database[dict], workflow_doc: dict, workflow_id: str, t
     """
     from app.services.workflow_engine import apply_step_input_config, sanitize_step_name
 
+    denied_fixed = set(_denied_fixed_documents(db, workflow_doc, trigger_step_data))
+
     steps_data = [{"name": "Document", "data": trigger_step_data, "tasks": []}]
 
     # Track which steps the user designated as deliverables.
@@ -334,6 +336,11 @@ def build_steps_data(db: Database[dict], workflow_doc: dict, workflow_id: str, t
                 fixed_doc_config = input_cfg.get("fixed_documents", [])
                 for fd in fixed_doc_config:
                     fd_uuid = fd.get("uuid") if isinstance(fd, dict) else str(fd)
+                    # Never loaded for a run that may not read it. Every run
+                    # path refuses such a run before it gets here; this is so
+                    # a path that forgets to still cannot read the text.
+                    if fd_uuid in denied_fixed:
+                        raise FixedDocumentsDenied(len(denied_fixed))
                     if fd_uuid and fd_uuid not in doc_uuids:
                         doc_uuids.append(fd_uuid)
 
@@ -856,6 +863,32 @@ def _resolve_input_doc_uuids(workflow_doc: dict, trigger_step_data: dict) -> lis
     return doc_uuids
 
 
+class FixedDocumentsDenied(Exception):
+    """A run would read fixed documents neither its runner nor the workflow's
+    owner can open. Deterministic: fail the run with the message, don't retry."""
+
+    def __init__(self, count: int) -> None:
+        from app.services.fixed_document_access import fixed_documents_denied_message
+
+        self.count = count
+        super().__init__(fixed_documents_denied_message(count))
+
+
+def _denied_fixed_documents(
+    db: Database[dict], workflow_doc: dict, trigger_step_data: dict | None,
+    activity_id: str | ObjectId | None = None,
+) -> list[str]:
+    """Fixed documents this run may not read.
+
+    The runner is whoever started the run: ``user_id`` on the trigger data
+    (every dispatcher sets it) and the owner of the run's activity row.
+    """
+    from app.services.fixed_document_access import unreadable_fixed_documents
+
+    runners = [(trigger_step_data or {}).get("user_id"), _activity_owner(db, activity_id)]
+    return unreadable_fixed_documents(db, workflow_doc, runners)
+
+
 def _missing_fixed_documents(db: Database[dict], workflow_doc: dict) -> list[str]:
     """Titles of fixed documents (Input tab) that no longer exist.
 
@@ -1181,6 +1214,19 @@ def execute_workflow_task(self: Task, workflow_result_id: str, workflow_id: str,
                 "code": "fixed_documents_missing",
                 "missing_documents": missing_fixed[:20],
             },
+        )
+        return None
+
+    denied_fixed = _denied_fixed_documents(db, workflow_doc, trigger_step_data, activity_id)
+    if denied_fixed:
+        # Also a configuration error: no retry, and no document text is read.
+        logger.warning(
+            "Workflow %s aborted pre-flight: %d fixed document(s) not readable by its runner or owner",
+            workflow_id, len(denied_fixed),
+        )
+        _mark_workflow_failed(
+            db, workflow_result_id, activity_id, str(FixedDocumentsDenied(len(denied_fixed))),
+            error_payload={"code": "fixed_documents_access_denied", "count": len(denied_fixed)},
         )
         return None
 
@@ -1879,6 +1925,23 @@ def resume_workflow_after_approval(self: Task, approval_uuid: str) -> dict | Non
     # Rebuild steps_data through the same builder the initial run uses, so the
     # resumed pass executes the identical configuration.
     trigger_data = result_doc.get("input_context", {}) or {}
+    _resume_act = db.activity_event.find_one(
+        {"workflow_result": ObjectId(workflow_result_id)}, {"_id": 1}
+    )
+    # A run paused before fixed documents were access-checked (or whose
+    # sharing changed while it waited) must not read them on the way back in.
+    denied_fixed = _denied_fixed_documents(
+        db, workflow_doc, trigger_data, _resume_act["_id"] if _resume_act else None,
+    )
+    if denied_fixed:
+        _mark_workflow_failed(
+            db, workflow_result_id, _resume_act["_id"] if _resume_act else None,
+            str(FixedDocumentsDenied(len(denied_fixed))),
+            error_payload={"code": "fixed_documents_access_denied", "count": len(denied_fixed)},
+        )
+        if _resume_act:
+            _clear_pause_marker(db, _resume_act["_id"])
+        return {"status": "error", "result_id": workflow_result_id}
     steps_data, _ = build_steps_data(db, workflow_doc, workflow_id, trigger_data)
 
     user_id = workflow_doc.get("user_id")

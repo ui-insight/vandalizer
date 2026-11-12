@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Security
+- **A workflow's fixed documents are access-checked when saved and when run.** Adding a fixed document, in the workflow's input settings or when chat creates a workflow, requires access to that document ("You don't have access to a document set as a fixed document"); otherwise nothing is created or saved. Every run (manual, batch, resumed after approval, scheduled or folder-watch, and optimizer trials) reads a fixed document only if the person who started it, or the workflow's owner, can open it; otherwise the run stops before reading any text and says so. **Operators:** workflows saved earlier are covered by the run-time check; no migration is needed.
 - Upgrade audited frontend and Python dependencies, including the compatible MSAL/cryptography and FastAPI/Starlette stacks. Replace unmaintained PyPDF2 with pypdf and verify saved PDF form values. Chroma's development port now binds to localhost. Three Chroma advisories still have no published fix; see `docs/v5-release-readiness.md` for residual risk and release gates.
 
 ### Added

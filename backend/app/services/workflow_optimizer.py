@@ -1300,15 +1300,19 @@ async def _execute_workflow_inproc(
         from bson import ObjectId
 
         from app.tasks import get_sync_db
-        from app.tasks.workflow_tasks import build_steps_data
+        from app.tasks.workflow_tasks import FixedDocumentsDenied, build_steps_data
 
         db = get_sync_db()
         workflow_doc = db.workflow.find_one({"_id": ObjectId(wf_id)})
         if not workflow_doc:
             raise OptimizationInputError(f"Workflow {wf_id} not found")
-        steps_data, _ = build_steps_data(
-            db, workflow_doc, wf_id, {"doc_uuids": list(doc_uuids), "user_id": user_id},
-        )
+        try:
+            steps_data, _ = build_steps_data(
+                db, workflow_doc, wf_id, {"doc_uuids": list(doc_uuids), "user_id": user_id},
+            )
+        except FixedDocumentsDenied as denied:
+            # Trials read the workflow's fixed documents like any run does.
+            raise OptimizationInputError(str(denied)) from denied
         return steps_data
 
     steps_data = await asyncio.to_thread(_build)

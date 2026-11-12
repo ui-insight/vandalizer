@@ -6136,6 +6136,18 @@ async def create_workflow(
         return model_error
     model = requested_model or context.deps.model_name or None
 
+    # A fixed document's text goes into every run, so adding one needs read
+    # access to it. Refused before the preview: there is nothing to approve.
+    from app.services import access_control, workflow_service
+
+    fixed_document_uuids = [str(u) for u in (fixed_document_uuids or []) if u]
+    try:
+        await workflow_service.ensure_fixed_documents_readable(
+            {"fixed_documents": fixed_document_uuids}, context.deps.user,
+        )
+    except workflow_service.FixedDocumentAccessError as e:
+        return {"error": f"{e} Nothing was created."}
+
     # Validate every step up front so the preview reflects a buildable plan and
     # we never half-create a workflow because step 4 was malformed.
     plan: list[dict] = []
@@ -6255,7 +6267,8 @@ async def create_workflow(
     if fixed_document_uuids:
         fixed: list[dict] = []
         for u in fixed_document_uuids:
-            d = await SmartDocument.find_one(SmartDocument.uuid == u)
+            # Checked again here: the preview may have waited on approval.
+            d = await access_control.get_authorized_document(u, user, allow_admin=True)
             if d:
                 fixed.append({"uuid": u, "title": d.title or "Document"})
         if fixed:

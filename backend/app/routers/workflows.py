@@ -919,6 +919,8 @@ async def update_workflow(workflow_id: str, req: UpdateWorkflowRequest, user: Us
         )
     except DuplicateNameError as e:
         raise HTTPException(status_code=409, detail=str(e))
+    except svc.FixedDocumentAccessError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
     # Flag stale verification if this workflow was verified
