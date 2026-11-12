@@ -50,6 +50,22 @@ describe('historical approval evidence', () => {
     const chatter: ChatMessage = { role: 'assistant', content: 'Sounds good! Anything else?' }
     expect(approvalHistoryFor(preview, [approval, chatter]).preview.label).toBe('Not done')
   })
+  it('keeps a card approvable when its approval ran nothing and the server still has it waiting', () => {
+    // Support ticket: Create project was "approved", the Assistant replied
+    // "created" without running it, and the card was locked with no project.
+    const click: ChatMessage = { role: 'user', content: 'Yes, go ahead', approval_for: 'preview' }
+    const chatter: ChatMessage = { role: 'assistant', content: 'The workflow was created and is ready.' }
+    expect(approvalHistoryFor(preview, [click, chatter], false, ['preview'])).toEqual({})
+    // No reply at all (the Assistant could not answer): also approvable again.
+    expect(approvalHistoryFor(preview, [click], false, ['preview'])).toEqual({})
+    // While that turn is still running, the click stands.
+    expect(approvalHistoryFor(preview, [click], true, ['preview']).preview.label).toBe('Approval requested')
+    // Once the server no longer has it waiting, it is history.
+    expect(approvalHistoryFor(preview, [click, chatter], false, []).preview.label).toBe('Not done')
+    // A cancel is final even if the list has not caught up.
+    const cancel: ChatMessage = { role: 'user', content: 'No, cancel that', decline_for: 'preview' }
+    expect(approvalHistoryFor(preview, [cancel, chatter], false, ['preview']).preview.label).toBe('Cancellation requested')
+  })
   it('does not call an interrupted reply not done', () => {
     const stopped: ChatMessage = { role: 'assistant', content: 'Creating', interruption: 'connection' }
     expect(approvalHistoryFor(preview, [approval, stopped]).preview.label).toBe('Approval requested')

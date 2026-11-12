@@ -814,3 +814,90 @@ def require_honest_completion(ctx: RunContext["AgenticChatDeps"], output: str) -
     deps.completion_claim_retry_used = True
     labels = sorted({approve_button_label(tool) for tool in waiting})
     raise ModelRetry(COMPLETION_RETRY_INSTRUCTION.format(cards=", ".join(f"“{label}”" for label in labels)))
+
+
+# An action the user approved this turn that the reply never carried out.
+# Support ticket: a Create project card was approved, the model answered "The
+# project was created and is ready" without calling the tool, no project
+# existed, and the chat's own Activity log said "Approved, not run". The gate
+# removes an action from the waiting list only when it actually executes, so
+# an approved action still on the list at the end of the reply did not run.
+
+UNRUN_RETRY_INSTRUCTION = (
+    "The user approved {cards}, but you have not carried it out: you ended your reply without "
+    "calling its tool, so nothing has been created, saved or changed. Call {tools} now with the "
+    "same arguments as the preview and confirmed=true. If you cannot, say in one sentence that "
+    "it has not been done and why. Never say it was done. Do not repeat your previous reply."
+)
+UNRUN_CLAIM_RETRY_INSTRUCTION = (
+    "Your reply says something was created, saved, added or finished, but {cards} is still "
+    "waiting for approval and has not run. If the user's message clearly approved it, call "
+    "{tools} now with the same arguments as the preview and confirmed=true. A thank-you or an "
+    "acknowledgement of your last answer is not an approval: in that case say it has not been "
+    "done yet and point to its card. Never say it was done. Do not repeat your previous reply."
+)
+
+
+def approved_but_not_run(deps: "AgenticChatDeps | None") -> list[dict]:
+    """Waiting-list entries this turn was allowed to run and did not."""
+    approved = getattr(deps, "approved_confirmations", None) if deps is not None else None
+    if not approved:
+        return []
+    conversation = getattr(deps, "conversation", None)
+    return [
+        p for p in (getattr(conversation, "pending_confirmations", None) or [])
+        if isinstance(p, dict) and p.get("fp") in approved
+    ]
+
+
+def _unrun_to_report(deps: "AgenticChatDeps | None", text: str) -> list[dict]:
+    """The unrun actions *text* has to answer for.
+
+    A card's button is an explicit approval, so the action not running is
+    always wrong. A typed message may not have been an approval at all; it
+    only counts when the reply goes on to say something was done.
+    """
+    unrun = approved_but_not_run(deps)
+    if not unrun:
+        return []
+    mode = getattr(deps, "approval_mode", "none")
+    if mode == "card" or (mode == "typed_single" and claims_done(text)):
+        return unrun
+    return []
+
+
+def _card_names(entries: list[dict]) -> str:
+    return ", ".join(f"“{p.get('label') or approve_button_label(str(p.get('tool') or ''))}”" for p in entries)
+
+
+def require_approved_action_ran(ctx: RunContext["AgenticChatDeps"], output: str) -> str:
+    """Output validator: send back, once per turn, a reply that skipped the approved action."""
+    deps = ctx.deps
+    if ctx.partial_output or deps is None or getattr(deps, "unrun_approval_retry_used", False):
+        return output
+    unrun = _unrun_to_report(deps, output)
+    if not unrun:
+        return output
+    # Once only: a second miss is accepted, and the note below tells the user.
+    deps.unrun_approval_retry_used = True
+    template = UNRUN_RETRY_INSTRUCTION if getattr(deps, "approval_mode", "none") == "card" else UNRUN_CLAIM_RETRY_INSTRUCTION
+    raise ModelRetry(template.format(
+        cards=_card_names(unrun), tools=", ".join(sorted({str(p.get("tool") or "the tool") for p in unrun})),
+    ))
+
+
+def unrun_approval_note(text: str, deps: "AgenticChatDeps | None") -> str | None:
+    """What to add when the final reply still leaves an approved action unrun.
+
+    The streamed text can't be taken back, so the user is told plainly, and
+    told the card is still there to approve.
+    """
+    unrun = _unrun_to_report(deps, text)
+    if not unrun:
+        return None
+    one = len(unrun) == 1
+    return (
+        f"\n\n_Note: {_card_names(unrun)} did not run, so nothing was created or changed by "
+        f"{'it' if one else 'them'}. {'Its card is' if one else 'Their cards are'} still waiting: "
+        f"approve {'it' if one else 'each one'} again to carry {'it' if one else 'them'} out._"
+    )

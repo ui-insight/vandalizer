@@ -44,6 +44,20 @@ export function hasWaitingCard(message: ChatMessage, pending: readonly string[])
   return results(message).some(result => waiting.has(result.tool_call_id) && object(result.content).needs_confirmation === true)
 }
 
+/** The last click on this card was an approval, that turn is over, and no
+ * reply in it ran the action. */
+function approvedWithoutRunning(id: string, toolName: string | undefined, following: ChatMessage[], turnActive: boolean): boolean {
+  let last = -1
+  following.forEach((m, i) => { if (m.role === 'user' && (m.approval_for === id || m.decline_for === id)) last = i })
+  if (last < 0 || following[last].approval_for !== id) return false
+  const after = following.slice(last + 1)
+  const end = after.findIndex(m => m.role === 'user')
+  if (turnActive && end < 0) return false
+  const replies = (end < 0 ? after : after.slice(0, end)).filter(m => m.role === 'assistant')
+  if (replies.some(m => m.interruption)) return false
+  return !replies.some(m => calls(m).some(call => call.tool_name === toolName && call.args.confirmed === true))
+}
+
 /** Associate an execution with a preview in the next turn by matching its
  * arguments, a stored Page preview ID, or a successful Skill receipt's target.
  * A later unrelated run must never make an old approval look completed.
@@ -73,6 +87,11 @@ export function approvalHistoryFor(message: ChatMessage, following: ChatMessage[
     // even after a typed reply or another card's decision.
     const clicked = following.some(m => m.role === 'user' && (m.approval_for === id || m.decline_for === id))
     if (waiting.has(id) && !clicked) continue
+    // Approved, but the turn ended without the action running, and the server
+    // still has it armed: it can be approved again. Support ticket: the card
+    // was locked as "no longer actionable" while the project it was meant to
+    // create did not exist, leaving no way to carry it out.
+    if (waiting.has(id) && approvedWithoutRunning(id, original?.tool_name, following, turnActive)) continue
     const nextUser = following.findIndex(m => m.role === 'user' && (
       (!m.approval_for && !m.decline_for) || m.approval_for === id || m.decline_for === id))
     if (nextUser < 0 && following.some(m => m.role === 'user')) continue

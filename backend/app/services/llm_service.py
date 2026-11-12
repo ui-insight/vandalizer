@@ -1282,8 +1282,10 @@ def create_agentic_chat_agent(
         from app.services.calculation_claims import require_calculated_figures
         agent.output_validator(require_calculated_figures)
         # "All steps completed / saved" while this reply's approval cards wait.
-        from app.services.approval_claims import require_honest_completion
+        from app.services.approval_claims import require_approved_action_ran, require_honest_completion
         agent.output_validator(require_honest_completion)
+        # An approved card whose action the reply never carried out.
+        agent.output_validator(require_approved_action_ran)
         _agentic_chat_agent_cache[cache_key] = agent
 
     return _agentic_chat_agent_cache[cache_key]
