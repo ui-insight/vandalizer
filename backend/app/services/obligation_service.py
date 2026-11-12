@@ -576,19 +576,46 @@ def _norm_title(title: str) -> str:
     return (title or "").strip().lower()
 
 
-async def is_duplicate(project_uuid: str, clean: dict) -> bool:
+#: Statuses a proposal is checked against. A superseded item was replaced by
+#: an amendment and is not "in the inbox" any more.
+_KNOWN_STATUSES = ("open", "done")
+
+
+async def find_existing(project_uuid: str, clean: dict) -> Optional[Obligation]:
+    """The inbox item a proposal repeats, open or already marked done.
+
+    Support ticket: only open items were compared, so a deadline marked Done
+    was proposed again on the next run and would have come back as open, with
+    its reminders starting over.
+    """
     existing = await Obligation.find(
-        Obligation.project_uuid == project_uuid,
-        Obligation.kind == clean["kind"],
-        Obligation.status == "open",
+        {"project_uuid": project_uuid, "kind": clean["kind"], "status": {"$in": list(_KNOWN_STATUSES)}}
     ).to_list()
+    matches = []
     for ob in existing:
+        if ob.status not in _KNOWN_STATUSES:
+            continue
         if clean["kind"] == "deadline" and ob.due_at and clean.get("due_at"):
             if _same_deadline(ob, clean):
-                return True
+                matches.append(ob)
         elif _norm_title(ob.title) == _norm_title(clean["title"]):
-            return True
-    return False
+            matches.append(ob)
+    # An open copy is the one the inbox is showing.
+    return next((ob for ob in matches if ob.status == "open"), matches[0] if matches else None)
+
+
+async def is_duplicate(project_uuid: str, clean: dict) -> bool:
+    return await find_existing(project_uuid, clean) is not None
+
+
+def _already_reason(ob: Obligation, user: User) -> str:
+    """Why a repeated proposal is left out. Every variant keeps the words
+    "already in this project's inbox", which callers match on."""
+    if ob.status == "done":
+        return "already in this project's inbox, marked done"
+    if user.user_id in (ob.dismissed_by or []):
+        return "already in this project's inbox, dismissed by you"
+    return "already in this project's inbox or proposal"
 
 
 async def save_checked(project: Project, user: User, clean: dict) -> Obligation:
@@ -630,8 +657,12 @@ async def propose(project: Project, user: User, items: list[dict]) -> dict:
             continue
         for occurrence in occurrences:
             row = {**clean, **occurrence}
-            if any(a["clean"] == row for a in accepted) or await is_duplicate(project.uuid, row):
+            if any(a["clean"] == row for a in accepted):
                 rejected.append({"title": row["title"], "reason": "already in this project's inbox or proposal"})
+                continue
+            existing = await find_existing(project.uuid, row)
+            if existing is not None:
+                rejected.append({"title": row["title"], "reason": _already_reason(existing, user)})
                 continue
             replaced = await find_replaced(project.uuid, row)
             accepted.append({"clean": row, "replaces": serialize(replaced, user) if replaced else None})
