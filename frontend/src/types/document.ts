@@ -26,6 +26,8 @@ export interface Document {
   chunk_count?: number
   ingest_error?: string | null
   error_message?: string | null
+  /** False when the file itself can't be read, so a retry would fail again. */
+  error_retryable?: boolean | null
   extraction_low_quality?: boolean
   /** Stored ingestion-warning codes: the text is real but not the whole
    * document, or the hidden-text safety check could not run. */

@@ -13,3 +13,84 @@ export function documentReadinessMessage(doc: Pick<Document, 'processing' | 'tas
   if (doc.extraction_low_quality) return 'Text may be incomplete. Inspect the original before using answers or extracted values.'
   return null
 }
+
+export type DocumentIssueKind = 'failed_check' | 'no_text' | 'not_indexed' | 'poor_text' | 'partial_text'
+
+export type DocumentIssue = {
+  kind: DocumentIssueKind
+  /** Short badge text for a file row. */
+  label: string
+  /** The full reason, for hover and screen readers. */
+  detail: string
+  /** A failure blocks use of the file; a warning only limits it. */
+  tone: 'error' | 'warning'
+  /** True when re-running the upload pipeline can clear it. */
+  retryable: boolean
+}
+
+type IssueDoc = Pick<Document, 'processing' | 'task_status' | 'valid'> & Partial<Document>
+
+/** The one issue a file row shows, most blocking first. Null while the file
+ *  is still processing, and for a file with nothing wrong. */
+export function documentIssue(doc: IssueDoc): DocumentIssue | null {
+  if (!isDocReady(doc)) return null
+  if (!doc.valid) {
+    return {
+      kind: 'failed_check', label: 'Failed check', tone: 'error', retryable: false,
+      detail: doc.validation_feedback
+        ? `Failed validation: ${doc.validation_feedback}`
+        : 'This document did not pass automated upload validation.',
+    }
+  }
+  if (doc.task_status === 'error') {
+    // error_retryable false: the file itself is the problem (damaged, or a
+    // format that can't be read), so a retry would fail the same way.
+    const retryable = doc.error_retryable !== false
+    return {
+      kind: 'no_text', label: 'No text', tone: 'error', retryable,
+      detail: doc.error_message
+        ? `Text extraction failed: ${doc.error_message}`
+        : `Text extraction failed for this document — chat and extraction cannot read it. ${retryable ? 'Try Retry extraction or re-upload it.' : 'Upload a replacement.'}`,
+    }
+  }
+  if (doc.ingest_error) {
+    return {
+      kind: 'not_indexed', label: 'Not indexed', tone: 'warning', retryable: true,
+      detail: `Could not index this document for search: ${doc.ingest_error}. Chat and Knowledge Base retrieval will not work.`,
+    }
+  }
+  if (doc.extraction_low_quality) {
+    return {
+      kind: 'poor_text', label: 'Poor text', tone: 'warning', retryable: true,
+      detail: 'Text extracted poorly from this document — most of its stored text is unreadable, so chat answers about it are likely to be unreliable. Try Retry extraction or re-upload it.',
+    }
+  }
+  if (doc.ingestion_warning_text) {
+    return {
+      kind: 'partial_text', label: 'Partial text', tone: 'warning', retryable: false,
+      detail: `This document was ingested with a caveat: ${doc.ingestion_warning_text}. Answers about it may be incomplete.`,
+    }
+  }
+  return null
+}
+
+const ISSUE_ORDER: DocumentIssueKind[] = ['failed_check', 'no_text', 'not_indexed', 'poor_text', 'partial_text']
+const ISSUE_SUMMARY: Record<DocumentIssueKind, string> = {
+  failed_check: 'failed check',
+  no_text: 'no text',
+  not_indexed: 'not indexed',
+  poor_text: 'poor text',
+  partial_text: 'partial text',
+}
+
+/** Count per issue type across a file list, e.g. "4 not indexed · 1 no text".
+ *  Null when no file has an issue. */
+export function documentIssueSummary(docs: IssueDoc[]): string | null {
+  const counts = new Map<DocumentIssueKind, number>()
+  for (const doc of docs) {
+    const issue = documentIssue(doc)
+    if (issue) counts.set(issue.kind, (counts.get(issue.kind) ?? 0) + 1)
+  }
+  if (!counts.size) return null
+  return ISSUE_ORDER.filter(kind => counts.has(kind)).map(kind => `${counts.get(kind)} ${ISSUE_SUMMARY[kind]}`).join(' · ')
+}

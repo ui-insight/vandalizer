@@ -1,4 +1,4 @@
-import { documentReadinessMessage, type DocumentReadiness } from '../../utils/documentReadiness'
+import { documentIssue, documentReadinessMessage, type DocumentReadiness } from '../../utils/documentReadiness'
 import { WorkspaceSectionHeader } from '../shared/WorkspaceSectionHeader'
 import { useCallback, useMemo, useState, useRef, useEffect, type ReactNode, type DragEvent, type Ref } from 'react'
 import { Plus, Folder as FolderIcon, Upload, Trash2, Download, FolderInput } from 'lucide-react'
@@ -26,6 +26,7 @@ import { DocumentUsageDialog, UsageSummaryList, UsageCheckFailedNote, RemoveFrom
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { createFolder, renameFolder, deleteFolder, convertFolderToTeam, moveFolder, exportFolder } from '../../api/folders'
 import { listAutomations } from '../../api/automations'
+import { retryExtraction } from '../../api/documents'
 import type { Document, Folder } from '../../types/document'
 import { isDocReady } from '../../utils/processingStatus'
 import { SUPPORTED_ACCEPT_ATTR } from '../../utils/fileTypes'
@@ -414,6 +415,33 @@ export function FileBrowser({ listScrollRef, onListScroll, searchField, selected
       setBulkDeleting(false)
     }
   }, [selectedUuids, folders, documents, refresh, confirm, setSelectedUuids, toast])
+
+  // Retry from the row: the same re-run the open file offers. It re-reads the
+  // text and rebuilds the search index, so it clears both kinds of failure.
+  const [retryingUuids, setRetryingUuids] = useState<Set<string>>(() => new Set())
+  const handleRetryDoc = useCallback(async (doc: Document) => {
+    // A re-read clears the stored text before it starts. That costs nothing
+    // for a file with no text, but one that only failed indexing or read
+    // poorly still has text chat can use: say so before replacing it.
+    if (documentIssue(doc)?.kind !== 'no_text') {
+      const ok = await confirm({
+        title: `Read ${doc.title} again?`,
+        message: 'This reads the file again and rebuilds its search index. Its current text is replaced, and if the new read fails the file will have no text until it is retried.',
+        confirmLabel: 'Read again',
+      })
+      if (!ok) return
+    }
+    setRetryingUuids(prev => new Set(prev).add(doc.uuid))
+    try {
+      await retryExtraction(doc.uuid)
+      // The list polls while a file is processing, so the row updates itself.
+      await refresh()
+    } catch (err) {
+      toast(err instanceof Error ? `Could not retry ${doc.title}: ${err.message}` : `Could not retry ${doc.title}`, 'error')
+    } finally {
+      setRetryingUuids(prev => { const next = new Set(prev); next.delete(doc.uuid); return next })
+    }
+  }, [refresh, toast, confirm])
 
   const handleDropFile = useCallback(async (fileUuid: string, folderUuid: string) => {
     try {
@@ -849,6 +877,8 @@ export function FileBrowser({ listScrollRef, onListScroll, searchField, selected
           sort={sort}
           onSort={handleSort}
           watchedFolderUuids={watchedFolderUuids}
+          onRetryDoc={handleRetryDoc}
+          retryingUuids={retryingUuids}
         />}
       </div>
 
