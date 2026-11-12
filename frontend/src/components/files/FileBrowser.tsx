@@ -55,7 +55,6 @@ export interface ContentMatch {
 }
 
 interface FileBrowserProps {
-  searchAction?: ReactNode
   searchField?: ReactNode
   selectedDocumentUuids?: string[]
   selectedFolderUuids?: string[]
@@ -116,7 +115,7 @@ function keptKnowledgeBasesMessage(results: DeleteFileResult[]): string | null {
 // The delete confirmation names what it deletes; past this many, "and N more".
 const DELETE_NAME_CAP = 8
 
-export function FileBrowser({ searchAction, searchField, selectedDocumentUuids, selectedFolderUuids, onDocClick, searchQuery = '', contentMatches, contentSearchState, onRetryContentSearch, onSelectionChange, onDocNamesChange, onDocumentReadinessChange, onFolderSelectionChange, onFolderNamesChange, onSelectionProcessingChange, currentFolder: controlledFolder, onFolderNavigate, onAskAboutFolder, onRunWorkflowOnFolder, onAddFolderToKB, rootFolder = null, rootLabel, teamScopeUuid }: FileBrowserProps) {
+export function FileBrowser({ searchField, selectedDocumentUuids, selectedFolderUuids, onDocClick, searchQuery = '', contentMatches, contentSearchState, onRetryContentSearch, onSelectionChange, onDocNamesChange, onDocumentReadinessChange, onFolderSelectionChange, onFolderNamesChange, onSelectionProcessingChange, currentFolder: controlledFolder, onFolderNavigate, onAskAboutFolder, onRunWorkflowOnFolder, onAddFolderToKB, rootFolder = null, rootLabel, teamScopeUuid }: FileBrowserProps) {
   const { currentTeam } = useTeams()
   const confirm = useConfirm()
   const { toast } = useToast()
@@ -660,7 +659,7 @@ export function FileBrowser({ searchAction, searchField, selectedDocumentUuids, 
       onDragLeave={handlePanelDragLeave}
       onDrop={handlePanelDrop}
     >
-      <WorkspaceSectionHeader title="Files" actions={<>{searchAction}
+      <WorkspaceSectionHeader title="Files" actions={<>
       <div ref={addMenuRef} className="relative inline-block">
         <button
           type="button"
