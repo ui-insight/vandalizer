@@ -5358,6 +5358,10 @@ def _describe_obligation(clean: dict) -> str:
 
 def _obligation_review_reason(reason: str) -> str:
     """User-facing explanation; checker instructions stay in the tool result."""
+    if "marked done" in reason:
+        return "Already marked done in this inbox."
+    if "dismissed by you" in reason:
+        return "Already in this inbox; you dismissed it."
     if "already in" in reason:
         return "Already included in this inbox or proposal."
     if "can't open" in reason:
@@ -5562,6 +5566,22 @@ async def propose_obligations(
     ]
     lines = [f"Add: {description}" for description in descriptions]
     lines += [f"Not included: {r['title']} — {r['explanation']}" for r in excluded]
+    if not accepted and rejected and all("already in" in (r.get("reason") or "") for r in rejected):
+        # Nothing failed: every item is in the inbox already, open or done.
+        # Support ticket: a re-run after marking a deadline Done offered it
+        # again. Saying "couldn't be checked" here would send the model off
+        # to re-quote items that need nothing.
+        return {
+            "ok": True,
+            "project": project.title,
+            "added": [],
+            "already_in_inbox": excluded,
+            "message": (
+                f'Nothing new to add: all {len(excluded)} item{"s are" if len(excluded) != 1 else " is"} already in the RA inbox '
+                f'for "{project.title}". ' + " ".join(f"{r['title']}: {r['explanation']}" for r in excluded)
+                + " Tell the user this; do not propose these again or reopen items marked done."
+            ),
+        }
     if not accepted:
         context.deps.obligation_failures = failures + 1
         return {
