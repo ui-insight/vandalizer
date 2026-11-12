@@ -104,16 +104,27 @@ export function waitingActions(messages: readonly ChatMessage[], pending: readon
   })
 }
 
-const AFFIRM = new Set(['yes', 'yeah', 'yep', 'yup', 'y', 'sure', 'ok', 'okay', 'k', 'approve', 'approved', 'confirm',
+// Words that say "do it". "ok" and "okay" are not among them: on their own
+// they acknowledge the last answer as often as they approve a card (support
+// ticket: "ok thanks", sent after an unrelated answer, approved a waiting
+// Create project card). They count only beside one of these ("ok, do it").
+const AFFIRM = new Set(['yes', 'yeah', 'yep', 'yup', 'y', 'sure', 'approve', 'approved', 'confirm',
   'confirmed', 'go', 'proceed', 'do'])
-const FILLER = new Set(['ahead', 'it', 'please', 'thanks', 'thank', 'you', 'sounds', 'looks', 'good', 'great', 'fine',
-  'perfect', 'lets', "let's", 'that', 'thats', "that's", 'this', 'one', 'for', 'with', 'and', 'right', 'sir'])
+// With a thank-you in the message, "sure" is politeness too.
+const EXPLICIT = new Set([...AFFIRM].filter(w => w !== 'sure'))
+const GRATITUDE = new Set(['thanks', 'thank', 'thx', 'ty', 'cheers'])
+const FILLER = new Set(['ok', 'okay', 'k', 'ahead', 'it', 'please', 'you', 'sounds', 'looks', 'good', 'great', 'fine',
+  'perfect', 'lets', "let's", 'that', 'thats', "that's", 'this', 'one', 'for', 'with', 'and', 'right', 'sir',
+  ...GRATITUDE])
 
-/** "Yes, go ahead", "ok do it", "approve": a bare yes that names no action. */
+/** "Yes, go ahead", "ok do it", "approve": a clear yes that names no action.
+ * Not "ok", "ok thanks" or "sounds good": those go to the Assistant as typed. */
 export function isPlainApproval(text: string): boolean {
   const words = text.toLowerCase().replace(/[^a-z' ]+/g, ' ').split(/\s+/).filter(Boolean)
   if (!words.length || words.length > 8) return false
-  return words.some(w => AFFIRM.has(w)) && words.every(w => AFFIRM.has(w) || FILLER.has(w))
+  if (!words.every(w => AFFIRM.has(w) || FILLER.has(w))) return false
+  const needed = words.some(w => GRATITUDE.has(w)) ? EXPLICIT : AFFIRM
+  return words.some(w => needed.has(w))
 }
 
 export type TypedApproval = { approve: WaitingAction } | { ask: WaitingAction[] } | null

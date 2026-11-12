@@ -65,7 +65,7 @@ from app.services.context_budget import (
     token_safety_margin,
 )
 from app.services.citation_grounding import ground_citation, normalize_citation_markup
-from app.services.approval_claims import announces_unfinished_action, unprepared_card_note
+from app.services.approval_claims import announces_unfinished_action, unprepared_card_note, unrun_approval_note
 from app.services.page_authoring import declares_page_too_large, requests_page
 from app.services.chat_output import public_chat_text
 from app.services.chat_budget_tables import reconcile_budget_tables
@@ -3004,8 +3004,15 @@ async def chat_stream(
                 # The model was sent back once for pointing at an approval card
                 # it never prepared; if the reply still does, say so instead of
                 # leaving the user hunting for the button.
-                note = unprepared_card_note("".join(full_response), deps)
-                if note:
+                # Likewise for an approved action the reply never carried
+                # out ("The project was created" with no project): the model
+                # had its retry; now the user is told it did not run.
+                for note in (
+                    unprepared_card_note("".join(full_response), deps),
+                    unrun_approval_note("".join(full_response), deps),
+                ):
+                    if not note:
+                        continue
                     full_response.append(note)
                     if streamed_segments and streamed_segments[-1].get("kind") == "text":
                         streamed_segments[-1]["content"] += note

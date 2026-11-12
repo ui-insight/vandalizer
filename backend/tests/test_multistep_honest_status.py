@@ -197,3 +197,111 @@ def test_unclear_anchors_are_still_refused(rule, reason):
     with pytest.raises(ValueError) as exc:
         calculate_deadlines([_src(rule, "timing"), PERIOD])
     assert reason in str(exc.value)
+
+
+# ── An approved action the reply never carried out ──────────────────────────
+# Support ticket: a Create project card was approved (by "ok thanks", which
+# counted as a yes), the model replied "The project 'OK Thanks Test' was
+# created and is ready" without calling the tool, and no project existed.
+
+def _approved(mode="card", still_waiting=True):
+    entry = {"fp": "fp-project", "turn": 3, "tool": "create_project", "label": "Create project", "call_id": "call-1"}
+    conversation = types.SimpleNamespace(pending_confirmations=[entry] if still_waiting else [], save=AsyncMock())
+    deps = types.SimpleNamespace(conversation=conversation, turn_marker=9, approval_mode=mode,
+                                 approved_confirmations=frozenset({"fp-project"}), unrun_approval_retry_used=False)
+    return types.SimpleNamespace(deps=deps, partial_output=False)
+
+
+CLAIM = "The project 'OK Thanks Test' was created and is ready."
+
+
+def test_an_approved_card_that_did_not_run_is_sent_back_once_then_noted():
+    ctx = _approved()
+    with pytest.raises(ModelRetry) as retry:
+        approval_claims.require_approved_action_ran(ctx, CLAIM)
+    assert "“Create project”" in str(retry.value) and "create_project" in str(retry.value)
+    assert "confirmed=true" in str(retry.value)
+    # Second miss is accepted, and the user is told it did not run.
+    assert approval_claims.require_approved_action_ran(ctx, CLAIM) == CLAIM
+    note = approval_claims.unrun_approval_note(CLAIM, ctx.deps)
+    assert "“Create project” did not run" in note and "nothing was created" in note
+    assert "approve it again" in note
+
+
+def test_a_button_approval_that_did_not_run_is_reported_whatever_the_reply_says():
+    ctx = _approved()
+    with pytest.raises(ModelRetry):
+        approval_claims.require_approved_action_ran(ctx, "Anything else I can help with?")
+    assert approval_claims.unrun_approval_note("Anything else I can help with?", ctx.deps)
+
+
+def test_an_action_that_ran_needs_no_note():
+    ctx = _approved(still_waiting=False)  # the gate removes it when it executes
+    assert approval_claims.require_approved_action_ran(ctx, "Created the project.") == "Created the project."
+    assert approval_claims.unrun_approval_note("Created the project.", ctx.deps) is None
+
+
+def test_a_typed_message_only_counts_when_the_reply_claims_it_was_done():
+    # "ok thanks" now reaches the model as typed. Answering it is fine;
+    # answering "created" is not.
+    ctx = _approved(mode="typed_single")
+    polite = "You're welcome! The Create project card is still waiting for your approval."
+    assert approval_claims.require_approved_action_ran(ctx, polite) == polite
+    assert approval_claims.unrun_approval_note(polite, ctx.deps) is None
+    with pytest.raises(ModelRetry) as retry:
+        approval_claims.require_approved_action_ran(ctx, CLAIM)
+    assert "acknowledgement" in str(retry.value)
+    assert approval_claims.unrun_approval_note(CLAIM, ctx.deps)
+
+
+def test_a_typed_question_about_something_else_is_not_a_claim_about_the_card():
+    """A Create project card waits and the user asks an unrelated question.
+    The answer reports something as done, but not the card's action."""
+    ctx = _approved(mode="typed_single")
+    answer = "Three files were added last week."
+    assert approval_claims.require_approved_action_ran(ctx, answer) == answer
+    assert approval_claims.unrun_approval_note(answer, ctx.deps) is None
+    assert ctx.deps.unrun_approval_retry_used is False
+
+
+def test_a_typed_message_is_never_told_to_run_the_action():
+    """A typed message got here without being recognised as an approval, so
+    the retry must not have the model call the tool."""
+    ctx = _approved(mode="typed_single")
+    with pytest.raises(ModelRetry) as retry:
+        approval_claims.require_approved_action_ran(ctx, CLAIM)
+    text = str(retry.value)
+    assert "Do not call create_project" in text
+    assert "confirmed=true" not in text
+
+
+def test_a_turn_that_approved_nothing_is_left_alone():
+    ctx = _approved(mode="none")
+    ctx.deps.approved_confirmations = frozenset()
+    assert approval_claims.require_approved_action_ran(ctx, CLAIM) == CLAIM
+    assert approval_claims.unrun_approval_note(CLAIM, ctx.deps) is None
+
+
+def test_the_unrun_validator_is_registered_and_the_reminder_rules_out_thanks():
+    import inspect
+
+    from app.services import llm_service
+    from app.services.approval_scope import approval_reminder, decide
+
+    assert "require_approved_action_ran" in inspect.getsource(llm_service)
+    pending = [{"fp": "fp-project", "turn": 3, "tool": "create_project", "label": "Create project", "call_id": "c"}]
+    note = approval_reminder(decide(pending), pending)
+    assert "thank-you" in note and "is not an approval" in note
+    assert "Never say the step was done unless you ran it" in note
+
+
+def test_a_turn_can_send_a_reply_back_more_than_once():
+    """Each reply check retries at most once, but the library allows one retry
+    per turn by default: two different checks failing in a row ended the turn
+    with an error. The chat agent is built with room for a few."""
+    import inspect
+
+    from app.services import llm_service
+
+    assert llm_service.CHAT_OUTPUT_RETRIES >= 2
+    assert 'retries={"output": CHAT_OUTPUT_RETRIES}' in inspect.getsource(llm_service.create_agentic_chat_agent)
