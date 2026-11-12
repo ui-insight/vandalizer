@@ -19,6 +19,7 @@ import { ExistingFilesDialog } from '../files/ExistingFilesDialog'
 import { FileProcessingCell, type ProcessingCellDoc } from './FileProcessingCell'
 import { ChatExportActions } from './ChatExportActions'
 import { TrialTopUpDialog } from '../trial/TrialTopUpDialog'
+import { UnverifiedEmailAction } from '../trial/UnverifiedEmailAction'
 import { FirstSessionHome, ReturningHome } from './HomeExperience'
 import { RAInbox } from './RAInbox'
 import { HomeWorkQueue } from './HomeWorkQueue'
@@ -1446,6 +1447,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                   Your last message wasn't carried out. Top up here and it's sent again, including an approval or button you just clicked.
                 </span>
               </div>
+            ) : errorDetails?.code === 'trial_email_unverified' ? (
+              <UnverifiedEmailAction />
             ) : errorDetails?.suggestedAction === 'continue' ? (
               <div className="mt-2 flex items-center gap-2">
                 <button

@@ -257,6 +257,8 @@ export interface UserDetailResponse {
   is_admin: boolean
   is_staff: boolean
   is_examiner: boolean
+  /** A trial account that hasn't confirmed its email: AI features stay off until it does. */
+  email_unverified?: boolean
   tokens_in: number
   tokens_out: number
   workflows_started: number
@@ -466,6 +468,14 @@ export function updateUserRoles(userId: string, roles: { is_admin?: boolean; is_
     method: 'PUT',
     body: JSON.stringify(roles),
   })
+}
+
+/** Confirm a trial user's email address on their behalf, switching AI features on. */
+export function markUserEmailVerified(userId: string) {
+  return apiFetch<{ ok: boolean; email_unverified: boolean }>(
+    `/api/admin/users/${encodeURIComponent(userId)}/verify-email`,
+    { method: 'POST' },
+  )
 }
 
 // Models

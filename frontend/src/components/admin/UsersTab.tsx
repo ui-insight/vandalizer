@@ -13,7 +13,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import {
-  getUserLeaderboard, getUserDetail, getUserHistory, updateUserRoles,
+  getUserLeaderboard, getUserDetail, getUserHistory, updateUserRoles, markUserEmailVerified,
 } from '../../api/admin'
 import type {
   UserHistoryItem, UserLeaderboardItem,
@@ -35,6 +35,7 @@ function UserDrillDown({ userId, onBack }: { userId: string; onBack: () => void 
   const { toast } = useToast()
   const [days, setDays] = useState(30)
   const [savingRoles, setSavingRoles] = useState(false)
+  const [verifying, setVerifying] = useState(false)
 
   const request = useCallback(() => getUserDetail(userId, days), [userId, days])
   const { data, setData, loading, error, load } = useAdminQuery(request)
@@ -73,6 +74,48 @@ function UserDrillDown({ userId, onBack }: { userId: string; onBack: () => void 
           <div style={{ fontSize: 13, color: '#6b7280' }}>{data.email || data.user_id}</div>
         </div>
       </div>
+
+      {/* Unconfirmed trial email: the one state that blocks AI features */}
+      {data.email_unverified && (
+        <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 'var(--ui-radius, 12px)', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 260 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#92400e' }}>Email not verified</div>
+            <div style={{ fontSize: 13, color: '#78350f', marginTop: 4 }}>
+              This person hasn't opened the confirmation link, so AI features are off for their account. If the email didn't reach them, you can confirm the address yourself.
+            </div>
+          </div>
+          <button
+            type="button"
+            disabled={verifying}
+            onClick={async () => {
+              const who = data.name || data.email || userId
+              const ok = await confirm({
+                title: 'Mark email as verified?',
+                message: (
+                  <>
+                    Confirm <strong>{data.email || userId}</strong> as the email address for <strong>{who}</strong>? AI features turn on for their account straight away, without them opening the emailed link.
+                  </>
+                ),
+                confirmLabel: 'Mark as verified',
+              })
+              if (!ok) return
+              setVerifying(true)
+              try {
+                await markUserEmailVerified(userId)
+                setData(prev => prev ? { ...prev, email_unverified: false } : prev)
+                toast(`Email verified for ${who}. They can use AI features now.`, 'success')
+              } catch (e) {
+                toast(`Couldn't mark the email as verified: ${e instanceof Error ? e.message : 'unknown error'}`, 'error')
+              } finally {
+                setVerifying(false)
+              }
+            }}
+            style={{ padding: '8px 16px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #b45309', background: '#b45309', color: '#fff', fontSize: 13, fontWeight: 600, cursor: verifying ? 'wait' : 'pointer', opacity: verifying ? 0.6 : 1 }}
+          >
+            {verifying ? 'Marking as verified…' : 'Mark email as verified'}
+          </button>
+        </div>
+      )}
 
       {/* Role management (admin only) */}
       {currentUser?.is_admin && (
