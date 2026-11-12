@@ -613,12 +613,18 @@ def _stream_error_event(exc: BaseException, user_message: str) -> dict:
     in-app top-up and then retry the same message — including an approval
     ("Yes, go ahead") whose action is still armed, since a blocked turn never
     ran it.
+
+    An unconfirmed address carries its own code: sending the same message
+    again can't succeed until the address is confirmed, so the client offers
+    the resend there instead of Retry.
     """
-    from app.exceptions import TrialBudgetExceededError
+    from app.exceptions import TrialBudgetExceededError, TrialUnverifiedError
 
     event = {"kind": "error", "content": user_message}
     if isinstance(exc, TrialBudgetExceededError) and exc.code == "budget_exhausted":
         event["code"] = "trial_budget_exhausted"
+    elif isinstance(exc, TrialUnverifiedError):
+        event["code"] = "trial_email_unverified"
     return event
 
 
@@ -4911,7 +4917,7 @@ async def _build_project_context(project_uuid: str, user: User) -> str:
     if not project:
         return ""
     overview = await project_service.get_project_overview(project, user)
-    pins = await project_service.list_pins(project)
+    pins = await project_service.list_pins(project, user)
     caps = overview["capabilities"]
 
     lines = [

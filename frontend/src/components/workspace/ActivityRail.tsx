@@ -30,6 +30,7 @@ import { useToast } from '../../contexts/ToastContext'
 import { useConfirm } from '../shared/useConfirm'
 import { useCertificationPanel } from '../../contexts/CertificationPanelContext'
 import { LEVEL_CONFIG } from '../certification/constants'
+import { certificationBadgeHint } from '../certification/badgeHint'
 import { ActivityActions } from './ActivityActions'
 import { cn } from '../../lib/cn'
 import type { ActivityEvent } from '../../types/chat'
@@ -132,6 +133,7 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
   const certXp = progress?.total_xp || 0
   const certCertified = !!progress?.certified
   const certStarted = certXp > 0
+  const certHint = certificationBadgeHint({ level: certLevel, xp: certXp, certified: certCertified, title: certTitle, levels: course?.levels })
 
   const handleDelete = useCallback(
     async (e: React.MouseEvent, id: string) => {
@@ -382,6 +384,7 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
   return (
     <aside
       ref={railRef}
+      id="workspace-activity-rail"
       aria-label="Activity"
       className={cn('activity-rail', visualDocked && 'activity-rail--docked')}
     >
@@ -503,11 +506,13 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
 
       {/* Certification badge footer */}
       <div className="activity-rail__footer">
+        <span id="activity-certification-hint" className="sr-only">{certHint}</span>
         <button
           type="button"
           aria-label="Open certification"
           onClick={() => { onNavigate?.(); openPanel() }}
-          title={certCertified ? certTitle : certStarted ? `${certConfig.label} · ${certXp} XP` : 'Get Certified'}
+          title={certHint}
+          aria-describedby="activity-certification-hint"
           className={cn('activity-rail__certification', certCertified && 'activity-rail__certification--certified')}
         >
           <Award

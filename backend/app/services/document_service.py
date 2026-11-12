@@ -1,4 +1,9 @@
-from typing import Optional
+import asyncio
+import datetime
+from pathlib import Path
+from typing import Any, Optional
+
+from pydantic import BaseModel, Field
 
 from app.config import Settings
 from app.models.document import SmartDocument
@@ -98,6 +103,113 @@ def is_extraction_low_quality(doc: SmartDocument) -> bool:
     return ratio > Settings().extraction_max_nonletter_ratio
 
 
+class _ChildDocument(BaseModel):
+    """Just enough of a document to count it and date its folder; the list
+    must not pull every child's ``raw_text`` to say "12 items"."""
+
+    folder: Optional[str] = None
+    user_id: Optional[str] = None
+    team_id: Optional[str] = None
+    updated_at: Optional[datetime.datetime] = None
+
+
+class _ChildFolder(BaseModel):
+    id: Any = Field(default=None, alias="_id")
+    parent_id: Optional[str] = None
+    user_id: Optional[str] = None
+    team_id: Optional[str] = None
+
+
+def _created_at(object_id: Any) -> datetime.datetime | None:
+    """A folder stores no dates; its ObjectId carries when it was created.
+
+    Returned naive in server-local time, the convention ``SmartDocument``'s
+    ``datetime.now()`` timestamps already use, so the two compare and render
+    alike.
+    """
+    generated = getattr(object_id, "generation_time", None)
+    if not isinstance(generated, datetime.datetime):
+        return None
+    return generated.astimezone().replace(tzinfo=None)
+
+
+async def _folder_summaries(
+    folders: list[SmartFolder], user: User, *, in_project: bool
+) -> dict[str, dict]:
+    """Item count and last-modified date for each listed folder.
+
+    Both are derived at read time. The count is the folder's direct contents
+    as this viewer would see them on opening it (same owner/team rule as the
+    listing itself). "Modified" is the newest of: the folder's creation, a
+    file in it being added or changed, a subfolder being created in it.
+    """
+    if not folders:
+        return {}
+    uuids = [f.uuid for f in folders]
+    # A project root's contents belong to several people; so does everything
+    # under a project. Those are not narrowed to the viewer's own items.
+    shared = set(uuids) if in_project else await access_control.project_root_folder_uuids(uuids)
+    by_uuid = {f.uuid: f for f in folders}
+
+    def visible(parent_uuid: str | None, item: Any) -> bool:
+        parent = by_uuid.get(parent_uuid or "")
+        if parent is None:
+            return False
+        if parent.uuid in shared:
+            return True
+        if parent.team_id:
+            return bool(item.team_id == parent.team_id)
+        return bool(item.user_id == user.user_id)
+
+    child_documents = await SmartDocument.find(
+        {"folder": {"$in": uuids}, "soft_deleted": {"$ne": True}, "superseded_by": None},
+        projection_model=_ChildDocument,
+    ).to_list()
+    child_folders = await SmartFolder.find(
+        {"parent_id": {"$in": uuids}}, projection_model=_ChildFolder
+    ).to_list()
+
+    counts = {u: 0 for u in uuids}
+    latest: dict[str, datetime.datetime | None] = {f.uuid: _created_at(f.id) for f in folders}
+
+    def note(parent_uuid: str, when: Any) -> None:
+        counts[parent_uuid] += 1
+        if isinstance(when, datetime.datetime):
+            if when.tzinfo is not None:
+                when = when.astimezone().replace(tzinfo=None)
+            current = latest.get(parent_uuid)
+            if current is None or when > current:
+                latest[parent_uuid] = when
+
+    for d in child_documents:
+        if d.folder and visible(d.folder, d):
+            note(d.folder, d.updated_at)
+    for child in child_folders:
+        if child.parent_id and visible(child.parent_id, child):
+            note(child.parent_id, _created_at(child.id))
+
+    summaries: dict[str, dict] = {}
+    for u in uuids:
+        modified = latest.get(u)
+        summaries[u] = {"item_count": counts[u], "updated_at": modified.isoformat() if modified else ""}
+    return summaries
+
+
+def _stored_sizes(documents: list[SmartDocument]) -> dict[str, int]:
+    """Size on disk of each listed file, keyed by uuid. Files that are not
+    there (or sit outside the upload root) are simply absent."""
+    root = Path(Settings().upload_dir).resolve()
+    sizes: dict[str, int] = {}
+    for d in documents:
+        try:
+            target = (root / d.path).resolve()
+            if target.is_relative_to(root) and target.is_file():
+                sizes[d.uuid] = target.stat().st_size
+        except (OSError, TypeError, ValueError):
+            continue
+    return sizes
+
+
 async def list_contents(
     *,
     user: User,
@@ -109,6 +221,7 @@ async def list_contents(
 
     folders: list[SmartFolder] = []
     documents: list[SmartDocument] = []
+    in_project = False
 
     if folder_id != "0":
         current_folder = await access_control.get_authorized_folder(
@@ -119,6 +232,7 @@ async def list_contents(
 
         project = await access_control.find_folder_project(current_folder.uuid)
         if project:
+            in_project = True
             candidate_folders = await SmartFolder.find({"parent_id": current_folder.uuid}).to_list()
             folders = [f for f in candidate_folders if await access_control.get_authorized_folder(f.uuid, user, team_access=team_access)]
             candidate_documents = await SmartDocument.find({"folder": current_folder.uuid, "soft_deleted": {"$ne": True}, "superseded_by": None}).to_list()
@@ -173,6 +287,9 @@ async def list_contents(
             }
         ).to_list()
 
+    summaries = await _folder_summaries(folders, user, in_project=in_project)
+    sizes = await asyncio.to_thread(_stored_sizes, documents)
+
     return {
         "folders": [
             {
@@ -182,6 +299,7 @@ async def list_contents(
                 "parent_id": f.parent_id,
                 "is_shared_team_root": f.is_shared_team_root,
                 "team_id": f.team_id,
+                **summaries.get(f.uuid, {"item_count": 0, "updated_at": ""}),
             }
             for f in folders
         ],
@@ -198,6 +316,8 @@ async def list_contents(
                 "folder": d.folder,
                 "created_at": d.created_at.isoformat() if d.created_at else "",
                 "updated_at": d.updated_at.isoformat() if d.updated_at else "",
+                # None when the stored file is not on disk (nothing to measure).
+                "size_bytes": sizes.get(d.uuid),
                 "token_count": d.token_count,
                 "num_pages": d.num_pages,
                 "classification": d.classification,

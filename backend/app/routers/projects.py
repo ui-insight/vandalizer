@@ -84,7 +84,10 @@ async def list_pins(project_uuid: str, user: User = Depends(get_current_user)) -
     project = await project_service.get_authorized_project(project_uuid, user)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    return await project_service.list_pins(project, user)
+    # Someone who can unpin also sees, by type only, the pins they can't open.
+    return await project_service.list_pins(
+        project, user, include_restricted=await project_service.can_manage_project(project, user),
+    )
 
 
 class DefaultSkillRequest(BaseModel):

@@ -42,7 +42,7 @@ Changes show a saving message followed by confirmation. If a response is lost, t
 
 Library **Skills** replace the former Library Prompts. Existing saved instructions keep their content, links, and sharing. Workflow **Prompt** nodes remain reasoning steps in the workflow editor.
 
-Open **Library → Skills** and click a Skill to run it in the current chat. The Assistant starts immediately using the Skill instructions and your selected sources. The request appears in the conversation so you can follow up naturally. To inspect or edit the instructions, use the Skill’s **More actions → Edit** menu in the Library.
+Open **Library → Skills** and click a Skill to preview it: its name, its **When to use** line and its instructions. Choose **Run Skill** to start it in the current chat with your selected sources; the request appears in the conversation so you can follow up naturally. **Edit** in the preview, or the Skill’s **More actions → Edit** menu, changes the instructions. Closing the preview runs nothing.
 
 A Skill can carry an optional **When to use** line, such as "reviewing a new award notice against our intake checklist". Add it when you create the Skill or from **More actions → Edit**. The Assistant reads the line when it lists your Skills and searches it when you ask for one, so a clear line helps it suggest the right Skill. Changing the line creates a new Skill version, like editing the instructions; existing chats keep the version they selected.
 

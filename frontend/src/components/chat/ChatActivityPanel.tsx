@@ -66,10 +66,10 @@ export function ChatActivityPanel({ conversationUuid, refreshKey, busy, onDecide
         onClick={() => setOpen(true)}
         title="What you approved in this chat, and what happened"
         aria-label="Activity: what you approved in this chat"
-        className="flex shrink-0 items-center gap-1 rounded-[var(--ui-radius)] p-1.5 text-xs font-medium text-gray-600 hover:text-gray-800 transition-colors"
+        className="chat-composer-tool"
       >
         <History className="h-4 w-4" aria-hidden="true" />
-        Activity
+        <span className="chat-composer-tool-label">Activity</span>
       </button>
 
       {open && (

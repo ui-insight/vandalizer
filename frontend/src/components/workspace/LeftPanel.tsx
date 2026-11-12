@@ -3,7 +3,8 @@ import { useNavigate, useSearch } from '@tanstack/react-router'
 import { PanelsTopLeft } from 'lucide-react'
 import { PagesBrowser } from '../artifacts/PagesBrowser'
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
-import { ArrowLeft, FileText, Link2, Search, X } from 'lucide-react'
+import { ArrowLeft, FileText, Link2 } from 'lucide-react'
+import { WorkspaceSearchBar } from '../shared/WorkspaceSearchBar'
 import { FileBrowser } from '../files/FileBrowser'
 import type { ContentMatch } from '../files/FileBrowser'
 import { DocumentViewer } from '../files/DocumentViewer'
@@ -50,7 +51,6 @@ export function LeftPanel() {
   const setFilesView = useCallback((view: 'documents' | 'pages' | 'templates') => { void navigateFiles({ to: '/', search: prev => ({ ...prev, files: view === 'documents' ? undefined : view }) }) }, [navigateFiles])
   const [showRawText, setShowRawText] = useState(false)
   const [showUsage, setShowUsage] = useState(false)
-  const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [contentSearchState, setContentSearchState] = useState<'loading' | 'error' | null>(null)
   const [searchAttempt, setSearchAttempt] = useState(0)
@@ -58,7 +58,6 @@ export function LeftPanel() {
   const [currentFolder, setCurrentFolder] = useState<string | null>(null)
   const listScroller = useRef<HTMLDivElement>(null)
   const listPosition = useRef(0)
-  const searchInputRef = useRef<HTMLInputElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const pollRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
   const viewingDocRef = useRef(viewingDoc)
@@ -73,7 +72,6 @@ export function LeftPanel() {
     setShowRawText(false)
     setShowUsage(false)
     setSearchQuery('')
-    setSearchOpen(false)
     setContentMatches([])
     setWorkflowPickerFolder(null)
     setKbPickerFolder(null)
@@ -245,11 +243,6 @@ export function LeftPanel() {
     }
   }, [viewingDoc?.processing, checkStatus])
 
-  // Focus search input when opened
-  useEffect(() => {
-    if (searchOpen) searchInputRef.current?.focus()
-  }, [searchOpen])
-
   // Keep list controls mounted and restore the visible list position on return.
   useLayoutEffect(() => {
     if (!viewingDoc) listScroller.current?.scrollTo({ top: listPosition.current, behavior: 'instant' })
@@ -298,12 +291,6 @@ export function LeftPanel() {
     }
   }, [searchQuery, searchAttempt])
 
-  const handleCloseSearch = () => {
-    setSearchOpen(false)
-    setSearchQuery('')
-    setContentMatches([])
-  }
-
   return (
     <aside aria-label="Files" className="flex h-full min-h-0 flex-col overflow-hidden bg-panel-bg relative">
       <nav aria-label="Files views" className="files-view-tabs">
@@ -331,6 +318,13 @@ export function LeftPanel() {
         <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
           <DocumentViewer
             docUuid={viewingDoc.uuid}
+            // Opening a source also puts it in chat's scope. A file that
+            // turns out to be gone must not stay there reading "Ready".
+            onMissing={() => {
+              const gone = viewingDoc.uuid
+              setSelectedDocUuids(current => current.filter(uuid => uuid !== gone))
+              setSelectedDocNames(current => Object.fromEntries(Object.entries(current).filter(([uuid]) => uuid !== gone)))
+            }}
             highlightTerms={highlightTerms}
             highlightPage={highlightPage}
             highlightPageApproximate={highlightPageApproximate}
@@ -381,14 +375,14 @@ export function LeftPanel() {
           )}
         </div>
       )}
-        <div ref={listScroller} onScroll={event => { if (!viewingDoc) listPosition.current = event.currentTarget.scrollTop }} className="overflow-auto hide-scrollbar" style={{ display: viewingDoc ? 'none' : undefined, flex: 1, minHeight: 0, paddingBottom: 60 }}>
+        {/* The panel itself no longer scrolls: FileBrowser fills it and scrolls
+            only its rows, so the upload area and column headers stay put. The
+            overflow here is the fallback for a window too short to fit them. */}
+        <div className="overflow-auto hide-scrollbar" style={{ display: viewingDoc ? 'none' : 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
           <FileBrowser
-            searchAction={!searchOpen && <button type="button" title="Search files" aria-label="Search files" onClick={() => setSearchOpen(true)} className="workspace-header-icon"><Search size={18} /></button>}
-            searchField={searchOpen && <div className="workspace-file-search">
-              <Search size={16} aria-hidden="true" />
-              <input ref={searchInputRef} type="search" aria-label="Search files and content" placeholder="Search files and content..." value={searchQuery} onChange={event => setSearchQuery(event.target.value)} />
-              <button type="button" aria-label="Close search" className="workspace-header-icon" onClick={handleCloseSearch}><X size={18} /></button>
-            </div>}
+            listScrollRef={listScroller}
+            onListScroll={top => { if (!viewingDoc) listPosition.current = top }}
+            searchField={<WorkspaceSearchBar value={searchQuery} onChange={setSearchQuery} label="Search files and content" placeholder="Search files and content…" />}
             selectedDocumentUuids={selectedDocUuids}
             selectedFolderUuids={selectedFolderUuids}
             searchQuery={searchQuery}

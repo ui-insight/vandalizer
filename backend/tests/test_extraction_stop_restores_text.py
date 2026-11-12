@@ -33,6 +33,12 @@ class _Snapshots:
     async def delete_one(self, query):
         self.rows.pop(query["_id"], None)
 
+    async def update_one(self, query, update):
+        row = self.rows.get(query["_id"])
+        if row is not None:
+            row.update(update["$set"])
+        return SimpleNamespace(matched_count=1 if row is not None else 0)
+
 
 def _doc(**stored):
     return SimpleNamespace(id="oid-1", uuid="doc-1", task_id="task-1", _extraction_restart_revision=4, **stored)
@@ -58,6 +64,8 @@ GOOD = {
     "text_markers": [{"page": 1, "offset": 0}], "extraction_nonletter_ratio": 0.01,
     "ingestion_warnings": [], "task_status": "complete", "validating": False,
     "error_message": None, "error_retryable": None, "text_layer_rejected": False,
+    "classification": "ferpa", "classification_confidence": 0.9,
+    "classified_at": None, "classified_by": "auto",
 }
 
 
@@ -73,12 +81,39 @@ async def test_a_reread_keeps_a_copy_of_the_text_it_is_about_to_clear(store):
     assert store.indexes == [("saved_at", {"expireAfterSeconds": extraction_snapshots.KEEP_SECONDS})]
 
 
-async def test_a_document_with_no_text_keeps_no_copy_and_drops_an_old_one(store):
-    store.rows["doc-1"] = {"revision": 2, "fields": GOOD}
+async def test_a_document_with_no_text_keeps_no_copy(store):
     documents = _documents({"_id": "oid-1", **GOOD, "raw_text": ""})
     with patch.object(extraction_snapshots.SmartDocument, "get_motor_collection", return_value=documents):
         assert await extraction_snapshots.save_previous_reading(_doc(), revision=5) is False
     assert await extraction_snapshots.previous_reading("doc-1") is None
+
+
+async def test_a_second_restart_over_one_in_flight_carries_the_copy_forward(store):
+    """A double-clicked Re-run OCR, or a retry of a stuck read, starts again
+    while the text is already cleared. The copy from the first restart is the
+    only place the text still exists, so it moves to the new run."""
+    store.rows["doc-1"] = {"revision": 5, "fields": dict(GOOD)}
+    documents = _documents({"_id": "oid-1", **GOOD, "raw_text": ""})
+    with patch.object(extraction_snapshots.SmartDocument, "get_motor_collection", return_value=documents):
+        assert await extraction_snapshots.save_previous_reading(_doc(), revision=6) is True
+    saved = await extraction_snapshots.previous_reading("doc-1")
+    assert saved["revision"] == 6
+    assert saved["fields"]["raw_text"] == GOOD["raw_text"]
+
+
+def test_the_copy_keeps_the_classification_made_from_that_text():
+    """A re-read reclassifies, possibly while the text is empty; restoring the
+    text without its label could leave restricted text marked unrestricted."""
+    for field in ("classification", "classification_confidence", "classified_at", "classified_by"):
+        assert field in extraction_snapshots.READING_FIELDS
+
+
+def test_a_finished_read_discards_the_copy_and_never_raises():
+    db = {extraction_snapshots.COLLECTION: MagicMock()}
+    extraction_snapshots.discard_sync(db, "doc-1")
+    db[extraction_snapshots.COLLECTION].delete_one.assert_called_once_with({"_id": "doc-1"})
+    db[extraction_snapshots.COLLECTION].delete_one.side_effect = RuntimeError("mongo down")
+    extraction_snapshots.discard_sync(db, "doc-1")
 
 
 async def test_a_failed_copy_never_blocks_the_reread(monkeypatch):

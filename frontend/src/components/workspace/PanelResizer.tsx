@@ -1,5 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
+import { GripVertical } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
+
+/** The visible handle on a divider: without it nothing shows that a 6px
+ *  line can be dragged. */
+export function ResizeGrip({ active }: { active?: boolean }) {
+  return (
+    <span aria-hidden="true" className="workspace-panel-resizer__grip" data-active={active || undefined}>
+      <GripVertical className="h-3 w-3" />
+    </span>
+  )
+}
 
 interface PanelResizerProps {
   containerRef: React.RefObject<HTMLDivElement | null>
@@ -30,6 +41,7 @@ export function PanelResizer({ containerRef, value, min, max, onDragStart, onDra
       aria-valuemin={Math.round(min * 10) / 10} aria-valuemax={Math.round(max * 10) / 10} aria-valuenow={Math.round(value * 10) / 10}
       aria-valuetext={`Left panel ${Math.round(value)} percent; tools ${Math.round(100 - value)} percent`}
       aria-describedby="workspace-resize-help"
+      title="Drag to resize. Double-click to reset."
       className="workspace-panel-resizer shrink-0 cursor-col-resize focus-visible:outline-2 focus-visible:outline-highlight"
       style={{ width: 6, position: 'relative', zIndex: 12, touchAction: 'none', background: dragging ? 'var(--highlight-color)' : '#e5e7eb' }}
       onKeyDown={event => {
@@ -51,6 +63,7 @@ export function PanelResizer({ containerRef, value, min, max, onDragStart, onDra
       onLostPointerCapture={() => { if (restoreRef.current) { setPanelSplit(clamp(value)); finish() } }}
     >
       <span aria-hidden="true" style={{ position: 'absolute', inset: '0 -4px' }} />
+      <ResizeGrip active={dragging} />
       <span id="workspace-resize-help" className="sr-only">Use Left and Right arrows to resize. Home and End use the smallest and largest sizes that fit. Double-click to reset.</span>
     </div>
   )

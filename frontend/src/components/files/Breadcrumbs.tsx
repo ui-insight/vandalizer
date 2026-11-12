@@ -13,9 +13,12 @@ interface BreadcrumbsProps {
   // ("0" = top level). This is the only drag path that moves a file *up*
   // the tree — folder rows only cover folders visible in the current view.
   onDropFile?: (fileUuid: string, folderId: string) => void
+  // What the current folder holds, e.g. "6 folders, 10 files". Shown after
+  // the trail; omitted while the contents are not known.
+  summary?: string
 }
 
-export function Breadcrumbs({ items, onNavigate, floor = null, homeLabel = 'Home', onDropFile }: BreadcrumbsProps) {
+export function Breadcrumbs({ items, onNavigate, floor = null, homeLabel = 'Home', onDropFile, summary }: BreadcrumbsProps) {
   const atRoot = items.length === 0
   const parentId = items.length >= 2 ? items[items.length - 2].uuid : floor
   const currentTitle = items.length > 0 ? items[items.length - 1].title : null
@@ -122,6 +125,12 @@ export function Breadcrumbs({ items, onNavigate, floor = null, homeLabel = 'Home
           <li className="inline-flex min-w-0 items-center text-sm [overflow-wrap:anywhere]" aria-current="page">
             <span className="mx-[7.5px] text-gray-400" aria-hidden="true">›</span>
             <span style={{ color: '#111', fontWeight: 600 }}>{currentTitle}</span>
+          </li>
+        )}
+        {summary && (
+          <li className="inline-flex items-center text-sm text-gray-600" data-testid="folder-summary">
+            <span className="mx-[7.5px] text-gray-400" aria-hidden="true">·</span>
+            <span>{summary}</span>
           </li>
         )}
       </ol>

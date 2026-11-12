@@ -30,6 +30,11 @@ READING_FIELDS = (
     "raw_text", "token_count", "text_markers", "extraction_nonletter_ratio",
     "ingestion_warnings", "task_status", "validating", "error_message",
     "error_retryable", "text_layer_rejected",
+    # The data classification belongs to the text it was made from. A re-read
+    # schedules a new classification, which can run while the text is still
+    # empty and label the document "unrestricted"; putting the text back
+    # without its label would leave restricted text marked as open.
+    "classification", "classification_confidence", "classified_at", "classified_by",
 )
 
 #: A copy this large is skipped rather than risk the 16 MB record limit.
@@ -49,8 +54,12 @@ async def save_previous_reading(doc: SmartDocument, revision: int) -> bool:
     """Copy *doc*'s current reading before a re-read clears it.
 
     ``revision`` is the restart revision the re-read is about to claim; Stop
-    restores the copy only into that same run. A document with no text has
-    nothing worth keeping, and any older copy is dropped.
+    restores the copy only into that same run.
+
+    A document with no text has nothing to copy. If an earlier copy exists it
+    is carried forward to this run: that happens when a re-read is started
+    over one still in flight (a double click, a retry of a stuck read), and
+    dropping the copy there would lose the text for good.
     """
     global _index_ready
     try:
@@ -60,7 +69,10 @@ async def save_previous_reading(doc: SmartDocument, revision: int) -> bool:
         )
         raw = raw or {}
         text = raw.get("raw_text") or ""
-        if not text or len(text.encode("utf-8")) > MAX_TEXT_BYTES:
+        if not text:
+            carried = await snapshots.update_one({"_id": doc.uuid}, {"$set": {"revision": revision}})
+            return bool(carried.matched_count)
+        if len(text.encode("utf-8")) > MAX_TEXT_BYTES:
             await snapshots.delete_one({"_id": doc.uuid})
             return False
         if not _index_ready:
@@ -98,5 +110,15 @@ async def previous_reading(doc_uuid: str) -> Optional[dict]:
 async def discard(doc_uuid: str) -> None:
     try:
         await _collection().delete_one({"_id": doc_uuid})
+    except Exception:
+        logger.warning("Could not discard the previous reading of document %s", doc_uuid, exc_info=True)
+
+
+def discard_sync(db: Any, doc_uuid: str) -> None:
+    """``discard`` for the synchronous worker: once a re-read has stored its
+    own text there is nothing left to put back, and the old copy should not
+    sit around holding the document's previous text."""
+    try:
+        db[COLLECTION].delete_one({"_id": doc_uuid})
     except Exception:
         logger.warning("Could not discard the previous reading of document %s", doc_uuid, exc_info=True)

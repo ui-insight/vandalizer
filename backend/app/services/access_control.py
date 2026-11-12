@@ -199,6 +199,14 @@ async def find_folder_project(folder_uuid: str | None) -> Project | None:
     return min(projects, key=lambda project: ancestors.index(project.root_folder_uuid)) if projects else None
 
 
+async def project_root_folder_uuids(folder_uuids: list[str]) -> set[str]:
+    """Which of these folders are a project's root folder."""
+    if not folder_uuids:
+        return set()
+    projects = await Project.find({"root_folder_uuid": {"$in": folder_uuids}}).to_list()
+    return {project.root_folder_uuid for project in projects}
+
+
 async def _can_access_project_files(project: Project, user: User, access: TeamAccessContext, *, write: bool, allow_admin: bool) -> bool:
     if project.owner_user_id == user.user_id or (allow_admin and user.is_admin):
         return True

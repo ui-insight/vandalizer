@@ -67,7 +67,8 @@ async function expectSurfaces(panel: string, cta: string | null, badgeTitle: str
   await waitFor(() => expect(screen.getByLabelText('Panel course')).toHaveTextContent(panel))
   if (cta) expect(screen.getByRole('button', { name: cta })).toBeInTheDocument()
   else expect(screen.queryByRole('button', { name: /^(?:Start the certification course|Continue certification)/ })).toBeNull()
-  expect(badge()).toHaveAttribute('title', badgeTitle)
+  // The hover text explains the badge; it opens with what the badge shows.
+  expect(badge()).toHaveAttribute('title', expect.stringContaining(badgeTitle))
 }
 const completed = persistedWrites.find(result => result.tool_name === 'complete_certification_module' && Number(result.content.xp_earned) > 0)!.content
 const submitted = persistedWrites.find(result => result.tool_name === 'submit_certification_assessment')!.content
@@ -96,12 +97,12 @@ it('updates panel, home CTA and rail badge from each chat write', async () => {
 
   server.progress = progress(v5, { ai_literacy: { completed: true, stars: 2 } }, { total_xp: 125, level: 'apprentice' })
   act(() => chatWrite({ tool_name: 'complete_certification_module', tool_call_id: 'done', quality: null, content: completed }))
-  await expectSurfaces('5.0.0 125 XP', 'Continue certification (1/3)', 'Apprentice · 125 XP')
+  await expectSurfaces('5.0.0 125 XP', 'Continue certification (1/3)', 'Apprentice, with 125 XP')
 
   // A star upgrade re-completes the same module: XP moves, the module count does not.
   server.progress = progress(v5, { ai_literacy: { completed: true, stars: 3 } }, { total_xp: 150, level: 'apprentice' })
   act(() => chatWrite({ tool_name: 'complete_certification_module', tool_call_id: 'stars', quality: null, content: { ...completed, stars: 3, total_xp: 150 } }))
-  await expectSurfaces('5.0.0 150 XP', 'Continue certification (1/3)', 'Apprentice · 150 XP')
+  await expectSurfaces('5.0.0 150 XP', 'Continue certification (1/3)', 'Apprentice, with 150 XP')
   expect(reads() - before).toBe(4)
 
   // Previews, errors and reads change nothing and read nothing.
@@ -129,5 +130,5 @@ it('updates every surface after panel writes, graduation and a course switch', a
   server.course = legacy
   server.progress = progress(legacy, { ai_literacy: { completed: true, stars: 1 } }, { total_xp: 100, level: 'apprentice' })
   await act(async () => { await handle.current!.refresh() })
-  await expectSurfaces('legacy-2026-10-02.1 100 XP', 'Continue certification (1/4)', 'Apprentice · 100 XP')
+  await expectSurfaces('legacy-2026-10-02.1 100 XP', 'Continue certification (1/4)', 'Apprentice, with 100 XP')
 }, 20_000)

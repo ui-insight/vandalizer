@@ -45,8 +45,29 @@ function renderFileRow(props: Partial<Parameters<typeof FileRow>[0]> = {}) {
 describe('FileRow', () => {
   it('marks a stopped extraction as stopped, not as a red failure', () => {
     renderFileRow({ doc: makeDoc({ task_status: 'error', extraction_stopped: true, error_message: 'Text extraction was stopped. Retry to read this document again.' }) })
-    expect(screen.getByRole('img', { name: /Text extraction was stopped/ })).toBeTruthy()
-    expect(screen.queryByRole('img', { name: /Text extraction failed/ })).toBeNull()
+    expect(screen.getByText(/^Stopped/)).toHaveTextContent('Text extraction was stopped')
+    expect(screen.queryByText(/^No text/)).toBeNull()
+  })
+
+  it('shows the file size, and nothing when it is unknown', () => {
+    const { unmount } = renderFileRow({ doc: makeDoc({ size_bytes: 4.2 * 1024 * 1024 }) })
+    expect(screen.getByText('4.2 MB')).toBeTruthy()
+    unmount()
+    renderFileRow({ doc: makeDoc({ size_bytes: null }) })
+    expect(screen.queryByText(/\b(B|KB|MB)$/)).toBeNull()
+  })
+
+  it('uses a different icon for each kind of file', () => {
+    const kindOf = (extension: string) => {
+      const { container, unmount } = renderFileRow({ doc: makeDoc({ extension }) })
+      const kind = container.querySelector('[data-file-kind]')?.getAttribute('data-file-kind')
+      const drawing = container.querySelector('[data-file-kind] svg')?.innerHTML
+      unmount()
+      return { kind, drawing }
+    }
+    const pdf = kindOf('pdf'), sheet = kindOf('xlsx'), doc = kindOf('docx')
+    expect([pdf.kind, sheet.kind, doc.kind]).toEqual(['pdf', 'spreadsheet', 'document'])
+    expect(new Set([pdf.drawing, sheet.drawing, doc.drawing]).size).toBe(3)
   })
 
   it('renders document title', () => {
@@ -174,5 +195,48 @@ describe('FileRow', () => {
     })
     expect(screen.getByTitle(/Text extraction failed/)).toBeTruthy()
     expect(screen.queryByTitle(/ingested with a caveat/)).toBeNull()
+  })
+
+  describe('issue badge and Retry', () => {
+    it('shows a short badge with the full reason on hover, not a sentence under the name', () => {
+      renderFileRow({ doc: makeDoc({ ingest_error: 'chroma down' }) })
+      const badge = screen.getByTitle(/Could not index this document for search: chroma down/)
+      expect(badge.textContent).toMatch(/^Not indexed/)
+      expect(screen.queryByText(/Search indexing failed/)).toBeNull()
+    })
+
+    it('labels a failed extraction "No text"', () => {
+      renderFileRow({ doc: makeDoc({ task_status: 'error', error_message: 'no pages' }) })
+      expect(screen.getByTitle('Text extraction failed: no pages').textContent).toMatch(/^No text/)
+    })
+
+    it('offers Retry for a failure a retry can clear, without opening the file', () => {
+      const onRetry = vi.fn()
+      const onClick = vi.fn()
+      const doc = makeDoc({ ingest_error: 'chroma down' })
+      renderFileRow({ doc, onRetry, onClick })
+      fireEvent.click(screen.getByRole('button', { name: 'Retry Test Document.pdf' }))
+      expect(onRetry).toHaveBeenCalledWith(doc)
+      expect(onClick).not.toHaveBeenCalled()
+    })
+
+    it('offers no Retry when the file itself cannot be read, or failed its upload check', () => {
+      const onRetry = vi.fn()
+      const view = renderFileRow({ doc: makeDoc({ task_status: 'error', error_retryable: false }), onRetry })
+      expect(screen.getByText(/^No text/)).toBeTruthy()
+      expect(screen.queryByRole('button', { name: /^Retry/ })).toBeNull()
+      view.unmount()
+      renderFileRow({ doc: makeDoc({ valid: false }), onRetry })
+      expect(screen.getByText(/^Failed check/)).toBeTruthy()
+      expect(screen.queryByRole('button', { name: /^Retry/ })).toBeNull()
+    })
+
+    it('shows no badge or Retry on a healthy file, or one still processing', () => {
+      const view = renderFileRow({ onRetry: vi.fn() })
+      expect(screen.queryByRole('button', { name: /^Retry/ })).toBeNull()
+      view.unmount()
+      renderFileRow({ doc: makeDoc({ processing: true, ingest_error: 'old' }), onRetry: vi.fn() })
+      expect(screen.queryByText(/^Not indexed/)).toBeNull()
+    })
   })
 })
