@@ -31,7 +31,7 @@ from app.services.access_control import (
     get_team_access_context,
     has_open_verification_review_access,
 )
-from app.services import name_conflicts
+from app.services import name_conflicts, step_knowledge_access
 from app.services.config_service import get_user_model_name
 from app.services.run_metadata import describe_run
 
@@ -685,6 +685,7 @@ async def add_task(step_id: str, name: str, user: User, data: dict = {}) -> dict
         return None
 
     await ensure_step_document_readable(data, user)
+    await step_knowledge_access.ensure_task_kb_readable(name, data, user)
     task = WorkflowStepTask(name=name, data=data)
     await task.insert()
     if task.id is None:
@@ -709,10 +710,19 @@ async def update_task(task_id: str, user: User, name: str | None = None, data: d
     if not can_manage_workflow(parent_wf, user, team_access):
         return None
 
+    if data is not None:
+        await ensure_step_document_readable(data, user, already=task.data)
+    if name is not None or data is not None:
+        # Either change can point the task at a knowledge base: new settings,
+        # or a new task type that reads settings already there.
+        await step_knowledge_access.ensure_task_kb_readable(
+            name if name is not None else task.name,
+            data if data is not None else task.data, user,
+            already_name=task.name, already_data=task.data,
+        )
     if name is not None:
         task.name = name
     if data is not None:
-        await ensure_step_document_readable(data, user, already=task.data)
         task.data = data
     await task.save()
     return {"id": str(task.id), "name": task.name, "data": task.data}
@@ -788,6 +798,7 @@ async def run_workflow(
         )
 
     await ensure_fixed_documents_runnable(wf, user, user_id)
+    await step_knowledge_access.ensure_kbs_runnable(wf, user, user_id)
 
     # No explicit model → fall back to the workflow's own default (set via the
     # canvas model selector), then to the user's configured default. The engine
@@ -1038,6 +1049,7 @@ async def run_workflow_batch(
         )
 
     await ensure_fixed_documents_runnable(wf, user, user_id)
+    await step_knowledge_access.ensure_kbs_runnable(wf, user, user_id)
 
     # No explicit model → fall back to the workflow's own default (set via the
     # canvas model selector), then to the user's configured default. The engine

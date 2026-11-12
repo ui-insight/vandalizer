@@ -553,6 +553,8 @@ def execute_workflow_passive(self: Task, trigger_event_id: str) -> dict:
         from app.tasks.workflow_tasks import (
             FixedDocumentsDenied,
             _denied_fixed_documents,
+            _denied_knowledge_bases,
+            knowledge_bases_denied_message,
             _missing_fixed_documents,
             build_steps_data,
             default_model_for_owner,
@@ -591,6 +593,21 @@ def execute_workflow_passive(self: Task, trigger_event_id: str) -> dict:
                 {"$set": {"status": "error", "error": msg,
                           "error_payload": {"code": "fixed_documents_access_denied",
                                             "count": len(denied_fixed)}}},
+            )
+            db.workflow_trigger_event.update_one(
+                {"_id": event["_id"]}, {"$set": {"status": "failed", "error": msg}},
+            )
+            return {"error": msg, "result_id": str(result_id)}
+
+        # Likewise a knowledge base its owner can't open is never queried.
+        denied_kbs = _denied_knowledge_bases(db, workflow, trigger_step_data)
+        if denied_kbs:
+            msg = knowledge_bases_denied_message(len(denied_kbs))
+            db.workflow_result.update_one(
+                {"_id": result_id},
+                {"$set": {"status": "error", "error": msg,
+                          "error_payload": {"code": "knowledge_bases_access_denied",
+                                            "count": len(denied_kbs)}}},
             )
             db.workflow_trigger_event.update_one(
                 {"_id": event["_id"]}, {"$set": {"status": "failed", "error": msg}},

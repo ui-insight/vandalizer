@@ -902,6 +902,25 @@ def _denied_fixed_documents(
     return unreadable_configured_documents(db, workflow_doc, runners)
 
 
+def _denied_knowledge_bases(
+    db: Database[dict], workflow_doc: dict, trigger_step_data: dict | None,
+    activity_id: str | ObjectId | None = None,
+) -> list[str]:
+    """Knowledge bases this run's steps would query that neither its runner
+    nor the workflow's owner can open (see ``step_knowledge_access``)."""
+    from app.services import step_knowledge_access
+
+    kb_uuids = step_knowledge_access.workflow_kb_uuids_sync(db, workflow_doc)
+    runners = [workflow_doc.get("user_id"), (trigger_step_data or {}).get("user_id"), _activity_owner(db, activity_id)]
+    return step_knowledge_access.unreadable_for_run_sync(kb_uuids, runners)
+
+
+def knowledge_bases_denied_message(count: int) -> str:
+    from app.services import step_knowledge_access
+
+    return step_knowledge_access.knowledge_bases_denied_message(count)
+
+
 def _missing_fixed_documents(db: Database[dict], workflow_doc: dict) -> list[str]:
     """Titles of fixed documents (Input tab) that no longer exist.
 
@@ -1242,6 +1261,18 @@ def execute_workflow_task(self: Task, workflow_result_id: str, workflow_id: str,
         _mark_workflow_failed(
             db, workflow_result_id, activity_id, str(FixedDocumentsDenied(len(denied_fixed))),
             error_payload={"code": "fixed_documents_access_denied", "count": len(denied_fixed)},
+        )
+        return None
+
+    denied_kbs = _denied_knowledge_bases(db, workflow_doc, trigger_step_data, activity_id)
+    if denied_kbs:
+        logger.warning(
+            "Workflow %s aborted pre-flight: %d knowledge base(s) not readable by its runner or owner",
+            workflow_id, len(denied_kbs),
+        )
+        _mark_workflow_failed(
+            db, workflow_result_id, activity_id, knowledge_bases_denied_message(len(denied_kbs)),
+            error_payload={"code": "knowledge_bases_access_denied", "count": len(denied_kbs)},
         )
         return None
 
@@ -1958,6 +1989,18 @@ def resume_workflow_after_approval(self: Task, approval_uuid: str) -> dict | Non
             db, workflow_result_id, _resume_act["_id"] if _resume_act else None,
             str(FixedDocumentsDenied(len(denied_fixed))),
             error_payload={"code": "fixed_documents_access_denied", "count": len(denied_fixed)},
+        )
+        if _resume_act:
+            _clear_pause_marker(db, _resume_act["_id"])
+        return {"status": "error", "result_id": workflow_result_id}
+    denied_kbs = _denied_knowledge_bases(
+        db, workflow_doc, trigger_data, _resume_act["_id"] if _resume_act else None,
+    )
+    if denied_kbs:
+        _mark_workflow_failed(
+            db, workflow_result_id, _resume_act["_id"] if _resume_act else None,
+            knowledge_bases_denied_message(len(denied_kbs)),
+            error_payload={"code": "knowledge_bases_access_denied", "count": len(denied_kbs)},
         )
         if _resume_act:
             _clear_pause_marker(db, _resume_act["_id"])

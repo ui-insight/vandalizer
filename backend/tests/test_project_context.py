@@ -21,12 +21,15 @@ from tests.test_workflow_tasks import _mock_db
 @pytest.fixture(autouse=True)
 def _no_step_documents():
     """These tests run without a database, and their workflows have no step
-    that reads a selected document: skip that lookup on the run path."""
+    that reads a selected document or queries a knowledge base: skip those
+    lookups on the run path."""
     from unittest.mock import AsyncMock as _AsyncMock, patch as _patch
 
+    from app.services import step_knowledge_access as _step_knowledge_access
     from app.services import workflow_service as _workflow_service
 
-    with _patch.object(_workflow_service, "step_document_uuids", _AsyncMock(return_value=[])):
+    with _patch.object(_workflow_service, "step_document_uuids", _AsyncMock(return_value=[])), \
+         _patch.object(_step_knowledge_access, "workflow_kb_uuids", _AsyncMock(return_value=[])):
         yield
 
 

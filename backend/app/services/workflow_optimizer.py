@@ -1290,6 +1290,16 @@ async def _execute_workflow_inproc(
     _u = await _User.find_one(_User.user_id == user_id)
     allow_code_execution = bool(_u and getattr(_u, "is_admin", False))
 
+    # Trials query the workflow's knowledge bases like any run does, so the
+    # same access rule applies before anything is searched.
+    from app.services import step_knowledge_access
+    from app.services.workflow_service import FixedDocumentAccessError
+
+    try:
+        await step_knowledge_access.ensure_workflow_kbs_runnable(wf_id, _u, user_id)
+    except FixedDocumentAccessError as denied:
+        raise OptimizationInputError(str(denied)) from denied
+
     # Build steps_data through the one builder every run path uses (#862).
     # The optimizer's own copy skipped step-level input, field_metadata,
     # saved Prompt/Formatter resolution, the selected-document preload and
