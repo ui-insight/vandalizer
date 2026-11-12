@@ -15,10 +15,29 @@
 .context-assistant-launcher { position: absolute; right: 20px; bottom: 20px; z-index: 25; display: flex; align-items: center; gap: 8px; padding: 12px 16px; border: 1px solid #cbd2d9; border-radius: 12px; background: white; color: #242b32; box-shadow: 0 4px 16px #17212b18; font: inherit; font-size: var(--workspace-font-control); font-weight: 600; cursor: pointer; }
 .context-assistant-close { width: 100%; padding: 8px 12px; background: #f4f5f6; color: #414b55; border: 0; font: inherit; font-size: var(--workspace-font-meta); cursor: pointer; }
 .header-activity { display: grid; place-items: center; width: 32px; background: white; border: 1px solid #d1d5db; border-radius: 50%; cursor: pointer; color: #4b5563; }
-.file-browser { container: files / inline-size; }
-.file-list-surface { margin-top: 10px; border: 1px solid #dce1e5; border-radius: 10px; overflow: hidden; background: #fff; }
+/* The Files panel is a column that fills its pane: header, upload area and
+   folder trail keep their height, and the list takes what is left and is the
+   only part that scrolls, with a scrollbar that shows. */
+/* No min-height: 0 here. In a pane too short for the header, upload area and a few rows, the browser keeps its
+   natural height and the pane scrolls instead, so its bottom padding (room for the assistant button) still applies. */
+.file-browser { container: files / inline-size; display: flex; flex-direction: column; flex: 1 1 auto; box-sizing: border-box; }
+.file-browser > * { flex-shrink: 0; }
+/* scroll-padding-top keeps a row focused by keyboard from landing under the sticky column headers. */
+.file-list-surface { flex: 1 1 0; min-height: 132px; scroll-padding-top: 44px; margin-top: 10px; border: 1px solid #dce1e5; border-radius: 10px; overflow-x: hidden; overflow-y: auto; background: #fff; }
+/* Chrome, Edge and Safari ignore ::-webkit-scrollbar once scrollbar-width or
+   scrollbar-color is set, and on macOS then fall back to a scrollbar that
+   hides until you scroll. So those two go only to browsers without the
+   pseudo-element (Firefox). */
+@supports not selector(::-webkit-scrollbar) { .file-list-surface { scrollbar-width: thin; scrollbar-color: #aab4c0 transparent; } }
+.file-list-surface::-webkit-scrollbar { width: 10px; }
+.file-list-surface::-webkit-scrollbar-thumb { background: #aab4c0; border-radius: 8px; border: 2px solid #fff; }
+.file-list-surface::-webkit-scrollbar-track { background: transparent; }
 .file-table { color: var(--workspace-text); }
 .file-table thead { background: #f8f9fa; }
+/* Name / Modified stay at the top of the list while rows scroll under them.
+   A collapsed table border does not travel with a sticky cell, so the rule
+   under the header is drawn as a shadow. */
+.file-table thead th { position: sticky; top: 0; z-index: 2; background: #f8f9fa; box-shadow: inset 0 -1px 0 #dddddd; }
 .file-table tbody tr:last-child { border-bottom: 0 !important; }
 .file-table tbody tr:hover { background: var(--workspace-hover); }
 .file-table tbody tr:has(input:checked) { background: var(--workspace-selected); }
