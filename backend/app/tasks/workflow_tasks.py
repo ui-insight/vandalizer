@@ -349,6 +349,8 @@ def build_steps_data(db: Database[dict], workflow_doc: dict, workflow_id: str, t
                 doc_metas = []
                 for uuid in doc_uuids:
                     doc = db.smart_document.find_one({"uuid": uuid})
+                    if doc and doc.get("soft_deleted"):
+                        doc = None  # deleted: its text is not read
                     if doc and doc.get("origin_workflow_id") == workflow_id:
                         logger.info(
                             "Skipping own-origin document %s to prevent workflow self-loop",
@@ -377,7 +379,13 @@ def build_steps_data(db: Database[dict], workflow_doc: dict, workflow_id: str, t
 
             # Pre-load specific document text when select_document is selected
             if _wants_selected_document(task_data) and task_data.get("selected_document_uuid"):
+                # Same rule as a fixed document: never loaded for a run that
+                # may not read it.
+                if task_data["selected_document_uuid"] in denied_fixed:
+                    raise FixedDocumentsDenied(len(denied_fixed))
                 sel_doc = db.smart_document.find_one({"uuid": task_data["selected_document_uuid"]})
+                if sel_doc and sel_doc.get("soft_deleted"):
+                    sel_doc = None  # deleted: its text is not read
                 if sel_doc and sel_doc.get("raw_text"):
                     task_data["selected_doc_text"] = sel_doc["raw_text"]
                     if task_doc.get("name") in DOC_META_TASKS:
@@ -864,8 +872,9 @@ def _resolve_input_doc_uuids(workflow_doc: dict, trigger_step_data: dict) -> lis
 
 
 class FixedDocumentsDenied(Exception):
-    """A run would read fixed documents neither its runner nor the workflow's
-    owner can open. Deterministic: fail the run with the message, don't retry."""
+    """A run would read documents from the workflow's setup that neither its
+    runner nor the workflow's owner can open. Deterministic: fail the run with
+    the message, don't retry."""
 
     def __init__(self, count: int) -> None:
         from app.services.fixed_document_access import fixed_documents_denied_message
@@ -878,15 +887,16 @@ def _denied_fixed_documents(
     db: Database[dict], workflow_doc: dict, trigger_step_data: dict | None,
     activity_id: str | ObjectId | None = None,
 ) -> list[str]:
-    """Fixed documents this run may not read.
+    """Documents in the workflow's own setup that this run may not read:
+    its fixed documents and any step's selected document.
 
     The runner is whoever started the run: ``user_id`` on the trigger data
     (every dispatcher sets it) and the owner of the run's activity row.
     """
-    from app.services.fixed_document_access import unreadable_fixed_documents
+    from app.services.fixed_document_access import unreadable_configured_documents
 
     runners = [(trigger_step_data or {}).get("user_id"), _activity_owner(db, activity_id)]
-    return unreadable_fixed_documents(db, workflow_doc, runners)
+    return unreadable_configured_documents(db, workflow_doc, runners)
 
 
 def _missing_fixed_documents(db: Database[dict], workflow_doc: dict) -> list[str]:
@@ -907,9 +917,11 @@ def _missing_fixed_documents(db: Database[dict], workflow_doc: dict) -> list[str
         uuid = (fd.get("uuid") if isinstance(fd, dict) else str(fd)) or ""
         if not uuid:
             continue
-        doc = db.smart_document.find_one({"uuid": uuid}, {"title": 1, "soft_deleted": 1})
+        doc = db.smart_document.find_one({"uuid": uuid}, {"soft_deleted": 1})
         if not doc or doc.get("soft_deleted"):
-            title = (fd.get("title") if isinstance(fd, dict) else None) or (doc or {}).get("title") or uuid
+            # The title saved with the entry (or the id as entered), never the
+            # file's own: whoever reads this message may not be entitled to it.
+            title = (fd.get("title") if isinstance(fd, dict) else None) or uuid
             missing.append(title)
     return missing
 
@@ -1763,7 +1775,10 @@ def execute_task_step_test(self: Task, task_name: str, task_data: dict, doc_uuid
 
     # Pre-load specific document text when select_document is selected
     if _wants_selected_document(task_data) and task_data.get("selected_document_uuid"):
+        # The route authorizes this document for the person testing the step.
         sel_doc = db.smart_document.find_one({"uuid": task_data["selected_document_uuid"]})
+        if sel_doc and sel_doc.get("soft_deleted"):
+            sel_doc = None  # deleted: its text is not read
         if sel_doc and sel_doc.get("raw_text"):
             task_data["selected_doc_text"] = sel_doc["raw_text"]
             if task_name in DOC_META_TASKS:

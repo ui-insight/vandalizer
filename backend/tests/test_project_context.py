@@ -18,6 +18,19 @@ from tests.test_project_service import _project, CAPS
 from tests.test_workflow_tasks import _mock_db
 
 
+@pytest.fixture(autouse=True)
+def _no_step_documents():
+    """These tests run without a database, and their workflows have no step
+    that reads a selected document: skip that lookup on the run path."""
+    from unittest.mock import AsyncMock as _AsyncMock, patch as _patch
+
+    from app.services import workflow_service as _workflow_service
+
+    with _patch.object(_workflow_service, "step_document_uuids", _AsyncMock(return_value=[])):
+        yield
+
+
+
 @pytest.mark.asyncio
 async def test_context_round_trip_clear_and_omitted_patch_preserves_it(client, route_env):
     project = _project(context="Existing brief", save=AsyncMock())

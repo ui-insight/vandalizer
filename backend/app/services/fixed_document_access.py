@@ -1,16 +1,19 @@
-"""Who may have a workflow read its fixed documents.
+"""Who may have a workflow read the documents it is set up with.
 
-A fixed document rides along on every run of a workflow, so it follows the
-same access rules as a document someone selects for a run.
+A workflow can name documents in its own configuration: the fixed documents
+on its Input tab, which ride along on every run, and a step's selected
+document. Both follow the same access rules as a document someone selects
+for a run.
 
 Two rules:
 
-* **Saving**: a fixed document can only be added by someone who can read it
-  (``workflow_service.ensure_fixed_documents_readable``).
-* **Running**: a fixed document is read only if the person running the
-  workflow, or the workflow's owner, can read it. The owner counts because
-  bundling a reference file into a workflow they share is theirs to decide;
-  a copy of that workflow belongs to someone else and gets no such pass.
+* **Saving**: such a document can only be added by someone who can read it
+  (``workflow_service.ensure_fixed_documents_readable`` and
+  ``ensure_step_document_readable``).
+* **Running**: it is read only if the person running the workflow, or the
+  workflow's owner, can read it. The owner counts because bundling a
+  reference file into a workflow they share is theirs to decide; a copy of
+  that workflow belongs to someone else and gets no such pass.
 
 This module is the run-time rule for the worker, which is synchronous pymongo
 and cannot call ``access_control``. It mirrors ``get_authorized_document``
@@ -48,14 +51,34 @@ def fixed_document_uuids(input_config: dict | None) -> list[str]:
     return uuids
 
 
+STEP_DOCUMENT_ACCESS_MESSAGE = (
+    "You don't have access to the document this step is set to read. Choose a "
+    "file of your own or one that has been shared with you."
+)
+
+
+def selected_document_uuid(task_data: dict | None) -> str | None:
+    """The document a step is set to read, if it reads one.
+
+    A step loads ``selected_document_uuid`` only when ``select_document`` is
+    among its ``input_sources`` (or is its legacy ``input_source``).
+    """
+    data = task_data if isinstance(task_data, dict) else {}
+    sources = data.get("input_sources")
+    wants = (isinstance(sources, list) and "select_document" in sources) or data.get("input_source") == "select_document"
+    uuid = data.get("selected_document_uuid")
+    return uuid if wants and isinstance(uuid, str) and uuid else None
+
+
 def fixed_documents_denied_message(count: int) -> str:
     """Deliberately names no file: the reader isn't entitled to its title."""
     one = count == 1
     return (
-        f"This workflow has {'a fixed document' if one else f'{count} fixed documents'} that "
+        f"This workflow is set up to read {'a document' if one else f'{count} documents'} that "
         f"neither you nor the workflow's owner can open, so the run was stopped before reading "
-        f"{'it' if one else 'them'}. Remove {'it' if one else 'them'} on the workflow's Input tab, "
-        f"or ask the file's owner to share {'it' if one else 'them'}."
+        f"{'it' if one else 'them'}. Remove {'it' if one else 'them'} on the workflow's Input tab "
+        f"or from the step that reads {'it' if one else 'them'}, or ask the file's owner to share "
+        f"{'it' if one else 'them'}."
     )
 
 
@@ -125,21 +148,29 @@ class _Reader:
         return bool(document.get("team_id") and document["team_id"] in self.teams)
 
 
-def unreadable_fixed_documents(
-    db: Database[dict], workflow_doc: dict, runner_user_ids: Iterable[str | None] = (),
-) -> list[str]:
-    """Uuids of fixed documents this run may not read.
+def step_document_uuids(db: Database[dict], workflow_doc: dict) -> list[str]:
+    """Documents the workflow's steps are set to read (``selected_document_uuid``)."""
+    uuids: list[str] = []
+    for step_id in workflow_doc.get("steps") or []:
+        step = db.workflow_step.find_one({"_id": step_id}, {"tasks": 1}) or {}
+        for task_id in step.get("tasks") or []:
+            task = db.workflow_step_task.find_one({"_id": task_id}, {"data": 1}) or {}
+            uuid = selected_document_uuid(task.get("data"))
+            if uuid and uuid not in uuids:
+                uuids.append(uuid)
+    return uuids
 
-    A document is readable when the workflow's owner or anyone in
-    *runner_user_ids* (the person who started the run) can read it. Documents
-    that no longer exist are not listed: a deleted fixed document is reported
-    by ``_missing_fixed_documents`` with its own message.
+
+def unreadable_documents(
+    db: Database[dict], uuids: Iterable[str], user_ids: Iterable[str | None],
+) -> list[str]:
+    """Which of *uuids* none of *user_ids* may read.
+
+    Documents that no longer exist (or are soft-deleted) are not listed: they
+    are never loaded, and a deleted fixed document has its own message.
     """
-    uuids = fixed_document_uuids(workflow_doc.get("input_config"))
-    if not uuids:
-        return []
     people: list[str] = []
-    for user_id in (workflow_doc.get("user_id"), *runner_user_ids):
+    for user_id in user_ids:
         if user_id and user_id not in people:
             people.append(user_id)
     readers = [_Reader(db, user_id) for user_id in people]
@@ -153,3 +184,28 @@ def unreadable_fixed_documents(
         if not any(reader.can_read(document) for reader in readers):
             denied.append(uuid)
     return denied
+
+
+def unreadable_fixed_documents(
+    db: Database[dict], workflow_doc: dict, runner_user_ids: Iterable[str | None] = (),
+) -> list[str]:
+    """Uuids of fixed documents this run may not read.
+
+    A document is readable when the workflow's owner or anyone in
+    *runner_user_ids* (the person who started the run) can read it.
+    """
+    return unreadable_documents(
+        db, fixed_document_uuids(workflow_doc.get("input_config")),
+        (workflow_doc.get("user_id"), *runner_user_ids),
+    )
+
+
+def unreadable_configured_documents(
+    db: Database[dict], workflow_doc: dict, runner_user_ids: Iterable[str | None] = (),
+) -> list[str]:
+    """Fixed documents and step documents this run may not read."""
+    uuids = fixed_document_uuids(workflow_doc.get("input_config"))
+    for uuid in step_document_uuids(db, workflow_doc):
+        if uuid not in uuids:
+            uuids.append(uuid)
+    return unreadable_documents(db, uuids, (workflow_doc.get("user_id"), *runner_user_ids))

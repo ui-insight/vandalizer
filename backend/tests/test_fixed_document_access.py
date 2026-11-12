@@ -121,11 +121,68 @@ def test_no_input_mode_and_deleted_files_are_not_access_failures():
     assert access.unreadable_fixed_documents(db, _workflow("bob", "gone", "trashed"), ["bob"]) == []
 
 
+def _with_steps(db, workflow: dict, *task_datas: dict) -> dict:
+    db.workflow_step = _Collection([{"_id": "s1", "name": "Step", "tasks": [f"t{i}" for i in range(len(task_datas))]}])
+    db.workflow_step_task = _Collection([{"_id": f"t{i}", "name": "Prompt", "data": d} for i, d in enumerate(task_datas)])
+    return {**workflow, "steps": ["s1"]}
+
+
+def test_a_deleted_documents_text_is_never_loaded():
+    """A soft-deleted file keeps its text; the builder must not read it, on any
+    run path (not every path has the missing-document pre-flight)."""
+    from app.tasks import workflow_tasks
+
+    trashed = {"uuid": "trashed", "user_id": "bob", "soft_deleted": True, "raw_text": "old text"}
+    db = _db(smart_document=[trashed])
+    workflow = _with_steps(
+        db, _workflow("bob", "trashed"),
+        {"prompt": "p", "input_sources": ["select_document"], "selected_document_uuid": "trashed"},
+    )
+    steps, _ = workflow_tasks.build_steps_data(db, workflow, "wf-1", {"doc_uuids": [], "user_id": "bob"})
+    assert "old text" not in repr(steps)
+
+
+def test_a_missing_fixed_document_is_named_by_its_saved_title_only():
+    from app.tasks import workflow_tasks
+
+    db = _db(smart_document=[{"uuid": "trashed", "title": "Real title", "soft_deleted": True}])
+    workflow = {"input_config": {"fixed_documents": ["trashed", {"uuid": "gone", "title": "Policy.pdf"}]}}
+    # The id as entered, not "Real title".
+    assert workflow_tasks._missing_fixed_documents(db, workflow) == ["trashed", "Policy.pdf"]
+
+
+# ---------------------------------------------------------------------------
+# A step's selected document follows the same rule
+# ---------------------------------------------------------------------------
+
+SELECTED = {"prompt": "p", "input_sources": ["select_document"], "selected_document_uuid": "secret-a"}
+
+
+def test_only_a_step_that_reads_its_selected_document_counts():
+    assert access.selected_document_uuid(SELECTED) == "secret-a"
+    assert access.selected_document_uuid({"input_source": "select_document", "selected_document_uuid": "x"}) == "x"
+    # Left over from an earlier setting, but not read.
+    assert access.selected_document_uuid({"input_sources": ["step_input"], "selected_document_uuid": "x"}) is None
+    assert access.selected_document_uuid({"input_sources": ["select_document"]}) is None
+
+
+def test_a_run_may_not_read_a_step_document_its_runner_and_owner_cannot_open():
+    from app.tasks import workflow_tasks
+
+    db = _db(smart_document=[SECRET], team=TEAMS, team_membership=MEMBERS)
+    workflow = _with_steps(db, _workflow("bob"), SELECTED)
+    assert workflow_tasks._denied_fixed_documents(db, workflow, {"user_id": "bob"}) == ["secret-a"]
+    with pytest.raises(workflow_tasks.FixedDocumentsDenied):
+        workflow_tasks.build_steps_data(db, workflow, "wf-1", {"doc_uuids": [], "user_id": "bob"})
+    # Alice's own workflow reads it as before.
+    assert workflow_tasks._denied_fixed_documents(db, _with_steps(db, _workflow("alice"), SELECTED), {"user_id": "alice"}) == []
+
+
 def test_the_refusal_names_no_file():
     message = access.fixed_documents_denied_message(1)
     assert "neither you nor the workflow's owner can open" in message
     assert "secret" not in message.lower()
-    assert "2 fixed documents" in access.fixed_documents_denied_message(2)
+    assert "2 documents" in access.fixed_documents_denied_message(2)
 
 
 def test_the_builder_never_loads_a_denied_fixed_document():
@@ -238,3 +295,85 @@ async def test_chat_refuses_to_create_the_workflow_at_all():
     assert "Nothing was created" in result["error"]
     gate.assert_not_awaited()
     create.assert_not_awaited()
+
+
+async def test_a_step_cannot_be_set_to_read_a_document_the_user_cannot_read():
+    bob = SimpleNamespace(user_id="bob")
+    lookup = _authorized({"bobs"})
+    with patch.object(workflow_service, "get_authorized_document", lookup):
+        await workflow_service.ensure_step_document_readable({**SELECTED, "selected_document_uuid": "bobs"}, bob)
+        with pytest.raises(workflow_service.FixedDocumentAccessError) as refused:
+            await workflow_service.ensure_step_document_readable(SELECTED, bob)
+        # Unchanged from what the step already read: its author's choice stands.
+        await workflow_service.ensure_step_document_readable(SELECTED, bob, already=dict(SELECTED))
+        # Not read by the step, so not checked.
+        await workflow_service.ensure_step_document_readable(
+            {"input_sources": ["step_input"], "selected_document_uuid": "secret-a"}, bob,
+        )
+    assert "secret-a" not in str(refused.value)
+
+
+async def test_a_whole_definition_written_at_once_is_checked():
+    """Importing a file into a workflow, or restoring a version, replaces the
+    input settings and steps in one go."""
+    manager = SimpleNamespace(user_id="amir")
+    with patch.object(workflow_service, "get_team_access_context", AsyncMock()), \
+         patch.object(workflow_service, "get_authorized_document", _authorized({"amirs"})):
+        ok = {"input_config": {"fixed_documents": [{"uuid": "amirs"}]},
+              "steps": [{"tasks": [{"name": "Prompt", "data": {**SELECTED, "selected_document_uuid": "amirs"}}]}]}
+        await workflow_service.ensure_definition_documents_readable(ok, manager)
+
+        with pytest.raises(workflow_service.FixedDocumentAccessError):
+            await workflow_service.ensure_definition_documents_readable(
+                {"input_config": {"fixed_documents": [{"uuid": "owners-file"}]}}, manager,
+            )
+        with pytest.raises(workflow_service.FixedDocumentAccessError):
+            await workflow_service.ensure_definition_documents_readable(
+                {"steps": [{"tasks": [{"name": "Prompt", "data": SELECTED}]}]}, manager,
+            )
+        # What the workflow already reads is not re-checked.
+        await workflow_service.ensure_definition_documents_readable(
+            {"input_config": {"fixed_documents": [{"uuid": "owners-file"}]},
+             "steps": [{"tasks": [{"name": "Prompt", "data": SELECTED}]}]},
+            manager, already_input_config={"fixed_documents": ["owners-file"]},
+            already_step_documents={"secret-a"},
+        )
+
+
+async def test_adding_or_changing_a_step_checks_its_document_before_saving():
+    bob = SimpleNamespace(user_id="bob")
+    step = SimpleNamespace(id="s1", tasks=[], save=AsyncMock())
+    task = SimpleNamespace(id="t1", name="Prompt", data={"prompt": "p"}, save=AsyncMock())
+    with patch.object(workflow_service, "WorkflowStep") as steps, \
+         patch.object(workflow_service, "WorkflowStepTask") as tasks, \
+         patch.object(workflow_service, "PydanticObjectId", lambda value: value), \
+         patch.object(workflow_service, "_get_workflow_for_step", AsyncMock(return_value=SimpleNamespace())), \
+         patch.object(workflow_service, "_get_workflow_for_task", AsyncMock(return_value=SimpleNamespace())), \
+         patch.object(workflow_service, "get_team_access_context", AsyncMock()), \
+         patch("app.services.access_control.can_manage_workflow", return_value=True), \
+         patch.object(workflow_service, "get_authorized_document", _authorized(set())):
+        steps.get = AsyncMock(return_value=step)
+        tasks.get = AsyncMock(return_value=task)
+        with pytest.raises(workflow_service.FixedDocumentAccessError):
+            await workflow_service.add_task("s1", "Prompt", bob, data=SELECTED)
+        tasks.assert_not_called()  # nothing was created
+        with pytest.raises(workflow_service.FixedDocumentAccessError):
+            await workflow_service.update_task("t1", bob, data=SELECTED)
+
+    assert task.data == {"prompt": "p"}
+    task.save.assert_not_awaited()
+    step.save.assert_not_awaited()
+
+
+async def test_a_run_is_refused_before_dispatch_for_a_step_document_too():
+    bob = SimpleNamespace(user_id="bob")
+    wf = SimpleNamespace(input_config={}, user_id="bob", steps=["s1"])
+    document = MagicMock()
+    document.find_one = AsyncMock(return_value=SimpleNamespace(soft_deleted=False))
+    with patch.object(workflow_service, "step_document_uuids", AsyncMock(return_value=["secret-a"])), \
+         patch.object(workflow_service, "SmartDocument", document), \
+         patch.object(workflow_service, "get_team_access_context", AsyncMock()), \
+         patch.object(workflow_service, "get_authorized_document", _authorized(set())):
+        with pytest.raises(workflow_service.FixedDocumentAccessError) as refused:
+            await workflow_service.ensure_fixed_documents_runnable(wf, bob, "bob")
+    assert "neither you nor the workflow's owner can open" in str(refused.value)

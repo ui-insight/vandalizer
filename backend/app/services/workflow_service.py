@@ -289,8 +289,72 @@ async def ensure_fixed_documents_readable(
             raise FixedDocumentAccessError(FIXED_DOCUMENT_ACCESS_MESSAGE)
 
 
+async def ensure_step_document_readable(
+    task_data: dict | None, user: User, *, already: dict | None = None,
+) -> None:
+    """Refuse a step set to read a document *user* cannot read.
+
+    The same rule as a fixed document, for a step's selected document. A
+    document the step already read (*already*) is left alone, so editing a
+    step's other settings isn't blocked by a choice its author made.
+    """
+    from app.services.fixed_document_access import (
+        STEP_DOCUMENT_ACCESS_MESSAGE,
+        selected_document_uuid,
+    )
+
+    doc_uuid = selected_document_uuid(task_data)
+    if not doc_uuid or doc_uuid == selected_document_uuid(already):
+        return
+    document = await get_authorized_document(doc_uuid, user, allow_admin=True)
+    if not document or document.soft_deleted:
+        raise FixedDocumentAccessError(STEP_DOCUMENT_ACCESS_MESSAGE)
+
+
+async def ensure_definition_documents_readable(
+    definition: dict | None, user: User, *, already_input_config: dict | None = None,
+    already_step_documents: set[str] | None = None,
+) -> None:
+    """The save-time checks for a whole workflow definition being written at
+    once (an import into a workflow, a restored version): its fixed documents
+    and each step's selected document.
+    """
+    definition = definition if isinstance(definition, dict) else {}
+    await ensure_fixed_documents_readable(
+        definition.get("input_config"), user, already=already_input_config,
+    )
+    kept = already_step_documents or set()
+    for step in definition.get("steps") or []:
+        for task in (step.get("tasks") if isinstance(step, dict) else None) or []:
+            data = task.get("data") if isinstance(task, dict) else None
+            from app.services.fixed_document_access import selected_document_uuid
+
+            if selected_document_uuid(data) in kept:
+                continue
+            await ensure_step_document_readable(data, user)
+
+
+async def step_document_uuids(wf: Workflow) -> list[str]:
+    """Documents the workflow's steps are set to read."""
+    from app.services.fixed_document_access import selected_document_uuid
+
+    if not wf.steps:
+        return []
+    steps = await WorkflowStep.find({"_id": {"$in": wf.steps}}).to_list()
+    task_ids = [task_id for step in steps for task_id in (step.tasks or [])]
+    if not task_ids:
+        return []
+    uuids: list[str] = []
+    for task in await WorkflowStepTask.find({"_id": {"$in": task_ids}}).to_list():
+        doc_uuid = selected_document_uuid(task.data)
+        if doc_uuid and doc_uuid not in uuids:
+            uuids.append(doc_uuid)
+    return uuids
+
+
 async def ensure_fixed_documents_runnable(wf: Workflow, user: User | None, user_id: str | None) -> None:
-    """Refuse to start a run that would read a fixed document it shouldn't.
+    """Refuse to start a run that would read a document from the workflow's
+    setup (a fixed document, or a step's selected document) it shouldn't.
 
     Readable means the person starting the run, or the workflow's owner, can
     open it (see ``fixed_document_access``). The worker applies the same rule
@@ -303,6 +367,9 @@ async def ensure_fixed_documents_runnable(wf: Workflow, user: User | None, user_
     )
 
     uuids = fixed_document_uuids(wf.input_config)
+    for doc_uuid in await step_document_uuids(wf):
+        if doc_uuid not in uuids:
+            uuids.append(doc_uuid)
     if not uuids:
         return
     people: dict[str, User] = {}
@@ -596,6 +663,7 @@ async def add_task(step_id: str, name: str, user: User, data: dict = {}) -> dict
     if not can_manage_workflow(parent_wf, user, team_access):
         return None
 
+    await ensure_step_document_readable(data, user)
     task = WorkflowStepTask(name=name, data=data)
     await task.insert()
     if task.id is None:
@@ -623,6 +691,7 @@ async def update_task(task_id: str, user: User, name: str | None = None, data: d
     if name is not None:
         task.name = name
     if data is not None:
+        await ensure_step_document_readable(data, user, already=task.data)
         task.data = data
     await task.save()
     return {"id": str(task.id), "name": task.name, "data": task.data}
