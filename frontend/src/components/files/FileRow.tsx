@@ -1,5 +1,5 @@
 import { documentIssue } from '../../utils/documentReadiness'
-import { Loader2, MoreHorizontal, AlertTriangle, Shield, AlertCircle, RotateCw } from 'lucide-react'
+import { Loader2, MoreHorizontal, AlertTriangle, Shield, AlertCircle, CircleStop, RotateCw } from 'lucide-react'
 import { FileTypeIcon } from './FileTypeIcon'
 import { formatFileSize } from '../../utils/fileDisplay'
 import type { Document } from '../../types/document'
@@ -84,7 +84,9 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
             // Decorative: the badge beside the name carries the words.
             issue.tone === 'error'
               ? <AlertTriangle className="h-4 w-4 shrink-0 mr-2.5 text-red-500" aria-hidden="true" />
-              : <AlertCircle className="h-4 w-4 shrink-0 mr-2.5 text-amber-500" aria-hidden="true" />
+              : issue.tone === 'neutral'
+                ? <CircleStop className="h-4 w-4 shrink-0 mr-2.5 text-gray-500" aria-hidden="true" />
+                : <AlertCircle className="h-4 w-4 shrink-0 mr-2.5 text-amber-500" aria-hidden="true" />
           ) : <FileTypeIcon extension={doc.extension} />}
           <div style={{ minWidth: 0, flex: 1 }}>
             <span className="flex items-center gap-1.5">
@@ -105,7 +107,9 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
                   className="shrink-0 rounded-full px-1.5 py-0.5 text-xs font-semibold"
                   style={issue.tone === 'error'
                     ? { backgroundColor: '#fee2e2', color: '#991b1b' }
-                    : { backgroundColor: '#fef3c7', color: '#92400e' }}
+                    : issue.tone === 'neutral'
+                      ? { backgroundColor: '#e5e7eb', color: '#374151' }
+                      : { backgroundColor: '#fef3c7', color: '#92400e' }}
                   title={issue.detail}
                 >
                   {issue.label}

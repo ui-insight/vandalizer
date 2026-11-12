@@ -354,6 +354,10 @@ async def delete_document(
             logger.warning("Failed to delete file for document %s: %s", doc_uuid, relative_path)
 
     await doc.delete()
+    # A deleted document's earlier text goes with it.
+    from app.services import extraction_snapshots
+
+    await extraction_snapshots.discard(doc.uuid)
     await _unlink_version(doc)
     await audit_service.log_event(
         action="document.delete",

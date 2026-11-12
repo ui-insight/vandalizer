@@ -1,4 +1,4 @@
-import { documentIssue, documentReadinessMessage, type DocumentReadiness } from '../../utils/documentReadiness'
+import { documentIssue, documentReadinessMessage, documentReadinessState, type DocumentReadiness } from '../../utils/documentReadiness'
 import { WorkspaceSectionHeader } from '../shared/WorkspaceSectionHeader'
 import { useCallback, useMemo, useState, useRef, useEffect, type ReactNode, type DragEvent, type Ref } from 'react'
 import { Plus, Folder as FolderIcon, Upload, Trash2, Download, FolderInput } from 'lucide-react'
@@ -218,7 +218,7 @@ export function FileBrowser({ listScrollRef, onListScroll, searchField, selected
   }, [selectedUuids, documents, onSelectionChange, onDocNamesChange, onSelectionProcessingChange])
 
   useEffect(() => {
-    onDocumentReadinessChange?.([...documents, ...(contentMatches ?? [])].map(doc => ({ uuid: doc.uuid, title: doc.title, message: documentReadinessMessage(doc) })))
+    onDocumentReadinessChange?.([...documents, ...(contentMatches ?? [])].map(doc => ({ uuid: doc.uuid, title: doc.title, message: documentReadinessMessage(doc), state: documentReadinessState(doc) })))
   }, [documents, contentMatches, onDocumentReadinessChange])
 
   // Sync selected folder UUIDs to parent
@@ -423,7 +423,7 @@ export function FileBrowser({ listScrollRef, onListScroll, searchField, selected
     // A re-read clears the stored text before it starts. That costs nothing
     // for a file with no text, but one that only failed indexing or read
     // poorly still has text chat can use: say so before replacing it.
-    if (documentIssue(doc)?.kind !== 'no_text') {
+    if (!['no_text', 'stopped'].includes(documentIssue(doc)?.kind ?? '')) {
       const ok = await confirm({
         title: `Read ${doc.title} again?`,
         message: 'This reads the file again and rebuilds its search index. Its current text is replaced, and if the new read fails the file will have no text until it is retried.',

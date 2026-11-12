@@ -23,6 +23,16 @@ describe('AttachmentList', () => {
     rerender(<AttachmentList activeSkill={null} />)
     expect(container).toBeEmptyDOMElement()
   })
+  it('does not say Ready for a selected file whose extraction was stopped or failed (support ticket)', () => {
+    const { rerender } = render(<AttachmentList selectedDocUuids={['d']} selectedDocNames={{ d: 'Award.pdf' }} processingByUuid={{}} documentStates={{ d: 'stopped' }} />)
+    expect(screen.getByText('Stopped · open Files to retry')).toBeInTheDocument()
+    expect(screen.queryByText('Ready')).not.toBeInTheDocument()
+    rerender(<AttachmentList selectedDocUuids={['d']} selectedDocNames={{ d: 'Award.pdf' }} processingByUuid={{}} documentStates={{ d: 'failed' }} />)
+    expect(screen.getByText('Text extraction failed · open Files to retry')).toBeInTheDocument()
+    expect(screen.queryByText('Ready')).not.toBeInTheDocument()
+    rerender(<AttachmentList selectedDocUuids={['d']} selectedDocNames={{ d: 'Award.pdf' }} processingByUuid={{}} documentStates={{ d: undefined }} />)
+    expect(screen.getByText('Ready')).toBeInTheDocument()
+  })
   it('does not label a failed document ready after its progress notice disappears', () => {
     render(<AttachmentList selectedDocUuids={['failed']} selectedDocNames={{ failed: 'Scanned.pdf' }} processingByUuid={{}} documentErrors={{ failed: 'OCR failed' }} />)
     expect(screen.getByText('Processing failed · open Files to retry')).toBeInTheDocument()

@@ -43,6 +43,12 @@ function renderFileRow(props: Partial<Parameters<typeof FileRow>[0]> = {}) {
 }
 
 describe('FileRow', () => {
+  it('marks a stopped extraction as stopped, not as a red failure', () => {
+    renderFileRow({ doc: makeDoc({ task_status: 'error', extraction_stopped: true, error_message: 'Text extraction was stopped. Retry to read this document again.' }) })
+    expect(screen.getByText(/^Stopped/)).toHaveTextContent('Text extraction was stopped')
+    expect(screen.queryByText(/^No text/)).toBeNull()
+  })
+
   it('shows the file size, and nothing when it is unknown', () => {
     const { unmount } = renderFileRow({ doc: makeDoc({ size_bytes: 4.2 * 1024 * 1024 }) })
     expect(screen.getByText('4.2 MB')).toBeTruthy()

@@ -332,6 +332,7 @@ async def list_contents(
                 "ingest_error": d.ingest_error,
                 "error_message": d.error_message,
                 "error_retryable": d.error_retryable,
+                "extraction_stopped": extraction_stopped(d),
                 "extraction_low_quality": is_extraction_low_quality(d),
                 "ingestion_warnings": ingestion_warnings(d),
                 # The list endpoint is what feeds the file browser; serving
@@ -446,6 +447,7 @@ async def poll_status(doc_uuid: str, user: User) -> dict | None:
         "path": doc.path,
         "error_message": doc.error_message,
         "error_retryable": doc.error_retryable,
+        "extraction_stopped": extraction_stopped(doc),
         "processing": doc.processing,
         "extension": (doc.extension or "").lower().lstrip(".") or None,
         "title": doc.title,
@@ -469,45 +471,79 @@ EXTRACTION_STOPPED_MESSAGE = (
 )
 
 
-async def cancel_extraction(doc: SmartDocument) -> bool:
+def extraction_stopped(doc: SmartDocument) -> bool:
+    """The document has no reading because someone stopped it, not because
+    reading it failed. Shown as "Stopped", not as a failure."""
+    return doc.task_status == "error" and doc.error_message == EXTRACTION_STOPPED_MESSAGE
+
+
+async def cancel_extraction(doc: SmartDocument) -> Optional[str]:
     """Stop a document's in-flight extraction so it can be restarted.
 
-    Flips the document to a retryable error first, then revokes the worker.
-    The DB write is the source of truth: clearing ``task_id`` is what makes
-    the extraction task drop its result if the revoke does not reach it (a
-    pool that cannot terminate, a worker mid-write), since every write that
-    task makes is filtered on its own task id. Callers check authorization.
+    When the stopped run was a re-read of a document that already had text,
+    and it had not stored a new reading yet, the previous reading is put back
+    and the document is as it was before the re-read ("restored"). Otherwise
+    the document is flipped to a retryable error ("stopped").
 
-    Returns False when nothing was in flight by the time the write landed.
+    Either way the DB write comes first, then the worker is revoked. The
+    write is the source of truth: clearing ``task_id`` is what makes the
+    extraction task drop its result if the revoke does not reach it (a pool
+    that cannot terminate, a worker mid-write), since every write that task
+    makes is filtered on its own task id. Callers check authorization.
+
+    Returns None when nothing was in flight by the time the write landed.
     """
     import logging
 
     # Lazy: the tasks module and the Celery app pull in the worker stack.
     from app.celery_app import celery_app
+    from app.services import extraction_snapshots
     from app.tasks.document_tasks import _IN_PROGRESS_TASK_STATUSES
 
     task_id = doc.task_id
-    result = await SmartDocument.get_motor_collection().update_one(
-        {
-            "_id": doc.id,
-            "$or": [
-                {"processing": True},
-                {"task_status": {"$in": _IN_PROGRESS_TASK_STATUSES}},
-            ],
-        },
-        {"$set": {
-            "processing": False,
-            "task_status": "error",
-            "task_id": None,
-            "error_message": EXTRACTION_STOPPED_MESSAGE,
-            "error_retryable": True,
-        },
-         # Like a restart: the stopped run's later steps (update, ingestion,
-         # cleanup) are filtered on the revision and now match nothing.
-         "$inc": {"_extraction_restart_revision": 1}},
-    )
-    if not result.matched_count:
-        return False
+    collection = SmartDocument.get_motor_collection()
+    in_flight = {"$or": [
+        {"processing": True},
+        {"task_status": {"$in": _IN_PROGRESS_TASK_STATUSES}},
+    ]}
+    # Like a restart: the stopped run's later steps (update, ingestion,
+    # cleanup) are filtered on the revision and now match nothing.
+    bump = {"$inc": {"_extraction_restart_revision": 1}}
+
+    outcome: Optional[str] = None
+    previous = await extraction_snapshots.previous_reading(doc.uuid)
+    if previous is not None:
+        fields = previous["fields"]
+        # The copy can only have been taken from a settled document; anything
+        # else (a stale run that was re-claimed) settles as read.
+        if fields.get("task_status") not in ("complete", "error", None):
+            fields["task_status"] = "complete"
+        restored = await collection.update_one(
+            # Only into the run the copy was taken for, and only while that
+            # run has stored nothing: once it has written its own reading,
+            # that newer text is the document's text.
+            {"_id": doc.id, **in_flight,
+             "_extraction_restart_revision": previous["revision"], "raw_text": ""},
+            {"$set": {**fields, "processing": False, "task_id": None}, **bump},
+        )
+        if restored.matched_count:
+            outcome = "restored"
+            await extraction_snapshots.discard(doc.uuid)
+
+    if outcome is None:
+        result = await collection.update_one(
+            {"_id": doc.id, **in_flight},
+            {"$set": {
+                "processing": False,
+                "task_status": "error",
+                "task_id": None,
+                "error_message": EXTRACTION_STOPPED_MESSAGE,
+                "error_retryable": True,
+            }, **bump},
+        )
+        if not result.matched_count:
+            return None
+        outcome = "stopped"
 
     # SIGTERM the prefork child reading it; a task still queued (or waiting
     # out an OCR retry backoff under the same id) is dropped when it arrives.
@@ -519,13 +555,17 @@ async def cancel_extraction(doc: SmartDocument) -> bool:
                 "Failed to revoke extraction task %s for document %s",
                 task_id, doc.uuid, exc_info=True,
             )
-    return True
+    return outcome
 
 
 async def restart_extraction(
     doc: SmartDocument, user_id: str, *, request_ocr: bool = False,
 ) -> dict:
     """Clear a document's extracted text and re-dispatch the upload chain.
+
+    The text is cleared because every later step reads it from the document;
+    a copy of the previous reading is kept so ``cancel_extraction`` can
+    restore it if the run is stopped before it stores a new one.
 
     Shared by the document's Retry extraction and a knowledge-base source's
     Reprocess, so both re-read a page the same way. Callers check
@@ -568,6 +608,12 @@ async def restart_extraction(
         request_ocr or doc.task_status == "error" or low_quality or missed_pages
     )
     ocr_required = is_pdf and (low_quality or doc.text_layer_rejected)
+    # Keep what the document reads as now, so stopping this run can put it
+    # back. Taken before the claim clears it, and tagged with the revision
+    # the claim is about to take.
+    from app.services import extraction_snapshots
+
+    await extraction_snapshots.save_previous_reading(doc, doc._extraction_restart_revision + 1)
     await claim_extraction_restart(doc, {
         'task_status': 'extracting', 'processing': True,
         'validating': True, '_validation_heartbeat_at': _datetime.datetime.now(),

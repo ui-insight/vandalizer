@@ -982,6 +982,11 @@ def update_document_fields(self: Task, document_uuid: str, extraction_revision: 
     if not result.matched_count:
         return
 
+    # This read is the document's text now; the copy kept for Stop is done with.
+    from app.services import extraction_snapshots
+
+    extraction_snapshots.discard_sync(db, document_uuid)
+
     # Now that raw_text is populated, ingest any KB sources that were added
     # before extraction finished and parked in "pending" (see
     # knowledge_service._ingest_document_source).

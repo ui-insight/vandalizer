@@ -183,6 +183,35 @@ describe('RawTextModal Stop', () => {
     expect(screen.getByRole('button', { name: /retry extraction/i })).toBeTruthy()
   })
 
+  it('shows a stopped first read as Stopped, not as a failure', async () => {
+    vi.mocked(pollStatus).mockResolvedValue(pollResponse({
+      status: 'error', processing: false, raw_text: '', extraction_stopped: true,
+      error_message: 'Text extraction was stopped. Retry to read this document again.',
+      error_retryable: true,
+    }))
+    render(<RawTextModal docUuid="doc-1" onClose={vi.fn()} />)
+    expect(await screen.findByText('Text extraction stopped')).toBeTruthy()
+    expect(screen.queryByText('Text extraction failed')).toBeNull()
+    expect(screen.getByRole('button', { name: /retry extraction/i })).toBeTruthy()
+  })
+
+  it('keeps showing the previous text when a re-run is stopped (support ticket)', async () => {
+    // Re-run OCR on a document that read fine, then Stop: the server puts
+    // the old text back, and the window says so instead of showing an error.
+    vi.mocked(pollStatus)
+      .mockResolvedValueOnce(pollResponse({ status: 'ocr', processing: true, complete: false, raw_text: '' }))
+      .mockResolvedValueOnce(pollResponse({ raw_text: 'The text it had before.' }))
+    vi.mocked(cancelExtraction).mockResolvedValue({ uuid: 'doc-1', status: 'restored', restored_previous_text: true })
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    render(<RawTextModal docUuid="doc-1" onClose={vi.fn()} />)
+    fireEvent.click(await screen.findByRole('button', { name: /^stop$/i }))
+
+    expect(await screen.findByText('The text it had before.')).toBeTruthy()
+    expect(screen.getByRole('status')).toHaveTextContent('Stopped. This document still has the text it had before.')
+    expect(screen.queryByText(/Text extraction (failed|stopped)/)).toBeNull()
+  })
+
   it('does nothing when the confirmation is cancelled', async () => {
     vi.mocked(pollStatus).mockResolvedValue(pollResponse({ status: 'ocr', processing: true, complete: false, raw_text: '' }))
     vi.spyOn(window, 'confirm').mockReturnValue(false)
