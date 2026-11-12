@@ -7,7 +7,7 @@ found: <id>". No database: documents and obligations are stand-ins.
 
 import datetime
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.models.obligation import Obligation, ObligationSource
 from app.services import deadline_reminders, obligation_service
@@ -29,8 +29,25 @@ def _ob(uuid: str, document_uuid: str, **kw) -> Obligation:
 
 
 def _documents(*existing: str):
-    """SmartDocument stand-in holding only *existing* uuids."""
-    return fake_model([SimpleNamespace(uuid=u) for u in existing])
+    """SmartDocument stand-in holding only *existing* uuids.
+
+    ``find`` applies the query's ``uuid: {$in: [...]}`` filter, so a test fails
+    if the code asks for the wrong documents, and supports the projection and
+    count the real queries use.
+    """
+    model = MagicMock()
+
+    def find(query):
+        wanted = set((query.get("uuid") or {}).get("$in") or [])
+        rows = [SimpleNamespace(uuid=u) for u in existing if u in wanted]
+        result = MagicMock()
+        result.project.return_value = result
+        result.to_list = AsyncMock(return_value=rows)
+        result.count = AsyncMock(return_value=len(rows))
+        return result
+
+    model.find = MagicMock(side_effect=find)
+    return model
 
 
 async def test_a_cited_file_that_no_longer_exists_is_reported_deleted():
@@ -39,7 +56,9 @@ async def test_a_cited_file_that_no_longer_exists_is_reported_deleted():
         deleted = await obligation_service.deleted_source_uuids(obligations)
     assert deleted == {"gone"}
     # Soft-deleted files count as gone too.
-    assert docs.find.call_args.args[0]["soft_deleted"] == {"$ne": True}
+    query = docs.find.call_args.args[0]
+    assert query["soft_deleted"] == {"$ne": True}
+    assert set(query["uuid"]["$in"]) == {"gone", "kept-file"}
 
 
 async def test_items_without_sources_cost_no_lookup():

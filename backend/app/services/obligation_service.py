@@ -14,6 +14,8 @@ import re
 import uuid as uuid_mod
 from typing import Any, Collection, Iterable, Optional
 
+from pydantic import BaseModel
+
 from app.models.document import SmartDocument
 from app.models.obligation import (
     DEADLINE_TYPES,
@@ -645,6 +647,10 @@ def _sort_key(ob: Obligation) -> tuple[int, datetime.datetime, datetime.datetime
     return (rank, due, ob.created_at)
 
 
+class _UuidOnly(BaseModel):
+    uuid: str
+
+
 async def deleted_source_uuids(obligations: Iterable[Obligation]) -> set[str]:
     """Cited document uuids that no longer exist (support ticket).
 
@@ -656,9 +662,11 @@ async def deleted_source_uuids(obligations: Iterable[Obligation]) -> set[str]:
     cited = {s.document_uuid for o in obligations for s in (o.sources or [])}
     if not cited:
         return set()
+    # Uuids only: this runs on every inbox load and reminder sweep, and a
+    # document carries its whole extracted text.
     found = await SmartDocument.find(
         {"uuid": {"$in": list(cited)}, "soft_deleted": {"$ne": True}},
-    ).to_list()
+    ).project(_UuidOnly).to_list()
     return cited - {d.uuid for d in found}
 
 

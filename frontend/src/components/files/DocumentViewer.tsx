@@ -3,6 +3,7 @@ import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, Loader2, X, Search, AlertCi
 import { downloadFileUrl } from '../../api/files'
 import { FullViewButton, useFullView } from './viewerFullView'
 import { pollStatus, retryExtraction } from '../../api/documents'
+import { ApiError } from '../../api/client'
 import { SpreadsheetViewer } from './SpreadsheetViewer'
 import { DocumentSearchBar, useFindInDocumentHotkey } from './DocumentSearchBar'
 import { stageCopy } from '../../utils/processingStatus'
@@ -245,7 +246,14 @@ export function DocumentViewer({ docUuid, onMissing, highlightTerms = [], highli
     fetch(inlineUrl, { method: 'HEAD', credentials: 'include' })
       .then(async (resp) => {
         if (cancelled) return
-        if (resp.status === 404) onMissingRef.current?.()
+        // A 404 here can also mean the stored file couldn't be read while the
+        // document and its text are intact. Only report it gone when the
+        // document itself is.
+        if (resp.status === 404) {
+          pollStatus(docUuid).catch((error: unknown) => {
+            if (!cancelled && error instanceof ApiError && error.status === 404) onMissingRef.current?.()
+          })
+        }
         if (!resp.ok) throw new Error(resp.status === 401 || resp.status === 403 ? 'This source is not accessible with your current account. Ask its owner for access, then retry.' : resp.status === 404 ? 'This source is no longer available. It may have been removed or access may have changed.' : 'The source could not be loaded. Check your connection and retry.')
         const ct = resp.headers.get('content-type') || ''
         if (ct.includes('csv') || ct.includes('spreadsheet') || ct.includes('excel') || ct.includes('ms-excel')) {

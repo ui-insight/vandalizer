@@ -1458,9 +1458,10 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                 </span>
               </div>
             ) : errorDetails?.code === 'document_missing' ? (
-              // Retry would send the same missing file again. Once it is off
-              // the chat, the message can go without it.
-              missingFilesNotice && (
+              // Retry would send the same missing file again; this sends the
+              // message without it. Offered even when the file has no chip
+              // here (a queued or handed-over message carried it).
+              (errorDetails.missingDocuments?.length ?? 0) > 0 && (
                 <div className="mt-2">
                   <button
                     onClick={() => retryWithoutDocuments(errorDetails.missingDocuments ?? [])}

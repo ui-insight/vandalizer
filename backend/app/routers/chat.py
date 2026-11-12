@@ -81,9 +81,10 @@ async def _missing_documents_error(document_uuids: list[str]) -> HTTPException:
     """
     from app.models.document import SmartDocument
 
+    # Counted, not loaded: only whether any of them still exists matters.
     still_there = await SmartDocument.find(
         {"uuid": {"$in": document_uuids}, "soft_deleted": {"$ne": True}},
-    ).to_list()
+    ).count()
     deleted = not still_there
     several = len(document_uuids) > 1
     if deleted:
