@@ -20,6 +20,8 @@ export function RailResizer({ value, min, max, onChange, onReset, onDragStart, o
   const [dragging, setDragging] = useState(false)
   const restoreRef = useRef<(() => void) | null>(null)
   const startValue = useRef(value)
+  const startX = useRef(0)
+  const moved = useRef(false)
   useEffect(() => () => { restoreRef.current?.() }, [])
   const clamp = (next: number) => Math.round(Math.max(min, Math.min(max, next)))
   const widthAt = (clientX: number) => clamp(window.innerWidth - clientX)
@@ -49,12 +51,28 @@ export function RailResizer({ value, min, max, onChange, onReset, onDragStart, o
         restoreRef.current = () => { document.body.style.userSelect = userSelect; document.body.style.cursor = cursor; onDragEnd?.() }
         document.body.style.userSelect = 'none'; document.body.style.cursor = 'col-resize'
         startValue.current = value
+        startX.current = event.clientX
+        moved.current = false
         setDragging(true); onDragStart?.()
       }}
-      onPointerMove={event => { if (dragging) onChange(widthAt(event.clientX), false) }}
-      onPointerUp={event => { if (dragging) { onChange(widthAt(event.clientX), true); finish(); event.currentTarget.releasePointerCapture(event.pointerId) } }}
-      onPointerCancel={() => { if (dragging) { onChange(startValue.current, true); finish() } }}
-      onLostPointerCapture={() => { if (restoreRef.current) { onChange(startValue.current, true); finish() } }}
+      onPointerMove={event => {
+        if (!dragging) return
+        // A click to focus the divider is not a resize: nothing changes until
+        // the pointer has actually travelled.
+        if (!moved.current && Math.abs(event.clientX - startX.current) < 3) return
+        moved.current = true
+        onChange(widthAt(event.clientX), false)
+      }}
+      onPointerUp={event => {
+        if (!dragging) return
+        if (moved.current) onChange(widthAt(event.clientX), true)
+        finish(); event.currentTarget.releasePointerCapture(event.pointerId)
+      }}
+      // An interrupted drag puts the panel back without saving anything: the
+      // width shown may be the saved one fitted to a narrow window, and
+      // saving that would overwrite the person's preference.
+      onPointerCancel={() => { if (dragging) { if (moved.current) onChange(startValue.current, false); finish() } }}
+      onLostPointerCapture={() => { if (restoreRef.current) { if (moved.current) onChange(startValue.current, false); finish() } }}
     >
       <span aria-hidden="true" style={{ position: 'absolute', inset: '0 -4px' }} />
       <ResizeGrip active={dragging} />

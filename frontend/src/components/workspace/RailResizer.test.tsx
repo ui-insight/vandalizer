@@ -30,3 +30,27 @@ it('drags to the distance from the right edge, and only remembers the width on r
   expect(document.body.style.cursor).toBe('')
   vi.unstubAllGlobals()
 })
+
+it('a click on the divider, or an interrupted drag, changes and saves nothing', () => {
+  vi.stubGlobal('PointerEvent', MouseEvent)
+  const onChange = vi.fn()
+  render(<RailResizer value={320} min={260} max={560} onChange={onChange} onReset={vi.fn()} />)
+  const control = screen.getByRole('separator')
+  control.setPointerCapture = vi.fn(); control.releasePointerCapture = vi.fn()
+
+  // Press and release in place: focusing the divider is not a resize.
+  const at = window.innerWidth - 322
+  fireEvent.pointerDown(control, { button: 0, clientX: at })
+  fireEvent.pointerMove(control, { clientX: at + 1 })
+  fireEvent.pointerUp(control, { clientX: at + 1 })
+  expect(onChange).not.toHaveBeenCalled()
+
+  // A drag the browser cancels puts the panel back without saving.
+  fireEvent.pointerDown(control, { button: 0, clientX: at })
+  fireEvent.pointerMove(control, { clientX: window.innerWidth - 400 })
+  fireEvent.pointerCancel(control)
+  expect(onChange).toHaveBeenLastCalledWith(320, false)
+  expect(onChange.mock.calls.some(call => call[1] === true)).toBe(false)
+  expect(document.body.style.cursor).toBe('')
+  vi.unstubAllGlobals()
+})

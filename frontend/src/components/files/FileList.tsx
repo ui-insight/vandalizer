@@ -99,6 +99,7 @@ export function FileList({
       <colgroup>
         <col style={{ width: 32 }} />
         <col />
+        <col className="file-size-col" style={{ width: 96 }} />
         <col style={{ width: 110 }} />
       </colgroup>
       <thead>
@@ -131,6 +132,26 @@ export function FileList({
               </button>
             ) : (
               <>Name<SortIndicator column="name" sort={sort} /></>
+            )}
+          </th>
+          <th
+            scope="col"
+            className="file-size-cell"
+            aria-sort={sort?.column === 'size' ? (sort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+            style={{ ...headerStyle, textAlign: 'right' }}
+          >
+            {onSort ? (
+              <button
+                type="button"
+                onClick={() => onSort('size')}
+                className="hover:bg-[#a6b5c945] hover:text-[#191919] transition-colors"
+                style={{ ...sortButtonStyle, justifyContent: 'flex-end', width: '100%' }}
+              >
+                Size
+                <SortIndicator column="size" sort={sort} />
+              </button>
+            ) : (
+              <>Size<SortIndicator column="size" sort={sort} /></>
             )}
           </th>
           <th

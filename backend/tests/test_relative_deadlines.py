@@ -340,3 +340,44 @@ async def test_a_table_quote_with_a_date_the_document_lacks_is_still_refused(mon
                         {**source("Start Date End Date Sep 1, 2025 Aug 31, 2028", "period_of_performance").model_dump(), "page": None}]}
     checked = await service.propose(project, SimpleNamespace(user_id="user1"), [item])
     assert checked["accepted"] == [] and "not found" in checked["rejected"][0]["reason"]
+
+
+@pytest.mark.asyncio
+async def test_a_deadline_marked_done_is_not_proposed_again(project_env, monkeypatch):
+    """Support ticket: "Greenhouse trial dataset due", marked Done, came back
+    as "1 item to add" on the next run because only open items were compared."""
+    project, user, _ = project_env
+    row = (await service.propose(project, user, [proposal()]))["accepted"][0]["clean"]
+    done = Obligation.model_construct(uuid="done", project_uuid=project.uuid, created_by=user.user_id, status="done", **row)
+    monkeypatch.setattr(service, "Obligation", fake_model([done]))
+
+    assert (await service.find_existing(project.uuid, row)).uuid == "done"
+    checked = await service.propose(project, user, [proposal()])
+    assert checked["accepted"] == []
+    assert checked["rejected"][0]["reason"] == "already in this project's inbox, marked done"
+
+    # An item an amendment replaced is no longer in the inbox.
+    superseded = Obligation.model_construct(uuid="old", project_uuid=project.uuid, created_by=user.user_id, status="superseded", **row)
+    monkeypatch.setattr(service, "Obligation", fake_model([superseded]))
+    assert await service.find_existing(project.uuid, row) is None
+
+
+@pytest.mark.asyncio
+async def test_a_dismissed_item_says_so_and_an_open_copy_wins(project_env, monkeypatch):
+    project, user, _ = project_env
+    row = (await service.propose(project, user, [proposal()]))["accepted"][0]["clean"]
+    make = lambda uuid, **extra: Obligation.model_construct(uuid=uuid, project_uuid=project.uuid, created_by=user.user_id, **{**row, **extra})  # noqa: E731
+    monkeypatch.setattr(service, "Obligation", fake_model([make("dismissed", dismissed_by=[user.user_id])]))
+    checked = await service.propose(project, user, [proposal()])
+    assert checked["rejected"][0]["reason"] == "already in this project's inbox, dismissed by you"
+
+    monkeypatch.setattr(service, "Obligation", fake_model([make("done", status="done"), make("open")]))
+    assert (await service.find_existing(project.uuid, row)).uuid == "open"
+
+
+def test_the_card_says_already_done():
+    from app.services.chat_tools import _obligation_review_reason
+
+    assert _obligation_review_reason("already in this project's inbox, marked done") == "Already marked done in this inbox."
+    assert _obligation_review_reason("already in this project's inbox, dismissed by you") == "Already in this inbox; you dismissed it."
+    assert _obligation_review_reason("already in this project's inbox or proposal") == "Already included in this inbox or proposal."
