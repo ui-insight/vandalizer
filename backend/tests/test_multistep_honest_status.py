@@ -254,6 +254,27 @@ def test_a_typed_message_only_counts_when_the_reply_claims_it_was_done():
     assert approval_claims.unrun_approval_note(CLAIM, ctx.deps)
 
 
+def test_a_typed_question_about_something_else_is_not_a_claim_about_the_card():
+    """A Create project card waits and the user asks an unrelated question.
+    The answer reports something as done, but not the card's action."""
+    ctx = _approved(mode="typed_single")
+    answer = "Three files were added last week."
+    assert approval_claims.require_approved_action_ran(ctx, answer) == answer
+    assert approval_claims.unrun_approval_note(answer, ctx.deps) is None
+    assert ctx.deps.unrun_approval_retry_used is False
+
+
+def test_a_typed_message_is_never_told_to_run_the_action():
+    """A typed message got here without being recognised as an approval, so
+    the retry must not have the model call the tool."""
+    ctx = _approved(mode="typed_single")
+    with pytest.raises(ModelRetry) as retry:
+        approval_claims.require_approved_action_ran(ctx, CLAIM)
+    text = str(retry.value)
+    assert "Do not call create_project" in text
+    assert "confirmed=true" not in text
+
+
 def test_a_turn_that_approved_nothing_is_left_alone():
     ctx = _approved(mode="none")
     ctx.deps.approved_confirmations = frozenset()
@@ -272,3 +293,15 @@ def test_the_unrun_validator_is_registered_and_the_reminder_rules_out_thanks():
     note = approval_reminder(decide(pending), pending)
     assert "thank-you" in note and "is not an approval" in note
     assert "Never say the step was done unless you ran it" in note
+
+
+def test_a_turn_can_send_a_reply_back_more_than_once():
+    """Each reply check retries at most once, but the library allows one retry
+    per turn by default: two different checks failing in a row ended the turn
+    with an error. The chat agent is built with room for a few."""
+    import inspect
+
+    from app.services import llm_service
+
+    assert llm_service.CHAT_OUTPUT_RETRIES >= 2
+    assert 'retries={"output": CHAT_OUTPUT_RETRIES}' in inspect.getsource(llm_service.create_agentic_chat_agent)

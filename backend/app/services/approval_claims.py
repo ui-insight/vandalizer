@@ -829,13 +829,41 @@ UNRUN_RETRY_INSTRUCTION = (
     "same arguments as the preview and confirmed=true. If you cannot, say in one sentence that "
     "it has not been done and why. Never say it was done. Do not repeat your previous reply."
 )
+# No instruction to call the tool here. A typed message reaches this point
+# without having been recognised as an approval (those arrive as a card
+# decision), so telling the model to run {tools} would have it act on a
+# thank-you, or on a question about something else.
 UNRUN_CLAIM_RETRY_INSTRUCTION = (
     "Your reply says something was created, saved, added or finished, but {cards} is still "
-    "waiting for approval and has not run. If the user's message clearly approved it, call "
-    "{tools} now with the same arguments as the preview and confirmed=true. A thank-you or an "
-    "acknowledgement of your last answer is not an approval: in that case say it has not been "
-    "done yet and point to its card. Never say it was done. Do not repeat your previous reply."
+    "waiting for approval and has not run. A thank-you, an acknowledgement of your last answer, "
+    "or a question about something else is not an approval. Do not call {tools} in this reply. "
+    "Say it has not been done yet and point to its card, where the user can approve it. Never "
+    "say it was done. Do not repeat your previous reply."
 )
+
+# Words too general to tie a reply to one particular waiting action.
+_GENERIC_ACTION_WORDS = frozenset({
+    "approve", "create", "created", "save", "saved", "add", "added", "update", "updated",
+    "delete", "deleted", "remove", "removed", "run", "send", "share", "new", "with", "from",
+    "this", "that", "the", "and", "for",
+})
+
+
+def _names_action(text: str, entry: dict) -> bool:
+    """Whether *text* is talking about this waiting action.
+
+    A reply can report something as done that has nothing to do with the
+    card: "Three files were added last week." while a Create project card
+    waits. Only a reply that names what the card would act on (its label or
+    its tool, minus the general verbs) is a claim about that card.
+    """
+    from app.services.chat_tools import approve_button_label
+
+    label = str(entry.get("label") or approve_button_label(str(entry.get("tool") or "")))
+    words = {w for w in re.findall(r"[a-z]+", f"{label} {entry.get('tool') or ''}".lower()) if len(w) >= 4}
+    specific = words - _GENERIC_ACTION_WORDS
+    lowered = (text or "").lower()
+    return any(re.search(rf"\b{re.escape(word)}", lowered) for word in (specific or words))
 
 
 def approved_but_not_run(deps: "AgenticChatDeps | None") -> list[dict]:
@@ -855,14 +883,18 @@ def _unrun_to_report(deps: "AgenticChatDeps | None", text: str) -> list[dict]:
 
     A card's button is an explicit approval, so the action not running is
     always wrong. A typed message may not have been an approval at all; it
-    only counts when the reply goes on to say something was done.
+    only counts when the reply goes on to say that action was done: a
+    done-claim about something else (an answer to an unrelated question) is
+    not about the card.
     """
     unrun = approved_but_not_run(deps)
     if not unrun:
         return []
     mode = getattr(deps, "approval_mode", "none")
-    if mode == "card" or (mode == "typed_single" and claims_done(text)):
+    if mode == "card":
         return unrun
+    if mode == "typed_single" and claims_done(text):
+        return [entry for entry in unrun if _names_action(text, entry)]
     return []
 
 
