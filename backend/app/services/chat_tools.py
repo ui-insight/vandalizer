@@ -6011,8 +6011,10 @@ async def _build_workflow_step_data(
             return None, "a knowledge_base_query step needs a 'kb_uuid'"
         if not query:
             return None, "a knowledge_base_query step needs a 'query'"
-        kb = await KnowledgeBase.find_one(KnowledgeBase.uuid == kb_uuid)
-        if not kb or not (kb.verified or _kb_access_ok(kb, context.deps.user_id, context.deps.team_id)):
+        # The same rule the editor and the run apply to a step's knowledge base.
+        from app.services import access_control as _access_control
+
+        if not await _access_control.get_authorized_knowledge_base(kb_uuid, context.deps.user, allow_admin=True):
             return None, f"knowledge base '{kb_uuid}' not found or not accessible"
         mode = step.get("mode") if step.get("mode") in ("passages", "answer") else "answer"
         return {"kb_uuid": kb_uuid, "query": query, "mode": mode, "model": model}, None
@@ -6147,6 +6149,18 @@ async def create_workflow(
         return model_error
     model = requested_model or context.deps.model_name or None
 
+    # A fixed document's text goes into every run, so adding one needs read
+    # access to it. Refused before the preview: there is nothing to approve.
+    from app.services import access_control, workflow_service
+
+    fixed_document_uuids = [str(u) for u in (fixed_document_uuids or []) if u]
+    try:
+        await workflow_service.ensure_fixed_documents_readable(
+            {"fixed_documents": fixed_document_uuids}, context.deps.user,
+        )
+    except workflow_service.FixedDocumentAccessError as e:
+        return {"error": f"{e} Nothing was created."}
+
     # Validate every step up front so the preview reflects a buildable plan and
     # we never half-create a workflow because step 4 was malformed.
     plan: list[dict] = []
@@ -6266,7 +6280,8 @@ async def create_workflow(
     if fixed_document_uuids:
         fixed: list[dict] = []
         for u in fixed_document_uuids:
-            d = await SmartDocument.find_one(SmartDocument.uuid == u)
+            # Checked again here: the preview may have waited on approval.
+            d = await access_control.get_authorized_document(u, user, allow_admin=True)
             if d:
                 fixed.append({"uuid": u, "title": d.title or "Document"})
         if fixed:

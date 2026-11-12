@@ -476,7 +476,7 @@ async def export_catalog(user: User = Depends(get_current_user)) -> StreamingRes
 
     from app.services import export_import_service as eis
 
-    data = await eis.export_catalog(user.email or user.user_id)
+    data = await eis.export_catalog(user.email or user.user_id, user)
     json_bytes = json.dumps(data, indent=2, default=str).encode()
     return StreamingResponse(
         io.BytesIO(json_bytes),
