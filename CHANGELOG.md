@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Security
+- **A project pin never grants access to what it points at.** Pinning a workflow, extraction, automation or knowledge base to a project now requires access to that item as well as edit access to the project ("You don't have access to this workflow"), in the app and in chat, where it is refused before the approval card. A project's pins list only the items the person looking can open, and running a pin requires access to the pinned item. Skill and Page pins already worked this way. **Operators:** pins saved earlier are covered when they are listed or run; no migration is needed. Project members who relied on a teammate's pin to reach an item they can't otherwise open will no longer see it.
 - Upgrade audited frontend and Python dependencies, including the compatible MSAL/cryptography and FastAPI/Starlette stacks. Replace unmaintained PyPDF2 with pypdf and verify saved PDF form values. Chroma's development port now binds to localhost. Three Chroma advisories still have no published fix; see `docs/v5-release-readiness.md` for residual risk and release gates.
 
 ### Added
