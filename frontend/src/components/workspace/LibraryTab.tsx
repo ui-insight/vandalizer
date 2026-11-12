@@ -1819,8 +1819,10 @@ export function LibraryTab() {
                       border: 'none',
                       backgroundColor: 'var(--highlight-color, #eab308)',
                       color: 'var(--highlight-text-color, #000)',
-                      cursor: editLoading || !editContent.trim() ? 'not-allowed' : 'pointer',
-                      opacity: editLoading || !editContent.trim() ? 0.5 : 1,
+                      // Looks disabled whenever it is: a load error or a Skill
+                      // with no identity can't run either.
+                      cursor: editLoading || !!editLoadError || !editContent.trim() || (editingItem.set_type === 'prompt' && !editingItem.item_uuid) ? 'not-allowed' : 'pointer',
+                      opacity: editLoading || !!editLoadError || !editContent.trim() || (editingItem.set_type === 'prompt' && !editingItem.item_uuid) ? 0.5 : 1,
                     }}
                   >
                     {editingItem.set_type === 'prompt' ? 'Run Skill' : 'Use in Assistant'}
