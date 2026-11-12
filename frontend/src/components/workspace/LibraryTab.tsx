@@ -482,8 +482,8 @@ export function LibraryTab() {
     }
   }
 
-  // Formatter rows open a preview; Skill rows run immediately. Both kinds
-  // keep their instruction editor available from the row menu.
+  // Skill and formatter rows open a preview; both kinds keep their
+  // instruction editor available from the row menu.
   const [editingItem, setEditingItem] = useState<import('../../types/library').LibraryItem | null>(null)
   const [editMode, setEditMode] = useState<'preview' | 'edit'>('preview')
   const [editTitle, setEditTitle] = useState('')
@@ -1430,11 +1430,9 @@ export function LibraryTab() {
                     // last-used comes from its run history (server-side).
                     if (it.kind === 'workflow') {
                       openWorkflow(it.item_id)
-                    } else if (it.set_type === 'prompt') {
-                      if (!it.item_uuid) return
-                      markUsed(it.id)
-                      sendChatMessage('', { documentUuids: selectedDocUuids, folderUuids: selectedFolderUuids, skillUuid: it.item_uuid })
-                    } else if (it.set_type === 'formatter') {
+                    } else if (it.set_type === 'prompt' || it.set_type === 'formatter') {
+                      // A click shows what a Skill says before it runs; it
+                      // starts in chat only from the preview's Run Skill.
                       openPromptModal(it, 'preview')
                     } else if (it.kind === 'search_set') {
                       openExtraction(it.item_uuid || it.item_id)
