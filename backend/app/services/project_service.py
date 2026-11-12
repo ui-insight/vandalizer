@@ -701,6 +701,28 @@ async def authorized_pin_name(pin_type: str, target_id: str, user: User) -> str 
     return None
 
 
+async def _pin_target_exists(pin: ProjectPin) -> bool:
+    """Whether a pin still points at something (a deleted target is a stale pin)."""
+    from beanie import PydanticObjectId
+
+    try:
+        if pin.pin_type == "workflow":
+            from app.models.workflow import Workflow
+            return await Workflow.get(PydanticObjectId(pin.target_id)) is not None
+        if pin.pin_type == "automation":
+            from app.models.automation import Automation
+            return await Automation.get(PydanticObjectId(pin.target_id)) is not None
+    except Exception:
+        return False
+    if pin.pin_type == "extraction":
+        from app.models.search_set import SearchSet
+        return await SearchSet.find_one(SearchSet.uuid == pin.target_id) is not None
+    if pin.pin_type == "knowledge_base":
+        from app.models.knowledge import KnowledgeBase
+        return await KnowledgeBase.find_one(KnowledgeBase.uuid == pin.target_id) is not None
+    return False
+
+
 async def authorize_resource(pin_type: str, target_id: str, user: User) -> str:
     """Project references never confer access to their underlying resources."""
     if pin_type == "skill":
@@ -712,11 +734,20 @@ async def authorize_resource(pin_type: str, target_id: str, user: User) -> str:
     return title
 
 
-async def list_pins(project: Project, user: User | None = None) -> list[dict]:
+def _restricted_pin_name(pin_type: str) -> str:
+    label = _PIN_LABELS.get(pin_type, "item")
+    return f"{'An' if label[0] in 'aeiou' else 'A'} {label} you don't have access to"
+
+
+async def list_pins(
+    project: Project, user: User | None = None, *, include_restricted: bool = False,
+) -> list[dict]:
     """The project's pins that *user* can open, each with its target's name.
 
-    A pin whose target the user can't access is left out entirely, so its
-    name is never shown and it can't be picked to run.
+    A pin whose target the user can't access is left out, so its name is never
+    shown and it can't be picked to run. With *include_restricted* (the pins
+    list for someone who manages the project) such a pin is still listed, as
+    its type only and marked ``restricted``, so it can be removed.
     """
     pins = await ProjectPin.find(
         ProjectPin.project_uuid == project.uuid
@@ -738,6 +769,14 @@ async def list_pins(project: Project, user: User | None = None) -> list[dict]:
             # No viewer, no names: a pin's target is listed only for someone
             # who can open it themselves.
             name = await authorized_pin_name(pin.pin_type, pin.target_id, user) if user else None
+            if name is None and include_restricted and await _pin_target_exists(pin):
+                result.append({
+                    "pin_type": pin.pin_type,
+                    "target_id": pin.target_id,
+                    "name": _restricted_pin_name(pin.pin_type),
+                    "restricted": True,
+                })
+                continue
         if name is None:
             continue  # deleted, or not this user's to see
         result.append({

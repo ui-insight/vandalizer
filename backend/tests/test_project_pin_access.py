@@ -97,8 +97,7 @@ async def test_running_a_pin_you_cannot_open_is_refused_without_its_name(pin_typ
         model.find.return_value.to_list = AsyncMock(return_value=pins)
         result = await chat_tools.run_pin_on_project(_context(), pin_type, "a-private-id", confirmed=True)
 
-    assert "you don't have access to it" in result["error"]
-    assert "private workflow" not in result["error"].lower()
+    assert result == {"error": f"That {pin_type} is not pinned to this project, or you don't have access to it."}
     gate.assert_not_awaited()
     run_workflow.assert_not_awaited()
     run_extraction.assert_not_awaited()
@@ -147,3 +146,80 @@ async def test_the_chat_prompt_lists_pins_for_the_person_chatting():
         await chat_service._build_project_context("p1", BOB)
 
     list_pins.assert_awaited_once_with(project, BOB)
+
+
+async def test_access_lost_while_a_workflow_run_waited_for_approval_stops_it():
+    listed = [{"pin_type": "workflow", "target_id": "wf-1", "name": "Compliance"}]
+    with patch.object(chat_tools, "_resolve_active_project", AsyncMock(return_value=PROJECT)), \
+         patch("app.services.assistant_capabilities.refusal", return_value=None), \
+         patch.object(project_service, "can_manage_project", AsyncMock(return_value=True)), \
+         patch.object(project_service, "list_pins", AsyncMock(return_value=listed)), \
+         patch.object(project_service, "get_project_document_uuids", AsyncMock(return_value=["d1"])), \
+         patch.object(chat_tools, "_confirm_gate", AsyncMock(return_value=None)), \
+         patch.object(access_control, "get_authorized_workflow", AsyncMock(return_value=None)), \
+         patch.object(chat_tools, "_execute_workflow", AsyncMock()) as run_workflow:
+        result = await chat_tools.run_pin_on_project(_context(), "workflow", "wf-1", confirmed=True)
+
+    assert result == {"error": "You don't have access to this workflow."}
+    run_workflow.assert_not_awaited()
+
+
+@pytest.mark.parametrize("pin_type", ["automation", "knowledge_base"])
+async def test_automation_and_knowledge_base_pins_are_listed_only_for_people_who_can_open_them(pin_type):
+    pins = [SimpleNamespace(pin_type=pin_type, target_id="theirs"), SimpleNamespace(pin_type=pin_type, target_id="mine")]
+
+    async def lookup(target_id, user, **_):
+        return SimpleNamespace(name="Mine", title="Mine") if target_id == "mine" else None
+
+    with patch.object(project_service, "ProjectPin") as model, \
+         patch.object(access_control, LOOKUPS[pin_type], AsyncMock(side_effect=lookup)):
+        model.find.return_value.to_list = AsyncMock(return_value=pins)
+        listed = await project_service.list_pins(PROJECT, BOB)
+
+    assert listed == [{"pin_type": pin_type, "target_id": "mine", "name": "Mine"}]
+
+
+async def test_someone_who_manages_the_project_sees_a_pin_they_cannot_open_by_type_only():
+    pins = [SimpleNamespace(pin_type="workflow", target_id="a-private-id"),
+            SimpleNamespace(pin_type="extraction", target_id="deleted-set")]
+    exists = AsyncMock(side_effect=lambda pin: pin.target_id == "a-private-id")
+    with patch.object(project_service, "ProjectPin") as model, \
+         patch.object(project_service, "_pin_target_exists", exists), \
+         patch.object(access_control, "get_authorized_workflow", AsyncMock(return_value=None)), \
+         patch.object(access_control, "get_authorized_search_set", AsyncMock(return_value=None)):
+        model.find.return_value.to_list = AsyncMock(return_value=pins)
+        listed = await project_service.list_pins(PROJECT, BOB, include_restricted=True)
+
+    # Removable, but with no name; a pin whose target was deleted stays hidden.
+    assert listed == [{
+        "pin_type": "workflow", "target_id": "a-private-id",
+        "name": "A workflow you don't have access to", "restricted": True,
+    }]
+
+
+async def test_the_award_snapshot_lists_a_pinned_page_only_for_someone_who_can_open_it():
+    from fastapi import HTTPException
+
+    from app.services import award_snapshot
+
+    pins = [SimpleNamespace(target_id="page-open"), SimpleNamespace(target_id="page-private")]
+
+    async def authorize(pin_type, target_id, user):
+        if target_id == "page-private":
+            raise HTTPException(404, "Unavailable")
+        return "Open page"
+
+    activity = MagicMock()
+    activity.find.return_value.sort.return_value.first_or_none = AsyncMock(return_value=None)
+    artifact = MagicMock()
+    artifact.find.return_value.sort.return_value.limit.return_value.to_list = AsyncMock(return_value=[])
+    pin_model = MagicMock()
+    pin_model.find.return_value.to_list = AsyncMock(return_value=pins)
+    with patch("app.models.activity.ActivityEvent", activity), \
+         patch("app.models.artifact.Artifact", artifact), \
+         patch("app.models.project.ProjectPin", pin_model), \
+         patch.object(project_service, "authorize_resource", AsyncMock(side_effect=authorize)):
+        await award_snapshot._activity(PROJECT, BOB)
+
+    query = artifact.find.call_args.args[0]
+    assert query["$or"][1] == {"uuid": {"$in": ["page-open"]}}
