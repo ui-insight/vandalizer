@@ -1,9 +1,15 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import datetime
 import secrets
 import uuid
 
 from beanie import PydanticObjectId
 
+if TYPE_CHECKING:
+    from app.config import Settings
 from app.models.folder import SmartFolder
 from app.models.team import Team, TeamInvite, TeamJoinLink, TeamMembership
 from app.models.user import User
@@ -121,7 +127,7 @@ async def update_team_name(
     if not team:
         raise ValueError("Team not found")
     _require_min_role(
-        await _get_membership(team.id, actor_user_id), "admin"
+        await _get_membership(persisted_team_id(team), actor_user_id), "admin"
     )
     team.name = name
     await team.save()
@@ -130,14 +136,14 @@ async def update_team_name(
 
 async def invite_member(
     team_uuid: str, email: str, role: str, actor_user_id: str,
-    settings=None,
+    settings: Settings | None = None,
 ) -> TeamInvite:
     """Invite a user to a team by email and send an invitation email."""
     team = await Team.find_one(Team.uuid == team_uuid)
     if not team:
         raise ValueError("Team not found")
     _require_min_role(
-        await _get_membership(team.id, actor_user_id), "admin"
+        await _get_membership(persisted_team_id(team), actor_user_id), "admin"
     )
 
     existing = await TeamInvite.find_one(
@@ -167,7 +173,7 @@ async def invite_member(
 
 
 async def _send_invite_email(
-    invite: TeamInvite, team: Team, inviter_user_id: str, settings=None,
+    invite: TeamInvite, team: Team, inviter_user_id: str, settings: Settings | None = None,
 ) -> None:
     """Send the invitation email."""
     from app.config import Settings
@@ -177,7 +183,7 @@ async def _send_invite_email(
         settings = Settings()
 
     inviter = await User.find_one(User.user_id == inviter_user_id)
-    inviter_name = inviter.name if inviter else inviter_user_id
+    inviter_name = (inviter.name or inviter.user_id) if inviter else inviter_user_id
 
     accept_url = f"{settings.frontend_url}/invite?token={invite.token}"
     subject, html = team_invite_email(inviter_name, team.name, invite.role, accept_url)
@@ -223,6 +229,9 @@ async def accept_invite(token: str, user: User) -> Team:
     ).days > INVITE_EXPIRY_DAYS:
         raise ValueError("Invite has expired")
 
+    if not user.email or user.email.strip().casefold() != invite.email.strip().casefold():
+        raise ValueError("Sign in with the email address this invitation was sent to")
+
     team = await Team.get(invite.team)
     if not team:
         raise ValueError("Team not found")
@@ -232,6 +241,15 @@ async def accept_invite(token: str, user: User) -> Team:
         TeamMembership.team == team.id,
         TeamMembership.user_id == user.user_id,
     )
+    # A register-then-accept retry is harmless for a current member, but a
+    # consumed email invitation must not restore access after removal or reapply
+    # an old elevated role after an administrator changes it.
+    if invite.accepted:
+        if not existing:
+            raise ValueError("Invitation already used; ask a team administrator for a new invitation")
+        user.current_team = team.id
+        await user.save()
+        return team
     if not existing:
         membership = TeamMembership(
             team=team.id, user_id=user.user_id, role=invite.role
@@ -329,7 +347,7 @@ async def notify_team_share(
         snippet = comment.strip().replace("\n", " ")
         body = f'"{item_name}" — {snippet[:160]}'
 
-    members = await get_team_members(team.id)
+    members = await get_team_members(persisted_team_id(team))
     settings: Settings | None = None
     for m in members:
         recipient_id = m.get("user_id")
@@ -368,7 +386,7 @@ async def switch_team(team_uuid: str, user: User) -> Team:
     team = await Team.find_one(Team.uuid == team_uuid)
     if not team:
         raise ValueError("Team not found")
-    membership = await _get_membership(team.id, user.user_id)
+    membership = await _get_membership(persisted_team_id(team), user.user_id)
     if not membership:
         raise ValueError("Not a member of this team")
     user.current_team = team.id
@@ -384,10 +402,10 @@ async def change_role(
     if not team:
         raise ValueError("Team not found")
 
-    actor_m = await _get_membership(team.id, actor_user_id)
-    _require_min_role(actor_m, "admin")
+    actor_m = await _get_membership(persisted_team_id(team), actor_user_id)
+    actor_m = _require_min_role(actor_m, "admin")
 
-    target_m = await _get_membership(team.id, target_user_id)
+    target_m = await _get_membership(persisted_team_id(team), target_user_id)
     if not target_m:
         raise ValueError("Target user is not a member")
 
@@ -415,10 +433,11 @@ async def remove_member(
     if not team:
         raise ValueError("Team not found")
 
+    target_m: TeamMembership | None
     is_self = target_user_id == actor_user_id
 
     if is_self:
-        actor_m = await _get_membership(team.id, actor_user_id)
+        actor_m = await _get_membership(persisted_team_id(team), actor_user_id)
         if not actor_m:
             raise ValueError("You are not a member of this team")
         if actor_m.role == "owner":
@@ -427,9 +446,9 @@ async def remove_member(
             )
         target_m = actor_m
     else:
-        actor_m = await _get_membership(team.id, actor_user_id)
-        _require_min_role(actor_m, "admin")
-        target_m = await _get_membership(team.id, target_user_id)
+        actor_m = await _get_membership(persisted_team_id(team), actor_user_id)
+        actor_m = _require_min_role(actor_m, "admin")
+        target_m = await _get_membership(persisted_team_id(team), target_user_id)
         if not target_m:
             raise ValueError("Target user is not a member")
         if target_m.role == "owner":
@@ -505,11 +524,11 @@ async def transfer_ownership(
     if not team:
         raise ValueError("Team not found")
 
-    current_m = await _get_membership(team.id, current_owner_id)
+    current_m = await _get_membership(persisted_team_id(team), current_owner_id)
     if not current_m or current_m.role != "owner":
         raise ValueError("Only the team owner can transfer ownership")
 
-    new_m = await _get_membership(team.id, new_owner_id)
+    new_m = await _get_membership(persisted_team_id(team), new_owner_id)
     if not new_m:
         raise ValueError("New owner must be a member of the team")
 
@@ -534,7 +553,7 @@ async def delete_team(team_uuid: str, actor_id: str) -> bool:
     if not team:
         raise ValueError("Team not found")
 
-    actor_m = await _get_membership(team.id, actor_id)
+    actor_m = await _get_membership(persisted_team_id(team), actor_id)
     if not actor_m or actor_m.role != "owner":
         raise ValueError("Only the team owner can delete the team")
 
@@ -584,7 +603,7 @@ async def create_join_link(
     if not team:
         raise ValueError("Team not found")
     _require_min_role(
-        await _get_membership(team.id, actor_user_id), "admin"
+        await _get_membership(persisted_team_id(team), actor_user_id), "admin"
     )
 
     link = TeamJoinLink(
@@ -608,7 +627,7 @@ async def get_team_join_links(
     if not team:
         raise ValueError("Team not found")
     _require_min_role(
-        await _get_membership(team.id, actor_user_id), "admin"
+        await _get_membership(persisted_team_id(team), actor_user_id), "admin"
     )
 
     links = await TeamJoinLink.find(
@@ -722,6 +741,13 @@ async def accept_join_link(token: str, user: User) -> Team:
 
 # --- helpers ---
 
+def persisted_team_id(team: Team) -> PydanticObjectId:
+    """A membership query must identify a persisted team."""
+    if team.id is None:
+        raise ValueError("Team has not been saved")
+    return team.id
+
+
 async def _get_membership(
     team_id: PydanticObjectId, user_id: str
 ) -> TeamMembership | None:
@@ -731,8 +757,9 @@ async def _get_membership(
     )
 
 
-def _require_min_role(membership: TeamMembership | None, min_role: str) -> None:
+def _require_min_role(membership: TeamMembership | None, min_role: str) -> TeamMembership:
     if not membership:
         raise ValueError("Not a member of this team")
     if ROLE_RANK.get(membership.role, 99) > ROLE_RANK.get(min_role, 99):
         raise ValueError(f"Requires at least {min_role} role")
+    return membership

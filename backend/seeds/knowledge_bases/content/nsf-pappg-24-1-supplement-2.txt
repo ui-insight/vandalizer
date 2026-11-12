@@ -1,0 +1,132 @@
+NSF PAPPG (NSF 24-1) — Supplement 2 (NSF 26-202)
+Source: https://www.nsf.gov/policies/document/pappg24-1-supplement-2
+
+Policies and Procedures
+
+## Policy Notice: Implementation of Policy Changes to Proposal and Award Policies and Procedures Guide (PAPPG) 24-1, Supplement 2
+
+The information set out in this notice takes precedence over existing policies and procedures in PAPPG 24-1. It applies for all financial assistance awarded on or after Jan. 22, 2026.
+
+### Issuance date
+
+Jan. 22, 2026
+
+### Effective date
+
+Jan. 22, 2026
+
+### Applies to
+
+U.S. National Science Foundation (NSF) grants and cooperative agreements
+
+### Subject
+
+Implementation of Policy Changes to Proposal and Award Policies and Procedures Guide (PAPPG) 24-1, Supplement 2
+
+### Purpose
+
+This notice implements revisions to NSF's Proposal and Award Policies and Procedures Guide (PAPPG). It takes precedence over existing policies and procedures set forth in the 24-1 version of the PAPPG for all financial assistance awarded on or after the effective date of this notice or the respective dates set in notices cited in this notice.
+
+In addition, NSF is updating its Research.gov Project Reports and Public Access Repository systems to align with the agency's Gold Standard Science implementation plan.
+
+### Background
+
+While publication of the PAPPG has been deferred, NSF will continue to publish financial assistance policies to advance administration priorities, implement statutes, memorialize current practices, and implement other time sensitive matters. NSF will issue policy changes via NSF supplemental Policy Notices in the interim.1
+
+Changes to the NSF Public Access Repository (PAR) include:
+
+- Removing the 12-month publication embargo from all Portable Document Format (PDF) product types.
+- Enabling input of Author Accepted Manuscripts (AAM) and Version of Record (VoR).
+- Making machine-readable versions of publications in Extensible Markup Language (XML) format available for download.
+- Enabling PAR Identifiers (IDs) to behave as Persistent Identifiers (PID), similar to Digital Object Identifiers (DOIs).
+
+Changes to Research.gov Project Reports include:
+
+- Auto-populating PAR IDs as Persistent ID links from PAR into Project Reports for journal articles, conference papers, datasets and workshop reports.
+- Auto-populating Author Accepted Manuscript (AAM) and Version of Record (VOR) metadata from PAR into Project Reports for journal articles, conference papers and workshop reports.
+- Prohibiting direct dataset entry into project reports within Research.gov.
+
+### Policy revisions
+
+The following sections of the PAPPG are revised to align with NSF's Gold Standard Science implementation plan:
+
+- Public Access to Research Products (Chapter XI.D.2.c)
+- Dissemination and Sharing of Research Results (Chapter XI.D.4)
+- Data Management and Sharing Plan (Chapter II.D.2.(i).(ii))
+
+#### 1. Public Access to Research Products
+
+Chapter XI.D.2.c is revised to provide detailed guidance on the required sharing of research products under NSF's Public Access Policy. More information about the policy, including help guides, can be accessed on Research.gov. The following underlined text replaces previous text and strikethrough text is removed in the sections as specified:
+
+- NSF's policy on public access to copyrighted material research products (Public Access Policy) reflects the Foundation's commitment to making certain that, to the extent possible, the American public, industry and the scientific community have access to the results of Federally funded scientific research. Pursuant to this policy, recipients must ensure the following for research products arising from NSF awards: that articles in peer-reviewed scholarly journals and papers in juried conference proceedings:
+
+- are deposited in NSF’s Public Access Repository;
+- are available for download, reading, and analysis within 12 months of publication;
+- possess a minimum set of machine-readable metadata elements as described in the Public Access Policy; and Proposal & Award Policies & Procedures Guide XI-18 NSF 24-1
+- are reported in annual and final reports with a persistent identifier. Either the final printed version or the final peer-reviewed manuscript is acceptable for deposit
+
+-
+Author's Accepted Manuscript (AAM) Deposit: Final versions of manuscripts accepted for publication after peer-review in either scholarly journals or juried conference papers or workshop proceedings (collectively referred to as author's accepted manuscripts or AAMs) must be deposited in NSF's Public Access Repository (PAR) at or before the time of publication. Further, such deposits are required for these products to be included as part of the annual project reporting process.
+
+Deposit of AAMs into PAR fulfills NSF public access requirements for publications and does not require payment of special fees to publishers or other third parties. Special fees for the purpose of making published versions of record (VORs) publicly accessible are allowable costs but such payments are not required for deposits of AAMs in PAR.
+
+- Dataset Sharing: Scientific datasets underlying peer-reviewed scholarly publications resulting from federally funded research should be made publicly available as per the Data Management and Sharing Plan (See PAPPG Chapter II.D.2.i(ii)) of the associated award.
+- Persistent Identifiers (PIDs): Existing PIDs associated with any PAR entry must be included in the PAR record (e.g., a Digital Object Identifier (DOI) assigned to a VOR). Researchers are encouraged to deposit datasets in online repositories which assign them a PID. If no PIDs are associated with an item being deposited in PAR, minimal descriptive metadata (see below) should be entered manually. Note that upon the completion of a PAR deposit, the new entry is assigned a PARID that also functions as a PID.
+- Metadata: AAMs and datasets should possess a minimum set of descriptive metadata elements as specified in the annual project reporting requirements. These metadata elements are normally supplied automatically via the PID; if one is not yet available at the time of submission to PAR, metadata must be manually entered.
+
+Each NSF award contains, as part of the award general terms and conditions, an article implementing the public access requirements.
+
+#### 2. Dissemination and Sharing of Research Results
+
+Chapter XI.D.4 is revised to clarify the expectations of investigators to publicly share information and enable public reuse of information. The following underlined text replaces previous text and strikethrough text is removed in the sections as specified:
+
+- b. Investigators are expected to publicly share with other researchers, at no more than incremental cost and within a reasonable time, the primary data, samples, physical collections, software, inventions, curriculum material, and other supporting materials created or gathered in the course of work under NSF awards. Recipients are expected to encourage and facilitate such sharing. Privileged or confidential information should be released only in a form that protects the privacy of individuals and subjects involved. Exceptions to this sharing expectation requirement may be requested by the recipient to, for example, for a particular field or discipline to safeguard the privacy and rights of individuals and subjects, the validity of results, the integrity of collections, or to accommodate the legitimate interest of investigators. These exceptions must be detailed in the DMSP at the time of original proposal submission (see PAPPG Chapter II.D.2.i.(ii)). A recipient or investigator also may must obtain prior written approval request a particular adjustment or exception from the cognizant NSF Program Officer to make an adjustment or exception to the DMSP if such a change constitutes a change in objectives or scope (see PAPPG Chapter VII.B.1. for additional information).
+- c. Investigators and recipients are encouraged to share software and inventions created under the award or otherwise make them or their products widely available and usable.
+- d. c. NSF normally allows recipients to retain principal legal rights to intellectual property developed under NSF awards to provide incentives for development and dissemination of inventions, software and publications that can enhance their usefulness, accessibility, and upkeep. However, whenever such incentives are not deemed pertinent, such material should be assigned permissive licenses that allow for public reuse.Such Further, these incentives do not however, reduce the responsibility that investigators and organizations have as members of the scientific and engineering community, to make results, data, and collections available to other researchers.
+
+#### 3. Data Management and Sharing Plan
+
+Note: The Research.gov tool referred to in this section will be released on April 27, 2026. Proposals submitted before that date should continue preparing the DMSP as a PDF upload.
+
+Chapter II.D.2.(i).(ii) is revised to specify the requirements on Research.gov for applicants to follow for submission of their data management and sharing plans. The following underlined text replaces previous text and strikethrough text is removed in the sections as specified:
+
+- (ii) Data Management and Sharing Plan (DMSP). Proposals must include a DMSP created using the tool implemented on Research.gov. a document of no more than two pages uploaded under “Data Management and Sharing Plan” in the supplementary documentation section of Research.gov. This supplementary document should describe how the proposal will conform to NSF policy on the dissemination and sharing of research results (see Chapter XI.D.4). Recipients are required to share all data supporting NSF funded publications at the time of publication. Exceptions to this sharing requirement must be described and justified within the DMSP.
+- , and may include: 1. the types of data, samples, physical collections, software, curriculum materials, and other materials to be produced in the course of the project; 2. the standards to be used for data and metadata format and content (where existing standards are absent or deemed inadequate, this should be documented along with any proposed solutions or remedies); 3. policies for access and sharing including provisions for appropriate protection of privacy, confidentiality, security, intellectual property, or other rights or requirements; 4. policies and provisions for re-use, re-distribution, and the production of derivatives; and 5. plans for archiving data, samples, and other research products, and for preservation of access to them.
+- Data management and sharing requirements and plans specific to the Directorate, Office, Division, Program, or other NSF unit, relevant to a proposal are available on the NSF website. If guidance specific to the program unit is not available, then the requirements established in this section apply. Simultaneously submitted collaborative proposals and proposals that include subawards are a single unified project and should include only one supplemental combined Data Management and Sharing Plan DMSP, regardless of the number of non-lead collaborative proposals or subawards included.. In such collaborative proposals, the Data Management and Sharing Plan should discuss the relevant data issues in the context of the collaboration.
+- Proposers who feel that the plan cannot fit within the limit of two pages may use part of the 15-page Project Description for additional data management information. Proposers are advised that the Data Management and Sharing Plan must not be used to circumvent the 15-page Project Description limitation. The DMSPData Management and Sharing Plan will be reviewed as an integral part of the proposal, considered under Intellectual Merit or Broader Impacts or both, as appropriate for the scientific community of relevance.
+- A valid Data Management and Sharing Plan DMSP may include only the statement that no detailed plan is needed, for example, if no data, samples, physical collections, software, curriculum materials, or other materials are to be produced in the course of the project. However, such a statement must be accompanied by a clear justification.
+
+### Contact information
+
+For questions or further clarification, please contact:
+
+U.S. National Science Foundation
+Office of Award Management
+Financial Assistance Requirements Branch
+Email: policy@nsf.gov
+
+1. NSF issued Federal Register Notice, U.S. National Science Foundation Proposal/Award Information - NSF Proposal and Award Policies and Procedures Guide, 89 Fed. Reg. 100,549 (Dec. 12, 2024) on December 12, 2024 to seek public comments on many of the policies identified in this notice.
+
+###
+Additional resources
+
+-
+Supplement 1 to PAPPG 24-1
+
+-
+PAPPG 24-1
+
+This policy document contains current agency information.
+
+Publication number:
+
+NSF 26-202
+
+###
+Share
+
+Share on FacebookShare on X (formerly known as Twitter)Share on LinkedInEmail
+
+Published:
+
+January 22, 2026

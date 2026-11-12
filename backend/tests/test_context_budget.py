@@ -827,3 +827,28 @@ def test_an_unreadable_settings_object_still_falls_back_to_the_default(tmp_path,
     # Falls back to the default and finds it, rather than reading the failure
     # as an operator opt-out.
     assert cb.resolve_exact_tokenizer("Fake/Defaulted", {}) is not None
+
+
+# ---------------------------------------------------------------------------
+# The cut-to-fit note is signed, and chat is told whose it is
+# ---------------------------------------------------------------------------
+
+
+def test_cut_notes_say_they_are_not_part_of_the_file():
+    """Support ticket: with a large Excel file attached, chat told the user
+    their file "contains internal notes addressed to an AI (e.g., 'Read the
+    omitted part…')". That note is Vandalizer's, written where the file was cut.
+    """
+    from app.services.context_budget import (
+        _DOCUMENT_CUT_MARKER,
+        _FILE_CUT_MARKER,
+        CUT_NOTE_PREFIX,
+    )
+    from app.services.llm_service import AGENTIC_CHAT_SYSTEM_PROMPT, DOCUMENT_CHAT_RULES
+
+    for marker in (_DOCUMENT_CUT_MARKER, _FILE_CUT_MARKER):
+        assert marker.strip().lstrip("…").startswith(CUT_NOTE_PREFIX)
+    # Both chat modes that flag AI-addressed document text exempt the note.
+    for prompt in (AGENTIC_CHAT_SYSTEM_PROMPT, DOCUMENT_CHAT_RULES):
+        assert f"'{CUT_NOTE_PREFIX}' is from Vandalizer" in prompt
+        assert "never describe it as document content or flag it" in prompt

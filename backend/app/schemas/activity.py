@@ -11,6 +11,8 @@ class ActivityEventResponse(BaseModel):
     status: str
     title: Optional[str] = None
     conversation_id: Optional[str] = None
+    source_conversation_id: Optional[str] = None
+    document_titles: list[str] = []
     search_set_uuid: Optional[str] = None
     workflow_id: Optional[str] = None
     started_at: Optional[str] = None

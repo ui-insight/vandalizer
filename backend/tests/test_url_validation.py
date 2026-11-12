@@ -191,3 +191,26 @@ class TestNormalizeAllowedHost:
         with patch("app.config.Settings") as MockSettings:
             MockSettings.return_value.outbound_url_allowed_hosts = "router.example.edu"
             assert validate_outbound_url("https://router.example.edu/v1/search")
+
+
+class TestAllowlistNeverExemptsLocalRanges:
+    """An allowlisted name may reach RFC 1918 space, never loopback,
+    link-local (cloud metadata) or reserved ranges: a listed name that
+    resolves there is DNS rebinding or a misconfiguration."""
+
+    @pytest.mark.parametrize("address", ["127.0.0.1", "169.254.169.254", "240.0.0.1"])
+    def test_listed_host_is_still_blocked(self, address):
+        with patch(
+            "app.utils.url_validation.socket.getaddrinfo",
+            return_value=[(2, 1, 6, "", (address, 443))],
+        ):
+            with pytest.raises(ValueError, match="blocked IP"):
+                validate_outbound_url(
+                    "https://router.example.edu/", allowed_hosts=frozenset({"router.example.edu"}),
+                )
+
+    def test_ssrf_allowed_hosts_is_read_alongside_the_outbound_setting(self):
+        with patch("app.config.Settings") as MockSettings:
+            MockSettings.return_value.outbound_url_allowed_hosts = "env.example.edu"
+            MockSettings.return_value.ssrf_allowed_hosts = "MindRouter.Example.edu"
+            assert env_allowed_hosts() == frozenset({"env.example.edu", "mindrouter.example.edu"})

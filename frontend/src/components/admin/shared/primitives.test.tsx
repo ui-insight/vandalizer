@@ -18,7 +18,7 @@ describe('TrendDelta', () => {
   it('renders an increase as "good" (green) by default', () => {
     render(<TrendDelta current={20} previous={10} />)
     const el = screen.getByText('+100%')
-    expect(el.style.color).toBe('rgb(22, 163, 74)')
+    expect(el.style.color).toBe('rgb(21, 128, 61)')
   })
 
   it('invert flips an increase to "bad" (red) styling', () => {
@@ -30,7 +30,7 @@ describe('TrendDelta', () => {
   it('invert flips a decrease to "good" (green) styling', () => {
     render(<TrendDelta current={5} previous={10} invert />)
     const el = screen.getByText('-50%')
-    expect(el.style.color).toBe('rgb(22, 163, 74)')
+    expect(el.style.color).toBe('rgb(21, 128, 61)')
   })
 })
 

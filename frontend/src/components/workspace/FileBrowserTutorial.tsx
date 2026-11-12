@@ -210,7 +210,7 @@ export function FileBrowserTutorial({ highlighted }: { highlighted?: boolean }) 
         height={185}
         style={{ overflow: 'visible', maxWidth: '100%' }}
       />
-      <p style={{ fontSize: 13, color: '#6b7280', marginTop: 8, textAlign: 'center', maxWidth: 300 }}>
+      <p style={{ fontSize: 13, color: '#555e68', marginTop: 8, textAlign: 'center', maxWidth: 300 }}>
         Upload PDFs, Word docs, or spreadsheets using the Add button above
       </p>
     </div>

@@ -7,7 +7,6 @@
     "seed_id": "wf-pre-award-compliance-checker",
     "display_name": "Sponsor Compliance Checker",
     "description": "Checks a proposal against solicitation requirements, identifying formatting violations, missing sections, and eligibility concerns.",
-    "quality_tier": "excellent",
     "collections": [
       "pre-award",
       "compliance"
@@ -44,6 +43,34 @@
               }
             }
           ]
+        }
+      ],
+      "validation_plan": [
+        {
+          "id": "19c0726b-9405-5eaa-892e-c707e3b9096b",
+          "name": "Figures match the source",
+          "category": "accuracy",
+          "description": "Every page limit, font size, margin, dollar limit, deadline and date in the output appears in the source document with the same value, unit and (for dates) year. A figure the output calculated says how it was calculated and the arithmetic is right. FAIL if any value differs from the source, or appears with no basis in it."
+        },
+        {
+          "id": "bb6ef80c-35a1-5f87-b392-1939e8de01e2",
+          "name": "Every solicitation requirement is rated",
+          "category": "completeness",
+          "description": "Each requirement the solicitation states (limits, required sections and material, certifications, budget constraints, eligibility, deadline) is rated against the proposal. Where an amendment changes a requirement, the amended requirement is the one applied. FAIL for each requirement skipped or checked against a superseded version."
+        },
+        {
+          "id": "8070eb0d-d514-5bd3-9f59-65cd9ab306cd",
+          "name": "No clearance without evidence",
+          "category": "content",
+          "description": "Every favourable conclusion (compliant, within limits, eligible) rests on something the document states. Where the document does not give enough to decide, the output says the item could not be determined and what is needed. FAIL if the output calls something compliant, complete, allowable or low-risk without stated support."
+        }
+      ],
+      "validation_inputs": [
+        {
+          "id": "aeaa1a6e-f544-59c7-8de3-5a39e95bafab",
+          "type": "text",
+          "label": "Fictional solicitation, amendment and proposal draft. Answer key: the $200,000 direct-cost request exceeds the $180,000 cap by $20,000; budget arithmetic adds up (120,000 + 30,000 + 20,000 + 30,000 = 200,000; total 250,000) and indirect is 25% of direct; the budget justification is missing; the signed partner letter has not been received (a promise is not a letter); the draft still tracks the superseded November 12 deadline (now November 19, 2026, 5:00 p.m. Pacific Time); no page limit or exception is stated.",
+          "text": "FICTIONAL QA MATERIAL — NOT A REAL FUNDING OPPORTUNITY\nSource ID: notice-v1\nCommunity Resilience Pilot — original notice, October 1, 2026\n\n1. Eligibility\nAn application must be submitted by a university research office. Each university\nmay submit one application. This notice does not specify citizenship eligibility.\n\n2. Dates\nThe sponsor deadline is November 12, 2026 at 5:00 p.m. Pacific Time.\nThe institutional review deadline is November 9, 2026 at noon Pacific Time.\nThe project period is July 1, 2027 through June 30, 2028.\n\n3. Budget\nThe maximum direct-cost request is $180,000. Indirect costs are additional and\nmay not exceed 25% of direct costs. Equipment purchases are not permitted.\nTravel and subaward costs are allowed within the direct-cost limit.\nThis notice does not give an exception or waiver process.\n\n4. Required material\nInclude a project narrative, an itemized budget, a budget justification and one\nsigned community-partner letter. The letter must arrive with the application.\nThe notice does not specify a page limit for the budget justification.\n\nFICTIONAL QA MATERIAL — NOT A REAL FUNDING OPPORTUNITY\nSource ID: amendment-v2\nCommunity Resilience Pilot — official amendment, October 8, 2026\n\nThis amendment supersedes the sponsor deadline in section 2 of notice-v1.\nThe new sponsor deadline is November 19, 2026 at 5:00 p.m. Pacific Time.\nThe institutional review deadline remains November 9, 2026 at noon Pacific Time.\nAll other requirements, limits and project dates in notice-v1 remain unchanged.\n\nFICTIONAL QA MATERIAL — NOT A REAL PROPOSAL\nSource ID: proposal-draft\nCommunity Resilience Pilot — working proposal, October 6, 2026\nPrincipal investigator: Avery Example\nInternal tracking deadline: November 12, 2026 at 5:00 p.m. Pacific Time\nProject period: July 1, 2027 through June 30, 2028\n\nDraft budget\nPersonnel: $120,000\nTravel: $30,000\nSupplies: $20,000\nSubaward: $30,000\nDirect-cost total: $200,000\nIndirect costs: $50,000\nTotal request: $250,000\nEquipment: $0\n\nReadiness notes\nThe project narrative and itemized budget are attached to the internal record.\nThe budget justification is not yet attached. A partner has promised a letter,\nbut a signed letter has not been received. No sponsor exception is documented."
         }
       ]
     }

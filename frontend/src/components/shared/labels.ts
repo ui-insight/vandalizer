@@ -19,7 +19,8 @@ export interface DomainLabels {
   scoreFloorLabel: string
   scoreFloorDescription: string
   /** Suffix on the lift number ("better than no baseline"). */
-  liftLabel: string
+  /** What the optimizer's best-so-far score is compared against. */
+  baselineName: string
 }
 
 export const DOMAIN_LABELS: Record<AutovalidateDomain, DomainLabels> = {
@@ -31,8 +32,8 @@ export const DOMAIN_LABELS: Record<AutovalidateDomain, DomainLabels> = {
     },
     scoreFloorLabel: 'Score to beat (model alone)',
     scoreFloorDescription:
-      'How well the model answers without your knowledge base — the tuned KB needs to clear this bar to be worth keeping.',
-    liftLabel: 'better than the model alone',
+      'How well the model answers without your knowledge base. The tuned KB needs to clear this bar to be worth keeping.',
+    baselineName: 'the model alone',
   },
   extraction: {
     baselineTile: {
@@ -42,8 +43,8 @@ export const DOMAIN_LABELS: Record<AutovalidateDomain, DomainLabels> = {
     },
     scoreFloorLabel: 'Score to beat (no custom settings)',
     scoreFloorDescription:
-      'How well extraction performs with no custom settings — the tuned result needs to clear this bar to be worth keeping.',
-    liftLabel: 'better than no custom settings',
+      'How well extraction performs with no custom settings. The tuned result needs to clear this bar to be worth keeping.',
+    baselineName: 'no custom settings',
   },
   workflow: {
     baselineTile: {
@@ -53,7 +54,7 @@ export const DOMAIN_LABELS: Record<AutovalidateDomain, DomainLabels> = {
     },
     scoreFloorLabel: 'Score to beat (LLM alone)',
     scoreFloorDescription:
-      'How well a single-shot LLM call performs without the workflow — the tuned workflow needs to clear this bar to be worth keeping.',
-    liftLabel: 'better than the LLM alone',
+      'How well a single-shot LLM call performs without the workflow. The tuned workflow needs to clear this bar to be worth keeping.',
+    baselineName: 'the LLM alone',
   },
 }

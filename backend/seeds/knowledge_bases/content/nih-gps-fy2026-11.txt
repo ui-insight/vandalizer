@@ -1,0 +1,1748 @@
+NIH Grants Policy Statement (FY 2026 revision) — Chapter 11: Ruth L. Kirschstein National Research Service Awards
+Source: https://grants.nih.gov/policy-and-compliance/nihgps
+
+11 RUTH L. KIRSCHSTEIN NATIONAL RESEARCH
+SERVICE AWARDS
+11.1 GENERAL
+This chapter includes general information about Kirschstein-NRSA individual fellowships and institutional research training grants. Separate but all-inclusive sections are provided for each; therefore some
+information may appear duplicative but is provided separately so that nuances between individual fellowships and institutional training grants are covered. Many of the requirements of IIA also apply; this
+chapter of IIB includes appropriate cross-references to IIA when applicable.
+11.1.1 Background
+Section 487 of the PHS Act (42 U.S.C. 288) provides authority for NIH to award Kirschstein-NRSA individual fellowships to support predoctoral and postdoctoral training of individuals to undertake biomedical, behavioral, or clinical research at domestic and foreign, public and private institutions (profit
+and non-profit). Section 487(a)(1)(B) authorizes Kirschstein-NRSA institutional research training grants
+and limits institutional Kirschstein-NRSA support to training and research at domestic public and nonprofit private entities. The legislation requires postdoctoral NRSA recipients to pay back to the Federal
+government their initial 12 months of Kirschstein-NRSA postdoctoral support by engaging in healthrelated biomedical, behavioral and/or clinical research, health related research training, health-related
+teaching, or any combination of these activities. (See Payback Requirements in this chapter.) The regulations at 42 CFR Part 66 apply to these awards.
+11.1.2 Nondiscrimination
+The Kirschstein-NRSA program is conducted in compliance with applicable laws that provide that no
+person shall, on the grounds of race, color, national origin, handicap, or age, be excluded from participation in, be denied the benefits of, or be subjected to discrimination under any program or activity
+(or, on the basis of sex, with respect to any education program or activity) receiving Federal assistance.
+Applicant organizations are required to have appropriate Assurance of Compliance forms filed with
+HHS’s OCR before a grant may be made to that institution. The NIH awarding IC should be contacted if
+there are any questions concerning compliance. (See Public Policy Requirements and Objectives—Civil
+Rights in IIA for detailed requirements.)
+11.2 INDIVIDUAL FELLOWSHIPS
+11.2.1 General
+The Kirschstein-NRSA program helps ensure that  highly trained scientists are available in adequate numbers and in appropriate research areas to carry out the Nation’s biomedical, behavioral, and clinical
+research agenda. Fellowship activities can be in basic biomedical or clinical sciences, in behavioral or
+social sciences, in health services research, or in any other discipline relevant to the NIH mission. Under
+this authority, NIH awards individual postdoctoral fellowships (F32) to promising applicants with the
+potential to become productive, independent investigators in fields related to the mission of the NIH ICs.
+Individual predoctoral fellowships for research doctoral dissertation training (F31), Individual predoctoral fellowships for MD/PhD and other dual clinical / research doctoral training (F30), and Senior
+(GPS page IIB-30)
+
+Fellowships (F33), are also provided under this authority. For individual predoctoral fellowships, NIH
+ICs have differing requirements; specific NOFOs should be consulted for guidance.
+Kirschstein-NRSA fellowships are awarded as a result of national competition for research training in
+specified health-related areas. All NIH ICs have authority to award Kirschstein-NRSA fellowships. FIC
+and NLM also have unique funding authorities for fellowships that are not under the Kirschstein-NRSA
+authority.
+11.2.2 Eligibility
+11.2.2.1 Research Areas
+Kirschstein-NRSA fellowships may be made for research training in areas that fall within the missions of
+the NIH ICs. Applications that do not address these areas will be returned. An increased emphasis has
+been placed on the research training of physicians. The HHS Secretary is required by law, in taking into
+account the overall national needs for biomedical research personnel, to give special consideration to
+physicians who agree to undertake a minimum of 2 consecutive years of biomedical, behavioral, or clinical research training. NIH recognizes the critical importance of training clinicians to become researchers
+and encourages them to apply. For those who have a doctoral-level health professional degree, the proposed training may be used to satisfy a portion of the degree requirements for a master’s degree, a doctoral degree, or any other advanced research degree program.
+11.2.2.2 Research Training Program
+The Kirschstein-NRSA fellowship must be used to support a program of research training. It may not
+support studies leading to M.D., D.O., D.D.S., D.V.M., or other similar clinical, health professional
+degrees except when those studies are part of a formal combined research degree program such as the
+M.D./Ph.D. Similarly, Kirschstein-NRSA fellowships may not support the clinical portion of residency
+training. Research fellows in clinical areas are expected to devote full time effort to the proposed
+research training and to confine clinical duties to those that are part of the research training.
+11.2.2.3 Degree Requirements
+Predoctoral Training. Individuals must have received, as of the activation date of their Kirschstein-
+NRSA predoctoral fellowship award, a baccalaureate degree or equivalent and must be enrolled in and
+training at the postbaccalaureate level in a program leading to the award of a Ph.D. or equivalent
+research degree program (e.g., Eng.D., D.N.Sc., Dr.P.H., D.S.W., Pharm.D, Sc.D.), a formally combined
+MD/PhD, or other combined professional/clinical and research doctoral program (eg., D.O./Ph.D.,
+D.D.S./Ph.D., D.V.M./Ph.D.) in basic biomedical, behavioral, or clinical sciences, in behavioral or social
+sciences or in health services research.
+Postdoctoral Training. Before a Kirschstein-NRSA postdoctoral fellowship award can be activated, individuals must have received a Ph.D., M.D., D.D.S, D.M.D., D.C., D.O., D.V.M., O.D., D.P.M., Sc.D.,
+Eng.D., Dr. P.H., D.N.Sc., D.P.T., Pharm.D., N.D., D.S.W., Psy.D., or equivalent doctoral degree from
+an accredited domestic or foreign organization. Also acceptable is a statement by an AOR of the degreegranting institution that all degree requirements have been met. It is the responsibility of the sponsoring
+institution, not NIH, to determine if a foreign degree is equivalent.
+Senior Fellows. As of the beginning date of their award, senior fellows must have a doctoral degree (as
+specified in Postdoctoral training referenced above) and at least 7 subsequent years of relevant research
+and professional experience. The senior fellowship is awarded to provide opportunities for experienced
+scientists to make major changes in the direction of their research careers or to broaden their scientific
+backgrounds by acquiring new research capabilities. In addition, these awards will enable individuals
+(GPS page IIB-31)
+
+who are beyond the new investigator stage to take time from regular professional responsibilities to
+enhance their capabilities to engage in health-related research. Senior fellowships are made for full-time
+research training.  More information on the senior fellowship program can be found in the NIH
+Kirschstein-NRSA Senior Fellows (F33) program announcement available on the NIH Research Training
+and Career Development website.
+11.2.2.4 Citizenship
+The individual to be trained must be a citizen or a noncitizen national of the United States or have been
+lawfully admitted for permanent residence by the time of award. Noncitizen nationals are individuals,
+who, although not citizens of the United States, owe permanent allegiance to the United States. They generally are people born in outlying possessions of the United States (e.g., American Samoa and Swains
+Island). Individuals who have been lawfully admitted for permanent residence must have a currently
+valid Permanent Resident Card (USCIS Form I-551) or other legal verification of such status. For
+example, if an individual has the proper validation on their passport, a notarized photocopy of the passport could suffice. Because there is a 6-month limitation on this validation, it is the responsibility of the
+sponsoring institution to follow up and ensure that the individual receives the I-551 before the 6-month
+expiration date.
+An individual expecting to be admitted as a permanent resident by the earliest possible award date listed
+in the Kirschstein-NRSA individual fellowship program announcement may submit an application for a
+fellowship. The submission of documentation concerning permanent residency is not required as part of
+the initial application. Any fellowship applicant selected to receive an award must provide a notarized
+statement of admission for permanent residence prior to award.
+Fellowship applicants who have been lawfully admitted for permanent residence, i.e., have a Permanent
+Resident Card or other legal verification of such status, should check the Permanent Resident box in the
+citizenship section on the PHS Fellowship Supplemental Form of the fellowship application. Fellowship
+applicants who have applied for and have not yet been granted admission as a permanent resident should
+check the box indicating Permanent Resident of U.S. Pending.
+Individuals with a Conditional Permanent Residency Status may still apply for individual fellowships.
+However, in all cases when permanent residency status is involved, it is the responsibility of the sponsoring institution to assure the individual remains eligible for NRSA support for the period of time of
+any award.
+Individuals with Asylum/Refugee status do not automatically hold a type of permanent residency status;
+they have the opportunity to apply for permanent residency status once they have been in the U.S. for a
+period of time. Therefore, individuals with Asylum/Refugee status should only submit an individual fellowship application once they have applied for permanent residency status.
+When an application involving Permanent Residency is selected to receive an award, prior to any award
+being issued, a notarized statement will be required that documents that a licensed notary has seen the
+individual’s valid Permanent Resident Card or other valid verification from the U.S. Immigration and
+Naturalization Service of legal admission to the U.S.
+Individuals on temporary or student visas are not eligible to apply for Kirschstein-NRSA individual fellowships unless they have begun the process for becoming a permanent resident and expect to be admitted as a permanent resident by the earliest possible award date.
+11.2.2.5 Sponsorship
+General. Before submitting a Kirschstein-NRSA individual fellowship application, the fellowship applicant must identify a sponsoring institution and an individual who will serve as a sponsor (also called
+(GPS page IIB-32)
+
+mentor or supervisor) and supervise the training and research experience. The sponsoring institution may
+be domestic or foreign, public or private (for-profit or non-profit), including NIH intramural programs,
+other Federal laboratories, and units of State and local governments. The sponsoring institution is legally
+responsible for providing facilities for the applicant and financially responsible for the use and disposition of any funds awarded based on the application. The sponsor should be an active investigator in
+the area of the proposed research who will directly supervise the fellow’s research. The sponsor must
+document in the application the training plan for the applicant as well as the availability of staff, research
+support, and facilities for high-quality research training. In most cases, postdoctoral fellowships support
+research training experiences in new settings in order to maximize acquisition of new skills and knowledge. Therefore, postdoctoral fellowship applicants proposing training at their doctoral institution must
+document thoroughly the opportunity for new training experiences designed to broaden their scientific
+backgrounds. In addition, the application should propose research experiences that will allow the fellow
+to acquire new knowledge and/or technical skills that will enhance their potential to become a productive, independent investigator.
+Foreign Sponsorship. An individual may request support for training abroad. In such cases, the fellowship applicant is required to provide detailed justification for the foreign training, including the reasons why the facilities, the mentor, or other aspects of the proposed experience are more appropriate than
+training in a domestic setting. The justification is evaluated in terms of the scientific advantages of the
+foreign training as compared to the training available domestically. Foreign training may require additional administrative reviews and will be considered for funding only when the scientific advantages are
+clear.
+11.2.2.6 NIH Employees & Other Federal Sponsorship (Federal Fellows)
+Both civil service employees and PHS commissioned officers at NIH and other Federal laboratories are
+permitted to compete for predoctoral and postdoctoral fellowships. The proposed training should be
+primarily for career development rather than for the immediate research needs of NIH or the other
+Federal laboratory. When at an NIH laboratory, the employee’s supervisor must disassociate themselves
+from the review and award process.
+An individual at NIH or another Federal laboratory who is supported under an individual fellowship may
+not also hold an employee position with the Federal Government. Therefore, successful fellowship applicants for predoctoral or postdoctoral awards must either resign from NIH or the other Federal laboratory
+or take LWOP before activating the award. (There is no obligation or commitment by either the Federal
+agency or the fellow for future employment upon termination of the fellowship.)
+Support provided for Federal fellows is similar to those at non-Federal sponsoring institutions; stipends,
+tuition (when applicable), and institutional allowance are provided. However, the administration and payment of these fellowships is unique. Specifics are noted in the applicable sections below. This requirement does not apply to employees of facilities that are Government-owned but Contract-operated, as they
+are not considered Federal laboratories.
+11.2.2.7 Individuals on Active Military Duty
+NIH does not restrict career military personnel from applying for Kirschstein-NRSA individual fellowship awards while on active military duty. At the time of application, the fellowship applicant’s
+branch of the military service should submit a letter endorsing their application and indicating willingness to continue normal active duty pay and allowances during the period of the requested fellowship.
+If an award is made, the institutional allowance and necessary tuition and fees permitted on a postdoctoral program will be paid by NIH. However, stipends, health insurance, and travel allowances are not
+allowable charges to a Kirschstein-NRSA individual fellowship for career military personnel. Payment of
+concurrent benefits by NIH to active-duty career military recipients is not allowed.
+(GPS page IIB-33)
+
+11.2.3 Application Requirements and Due Dates
+11.2.3.1 Application
+Each fellowship applicant must submit an application based on the application package provided as part
+of the NOFO. Individual fellowship applications are submitted electronically through Grants.gov using
+an application package that combines form components from the SF424 (R&R) application with the PHS
+Fellowship Supplemental Form.
+The major emphasis of the application should be the research training experience and broadening of scientific competence. The AOR of the sponsoring institution agrees to secure and retain, but need not submit to NIH, the assurance signatures of the fellowship applicant and sponsor. For postdoctoral fellowship
+applicants, the assurance of the fellowship applicant includes certification that they have read the payback information and will meet any payback provisions required under the law as a condition for accepting the award.
+Fellowship applicants and sponsoring institutions must comply with policies and procedures governing
+such requirements as civil rights; the protection of human subjects, including data and safety monitoring
+requirements; research misconduct; the humane care and use of live vertebrate animals; the inclusion of
+women, minorities and individuals across the lifespan in study populations; human embryonic stem cells;
+and research involving recombinant or synthetic nucleic molecules. (For a complete list of applicable
+requirements, see Exhibit 4, Public Policy Requirements, Objectives and Appropriation Mandates in
+IIA.)
+11.2.3.2 eRA Commons Registration
+All fellowship applicants and sponsoring institutions must be registered in the eRA Commons. The fellowship applicant must be assigned the “PI Role” in the eRA Commons. Only the PI Role will provide
+the fellowship applicant with the appropriate access in the eRA Commons to the application and review
+information. When a prospective fellowship applicant is submitting an application through a sponsoring
+institution that is different than their current institution, that individual must be affiliated with the sponsoring institution.
+11.2.3.3 ORCID iDs
+The requirement for ORCID identifiers will be enforced at the time of application for individual fellowship including the following: F05, F30, F31, F32, F33, F37, F38, F99/K00 and FI2.
+eRA system validations will check whether applicants have ORCID iDs and applications will not be
+accepted unless an ORCID iD is linked to the PD/PI's eRA Commons Personal Profile.
+To either link their eRA profiles to existing ORCID accounts or create ORCID profiles and link them
+back to the eRA Commons, prospective applicants for individual fellowship awards may follow the
+ORCID link from their Personal Profiles in the eRA Commons.
+11.2.3.4 Letters of Reference
+As part of an application submission, at least three (but no more than five) letters of reference on behalf
+the fellowship applicant also must be submitted. Electronic submission of the fellowship application
+incorporates a separate, yet simultaneous electronic submission process for reference letters through the
+eRA Commons. Reference letters are submitted directly by the referee through the eRA Commons and
+not as part of the electronic application submitted through Grants.gov. Reference letters will be joined
+with the electronic application within the eRA system once an application completes the submission process. Applications that are missing the required letters may be delayed in the review process or not
+(GPS page IIB-34)
+
+accepted. Applicants must carefully follow the instructions provided in the Individual Fellowship Application Guide. The Application Guide includes specific instructions to be sent to prospective referees.
+11.2.3.5 Responsible Conduct of Research
+All fellowship applicants must include a plan to obtain instruction in the responsible conduct of research.
+This plan should document prior instruction in responsible conduct of research during the applicant’s current career stage (including the dates of last occurrence) and propose a plan to receive instruction in
+responsible conduct of research. The plan must address the five instructional components, format, subject
+matter, faculty participation, duration of instruction, and frequency of instruction, as outlined and
+explained below. The plan may include career stage-appropriate, individualized instruction or independent scholarly activities that will enhance the applicant’s understanding of ethical issues related to
+their specific research activities and the societal impact of that research. The role of the sponsor/mentor
+in responsible conduct of research instruction must be described. Applications lacking a plan for instruction in responsible conduct of research will be considered incomplete and may be delayed in the review
+process. Further, applications with unacceptable plans will not be funded until the applicant provides an
+acceptable, revised plan. For additional instructions, see the specific NOFO.
+ 1. Format. Discussion-based instruction in the responsible conduct of research is expected to
+remain a key feature of RCR training and to include substantive face-to-face interaction among
+participants and faculty. However, recognizing that advances in video conferencing now allow
+for effective “face-to-face” discussions to occur electronically, institutions may wish to consider
+incorporating video conferencing options into their RCR instruction, provided that those options
+are utilized in a way that fosters discussion, active learning, engagement, and interaction among
+the participants. At the same time, video conferencing should not be the sole means for meeting
+the requirement for RCR instruction, and a plan that employs only video conferencing will not
+be considered acceptable, except in special instances of short-term training programs or unusual
+and well-justified circumstances.
+(GPS page IIB-35)
+
+2. Subject Matter. Developments in the conduct of research and a growing understanding of the
+impact of the broader research environment have led to a recognition that additional topics merit
+inclusion in discussions of the responsible conduct of research, including below:
+ a. conflict of interest – personal, professional, and financial – and conflict of commitment,
+in allocating time, effort, or other research resources
+ b. policies regarding human subjects, live vertebrate animal subjects in research, and safe
+laboratory practices
+ c. mentor / mentee — responsibilities and relationships
+ d. safe research environments (e.g., those that  are free of sexual, racial, ethnic, disability
+and other forms of discriminatory harassment)
+ e. collaborative research including collaborations with industry and investigators and institutions in other countries
+ f. peer review, including the responsibility for maintaining confidentiality and security in
+peer review
+ g. data acquisition and analysis; and laboratory tools (e.g., tools for analyzing data and creating or working with digital images); recordkeeping practices, including methods such
+as electronic laboratory notebooks.
+ h. secure and ethical data use; data confidentiality, management, sharing, and ownership
+ i. research misconduct and policies for handling misconduct
+ j. responsible authorship and publication
+ k. the scientist as a responsible member of society, contemporary ethical issues in biomedical research, and the environmental and societal impacts of scientific research
+ 3. Faculty Participation. Sponsors and other appropriate faculty are highly encouraged to contribute both to formal and informal instruction in responsible conduct of research. Informal
+instruction occurs in the course of laboratory interactions and in other informal situations
+throughout the year. Sponsors may contribute to formal instruction in responsible conduct of
+research as discussion leaders, speakers, lecturers, and/or course directors.
+ 4. Duration of Instruction. Instruction should involve substantive contact hours between the fellow, sponsor and other appropriate faculty. Acceptable programs generally involve at least eight
+contact hours. A semester-long series of seminars/programs may be more effective than a single
+seminar or one-day workshop because it is expected that topics will then be considered in sufficient depth, learning will be better consolidated, and the subject matter will be synthesized
+within a broader conceptual framework.
+(GPS page IIB-36)
+
+5. Frequency of Instruction. Existing policy and guidance call for RCR instruction to be undertaken at least once during each career stage, and at a frequency of no less than once every four
+years. As institutions consider how to optimize the timing and delivery of instruction in the
+responsible conduct of research, they are encouraged to bear in mind the value of ongoing and
+discipline-specific training as individuals progress in their research careers. For example, while
+broad-based instruction in the responsible conduct of research is often appropriate early in graduate school; a more tailored, discipline-specific approach may better fit the needs of advanced
+graduate students and those who have transitioned to postdoctoral status. If advanced students
+and postdoctorates have been exposed to the full range of topics traditionally included in RCR
+instruction early in their scientific training, it may make sense for their ongoing and/or subsequent RCR training to focus on subjects most relevant to their fields, and institutions may wish
+to consider this approach, where applicable.
+Information on the nature of the instruction in the responsible conduct of research and the extent of fellow and faculty participation also must be provided in the annual progress report submitted as a prerequisite to receiving non-competing continuation support.
+11.2.3.6 Concurrent Applications
+An individual may not have two or more competing Kirschstein-NRSA individual fellowship applications pending review concurrently. In addition, CSR will not accept for review any application that is
+essentially the same as one already reviewed.
+11.2.3.7 Receipt Dates
+Kirschstein-NRSA individual fellowship applications undergo a review process that takes 5 to 8 months.
+The annual schedule for application receipt, review, and award can be found in a specific Notice of Funding Opportunity and on NIH's Standard Due Dates website.
+11.2.4 Review
+Each new and renewal application will be evaluated for scientific merit by an NIH SRG.
+11.2.4.1 Overall Impact
+Reviewers will provide an overall impact score to reflect their assessment of the likelihood that the fellowship will enhance the fellowship applicant’s potential for a productive independent scientific research
+career in a health-related field, in consideration of the scored and additional review criteria (as applicable
+for the project proposed).
+Individual Fellowship programs are training awards and not research awards. Major considerations in the
+review are the candidate’s potential for a productive career, the candidate’s need for the proposed training, and the degree to which the research training proposed, the sponsor, and the environment will satisfy
+those needs.
+11.2.4.2 Scored Review Criteria
+Reviewers will consider each of the three review criteria below in the determination of scientific and
+technical merit, and give a separate score for each. The following review criteria are applicable primarily
+to F30, F31, F32, F33 and F99/K00 applications. For review criteria pertaining to other individual fellowship applications (e.g., F05), please refer to the specific NOFO. The scored criteria are:
+ l Candidate's Preparedness and Potential
+ l Research Training Plan
+(GPS page IIB-37)
+
+l Commitment to Candidate
+The NOFO should be consulted for additional information describing each of the scored review criteria.
+11.2.4.3 Additional Review Criteria
+As applicable for the project proposed, reviewers will consider the following additional items in the
+determination of scientific and technical merit but will not give separate scores for these items:
+ l Protections for Human Subjects
+ l Inclusion of Women, Minorities, and Individuals Across the Lifespan
+ l Vertebrate Animals
+ l Biohazards
+ l Resubmission Applications
+ l Renewal Applications
+The NOFO should be consulted for additional information describing each of the relevant additional
+review criteria.
+11.2.4.4 Additional Review Considerations
+As applicable for the project proposed, reviewers will address each of the following items, but will not
+give scores for these items and should not consider them in providing an overall impact score.
+ l Training in the Responsible Conduct of Research
+ l Select Agents Research
+ l Resource Sharing Plans
+ l Authentication of Key Biological and/or Chemical Resources
+ l Budget and Period Support
+ l Foreign Sponsoring Institutions
+The NOFO should be consulted for additional information describing each of the relevant additional
+review considerations.
+11.2.4.5 Secondary Level of Review
+Kirschstein-NRSA individual fellowship applications receive a secondary level of review by IC staff. Criteria used in making award decisions include the SRG’s recommendation concerning the overall merit of
+the application, the relevance of the application to the IC’s research training priorities and program balance, and the availability of funds.
+11.2.5 Notification of Action
+Shortly after the initial review meeting, each fellowship applicant receives an e-mail indicating that the
+SRG recommendation/impact score is available in the eRA Commons. The fellowship applicant is also
+notified via an e-mail when the summary statement is available in the eRA Commons.
+The PO may notify the fellowship applicant about the final review recommendation. All questions about
+initial review recommendations and funding possibilities should be directed to the designated IC PO, not
+to the SRO of the SRG. Name and contact information of the assigned PO is also available in the eRA
+Commons. If the application is under consideration for funding, NIH will request any additional
+(GPS page IIB-38)
+
+necessary information from the applicant. After all program and administrative issues have been
+resolved, the NoA will be issued for those selected for funding.
+11.2.6 Period of Support
+No individual may receive more than 5 years of aggregate Kirschstein-NRSA support at the predoctoral
+level and 3 years of aggregate Kirschstein-NRSA support at the postdoctoral level, including any combination of Kirschstein-NRSA support from institutional research training grants and individual fellowships. For individual MD/PhD or other dual-doctoral degree fellowships (F30 only), individuals may
+receive up to 6 years of aggregate NRSA support at the predoctoral level, including any combination of
+support from institutional research training grants and individual fellowships.  Over the total duration of
+dual degree support, at least 50 percent of the award period must be devoted to graduate research training leading to the doctoral research degree. For F30 applications for dual-degree candidates other than
+DDS/PhD, DMD/PhD, and AuD/PhD candidates, applicants must have matriculated into a dual-degree
+program no more than 48 months prior to the due date of the initial (-01) application.  For DDS/PhD,
+DMD/PhD, and AuD/PhD degree candidates to be eligible, an applicant must have matriculated into a
+dual-degree program and  identified a dissertation research project and sponsor(s).
+Any exception to the maximum period of support requires a waiver from the NIH awarding IC based on
+review of a justification from the individual and sponsoring institution. The AOR of the sponsoring institution must make the request in writing to the NIH awarding IC on behalf of the fellow, and must secure
+and retain, but need not submit to NIH, the fellow and sponsor’s signatures. The request must specify the
+amount of additional support for which approval is sought. Individuals seeking additional support beyond the third year of postdoctoral support are strongly advised to consult with their PO before submitting
+a waiver request.
+Some generally recognized categories under which NIH may grant exceptions include the following:
+ l Physicians/Clinicians. Individuals requiring additional time to complete training, either as participants in a combined M.D./Ph.D. program or as clinicians (e.g., physicians, dentists, veterinarians) who are completing postdoctoral research training. An exception is contingent upon an
+assurance of the recipient’s good academic standing and sufficient justification.
+ l Interruptions (Break in Service). Requests for additional time also will be considered if an
+event unavoidably alters the planned course of the research training, if the interruption has significantly detracted from the nature or quality of the planned research training, and if a short
+extension would permit completion of the training as planned. Such events include sudden loss
+of the preceptor’s services or an accident, illness, or other personal situation, which prevent a fellow from effectively pursuing research training for a significant period of time. Requests for
+extension of support also will be considered if a short additional period would provide the fellow
+an opportunity to use an exceptional training resource directly related to the approved research
+training program.
+Requests for additional time that do not arise from either of the above-described circumstances will be
+considered only if they are accompanied by an exceptionally strong justification.
+11.2.7 Full-Time and Part-Time Training
+All fellows are required to pursue their research training full time. Full-time is generally defined as devoting at least 40 hours per week to research training activities or as specified by the sponsoring institution
+in accordance with its own policies.
+(GPS page IIB-39)
+
+Part-Time Training. While NRSA fellows are required to pursue training full-time, under certain circumstances, a written request may be submitted to the NIH awarding IC to permit less than full-time
+training.
+Written requests for part-time training will be considered on a case-by-case basis and must be approved
+by the NIH awarding IC in advance of each budget period. The circumstances requiring part-time training might include medical conditions, disability, or personal or family situations such as a child or elder
+care. Part-time training will not be approved to accommodate other sources of funding, job opportunities,
+clinical practice, clinical training, or responsibilities associated with the fellow’s position at the sponsoring institution.
+Each written request must be signed by the fellow, the AOR and the fellowship sponsor.  The request for
+part-time training must provide a justification of the need for a reduced level of effort and the expected
+duration of the period of part-time training. The written request also must include an estimate of the
+expected duration of the period of part-time training and assurances that the fellow intends to return to
+full-time training when that becomes possible and intends to complete the proposed research training program. In no case will it be permissible for the fellow to be engaged in Kirschstein-NRSA support for less
+than 50 percent effort. Individuals who must reduce their commitment to less than 50 percent effort must
+take a leave of absence from Kirschstein-NRSA fellowship support.
+NIH will issue a revised NoA with prorated stipend for the period of any approved part-time training.
+Part-time training may affect the rate of accrual or repayment of the service obligation for postdoctoral
+fellows.
+11.2.8 Initiation of Support
+11.2.8.1 Process
+The NIH IC will notify the fellowship applicant of the intention to make an award and confirm the plans
+for the start of fellowship support. The individual may activate the fellowship on or after the Federal;
+award date of the NoA up to the latest activation date shown in the NoA (generally 6 months after the
+Federal award  date). This timing allows the individual to make arrangements, such as the completion of
+degree requirements, coordination with the sponsor, and, if necessary, a move to the sponsoring institution. The latest activation date may be extended in unusual circumstances. Written requests for extensions should be submitted to the NIH awarding IC, by the AOR of the sponsoring institution. The
+sponsoring institution must secure and retain, but need not submit to NIH, signatures of the fellowship
+applicant and sponsor before the request is submitted to NIH.
+The Activation Notice must be submitted to the NIH awarding IC as of the day the individual begins
+training. A Payback Agreement also must be completed and submitted but only by postdoctoral fellows
+in their first 12 months of Kirschstein-NRSA postdoctoral support. See Reporting Requirements—Activation Notice and Reporting Requirements—Payback Agreement in this chapter. A stipend may not be
+paid until the forms are submitted and the fellow begins training. If necessary for payroll purposes, the
+Activation Notice and Payback Agreement may be submitted up to 30 days before the start date.
+However, any change in the planned activation start date must be reported immediately to the sponsoring
+institution’s business office and to the NIH awarding IC. If an award is conditioned upon completion of
+degree requirements, the fellow must submit, with the Activation Notice, proof of completion by the
+degree-granting institution.
+Generally, individual fellowship support is approved for consecutive years of training. The initial award
+budget period is usually for 12 months. Subsequent periods of approved fellowship training are consecutive with the first year of support and are usually in 12-month increments (budget periods). Awards
+for less than 12 months will be prorated accordingly. If a fellow decides not to activate the award, or to
+(GPS page IIB-40)
+
+terminate early, they must notify the institution’s business office, the sponsor, and the NIH awarding IC
+immediately, in writing. NIH will make any necessary adjustments in the stipend and other costs, including the institutional allowance.
+11.2.8.2 Payment
+Domestic. Non-Federal sponsoring institutions receive an award for the stipend, institutional allowance,
+and tuition and fees (when applicable). The institution directly pays the fellow and disburses all other
+awarded costs.
+Federal Laboratories. Fellows training at Federal laboratories are paid stipends directly by the NIH
+awarding IC through PMS. Reimbursement for appropriate expenditures is coordinated by the NIH
+awarding IC; however, payment is through PMS. Note, if a fellow is training at a facility that is Government-owned but Contract operated, this is not considered a Federal laboratory. As with other grants to
+these types of facilities, the sponsoring institution would be the contractor.
+Foreign. Fellows training at foreign sites are paid stipends directly by the NIH awarding IC, through
+PMS. However, the institutional allowance is awarded to and disbursed by the sponsoring institution.
+11.2.9 Allowable and Unallowable Costs
+11.2.9.1 Pre-award Costs
+Pre-award costs to an individual fellowship are limited. Stipends and tuition and fees may not be charged
+to a fellowship award until a fellow has actually activated the award and the appropriate paperwork submitted to NIH. Therefore, these costs may never be charged as pre-award to an individual fellowship.
+There are rare occasions when costs associated with the institutional allowance may be allowable as preaward costs. Sponsoring institutions should consult with the NIH awarding IC when considering a preaward cost.
+11.2.9.2 Stipends
+A stipend is provided as a subsistence allowance for Kirschstein-NRSA fellows to help defray living
+expenses during the research training experience. It is not provided as a condition of employment with
+either the Federal government or the sponsoring institution. Stipends must be paid in accordance with stipend levels established by NIH, which are based on a 12-month full-time training appointment. In the
+event of early termination, the stipend will be prorated according to the amount of time spent in training.
+The sponsoring institution will submit a Termination Notice reflecting the early termination and the NIH
+awarding IC will issue a revised NoA to decrease approved funding. The sponsoring institution must
+base its calculations on the applicable stipend level provided by NIH.
+While stipends are not provided as a condition of employment, NIH policy is not intended to discourage
+or otherwise prevent recipient organizations from hiring NRSA trainees and fellows as employees or
+providing them with benefits consistent with what the organization provides other employees at similar
+career stages.
+11.2.9.3 Stipend Levels
+Stipend levels are updated periodically in conjunction with an NIH annual appropriation. When increases
+are approved, they are published in the NIH Guide for Grants and Contracts. Current levels are posted
+on the NIH Fiscal Policies page. The NIH awarding IC will adjust fellowship awards on their
+anniversary dates to include the currently applicable stipend amount.
+General information related to stipends follows:
+(GPS page IIB-41)
+
+l Predoctoral. One stipend level is used for all predoctoral candidates, regardless of the level of
+experience.
+ l Postdoctoral. The stipend level for the entire first year of support is determined by the number
+of full years of relevant postdoctoral experience when the award is issued. Relevant experience
+may include research experience (including industrial), teaching assistantship, internship, residency, clinical duties, or other time spent in a health-related field beyond that of the qualifying
+doctoral degree. Once the appropriate stipend level has been determined, the fellow must be paid
+at that level for the entire grant year. The stipend for each additional year of Kirschstein-NRSA
+support is the next currently available level in the stipend structure and does not change midyear.
+ l Senior Fellows. The stipend level must be commensurate with the base salary or remuneration
+that would have been paid by the institution with which the individual is permanently affiliated
+when the award is issued but cannot exceed the current Kirschstein-NRSA stipend limit set by
+the NIH for those with 7 or more years of experience. The level of Kirschstein-NRSA support
+will take into account concurrent salary support provided by the institution and the policy of the
+sponsoring institution. NIH support does not provide fringe benefits for senior fellows.
+11.2.9.4 Institutional Allowance
+NIH awards an institutional allowance to help support the costs of training. The specific levels of allowance for predoctoral and postdoctoral support, including those for individuals training at Federal laboratories, for-profit organizations, or foreign organizations, are published in the NIH Guide for Grants and
+Contracts. They also are available on the NIH Institutional Training Grants web site.
+The institutional allowance is a fixed amount. Expenditures under institutional allowances are not subject
+to NIH prior approval requirements, and the institution is not required to account for these expenditures
+on an actual cost basis. Allowable uses of the Institutional Allowance are described below.
+Except for fellows at Federal training sites, consistent with NIH policy governing the type of expenditures appropriate for the institutional allowance, the sponsoring institution authorizes the expenditure of
+the institutional allowance on behalf of the fellow according to the institution’s policy. The institution is
+entitled to expend up to the full institutional allowance upon official activation of the award. However, if
+an individual fellow is not in a training status for more than 6 months of the award year, only one-half of
+that year’s institutional allowance may be charged to the grant. The NoA will be revised and the stipend
+and institutional allowance balances must be refunded to NIH.
+For fellows at Federal training sites, the NIH awarding IC authorizes the expenditure of the allowance,
+and payment is made through PMS.
+The type of sponsoring institution dictates what costs may be charged to this category and how the funds
+are to be administered:
+ l Non-Federal Public and Private Non-Profit Institutions (Domestic and Foreign). The allowance is intended to defray expenses for the individual fellow such as research supplies, equipment, travel to scientific meetings, and health insurance and to otherwise offset, insofar as
+possible, appropriate administrative costs of training. Funds are paid directly to and administered
+by the sponsoring institution.
+ l Federal Laboratories. The allowance is intended to cover the costs of scientific meeting travel,
+health insurance, and books. Funds are administered by the NIH awarding IC and disbursed
+through PMS.
+(GPS page IIB-42)
+
+l For-Profit Institutions. The allowance is intended to cover the costs of scientific meeting travel,
+health insurance, and books. Funds are paid directly to the sponsoring institution for disbursement to the fellow.
+The following are guidelines for the use of the institutional allowance:
+ l Travel. Payment for travel to scientific meetings is appropriate when it is necessary for the individual’s training and when the costs are incurred within the period of grant-supported training.
+For fellows at Federal laboratories, reimbursement of travel costs must be in accordance with
+applicable Federal travel regulations.
+Funds may not be expended to cover the costs of travel between the fellow’s place of residence
+and the domestic training institution, except that the sponsoring institution may authorize the cost
+of a one-way travel allowance in an individual case of extreme hardship.
+ l Health Insurance. A fellow’s health insurance is an allowable cost only if applied consistently
+to all individuals in a similar training status regardless of the source of support. Family health
+insurance is an allowable cost for fellows who have families and are eligible for family health
+insurance coverage at the sponsoring institution. Self-only health insurance is an allowable cost
+for fellows without families. Health insurance can include coverage for costs such as vision
+and/or dental care if consistent with organizational policy.
+ l Medical Liability and Other Special Insurance. Medical liability (malpractice) insurance or
+other special insurance is an allowable cost to NRSA grants only if nature of the research training requires such special insurance. For instance, medical liability would be allowable if the
+research training experience involves direct contact with patients or human subjects. In all cases,
+for the cost to be charged to the NRSA grant, it must be consistently required for all in a similar
+training status, regardless of the source of support. Special insurances that are routinely offered
+as optional employee benefits (such as disability insurance, life insurance, or workman’s compensation insurance), are not normally allowable charges (see separate section on Employee
+Benefits) unless the nature of the research training requires such special insurance.
+ l Extraordinary Costs. Additional funds may be requested by the institution when the training of a
+fellow involves extraordinary costs for travel to field sites remote from the sponsoring institution
+or accommodations for fellows who are disabled, as defined by the Americans with Disabilities
+Act. The funds requested for extraordinary costs must be reasonable in relationship to the total
+dollars awarded under a fellowship and must be directly related to the approved research training
+project. Such additional funds shall be provided only in exceptional circumstances that are fully
+justified and explained by the institution in the application or as part of a special written request.
+11.2.9.5 Tuition and Fees
+Tuition and fees are provided under the following policy:
+ l For individual predoctoral fellowships (F30 and F31), an amount equal to 60% of the actual
+tuition level at the applicant institution, up to $16,000 per year, will be provided. If the program
+supports formally combined dual-degree training (e.g., M.D.-Ph.D., D.D.S.-Ph.D.), the amount
+provided will be 60% of the actual tuition level, up to $21,000 per year. Note the new policy
+moves health insurance into the Institutional Allowance budget category for predoctoral fellowships. This is now consistent with the treatment of this cost for postdoctoral fellowships.
+(GPS page IIB-43)
+
+l For individual postdoctoral fellowships (F32) and individual senior fellowships (F33), an
+amount equal to 60% of the actual tuition level at the applicant institution, up to $4,500 per year,
+will be provided. If the fellow is enrolled in a program that supports postdoctoral individuals in
+formal degree-granting training, the amount provided will be 60% of the actual tuition level, up
+to $16,000 per year. For postdoctoral fellows, costs associated with tuition and fees are allowable only if they are required for specific courses in support of the research training. Health insurance is not included in this budget item because costs for it are to be charged as institutional
+allowance.
+11.2.9.6 Travel to Foreign Training Sites
+For fellows at foreign training sites, in addition to the institutional allowance, awards may include a
+single economy or coach round-trip travel fare. No allowance is provided for dependents. U.S. flag air
+carriers must be used to the maximum extent possible when commercial air transportation is the means
+of travel between the United States and a foreign country or between foreign countries. This requirement
+shall not be influenced by factors of cost, convenience, or personal travel preference. Any funds awarded
+for travel to/from foreign training sites must be reported on the Termination Notice as part of the
+“Amount of Stipend” column. For additional information regarding foreign travel, see Cost Considerations—Allowability of Costs/Activities-Selected Items of Cost-Travel/Employees in IIA.
+11.2.9.7 Childcare Costs
+Childcare costs are allowable for full-time NRSA fellows and full-time recipients of Predoctoral to
+Postdoctoral Fellow Transition Award (F99/K00) programs during the F99 phase of the award. Applicants and recipients may request the NRSA costs  as part of new applications, continuation applications
+(Type 5), or as an administrative supplement request (Type 3). Childcare cost levels are updated periodically. When increases are approved, they are published in the NIH Guide for Grants and Contracts.
+ Childcare must be provided by a licensed childcare provider. Recipients must maintain all supporting
+documentation (e.g., proof provider is licensed) and make it available to NIH officials upon request. NIH
+does not require recipients to submit this supporting documentation with each request.
+The NRSA fellow childcare costs are not tied to payback obligations, nor should it be reported as such.
+When childcare costs are awarded, they are generally restricted and cannot be re-budgeted without prior
+written approval from the NIH awarding IC. In cases of early termination, recipients may not use any
+unused portion of the childcare costs. It will remain unobligated and will be adjusted by the agency as
+part of the closeout process.
+11.2.9.8 Employee Benefits
+Since Kirschstein-NRSA fellowships are not provided as a condition of employment with either the
+Federal government or the sponsoring institution, institutions may not seek funds, or charge individual
+fellowship awards, for costs that normally would be associated with employee benefits (for example,
+Federal Insurance Contributions Act (FICA), which funds Social Security and Medicare, workman’s
+compensation, life insurance, union dues, and unemployment insurance). Concerning union dues or other
+similar costs otherwise paid personally by the fellow; if a fellow requests the institution deduct such a
+cost from the stipend amount, the institution can provide the fellow such a service. However, in no case
+can such a deduction from the stipend be made automatically without the approval of the fellow.
+11.2.9.9 Rebudgeting of Funds
+Individual fellowship awards are formula based, generally restricted for the specific budget category of
+the award, and cannot be rebudgeted without prior written approval from the NIH awarding IC.
+(GPS page IIB-44)
+
+l Stipends must be expended using the stipend level provided in the award; no funds can be
+rebudgeted into the stipend category to accommodate a stipend level different from the established NIH level. When a fellowship terminates early, any unexpended stipends must be returned
+and cannot be rebudgeted into any other budget category.
+ l Institutional allowance is a fixed amount of money with a number of allowable costs. In the rare
+case where institutional allowance may be unexpended, it can only be rebudgeted into the tuition
+and fees category when tuition and fees have been awarded.
+ l When tuition and fees is awarded, it is generally restricted and cannot be rebudgeted without
+prior written approval from the NIH awarding IC.
+11.2.10 Supplementation of Stipends, Compensation, and Other
+Income
+11.2.10.1 Stipend Supplementation
+Kirschstein-NRSA fellows receive stipends to defray living expenses. Stipends may be supplemented by
+an institution from non-Federal funds provided this supplementation is without any additional obligation
+for the fellow. An institution can determine the amount of stipend supplementation, if any, it will provide
+according to its own formally established policies governing stipend support. These policies must be consistently applied to all individuals in a similar status regardless of the source of funds. Federal funds may
+not be used for stipend supplementation unless specifically authorized under the terms of the program
+from which funds are derived. Under no circumstances may PHS funds be used for supplementation.
+An individual may use Federal educational loan funds or VA benefits when permitted by those programs
+as described in Other Income: Educational Loans or GI Bill in this chapter.
+11.2.10.2 Compensation
+NIH recognizes that Kirschstein-NRSA fellows may seek part-time employment incidental to their training program to offset further their expenses. Fellows and trainees may spend on average, an additional
+25% of their time (e.g., 10 hours per week) in part time research, teaching, or clinical employment, so
+long as those activities do not interfere with, or lengthen, the duration of their NRSA training. Funds
+characterized as compensation may be paid to fellows only when there is an employer-employee relationship, the payments are for services rendered, and the situation otherwise meets the conditions for
+compensation of students as detailed in Cost Considerations—Selected Items of Cost—Fringe Benefits /
+IHE Tuition/Tuition Remission in IIA. In addition, compensation must be in accordance with organizational policies applied consistently to both federally and non-federally supported activities and must
+be supported by acceptable accounting records that reflect the employer-employee relationship. Under
+these conditions, the funds provided as compensation (salary, fringe benefits, and/or tuition remission)
+for services rendered, such as teaching or laboratory assistance, are not considered stipend supplementation; they are allowable charges to Federal grants, including PHS research grants. However,
+NIH expects that compensation from research grants will be for limited part-time employment apart from
+the normal full-time training activities.
+Compensation may not be paid from a research grant that supports the same research that is part of the
+fellow’s planned training experience as approved in the Kirschstein-NRSA individual fellowship application.
+Stipend Supplementation & Compensation. Under no circumstances may the conditions of stipend supplementation or the services provided for compensation interfere with, detract from, or prolong the fellow’s approved Kirschstein-NRSA training program. Fellowship sponsors must approve all instances of
+(GPS page IIB-45)
+
+employment on research grants to verify that the circumstances will not detract from or prolong the
+approved training program.
+11.2.10.3 Other Income: Concurrent Benefits
+A Kirschstein-NRSA individual fellowship may not be held concurrently with another federally
+sponsored fellowship or similar Federal or non-Federal award that provides a stipend or otherwise duplicates provisions of the Kirschstein-NRSA.
+11.2.10.4 Other Income: Educational Loans or GI Bill
+An individual may accept concurrent educational remuneration from the VA (GI Bill) and Federal educational loan funds. Such funds are not considered supplementation or compensation.
+11.2.10.5 Other Income: NIH Loan Repayment Program
+Postdoctoral fellows may also be eligible to participate in the NIH Loan Repayment Program.
+11.2.10.6 Taxability of Stipends
+Section 117 of the Internal Revenue Code (26 U.S.C. 117) applies to the tax treatment of scholarships
+and fellowships. In general, degree candidates may exclude from gross income (for tax purposes) any
+amount used for qualified tuition and related expenses such as fees, books, supplies, and equipment
+required for courses of instruction at a qualified educational organization. Non-degree candidates are
+required to report as gross income any monies paid on their behalf for stipends or any course tuition and
+fees required for attendance.
+The IRS and Treasury Department released regulations in January 2005 (Revenue Procedures 2005-11)
+clarifying the student exception to the FICA (Social Security and Medicare) taxes for students employed
+by a school, college, or university where the student is pursuing a course of study. NIH’s understanding
+is that these final regulations do not apply to or impact Kirschstein-NRSA programs or awards.
+The taxability of stipends in no way alters the relationship between Kirschstein-NRSA fellows and sponsoring institutions. Kirschstein-NRSA stipends are not considered salaries. In addition, recipients of
+Kirschstein-NRSA individual fellowships are not considered to be in an employee-employer relationship
+with NIH or the sponsoring institution solely as a result of the Kirschstein-NRSA award. The interpretation and implementation of the tax laws are the domain of the IRS and the courts. NIH takes no position on what the status may be for a particular taxpayer, and it does not have the authority to dispense
+tax advice. Individuals should consult their local IRS office about the applicability of the law to their situation and for information on their tax obligations.
+11.2.10.7 Form 1099
+Although stipends are not considered salaries, these funds are subject to Federal and, sometimes, State
+income tax. Such income may be reported by the sponsoring institution on IRS Form 1099, Statement of
+Miscellaneous Income. Normally, the business office of the sponsoring institution will be responsible for
+annually preparing and issuing IRS Form 1099 for fellows paid through the institution (fellows at
+domestic non-Federal institutions). Sponsoring institutions are not required to issue a Form 1099, but it
+is a useful form of documentation of funds received and it serves as a reminder to the fellow that some
+tax liability may exist. Fellows are reminded that, even if the sponsoring institution does not issue a
+Form 1099, they still are required to report Kirschstein-NRSA stipends. For fellows training at a Federal
+or foreign laboratory and receiving a stipend from NIH, PMS will issue a Form 1099.
+(GPS page IIB-46)
+
+11.2.11 Reporting Requirements
+The submission of the forms described in this subsection is critical to establishing and paying stipends
+and other costs and determining possible payback service. All of these forms are available in PDF-fillable and Word formats. The NIH awarding IC may provide copies of applicable forms with the NoA or
+reference the NIH Forms Library website in the NoA.
+11.2.11.1 Activation Notice
+The individual may activate the fellowship on or after the issue date of the NoA up to the latest activation date shown in the NoA (generally 6 months after the award issue date). Immediately upon the initiation of training, the individual must complete and sign the Ruth L. Kirschstein Individual Fellowship
+Activation Notice (Form PHS 416-5), obtain the signature of the AOR, and forward the notice along
+with the Payback Agreement (required only for postdoctoral fellows in their first 12 months of
+Kirschstein-NRSA support) to the NIH awarding IC.
+For Kirschstein-NRSA fellows paid directly by PMS (i.e., those sponsored by foreign or federal institutions) the Activation Notice is required for the initial year only and should be submitted immediately
+prior to the initiation of training. For all other Kirschstein-NRSA fellows the form should not be submitted before the fellow actually begins training. Stipend checks are issued when both the Activation
+Notice and the Payback Agreement (required only for postdoctoral fellows in their first 12 months of
+Kirschstein-NRSA support) are received by the NIH awarding IC.
+ The Activation Notice is required for the initial year only. The Activation Notice may be submitted up
+to 30 days before the individual begins training if necessary for payroll purposes. However, the institution must not release any funds until the individual has started their fellowship training. Furthermore, if
+the individual does not begin research fellowship training on the day indicated, the institution must
+notify the NIH awarding IC immediately. Competing continuation awards must be activated on the day
+following the end of the last budget period of the previous award.
+11.2.11.2 Payback Agreement
+A Ruth L. Kirschstein National Research Service Award Payback Agreement (Form PHS 6031) that covers the initial 12 months of Kirschstein-NRSA postdoctoral support must be signed by each person who
+is to receive an individual postdoctoral fellowship. This form is not required if the individual has already
+received 12 months of postdoctoral Kirschstein-NRSA support under any Kirschstein-NRSA institutional
+research training grant or fellowship award. For details on Kirschstein-NRSA payback, see Payback
+Reporting Requirements in this chapter.
+No Payback Agreement is required for predoctoral fellows.
+11.2.11.3 Termination Notice
+The Ruth L. Kirschstein National Research Service Award Termination Notice (Form PHS 416-7) (along
+with the Activation Notice and the NoA) is the basis for validating the total period of Kirschstein-NRSA
+support and establishing the amount of payback obligation for each Kirschstein-NRSA fellow. For individual fellowships, a reminder of this reporting requirement may be sent to the fellow by the NIH awarding IC before the scheduled termination date. For early terminations, the completed form will be required
+immediately upon receipt of notification from the fellow or an AOR.
+For individual fellowships training at Foreign training sites, any funds awarded for travel to/from foreign
+training sites must be reported on the Termination Notice as part of the “Amount of Stipend” column.
+For individual fellowships training at Federal laboratories, this column should include all monies paid directly to them through PMS (stipend, travel, etc. as awarded).
+(GPS page IIB-47)
+
+The termination notice must be submitted within 30 days of the termination date even if the fellow is not
+available for signature. In most cases,  the information on the form must be verified by the sponsor and
+an institutional business official, however, in cases where the sponsor is not available to sign the Notice
+within the required timeframe, the form may be verified by the institutional business official alone. The
+lack of timely and accurate information on this form could adversely affect data collected associated
+with aggregate NRSA support and the payback process. For additional information on early termination,
+see Changes in the Project below. All Termination Notices for individual fellowships are required to be
+submitted electronically using the eRA Commons xTrain application.
+11.2.11.4 Consecutive Support
+If a fellow switches from one Kirschstein-NRSA grant mechanism to another (e.g., from an institutional
+research training grant to an individual fellowship or from one NIH IC to another), the requirement for
+payback service incurred is deferred until the total period of Kirschstein-NRSA support is completed. All
+fellowship applications are reviewed to determine if previous Kirschstein-NRSA support has been
+provided.
+11.2.11.5 Progress Reports
+Annual progress reports must be submitted for non-competing continuation support. The Research Performance Progress Report (RPPR), which is required for fellowship awards, can be accessed from the
+eRA Commons. The IDP requirement described in Non-Competing Continuation Progress Reports
+applies to individual fellowships. Inadequate or incomplete progress reports may result in a delay of continued support. For Kirschstein-NRSA individual fellowship awards, the final progress report information is required as part of the Termination Notice.
+11.2.11.6 Financial Reporting
+An annual or final FFR to report expenditure information is not required for Kirschstein-NRSA individual fellowship awards.
+11.2.12 Changes in the Project
+Individual fellowship awards are made for training at a specific institution under the guidance of a particular sponsor. The approval of the NIH awarding IC is required for a transfer of the award to another
+institution, a change in sponsor, or a project change. As part of the approval process, if a fellow
+sponsored by a domestic non-Federal institution requests a transfer to another domestic non-Federal institution before the end of the current award year, the institutions are responsible for negotiating which
+institution will pay the stipend until the end of the current year. Disposition of the institutional allowance
+is also negotiable between the two sponsoring organizations. No Activation Notice is required from the
+new sponsoring organization. The relinquishing sponsoring organization does not need to take any action
+in xTrain when a Fellowship is being transferred via a Change of Recipient Organization. The appointment will stay active as it currently is in xTrain. The new sponsoring organization of the fellow is
+responsible for continuing to manage the xTrain forms and performing the termination on behalf of all
+grant years when the Fellowship award ends.. No Activation Notice is required from the new sponsoring
+institution.
+Transfers involving Federal or foreign sponsoring institutions require unique administrative procedures
+and approvals. Because each transfer varies depending on individual circumstances, the sponsoring institution should contact the NIH awarding IC for specific guidance.
+(GPS page IIB-48)
+
+Any proposed change in the individual’s specified area of research training must be reviewed and
+approved in writing by the NIH awarding IC to ensure that the training continues to be within the scientific scope of the original peer-reviewed application.
+When the sponsor plans to be absent for a continuous period of more than 3 months, an interim sponsor
+must be named by the institution and approved in writing by the NIH awarding IC.
+11.2.13 Other Terms and Conditions
+11.2.13.1 Leave
+Vacations and Holidays. Kirschstein-NRSA fellows may receive the same vacations and holidays available to individuals in comparable training positions at the sponsoring institution. Fellows shall continue
+to receive stipends during vacations and holidays. At academic institutions, the time between semesters
+or academic quarters generally is considered an active part of the training period and is not considered to
+be a vacation or holiday.
+Sick leave and Other Leave. Kirschstein-NRSA fellows may continue to receive stipends for up to 15
+calendar days of sick leave per year. Under exceptional circumstances, this period may be extended by
+the NIH awarding IC in response to a written request from an AOR. Sick leave may be used for medical
+conditions related to pregnancy and childbirth.
+Parental Leave. Kirschstein-NRSA fellows may receive stipends for up to 60 calendar days (equivalent
+to 8 work weeks) of parental leave per year for the adoption or the birth of each child. NRSA trainees
+and fellows must provide advanced notification to the recipient institution prior to taking parental leave.
+Notification of supervisors and others about plans to use leave must be consistent with the organization’s
+policy and must be consistently applied regardless of the source of funds. Either parent is eligible for parental leave. The use of parental leave requires approval by the sponsor.
+Terminal Leave. A period of terminal leave is not permitted, and payment may not be made from grant
+funds for leave not taken.
+Unpaid Leave. Individuals requiring extended periods of time away from their research training experience, that is, more than 15 calendar days of sick leave or more than 60 calendar days of parental leave,
+must seek approval from the NIH awarding IC for an unpaid leave of absence. A request letter signed by
+the fellow and fellowship sponsor must be submitted by the AOR, and must advise the NIH awarding IC
+of the dates of the leave of absence. Upon approval of the request, the NIH awarding IC will issue a
+revised NoA extending the ending date of the current budget/project period by the appropriate number of
+days or months of unpaid leave time. Recipients are precluded from spending award funds during the
+leave of absence; although continued coverage of health insurance would be allowable if in accordance
+with policy of the sponsoring institution.
+During a leave of absence, documentation to suspend the award and/or the accrual of service for calculating the payback obligation must be completed and retained by the sponsoring institution. When the
+fellowship is eventually terminated, the leave of absence must be clearly documented on the Termination
+Notice.
+11.2.13.2 Termination
+NIH may terminate a Kirschstein-NRSA individual fellowship before its scheduled completion date if it
+determines that the recipient has materially failed to comply with the terms and conditions of the award
+or to carry out the purpose for which it was made. If an award is terminated, NIH will notify the fellow
+in writing of the determination, the reasons for the determination, the effective date, and the right to
+appeal the decision.
+(GPS page IIB-49)
+
+NIH also may terminate an award at the request of the sponsoring institution or the individual fellow.
+The NIH awarding IC must be notified immediately if a sponsoring institution wants to terminate an individual fellow or the fellow decides to terminate training before the scheduled completion date.
+If a fellow receives another NIH award, e.g., as a PD/PI on an R03, then the fellow is no longer eligible
+for the fellowship and the sponsoring institution should contact the awarding IC concerning early termination.
+If a Kirschstein-NRSA fellowship is terminated early, the stipend must be prorated according to the
+amount of time spent in training, and the NoA will be revised downward. In addition, if the length of the
+final budget period was 6 months or less, the balance of any institutional allowance (at least one-half)
+must be refunded.
+11.2.13.3 Publications and Sharing of Research Results
+NIH supports the practical application and sharing of outcomes of funded research. Therefore, recipients
+of Kirschstein-NRSA fellowships should make the results and accomplishments of their activities available to the research community and to the public at large. The sponsoring institution should assist the fellow in such activities, including the further development of discoveries and inventions for furthering
+research and benefiting the public. No restrictions should be placed on the publication of results.
+Kirschstein-NRSA fellows are encouraged to submit reports of their findings to the journals of their
+choice for publication. Responsibility for direction of the project should not be ascribed to NIH.
+However, NIH awarding IC support must be acknowledged by a footnote in language similar to the following: “This research was supported by the National Institutes of Health under Ruth L. Kirschstein
+National Research Service Award (number) from the (name of NIH IC).” In addition, Federal funding
+must be acknowledged as provided in Appropriation Mandates—Acknowledgment of Federal Funding in
+IIA.
+The Public Access Policy requirements described in Administrative Requirements—Availability of
+Research Results—NIH Public Access Policy in IIA apply to articles that are authored or co-authored by
+NRSA fellows and arose from NIH Support. Information on publications is included as part of the
+annual progress report.
+11.2.13.4 Copyright
+Except as otherwise provided in the conditions of the award, when a publication or similar copyrightable
+material is developed from work supported by NIH, the author is free to arrange for copyright without
+approval of the NIH awarding IC. Any such copyrighted materials shall be subject to a royalty-free,
+nonexclusive, and irrevocable right to the Federal agency to reproduce, publish, and otherwise use the
+work for Federal purposes  and to authorize others to do so.
+11.2.13.5 Inventions and Patents
+Fellowships funded primarily for educational purposes are not subject to invention reporting requirements nor does NIH have any rights to inventions under those awards (as specified in 37 CFR Part 401.1
+(b)). Kirschstein-NRSA fellows training at NIH represent an exception to this policy. Those fellows are
+subject to the provisions of EO 10096 and NIH determines the disposition of rights to any invention conceived or first actually reduced to practice during the period of the fellowship.
+11.2.13.6 Disposition of Professional Fees
+Fees resulting from clinical practice, professional consultation, or other comparable activities performed
+pursuant to the purpose of the award must be assigned to the sponsoring institution for disposition in
+accordance with established organizational policy. The term “professional fees” does not apply to
+(GPS page IIB-50)
+
+honoraria, fees for scholarly writing, delivery of occasional outside lectures, or service in an advisory
+capacity to public or private non-profit organizations, which, if permitted by organizational policy, may
+be retained by the fellow.
+11.2.13.7 Public Policy Requirements and Objectives
+All Public Policy Requirements, Objectives, and Other Appropriation Mandates discussed in IIA apply
+to Individual Kirschstein-NRSA fellowships when appropriate. Applicants must comply with policies
+and procedures governing such requirements as civil rights; the protection of human subjects, including
+data and safety monitoring requirements and inclusion policies for women, minorities and individuals
+across the lifespan; the humane care and use of live vertebrate animals; human embryonic stem cells;
+and/or or synthetic nucleic acid research. See IIA for a complete list of applicable requirements.
+It is the sponsoring institution’s responsibility to ensure that a fellow has received the proper training/education and is properly supervised particularly in the areas of human subjects research, vertebrate
+animal research, and occupational safety programs.
+Additional information and any application requirements can be found in the Individual Fellowship
+Application Guide.
+Information provided below is in addition to that provided in IIA where unique circumstances might
+exist for individual fellowships.
+11.2.13.7.1 Human Subjects
+Indefinite Involvement. If the sponsoring institution has an approved FWA on file with OHRP but, at
+the time of application, plans for the involvement of human subjects are indefinite, the assurance number
+should be provided in the application. If an award is made, human subjects may not be involved until a
+certification of IRB approval or designation of exemption has been submitted.
+If the applicant organization does not have an approved FWA with OHRP, one needs to be obtained
+prior to IRB approval.
+11.2.13.7.2 Vertebrate Animals
+Indefinite Involvement. If the sponsoring institution has an approved Animal Welfare Assurance on file
+with OLAW but, at the time of application, its plans for the involvement of vertebrate animals are so
+indefinite that IACUC review and approval are not feasible, the institution should indicate “Yes,” to the
+involvement of Vertebrate Animals, include the Animal Welfare Assurance number, and indicate “Indefinite.” If an award is made, vertebrate animals may not be involved until verification of the IACUC
+approval date has been submitted to the NIH awarding IC.
+If the applicant organization does not have an approved Animal Welfare Assurance on file with OLAW
+or for additional information on vertebrate animals, refer to the Individual Fellowship Application Guide
+or contact OLAW (see Part III).
+11.2.13.8 Applicability of NIH Standard Terms of Award
+Individual Fellowships are awarded under the NIH Standard Terms of Award however the provisions to
+extend the final budget period of a project period without additional funds and carryover of unobligated
+balances do not apply.
+(GPS page IIB-51)
+
+11.3 INSTITUTIONAL RESEARCH TRAINING GRANTS
+11.3.1 General
+NIH will award Kirschstein-NRSA institutional research training grants (T32, TL2, T34, T35, T35 and
+T90) to eligible institutions to develop or enhance research training opportunities for individuals, selected by the institution, who are training for careers in specified areas of biomedical, behavioral, and clinical research. The purpose of the Kirschstein-NRSA program is to help ensure that a highly trained
+workforce is available in adequate numbers and in the appropriate research areas and fields to carry out
+the nation’s biomedical, behavioral, and clinical research agenda. Training activities can be in basic biomedical or clinical sciences, in behavioral or social sciences, in health services research, or in any other
+discipline relevant to the NIH Mission. The Kirschstein-NRSA training programs support predoctoral,
+postdoctoral, and short-term research training as well as limited specialized support at the prebaccalaureate level. All NIH ICs except FIC and NLM award Kirschstein-NRSA institutional research
+training grants. FIC and NLM have unique funding authorities for training grants that are separate from
+the Kirschstein-NRSA authority.
+11.3.2 Eligibility
+11.3.2.1 Applicant Eligibility
+A domestic, non-profit public or private organization may apply for a grant to support a research training
+program in a specified area(s) of research. Support for predoctoral, postdoctoral, or a combination of
+trainees may be requested. (Specific program announcements should be consulted for IC guidelines.) Support for short-term training positions for students in health-professional degree programs also may be
+requested as indicated in Short-Term Research Training in this subsection. Each applicant institution
+must submit an application using the research training forms and instructions (see Application Requirements and Due Dates in this subsection).
+11.3.2.2 Research Areas
+Kirschstein-NRSA institutional research training grants may be made for research training in areas that
+fall within the missions of the NIH ICs. Applications that do not address these areas will be returned. An
+increased emphasis has been placed on the research training of physicians. The HHS Secretary is
+required by law, in taking into account the overall national needs for biomedical research personnel, to
+give special consideration to physicians who agree to undertake a minimum of 2 consecutive years of biomedical, behavioral, or clinical research training.
+The applicant institution must have a strong research program in the areas proposed for research training
+and must have the staff and facilities required to carry out the proposed program.
+Trainees appointed to the training program must have the opportunity to carry out supervised biomedical,
+behavioral, social or clinical research with the primary objective of developing or extending their
+research skills and knowledge in preparation for a research career.
+11.3.2.3 Training Program Director/Principal Investigator(s)
+The Training PD/PI must be an individual with the skills, knowledge, and resources necessary to organize and implement a high-quality research training program at the recipient organization. The Training
+PD/PI at the recipient organization will be responsible for the selection and appointment of trainees to
+the Kirschstein-NRSA research training grant and for the overall direction, management, and administration of the training program, including program evaluation, and submission of all required forms in a
+(GPS page IIB-52)
+
+timely manner. In selecting trainees, the PD/PI must make certain that individuals receiving support meet
+the eligibility requirements set forth in this subsection.
+More than one Training PD/PI (or multiple PD/PIs), may be designated on the application for training
+programs that require a team approach and therefore, clearly do not fit the single-PD/PI model (e.g., interdisciplinary of multidisciplinary training). The decision to apply for a single PD/PI or multiple PD/PIs is
+the responsibility of the investigators and applicant organizations, and should be determined and justified
+by the goals of the training program. Applications for grants with multiple PD/PIs require additional
+information, including the structure and governance of the PD/PI leadership team. In addition, the knowledge, skills and experience of the individual PD/PIs will be factored into the assessment of the overall
+scientific merit of the application. Multiple PD/PIs on a program share the authority and responsibility
+for leading and directing the training program, intellectually and logistically. Each PD/PI is responsible
+and accountable to the recipient organization for the proper conduct of the program, including the submission of required reports.
+Applications reflecting multiple PD/PIs must provide a Leadership Plan. The emphasis in the Leadership
+Plan should be on how it will benefit the research training program and the trainees.
+A single Contact PD/PI must be designated for the purpose of communicating with NIH, although other
+individuals may contact  NIH on behalf of the Contact PD/PI when necessary. Because training programs
+are intended to be coherent, NIH will not allocate the budget or training positions between multiple
+PD/PIs. Only a single award will be issued. Multiple PD/PI training programs should include reasonable
+numbers of PD/PIs and each individual should be included for a specific purpose. Multiple-PD/PI applications should not include all mentors of the training grant as PD/PIs, except in unusual cases.
+11.3.2.4 Research Training Program
+A Kirschstein-NRSA institutional research training grant must be used to support a program of research
+training. It may not support studies leading to the M.D., D.D.S., D.V.M., or other clinical, health professional training except when those studies are a part of a formal combined research degree program,
+such as the M.D./Ph.D. Similarly, trainees may not accept Kirschstein-NRSA support for clinical training
+that is part of residency training leading to clinical certification in a medical or dental specialty or subspecialty. However, clinicians are permitted and encouraged to engage in Kirschstein-NRSA-supported
+full-time, postdoctoral research training even when that experience is creditable toward certification by a
+clinical specialty or subspecialty board.
+Research trainees are expected to devote full time to the proposed research training. Full-time is generally defined as devoting at least 40 hours per week to the program or as specified by the sponsoring
+institution in accordance with its own policies. In order to fulfill the full-time requirement, trainees who
+also are training as clinicians must confine clinical duties to those that are an integral part of the research
+training experience.
+11.3.2.5 Degree Requirements
+11.3.2.5.1 Predoctoral Training
+Predoctoral research training is for individuals who have a baccalaureate degree or equivalent and are
+enrolled in and training at the postbaccalaureate level in a program leading to either a Ph.D., a comparable research doctoral degree, or a combined clinical degree and Ph.D., such as M.D./Ph.D. Individuals who have Ph.D., M.D., D.D.S., D.M.D., D.C., D.O., D.V.M., O.D., D.P.M., Sc.D., Eng.D., Dr.
+P.H., D.N.Sc., D.P.T., Pharm.D., N.D., D.S.W., Psy.D., or equivalent doctoral degree from an accredited
+domestic or foreign organization are not eligible for predoctoral training. Students enrolled in an integrated dual degree program leading to any of the degrees described above are eligible for the predoctoral
+(GPS page IIB-53)
+
+training program. An integrated dual degree training program is a postgraduate program that leads to two
+degrees that are pursued concurrently. The student maintains their predoctoral training status as long as
+they remain enrolled in the dual degree program, regardless of whether the health professional degree
+(M.D. D.D.S.) is awarded prior to the research doctoral degree. A student cannot possess both predoctoral and postdoctoral statuses. A student that is not enrolled in a dual degree program and is pursuing both a research degree and health professions degree separately will not maintain their predoctoral
+status if the student completes one degree prior to completing the other degree (e.g. student completes
+the M.D. degree prior to completing their Ph.D.).
+Students enrolled in health-professional programs that are not part of a formal, dual-degree program (i.e.,
+M.D./Ph.D.), and who wish to postpone their professional studies to gain research experience, also may
+be appointed to a Kirschstein-NRSA institutional research training grant. Predoctoral research training
+must emphasize fundamental training in areas of basic biomedical, behavioral, and clinical sciences.
+11.3.2.5.2 Postdoctoral Training
+Postdoctoral research training is for individuals who have received a Ph.D., M.D., D.D.S., D.M.D., D.C.,
+D.O., D.V.M., O.D., D.P.M., Sc.D., Eng.D., Dr. P.H., D.N.Sc., D.P.T., Pharm.D., N.D., D.S.W., Psy.D.,
+or equivalent doctoral degree from an accredited domestic or foreign organization. It is the responsibility
+of the recipient institution, not NIH, to determine if a foreign degree is equivalent. Research training at
+the postdoctoral level must emphasize specialized training to meet national research priorities in the biomedical, behavioral, or clinical sciences.
+Kirschstein-NRSA institutional research training grants are a desirable mechanism for the postdoctoral
+training of physicians and other health professionals who may have had extensive clinical training but
+limited research experience. For such individuals, the training may be a part of a research degree program. In all cases, health-professional postdoctoral trainees are to engage in at least two years of
+research, research training, or comparable experiences beginning at the time of appointment.
+11.3.2.5.3 Short-Term Research Training
+Short-term research training includes the following:
+ l Students in Health Professional Schools. NIH offers two short-term training programs: those
+that are part of a traditional institutional research training grant (T32) and those that exclusively
+support short-term trainees (T35). Short-term research training experiences of 2 to 3 months are
+available to students in health-professional schools under both mechanisms. All short-term training must be full time. Unless otherwise stated, the requirements that apply to institutional
+research training grants also apply to short-term research training. Current stipend levels are published in the NIH Guide for Grants and Contracts.
+ l T32. T32 (Kirschstein NRSA-Institutional Research Training Grant) applications may include a
+request for short-term positions reserved specifically to provide full-time health-related research
+training experiences during the summer or other “off-quarter” periods. Such positions are limited
+to medical students, dental students, students in other health-professional programs, and graduate
+students in the physical or quantitative sciences. Short-term appointments under institutional
+research training grants are intended to provide health-professional students with opportunities to
+participate in biomedical, behavioral, or clinical research in an effort to attract these individuals
+into research careers.
+To be eligible for short-term predoctoral research training positions, students must be enrolled and in
+good standing and must have completed at least one quarter or semester in a program leading to a clinical doctorate or doctorate degree in a quantitative science, such as physics, mathematics, or engineering,
+(GPS page IIB-54)
+
+before participating in the program. Individuals already matriculated in a formal research degree program
+in the health sciences, holding a research doctorate or master’s degree, or a combined professional and
+research doctorate normally are not eligible for short-term training positions. In schools of pharmacy,
+only candidates for the Pharm. D. degree are eligible for short-term positions.
+Short-term positions should be requested in the application. Short-term research training positions should
+last at least 8, but no more than 12, weeks. Health-professional students and students in the quantitative
+sciences selected for appointment should be encouraged to obtain multiple periods of short-term, healthrelated research training during the years leading to their degrees. Such appointments may be consecutive or may be reserved for summers or other “off-quarter” periods.
+Since some NIH ICs do not support short-term research training positions under the T32 or support them
+on a limited basis only, applicants are urged to contact the appropriate NIH IC before requesting shortterm research training positions as part of a T32 application.
+T35. Several NIH ICs provide short-term research using a separate training grant mechanism (T35). The
+program intent and student eligibility requirements are similar to those indicated for the T32. However,
+since this Kirschstein-NRSA funding mechanism is used by only a few NIH ICs; interested applicants
+are encouraged to contact specific ICs for details.
+11.3.2.5.4 Pre-baccalaureate Training
+NIH offers distinct programs for pre-baccalaureate training under the auspices of the Kirschstein-NRSA
+undergraduate support mechanism (T34).
+These programs are designed to support selected students at a variety of institutions, depending on the
+specific program.
+Information about the specific programs are available in the applicable NOFOs.
+11.3.2.6 Citizenship
+The individual to be trained must be a citizen or a noncitizen national of the United States or have been
+lawfully admitted for permanent residence at the time of appointment. Noncitizen nationals are individuals who, although not citizens of the United States, owe permanent allegiance to the United States.
+They generally are people born in outlying possessions of the United States (e.g., American Samoa and
+Swains Island). Individuals who have been lawfully admitted for permanent residence must have a currently valid Permanent Resident Card (USCIS Form I-551) or other legal verification of such status. For
+example, if an individual has the proper validation on their passport, a notarized photocopy of the passport could suffice. Because there is a 6-month limitation on this validation, it is the recipient’s responsibility to follow up and ensure that the individual received the I-551 prior to the 6-month expiration date.
+A notarized statement verifying possession of permanent residency documentation must be submitted
+with the Statement of Appointment (PHS Form 2271). Individuals with a Conditional Permanent Resident status may be supported on Kirschstein-NRSA training grants; however, as with all types of Permanent Resident status it is the recipient’s responsibility to assure the individual remains eligible for
+NRSA support for the period of time of any appointment. Individuals with Asylum/Refugee status do not
+automatically hold a form of permanent residency status; they have the opportunity to apply for permanent residency status once they have been in the U.S. for a period of time. Therefore, individuals with
+Asylum/Refugee status may not be appointed to a Kirschstein-NRSA training grant until they have also
+secured permanent residency status. Individuals on temporary or student visas are not eligible for
+Kirschstein-NRSA support.
+(GPS page IIB-55)
+
+11.3.3 Application Requirements and Due Dates
+11.3.3.1 Application
+All applications for Kirschstein-NRSA institutional research training grants are submitted electronically
+through Grants.gov and use an application package that combines form components from the SF424
+(R&R) application along with the PHS398 components. Application forms and instructions are provided
+as part of each NOFO. Applicants should pay particular attention to the special instructions for institutional research training grants found in the SF424(R&R) Application Guide.
+11.3.3.2 Due Dates
+Several NIH ICs receive training grant applications three times each year; however, many ICs use only
+one or two receipt dates. Information on IC-specific receipt dates is available on Grants.gov in the NIH-
+wide T32 and T35 NOFOs and NOFOs issued by the individual NIH ICs or by contacting the appropriate NIH IC program official. For a list of the standard receipt dates and review cycle, see the NIH
+Standard Due Dates website. (Also see research training.)
+Applicants are encouraged to contact the appropriate NIH staff before preparing and submitting an application.
+11.3.3.3 Special Program Considerations
+The duration of training, the transition of trainees to individual support mechanisms, and their transition
+to the next career stage are important considerations in institutional training programs. Studies have
+shown that the length of the research training grant appointment of postdoctoral trainees with health-professional degrees strongly correlates to subsequent application for and success in receiving independent
+NIH research support. Therefore, Training PD/PIs should appoint only those individuals who are committed to a career in research and plan to remain on the training grant or in a non-Kirschstein-NRSA
+research experience for a minimum of 2 years in the aggregate. It also has been shown that transition to
+independent support is related to career success. Therefore, Training PD/PIs also should encourage and
+provide training in the skills necessary for postdoctoral trainees to apply for subsequent support through
+individual postdoctoral fellowships, mentored career development awards (K programs), or independent
+research project grants. When reviewing Kirschstein-NRSA institutional research training grant applications, peer reviewers will examine the training record to determine the average duration of training
+appointments for health-professional postdoctoral trainees and whether there is a history of transition to
+individual support mechanisms.
+ Programs located in clinical departments that focus on research training for individuals with the M.D. or
+other health-professional degrees should consider developing ties to basic science departments, or, if consistent with the goals of the program, modifying the program to include individuals with research doctorates. In these cases, applications should describe the basic science department’s contribution to the
+research training experience and also indicate whether both health professional trainees and trainees with
+research doctorates will be included in the training program.
+Training PD/PIs also must develop methods for ongoing evaluation of the quality and effectiveness of
+the training program. This should include plans to obtain feedback from current and former trainees to
+help identify weaknesses in the program and provide suggestions for program improvements as well as
+plans for assessing trainee’s career development and progression, including publications, degree completion, and post-training positions. Evaluation results are to be included in competing continuation
+(renewal) applications and as part of the Final RPPR.
+Within the framework of the program’s longstanding commitment to excellence and projected need for
+investigators in particular areas of research, attention must be given to recruiting prospective trainees
+(GPS page IIB-56)
+
+from all backgrounds  in the biomedical, behavioral and clinical sciences. According to 42 USC 288 (a)
+(4), this program must be carried out "in a manner that will result in the recruitment of women, and individuals from disadvantaged backgrounds (including racial and ethnic minorities), into fields of biomedical or behavioral research and in the provision of research training to women and such individuals."
+Individuals of all backgrounds are encouraged to participate.
+11.3.3.4 Training in the Responsible Conduct of Research
+Every trainee supported by an NRSA training grant must receive instruction in the responsible conduct
+of research. All applications must include a plan to provide such instruction. The plan must address the
+five components listed below. Renewal (Type 2) applications must, in addition, describe changes in
+formal instruction over the past project period and plans for the future to address any weaknesses in the
+current instructional plan. All training faculty who served as course directors, speakers, lecturers, and/or
+discussion leaders during the past project period must be named in the application. Applications lacking
+a plan for instruction in responsible conduct of research will be considered incomplete and may be
+delayed in the review process. Plans and past record will be rated as acceptable or unacceptable.  Applications with unacceptable plans will not be funded until the applicant provides an acceptable, revised
+plan.  For additional instructions, see the specific NOFO.
+1. Format. Discussion-based instruction in the responsible conduct of research is expected to remain a
+key feature of RCR training and to include substantive face-to-face interaction among participants and
+faculty. However, recognizing that advances in video conferencing now allow for effective “face-toface” discussions to occur electronically, institutions may wish to consider incorporating video conferencing options into their RCR instruction, provided that those options are utilized in a way that fosters
+discussion, active learning, engagement, and interaction among the participants. At the same time, video
+conferencing should not be the sole means for meeting the requirement for RCR instruction, and a plan
+that employs only video conferencing will not be considered acceptable, except in special instances of
+short-term training programs, or unusual and well-justified circumstances
+2. Subject Matter. Developments in the conduct of research and a growing understanding of the impact
+of the broader research environment have led to a recognition that additional topics merit inclusion in discussions of the responsible conduct of research, including:
+ a. conflict of interest – personal, professional, and financial – and conflict of commitment, in allocating time, effort, or other research resources
+ b. policies regarding human subjects, live vertebrate animal subjects in research, and safe laboratory practices
+ c. mentor/trainee responsibilities and relationships.
+ d. safe research environments (e.g., those that  are free of sexual, racial, ethnic, disability and other
+forms of discriminatory harassment)
+ e. collaborative research including collaborations with industry and investigators and institutions in
+other countries
+ f. peer review, including the responsibility for maintaining confidentiality and security in peer
+review
+ g. data acquisition and analysis; laboratory tools (e.g., tools for analyzing data and creating or working with digital images); recordkeeping practices, including methods such as electronic laboratory notebooks;
+ h. secure and ethical data use; data confidentiality, management, sharing, and ownership
+ i. research misconduct and policies for handling misconduct
+(GPS page IIB-57)
+
+j. responsible authorship and publication
+ k. the scientist as a responsible member of society, contemporary ethical issues in biomedical
+research, and the environmental and societal impacts of scientific research
+3. Faculty Participation. Training faculty and sponsors/mentors are highly encouraged to contribute both
+to formal and informal instruction in responsible conduct of research. Informal instruction occurs in the
+course of laboratory interactions and in other informal situations throughout the year. Training faculty
+may contribute to formal instruction in responsible conduct of research as discussion leaders, speakers,
+lecturers, and/or course directors. Rotation of training faculty as course directors, instructors, and/or discussion leaders may be a useful way to achieve the ideal of full faculty participation in formal responsible conduct of research courses over a period of time.
+4. Duration of Instruction. Instruction should involve substantive contact hours between the trainees and
+the participating faculty. Acceptable programs generally involve at least eight contact hours. A semesterlong series of seminars/programs may be more effective than a single seminar or one-day workshop
+because it is expected that topics will then be considered in sufficient depth, learning will be better consolidated, and the subject matter will be synthesized within a broader conceptual framework.
+5. Frequency of Instruction. Existing policy and guidance call for RCR instruction to be undertaken at
+least once during each career stage, and at a frequency of no less than once every four years. As institutions consider how to optimize the timing and delivery of instruction in the responsible conduct of
+research, they are encouraged to bear in mind the value of ongoing and discipline-specific training as
+individuals progress in their research careers. For example, while broad-based instruction in the responsible conduct of research is often appropriate early in graduate school; a more tailored, discipline-specific
+approach may better fit the needs of advanced graduate students and those who have transitioned to
+postdoctoral status. If advanced students and postdoctorates have been exposed to the full range of topics
+traditionally included in RCR instruction early in their scientific training, it may make sense for their
+ongoing and/or subsequent RCR training to focus on subjects most relevant to their fields, and institutions may wish to consider this approach, where applicable.
+Information on the nature of the instruction in the responsible conduct of research and the extent of
+trainee and faculty participation also must be provided in the annual progress report submitted as a prerequisite to receiving non-competing continuation support.
+11.3.4 Review
+11.3.4.1 Overall
+Each initial and competing continuation application will be evaluated for scientific merit by an NIH peer
+review group. Kirschstein-NRSA institutional research training grant applications also must be reviewed
+by the National Advisory Council or Board of the IC whose activities relate to the proposed research
+training.
+11.3.4.2 Overall Impact
+Reviewers will provide an overall impact score to reflect their assessment of the likelihood for the
+research training program to exert a sustained, powerful influence on the research field(s) involved. The
+scored review criteria and additional review criteria (as applicable for the research training program proposed) will be considered when determining the overall impact.
+(GPS page IIB-58)
+
+11.3.4.3 Scored Review Criteria
+Reviewers will consider each of the review criteria below in the determination of the scientific and technical merit, and give a separate score for each. An application does not need to be strong in all categories
+to be judged likely to have major scientific merit.
+ l Training Program and Environment
+ l Training Program Director/Principal Investigator
+ l Preceptor/Mentors
+ l Trainees
+ l Training Record
+The NOFO should be consulted for additional information describing each of the scored review criteria.
+Individual Institutes and Centers may have additional specialized review criteria appropriate for their special initiatives and mission.
+11.3.4.4 Additional Review Criteria
+As applicable for the project proposed, reviewers will consider the following additional items in the
+determination of scientific and technical merit, but will not give separate scores for these items.
+ l Protections for Human Subjects
+ l Inclusion of Women, Minorities, and Individuals Across the Lifespan
+ l Vertebrate Animals
+ l Biohazards
+ l Training in Methods for Enhancing Reproducibility
+ l Resubmission Applications
+ l Renewal Applications
+ l Revision Applications
+The NOFO should be consulted for additional information describing each of the relevant addition
+review criteria.
+11.3.4.5 Additional Review Considerations
+As applicable for the training program proposed, reviewers will address each of the following items, but
+will not give scores for these items and should not consider them in providing the overall impact score:
+ l Training in the Responsible Conduct of Research
+ l Select Agents Research
+ l Budget and Period of Support
+The NOFO should be consulted for additional information describing each of the relevant addition
+review considerations.
+11.3.4.6 National Advisory Council Review
+Following initial peer review, applications undergo a second-level review by the appropriate NIH IC’s
+National Advisory Council or Board. In addition to the assessment of the scientific and educational merit
+(GPS page IIB-59)
+
+of the research training grant application, these advisory groups will consider the initial peer review
+group’s comments on  the plan for instruction in the responsible conduct of research.
+11.3.5 Notification of Action
+Shortly after the initial peer review meeting, the PD/PI will be sent an e-mail indicating that the SRG
+recommendation/impact score is available in the eRA Commons. The PD/PI is also notified via an e-mail
+when the summary statement is available in the eRA Commons. The PD/PI may be notified by the PO of
+the final review recommendation. Once any and all administrative and programmatic issues have been
+resolved, the NoA will be issued for applications selected for funding. Any questions concerning initial
+review recommendations and funding possibilities should be directed to the named PO, not to the SRO
+of the SRG. Name and contact information of the assigned PO is also available in the eRA Commons.
+11.3.6 Period of Support
+11.3.6.1 Training Grants
+Kirschstein-NRSA institutional research training grants may be made for competitive segments of up to
+5 years and are renewable. Awards within an approved competitive segment normally are made in 12-
+month increments, referred to as budget periods; support for additional non-competitive years depends
+on satisfactory progress, submission of all required trainee-related documents, and availability of funds.
+11.3.6.2 Trainees
+Trainees under Kirschstein-NRSA institutional research training grants generally are appointed for fulltime 12-month continuous periods. An appointment or reappointment period may begin any time during
+a particular budget period but may not begin before the budget period start date of the grant year. An
+appointment or reappointment may not exceed 12 months without prior approval by the NIH awarding
+IC. All trainees are required to pursue their research training on a full-time basis. Full-time is generally
+defined as devoting at least 40 hours per week to the program or as specified by the recipient institution
+in accordance with its own policies. Unless the NIH awarding IC furnishes other instructions, the amount
+of the stipend, tuition, and fees for each full period of appointment must be obligated by the recipient
+from funds available when the individual begins training.
+With the exception of specifically designated short-term research training positions, no trainee may be
+appointed under a regular Kirschstein-NRSA institutional research training grant for less than 9 months
+except with the prior written approval of the NIH awarding IC and then usually only to complete an
+ongoing program of training. An initial appointment of less than 9 months may be allowed as long as an
+assurance is included that the individual will be immediately reappointed in the subsequent year so that
+the cumulative continuous training period is at least 9 months.
+Part-Time Training. While Kirschstein-NRSA trainees are required to pursue research training on a fulltime basis, under certain circumstances, a written request may be submitted to the NIH awarding IC to
+change a trainee appointment to less than full time. All such requests must be signed by the trainee, the
+AOR and the training grant PD/PI.  The request for part-time training must provide a justification of the
+need for a reduced level of effort and the expected duration of the period of part-time training. Such
+requests will be considered case-by-case and must be approved by the awarding IC before the applicable
+budget period. The circumstances requiring the part-time training might include medical conditions, disability, or personal or family situations such as a child or elder care. Part-time training will not be
+approved to accommodate use of other sources of funding, job opportunities, clinical practice, clinical
+training, or for other responsibilities associated with the trainee’s position at the organization. In each
+case, the written request must be signed by an AOR and must include documentation supporting the need
+(GPS page IIB-60)
+
+for part-time training. Countersignatures of the trainee and program director must be secured and
+retained by the recipient, but need not be submitted to NIH prior to submission to NIH. The written
+request also must include an estimate of the expected duration of the period of part-time training and
+assurances that the trainee intends to return to full-time training when that becomes possible and intends
+to complete the research training program.
+The stipend may be prorated in the grant award during the period of any approved part-time training.
+Part-time training also may affect the rate of accrual or repayment of the service obligation for postdoctoral trainees. In no case will it be permissible for the trainee to be engaged in Kirschstein-NRSA-supported research for less than 50 percent effort. Individuals who must reduce their commitment to less
+than 50 percent effort must take a leave-of-absence from a Kirschstein-NRSA training grant.
+11.3.6.3 Kirschstein-NRSA Limitations
+No individual trainee may receive more than 5 years of aggregate Kirschstein-NRSA support at the predoctoral level and 3 years of aggregate Kirschstein-NRSA support at the postdoctoral level, including
+any combination of support from Kirschstein-NRSA institutional research training grants and individual
+fellowships.
+Any exception to the maximum period of support requires a waiver from the NIH awarding IC based on
+review of a justification from the individual and the recipient organization. The AOR must make the
+request in writing to the NIH awarding IC on behalf of the trainee. The endorsement of the trainee’s
+PD/PI certifying the need for additional support is retained by the recipient institution. The request must
+specify the amount and length of additional support for which approval is sought.
+Some generally recognized categories under which NIH may grant exceptions include the following:
+ l Physicians/Clinicians. Individuals requiring additional time to complete training, either as participants in a combined M.D./Ph.D. program or as clinicians (e.g., physicians, dentists, veterinarians) who are completing postdoctoral research training, may anticipate favorable
+consideration of a request for waiver of the time limitation. This action is contingent upon an
+assurance of the trainee’s good academic standing and justified need for the exception to this
+policy.
+ l Interruptions (Break in Service). Requests for additional time also will be considered if an
+event unavoidably has altered the planned course of the research training, if the interruption has
+significantly detracted from the nature or quality of the planned research training, and if a short
+extension would permit completion of the training as planned. Such events include sudden loss
+of the preceptor’s services or an accident, illness, or other personal situation that prevents a
+trainee from effectively pursuing research training for a significant period of time. Requests for
+extension of support also will be considered if a short additional period would provide the
+trainee an opportunity to use an exceptional training resource directly related to the approved
+research training program.
+Requests that arise from circumstances other than those described above will be considered only if they
+are accompanied by an exceptionally strong justification.
+11.3.7 Initiation of Support
+The NoA is issued to the recipient organization, generally for a budget period of 12 months. A trainee
+may be appointed any time during the budget period for an appointment period of 9 to 12 months,
+without prior approval by the NIH awarding IC. A trainee appointment may not begin before the budget
+period start date.
+(GPS page IIB-61)
+
+At the time of the initial appointment and subsequent reappointment of trainees, the Training PD/PI must
+submit a Statement of Appointment for each trainee to the NIH awarding IC. In addition, a signed Payback Agreement must be submitted for each postdoctoral trainee who is in their first 12 months of
+Kirschstein-NRSA postdoctoral support. See Reporting Requirements—Statement of Appointment (Form
+PHS 2271) and Reporting Requirements—Payback Agreement (Form PHS 6031) in this chapter for specific information on required forms. The Statement of Appointment includes biographical data on the
+trainee and the stipend level for the period of appointment. The stipend is paid by the recipient organization directly to the trainee.
+11.3.8 Allowable and Unallowable Costs
+Policies included in the applicable cost principles in 2 CFR Part 200, Subpart E and the NIHGPS govern
+the expenditure of all training grant funds, unless otherwise indicated in the NoA.
+11.3.8.1 Pre-Award Costs
+While some pre-award costs are allowable to a training grant, recipients should note that stipends and
+tuition and fees may not be charged to a grant until a trainee has been officially appointed and the appropriate paperwork submitted to NIH. Therefore, these costs may not be charged as pre-award to an institutional training grant. There are rare occasions when costs associated with training related expenses
+and/or trainee travel may be allowable as pre-award costs. Recipient institutions should consult with the
+NIH awarding IC when considering a pre-award cost.
+11.3.8.2 Stipends
+Trainees generally are supported for 12-month full-time training appointments for which they receive a
+stipend as a subsistence allowance to help defray living expenses during the research training experience.
+The stipend is not “salary” and is not provided as a condition of employment with either the Federal government or the recipient organization.
+While stipends are not provided as a condition of employment, NIH policy is not intended to discourage
+or otherwise prevent recipient organizations from hiring NRSA trainees and fellows as employees or
+providing them with benefits consistent with what the organization provides other employees at similar
+career stages. Institutions should consult their local IRS office about the applicability of the law to their
+situation and for information on their tax obligations.
+Stipends must be paid in accordance with established stipend levels. No departure from the standard stipend provided by NIH under the grant may be negotiated by the recipient organization with the trainee.
+NIH stipend amounts may be adjusted only at the time of appointment or reappointment. For appointments of less than 12 months, the stipend will be prorated.
+Stipend levels are updated almost every fiscal year. When increases are approved, they are published in
+NIH Guide for Grants and Contracts. Current levels also are posted on NIH Fiscal Policies page..
+Stipend levels are as follows:
+ l Prebaccalaureate. One stipend level is provided for trainees.
+ l Predoctoral. One stipend level is used for all predoctoral trainees, regardless of the level of
+experience.
+(GPS page IIB-62)
+
+l Postdoctoral. The stipend level for the entire first year of support is determined by the number
+of full years of relevant postdoctoral experience at the time of appointment. Relevant experience
+may include research experience (including industrial), teaching assistantship, internship, residency, clinical duties, or other time spent in a health-related field beyond that of the qualifying
+doctoral degree. Once the appropriate stipend level has been determined, the trainee must be
+paid at that level for the entire grant year. The stipend for each additional year of Kirschstein-
+NRSA support is the next level in the stipend structure and does not change mid-year.
+11.3.8.3 Trainee Tuition and Fees
+Tuition and fees are allowable trainee costs only if such charges are applied consistently to all individuals in a similar training status at the organization, without regard to their source of support.
+Tuition at the postdoctoral level is limited to that required for specific courses in support of the approved
+training program and requires NIH awarding IC prior approval.
+Tuition and fees are provided under the following policy:
+ l For Predoctoral Trainees. An amount equal to 60% of the actual tuition level at the applicant
+institution, up to $16,000 per year, will be provided. If the program supports formally combined
+dual-degree training (e.g., M.D.-Ph.D, D.D.S.-Ph.D.), the amount provided per trainee will be
+60% of the actual tuition level, up to $21,000 per year.
+ l For Postdoctoral Trainees. An amount equal to 60% of the actual tuition level at the applicant
+institution, up to $4,500 per year, will be provided. If the trainee is enrolled in a program that
+supports postdoctoral individuals in formal degree-granting training, the amount provided per
+trainee will be 60% of the actual tuition level, up to $16,000 per year.
+Tuition and fees are awarded as a lump sum that can be allocated (without the prior approval of the NIH
+awarding IC) based on recipient needs.
+11.3.8.4 Training-Related Expenses
+Funds are provided to defray costs such as staff salaries, consultant costs, equipment, research supplies,
+staff travel, trainee health insurance (self-only or family as applicable), and other expenses directly
+related to the training program. Funds are requested and awarded as a lump sum on the basis of the predetermined amount per predoctoral and postdoctoral trainee approved for support. Levels are published
+in the NIH Guide for Grants and Contracts. Interested applicants should consult the program announcement regarding the specific level for programs such as the short-term training program or the MARC  program. Many of the costs allowable under Training-Related Expenses may cover global costs for an
+institutional training program where the Kirschstein-NRSA support covers only some of the participating
+trainees. For these types of global costs, institutions should allocate the appropriate portion of such costs
+to the training grant. Institutions are reminded that this budget category is a finite amount of money available to cover a variety of allowable costs. Institutions should be particularly mindful to apply core cost
+principles of allocation and consistent treatment.
+Health Insurance. Health Insurance (self-only or family) are allowable trainee related expenses only if
+such charges are applied consistently to all individuals in a similar training status at the organization,
+without regard to their source of support. Health insurance can include coverage for costs such as vision
+and/or dental care if consistent with organizational policy. Health insurance is awarded as part of the
+Training Related Expenses category.
+Medical Liability and Other Special Insurance. Medical liability (malpractice) insurance or other special insurance is an allowable cost to NRSA grants only if nature of the research training requires such
+special insurance. For instance, medical liability would be allowable if the research training experience
+(GPS page IIB-63)
+
+involves direct contact with patients or human subjects. In all cases, for the cost to be charged to the
+NRSA grant, it must be consistently required for all in a similar training status, regardless of the source
+of support. Special insurances that are routinely offered as optional employee benefits (such as disability
+insurance, life insurance, or workman’s compensation insurance), are not normally allowable charges
+(see separate section on Employee Benefits) unless the nature of the research training requires such special insurance.
+Staff Salaries. Institutions are reminded that applicable cost principles apply. Training programs may
+qualify as a “major project” where administrative salaries are allowable as a training-related expense.
+Speaker Fees. When speakers are part of program required for NSRA-supported trainees, a portion of
+such a cost could be charged as Training-related expenses.
+Meals. As stated in IIA, the cost of meals may be allowable if they are provided in conjunction with a
+meeting considered an ancillary activity to the training grant. A portion of such a cost could be charged
+as Training-related expenses. See Cost Considerations—The Cost Principles in IIA for specific guidance
+on the need institutional policies on consistent treatment and reasonableness.
+Extraordinary Costs. Under exceptional circumstances, which can include accommodating the disabilities of a trainee, it is possible to request organizational costs above the standard level. Requests for
+additional costs must be explained in detail and justified in the application. Consultation with NIH program staff in advance of such requests is strongly advised.
+11.3.8.5 Trainee Travel Costs
+If requested by the recipient, the NIH awarding IC may provide grant funds to cover the costs of trainee
+travel, including attendance at scientific meetings, which the organization determines is necessary to the
+individual’s training. Trainees must be appointed to the training grants at time of the actual travel for this
+to be an allowable cost. Funds may not be expended to cover the costs of travel between the trainee’s
+place of residence and the training institution, except that the recipient organization may authorize a oneway travel allowance in an individual case of extreme hardship.
+In addition, support for travel to a research training experience away from the recipient organization may
+be permitted. Research training experiences away from the parent organization must be justified on the
+basis of the type of opportunities for training available, the opportunities offered that are different from
+those at the parent organization, and the relationship of the proposed experience to the trainee’s career
+stage and career goals. This type of research training requires prior approval of the NIH awarding IC.
+Letters requesting such training may be submitted to the NIH awarding IC at any time during the appointment period.
+11.3.8.6 Short-Term Training Costs
+The recipient may receive up to one-twelfth of the annual amount designated for training-related
+expenses each month to offset the costs of tuition, fees, travel, supplies, and other expenses for each
+short-term, health-professional research training position.
+11.3.8.7 Employee Benefits
+Because Kirschstein-NRSA awards are not provided as a condition of employment with either the
+Federal government or the recipient, it is inappropriate and unallowable for organizations to seek funds,
+or to charge Kirschstein-NRSA institutional research training grants, for costs that normally would be
+associated with employee benefits (for example, FICA, workers compensation, life insurance, union
+dues, and unemployment insurance). Concerning union dues or other similar costs otherwise paid personally by the trainee, if a trainee requests the institution deduct such a cost from the stipend amount, the
+(GPS page IIB-64)
+
+institution can provide the trainee such a service. However, in no case can such a deduction from the stipend be made automatically without the approval of the trainee and institution.
+11.3.8.8 Indirect Costs
+Recipients, other than State, local, or Indian tribes (or ‘‘federally recognized Indian tribes”), will receive
+indirect costs at 8 percent of modified total direct costs (exclusive of tuition and fees,  childcare costs,
+consortiums in excess of $25,000, and expenditures for equipment) rather than on the basis of a negotiated rate agreement. State, local, and Indian tribe (or ‘‘federally recognized Indian tribes”) are eligible
+for full indirect cost reimbursement. For this policy, State universities or hospitals are not considered
+governmental agencies.
+11.3.8.9 Childcare Costs
+Childcare costs are allowable for full-time predoctoral or postdoctoral NRSA trainees appointed to the
+NRSA institutional research training award prior to use of the childcare costs. NIH will provide childcare
+costs at the time each new, renewal, or continuation award is made. Childcare cost levels are updated
+periodically and published in the NIH Guide for Grants and Contracts.
+The NRSA trainee childcare costs are not tied to payback obligations and should not be reported as such.
+Childcare must be provided by a licensed childcare provider. Recipients must maintain all supporting
+documentation (e.g., proof provider is licensed) and make it available to NIH officials upon request. NIH
+does not require recipients to submit this supporting documentation with each request.
+11.3.9 Rebudgeting of Funds
+Funds may be rebudgeted only as follows:
+ l Trainee-Related Expenses. Rebudgeting of funds awarded in a lump sum for trainee-related
+expenses does not require NIH awarding IC prior approval.
+ l Trainee Costs. For rebudgeting purposes, trainee costs include funds awarded in the stipends or
+tuition/fees budget categories. These costs may not be used for other purposes except under
+unusual circumstances and then only with the prior approval of the NIH awarding IC. Unless otherwise restricted, rebudgeting into or within the stipends and tuition/fees is allowable without
+prior approval of the NIH awarding IC.
+ l Trainee Travel. For rebudgeting purposes, trainee travel is not considered a trainee cost and,
+therefore, may be rebudgeted into any other budget category without prior approval of the NIH
+awarding IC.
+11.3.10 Stipend Supplementation, Compensation, and Other Income
+11.3.10.1 Stipend Supplementation
+Recipients may supplement stipends from non-Federal funds provided the supplementation is without
+any additional obligation for the trainee. An organization can determine what amount of stipend supplementation, if any, will be provided according to its own formally established policies governing stipend support. These policies must be consistently applied to all individuals in a similar training status
+regardless of the source of funds. Federal funds may not be used for stipend supplementation unless specifically authorized under the terms of the program from which funds are derived. An individual may use
+Federal educational loan funds or VA benefits when permitted by those programs as described in Educational Loans or GI Bill below. Under no circumstances may PHS funds be used for supplementation.
+(GPS page IIB-65)
+
+11.3.10.2 Compensation
+NIH recognizes that student or postdoctoral trainees may seek part-time employment coincidental to
+their training program to further offset their expenses. Fellows and trainees may spend on average, an
+additional 25% of their time (e.g., 10 hours per week) in part time research, teaching, or clinical employment, so long as those activities do not interfere with, or lengthen, the duration of their NRSA training.
+Funds characterized as compensation may be paid to trainees only when there is an employer-employee
+relationship, the payments are for services rendered, and the situation otherwise meets the conditions of
+the compensation of students as detailed in Cost Considerations—Allowability of Costs/Activities—
+Selected Items of Cost—Fringe Benefits / IHE Tuition/Tuition Remission in IIA. In addition, compensation must be in accordance with organizational policies consistently applied to both federally and
+non-federally supported activities and must be supported by acceptable accounting records that reflect
+the employer-employee relationship. Under these conditions, the funds provided as compensation (salary,
+fringe benefits, and/or tuition remission) for services rendered, such as teaching, laboratory assistance, or
+clinical duties are not considered stipend supplementation; they are allowable charges to Federal grants,
+including PHS research grants. However, NIH expects that compensation from research grants will be
+for limited part-time employment apart from the normal full-time training activities.
+Compensation may not be paid from a research grant that supports the same research that is part of the
+trainee’s planned training experience as approved in the Kirschstein-NRSA institutional research training
+grant application.
+Stipend Supplementation & Compensation. Under no circumstances may the conditions of stipend supplementation or the services provided for compensation interfere with, detract from, or prolong the
+trainee’s approved Kirschstein-NRSA training program. Training PD/PIs must approve all instances of
+employment on research grants to verify that the circumstances will not detract from or prolong the
+approved training program.
+11.3.10.3 Other Income: Concurrent Benefits
+An individual may not receive support under a Kirschstein-NRSA institutional research training grant
+concurrently with another federally sponsored fellowship or similar Federal or non-Federal award that
+provides a stipend or otherwise duplicates provisions of the Kirschstein-NRSA award.
+11.3.10.4 Other Income: Educational Loans or GI Bill
+An individual may accept concurrent educational remuneration from the VA (GI Bill) and Federal educational loan funds. Such funds are not considered supplementation or compensation. In the case of the
+MARC-U*STAR program, funds from a Pell grant may be accepted as well.
+11.3.10.5 Other Income: NIH Loan Repayment Program
+Postdoctoral trainees also may be eligible to participate in the NIH Loan Repayment Program.
+11.3.10.6 Taxability of Stipends
+Section 117 of the Internal Revenue Code (26 U.S.C. 117) applies to the tax treatment of scholarships
+and fellowships. Degree candidates may exclude from gross income (for tax purposes) any amount used
+for qualified tuition and related expenses, such as fees, books, supplies, and equipment, required for
+courses of instruction at a qualified educational organization. Nondegree candidates are required to
+report as gross income any monies paid on their behalf for stipends or any course tuition and fees
+required for attendance.
+The IRS and Treasury Department released regulations in January 2005 (Revenue Procedures 2005-11)
+clarifying the student exception to the FICA (Social Security and Medicare) taxes for students employed
+(GPS page IIB-66)
+
+by a school, college, or university where the student is pursuing a course of study. NIH’s understanding
+is that these final regulations do not apply to or impact Kirschstein-NRSA programs or awards.
+The taxability of stipends in no way alters the relationship between Kirschstein-NRSA trainees and recipient organizations. Kirschstein-NRSA stipends are not considered salaries. In addition, trainees supported
+under Kirschstein-NRSA institutional research training grants are not considered to be in an employeeemployer relationship with NIH or the recipient organization solely as a result of the Kirschstein-NRSA
+support. Interpretation and implementation of the tax laws are the domain of the IRS and the courts. NIH
+takes no position on what the status may be for a particular taxpayer, and it does not have the authority
+to dispense tax advice. Individuals should consult their local IRS office about the applicability of the law
+to their situation and for information on their tax obligations.
+11.3.10.7 Form 1099
+Although stipends are not considered salaries, the funds are subject to Federal and, sometimes, State
+taxes. The recipient organization may report such funds on IRS Form 1099, Statement of Miscellaneous
+Income. Normally, the business office of the recipient organization will be responsible for annually preparing and issuing the IRS Form 1099 for trainees. Recipient organizations are not required to issue the
+Form 1099, but it is a useful form of documentation of funding received and it serves as a reminder to
+the trainee that some tax liability may exist. Even if the recipient organization does not issue the Form
+1099, trainees are required to report Kirschstein-NRSA stipends as income.
+11.3.11 Carryover Authority
+NIH Standard Terms of Award apply to Kirschstein-NRSA institutional research training grants; however, in most cases, recipients must obtain awarding IC prior approval to carry over funds. Some NIH
+awarding ICs have also waived this prior approval requirement for training grants. The NoA for a
+Kirschstein-NRSA institutional research training grant will specify whether or not the recipient must
+obtain the prior approval of the awarding IC to carry over funds.
+11.3.12 Program Income
+Applicants for NIH research grants, including Kirschstein-NRSA institutional research training grants,
+are required to include in their grant applications an estimate of the amount and source of program
+income expected to be generated as a result of the project for which support is being sought. See Administrative Requirements—Management Systems and Procedures—Program Income in IIA for policies that
+govern the disposition and reporting of program income.
+11.3.13 Reporting Requirements
+The submission of the forms described in this subsection is critical to establishing the payment of stipends and other costs and determining possible payback service. Failure to submit the required forms in
+a timely manner may result in an expenditure disallowance or a delay in any continuation funding. All of
+these forms are available in the Forms Directory.
+11.3.13.1 Statement of Appointment (Form PHS 2271)
+The recipient must submit a PHS 2271 to the NIH awarding IC before or at the start of each trainee’s
+appointment or reappointment. The PHS 2271 cannot be submitted until after the NoA for the respective
+budget period has been issued. Recipients are required to submit the PHS 2271 data electronically using
+the eRA Commons xTrain application. See xTrain for more information. Trainees are required to sign
+reappointments and amendments, just as they are required to sign the initial appointments.
+(GPS page IIB-67)
+
+The requirement for ORCID identifiers is incorporated into the appointment process for trainees, scholars, and participants supported by institutional research training, career development, and research education awards that require appointments through the xTrain system, including the following: T03, T15,
+T32, T34, T35, T37, T42, T90/R90, TL1, TL4, TU2, K12/KL2, R25, R38, RL5, and RL9.
+At the time of appointment, the xTrain system will check whether appointees have ORCID iDs and
+appointments will not be accepted for agency review unless an ORCID iD is linked to the individual's
+eRA Commons Personal Profile.
+No stipend or other allowance may be paid until the appointment form has been submitted. If the support
+covers the individual’s initial 12 months of postdoctoral support, a signed Payback Agreement also must
+be submitted. The information on the Statement of Appointment (and the Termination Notice as discussed below) is the basis for determining the length or amount of an individual’s payback requirement.
+The PD/PI and the organizations’ financial officials should coordinate the information reported on the
+Statement of Appointment. It should be treated as a financial document for obligating funds (stipends),
+which later are reflected on the Termination Notice and as part of the total costs in the FFR.
+Interim Revisions. Any changes or corrections involving a trainee appointment under a Kirschstein-
+NRSA institutional research training grant, such as name, permanent mailing address, period of training,
+or stipend support, must be reported by the Training PD/PI to the NIH awarding IC on an amended PHS
+2271 at the time of the change, require the trainee signature, and be submitted through xTrain.
+Consecutive Support. If a trainee switches from one Kirschstein-NRSA mechanism to another (e.g.,
+from an individual fellowship to a training grant) or from one NIH awarding IC to another, the requirement for payback service incurred is deferred until the total period of Kirschstein-NRSA support is completed. All Statement of Appointment forms are reviewed to determine if previous Kirschstein-NRSA
+support has been provided.
+11.3.13.2 Payback Agreement (Form PHS 6031)
+A Payback Agreement that covers the initial 12 months of Kirschstein-NRSA postdoctoral support must
+be signed by each postdoctoral trainee. If the individual has already received 12 months of postdoctoral
+support under any Kirschstein-NRSA training grant or fellowship award, this form is not required. For
+details on Kirschstein-NRSA payback, see Payback Requirements in this chapter.
+No Payback Agreement is required for predoctoral or prebaccalaureate trainees.
+11.3.13.3 Termination Notice (Form PHS 416-7)
+The Termination Notice (along with the PHS 2271 Statement of Appointment form) is the basis for validating the total period of Kirschstein-NRSA support and establishing the amount of payback obligation,
+if any, for each Kirschstein-NRSA trainee. The PD/PI is responsible for submitting a Termination Notice
+for each trainee within 30 days of the end of the total period of support even if the trainee is not available for signature. In most cases,  the information on the form must be verified by the program director
+and an institutional business official, however, in cases where the program director is not available to
+sign the Notice within the required timeframe, the form may be verified by the institutional business official alone. The lack of timely and accurate information on this form could adversely affect data collected
+associated with aggregate NRSA support and the payback process. Recipients are required to submit the
+PHS 416-7 data electronically using the xTrain application.
+See xTrain for more information.
+No Termination Notice is required for prebaccalaureate (T34) trainees.
+(GPS page IIB-68)
+
+11.3.13.4 Research Performance Progress Reports
+RPPRs must be submitted for non-competing continuation support in accordance with the RPPR instructions. Report forms and instructions are available from the Forms Directory. Guidance for training grants
+can be found in section 7.4 of the RPPR Instructions. Following completion or termination of a project
+period, the recipient must submit a Final RPPR to the NIH awarding IC within 120 days after the end of
+grant support.
+The IDP provision described in Non-Competing Continuation Progress Reports applies to all trainees
+reported on a Statement of Appointment Form (PHS2271). This information should be provided using
+the instructions in Non-Competing Continuation Progress Reports.
+11.3.13.5 Federal Financial Report (FFR)
+An annual FFR is required for all Kirschstein-NRSA institutional research training grant awards no later
+than 90 days after the end of the calendar quarter in which the budget period ended. This report will document the financial status of the grant according to the official accounting records of the recipient organization. Trainee stipends and tuition are obligated for the full 12-month appointment from the budget
+period in which the appointment is initiated. Portions of stipends, tuition, childcare costs, and applicable
+indirect costs that extend beyond the budget period are reported as unliquidated obligations. The same
+principal may apply to trainee health insurance when an institution cannot truly obligate the full amount
+of health insurance at the start of the appointment.
+If the report covers the final budget period of the project period, it must have no unliquidated obligations, must indicate the exact balance of unobligated funds, and is due within 120 days of the period of
+performance end date (see Administrative Requirements—Monitoring—Reporting—Financial Reports
+and Administrative Requirements—Closeout—Final Reports in IIA).
+11.3.14 Closeout
+The Closeout requirements included in IIA apply (see Administrative Requirements—Closeout—Final
+Reports). In addition, Termination Notices for all trainees are required.
+11.3.15 Changes in the Project
+Changes in the program objectives as they relate to the area of research training for which the grant was
+approved require prior approval of the NIH awarding IC.
+If the PD/PI is expected to be absent more than 3 months, plans for the conduct of the program during
+their absence must be approved in writing by the NIH awarding IC. Any proposed change of PD/PI must
+be requested by the recipient organization and be approved in writing by the NIH awarding IC following
+review of the nominee’s qualifications and re-evaluation of the project in light of the proposed change.
+Kirschstein-NRSA institutional research training grants may not be transferred from one domestic organization to another except under the most unusual circumstances. Such a change generally will be
+approved by the NIH awarding IC only if all of the major benefits attributable to the original grant can
+be transferred and there is no negative impact on trainees active in the program.
+(GPS page IIB-69)
+
+11.3.16 Other Terms and Conditions
+11.3.16.1 Leave
+Note: The leave durations stated below apply to full-time trainees. Short-term trainee leave must be proportionally adjusted based depending on the duration of appointment.
+In general, trainees may receive stipends during the normal periods of vacation and holidays observed by
+individuals in comparable training positions at the sponsoring institution. For the purpose of these
+awards, however, the period between the spring and fall semesters is considered to be an active time of
+research and research training and is not considered to be a vacation or holiday. Trainees may receive stipends for up to 15 calendar days of sick leave per year. Under exceptional circumstances, this period
+may be extended by the NIH awarding IC in response to a written request from an AOR. Sick leave may
+be used for the medical conditions related to pregnancy and childbirth. Trainees may receive stipends for
+up to 60 calendar days (equivalent to 8 work weeks) of parental leave per year for the adoption or the
+birth of each child. Either parent is eligible for parental leave. Kirschstein-NRSA trainees and fellows
+must provide advanced notification to the recipient institution prior to taking parental leave. Notification
+of supervisors and others about plans to use leave must be consistent with the organization’s policy and
+must be consistently applied regardless of the source of funds. A period of terminal leave is not permitted, and payment may not be made from traineeship funds for leave not taken. Trainees requiring periods of time away from their research training experience longer than specified here, i.e., more than 15
+calendar days of sick leave or more than 60 calendar days of parental leave, must seek approval from the
+NIH awarding component for an unpaid leave of absence. Approval for a leave of absence must be
+requested in advance by an AOR on behalf of the trainee. Trainees supported by academic institutions
+should refer to the NIH Institutional NRSA training grant guidelines in the NIH Grants Policy Statement
+for further guidance regarding vacations and requested leave.
+Vacations and Holidays. Trainees may receive the same vacations and holidays available to individuals
+in comparable training positions at the recipient organization. Trainees will continue to receive stipends
+during vacations and holidays. At academic institutions, the time between semesters or academic quarters generally is considered an active part of the training period and is not considered to be a vacation or
+holiday.
+Sick Leave and Other Leave. Trainees may continue to receive stipends for up to 15 calendar days of
+sick leave per year. Under exceptional circumstances, this period may be extended by the NIH awarding
+IC in response to a written request from an AOR. Sick leave may be used for the medical conditions
+related to pregnancy and childbirth.
+Parental Leave. Trainees may receive stipends for up to 60 calendar days (equivalent to 8 work weeks)
+of parental leave per year for the adoption or the birth of each child. Either parent is eligible for parental
+leave. Kirschstein-NRSA trainees and fellows must provide advanced notification to the recipient institution prior to taking parental leave. Notification of supervisors and others about plans to use leave must
+be consistent with the organization’s policy and must be consistently applied regardless of the source of
+funds.
+Terminal Leave. A period of terminal leave is not permitted, and payment may not be made from grant
+funds for leave not taken.
+Unpaid Leave. Individuals requiring extended periods of time away from their research training experience, that is, more than 15 calendar days of sick leave or more than 60 calendar days of parental leave,
+must seek approval from the NIH awarding IC for an unpaid leave of absence. A request letter must be
+submitted by the AOR, signed by the trainee as well as the training grant PD/PI.
+(GPS page IIB-70)
+
+During a leave of absence, documentation to suspend the period of appointment must be completed by
+submitting an amended Statement of Appointment and a Termination Notice. These forms should be submitted to the NIH awarding IC at the beginning of the leave. Upon resumption of Kirschstein-NRSA support, the reappointment must be documented on another Statement of Appointment form.
+11.3.16.2 Termination
+NIH may terminate a Kirschstein-NRSA institutional research training grant before its normal completion date if it determines that the recipient has materially failed to comply with the terms and conditions of the award or to carry out the purpose for which the award was made. If an award is
+terminated, NIH will notify the recipient organization in writing of this determination, the reasons for the
+determination, the effective date, and the right to appeal the decision. NIH also may terminate an award
+at the request of the recipient.
+An organization that wants to terminate a training grant before the scheduled termination date must
+notify the NIH awarding IC immediately. In such cases, NIH will issue a revised NoA to specify the
+changed period of support and to show prorated trainee stipends, depending on the amount of time spent
+in training.
+11.3.16.3 Publications and Sharing of Research Results
+NIH supports the practical application and sharing of outcomes of funded research. Therefore, PD/PIs
+and trainees should make the results and accomplishments of their Kirschstein-NRSA institutional training grant activities available to the research community and to the public at large. The recipient organization should assist trainees in these activities, including further development of discoveries and
+inventions for furthering research and benefiting the public. No restrictions should be placed on the publication of results.
+Trainees are encouraged to submit reports of their findings for publication to the journals of their choice.
+Responsibility for direction of the project should not be ascribed to NIH. However, NIH IC support must
+be acknowledged by a footnote in language similar to the following: “This investigation was supported
+by the National Institutes of Health under Ruth L. Kirschstein National Research Service Award (number) from the (name of NIH IC).” In addition, Federal funding must be acknowledged as provided in
+Appropriation Mandates—Acknowledgment of Federal Funding in IIA.
+The Public Access Policy requirements described in Administrative Requirements—Availability of
+Research Results—NIH Public Access Policy in IIA apply to articles that are authored or co-authored by
+NRSA trainees and arose from NIH Support. Information on trainee publications is included as part of
+the annual progress report.
+11.3.16.4 Copyright
+Except as otherwise provided in the NoA, when a publication or similar copyrightable material is
+developed from work supported by NIH, the author is free to arrange for copyright without the approval
+of the NIH awarding IC. Any such copyrighted materials shall be subject to a royalty-free, nonexclusive,
+and irrevocable license to the Federal government to reproduce, translate, publish, and use and dispose of
+such materials, and to authorize others to do so for Federal government purposes.
+11.3.16.5 Inventions and Patents
+All Kirschstein-NRSA institutional research training grants and other funding agreements awarded
+primarily for educational purposes are not subject to invention reporting requirements nor does NIH have
+any rights to inventions under those grants and agreements (as specified in  2 CFR 200.315 and in 37
+CFR 401.1(b)).
+(GPS page IIB-71)
+
+11.3.16.6 Disposition of Professional Fees
+Fees resulting from clinical practice, professional consultation, or other comparable activities performed
+pursuant to the purpose of the award may not be retained by the trainee. Such fees must be assigned to
+the recipient organization for disposition in accordance with NIH policy on program income (see Administrative Requirements—Management Systems and Procedures—Program Income in IIA). The term “professional fees” does not apply to honoraria, fees for scholarly writing, delivery of occasional outside
+lectures, or service in an advisory capacity to public or private non-profit organizations. If permitted by
+organizational policy, these fees may be retained by the trainee.
+11.3.16.7 Public Policy Requirements and Objectives
+All Public Policy Requirements, Objectives, and Other Appropriation Mandates discussed in IIA apply
+to Kirschstein-NRSA Institutional programs when appropriate. Applicants must comply with policies and
+procedures governing such requirements as civil rights; the protection of human subjects, including data
+and safety monitoring requirements and inclusion policies for women, minorities and individuals across
+the lifespan; the humane care and use of live vertebrate animals; human embryonic stem cells; and/or
+research involving recombinant or synthetic nucleic acid. See IIA for a complete list of applicable
+requirements.
+Additional information and any application requirements can be found in the SF424 (R&R), Section 8.
+Supplemental Instructions for Preparing Institutional Ruth L. Kirschstein-NRSA Applications.
+Information provided below is in addition to that provided in IIA where unique circumstances might
+exist for institutional training programs.
+11.3.16.7.1 Human Subjects
+Indefinite Involvement. If the applicant organization has an approved FWA or other applicable assurance on file with OHRP but, at the time of application, plans for the involvement of human subjects are
+indefinite, the assurance number should be provided in the application. If an award is made, human subjects may not be involved until a certification of IRB approval or designation of exemption has been submitted.
+In many instances, trainees supported by Kirschstein-NRSA institutional research training grants will be
+participating in research supported by research project grants for which the IRB review is already completed or an exemption is already designated. This review or exemption designation is sufficient,
+provided the research would not be substantially modified by the participation of a trainee. The appropriate grants must be identified along with their IRB review dates or exemption designation. The recipient institution must ensure that trainees have received the proper training/education in human subjects
+research.
+11.3.16.7.2 Vertebrate Animals
+Indefinite Involvement. If the applicant organization has an approved Animal Welfare Assurance on file
+with OLAW but, at the time of application, its plans for the involvement of vertebrate animals are so
+indefinite that IACUC review and approval are not feasible, the organization should indicate “Yes,” to
+the involvement of Vertebrate Animals and include the Animal Welfare Assurance number. If an award
+is made, vertebrate animals may not be involved until verification of the IACUC approval date has been
+submitted to the NIH awarding IC.
+In many instances, trainees supported by institutional research training grants will be participating in
+research supported by research project grants for which the IACUC review already is completed. This
+review is sufficient, provided the research would not be substantially modified by the participation of a
+(GPS page IIB-72)
+
+trainee. The appropriate grants must be identified along with their IACUC review dates. The institution
+must ensure that trainees are enrolled in the institution’s animal welfare training and occupational health
+and safety programs for personnel who have contact with animals, as appropriate. It is also the institution’s responsibility to ensure that trainees are properly supervised when working with live vertebrate
+animals.
+If the applicant organization does not have an approved Animal Welfare Assurance on file with OLAW
+or for additional information on vertebrate animals, refer to the Application Guide or contact OLAW
+(see Part III).
+11.4 PAYBACK REQUIREMENTS
+11.4.1 General
+The Kirschstein-NRSA legislation requires some recipients of support (post-doctoral fellows and trainees) to pay back the Federal government by engaging in health-related research, health-related research
+training or health-related teaching (or any combination thereof). See Payback—Service Payback—Definitions in this subsection for complete coverage of requirements.
+11.4.2 Implementation
+The incurrence of a payback obligation for an NRSA recipient is solely dependent upon when NRSA
+support was received. This section reflects current Payback requirements for individuals.
+Predoctoral Recipients. For predoctoral trainees no payback obligation is incurred. Thus, a Payback
+Agreement Form (PHS 6031) is not required.
+Postdoctoral Recipients. For individuals receiving postdoctoral support under individual fellowships or
+institutional research training grants, a payback obligation is incurred for the first 12 months of
+Kirschstein-NRSA support. However, the 13th and subsequent months of postdoctoral NRSA supported
+research training serves to pay back this obligation month by month. A Payback Agreement (PHS 6031)
+is required but only for the initial 12-month postdoctoral support period.
+Short-Term Training. Any individual receiving support for predoctoral short-term training does not
+incur a payback obligation; however, postdoctoral short-term training does incur a payback obligation.
+Support for short-term training accrues, along with any subsequent NRSA postdoctoral support, until the
+first 12 months is established. At that point, the 13th and subsequent months of support serve to offset
+the obligation month by month. If subsequent postdoctoral support is not received, the individual has an
+obligation to pay back in the traditional manner.
+11.4.3 Payback
+Once a Termination Notice has been submitted and accepted, the NIH awarding IC determines if a payback obligation exists. When a trainee or fellow must pay back, the Termination Notice and related documents are forwarded to the NIH Kirschstein-NRSA Payback Service Center (PSC). PSC personnel are
+NIH’s experts in Kirschstein-NRSA payback requirements. The PSC administers the payback activities
+of all NIH ICs. The authorities related to payback normally delegated to the IC are delegated to the
+Chief, Kirschstein-NRSA PSC. The PSC retains all records until an obligation is satisfied, and then transfers closed records to the Federal Records Center.
+(GPS page IIB-73)
+
+Most Kirschstein-NRSA recipients eventually fulfill their payback obligation by engaging in activities
+that are determined to be acceptable service. Some recipients fulfill their obligation via financial payback. On rare occasions, the payback obligation is waived.
+As indicated in Payback Reporting Requirements—Implementation in this subsection, the amount of a
+payback obligation incurred is solely dependent on the total period of support and the laws in effect
+when the Kirschstein-NRSA support was received.
+11.4.3.1 Service Payback
+11.4.3.1.1 Definitions
+For fulfilling the Kirschstein-NRSA service payback obligation, the following definitions apply:
+ l Research. Research is defined as an activity that involves designing experiments, developing protocols, and collecting and interpreting data. In addition, review of original research or administration of original research that includes providing scientific direction and guidance to research
+may be acceptable if a doctoral degree and relevant research experience is required for individuals filling such positions. Such research can be conducted in an academic, government, forprofit, or other environment in either a foreign or domestic setting. In addition, when consistent
+with the cumulative amount, type, and frequency of research or research training experiences,
+functions that involve analytic or other technical activities conducted in direct support of
+research, as defined above, will also satisfy the service payback obligation.
+ l Teaching. Teaching is an instructional activity that takes place in an organized educational or
+other instructional environment. Activities classified as teaching are generally carried out in a
+formal didactic setting, but other activities will be considered if they are consistent with the certifying institution’s policy on the definition of teaching responsibilities. Such teaching can be
+conducted at universities, professional schools, research institutes, teaching hospitals, primary
+schools, secondary schools, or colleges. When calculating hours of teaching per week, it is permissible to include 3 hours of preparation time for each hour of direct instruction. Acceptable
+teaching activities must have a biomedical or health-related relevance.
+ l Health-Related . “Health-related” means  related to the description, diagnosis, prevention, or
+treatment of disease. Fields other than those usually considered to be directly related to human
+disease, such as agriculture, environmental sciences, biotechnology, and bioengineering, also
+will be considered health-related.
+11.4.3.1.2 Time Commitment
+All acceptable activities must be undertaken for periods that average at least 20 hours per week. Total
+employment in such activities averaging less than 20 hours per week cannot be counted toward fulfilling
+the obligation except in cases of disability or other pressing personal or family circumstances, such as
+childcare or elder care responsibilities. It is not permissible for individuals otherwise engaged in fulltime employment to engage in service payback activities at effort levels below 20 hours per week.
+If less than 20 hours commitment per week is permitted, the total period of service obligation will be prorated. For example, an individual who owes 12 months of service and can devote only 10 hours per week
+to service payback activities due to a disability will be required to engage in such service for 24 months.
+These exceptions are rare and must receive prior approval from the PSC.
+11.4.3.1.3 Initiation of Payback Service
+Service payback obligations for postdoctoral recipients may be discharged by
+(GPS page IIB-74)
+
+l receiving an equal number of months of postdoctoral Kirschstein-NRSA support beginning in
+the 13th month of such postdoctoral Kirschstein-NRSA support, or
+ l engaging in an equal number of months of health-related research, health-related research training, or health-related teaching (or any combination thereof) that averages more than 20 hours per
+week.
+11.4.3.1.4 Source of Funding
+There is no restriction on the source of funds supporting an individual’s service payback activity. An
+individual could be supported by a PHS grant or any non-Kirschstein-NRSA Federal or non-Federal
+source. Unpaid service also is permitted.
+11.4.3.1.5 Timing of Service Obligation
+An individual must begin to undertake the payback service requirement within 2 years after the termination date of the individual’s Kirschstein-NRSA support unless an extension of time to begin payback has been approved by the PSC (see Payback—Extensions of Payback—Extensions of the 2-Year
+Period to Initiate Payback below).
+11.4.3.2 Financial Payback
+11.4.3.2.1 Policy and Principal Calculation
+If an individual does not perform payback service, the Federal government shall be entitled to recover
+certain costs. The amount the United States is entitled to recover depends on when support was received.
+Calculation formulas take into account the total amount paid the individual (see Interest and Interest Rate
+Calculation below), less any obligation already fulfilled through service or legislative allowance when
+applicable. The total paid an individual under an institutional research training grant or individual fellowship award at a domestic, non-Federal sponsoring institution is considered to be the stipend only. The
+total paid an individual under a fellowship award at a foreign sponsoring institution includes the payment
+for the round-trip travel costs. The total paid an individual under a fellowship award at a Federal sponsoring institution includes any money expended from the institutional allowance provided for such purposes as health insurance, travel, tuition, and fees.
+11.4.3.2.2 Interest and Interest Rate Calculation
+NIH computes interest on the principal amount beginning on the date the United States became entitled
+to recover stipends. The interest rate is the rate fixed by the Secretary of the Treasury after considering
+prevailing consumer rates of interest. Accordingly, interest may accrue on any Kirschstein-NRSA obligation if the 2-year grace period has passed, if deferment has expired, or if service has terminated before
+completion of the payback obligation. The Department of the Treasury certifies Kirschstein-NRSA
+interest rates quarterly. Interest is computed on a 360 day-a-year basis and is applied through the date of
+receipt. Any outstanding amount will continue to bear interest at the initial rate set by the Secretary of
+the Treasury until financial payback is complete.
+The date that sets the applicable rate of interest depends on the type of Kirschstein-NRSA account
+received for collection. If financial payback is voluntary, the signature date of the notification of voluntary payback is the date that determines the interest rate as well as the initiation of the 3-year repayment period. If financial payback is involuntary, the date that sets the interest rate and the 3-year
+repayment period is the date of expiration of the 2-year period following the completion date or termination of Kirschstein-NRSA support. For example, if during June 2021, OFM received an account
+reflecting January 31, 2019, as the termination date of NRSA support, the Federal government, lacking
+(GPS page IIB-75)
+
+any documentation to the contrary, becomes entitled to financial payback effective February 1, 2019.
+The rate of interest applicable is determined based on the February 1, 2019, date, and the total NRSA
+obligation is required to be fulfilled by January 31, 2022.
+The amount to be recovered financially, as determined from the Termination Notice plus applicable
+interest, shall be paid to the United States within the 3-year period following such date.
+11.4.3.3 Extensions of Payback
+The authorizing legislation and the implementing regulations (42 CFR Part 66) permit exceptions to certain requirements under the Act.
+11.4.3.3.1 Extensions of the 2-Year Period to Initiate Payback
+An extension of the 2-year period to initiate payback may be requested in the Annual Payback Activities
+Certification form. Indication of valid plans to initiate payback soon after the 2-year grace period may be
+good reason to grant an extension.
+11.4.3.3.2 Basis for Extensions or Break in Service
+The PSC may extend the period for undertaking payback service or permit breaks in continuous service.
+These determinations are based on the following criteria:
+ l An extension or break in service is necessary so the individual may complete their non-health
+related research or clinical training.
+ l An extension or break in service is necessary so the individual may participate in the NIH Loan
+Repayment Program.
+ l The individual is unable to complete the requirements within the specified period because of a
+temporary disability.
+ l Completion by the individual of the requirement within the specified period would involve substantial hardship to the individual, and failure to extend the period would be against equity and
+good conscience.
+Reasons for an extension or break in service include, for example, completing residency training where
+clinical teaching or research are not an integral part of the training, or seeking employment that would
+fulfill the payback requirements.
+Participation in LRP will result in an automatic deferral of the NRSA obligation because concurrent payback under both LRP and NRSA is not permissible.  Payback service cannot begin until after LRP has
+ended.
+11.4.3.4 Waiver
+11.4.3.4.1 Policy
+The authorizing legislation and the implementing regulation (42 CFR Part 66) permit exceptions to certain requirements under the Act. NIH may waive, in whole or in part, the payback obligation, upon
+determination that compliance by the individual is impossible or would involve substantial hardship.
+11.4.3.4.2 Waiver Criteria
+Requests for waivers should be made in writing to the PSC and should include an explanation of the
+need for the waiver according to the following criteria:
+(GPS page IIB-76)
+
+l Compliance by an individual will be deemed impossible if the individual is permanently, and
+totally disabled.
+ l In determining whether compliance would involve substantial hardship to the individual, the
+PSC will consider the individual’s
+ o financial resources and obligations at the time of request for a waiver and
+ o estimated future financial resources and obligations.
+ l In rare cases, the following also may be considered:
+ o Reasons for the individual’s failure to complete the requirements within the prescribed
+period, such as personal problems;
+ o Extent to which the individual has engaged in payback activities;
+ o Sufficiency of training to qualify the individual to perform such activities;
+ o Lack of employment opportunities appropriate to the individual’s education and training;
+ o Any other extenuating circumstances.
+Any obligation of any individual toward payback will be canceled upon death of the individual.
+11.4.4 Certification of Payback Activities
+11.4.4.1 Annual Payback Activities Certification (Form PHS 6031-1)
+11.4.4.2 Annual Certification
+Payback service is certified through the use of the Kirschstein-NRSA APAC (PHS 6031-1). Individuals
+with an outstanding payback obligation must complete an APAC annually until their payback obligation
+is fulfilled.
+If an individual has a payback obligation, an APAC is sent by the PSC approximately one year after the
+completion of Kirschstein-NRSA support. Payback service may be initiated within the first 12 months of
+termination even though trainees and fellows have up to 24 months to initiate payback. There is no penalty to those individuals who do not initiate payback within the first 12 months; however, it is critical
+that they complete an APAC form to ensure contact is maintained and addresses are current.
+The individual will report on the APAC the activity in which they were engaged for the preceding 12
+months, within the specified reporting period. These forms are to be returned within 30 days of the
+reporting period end date to the address specified on the mailing label included with the form.
+The PSC reviews the forms, determines acceptability of reported activities, and then informs the former
+trainee or fellow of their status. This process will continue annually until the individual’s total payback
+obligation is satisfied.
+11.4.4.3 Change of Address
+Any change in the mailing address of a Kirschstein-NRSA recipient must be reported promptly to the
+PSC until the service obligation is fully discharged. Notification of changes can be made by letter, telephone, fax, or e-mail to NRSAPaybackCenter@mail.nih.gov.
+11.4.4.4 Breaks in Kirschstein-NRSA Support
+Sometimes a trainee/fellow will have a period of non-Kirschstein-NRSA support between two
+Kirschstein-NRSA awards. An appropriate activity performed during this period of time may count for
+payback purposes toward the first Kirschstein-NRSA award. If the nonsupport period is 6 months or
+(GPS page IIB-77)
+
+longer, the individual receives an APAC form through the regular mechanism. However, if the break is
+less than 6 months, an APAC will not be mailed automatically. If acceptable payback service was performed during the break, the individual may complete an APAC, which can be obtained from the NIH
+web site.
+11.4.4.5 National Health Service Corps
+A Kirschstein-NRSA recipient may have also been a National Health Service Corps (NHSC) scholar.
+Kirschstein-NRSA recipients that also have been NHSC scholars  are required to fulfill their NHSC service commitment through direct clinical service to the underserved in accordance with NHSC policy.
+Any Kirschstein-NRSA payback must be fulfilled separately through acceptable Kirschstein-NRSA payback service.
+(GPS page IIB-78)

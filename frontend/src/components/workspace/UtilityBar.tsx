@@ -1,4 +1,5 @@
-import { MessageSquare, FolderOpen, Workflow, BookOpen, FolderKanban } from 'lucide-react'
+import { useState } from 'react'
+import { MessageSquare, FolderOpen, Workflow, BookOpen, FolderKanban, PanelLeftOpen, PanelLeftClose } from 'lucide-react'
 import { useWorkspace, type WorkspaceMode } from '../../contexts/WorkspaceContext'
 
 const MODES: { mode: WorkspaceMode; icon: typeof MessageSquare; label: string }[] = [
@@ -9,27 +10,34 @@ const MODES: { mode: WorkspaceMode; icon: typeof MessageSquare; label: string }[
 ]
 
 export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomation?: boolean }) {
-  const { workspaceMode, setWorkspaceMode, resetToHome, activeProjectRole, activeProjectUuid, deactivateProject } = useWorkspace()
+  const { workspaceMode, setWorkspaceMode, activeProjectRole, activeProjectUuid, deactivateProject } = useWorkspace()
+  const [showLabels, setShowLabels] = useState(false)
   // The Projects icon shows the picker, which is exclusive with being scoped
   // into a project — so it's "active" only when a project is NOT scoped.
+  const activeMode = workspaceMode === 'projects' && activeProjectUuid ? 'chat' : workspaceMode
   const projectsActive = workspaceMode === 'projects' && !activeProjectUuid
   // A shared-in viewer (e.g. a PI) gets chat only — no files/automations/knowledge.
   const modes = activeProjectRole === 'viewer' ? MODES.filter(m => m.mode === 'chat') : MODES
 
   return (
-    <div
+    <nav
+      aria-label="Workspace navigation"
+      className={`workspace-utility${showLabels ? ' workspace-utility--expanded' : ''}`}
       style={{
-        width: 48,
+        width: 88,
         background: 'var(--color-panel-dark)',
         borderRight: '1px solid #333',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        paddingTop: 8,
-        gap: 4,
+        paddingTop: 'var(--workspace-space-8)',
+        gap: 'var(--workspace-space-4)',
         flexShrink: 0,
       }}
     >
+      <button type="button" className="workspace-utility-toggle" aria-label={showLabels ? 'Hide navigation labels' : 'Show navigation labels'} aria-expanded={showLabels} onClick={() => setShowLabels(value => !value)}>
+        {showLabels ? <PanelLeftClose size={20} aria-hidden="true" /> : <PanelLeftOpen size={20} aria-hidden="true" />}
+      </button>
       {/* Projects — drops any active project scope and shows the project picker
           (the drawer). Being scoped into a project is exclusive with the list. */}
       <button
@@ -38,52 +46,51 @@ export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomatio
         aria-label="Projects"
         aria-current={projectsActive ? 'page' : undefined}
         style={{
-          width: 40,
-          height: 40,
+          width: 80,
+          minHeight: 56,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          flexDirection: 'column',
+          gap: 4,
           background: 'transparent',
           border: 'none',
           borderLeft: projectsActive ? '3px solid var(--highlight-color, #eab308)' : '3px solid transparent',
-          borderRadius: 4,
+          borderRadius: 'var(--workspace-radius-small)',
           cursor: 'pointer',
           padding: 0,
         }}
       >
-        <FolderKanban size={20} style={{ color: projectsActive ? '#fff' : '#888' }} />
+        <FolderKanban size={20} style={{ color: projectsActive ? '#fff' : '#b6bdc7' }} />
+        <span className="workspace-utility-label" style={{ fontSize: 12, color: projectsActive ? '#fff' : '#b6bdc7' }}>Projects</span>
       </button>
-      <div style={{ width: 24, height: 1, background: '#333', margin: '2px 0 4px' }} />
+      <div style={{ width: 24, height: 1, background: '#333', margin: "var(--workspace-space-2) 0 var(--workspace-space-4)" }} />
 
       {modes.map(({ mode, icon: Icon, label }) => {
-        const active = workspaceMode === mode
+        const active = activeMode === mode
         const isAutomations = mode === 'automations'
         const showPulse = isAutomations && hasActiveAutomation && active
         const showDot = isAutomations && hasActiveAutomation && !active
         return (
           <button
             key={mode}
-            onClick={() => {
-              if (mode === 'chat' && active) {
-                resetToHome()
-              } else {
-                setWorkspaceMode(mode)
-              }
-            }}
+            onClick={() => setWorkspaceMode(mode)}
             title={label}
             aria-label={label}
             aria-current={active ? 'page' : undefined}
             style={{
               position: 'relative',
-              width: 40,
-              height: 40,
+              width: 80,
+              minHeight: 56,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+          flexDirection: 'column',
+          gap: 4,
               background: 'transparent',
               border: 'none',
               borderLeft: active ? '3px solid var(--highlight-color, #eab308)' : '3px solid transparent',
-              borderRadius: 4,
+              borderRadius: 'var(--workspace-radius-small)',
               cursor: 'pointer',
               padding: 0,
               animation: showPulse ? 'automationGlow 2s ease-in-out infinite' : undefined,
@@ -91,8 +98,9 @@ export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomatio
           >
             <Icon
               size={20}
-              style={{ color: (isAutomations && hasActiveAutomation) ? 'var(--highlight-color, #eab308)' : active ? '#fff' : '#888' }}
+              style={{ color: (isAutomations && hasActiveAutomation) ? 'var(--highlight-color, #eab308)' : active ? '#fff' : '#b6bdc7' }}
             />
+            <span className="workspace-utility-label" style={{ fontSize: 12, color: active ? '#fff' : '#b6bdc7' }}>{label}</span>
             {showDot && (
               <span
                 style={{
@@ -121,6 +129,6 @@ export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomatio
           50% { opacity: 0.4; transform: scale(0.7); }
         }
       `}</style>
-    </div>
+    </nav>
   )
 }

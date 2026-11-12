@@ -141,4 +141,21 @@ spec:
   policyTypes: [Egress]
   egress:
     - {}
+{{- if .Values.chromadb.enabled }}
+---
+# Embedding runs in the backend. Chroma needs no outbound connections,
+# including model downloads, telemetry or calls to other cluster services.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "vandalizer.fullname" . }}-chromadb-egress
+  labels:
+    {{- include "vandalizer.labels" (dict "ctx" . "component" "networkpolicy") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "vandalizer.selectorLabels" (dict "ctx" . "component" "chromadb") | nindent 6 }}
+  policyTypes: [Egress]
+  egress: []
+{{- end }}
 {{- end }}

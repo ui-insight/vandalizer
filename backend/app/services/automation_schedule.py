@@ -107,7 +107,7 @@ def last_run_base(auto: dict | object, fallback: datetime.datetime) -> datetime.
     get = auto.get if isinstance(auto, dict) else lambda k, d=None: getattr(auto, k, d)
     stamps = [
         s for s in (get("last_scheduled_run_at"), get("schedule_armed_at"), get("created_at"))
-        if s is not None
+        if isinstance(s, datetime.datetime)
     ]
     if not stamps:
         stamps = [fallback]

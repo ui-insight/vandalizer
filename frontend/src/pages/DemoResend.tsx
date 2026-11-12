@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, Navigate, useParams } from '@tanstack/react-router'
 import { Mail, CheckCircle, Loader2, ArrowLeft, ExternalLink, AlertCircle, Clock } from 'lucide-react'
 import { Footer } from '../components/layout/Footer'
@@ -17,6 +17,8 @@ export default function DemoResend() {
   const [result, setResult] = useState<ResendResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [attempt, setAttempt] = useState(0)
+  const request = useRef<{ uuid: string; attempt: number; promise: Promise<ResendResult> } | null>(null)
 
   useEffect(() => {
     if (!uuid) {
@@ -24,11 +26,18 @@ export default function DemoResend() {
       setLoading(false)
       return
     }
-    resendCredentials(uuid)
-      .then(setResult)
-      .catch(() => setError('Something went wrong. Please try again in a moment.'))
-      .finally(() => setLoading(false))
-  }, [uuid])
+    let cancelled = false
+    setLoading(true); setError(''); setResult(null)
+    // A Strict Mode effect restart must not send a second email.
+    if (!request.current || request.current.uuid !== uuid || request.current.attempt !== attempt) {
+      request.current = { uuid, attempt, promise: resendCredentials(uuid) }
+    }
+    request.current.promise
+      .then(value => { if (!cancelled) setResult(value) })
+      .catch(reason => { if (!cancelled) setError(reason instanceof Error ? reason.message : 'Could not request a sign-in link. Retry in a moment.') })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [uuid, attempt])
 
   // Out of tokens → send them to the warm top-up screen.
   if (result?.status === 'exhausted' && result.feedback_token) {
@@ -63,14 +72,15 @@ export default function DemoResend() {
       <div className="relative z-10 pt-28 pb-16">
         <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
           {loading ? (
-            <div className="flex justify-center py-20">
+            <div role="status" aria-label="Requesting sign-in link" className="flex justify-center py-20">
               <Loader2 className="w-8 h-8 animate-spin text-[#f1b300]" />
             </div>
           ) : error ? (
             <div className="text-center py-20">
               <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-6" />
               <h2 className="text-2xl font-bold text-white mb-4">Something went wrong</h2>
-              <p className="text-gray-400">{error}</p>
+              <p role="alert" className="text-gray-400">{error}</p>
+              {uuid && <button onClick={() => setAttempt(value => value + 1)} className="mt-4 rounded-lg bg-white/10 px-6 py-3 font-bold text-white">Retry sign-in link</button>}
             </div>
           ) : result?.status === 'sent' ? (
             <div className="text-center py-12">
@@ -81,7 +91,7 @@ export default function DemoResend() {
                   We just emailed{result.email ? ` ${result.email}` : ' you'} a fresh one-click
                   sign-in link — no password needed.
                 </p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-gray-400">
                   The link works for the next 14 days. Don't see it? Check your spam folder.
                 </p>
               </div>
@@ -103,8 +113,9 @@ export default function DemoResend() {
                 <AlertCircle className="w-16 h-16 text-amber-400 mx-auto mb-6" />
                 <h2 className="text-2xl font-bold text-white mb-4">That didn't go through</h2>
                 <p className="text-gray-400">
-                  We couldn't send the email just now. Please refresh to try again in a moment.
+                  We couldn't send the email just now. Retry when you are ready.
                 </p>
+                <button onClick={() => setAttempt(value => value + 1)} className="mt-4 rounded-lg bg-white/10 px-6 py-3 font-bold text-white">Retry sign-in link</button>
               </div>
             </div>
           ) : (

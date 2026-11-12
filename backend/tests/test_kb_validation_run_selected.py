@@ -187,7 +187,12 @@ def test_admin_aggregate_reads_leave_smoke_tests_out():
         quality_service.get_quality_items,
         quality_service.get_quality_item_detail,
     ):
-        assert "NOT_SMOKE_TEST" in inspect.getsource(fn), fn.__name__
+        src = inspect.getsource(fn)
+        # Fleet-wide reads use NOT_FLEET_NOISE, which also drops the
+        # onboarding demo's fabricated run; both exclude smoke tests.
+        assert "NOT_SMOKE_TEST" in src or "NOT_FLEET_NOISE" in src, fn.__name__
+    assert SMOKE_TEST_SOURCE in quality_service.NOT_FLEET_NOISE["source"]["$nin"]
+    assert "demo_seed" in quality_service.NOT_FLEET_NOISE["source"]["$nin"]
 
 
 # ---------------------------------------------------------------------------

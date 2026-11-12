@@ -9,7 +9,7 @@ export function getAutomation(id: string) {
   return apiFetch<Automation>(`/api/automations/${id}`)
 }
 
-export function createAutomation(data: { name: string; description?: string; trigger_type?: string; trigger_config?: Record<string, unknown>; action_type?: string; action_id?: string; shared_with_team?: boolean }) {
+export function createAutomation(data: { name: string; description?: string; trigger_type?: string; trigger_config?: Record<string, unknown>; action_type?: string; action_id?: string; shared_with_team?: boolean; output_config?: Record<string, unknown> }) {
   return apiFetch<Automation>('/api/automations', { method: 'POST', body: JSON.stringify(data) })
 }
 
@@ -54,13 +54,25 @@ export function getActiveAutomations() {
 }
 
 /** Run an automation once, now, through its real pipeline (outputs fire). */
-export function runAutomationNow(id: string, documentUuids?: string[]) {
+export function runAutomationNow(id: string, documentUuids?: string[], requestId?: string) {
   return apiFetch<RunNowResponse>(`/api/automations/${id}/run-now`, {
     method: 'POST',
-    body: JSON.stringify(documentUuids && documentUuids.length ? { document_uuids: documentUuids } : {}),
+    body: JSON.stringify({ ...(documentUuids?.length ? { document_uuids: documentUuids } : {}), ...(requestId ? { request_id: requestId } : {}) }),
   })
 }
 
 export function getAutomationRun(id: string, triggerEventId: string) {
   return apiFetch<AutomationRunStatus>(`/api/automations/${id}/runs/${triggerEventId}`)
+}
+
+
+export interface AutomationHistoryCursor { before: string; before_id: string }
+export interface AutomationHistoryPage {
+  items: AutomationRunStatus[]
+  next_cursor: AutomationHistoryCursor | null
+}
+
+export function getAutomationHistory(id: string, cursor?: AutomationHistoryCursor) {
+  const params = new URLSearchParams({ limit: '20', ...cursor })
+  return apiFetch<AutomationHistoryPage>(`/api/automations/${id}/runs?${params}`)
 }

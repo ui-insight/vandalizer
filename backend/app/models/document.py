@@ -1,8 +1,9 @@
 import datetime
-from typing import Optional
+from typing import Optional, Self
 
-from pydantic import Field
+from pydantic import Field, ModelWrapValidatorHandler, PrivateAttr, model_validator
 from beanie import Document
+from pymongo import IndexModel
 
 
 class SmartDocument(Document):
@@ -29,6 +30,16 @@ class SmartDocument(Document):
     updated_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
     folder: Optional[str] = None
     is_default: bool = False
+
+    # Version chain ("Upload new version"). Every version is its own document
+    # with its own text, so a Page built from version 1 can be compared with
+    # version 2. ``version_root`` is the first version's uuid (None on a file
+    # that was never revised); ``superseded_by`` is set once a newer version
+    # exists, which hides this one from the file list.
+    version_root: Optional[str] = None
+    version_number: int = 1
+    previous_version_uuid: Optional[str] = None
+    superseded_by: Optional[str] = None
     token_count: int = 0
     num_pages: int = 0
 
@@ -70,6 +81,9 @@ class SmartDocument(Document):
     ingestion_warnings: list[str] = []
     # 1-indexed PDF pages behind the "unread_pages" warning.
     unread_pages: list[int] = []
+    # Set when ocr_envelope_repair decoded a stored raw OCR JSON envelope into
+    # this document's text in place (documents read before that fix).
+    ocr_envelope_repaired_at: Optional[datetime.datetime] = None
 
     # Per-location char-offset markers from text extraction, used to attach
     # page (PDF) or sheet (XLSX) metadata to chunks for citations. Empty for
@@ -83,6 +97,14 @@ class SmartDocument(Document):
     classified_at: Optional[datetime.datetime] = None
     classified_by: Optional[str] = None  # "auto" or user_id
 
+    # Onboarding
+    is_onboarding_sample: bool = False
+
+    # Internal course sample identity. Ordinary uploads leave this unset.
+    # Active samples arbitrate insertion before dispatching background work.
+    # Explicit rename/move releases the binding; it is not immutable evidence.
+    certification_provisioning_key: Optional[str] = None
+
     # Data retention
     retention_hold: bool = False
     retention_hold_reason: Optional[str] = None
@@ -95,13 +117,42 @@ class SmartDocument(Document):
     origin_workflow_id: Optional[str] = None
     origin_workflow_run_id: Optional[str] = None
     origin_run_at: Optional[datetime.datetime] = None
+    # Set on files Vandalizer wrote itself ("chat", "workflow", "automation"):
+    # summaries and reports, not originals. The award snapshot reads facts
+    # only from originals when the project has one (support ticket: a saved
+    # summary was cited as the award's source).
+    generated_by: Optional[str] = None
+
+    # The restart CAS owns this raw database field. Ordinary worker save()
+    # calls must not serialize an older copy back over the current revision.
+    _extraction_restart_revision: int = PrivateAttr(default=0)
+
+    @model_validator(mode='wrap')
+    @classmethod
+    def remember_restart_revision(cls, value: object, handler: ModelWrapValidatorHandler[Self]) -> Self:
+        document = handler(value)
+        if isinstance(value, dict):
+            revision = value.get('_extraction_restart_revision', 0)
+            if type(revision) is not int or revision < 0:
+                raise ValueError('Invalid extraction restart revision')
+            document._extraction_restart_revision = revision
+        return document
 
     class Settings:
         name = "smart_document"
+        # Include the private restart counter when reading full documents;
+        # it is consumed by the validator and never serialized by model saves.
+        projection = None
         indexes = [
+            IndexModel(
+                [('certification_provisioning_key', 1), ('user_id', 1), ('folder', 1), ('title', 1)],
+                name='unique_active_certification_sample', unique=True,
+                partialFilterExpression={'certification_provisioning_key': {'$type': 'string'}, 'soft_deleted': False},
+            ),
             "uuid",
             "user_id",
             "team_id",
+            "version_root",
             [("user_id", 1), ("folder", 1)],
             [("team_id", 1), ("folder", 1)],
             "created_at",

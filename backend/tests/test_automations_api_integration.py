@@ -161,7 +161,8 @@ def _mock_smart_document_class():
 
 @pytest.fixture
 async def client():
-    with patch("app.main.init_db", new_callable=AsyncMock):
+    with patch("app.main.init_db", new_callable=AsyncMock), \
+         patch("app.routers.automations.record_extraction_dispatch", new_callable=AsyncMock):
         from app.main import app
         from app.rate_limit import limiter
 
@@ -953,6 +954,7 @@ class TestAutomationCRUD:
         with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
              patch("app.dependencies.User") as MockUser, \
              patch("app.routers.automations.svc.list_automations", new_callable=AsyncMock, return_value=[auto]), \
+             patch("app.routers.automations._latest_run_summaries", new_callable=AsyncMock, return_value={str(auto.id): {"status": "completed", "created_at": now}}), \
              patch("app.routers.automations.access_control.get_team_access_context", new_callable=AsyncMock, return_value=TeamAccessContext()), \
              patch("app.routers.automations.access_control.can_manage_automation", return_value=True):
             MockUser.find_one = AsyncMock(return_value=user)
@@ -968,6 +970,8 @@ class TestAutomationCRUD:
         assert len(body) == 1
         assert body[0]["name"] == "Test Automation"
         assert body[0]["can_manage"] is True
+        assert body[0]["last_event_status"] == "completed"
+        assert body[0]["last_event_at"] == now.isoformat()
 
     @pytest.mark.asyncio
     async def test_get_automation_not_found(self, client):

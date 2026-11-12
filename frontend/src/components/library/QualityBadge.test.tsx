@@ -1,70 +1,43 @@
-import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { QualityBadge } from './QualityBadge'
 
 describe('QualityBadge', () => {
-  it('renders "excellent" tier with score', () => {
-    render(<QualityBadge tier="excellent" score={95} />)
-    expect(screen.getByText('Quality: Excellent (95%)')).toBeTruthy()
+  it('leads with descriptive quality and exposes the exact score in evaluation details', () => {
+    const openItem = vi.fn()
+    render(<div onClick={openItem}><QualityBadge tier="excellent" score={95} testCaseCount={40} lastValidatedAt="2026-10-28T12:00:00Z" /></div>)
+    const summary = screen.getByLabelText('Strong on tested examples. View evaluation')
+    expect(summary).toHaveTextContent('Tested on 40 examples')
+    expect(summary).not.toHaveTextContent('95')
+    expect(screen.getByText(/Recorded score: 95\/100/)).not.toBeVisible()
+    fireEvent.click(summary)
+    expect(screen.getByRole('region', { name: 'Evaluation details' })).toHaveTextContent('95/100')
+    expect(openItem).not.toHaveBeenCalled()
   })
-
-  it('renders "good" tier with score', () => {
-    render(<QualityBadge tier="good" score={78} />)
-    expect(screen.getByText('Quality: Good (78%)')).toBeTruthy()
+  it('shows low measured scores as needing improvement, not missing validation', () => {
+    render(<QualityBadge tier={null} score={0} />)
+    expect(screen.getByText('Needs improvement')).toBeVisible()
   })
-
-  it('renders "fair" tier with score', () => {
-    render(<QualityBadge tier="fair" score={55} />)
-    expect(screen.getByText('Quality: Fair (55%)')).toBeTruthy()
+  it('shows limited evidence alongside strong performance', () => {
+    render(<QualityBadge tier="good" score={80} testCaseCount={2} />)
+    expect(screen.getByText('Strong on tested examples')).toBeVisible()
+    expect(screen.getByText('Limited evidence')).toBeVisible()
   })
-
-  it('renders "Unvalidated" when tier is null', () => {
-    render(<QualityBadge tier={null} score={null} />)
-    expect(screen.getByText('Unvalidated')).toBeTruthy()
-  })
-
-  it('renders tier name without percentage when score is null', () => {
-    render(<QualityBadge tier="good" score={null} />)
-    expect(screen.getByText('Quality: Good')).toBeTruthy()
-  })
-
-  it('rounds score to nearest integer', () => {
-    render(<QualityBadge tier="excellent" score={92.7} />)
-    expect(screen.getByText('Quality: Excellent (93%)')).toBeTruthy()
-  })
-
-  it('replaces the tier with the pending-review state after a regression', () => {
-    render(<QualityBadge tier="excellent" score={95} regressionPending />)
-    expect(screen.getByText('Regression pending review')).toBeTruthy()
-    expect(screen.queryByText('Quality: Excellent (95%)')).toBeNull()
-  })
-
-  it('renders an asserted tier in the neutral style, in plain words', () => {
-    // A seeded "excellent" with no measured score is a claim, not a rating.
+  it('does not endorse an author assertion or a tier without a measured score', () => {
     render(<QualityBadge tier="excellent" score={null} asserted />)
-    const badge = screen.getByText('Rated Excellent by its author · not yet checked here')
-    expect(badge.getAttribute('title')).toContain('Nobody here has run a validation')
-    expect(badge.style.color).not.toBe('rgb(21, 128, 61)')
+    expect(screen.getByText('Not evaluated')).toBeVisible()
+    expect(screen.getByText('Author rating · no measured evaluation')).toBeVisible()
+    expect(screen.queryByText('Strong on tested examples')).not.toBeInTheDocument()
   })
-
-  it('leads with "Checked" on a shared entry and says when nothing was', () => {
-    render(<QualityBadge tier="good" score={87} variant="catalog" />)
-    expect(screen.getByText('Checked · Good (87%)')).toBeTruthy()
+  it('prioritizes regressions over outdated and high-scoring evaluations', () => {
+    render(<QualityBadge tier="excellent" score={99} outdated regressionPending />)
+    expect(screen.getByText('Needs review')).toBeVisible()
+    fireEvent.click(screen.getByLabelText('Needs review. View evaluation'))
+    expect(screen.getByRole('region')).toHaveTextContent('A regression is awaiting review')
   })
-
-  it('says "Not yet checked here" for a shared entry with no tier at all', () => {
-    render(<QualityBadge tier={null} score={null} variant="catalog" />)
-    expect(screen.getByText('Not yet checked here')).toBeTruthy()
-  })
-
-  it('ignores the asserted flag when there is no tier to assert', () => {
-    render(<QualityBadge tier={null} score={null} asserted />)
-    expect(screen.getByText('Unvalidated')).toBeTruthy()
-  })
-
-  it('explains the pending-review state on hover', () => {
-    render(<QualityBadge tier="good" score={70} regressionPending title="ignored" />)
-    const badge = screen.getByText('Regression pending review')
-    expect(badge.getAttribute('title')).toContain('no longer applies')
+  it('shows an outdated evaluation without claiming that its performance is current', () => {
+    render(<QualityBadge tier="excellent" score={99} outdated />)
+    expect(screen.getByText('Evaluation outdated')).toBeVisible()
+    expect(screen.queryByText('Strong on tested examples')).not.toBeInTheDocument()
   })
 })

@@ -6,11 +6,13 @@ import tempfile
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
+from pymongo.errors import DuplicateKeyError
 
 from app.config import Settings
 from app.models.document import SmartDocument
 from app.models.folder import SmartFolder
 from app.models.user import User
+from app.services.extraction_dispatch import record_extraction_dispatch
 from app.services import access_control, audit_service
 from app.utils.file_validation import is_allowed_file, is_valid_file_content
 from werkzeug.utils import secure_filename
@@ -41,10 +43,26 @@ async def upload_document(
     settings: Settings,
     folder: str | None = None,
     root_folder_name: str | None = None,
+    certification_provisioning_key: str | None = None,
+    replaces: SmartDocument | None = None,
 ) -> dict:
+    """Store an upload and start reading it.
+
+    ``replaces`` uploads a new version of that (already authorized) document:
+    the new file lands in the same folder and team, skips the duplicate-name
+    check, and the old version is marked superseded so it leaves the file
+    list. Pages built from the old version then offer an update.
+    """
     safe_name = secure_filename(filename)
     extension = raw_extension.lower().lstrip(".")
     user_id = user.user_id
+
+    if certification_provisioning_key is not None and (
+        len(certification_provisioning_key) != 64
+        or any(char not in '0123456789abcdef' for char in certification_provisioning_key)
+        or root_folder_name or not folder or folder == '0'
+    ):
+        raise ValueError('Course sample creation requires its original identity and lab folder.')
 
     if not is_allowed_file(safe_name):
         raise ValueError(f"File type '{extension}' is not allowed.")
@@ -62,8 +80,14 @@ async def upload_document(
     parent_folder: SmartFolder | None = None
     team_id: str | None = None
 
-    if target_folder and target_folder != "0":
-        parent_folder = await access_control.get_authorized_folder(target_folder, user)
+    if replaces is not None:
+        if replaces.superseded_by:
+            raise ValueError("A newer version of this file already exists. Upload to the latest version.")
+        target_folder = replaces.folder or "0"
+        team_id = replaces.team_id
+        root_folder_name = None
+    elif target_folder and target_folder != "0":
+        parent_folder = await access_control.get_authorized_folder(target_folder, user, contribute=True)
         if not parent_folder:
             raise ValueError("Folder not found.")
         team_id = parent_folder.team_id
@@ -83,12 +107,16 @@ async def upload_document(
         target_folder = "0"
 
     # De-duplicate
-    if team_id:
+    existing: SmartDocument | None = None
+    if replaces is not None:
+        pass  # A new version may share its name with the version it replaces.
+    elif team_id:
         existing = await SmartDocument.find_one(
             SmartDocument.title == safe_name,
             SmartDocument.team_id == team_id,
             SmartDocument.folder == target_folder,
             SmartDocument.soft_deleted != True,  # noqa: E712
+            SmartDocument.superseded_by == None,  # noqa: E711 — older versions are hidden
         )
     else:
         existing = await SmartDocument.find_one(
@@ -96,6 +124,7 @@ async def upload_document(
             SmartDocument.user_id == user_id,
             SmartDocument.folder == target_folder,
             SmartDocument.soft_deleted != True,  # noqa: E712
+            SmartDocument.superseded_by == None,  # noqa: E711 — older versions are hidden
         )
     if existing:
         return {"complete": True, "exists": True, "uuid": existing.uuid}
@@ -133,20 +162,12 @@ async def upload_document(
     relative_path_str = f"{user_id}/{uid}.{extension}"
     await storage.write(relative_path_str, file_data)
 
-    # Celery tasks need a local filesystem path; use public_path() for local
-    # storage or write a temporary file for remote backends (e.g. S3).
-    local_path = storage.public_path(relative_path_str)
-    if local_path is None:
-        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{extension}")
-        tmp.write(file_data)
-        tmp.close()
-        local_path = tmp.name
-
     relative_path = Path(relative_path_str)
 
     document = SmartDocument(
         title=safe_name,
         processing=True,
+        validating=True,
         valid=True,
         raw_text="",
         downloadpath=str(relative_path),
@@ -158,8 +179,56 @@ async def upload_document(
         folder=target_folder,
         task_id=None,
         task_status="layout",
+        certification_provisioning_key=certification_provisioning_key,
     )
-    await document.insert()
+    if replaces is not None:
+        document.version_root = replaces.version_root or replaces.uuid
+        document.version_number = (replaces.version_number or 1) + 1
+        document.previous_version_uuid = replaces.uuid
+        # Claim the old version first: two concurrent uploads must not both
+        # become "the" next version and fork the history.
+        claimed = await SmartDocument.get_motor_collection().update_one(
+            {"uuid": replaces.uuid, "superseded_by": None}, {"$set": {"superseded_by": uid}},
+        )
+        if claimed.modified_count != 1:
+            try:
+                await storage.delete(relative_path_str)
+            except Exception:
+                logger.exception("Could not remove unused version upload %s", relative_path_str)
+            raise ValueError("A newer version of this file already exists. Upload to the latest version.")
+    try:
+        await document.insert()
+    except BaseException as exc:
+        if replaces is not None:
+            # The new version was never stored; the old one is current again.
+            await SmartDocument.get_motor_collection().update_one(
+                {"uuid": replaces.uuid, "superseded_by": uid}, {"$set": {"superseded_by": None}},
+            )
+        if not isinstance(exc, DuplicateKeyError) or certification_provisioning_key is None:
+            raise
+        # Another request inserted the same active course source. Each upload
+        # used a random storage path, so only this losing candidate is removed.
+        existing = await SmartDocument.find_one(
+            SmartDocument.certification_provisioning_key == certification_provisioning_key,
+            SmartDocument.user_id == user_id, SmartDocument.folder == target_folder,
+            SmartDocument.title == safe_name, SmartDocument.soft_deleted == False,  # noqa: E712
+        )
+        if existing is None or existing.path == relative_path_str:
+            raise
+        try:
+            await storage.delete(relative_path_str)
+        except Exception:
+            logger.exception('Could not remove losing course sample upload %s', relative_path_str)
+        return {"complete": True, "exists": True, "uuid": existing.uuid}
+
+    # Only the inserted candidate needs a local task path and dispatch. An
+    # interrupted/unknown dispatch still requires its own recovery protocol.
+    local_path = storage.public_path(relative_path_str)
+    if local_path is None:
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{extension}")
+        tmp.write(file_data)
+        tmp.close()
+        local_path = tmp.name
 
     # Dispatch Celery tasks for extraction + validation
     from app.tasks.upload_tasks import dispatch_upload_tasks
@@ -170,9 +239,14 @@ async def upload_document(
         document_path=local_path,
         user_id=user_id,
     )
-    document.task_id = task_id
-    await document.save()
+    await record_extraction_dispatch(document, task_id)
 
+    if replaces is not None:
+        from app.services.page_sources import notify_source_revised
+
+        await notify_source_revised(replaces, document)
+        return {"complete": True, "uuid": uid, "document_id": str(document.id),
+                "version_number": document.version_number, "replaces": replaces.uuid}
     return {"complete": True, "uuid": uid, "document_id": str(document.id)}
 
 
@@ -280,6 +354,11 @@ async def delete_document(
             logger.warning("Failed to delete file for document %s: %s", doc_uuid, relative_path)
 
     await doc.delete()
+    # A deleted document's earlier text goes with it.
+    from app.services import extraction_snapshots
+
+    await extraction_snapshots.discard(doc.uuid)
+    await _unlink_version(doc)
     await audit_service.log_event(
         action="document.delete",
         actor_user_id=user.user_id,
@@ -292,12 +371,56 @@ async def delete_document(
     return True
 
 
+async def _unlink_version(doc: SmartDocument) -> None:
+    """Close the gap a deleted version leaves in its file's history.
+
+    Deleting the current version makes the previous one current again (it
+    returns to the file list); deleting an older one links its neighbours.
+    """
+    if not (doc.previous_version_uuid or doc.superseded_by):
+        return  # never revised: nothing to relink
+    collection = SmartDocument.get_motor_collection()
+    if doc.previous_version_uuid:
+        await collection.update_one(
+            {"uuid": doc.previous_version_uuid, "superseded_by": doc.uuid},
+            {"$set": {"superseded_by": doc.superseded_by}},
+        )
+    if doc.superseded_by:
+        await collection.update_one(
+            {"uuid": doc.superseded_by, "previous_version_uuid": doc.uuid},
+            {"$set": {"previous_version_uuid": doc.previous_version_uuid}},
+        )
+
+
+async def list_versions(doc: SmartDocument, user: User) -> list[dict]:
+    """Every version of ``doc``'s file the caller can open, newest first."""
+    root = doc.version_root or doc.uuid
+    found = await SmartDocument.find(
+        {"$or": [{"uuid": root}, {"version_root": root}], "soft_deleted": {"$ne": True}},
+    ).to_list()
+    team_access = await access_control.get_team_access_context(user)
+    versions = []
+    for item in sorted(found, key=lambda d: d.version_number or 1, reverse=True):
+        if not await access_control.get_authorized_document(item.uuid, user, team_access=team_access):
+            continue
+        versions.append({
+            "uuid": item.uuid, "title": item.title, "extension": item.extension,
+            "version_number": item.version_number or 1,
+            "created_at": item.created_at.isoformat() if item.created_at else None,
+            "current": item.superseded_by is None,
+            "processing": bool(item.processing),
+        })
+    return versions
+
+
 async def rename_document(doc_uuid: str, new_title: str, *, user: User) -> bool:
     if not new_title.strip():
         raise ValueError("File name cannot be empty.")
     doc = await access_control.get_authorized_document(doc_uuid, user, manage=True)
     if not doc:
         return False
+    if doc.title != new_title:
+        doc.certification_provisioning_key = None
     doc.title = new_title
     if not doc.downloadpath:
         doc.downloadpath = doc.path
@@ -312,7 +435,7 @@ async def move_document(file_uuid: str, folder_id: str, *, user: User) -> bool:
 
     target_team_id: str | None = None
     if folder_id != "0":
-        folder = await access_control.get_authorized_folder(folder_id, user)
+        folder = await access_control.get_authorized_folder(folder_id, user, contribute=True)
         if not folder:
             return False
         target_team_id = folder.team_id
@@ -321,6 +444,8 @@ async def move_document(file_uuid: str, folder_id: str, *, user: User) -> bool:
         raise ValueError("Cannot move files between personal and team folders.")
 
     old_folder = doc.folder
+    if old_folder != folder_id:
+        doc.certification_provisioning_key = None
     doc.folder = folder_id
     await doc.save()
 

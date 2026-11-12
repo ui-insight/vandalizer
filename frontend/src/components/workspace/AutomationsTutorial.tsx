@@ -15,7 +15,7 @@ const CARD = '#272d3d'
 const BORDER = '#363e52'
 const BORDER_LT = '#424b62'
 const TEXT = '#c0c7d6'
-const TEXT_DIM = '#7a8499'
+const TEXT_DIM = '#aeb7c9'
 const ACCENT = '#5e6a82'
 const DOT_BG = '#323a4e'
 

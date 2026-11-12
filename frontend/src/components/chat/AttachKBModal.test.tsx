@@ -88,3 +88,18 @@ describe('AttachKBModal', () => {
     expect(row.textContent).toMatch(/attached/)
   })
 })
+
+it('keeps the search and prior selection when a scope load fails and retries', async () => {
+  const onAttach = vi.fn()
+  render(<AttachKBModal attachedUuids={[]} maxAttached={3} onAttach={onAttach} onClose={vi.fn()} />)
+  fireEvent.click(await screen.findByRole('button', { name: /Export Control/ }))
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Guidance' } })
+  mockList.mockRejectedValueOnce(new Error('Offline'))
+  fireEvent.click(screen.getByRole('button', { name: 'Team' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Retry knowledge bases' }))
+  await screen.findByRole('button', { name: /Uniform Guidance/ })
+  expect(screen.getByRole('textbox')).toHaveValue('Guidance')
+  fireEvent.click(screen.getByRole('button', { name: 'Attach' }))
+  expect(onAttach).toHaveBeenCalledWith([{ uuid: 'kb-1', title: 'Export Control' }])
+  expect(mockList).toHaveBeenLastCalledWith({ scope: 'team', limit: 100 })
+})

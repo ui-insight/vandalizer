@@ -43,7 +43,7 @@ JUDGE_UNAVAILABLE = "JUDGE_UNAVAILABLE"
 
 def is_judge_unavailable(verdict: dict | None) -> bool:
     """True when a verdict is an outage, not a measurement."""
-    return bool(verdict) and verdict.get("verdict") == JUDGE_UNAVAILABLE
+    return verdict is not None and verdict.get("verdict") == JUDGE_UNAVAILABLE
 
 
 
@@ -154,7 +154,8 @@ def _extract_json(text: str) -> dict | list:
         if start >= 0 and end > start:
             s = s[start : end + 1]
     try:
-        return json.loads(s)
+        parsed = json.loads(s)
+        return parsed if isinstance(parsed, (dict, list)) else {}
     except Exception:
         return {}
 

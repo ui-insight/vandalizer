@@ -1,0 +1,1070 @@
+NIH Grants Policy Statement (FY 2026 revision) — Chapter 10: Construction, Modernization, or Major Alteration and Renovation of Research Facilities
+Source: https://grants.nih.gov/policy-and-compliance/nihgps
+
+10 Construction, Modernization, or Major Alteration and Renovation of Research
+10 CONSTRUCTION, MODERNIZATION, OR MAJOR
+ALTERATION AND RENOVATION OF RESEARCH
+FACILITIES
+10.1 GENERAL
+The chapter uses the following definitions:
+ l Construction. Construction of a new building, structure or facility, including the installation of
+fixed equipment, which provides space not presently available. It excludes the purchase of land
+and ancillary improvement, for example parking lots, roads, or fencing. The construction of shell
+space is not allowable as a construction activity since shell space does not provide usable space
+for research activities.
+ l Modernization. Alteration, renovation, remodeling, improvement, expansion or repair of, or completion of shell space in an existing building (whether for storage or human occupancy)  necessary to make the building suitable for use for the purposes of a particular program.
+Modernization is distinct from construction in that it leaves the existing structure in place. This
+can range from updating flooring to replacing everything except for the existing mainframe and
+foundations. When the primary purpose of the award is to modernize biomedical research facilities, the grant cannot support the conduct of any research.
+Alteration and Renovation (A&R) activities are considered as modernization activities and are typically
+supported under research grants where the primary purpose of the grant is other than construction or modernization. The determination of whether proposed A&R is major, or minor is made by the NIH Program
+Official. Major A&R is an unallowable activity or cost under foreign grants and foreign components in
+domestic grants.
+To issue awards with the primary purpose of construction or modernization,  an IC must have specific
+statutory authority allowing construction or modernization. Even if NIH has this authority, a recipient
+may not incur costs for any of these activities unless NIH specifically authorizes such costs.
+NIH generally requests applications, and makes awards, for construction or modernization under grants
+or cooperative agreements specifically for that purpose. The recipient retains the primary responsibility
+for the project, including all phases of design and construction. When needed, under cooperative agreements, there is substantial scientific/programmatic staff involvement during the performance of the activity, which may include providing technical assistance in designing, constructing, and commissioning the
+facility and coordinating collaboration with other IC funded construction activities.
+In addition, an applicant/recipient may propose to undertake an A&R project(s) under a grant whose
+primary purpose is other than construction or modernization. NIH characterizes these A&R projects as
+“minor” or “major,” depending on the type of activity proposed (see definitions above).  If a  post-award
+change would result in an A&R project that meets the definition of construction or Major A&R the recipient must notify the GMO in order for the IC to determine whether it is construction and whether the IC
+has the necessary statutory authority. The requirements that apply to minor A&R projects are addressed
+in IIA. Minor A&R projects are not required to satisfy all of the requirements of this chapter. Major
+A&R projects are subject to the requirements of this chapter as indicated.
+Except where indicated, the requirements in this chapter apply to NIH grant-supported construction or
+modernization in lieu of the requirements in IIA. For major A&R projects, this chapter applies to the
+A&R activity only and IIA pertains to the other grant-supported activities under the same award, if any.
+(GPS page IIB-6)
+
+10 Construction, Modernization, or Major Alteration and Renovation of Research
+However, there may be areas of overlap (e.g., a post-award change that causes a minor A&R project to
+become a major A&R project). See Exhibit 11 for a summary of the requirements specified in this
+chapter and their potential applicability to construction, modernization, or major A&R.
+This chapter addresses all aspects of grant-supported construction, modernization, and major A&R from
+application through closeout. Due to the size and complexity of these activities, this chapter describes in
+detail requirements and recipient responsibilities related to procurement of construction services (see Procurement Requirements for Construction Services below). Applicants and recipients also should refer to
+the construction grant program regulations (42 CFR Part 52b), which, by their terms, apply to construction and modernization grants as well as major A&R under a research grant mechanism; 2 CFR
+Part 200; and applicable administrative regulations; and program guidelines. Questions concerning construction or modernization grants or major A&R requirements or policies should be directed to the GMO
+or other official designated in the NoA.
+10.1.1 Eligibility
+In addition to any program-specific eligibility criteria, only public or private non-profit entities located in
+the United States or in U.S. territories or possessions are eligible to apply for construction or modernization grants. For-profit organizations and foreign organizations are not eligible to receive NIH construction or modernization grants. Major A&R is an unallowable activity or cost under foreign grants and
+foreign components in domestic grants.
+10.1.2 Notices of Funding Opportunity
+Construction grant applicants are required to apply in response to a specific NOFO. RFAs generally are
+used to solicit construction or modernization grant applications. PAs also may be issued to solicit construction or modernization grant applications for ongoing programs for which applications may be submitted under multiple cycles or years.
+In addition to the NOFO, NIH awarding ICs also may develop program guidelines that include detailed
+policy and procedural information applicable to specific construction and modernization grant programs/activities. Any program-specific requirements will be included in or referenced in the NOFO and
+NoA. Applicants should consult the NOFO and program guidelines, if any, when applying for construction or modernization grants.
+10.1.3 Application Review and Award
+Construction and modernization grant applications and applications requesting funding for a major A&R
+project are subject to peer review. Specific review criteria are included in the NOFO.
+Construction and modernization grants usually involve a single award, covering more than one year,
+made on the basis of an application for the entire project. Incremental funding (budget periods) within a
+project period normally is not used for construction or modernization grants and funding may be limited
+by the requirements of Federal appropriations law (31 U.S.C. §1552(a)) which may limit NIH’s ability to
+approve no-cost extensions. Recipients must consult with the GMO if it is expected that the construction
+or modernization activity is unlikely to be concluded within the project period specified in the NoA.
+Unlike other grants awarded by NIH, under which a recipient’s signature is not required to indicate
+acceptance of an award, under construction and modernization grants, the AOR must sign the NoA and
+return it to the GMO to indicate acceptance of the terms and conditions of award.
+(GPS page IIB-7)
+
+10 Construction, Modernization, or Major Alteration and Renovation of Research
+10.1.4 Title to Site
+NIH expects that the applicant holds (or will hold) fee simple title (i.e., absolute ownership of real property or absolute title to land, free of any claims against the title) to the property or other estate or interest
+in the site (e.g., leasehold interest) on which the construction, modernization, or major A&R is performed. NIH will determine whether an applicant meets this requirement as part of the administrative
+review of an application.
+The applicant must include with the application a legal opinion describing the interest the applicant has
+in the performance site. The legal opinion should describe any mortgages or other foreclosable liens on
+the property, including the principal amount of the mortgage (and rate of interest); the dates of the mortgage; the terms and conditions of repayment; the appraised value of the property; and any provisions
+designed to protect the Federal interest in the property.
+10.1.5 Matching Requirement
+The requirements for recipients to share in the cost of the project are set forth in 42 CFR Part 52.b.6,
+What is the rate of federal financial participation? Unless otherwise specified by statute, the rate of federal financial participation in a construction project cannot be more than 50 percent of allowable construction costs. NIH can waive this requirement; however, it is not automatic and must be requested from
+the IC prior to application submission.
+Matching may be in the form of allowable costs incurred by the recipient or a contractor under the grant.
+NIH generally does not allow recipients to use the value of third party in-kind contributions as a source
+to meet a matching requirement; however, the GMO may allow third party in-kind contributions
+included in the application budget on an exception basis. Third party in-kind contributions are the value
+of non-cash contributions provided by non-Federal third parties. Third party in-kind contributions may
+be in the form of real property, equipment, supplies and other expendable property and the value of
+goods and services directly benefiting and specifically identifiable to the project or program. To be allowable as matching, costs and in-kind contributions (if authorized) must meet allowability and documentation requirements of 2 CFR Part 200.306, as applicable. Costs and third party in-kind
+contributions claimed as matching also are subject to the requirements in IIA that apply to the expenditure of NIH funds.
+The source and amount of funds proposed by an applicant to meet a matching requirement must be identified in the application. The applicant also will be required to demonstrate that the funds are committed
+or available at the time of, and for the duration of, the award. Exception to “cash on hand” will require
+negotiation with NIH prior to award. This may take the form of an assurance, as specified by the NIH
+awarding IC. The amount of NIH (Federal) funds awarded, combined with the non-Federal share, will
+constitute the total approved budget as shown in the NoA. The prior approval and other dollar thresholds
+contained in this chapter are based on the total approved budget unless otherwise specified. Downward
+adjustments to the matching requirement after award are a prior approval action. If NIH approval is not
+received in advance it is considered a violation of the terms and conditions of the construction award and
+may warrant enforcement action.
+In addition to sharing in the costs of a construction  grant, the recipient must ensure the availability of sufficient funds for operation (or continued operation) of the facility when construction or modernization is
+completed to allow the effective use of the facility for the grant-supported purposes.
+(GPS page IIB-8)
+
+10 Construction, Modernization, or Major Alteration and Renovation of Research
+10.2 PROCUREMENT REQUIREMENTS FOR CONSTRUCTION
+SERVICES
+10.2.1 General
+Construction, modernization, and major A&R activity usually is carried out through one or more contracts under the grant. Therefore, the circumstances of the procurement are critical to the successful completion of the grant-supported project. Recipient procurement must comply with the requirements
+specified in 2 CFR Parts 200.317 through 200.327, as applicable. Recipients must use only those contracting methods that will:
+ l Ensure that all qualified contractors are given an opportunity to bid or propose and to have their
+bids/proposals fairly considered.
+ l Ensure that the contract(s) will result in the completion of a facility—ready for occupancy—that
+conforms to the design and specifications approved by NIH (or any appropriate modification
+thereof also approved by NIH), at a cost that is within the owner’s ability to pay.
+Unless otherwise authorized by NIH, all work associated with NIH grant-supported construction, modernization, or major A&R must be procured by formal advertising, resulting in lump-sum, fixed-price
+contracts using the Design-Bid-Build model. NIH may authorize other procurement methods and other
+types of contracts when sealed bidding is impractical (see Construction-Alternate Contracting Methods).
+The recipient must obtain NIH approval of final construction documents both before bids or proposals
+are solicited and prior to the award of the contract. The recipient must ensure that the project is completed in accordance with the approved plans and specifications or secure NIH approval of any changes
+that materially alter the scope or costs of the project, use of space, or functional layout.
+The two basic means of ensuring that a contract can be awarded at, or very near, the budgeted amount
+are accurate cost estimating and the use of bid alternates.
+A precise description of the scope of work, specifications, materials, and construction techniques will
+facilitate accurate cost estimating by the recipient and, ultimately, the responsive bidders. The description of the scope of work is especially important when multiple contracts will be awarded in support of
+the same project, because each contractor must know exactly what is involved in the portions of the job
+being bid.
+Where practical, the recipient may request in the invitation for bids, alternates to the base bid which are
+keyed to specified, and explicitly stated, changes in the project scope, materials, or construction techniques. The invitation may contain either additive alternates (adjustments increasing the amount of the
+base bid), or deductive alternates (adjustments reducing the amount of the base bid), or both. Additive
+alternates will make it possible to incorporate necessary features that otherwise would not have been
+included in the project as long as the features do not expand the scope of the peer reviewed and
+approved project. Alternates that are selected may be included in determining the low aggregate bid.
+If, notwithstanding the use of deductive alternates, all bids exceed the funds available, the recipient may:
+ l Decline to award the contract(s) and instead, after NIH approval, issue a revised invitation for
+bids containing changes in the bid documents or other factors affecting price.
+ l Negotiate with the low bidder. All changes in design and specifications resulting from such negotiations must be approved by NIH. If the low bidder refuses to negotiate, negotiations may be
+entered into with the next lowest bidder. If efforts to negotiate are unsuccessful, all bids must be
+cancelled and the project rebid.
+(GPS page IIB-9)
+
+10 Construction, Modernization, or Major Alteration and Renovation of Research
+If the NIH-supported project is less than the entire facility or project, the recipient must obtain bids or
+proposals that provide the costs for that portion of the total job that will be paid by NIH funds and any
+required matching. This may be done in one of the following ways:
+ l If the project consists of more than one building or site and can be divided for purposes of obtaining a price or cost estimate and for carrying out the construction or modernization, showing the
+cost for each building or site, or
+ l If the project is a single site or contains common space and cannot be divided for pricing and
+construction or modernization purposes, identifying or prorating the applicable costs or price.
+10.2.2 Liquidated Damages
+Invitations for bids must stipulate a time for completion of the project, expressed either in calendar days
+or as a fixed date, for each prime contract to be awarded under the project.
+At the option of the recipient, a liquidated damages provision may be included in the contract, allowing
+for assessment of damages when the contractor has not completed the construction by the date specified
+in the contract. Liquidated damages must be realistic and justified and must be approved by NIH before
+solicitation. Where damages are assessed, any amounts paid belong to the recipient.
+10.3 CONTRACTING METHODS
+10.3.1 Design-Bid-Build
+The traditional three-phase project delivery method in which the recipient contracts with separate entities
+for each the design and construction phase of a project. It begins with a project design phase, followed
+by the construction bid phase (including solicitation and selection of a construction contractor), and then
+the active construction phase.
+10.3.2 Alternate Contracting Methods
+The use of a contracting method other than Design-Bid-Build, including the use of construction management services or design-build services as described below, may be authorized by NIH when cost,
+time, and quality benefits will result. In making such determinations, NIH will consider the scope of the
+project, estimated cost, and other factors deemed relevant. NIH approval must be received before the
+recipient begins the process of using an alternate contracting method.
+If a construction management firm is currently employed, the recipient may choose to authorize that firm
+to perform the construction work. Such authorization requires NIH prior approval and the price for the
+work involved must not exceed the GMP also approved by NIH.
+10.3.2.1 Construction Manager
+10.3.2.1.1 Construction Manager as Agent
+Use of construction management services, under which the recipient contracts for technical consultation
+during the design stage of a project and for organization and general project oversight of construction
+activities during the construction phase, is considered professional services and, therefore, may be procured on a negotiated basis rather than by formal advertising. However, the services of CMs may be procured by formal advertising in those cases where State or local governments prohibit the award of
+construction management contracts on a negotiated basis. Where bids are invited, the bidders should be
+pre-qualified. Under this procedure, the CM, operating as a member of a recipient-architect-CM team, is
+(GPS page IIB-10)
+
+10 Construction, Modernization, or Major Alteration and Renovation of Research
+responsible for cost estimates during the design and construction as well as cost control, review of design
+(s) with a view toward value engineering, consultation on construction techniques, construction coordination and scheduling, and oversight of all construction activities. The CM’s fee is considered an eligible
+cost for the purpose of determining the total eligible cost of the project.
+10.3.2.1.2 Construction Manager-at-Risk
+A CM-at-Risk is considered a sole proprietorship, partnership, corporation, or other legal entity that
+assumes the financial risk for construction, rehabilitation, alteration, or repair of a facility at a GMP (see
+Construction-Alternate Contracting Methods-Guaranteed Maximum Price). The CM-at-Risk serves as a
+general contractor and provides consultation to the client during the design of the facility and through
+construction. The terms of the CM’s employment must be such as to preclude any conflict of interest.
+The recipient may authorize the CM as Agent to become the CM-at-Risk to perform the construction services when authorized by NIH.
+Under this procedure:
+ l The construction management contract must place total financial responsibility on the CM to
+complete construction of the project at or below a GMP. The CM is required to provide 100 percent performance and payment bonds to ensure that the facility can be completed with the
+amount of funds available.
+ l The GMP must be obtained from the CM before NIH will authorize the award of the first construction contract. This requirement applies whether or not phased construction techniques are
+employed. Each portion of the work for which a separate contract is expected shall be separately
+priced as an individual line item in the GMP contract.
+10.3.2.2 Design-Build Services
+Design-build is a method of project delivery in which one entity works under a single contract with the
+project owner to provide design and construction services. In design-build contracting, construction firms
+respond to a request for proposals by submitting building designs that meet the recipient’s performance
+requirements within a GMP (see Construction-Alternate Contracting Methods-Guaranteed Maximum
+Price) covering all architectural, engineering, and construction services required. The design-build firm
+must be selected in a manner that will allow maximum feasible competition. Because of the nature of
+design-build contracting, the following departures from formal advertising are authorized:
+ l Cost will be treated as a competitive factor although the recipient may insert in the request for
+proposals a specified maximum permissible figure.
+ l A contract may be awarded regardless of the number of proposals received or the number of
+firms determined to have met qualification standards.
+ l The recipient may negotiate cost or design with one or any number of firms.
+The selection of a design-build firm must be accomplished by a process that includes the following activities:
+ l Preparation of a RFP describing the recipient’s design requirements, cost requirements, standards
+for qualifying firms, and the criteria on which proposals will be judged.
+ l Public announcement of the RFP.
+ l Consideration of all proposals from firms that are determined to be qualified.
+ l Selection of that firm that, in the recipient’s judgment, represents the best offer considering both
+the firm’s qualifications and satisfaction of the criteria in the RFP.
+(GPS page IIB-11)
+
+10 Construction, Modernization, or Major Alteration and Renovation of Research
+On all design-build projects, the recipient must:
+ l Ensure a firm total cost by including in the contract a provision that extra costs resulting from
+errors or omissions in the drawings or estimates will be the design-build firm’s responsibility.
+ l Justify cost on the basis of comparability with similar construction.
+10.3.2.3 Guaranteed Maximum Price
+Under this procedure:
+ l The Guaranteed Maximum Price (GMP) contracting method can be used in either Construction
+Manager at Risk contracts or as part of Design-Build Services contracts. In either case, the project must be completed at or below the GMP.
+ l The recipient must transmit all GMP bids to the GMO, with its recommendation for award to the
+lowest responsive, responsible bidder.
+ l The GMP must be completely itemized, by trade, to include a separation of labor and materials,
+all markups, and no contingency other than that which will cover change orders as approved by
+the recipient.
+ l After approval of the GMP, all GMP subcontracts must be competed, and there must be at least
+three bidders to allow for an award.
+ o Issue a “sources sought” announcement describing the nature of the construction work
+required, the separate contracts to be awarded, and the standards for prequalification. It
+must also describe the complete scope of work with sufficient specificity to ensure
+response from all interested sources.
+ o Pre-qualify all firms that respond to the announcement who are determined by the recipient to meet the prequalification standards.
+ o Establish bidder’s lists for each of the invitations to bid. The lists must include all firms
+qualified on the basis of responses to the “sources sought” announcement and may also
+include other qualified firms known to the recipient.
+ o By written invitation, solicit bids from all firms on the bidders list.
+ o Consider bids from any contractor who requests permission to bid and who is determined by the recipient to meet the prequalification standards.
+ o If three bids cannot be obtained, the recipient must submit, in writing, to the GMO a
+detailed explanation of why the GMP contractor is unable to comply, along with supporting documentation for NIH consideration and approval of another alternate contracting method.
+ o Funds unexpended, due to lower construction costs than estimated in the GMP, must be
+refunded or credited to the recipient by the contractor and by the recipient to NIH. All
+costs in excess of the GMP are the responsibility of the GMP contractor.
+ o All subcontract prices must be approved by the GMO before making individual awards.
+The awards shall be made to the lowest-priced responsible, responsive bidders.
+10.4 DESIGN DOCUMENTATION REQUIREMENTS
+Unless otherwise specified in the NoA, following award acceptance for construction or modernization
+grants or award of funds for a major A&R project, the recipient may begin the design phase of the
+award, which includes the review, and approval of the design documents with the IC program or other
+(GPS page IIB-12)
+
+10 Construction, Modernization, or Major Alteration and Renovation of Research
+designated NIH staff. Funds for construction, modernization, or major A&R will not be released until the
+final architectural drawings, specifications, construction schedule, and updated cost estimates are
+reviewed and approved by the NIH IC unless otherwise indicated in the NoA. The release of funds is
+accomplished by a revised NoA. The purpose of the NIH design review is to ensure that applicable
+design standards, including, as applicable, the minimum requirements contained in 42 CFR Part 52b.12
+(see Minimum Requirements for Construction, Modernization, and Major A&R below), have been incorporated into the working drawings and specifications to ensure that program requirements are met, and
+that the facility will suitably accommodate the activities for which it is planned to be used.
+Advertisement for bids may be initiated only after approval of the final construction documents by the
+NIH awarding IC. The procurement methods to be employed, including any plans that involve a construction management contract with a GMP clause, must be reviewed and approved by the NIH awarding
+IC.
+10.4.1 Minimum Design Requirements for Construction, Modernization
+and Major A&R
+The minimum design requirements for NIH grant-supported construction or modernization are set forth
+in 42 CFR Part 52b.12. The NIH Design Requirements Manual incorporates the regulatory standards for
+construction or modernization grants and those for major A&R projects.
+Section 1.1.2 of the Design Requirements Manual provides the Required Codes and Standards for construction. The recipient will be subject to the standards in effect at the time of design or construction
+(modernization or A&R), as appropriate. Working drawings and specifications submitted for NIH
+approval (see Design Documentation Requirements above) must conform to the minimum standards in
+the NIH Design Requirements Manual. The NIH Design Requirements Manual also include policies,
+design standards, and technical criteria for use in planning, designing, and constructing or altering /
+renovating buildings owned or leased for use by NIH. Recipients are not subject to NIH site specific
+requirements contained in the NIH Design Requirements Manual but should meet the intended design
+objectives in such cases.
+Recipients also must ensure that each project meets the requirements of the applicable State and local
+codes and ordinances. Where State or local codes are proposed as a basis for facility design in lieu of
+NIH design requirements, a prior determination must be made by the NIH awarding IC that the specific
+State or local code is equivalent to, or exceeds, NIH requirements. If State and local codes or requirements exceed the design requirements set forth in NIH regulations, the NIH Design Requirements
+Manual or program guidelines, the more stringent requirements will apply.
+In planning and designing construction or modernization projects, recipients must consider that the facility is generally subject to an extended usage requirement, e.g., 10 or 20 years, after the date of occupancy and it should be constructed accordingly.
+NIH will monitor compliance with design requirements during the project’s design and construction
+phase. Recipients (or applicants) with questions concerning the applicability of requirements contained in
+the NIH Design Requirements Manual should consult with the NIH PO.
+10.5 EQUAL OPPORTUNITY AND LABOR STANDARDS
+Labor standards and equal employment opportunity requirements for federally assisted construction must
+be specified in the information provided to potential bidders/offerors on contracts for construction services under NIH construction and modernization grants and major A&R projects and must be included in
+the resulting contract documents (see 2 CFR Part 200, Appendix II to Part 200-Contract Provisions for
+(GPS page IIB-13)
+
+10 Construction, Modernization, or Major Alteration and Renovation of Research
+Non-Federal EntityContracts Under Federal Awards). NIH construction and modernization grants and
+major A&R projects (and contracts under them) are not subject to the requirements of the Davis-Bacon
+Act, unless the authorizing statute for the program/award specifically requires compliance.
+10.5.1 Equal Employment Opportunity
+Contracts (and subcontracts) for construction (including modernization or major A&R) are subject to  41
+CFR Part 60-1 implemented by OFCCP, DoL.
+Additional information is available at http://www.dol.gov/ofccp/.
+10.5.2 Labor Standards
+10.5.2.1 Contract Work Hours and Safety Standards
+Contractors and subcontractors providing construction services under NIH construction or modernization
+grants or major A&R projects with contracts or subcontracts exceeding $100,000 are subject to the
+requirements of the Contract Work Hours and Safety Standards Act, 40 U.S.C. 3701, et seq., concerning
+the payment of overtime and the maintenance of healthful and safe working conditions.
+Wages paid any laborer or mechanic employed by the contractor or subcontractor must be computed on
+the basis of a standard workweek of 40 hours. For all work in excess of the standard workweek, mechanics and laborers shall be compensated at a rate not less than one-and-a-half times the basic rate of pay.
+If this requirement is violated, the contractor or subcontractor is liable to the employee for the unpaid
+wages and may be liable to the Federal government for liquidated damages. NIH or the recipient may
+withhold otherwise payable funds to satisfy any such liability. The statute also specifies penalties for
+intentional violation of these requirements.
+Further, pursuant to standards issued by the Secretary of Labor, no contractor or subcontractor under an
+NIH grant shall require any laborer or mechanic employed in the performance of the contract to work in
+surroundings or under working conditions that are unsanitary, hazardous, or dangerous to an individual’s
+health or safety. Violation of these requirements may be cause for debarment from future Federal contracts or financial assistance.
+10.5.2.2 Disposition of Unclaimed Wages
+During or after the period of performance of a contract for construction services under an NIH grant, if it
+is discovered that an employee is entitled to wages but cannot be located for the purposes of payment (or
+for some reason refuses to accept payment), the recipient may eventually have to repay the Federal government. Therefore, NIH suggests that the contractor be required to turn over any unclaimed wages to
+the recipient.
+The recipient should notify the GMO that an escrow account has been established in the affected
+employee’s name and should maintain the account for 2 years (or longer if required by State or local
+law) following the completion of the contract. Upon the expiration of this period, any amounts still
+unclaimed will be disbursed by refunding to NIH either the entire amount, if the construction, modernization, or major A&R project was 100 percent funded by NIH, or an amount representing the percentage of NIH participation in the project. If the project was funded by more than one NIH or HHS
+program at differing rates, the refund should be based on an average percentage calculated by weighting
+each program’s rate of participation by the dollar amount of that program’s contribution.
+If the contractor has made a reasonable effort to locate the employee by having mail forwarded and contacting the employee’s union, the recipient need not repeat such attempts. If there is reason to believe
+(GPS page IIB-14)
+
+10 Construction, Modernization, or Major Alteration and Renovation of Research
+that the contractor’s efforts to locate employees that are due wages were not thorough, the recipient
+should attempt to locate the employees. Doing so will reduce the likelihood of future claims against the
+recipient.
+If any wages held in escrow are paid to an employee or an employee’s legal representative while the
+account is maintained, a complete report must be made to the GMO when the account is closed.
+10.6 REAL PROPERTY MANAGEMENT STANDARDS
+10.6.1 General
+Unless alternate requirements are specified in the governing statute:
+ l Construction, modernization and major A&R under research grants are subject to the requirements of 42 CFR Part 52b.
+ l Major A&R under center grants or minor A&R under other types of grants/mechanisms is subject to the provisions of 2 CFR Part 200.310 through 200.316, as applicable, regarding use, transfer of title, and disposition.
+Statutory provisions may specify alternate requirements for the length of the recipient’s accountability
+obligations, the Federal right of recovery, or waivers. To the extent statutory provisions differ from the
+requirements of 42 CFR Part 52b and/or 2 CFR Part 200, including those described in this subsection,
+the statutory provisions, as reflected in the terms and conditions of the award, apply.
+Real property constructed, modernized, or otherwise altered as part of a major alteration with NIH grant
+support may not be conveyed, transferred, assigned, mortgaged, leased, or in any other manner
+encumbered by the recipient, except as expressly authorized in writing by NIH. If the recipient defaults
+in any way on a mortgage, the recipient shall immediately notify the GMO by telephone and in writing.
+If the mortgagor intends to foreclose, the recipient must notify the GMO in writing at least 30 days
+before the foreclosure action is initiated.
+The mortgage agreement must specifically allow, in the case of default, that NIH or its designee may
+assume the role of mortgagor and continue to make payments. If NIH (or its designee) chooses not to
+assume the role of mortgagor, the mortgagee (recipient) must pay NIH an amount equal to the share of
+the sales proceeds otherwise due the recipient (mortgagor) times the Federal share in the property.
+Any NIH assignment of the property and mortgage responsibilities to any party other than NIH shall be
+subject to prior approval of the mortgagor.
+10.6.2 Notice of Federal Interest
+To protect the Federal interest in real property constructed, or where applicable, improved with NIH
+grant funds, recipients shall record a NFI in the appropriate official records of the jurisdiction in which
+the property is located as required by 2 CFR Part 200.316 and the NIHGPS. The NFI is required when
+use and disposition conditions apply to the property as stated in the NoA. The time of recordation shall
+be when construction begins. The recipient should consult with the GMO prior to recording the NFI, if
+necessary, to determine if the NFI is required under the award. Fees charged for recording the NFI may
+be charged to the grant (see Allowable and Unallowable Costs and Activities in this chapter). A copy of
+the recorded NFI must be provided to the GMO within 10 days following the date of recordation. To
+obtain a sample NFI, contact the GMO.
+(GPS page IIB-15)
+
+10 Construction, Modernization, or Major Alteration and Renovation of Research
+10.6.3 Insurance Requirements
+Builder’s risk insurance is required at the time construction begins. The insurance must cover potential
+losses after initiation, but before completion, of the construction or modernization caused by theft, fire,
+vandalism, and other types of accidental loss or damage to the structure.
+Immediately upon completion of construction, a nongovernmental recipient shall, at a minimum, provide
+the same type of insurance coverage as it maintains for other property it owns, consistent with the minimum coverage specified below. “Completion of construction” means either the point at which the
+builder turns a facility constructed with NIH grant support, or portion of a facility modernized or modified under a major A&R project, (that conforms to the design and specifications approved by  NIH and is
+available for occupancy) over to the recipient (i.e., the date of the final acceptance of the building or portion of a building) or the date of beneficial occupancy, whichever comes first.
+If title to real property constructed, modernized, or altered under a major A&R project under an NIH
+grant vests (or will vest upon completion) in the recipient, the following minimum insurance coverage is
+required:
+ l Title insurance policy that insures the fee interest in the real property for an amount not less than
+the full appraised value of the property. When the Federal participation covers only a portion of
+a building, title insurance should cover the total cost of the facility to prevent liens on the unsecured portion from having an adverse impact on the portion with a Federal interest. In those
+instances where the recipient already owns the land, such as a building being constructed in the
+middle of a campus setting, in lieu of a title insurance policy, the recipient may provide evidence
+satisfactory to the NIH awarding IC, such as legal or title opinion, that it has good and merchantable title free of all mortgages or other foreclosable liens to all land, rights of way, and easements necessary for the project. In instances where a recipient is given land by the State, if the
+State recently acquired the land in a land swap transaction, the recipient should obtain title insurance. However, if the State has owned the land for a considerable period of time (i.e., 5 years or
+more), title insurance would not be necessary; a copy of the State documents giving the land to
+the recipient would be sufficient. If the recipient must buy the land on which to build, a legal
+opinion would not be sufficient; title insurance must be obtained in order to protect the Federal
+interest in the building to be constructed.
+ l Physical destruction insurance policy that insures the full appraised value of the facility (whether
+owned or leased by the recipient) from risk of partial and total physical destruction. When the
+Federal participation covers only a portion of a building, the insurance should cover the total
+cost of the facility, because any damage to the building could make the building unusable and
+could thus affect the Federal interest. The insurance policy is to be maintained for the duration of
+the Federal interest in the property (see Real Property Management Standards—Use of Facility
+and Disposition in this chapter). The cost of insurance coverage after the period of grant support
+must be borne by a source other than the grant that provided the funds for the grant-supported
+project. The grant account will not remain active for this purpose.
+Governmental recipients may follow their own insurance requirements. Federally owned property
+provided to a recipient for use need not be insured by the recipient.
+The NIH awarding IC may waive one or both requirements above if the recipient shows that it is effectively self-insured against the risks involved. The term “effectively self-insured” means that the recipient
+has sufficient funds to pay for any damage to the facility, including total replacement if necessary, or to
+satisfy any liens placed against the facility. If the recipient claims self-insurance, the recipient must
+provide to NIH assurance that it has sufficient funds available to replace or repair the facility or to sat-
+(GPS page IIB-16)
+
+10 Construction, Modernization, or Major Alteration and Renovation of Research
+isfy all liens. This assurance should state the source of the funds, such as the organization’s endowment
+or other special funds set aside specifically for this purpose.
+10.6.4 Use of Facility and Disposition
+NIH construction grants require that the facility be used for biomedical or behavioral research for as long
+as needed for that purpose for the period prescribed in the NoA. The date of beneficial occupancy is the
+date that a facility constructed or modernized with NIH grant support conforming to the design and specifications approved by NIH are available for occupancy and fully operational to carry out all intended
+facility/research activities. During that time, the recipient must use the facility for the originally authorized purpose unless it obtains prior approval from the NIH awarding IC to use the facility for an alternate purpose. To ensure a recipient’s compliance with the facility usage requirement, the IC GMO will
+periodically (e.g., at least every two years) survey the recipient throughout the usage period and request a
+self-certification concerning continued use. NIH may also obtain the names of the investigator(s) occupying the space and an indication of their research interests. Most of the monitoring will be accomplished
+in this manner. However, NIH staff may perform periodic site visits to observe the use of the grant-supported space throughout the usage period. After the required usage period, NIH will no longer directly
+monitor the use of the space.
+When use and disposition conditions apply to real property supported under an NIH award, the recipient
+may not convey, transfer, assign, mortgage, lease, or in any other manner encumber such property
+without the prior written approval from the awarding office. If the recipient decides that the grant-support space is no longer needed before the expiration of the period of Federal interest, the recipient must
+request written disposition instruction from the awarding office. This action must be done prior to the
+recipient’s making any irreversible commitment related to property disposition. In this case, NIH may
+consider an alternate use of the facility or provide disposition instructions.
+In determining whether to approve an alternate use of the facility, NIH will take into consideration the
+extent to which the facility will be used for:
+ l Other health-related purposes consistent with the authorizing legislation of the program.
+ l Other health-related activities that are consistent with the mission of the IC; or
+ l Training and instruction in health fields for health professionals or health-related information programs for the public.
+The usage obligation may also be transferred to another facility with the prior approval of NIH. If
+approved, the remaining usage obligation shall be released from the original facility constructed with
+grant funds and transferred to the new facility. The recipient remains subject to all other requirements
+imposed by the NoA or successor document (if the change occurs following the period of grant support).
+For disposition of property acquired on an amortized acquisition basis, the computation of the Federal
+share of real property acquired with long-term debt financing will be computed for each year of grant
+support in which Federal funds are used to meet all or a portion of the down payment and/or principal on
+the mortgage.
+10.6.5 Real Estate Appraisals
+If a real estate transaction funded in whole or in part by NIH requires the use of a real estate appraisal
+(including, but not limited, to appraisals to determine the Federal share of real property and appraisals to
+determine required insurance levels), the appraisal must be performed by appraisers certified or licensed
+by the applicable State in accordance with the requirements established by Title XI of the Financial Institutions Reform, Recovery, and Enforcement Act of 1989, as amended (Public Law 101-73).
+(GPS page IIB-17)
+
+10 Construction, Modernization, or Major Alteration and Renovation of Research
+10.7 ALLOWABLE AND UNALLOWABLE COSTS AND
+ACTIVITIES
+The following lists indicate types of costs and activities generally allowable and unallowable under NIH
+construction or modernization grants and major A&R projects unless otherwise noted in the NOFO. The
+lists are not all-inclusive. Program guidelines, the NoA, and other terms and conditions of the award
+should be consulted for the specific costs allowable under a particular program or grant.
+Major A&R is unallowable under foreign grants and foreign components in domestic grants.
+The allowability and unallowability of costs and activities applies to the use of Federal funds and funds
+expended by the recipient to satisfy a matching requirement (see Matching Requirement in this chapter).
+Allowable costs and activities include the following:
+ l Acquisition and installation of fixed equipment.
+ l Appraisals
+ l Architectural and engineering services. Also see Pre-award costs below.
+ l Bid advertising
+ l Bid guarantees and performance and payment bonds. Bid guarantees and performance and payment bonds are allowable as provided in 2 CFR Part 200.326 and 2 CFR Part 200.427. A bid
+guarantee is a form of security assuring that the bidder will not withdraw a bid within the period
+specified for acceptance and will execute a written contract and furnish required bonds. Performance bonds secure fulfillment of all the contractor’s obligations under the contract and payment bonds assure payment as required by law to all persons supplying labor and material in the
+execution of the work provided for in the contract.
+ l Contingency fund.  To provide for unanticipated costs, applicants for construction grants may
+include a project contingency amount with the initial total allowable cost estimates. Contingency
+funds will be limited to 15 percent of the total allowable costs before bids are received and must
+be reduced to 10 percent after a construction contract has been awarded. NIH may maintain control up to 3% of the total contingency for unanticipated program specific changes during the
+course of the project.
+ l Filing fees for recording the NFI. See Real Property Management Standards—Notice of Federal
+Interest in this chapter.
+ l Force Account Labor. If the recipient’s own construction and maintenance staffs are used in carrying out construction or modernization activities (i.e., force account), the associated costs are
+allowable provided the recipient can document that a force account is less expensive than if the
+project were competitively bid and can substantiate all costs with appropriate receipts for the purchase of materials and certified pay records for the labor involved. This requires prior approval
+by the NIH awarding IC.
+ l General conditions (e.g. moveable site trailers, port-a-johns, hard hats, temporary or limited duration signage, security costs during construction).
+ l Inspection and commissioning fees.
+(GPS page IIB-18)
+
+10 Construction, Modernization, or Major Alteration and Renovation of Research
+ l Insurance. Costs of builders risk insurance, title insurance, physical destruction insurance, and
+liability insurance are generally allowable. Physical destruction, and liability insurance usually
+are treated as indirect costs but may be treated as direct costs in accordance with the established
+policy of the recipient, consistently applied regardless of the source of funds. Builder’s risk insurance and title insurance may be charged to the grant in proportion to the amount of NIH participation in the property (see Real Property Management Standards—Insurance Requirements in
+this chapter).
+ l Legal fees. Legal fees related to obtaining a legal opinion regarding title to a site.
+ l Pre-award costs. Costs incurred before award for architect’s fees, consultant’s fees and environmental analysis necessary to the planning and design of the project are allowable if the project
+is subsequently approved and funded. Pre-award construction or modernization costs are generally unallowable unless NIH grants an exception.
+ l Profit/fee for contractors/subcontractors. Allowable as part of the overall cost/price of a contract
+consistent with commercial practice.
+ l Project management.
+ l Relocation expenses related to the Uniform Relocation Assistance and Real Property Acquisition
+Policies Act of 1970 (49 CFR Part 24).
+ l Sidewalks necessary for use of facility.
+ l Site survey and soil investigation.
+ l Site clearance. Site clearance costs are allowable as long as they are reflected in the bid.
+ l Threat-risk assessment. Costs incurred for a site-specific or project-specific assessment of security risk by a qualified professional are allowable.
+ l NEPA and historic preservation analysis. Costs associated with evaluation of the environmental
+effects and historic preservation effects of proposed construction, modernization, or A&R activity and obtaining public input, producing the necessary studies, analysis, and resultant reports are
+allowable. Also see Pre-award costs above.
+Unallowable costs and activities include the following:
+ l Bonus payments to contractors. Bonus payments other than earned incentive payments to contractors under formal incentive arrangements are unallowable. An incentive arrangement is used
+to motivate contractors to provide required supplies or services at lower costs and, in certain
+instances, with improved delivery or technical performance, by relating the amount of profit or
+fee payable under the contract to the contractor’s performance.
+ l Construction of shell space designed for completion at a future date.
+ l Consultant fees not related to actual construction.
+ l Damage judgment suits.
+ l Equipment purchased through a conditional sales contract. A conditional sale is a type of agreement to sell under which the seller retains title to goods sold and delivered to a purchaser until
+full payment has been made.
+ l Fund-raising expenses.
+ l Indirect costs.
+ l Interior and exterior decorating fees (e.g. purchase of artwork, sculpture, etc.).
+(GPS page IIB-19)
+
+10 Construction, Modernization, or Major Alteration and Renovation of Research
+ l Land acquisition.
+ l Landscaping and irrigation costs.
+ l Legal services not related to title certification.
+ l Movable equipment.
+ l Off-site improvements. Off-site improvements, such as parking lots, are not allowable.
+10.8 ADMINISTRATIVE REQUIREMENTS
+10.8.1 Prior Approval Requirements
+Recipients must obtain written prior approval from the GMO for the following types of recipient-initiated project or budget changes:
+ l Any applicable change as specified in Administrative Requirements—Changes in Project and
+Budget in IIA.
+ l Revision that would result in a change in scope of the project, change in project site and/or location, including proposed modifications that would materially alter the costs of the project, space
+utilization, or financial outlay (including Federal/non-Federal cost share adjustments), resulting
+in changes in the previously approved procurement method or contract. Modifications that would
+materially alter the costs include the transfer of funds between construction and non-construction
+work.
+ l Deviations from design requirements.
+ l Alternate contracting methods.
+ l Revision that would increase the amount of Federal funds needed to complete the project.
+ l Extension of the project period with or without funds.
+ l Change in the use of the facility (see Real Property Standards—Use of Facility and Disposition
+in this chapter).
+ l Transfer of the remaining usage obligation to another facility.
+The request for approval must include sufficient information to allow NIH review of the circumstance(s)
+and need for the proposed change. For changes affecting construction contracts, if the recipient receives
+written prior approval from the GMO, the recipient may make or authorize the approved modifications to
+the construction contract. Minor modifications to construction contracts may be made without NIH
+awarding IC prior approval. However, copies of all change orders to construction contracts must be
+retained as grant-related records (see Administrative Requirements—Monitoring—Record Retention and
+Access in IIA).
+10.8.2 Alteration and Renovation Projects Under Non-construction
+Grants
+Two copies of each of the following documents must be submitted with each request for approval of
+minor A&R projects whether proposed in the application or as a post-award rebudgeting request:
+(GPS page IIB-20)
+
+10 Construction, Modernization, or Major Alteration and Renovation of Research
+ l Single-line drawing of the existing space and proposed alterations.
+ l Narrative description of the proposed functional utilization of the space and equipment requirements prepared by the program and administrative managers who will use and be responsible for
+the working space and, when appropriate, with input from architectural and engineering advisors.
+Final drawings and specifications will be based on this description. The description must include
+a detailed explanation of the need, character, and extent of the functions to be housed in the
+space proposed for A&R, using the following headings, as appropriate:
+ o General information
+ o Description of the functions to be performed in the space
+ o Space schedule (detailed description of floor space)
+ o List of fixed equipment proposed for the facility
+ o Cost estimate (see sample format in Exhibit 8)
+ o Special design problems
+ o Description of the existing and proposed utility systems for the modified space
+ o Description of plans to provide accessibility for the physically handicapped
+ o Provisions for meeting the requirements of the Life Safety Code
+ o Length of the property lease if the space is rented
+ o Other information required by program legislation or regulations.
+When the proposed alteration is to occur in a building that is under construction or in an incomplete
+structure, two copies of the following documentation also must be provided:
+ l Detailed justification for the need to perform the work before the building is completed
+ l Cost comparison between doing the work before and after the building is completed
+ l Description of other specific benefits to be gained by doing the work before the building is completed.
+Applicants/recipients undertaking major A&R projects  are subject to the review, approval, and documentation requirements included or referenced in this chapter for construction grants.
+10.9 CLOSEOUT
+Immediately upon completion of construction, modernization, or alteration under a major A&R project
+the recipient should contact the awarding IC GMO. Under construction grants, the recipient will generally be required to submit the following documents within 120 days following the completion of the
+project as part of the closeout process:
+ l A final tabulation of net assignable space supported under the award for each program activity.
+ l The actual cost of construction per gross and net square foot/meter.
+ l The actual total allowable project costs after construction per gross and net square foot/meter.
+ l Actual date of beneficial occupancy of the facility.
+ l A simplified floor plan or space assignment drawing in electronic format clearly marked to
+identify the grant-supported space.
+ l Final record as-built construction documents.
+(GPS page IIB-21)
+
+10 Construction, Modernization, or Major Alteration and Renovation of Research
+ l Electronic submission of the FFR reflecting both the Federal and non-Federal share of outlays
+when matching is required.
+ l A written assurance signed by the AOR stating that the recipient has the required insurance coverage and agrees to maintain the required insurance for the applicable duration of the Federal
+interest in the property or an indication that the recipient is self-insured against the risks
+involved and the source of funds.
+10.10 PUBLIC POLICY REQUIREMENTS
+In addition to the public policy requirements and objectives specified in IIA, grants for construction,
+modernization or major A&R projects are subject to the public policy requirements in this section. These
+requirements may be specified by statute, regulation, executive order, or policy, and apply regardless of
+the type of recipient. Exhibit 11 may be used as guidance; however, some of the requirements for construction or modernization grants or major A&R activities may not be applicable to your project or program. Specific questions about whether a particular requirement applies should be directed to the GMO
+of the awarding IC. Recipients of construction or modernization grants and funding for major A&R projects also must require contractors and subcontractors providing construction services to comply with certain Federal labor standards. These labor standards are discussed in Equal Employment Opportunity and
+Labor Standards in this chapter. Following are highlights of public policy requirements:
+ l Architectural Barriers Act of 1968, as amended (42 U.S.C. §§ 4151 et seq.). The Architectural
+Barriers Act of 1968, as amended, the Federal Property Management Regulations 101-19.6 (41
+CFR Part 101-19.6), and the Uniform Federal Accessibility Standards issued by the General Services Administration (41 CFR Part 101-19.6, Appendix A) set forth requirements to make facilities accessible to, and usable by, the physically handicapped and include minimum design
+standards. All new facilities constructed with NIH grant support must comply with these requirements. These minimum standards must be included in the specifications for any NIH-funded new
+construction unless the recipient proposes to substitute standards that meet or exceed these standards. Where NIH assistance is provided for alteration or renovation (including modernization) of
+existing facilities, the altered facility (or part of the facility) must comply, including use of the
+minimum standards in the specifications. The recipient will be responsible for conducting inspections to ensure compliance with these standards by any contractor performing construction services under the grant.
+ l Clean Air Act (42 U.S.C. 7401 et seq.), and Federal Water Pollution Control Act (Clean Water
+Act), as amended (33 U.S.C. 1251 et seq.). Provide for the protection and enhancement of the
+quality of the nation’s air resources to promote public health and welfare, and for restoring and
+maintaining the chemical, physical and biological integrity of the nation’s waters; for contracts
+exceeding $100,000.
+ l Coastal Zone Management Act of 1972 (16 U.S.C. §§1451 et seq.). Assurance of project consistency with the approved State management program developed under the Act.
+ l Copeland Act (40 U.S.C. §276c and 18 U.S.C. §874). When required by statute.
+ l Davis-Bacon Act (40 U.S.C. §§276a to 276a-7). When required by statute.
+(GPS page IIB-22)
+
+10 Construction, Modernization, or Major Alteration and Renovation of Research
+ l Earthquake Hazards Reduction Act of 1977, as amended (Public Law 95-124), and EO 12699,
+Seismic Safety of Federal and Federally Assisted or Regulated New Building Construction
+(January 5, 1990). Apply to NIH-assisted construction located in the applicable geographic location. The EO requires that new federally assisted or regulated buildings be designed and constructed using appropriate seismic standards compliant with State, country, or local jurisdictional
+building ordinances. Where necessary, special structural and other features to protect life and
+minimize damage to facilities from tornadoes also may be required.
+ l Endangered Species Act of 1973, as amended (P.L. 93-205). For the protection of endangered
+species.
+ l Flood Disaster Protection Act of 1973 — Flood Insurance — The Flood Disaster Protection
+Act of 1973, as amended (Public Law 93-234). Provides that no Federal financial assistance to
+acquire, modernize, or construct property may be provided in identified flood-prone communities in the United States, unless the community participates in the National Flood Insurance
+Program and flood insurance is purchased within 1 year of the identification. Lists of floodprone areas that are eligible for flood insurance are published in the Federal Register by FEMA.
+ l Lead-Based Paint Poisoning Prevention Act (42 U.S.C. §§4801 et seq.). Prohibits the use of
+lead-based paint in construction or rehabilitation of residence structures.
+ l National Environmental Policy Act of 1969 — NEPA, as amended (Public Law 91-190). Establishes national policy goals and procedures to protect and enhance the environment, including
+protection against natural disasters. NEPA requires all Federal agencies to consider the reasonably foreseeable environmental consequences of any major Federal activity, including grantsupported activities. If NIH determines that NEPA applies to grant-supported activities, NIH will
+require that the environmental aspects of the activity be reviewed and evaluated by NIH technical staff before final action on the application. This determination also includes determinations
+concerning floodplain management pursuant to EO 11988, Floodplain Management (May 24,
+1977) (42 FR 26951, 3 CFR Part, 1977 Comp., p. 117) and EO 11990, Protection of Wetlands
+(May 24, 1977) (42 FR 26961, 3 CFR, 1977 Comp., p. 121).
+Because projects for construction, modernization, or major A&R activities have the potential to affect
+the environment, NIH requires that applicants for this type of support provide information on anticipated
+environmental impact as part of their just-in-time submission. Applicants may use the Review of Environmental and Other Impacts document to supply this information. An alternate format can be used as
+long as equivalent environmental and other impacts information is provided.
+NIH will review the Environmental and Other Impacts information contained in the application to assess
+the level of environmental impact of the proposed project. It is the responsibility of NIH to determine
+which of the following will apply to the proposed project:
+ l Environmental Impact Statement (EIS). A document required of federal agencies by the NEPA
+for major projects or legislative proposals significantly affecting the environment. A tool for
+decision making, it describes the positive and negative effects of the undertaking and considers
+alternatives.
+ l Environmental Assessment (EA). An environmental analysis prepared pursuant to the NEPA to
+determine whether a federal action would significantly affect the environment and thus require a
+more detailed environmental impact statement.
+ l No Further Action is Required.
+If NIH determines that an EA or an EIS is required, the applicant (recipient) must conduct the appropriate environmental review and provide the necessary documentation to NIH for review, approval, and
+(GPS page IIB-23)
+
+10 Construction, Modernization, or Major Alteration and Renovation of Research
+processing. NIH will provide advice and assistance to the applicant (recipient), as necessary, concerning
+review procedures; evaluate the results of the review; and make the final decision on environmental
+impact as required by NEPA.
+Applicants also must (1) provide a current listing and copies, as applicable, of all relevant licenses, permits, and/or other approvals required including, but not limited to, the State and local air, water quality,
+and zoning board reports, and (2) indicate the State, local, and regional planning authorities contacted or
+consulted regarding the application and briefly discuss the proposed facility with respect to regional
+development plans.
+Applicants are not required to incur costs for extensive consultant services at the application stage; therefore, hiring of consultants to develop detailed data and elaborate presentations is discouraged and such
+costs generally will not be allowable as pre-award costs.
+ l Public Disclosure — Section 102 of NEPA and EO 11514. Section 102 of NEPA and EO
+11514 (March 5, 1970) provide for public comment and participation in the environmental
+impact review process. When there is an environmental impact (in accord with NEPA), the
+applicant must publicly disclose the project in a newspaper or other publicly available medium
+and to describe any environmental impacts that affect the protection and enhancement of environmental quality concurrent with notification to the SPOC (see Public Policy Requirements—
+Executive Orders—Intergovernmental Review of Programs under Executive Order 12372 in this
+chapter). An example of a sample disclosure statement follows:
+"Notice is hereby given that the Uptown Medical School proposes to construct additional space,
+partially utilizing Federal funds. The proposed construction project is the addition of 251 net
+square meters connected to the existing Allen Building, which is located at 5333 Main Street,
+Downtown, Ohio.
+The Medical School has evaluated the environmental and community impact of the proposed construction. There will be (appropriate text will describe impact). The Medical School anticipates
+that no significant permanent environmental impacts are foreseen, however, this determination is
+ultimately the responsibility of the awarding Federal agency. In accordance with Executive Order
+11514 (March 5, 1970), which implements the National Environmental Policy Act of 1969, as
+amended, any individual or group may comment on, or request information concerning, the environmental implications of the proposed project. Communications should be addressed to the
+Office of Planning, Uptown Medical School, and must be received by (date). The Federal grant
+application may be reviewed at the Office of the Dean, School of Medicine, 5333 Main Street,
+during normal working hours."
+ l National Historic Preservation Act of 1966 and Archaeological and Historic Preservation Act
+of 1974. Under the provisions of the National Historic Preservation Act, as amended (16 U.S.C.
+470 et seq.), and the Archaeological and Historic Preservation Act of 1974, as amended (16
+U.S.C. 469a-1 et seq.), the Secretary of the Interior has compiled a National Register of Historic
+Places—sites and buildings of significant importance to U.S. history. These statutes require that,
+before approval of a grant related activity, NIH take into account the effect on these sites of the
+proposed activity. NIH is primarily responsible for determining whether activities will affect a
+property listed in the National Register or one that meets the eligibility criteria for inclusion,
+even if not included in the National Register at the time the application is submitted. The
+National Register of Historic Places may be obtained from the State Liaison Officers designated
+by their respective states to administer this program or from the Advisory Council on Historic
+Preservation. The National Trust for Historic Preservation is at http://www.nationaltrust.org/.
+(GPS page IIB-24)
+
+10 Construction, Modernization, or Major Alteration and Renovation of Research
+If an eligible or potentially eligible historic property will be affected, the applicant must obtain
+clearance from both the appropriate State Historic Preservation Office and Tribal Historic Preservation Office before submitting the application. Failure to obtain this clearance will delay NIH
+action on an application. The State Historic Preservation Liaison Officer or the National Trust for
+Historic Preservation may be contacted for additional details.
+ l Rehabilitation Act of 1973. The HHS implementation of section 504 of the Rehabilitation Act of
+1973 is found in 45 CFR Part 84, Nondiscrimination on the Basis of Handicap in Programs and
+Activities Receiving Federal Financial Assistance. Section 504 is designed to eliminate discrimination on the basis of handicap in any program or activity receiving Federal financial assistance. Each facility or part of a facility constructed by, on behalf of, or for the use of a recipient
+shall be designed and constructed in such manner that the facility or part of the facility is readily
+accessible to and usable by handicapped persons. Furthermore, each facility or part of a facility
+which is modernized or altered by, on behalf of, or for the use of a recipient in a manner that
+affects or could affect the usability of the facility or part of the facility shall, to the maximum
+extent feasible, be modernized or altered in such manner that the altered portion of the facility is
+readily accessible to and usable by handicapped persons. Design, construction, or alteration of
+buildings shall conform to the Federal Property Management Regulations at 41 CFR Part 102
+subchapter C, Real Property, Part 102-76.
+ l Safe Drinking Water Act (Title XIV of the Public Health Service Act, as amended). For the
+protection of underground sources of drinking water.
+ l Uniform Relocation Assistance and Real Property Acquisition Policies Act of 1970 (Uniform
+Relocation Act). HHS requirements for complying with the Uniform Relocation Act are set forth
+in 49 CFR Part 24. Uniform relocation assistance and real property acquisition for Federal and
+federally assisted programs. The Uniform Relocation Act, 42 U.S.C. 4601 et seq., applies to all
+programs or projects undertaken by Federal agencies or with Federal financial assistance that
+cause the displacement of any person. The HHS requirements for complying with the Uniform
+Relocation Act are set forth in 45 CFR Part 15, which references 49 CFR Part 24. Those regulations provide policies and procedures for the acquisition of real property, including acquisition by recipients, and require that displaced people be treated fairly. They encourage acquiring
+entities to negotiate promptly and amicably with property owners so property owners’ interests
+are protected and litigation can be avoided.
+ l Wild and Scenic Rivers Act of 1968 (16 U.S.C. §§1271 et seq.). Related to protecting components or potential components of the national wild and scenic rivers system.
+10.10.1 Executive Orders
+ l Intergovernmental Review of Federal Programs (July 14, 1982), as amended, under Executive
+Order 12372. EO 12372 requires consultation with State and local officials on certain proposed
+Federal assistance. For HHS, these requirements are the Intergovernmental Review of Department of Health and Human Services Programs and Activities. NIH construction and modernization grants are subject to these requirements. Applicants from states that have chosen to
+participate in the intergovernmental review process should contact their SPOC as early as possible to alert the SPOC to the planned application and to obtain necessary instruction on the
+State process. Indian tribes (or "federally recognized Indian tribes") are not subject to these
+requirements.
+SPOCs are given 60 days to review applications. To accommodate this time frame and the NIH
+review process, an applicant must provide a copy of the application to the SPOC no later than the
+(GPS page IIB-25)
+
+10 Construction, Modernization, or Major Alteration and Renovation of Research
+time the application is submitted to NIH. SPOC comments must be submitted to NIH with the
+application, or the application must indicate the date on which the application was provided to
+the SPOC for review. If SPOC comments are not submitted with the application, the applicant
+must provide them upon receipt and may include its reaction to the comments, or it must notify
+NIH that it did not receive any SPOC response.
+ l Executive Order 11988, Floodplain Management (May 24, 1977) (42 FR 26951, 3 CFR, 1977
+Comp., p. 117). Uneconomical, hazardous, or unnecessary use of flood plains for construction.
+ l Executive Order 11990, Protection of Wetlands (May 24, 1977). See 42 FR 26961, 3 CFR,
+1977 Comp., p. 121.
+ l Executive Order 12185, Conservation of Petroleum and Natural Gas (Dec. 17, 1979). See 44
+FR 75093, 3 CFR, 1979 Comp., p. 474.
+ l Executive Order 12699, Seismic Safety of Federal and Federally Assisted or Regulated New
+Building Construction (January 5, 1990). See 3 CFR, 1990 Comp., p. 269. See Earthquake Hazards Reduction Act bullet in the Construction—Public Policy Requirements section.
+ l Executive Order 12770 — Metric System. Consistent with EO 12770 (July 25, 1991), Metric
+Usage in Federal Government Programs. All construction, modernization, or A&R (major or
+minor) supported by NIH grant funds must be designed using the metric system.
+Exhibit 11. Summary of Requirements Applicable to Construction, Modernization, and
+Major A&R Activities
+Program Regulation
+Requirement
+Type of Activity:
+Construction Grant
+Type of Activity:
+Modernization Grant
+Type of Activity: Major
+A&R Project
+NIH Construction Grants
+Regulations (42 CFR
+Part 52b)
+Applicable
+Applicable
+Applicable to major A&R
+under a research project
+grant; does not apply to
+minor A&R funded under
+an NIH Center grant.
+Public Policy Requirements
+Requirement
+Type of Activity:
+Construction Grant
+Type of Activity:
+Modernization Grant
+Type of Activity: Major
+A&R Project
+Architectural Barriers
+Act of 1968
+Applicable
+Applicable
+Applicable
+Clean Air and Clean
+Water Act
+Applicable
+Applicable
+Applicable
+Coastal Zone
+Management Act of
+1972
+Applicable
+Applicable
+Applicable
+Copeland Act
+As required by statute
+As required by statute
+As required by statute
+Davis-Bacon Act
+As required by statute
+As required by statute
+As required by statute
+(GPS page IIB-26)
+
+10 Construction, Modernization, or Major Alteration and Renovation of Research
+Requirement
+Type of Activity:
+Construction Grant
+Type of Activity:
+Modernization Grant
+Type of Activity: Major
+A&R Project
+Earthquake Hazards
+Reduction Act of 1977
+Applicable
+N/A
+N/A
+Endangered Species
+Act of 1973
+Applicable
+Applicable
+Applicable
+Flood Disaster
+Protection Act of 1973
+Applicable
+N/A
+N/A
+Lead-Based Paint
+Poisoning Prevention
+Act
+Applicable
+Applicable
+Applicable
+National Environmental
+Policy Act (NEPA) of
+1969
+Applicable
+Applicable
+As specified by NIH
+Public Disclosure —
+Section 102 of NEPA
+and EO 11514 (as
+applicable for the
+protection and
+enhancement of
+environmental quality)
+Applicable when the
+project involves an
+environmental impact
+Applicable when the
+project involves an
+environmental impact
+Applicable when the
+project involves an
+environmental impact
+Rehabilitation Act of
+1973 (45 CFR Part 84)
+Applicable
+Applicable
+Applicable
+Safe Drinking Water Act
+Applicable
+Applicable
+Applicable
+Uniform Relocation Act
+(49 CFR Part 24)
+Applicable
+N/A
+N/A
+Wild and Scenic Rivers
+Act of 1968
+Applicable
+Applicable
+Applicable
+Executive Orders
+Requirement
+Type of Activity:
+Construction Grant
+Type of Activity:
+Modernization Grant
+Type of Activity: Major
+A&R Project
+Executive Order 12372,
+Intergovernmental
+Review of Federal
+Programs
+Applicable
+Specified in the NOFO
+Applicable
+Executive Order 11988,
+Floodplain Management
+Applicable
+Applicable
+Applicable
+Executive Order 11990,
+Protection of Wetlands
+Applicable
+Applicable
+Applicable
+(GPS page IIB-27)
+
+10 Construction, Modernization, or Major Alteration and Renovation of Research
+Requirement
+Type of Activity:
+Construction Grant
+Type of Activity:
+Modernization Grant
+Type of Activity: Major
+A&R Project
+Executive Order 12185,
+Conservation of
+Petroleum and Natural
+Gas
+Applicable
+Applicable
+Applicable
+Executive Order 12699,
+Seismic Safety of
+Federal and Federally
+Assisted or Regulated
+New Building
+Construction
+Applicable
+N/A
+N/A
+Executive Order 12770,
+Metric System
+Applicable
+Applicable
+Applicable
+Other Requirements
+Requirement
+Type of Activity:
+Construction Grant
+Type of Activity:
+Modernization Grant
+Type of Activity: Major
+A&R Project
+Matching
+Specified in the NOFO
+and NoA
+Specified in the NOFO
+and NoA
+N/A
+NIH Design
+Requirements Manual
+Applicable
+Specified in the NOFO
+Applicable
+Design Documentation
+Requirements
+Applicable
+Applicable
+Applicable
+Procurement Requirement
+Requirement
+Type of Activity:
+Construction Grant
+Type of Activity:
+Modernization Grant
+Type of Activity: Major
+A&R Project
+Liquidated Damages
+Applicable
+Applicable
+Applicable
+Equal Employment Opportunity and Labor Standards
+Requirement
+Type of Activity:
+Construction Grant
+Type of Activity:
+Modernization Grant
+Type of Activity: Major
+A&R Project
+Equal Employment
+Opportunity
+Applicable
+Applicable
+Applicable
+Contract Work Hours
+and Safety Standards
+Contracts exceeding
+$100,000
+Contracts exceeding
+$100,000
+Contracts exceeding
+$100,000
+Disposition of
+Unclaimed Wages
+Applicable
+Applicable
+Applicable
+Real Property Standards
+(GPS page IIB-28)
+
+10 Construction, Modernization, or Major Alteration and Renovation of Research
+Requirement
+Type of Activity:
+Construction Grant
+Type of Activity:
+Modernization Grant
+Type of Activity: Major
+A&R Project
+Real Property
+Management Standards
+Applicable
+Applicable
+Applicable
+Notice of Federal
+Interest
+Applicable
+Applicable
+Applicable
+Title Insurance
+Applicable unless
+waived
+Applicable unless
+waived
+Applicable unless
+waived
+Physical Destruction
+Insurance
+Applicable unless
+waived
+Applicable unles waived
+Applicable unless
+waived
+Use of Facility and
+Disposition
+Specified in the NOFO
+and NoA
+Specified in the NOFO
+and NoA or 2 CFR
+Part 200.311 and 45
+CFR Part 75.318
+As specified by NIH in
+accordance with 2 CFR
+Part 200.311 and 45
+CFR Part 75.318
+Closeout
+Requirement
+Type of Activity:
+Construction Grant
+Type of Activity:
+Modernization Grant
+Type of Activity: Major
+A&R Project
+Final Record As-built
+Construction Documents
+Applicable
+Applicable
+N/A
+(GPS page IIB-29)

@@ -1,4 +1,6 @@
-import { useEffect, type ReactNode } from 'react'
+import { TaskHelpLink } from '../shared/TaskHelpLink'
+import { usePanelEffect } from '../shared/usePanelEffect'
+import { type ReactNode } from 'react'
 import {
   FolderKanban, FolderOpen, Database, Workflow, Zap, Users,
   Sparkles, ArrowRight, FileText, X, type LucideIcon,
@@ -15,7 +17,7 @@ import {
  * reopen it after projects exist.
  */
 export function ProjectsExplainer({ onClose }: { onClose?: () => void } = {}) {
-  useEffect(() => {
+  usePanelEffect(() => {
     if (!onClose) return
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -36,7 +38,7 @@ export function ProjectsExplainer({ onClose }: { onClose?: () => void } = {}) {
 
       {/* Hero */}
       <div className="pj-section text-center" style={{ animationDelay: '40ms' }}>
-        <div className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-violet-600">
+        <div className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-bold uppercase tracking-wider text-violet-600">
           <Sparkles size={12} /> Projects
         </div>
         <h2 className="text-2xl font-bold leading-tight tracking-tight text-gray-900">
@@ -44,10 +46,12 @@ export function ProjectsExplainer({ onClose }: { onClose?: () => void } = {}) {
         </h2>
         <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-gray-500">
           A project gathers the files, a knowledge base you can chat with, and the
-          workflows, extractions, and automations that act on them — so a grant, a
+          workflows, extractions, and automations that act on them, so a grant, a
           contract, or a review lives in one organized home.
         </p>
       </div>
+
+      <TaskHelpLink topic="project-scope">Worked example: review a proposal in a project</TaskHelpLink>
 
       {/* Animated diagram */}
       <div className="pj-section mt-7" style={{ animationDelay: '160ms' }}>
@@ -59,12 +63,12 @@ export function ProjectsExplainer({ onClose }: { onClose?: () => void } = {}) {
         <Card
           icon={FolderOpen}
           title="Files"
-          body="A dedicated folder tree for every document this work touches — uploads, drafts, and source material."
+          body="A dedicated folder tree for every document this work touches: uploads, drafts, and source material."
         />
         <Card
           icon={Database}
           title="A knowledge base"
-          body="Turn the project's files into a knowledge base you can chat with and cite — answers grounded in this work's documents."
+          body="Turn the project's files into a knowledge base you can chat with and cite, with answers grounded in this work's documents."
         />
         <Card
           icon={Workflow}
@@ -74,7 +78,7 @@ export function ProjectsExplainer({ onClose }: { onClose?: () => void } = {}) {
         <Card
           icon={Zap}
           title="Automations"
-          body="Let new files trigger the right workflow automatically — results land back in the project."
+          body="Let new files trigger the right workflow automatically, with results landing back in the project."
         />
       </Section>
 
@@ -178,7 +182,7 @@ function ProjectsDiagram() {
           <FolderKanban size={22} className="text-violet-600" />
         </div>
         <div className="text-sm font-semibold text-gray-900">Project</div>
-        <div className="flex items-center gap-1 text-[11px] text-gray-500">
+        <div className="flex items-center gap-1 text-xs text-gray-500">
           <Database size={11} /> KB
           <span className="mx-0.5">·</span>
           <Users size={11} /> Team

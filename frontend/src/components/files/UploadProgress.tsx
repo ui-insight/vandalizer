@@ -19,8 +19,9 @@ export function UploadProgress({ uploads, onDismiss }: UploadProgressProps) {
   return (
     <div className="space-y-2">
       {uploads.map((u) => (
-        <div key={u.id} role="status" aria-live="polite" className="flex items-center gap-3 rounded-md bg-white p-3 shadow-sm">
+        <div key={u.id} className="flex items-center gap-3 rounded-md bg-white p-3 shadow-sm">
           <div className="flex-1">
+            <span className="sr-only" role="status" aria-atomic="true">{u.fileName}: {u.error ? `Upload failed. ${u.error}` : u.done ? 'Upload complete' : 'Uploading'}</span>
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-gray-700">{u.fileName}</span>
               <span className="flex items-center gap-2">

@@ -1,0 +1,844 @@
+"""The RA inbox: obligations found in a project's documents (#999).
+
+Every obligation is checked against the document it cites before it is saved:
+its quote must be on the cited page, a deadline's date must be in its quote
+or calculated from a verified relative rule and period dates,
+and a limit's figures must be in their quotes. A proposal that fails is
+returned with the reason, never saved, so the inbox cannot hold a deadline
+the documents don't state.
+"""
+
+import datetime
+import html
+import re
+import uuid as uuid_mod
+from typing import Any, Collection, Iterable, Optional
+
+from pydantic import BaseModel
+
+from app.models.document import SmartDocument
+from app.models.obligation import (
+    DEADLINE_TYPES,
+    OBLIGATION_KINDS,
+    Obligation,
+    ObligationSource,
+)
+from app.models.project import Project
+from app.models.user import User
+
+_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def plain_quote(quote: str) -> str:
+    """A source quote as people read it.
+
+    Quotes must match the document's extracted text, which keeps table markup
+    (``<td>Period of Performance</td><td>January 1, 2026 ...</td>``). The stored
+    quote stays exact for verification; anything shown to a person drops the
+    tags, decodes entities and collapses whitespace.
+    """
+    return " ".join(html.unescape(_TAG_RE.sub(" ", quote or "")).split())
+
+
+_MONTHS = {
+    m: i for i, names in enumerate(
+        [("jan", "january"), ("feb", "february"), ("mar", "march"), ("apr", "april"),
+         ("may",), ("jun", "june"), ("jul", "july"), ("aug", "august"),
+         ("sep", "sept", "september"), ("oct", "october"), ("nov", "november"), ("dec", "december")],
+        start=1,
+    ) for m in names
+}
+_MONTH_NAMES = "|".join(sorted(_MONTHS, key=len, reverse=True))
+_DATE_IN_TEXT = re.compile(
+    r"\b(?P<mon>" + _MONTH_NAMES + r")\.?\s+(?P<day>\d{1,2})(?:st|nd|rd|th)?\b(?:,?\s+(?P<year>\d{4})\b)?"
+    r"|\b(?P<day2>\d{1,2})\s+(?P<mon2>" + _MONTH_NAMES + r")\.?,?(?:\s+(?P<year2>\d{4})\b)?"
+    r"|\b(?P<um>\d{1,2})/(?P<ud>\d{1,2})/(?P<uy>\d{2,4})\b"
+    r"|\b(?P<iy>\d{4})-(?P<im>\d{2})-(?P<id>\d{2})\b",
+    re.IGNORECASE,
+)
+# Generic regional time follows daylight-saving rules. Explicit standard or
+# daylight labels keep their stated offset; never silently reinterpret PST as PDT.
+_ZONES = {
+    "pacific": "America/Los_Angeles", "pt": "America/Los_Angeles",
+    "pst": "America/Los_Angeles", "pdt": "America/Los_Angeles",
+    "mountain": "America/Denver", "mt": "America/Denver",
+    "mst": "America/Denver", "mdt": "America/Denver",
+    "central": "America/Chicago", "ct": "America/Chicago",
+    "cst": "America/Chicago", "cdt": "America/Chicago",
+    "eastern": "America/New_York", "et": "America/New_York",
+    "est": "America/New_York", "edt": "America/New_York",
+    "alaska": "America/Anchorage", "hawaii": "Pacific/Honolulu",
+    "utc": "UTC", "gmt": "UTC",
+}
+_FIXED_OFFSETS = {"pst": -8, "pdt": -7, "mst": -7, "mdt": -6,
+                  "cst": -6, "cdt": -5, "est": -5, "edt": -4}
+_STANDARD_OFFSETS = {"pacific": -8, "mountain": -7, "central": -6,
+                     "eastern": -5, "alaska": -9, "hawaii": -10}
+_TIME_IN_TEXT = re.compile(
+    r"(?:\b(?P<h>\d{1,2})(?::(?P<m>\d{2}))?\s*(?P<ap>[ap])\.?\s?m\b\.?"
+    r"|\b(?P<h24>[01]?\d|2[0-3]):(?P<m24>[0-5]\d)\b"
+    r"|\b(?P<word>noon|midnight)\b)"
+    r"(?:\s*(?:\(|,)?\s*(?:"
+    r"(?P<zone>pacific|mountain|central|eastern|alaska|hawaii)(?:\s+(?P<zone_mode>standard|daylight|prevailing))?\s+time"
+    r"|(?P<abbr>pt|pst|pdt|mt|mst|mdt|ct|cst|cdt|et|est|edt|utc|gmt)\b"
+    r"|(?P<local>local\s+time|submitter'?s\s+local\s+time)))?",
+    re.IGNORECASE,
+)
+_MAX_ITEMS = 25
+
+
+def _now() -> datetime.datetime:
+    return datetime.datetime.now(datetime.timezone.utc)
+
+
+def _dates_in(text: str) -> set[tuple[Optional[int], int, int]]:
+    """(year or None, month, day) for each date written in *text*:
+    "Nov 19", "November 19, 2026", "19 November 2026", "11/19/2026", "2026-11-19"."""
+    found: set[tuple[Optional[int], int, int]] = set()
+    for m in _DATE_IN_TEXT.finditer(text or ""):
+        if m.group("mon"):
+            year = int(m.group("year")) if m.group("year") else None
+            found.add((year, _MONTHS[m.group("mon").lower()], int(m.group("day"))))
+        elif m.group("mon2"):
+            year = int(m.group("year2")) if m.group("year2") else None
+            found.add((year, _MONTHS[m.group("mon2").lower()], int(m.group("day2"))))
+        elif m.group("um"):
+            year = int(m.group("uy"))
+            found.add((year + 2000 if year < 100 else year, int(m.group("um")), int(m.group("ud"))))
+        elif m.group("iy"):
+            found.add((int(m.group("iy")), int(m.group("im")), int(m.group("id"))))
+    return found
+
+
+def _times_in(text: str) -> list[dict]:
+    """Each time of day written in *text*, with its zone when one is stated.
+
+    ``zone`` is an IANA name, ``"local"`` for "local time", or None.
+    """
+    found: list[dict] = []
+    for m in _TIME_IN_TEXT.finditer(text or ""):
+        if m.group("word"):
+            hour, minute = (12, 0) if m.group("word").lower() == "noon" else (0, 0)
+        elif m.group("ap"):
+            hour, minute = int(m.group("h")), int(m.group("m") or 0)
+            if not 1 <= hour <= 12 or minute > 59:
+                continue
+            hour = hour % 12 + (12 if m.group("ap").lower() == "p" else 0)
+        else:
+            hour, minute = int(m.group("h24")), int(m.group("m24"))
+        name = (m.group("zone") or m.group("abbr") or "").lower()
+        zone = _ZONES.get(name) or ("local" if m.group("local") else None)
+        offset = _FIXED_OFFSETS.get(name)
+        mode = (m.group("zone_mode") or "").lower()
+        if mode in {"standard", "daylight"}:
+            offset = _STANDARD_OFFSETS[name] + (1 if mode == "daylight" else 0)
+        found.append({"hour": hour, "minute": minute, "zone": zone, "offset": offset, "text": m.group(0).strip()})
+    return found
+
+
+def _normalized(text: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"[.,()]", "", (text or "").lower())).strip()
+
+
+def check_deadline(
+    due_value: Any, due_text: Any, quotes: str,
+) -> tuple[Optional[dict], Optional[str]]:
+    """Verify a deadline's full date, and any time and zone, against its quotes.
+
+    Returns ``({"due_at", "due_text"}, None)`` or ``(None, reason)``.
+    ``due_at`` is the deadline as the source writes it: the stated date, and
+    the stated time if there is one, in the source's own zone, without an
+    offset. ``due_text`` is the time as written, taken from the quote. Nothing
+    the source doesn't state is filled in: no year, time or zone.
+    """
+    raw = due_value.isoformat() if isinstance(due_value, datetime.datetime) else due_value
+    if not isinstance(raw, str) or not raw.strip():
+        return None, "a deadline needs due_at as an ISO date (2026-11-19 or 2026-11-19T17:00)"
+    raw = raw.strip()
+    due = _parse_due(raw)
+    if due is None:
+        return None, "a deadline needs due_at as an ISO date (2026-11-19 or 2026-11-19T17:00)"
+    has_time = len(raw) > 10
+    if due.second or due.microsecond or re.search(r"\b\d{1,2}:\d{2}:\d{2}\b", quotes):
+        return None, "deadline precision finer than a minute cannot be verified by this check"
+    dates = _dates_in(quotes)
+    times = _times_in(quotes)
+    time_keys = {(t['hour'], t['minute'], t['zone'], t['offset']) for t in times}
+    if times and (len(dates) > 1 or len(time_keys) > 1):
+        return None, "the quotes contain multiple dates or times; cite a narrower passage for this deadline so its components cannot be mixed"
+
+    stated_time: Optional[dict] = None
+    if has_time:
+        if not times:
+            return None, (
+                "the quote states no time of day; give due_at as a date only "
+                f"({due:%Y-%m-%d})"
+            )
+        if due.tzinfo is not None:
+            from zoneinfo import ZoneInfo
+
+            zoned = [t for t in times if t["zone"] and t["zone"] != "local"]
+            if not zoned:
+                return None, (
+                    f"the quote gives {times[0]['text']} without a time zone; give "
+                    "due_at without a UTC offset, as the source writes it"
+                )
+            for t in zoned:
+                zone = datetime.timezone(datetime.timedelta(hours=t["offset"])) if t["offset"] is not None else ZoneInfo(t["zone"])
+                local = due.astimezone(zone)
+                if (local.hour, local.minute) == (t["hour"], t["minute"]):
+                    due, stated_time = local.replace(tzinfo=None), t
+                    break
+            else:
+                return None, (
+                    f"due_at is not the time the quote states ({zoned[0]['text']})"
+                )
+        else:
+            stated_time = next(
+                (t for t in times if (t["hour"], t["minute"]) == (due.hour, due.minute)),
+                None,
+            )
+            if stated_time is None:
+                return None, (
+                    f"the quote does not state {due:%H:%M}; it gives {times[0]['text']}"
+                )
+
+    same_day = [(y, mo, d) for y, mo, d in dates if (mo, d) == (due.month, due.day)]
+    if not same_day:
+        return None, f"the quote does not state {due:%B} {due.day}; cite the passage that gives the date"
+    years = {y for y, _mo, _d in same_day if y is not None}
+    if years and due.year not in years:
+        return None, (
+            f"the quote states {due:%B} {due.day}, {min(years)}, not {due.year}"
+        )
+    if not years:
+        return None, (
+            f"the quote gives {due:%B} {due.day} without a year; cite a passage "
+            "that explicitly gives the full deadline date, including its year"
+        )
+
+    text = str(due_text or "").strip()[:120]
+    if text and _normalized(text) not in _normalized(quotes):
+        return None, "due_text must be copied from the quote; give the time exactly as written"
+    if not has_time and times:
+        return None, "the quote states a time of day; include that time in due_at so it is not lost"
+    if text and stated_time is not None:
+        described = _times_in(text)
+        expected = (stated_time['hour'], stated_time['minute'], stated_time['zone'], stated_time['offset'])
+        if len(described) != 1 or (described[0]['hour'], described[0]['minute'], described[0]['zone'], described[0]['offset']) != expected:
+            return None, "due_text must describe the same verified time and time zone as due_at"
+    # Store only the verified time/zone. The date is already in due_at; keeping
+    # the model's full "due June 30, 2026" phrase repeats it in every inbox/card.
+    verified_time = stated_time["text"] if stated_time is not None else None
+    if not has_time:
+        due = datetime.datetime.combine(due.date(), datetime.time())
+    return {"due_at": due, "due_text": verified_time or None}, None
+
+
+def _parse_due(value: Any) -> Optional[datetime.datetime]:
+    if isinstance(value, datetime.datetime):
+        return value
+    if not isinstance(value, str) or not value.strip():
+        return None
+    text = value.strip()
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d{1,6})?)?(?:Z|[+-]\d{2}:\d{2})?)?", text):
+        return None
+    text = text.replace("Z", "+00:00")
+    try:
+        return datetime.datetime.fromisoformat(text)
+    except ValueError:
+        return None
+
+
+def _as_number(value: Any) -> Optional[float]:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        cleaned = re.sub(r"[,$\s%]", "", value)
+        try:
+            return float(cleaned)
+        except ValueError:
+            return None
+    return None
+
+
+def _figures_in(text: str) -> set[float]:
+    from app.services.kb_answer_grounding import _money_values, _percent_values
+
+    values = set(_money_values(text)) | set(_percent_values(text))
+    for m in re.finditer(r"(?<![\w.$])(\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?(?![\w%])", text or ""):
+        values.add(float(m.group(0).replace(",", "")))
+    return values
+
+
+def _units_of(value: float, text: str) -> set[str]:
+    """How *text* states *value*: "%" (a percentage), "$", or "" (a bare number)."""
+    from app.services.kb_answer_grounding import _money_values, _percent_values
+
+    units = set()
+    if value in _percent_values(text):
+        units.add("%")
+    if value in _money_values(text):
+        units.add("$")
+    for m in re.finditer(r"(?<![\w.$])(\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?(?![\w%])", text or ""):
+        if float(m.group(0).replace(",", "")) == value:
+            units.add("")
+    return units
+
+
+def format_limit_figure(value: float, unit: Optional[str]) -> str:
+    """A limit figure as the inbox shows it: "$9,555", "22.5%", "1,200".
+
+    Exact, never rounded: the approval card must show the figure that is
+    about to be saved.
+    """
+    if unit == "$":
+        return f"${value:,.0f}" if float(value).is_integer() else f"${value:,.2f}"
+    number = f"{int(value):,}" if float(value).is_integer() else f"{value:,.6f}".rstrip("0").rstrip(".")
+    return f"{number}%" if unit == "%" else number
+
+
+def _limit_unit(
+    limit_value: float, limit_quote: str, observed: float, observed_quote: str, claimed: str,
+) -> tuple[Optional[str], Optional[str]]:
+    """The unit a limit and its observed value share, from how the quotes state them.
+
+    Returns ``(unit, None)`` — "%", "$" or None for plain numbers — or
+    ``(None, reason)`` when one is a percentage and the other is not.
+    Support ticket: a 22.5%-of-TDC limit was compared with the $17,550
+    indirect-cost amount and shown as "17550% exceeds the 22.5% limit"; the
+    model's "unit" was taken on trust and both figures were in their quotes.
+    """
+    def is_percent(units: set[str]) -> set[bool]:
+        return {u == "%" for u in units}
+
+    limit_units = _units_of(limit_value, limit_quote)
+    observed_units = _units_of(observed, observed_quote)
+    shared = is_percent(limit_units) & is_percent(observed_units)
+    if not shared:
+        def say(value: float, units: set[str]) -> str:
+            return f"{value:g}%" if "%" in units else f"${value:,.0f}" if "$" in units else f"{value:,g}"
+        limit_kind = "a percentage" if "%" in limit_units else "an amount"
+        observed_kind = "a percentage" if "%" in observed_units else "an amount"
+        return None, (
+            f"the limit is {limit_kind} ({say(limit_value, limit_units)}) but the observed value is "
+            f"{observed_kind} ({say(observed, observed_units)}); a limit can only be compared with a "
+            f"value in the same unit. Use a different figure the document states in that unit, "
+            f"or give the limit alone, without observed_value"
+        )
+    if True in shared:
+        return "%", None
+    if "$" in limit_units | observed_units or claimed.strip() == "$":
+        return "$", None
+    return None, None
+
+
+def _page_text(doc: SmartDocument, page: Optional[int]) -> tuple[Optional[str], Optional[int]]:
+    """The cited page's text (widened by a page for interpolated OCR pages),
+    or the whole document when it has no page markers. Returns (text, page)."""
+    from app.services.chat_service import _page_positions
+
+    raw = doc.raw_text or ""
+    positions = _page_positions(getattr(doc, "text_markers", None), len(raw))
+    if not positions:
+        return raw, None
+    if page is None:
+        return None, None
+    pages = [p for _o, p, _a in positions]
+    if page not in pages:
+        return None, page
+    i = pages.index(page)
+    approximate = positions[i][2]
+    lo = positions[max(0, i - 1)][0] if approximate else positions[i][0]
+    hi_index = i + 2 if approximate else i + 1
+    hi = positions[hi_index][0] if hi_index < len(positions) else len(raw)
+    return raw[lo:hi], page
+
+
+async def _readable_document(document_uuid: str, user: User, project: Project) -> Optional[SmartDocument]:
+    """The cited document, if this user may read it (project files included)."""
+    from app.services import access_control
+
+    return await access_control.get_authorized_document(document_uuid, user)
+
+
+# Table markup, blanked to spaces of the same length so offsets still line up:
+# Markdown separator rows, HTML tags, and cell pipes.
+_TABLE_MARKUP = re.compile(r"^[ \t]*\|[ \t|:\-]*-[ \t|:\-]*$|<[^>]+>|\|", re.M)
+_PERIOD_ROLES = {"period_of_performance", "budget_period"}
+
+
+def _blank_markup(text: str) -> str:
+    return _TABLE_MARKUP.sub(lambda m: " " * len(m.group()), text)
+
+
+def _document_span(text: str, quote: str, role: str) -> Optional[str]:
+    """The document's own text for *quote*, or None when it isn't there.
+
+    A quote that matches as written is returned unchanged. Otherwise the
+    match ignores table markup: a model reading "| End Date | Aug 31, 2027 |"
+    quotes "End Date Aug 31, 2027" (support ticket: every deadline anchored on
+    a subaward's table End Date was refused as unverifiable). The document's
+    span is returned instead, markup included, so the period's columns can be
+    read; for a period quote it is widened to whole table lines so a header
+    row and its values keep the same columns.
+    """
+    from app.services.extraction_sources import find_quote_offset, normalize_with_map
+
+    if find_quote_offset(text, quote) is not None:
+        return quote
+    norm_doc, index_map = normalize_with_map(_blank_markup(text))
+    norm_quote, _ = normalize_with_map(_blank_markup(quote))
+    i = norm_doc.find(norm_quote) if norm_quote else -1
+    if i == -1:
+        return None
+    start, end = index_map[i], index_map[i + len(norm_quote) - 1] + 1
+    if role in _PERIOD_ROLES:
+        start, end = _whole_rows(text, start, end)
+    return text[start:end].strip()
+
+
+def _whole_rows(text: str, start: int, end: int) -> tuple[int, int]:
+    """Widen a matched span to the whole table rows it touches."""
+    lowered = text.lower()
+    row_start = lowered.rfind("<tr", 0, start)
+    row_end = lowered.find("</tr>", end)
+    if row_start != -1 and row_end != -1 and "</tr>" not in lowered[row_start:start]:
+        row_end += len("</tr>")
+        if row_end - row_start <= 2000:
+            return row_start, row_end
+    line_start = text.rfind("\n", 0, start) + 1
+    line_end = text.find("\n", end)
+    line_end = len(text) if line_end == -1 else line_end
+    span = text[line_start:line_end]
+    if ("|" in span or "\t" in span) and len(span) <= 2000:
+        return line_start, line_end
+    return start, end
+
+
+async def _check_source(raw: dict, user: User, project: Project) -> tuple[Optional[ObligationSource], str | None]:
+
+    if not isinstance(raw, dict):
+        return None, "a source must be an object with document_uuid, page and quote"
+    quote = str(raw.get("quote") or "").strip()
+    document_uuid = str(raw.get("document_uuid") or "").strip()
+    if not document_uuid or not quote:
+        return None, "every source needs a document_uuid and the exact quote"
+    doc = await _readable_document(document_uuid, user, project)
+    if doc is None:
+        return None, "the source document was not found or you can't open it"
+    page = raw.get("page") if isinstance(raw.get("page"), int) else None
+    text, page = _page_text(doc, page)
+    if text is None:
+        return None, (
+            f'"{doc.title}" has page numbers; give the page the quote is on'
+            if page is None else f'"{doc.title}" has no page {page}'
+        )
+    role = str(raw.get("role") or "evidence")
+    found = _document_span(text, quote, role)
+    if found is None:
+        where = f"page {page} of " if page is not None else ""
+        return None, f'the quote was not found on {where}"{doc.title}"'
+    return ObligationSource(
+        document_uuid=doc.uuid, document_title=doc.title or "", page=page,
+        quote=found, role=role,
+    ), None
+
+
+async def check_proposal(item: dict, user: User, project: Project) -> tuple[Optional[dict], str | None]:
+    """A proposed obligation, checked against its sources.
+
+    Returns ``(clean_item, None)`` or ``(None, reason)``. ``clean_item`` holds
+    the validated fields and ``ObligationSource`` objects ready to save.
+    """
+    if not isinstance(item, dict):
+        return None, "each obligation must be an object"
+    kind = item.get("kind")
+    if kind not in OBLIGATION_KINDS:
+        return None, f"kind must be one of {', '.join(OBLIGATION_KINDS)}"
+    title = str(item.get("title") or "").strip()
+    if not title:
+        return None, "a title is required"
+    raw_sources = item.get("sources") or []
+    if not isinstance(raw_sources, list) or not raw_sources:
+        return None, "at least one source (document, page and quote) is required"
+    if len(raw_sources) > 30:
+        return None, "at most 30 source passages can be checked per obligation"
+    sources: list[ObligationSource] = []
+    for raw in raw_sources:
+        src, reason = await _check_source(raw, user, project)
+        if src is None or reason:
+            return None, reason or "source could not be verified"
+        sources.append(src)
+    quotes = " ".join(s.quote for s in sources)
+    clean: dict[str, Any] = {"kind": kind, "title": title[:200], "sources": sources}
+
+    if kind == "deadline":
+        deadline_type = item.get("deadline_type") or "other"
+        if deadline_type not in DEADLINE_TYPES:
+            return None, f"deadline_type must be one of {', '.join(DEADLINE_TYPES)}"
+        clean["deadline_type"] = deadline_type
+        if item.get("relative_deadline") is True:
+            from app.services.relative_deadlines import calculate_deadlines
+
+            try:
+                clean["_occurrences"] = calculate_deadlines(sources)
+            except (ValueError, OverflowError) as exc:
+                return None, str(exc)
+        else:
+            from app.services.relative_deadlines import _OFFSET
+
+            if _OFFSET.search(quotes):
+                return None, "relative timing needs relative_deadline=true with timing and period source roles; the server calculates the dates"
+            checked, reason = check_deadline(item.get("due_at"), item.get("due_text"), quotes)
+            if checked is None or reason:
+                return None, reason or "deadline could not be verified"
+            clean.update(**checked)
+    elif kind == "limit":
+        limit_value = _as_number(item.get("limit_value"))
+        if limit_value is None:
+            return None, "a limit needs limit_value as a number"
+        observed = _as_number(item.get("observed_value"))
+        by_role = {s.role: s.quote for s in sources}
+        limit_quote = by_role.get("limit", quotes)
+        if limit_value not in _figures_in(limit_quote):
+            return None, "the limit's quote does not state the limit value"
+        claimed = str(item.get("unit") or "")
+        if observed is None or observed == limit_value:
+            # A plain limit. Support ticket: with observed_value required, the
+            # limit was repeated as its own observed value and every item read
+            # "$9,555 within the $9,555 limit". A comparison is only kept when
+            # the document gives a different figure to compare.
+            units = _units_of(limit_value, limit_quote)
+            unit = "%" if "%" in units else "$" if "$" in units or claimed.strip() == "$" else None
+            clean["sources"] = [
+                s.model_copy(update={"role": "evidence"}) if s.role == "observed" else s for s in sources
+            ]
+            clean.update(limit_value=limit_value, observed_value=None, unit=unit)
+        else:
+            observed_quote = by_role.get("observed", quotes)
+            if observed not in _figures_in(observed_quote):
+                return None, "the observed value is not stated in its quote"
+            unit, reason = _limit_unit(limit_value, limit_quote, observed, observed_quote, claimed)
+            if reason:
+                return None, reason
+            clean.update(limit_value=limit_value, observed_value=observed, unit=unit)
+    return clean, None
+
+
+async def find_replaced(project_uuid: str, clean: dict) -> Optional[Obligation]:
+    """The open deadline of the same type a new one would replace (an amendment)."""
+    if clean.get("kind") != "deadline" or clean.get("deadline_type") == "other":
+        return None
+    # Separate occurrences of a reporting schedule are not amendments.
+    if clean.get("deadline_calculation"):
+        return None
+    existing = await Obligation.find(
+        Obligation.project_uuid == project_uuid,
+        Obligation.kind == "deadline",
+        Obligation.deadline_type == clean["deadline_type"],
+        Obligation.status == "open",
+    ).to_list()
+    for ob in existing:
+        if ob.deadline_calculation:
+            continue
+        if clean.get("deadline_type") == "report_due" and ob.title.strip().lower() != clean["title"].strip().lower():
+            continue
+        if ob.due_at and clean.get("due_at") and ob.due_at.date() != clean["due_at"].date():
+            return ob
+    return None
+
+
+_TITLE_FILLER = frozenset({"a", "an", "and", "the", "of", "for", "to", "due", "deadline", "date", "on", "by"})
+
+
+def _title_words(title: str) -> set[str]:
+    return {w for w in re.findall(r"[a-z0-9]+", (title or "").lower()) if w not in _TITLE_FILLER}
+
+
+def _similar_titles(a: str, b: str) -> bool:
+    """"Semi-annual results due" and "Semi-annual results report": yes.
+    "Final invoice" and "Final report": no."""
+    wa, wb = _title_words(a), _title_words(b)
+    if not wa or not wb:
+        return False
+    return len(wa & wb) / len(wa | wb) > 0.5
+
+
+def _same_rule(a: str, b: str) -> bool:
+    return " ".join(re.findall(r"[a-z0-9]+", a.lower())) == " ".join(re.findall(r"[a-z0-9]+", b.lower()))
+
+
+def _same_deadline(ob: Obligation, clean: dict) -> bool:
+    if not (ob.due_at and clean.get("due_at")) or ob.due_at.date() != clean["due_at"].date():
+        return False
+    # Same date, same title (ignoring case, punctuation and "due"/"deadline")
+    # is the same deadline, however each request typed or sourced it. Support
+    # ticket: "Validated qPCR assay protocol", Jun 30 2026, was added twice,
+    # once from a stated date and once from a timing rule.
+    if _title_words(ob.title) and _title_words(ob.title) == _title_words(clean["title"]):
+        return True
+    old_calc, new_calc = ob.deadline_calculation, clean.get("deadline_calculation")
+    if old_calc or new_calc:
+        # Occurrences of a recurring rule. Support ticket: the 4 semi-annual
+        # results deadlines already in the inbox were proposed again because
+        # chat titled them differently. Same date + same quoted rule + a
+        # similar title is the same deadline; two deliverables a rule names
+        # separately ("final invoice", "final report") keep distinct titles.
+        if _norm_title(ob.title) == _norm_title(clean["title"]):
+            return True
+        if not (old_calc and new_calc and _similar_titles(ob.title, clean["title"])):
+            return False
+        # The quoted rule can be worded differently from one proposal to the
+        # next; the calculation it produced (anchor and offset) can't.
+        return _same_rule(old_calc.rule, new_calc.rule) or (
+            old_calc.anchor_kind == new_calc.anchor_kind and old_calc.offset_days == new_calc.offset_days
+        )
+    return ob.deadline_type == clean.get("deadline_type")
+
+
+def _norm_title(title: str) -> str:
+    return (title or "").strip().lower()
+
+
+#: Statuses a proposal is checked against. A superseded item was replaced by
+#: an amendment and is not "in the inbox" any more.
+_KNOWN_STATUSES = ("open", "done")
+
+
+async def find_existing(project_uuid: str, clean: dict) -> Optional[Obligation]:
+    """The inbox item a proposal repeats, open or already marked done.
+
+    Support ticket: only open items were compared, so a deadline marked Done
+    was proposed again on the next run and would have come back as open, with
+    its reminders starting over.
+    """
+    existing = await Obligation.find(
+        {"project_uuid": project_uuid, "kind": clean["kind"], "status": {"$in": list(_KNOWN_STATUSES)}}
+    ).to_list()
+    matches = []
+    for ob in existing:
+        if ob.status not in _KNOWN_STATUSES:
+            continue
+        if clean["kind"] == "deadline" and ob.due_at and clean.get("due_at"):
+            if _same_deadline(ob, clean):
+                matches.append(ob)
+        elif _norm_title(ob.title) == _norm_title(clean["title"]):
+            matches.append(ob)
+    # An open copy is the one the inbox is showing.
+    return next((ob for ob in matches if ob.status == "open"), matches[0] if matches else None)
+
+
+async def is_duplicate(project_uuid: str, clean: dict) -> bool:
+    return await find_existing(project_uuid, clean) is not None
+
+
+def _already_reason(ob: Obligation, user: User) -> str:
+    """Why a repeated proposal is left out. Every variant keeps the words
+    "already in this project's inbox", which callers match on."""
+    if ob.status == "done":
+        return "already in this project's inbox, marked done"
+    if user.user_id in (ob.dismissed_by or []):
+        return "already in this project's inbox, dismissed by you"
+    return "already in this project's inbox or proposal"
+
+
+async def save_checked(project: Project, user: User, clean: dict) -> Obligation:
+    replaced = await find_replaced(project.uuid, clean)
+    ob = Obligation(
+        uuid=uuid_mod.uuid4().hex,
+        project_uuid=project.uuid,
+        team_id=project.team_id,
+        created_by=user.user_id,
+        supersedes=replaced.uuid if replaced else None,
+        **clean,
+    )
+    await ob.insert()
+    if replaced:
+        replaced.status = "superseded"
+        replaced.superseded_by = ob.uuid
+        replaced.updated_at = _now()
+        await replaced.save()
+    return ob
+
+
+async def propose(project: Project, user: User, items: list[dict]) -> dict:
+    """Check proposed obligations without saving: what would be added, replaced or rejected."""
+    accepted: list[dict] = []
+    rejected: list[dict] = []
+    if len(items or []) > _MAX_ITEMS:
+        return {"accepted": [], "rejected": [{"title": "Batch", "reason": f"propose at most {_MAX_ITEMS} obligations at a time"}]}
+    from app.services.relative_deadlines import MAX_OCCURRENCES
+
+    for item in items or []:
+        clean, reason = await check_proposal(item, user, project)
+        title = str((item or {}).get("title") or "") if isinstance(item, dict) else ""
+        if clean is None or reason:
+            rejected.append({"title": title, "reason": reason or "obligation could not be verified"})
+            continue
+        occurrences = clean.pop("_occurrences", [{}])
+        if len(accepted) + len(occurrences) > MAX_OCCURRENCES:
+            rejected.append({"title": clean["title"], "reason": "too many dated occurrences in this batch; propose fewer schedules"})
+            continue
+        for occurrence in occurrences:
+            row = {**clean, **occurrence}
+            if any(a["clean"] == row for a in accepted):
+                rejected.append({"title": row["title"], "reason": "already in this project's inbox or proposal"})
+                continue
+            existing = await find_existing(project.uuid, row)
+            if existing is not None:
+                rejected.append({"title": row["title"], "reason": _already_reason(existing, user)})
+                continue
+            replaced = await find_replaced(project.uuid, row)
+            accepted.append({"clean": row, "replaces": serialize(replaced, user) if replaced else None})
+    return {"accepted": accepted, "rejected": rejected}
+
+
+def _sort_key(ob: Obligation) -> tuple[int, datetime.datetime, datetime.datetime]:
+    far = datetime.datetime.max.replace(tzinfo=datetime.timezone.utc)
+    due = ob.due_at.replace(tzinfo=ob.due_at.tzinfo or datetime.timezone.utc) if ob.due_at else far
+    rank = 0 if ob.kind == "deadline" else 1 if ob.in_conflict else 2
+    return (rank, due, ob.created_at)
+
+
+class _UuidOnly(BaseModel):
+    uuid: str
+
+
+async def deleted_source_uuids(obligations: Iterable[Obligation]) -> set[str]:
+    """Cited document uuids that no longer exist (support ticket).
+
+    Deleting a project's file leaves the items taken from it in place, still
+    quoting it. Checked when the items are read rather than when a file is
+    deleted, so every way a file can go (Files, folder delete, retention,
+    account deletion) is covered without each one knowing about the inbox.
+    """
+    cited = {s.document_uuid for o in obligations for s in (o.sources or [])}
+    if not cited:
+        return set()
+    # Uuids only: this runs on every inbox load and reminder sweep, and a
+    # document carries its whole extracted text.
+    found = await SmartDocument.find(
+        {"uuid": {"$in": list(cited)}, "soft_deleted": {"$ne": True}},
+    ).project(_UuidOnly).to_list()
+    return cited - {d.uuid for d in found}
+
+
+def source_deleted(ob: Obligation, deleted: Collection[str]) -> bool:
+    return any(s.document_uuid in deleted for s in (ob.sources or []))
+
+
+def awaiting_source_decision(ob: Obligation, deleted: Collection[str]) -> bool:
+    """A cited file is gone and nobody has said to keep the item.
+
+    Such an item is flagged in the inbox ("keep or dismiss?") and sends no
+    reminders: its date can no longer be checked against the document.
+    """
+    return source_deleted(ob, deleted) and not getattr(ob, "kept_without_source", False)
+
+
+async def serialize_checked(ob: Obligation, user: User, project_title: str | None = None) -> dict:
+    """``serialize`` for one item, with its sources checked for deletion."""
+    return serialize(ob, user, project_title, await deleted_source_uuids([ob]))
+
+
+def serialize(
+    ob: Obligation, user: User, project_title: str | None = None,
+    deleted: Collection[str] = (),
+) -> dict:
+    """*deleted* is ``deleted_source_uuids`` for the items being listed."""
+    return {
+        "uuid": ob.uuid,
+        "project_uuid": ob.project_uuid,
+        "project_title": project_title,
+        "kind": ob.kind,
+        "title": ob.title,
+        "deadline_type": ob.deadline_type,
+        "due_at": ob.due_at.isoformat() if ob.due_at else None,
+        "due_text": ob.due_text,
+        "deadline_calculation": ob.deadline_calculation.model_dump() if ob.deadline_calculation else None,
+        "limit_value": ob.limit_value,
+        "observed_value": ob.observed_value,
+        "unit": ob.unit,
+        "in_conflict": ob.in_conflict,
+        "sources": [{**s.model_dump(), "deleted": s.document_uuid in deleted} for s in ob.sources],
+        "source_deleted": source_deleted(ob, deleted),
+        "kept_without_source": bool(getattr(ob, "kept_without_source", False)),
+        "status": ob.status,
+        "supersedes": ob.supersedes,
+        "superseded_by": ob.superseded_by,
+        "dismissed": user.user_id in (ob.dismissed_by or []),
+    }
+
+
+async def inbox_projects(user: User) -> dict[str, Project]:
+    """The projects Home's inbox covers: every unarchived one *user* can see."""
+    from app.services.project_service import list_projects
+
+    return {p.uuid: p for p in await list_projects(user) if p.state != "archived"}
+
+
+async def inbox(
+    user: User,
+    *,
+    include_dismissed: bool = False,
+    projects: dict[str, Project] | None = None,
+) -> list[dict]:
+    """Open obligations across every project *user* can see, for Home."""
+    if projects is None:
+        projects = await inbox_projects(user)
+    if not projects:
+        return []
+    obligations = await Obligation.find(
+        {"project_uuid": {"$in": list(projects)}, "status": "open"},
+    ).to_list()
+    if not include_dismissed:
+        obligations = [o for o in obligations if user.user_id not in (o.dismissed_by or [])]
+    obligations.sort(key=_sort_key)
+    deleted = await deleted_source_uuids(obligations)
+    return [serialize(o, user, projects[o.project_uuid].title, deleted) for o in obligations]
+
+
+async def project_obligations(project: Project, user: User) -> list[dict]:
+    obligations = await Obligation.find(Obligation.project_uuid == project.uuid).to_list()
+    obligations.sort(key=lambda o: ({"open": 0, "done": 1, "superseded": 2}.get(o.status, 3), _sort_key(o)))
+    deleted = await deleted_source_uuids(obligations)
+    return [serialize(o, user, project.title, deleted) for o in obligations]
+
+
+async def set_kept_without_source(ob: Obligation, keep: bool) -> Obligation:
+    """Keep an item whose source file was deleted, for everyone on the project.
+
+    Reminders resume; the item still says its file is gone.
+    """
+    ob.kept_without_source = keep
+    ob.updated_at = _now()
+    await ob.save()
+    return ob
+
+
+async def set_done(ob: Obligation, user: User, done: bool) -> Obligation:
+    ob.status = "done" if done else "open"
+    ob.completed_by = user.user_id if done else None
+    ob.completed_at = _now() if done else None
+    ob.updated_at = _now()
+    await ob.save()
+    if done:
+        # A finished deadline stops asking for attention in anyone's bell.
+        from app.models.notification import Notification
+
+        await Notification.find(
+            {"item_kind": "obligation", "item_id": ob.uuid, "read": False},
+        ).update_many({"$set": {"read": True}})
+    return ob
+
+
+async def set_dismissed(ob: Obligation, user: User, dismissed: bool) -> Obligation:
+    """Hide or restore an obligation on this user's Home only."""
+    others = [u for u in (ob.dismissed_by or []) if u != user.user_id]
+    ob.dismissed_by = others + ([user.user_id] if dismissed else [])
+    ob.updated_at = _now()
+    await ob.save()
+    return ob

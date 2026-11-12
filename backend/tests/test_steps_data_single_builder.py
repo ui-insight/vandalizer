@@ -66,7 +66,8 @@ def _workflow_with_linked_prompt_and_extraction():
     ]
     smart_docs = [
         {"_id": ObjectId(), "uuid": "trigger-doc", "raw_text": "trigger text"},
-        {"_id": ObjectId(), "uuid": "fixed", "raw_text": "fixed text"},
+        # The workflow owner's own file: fixed documents are access-checked.
+        {"_id": ObjectId(), "uuid": "fixed", "raw_text": "fixed text", "user_id": "owner"},
         # Written by this very workflow: must not feed back into it.
         {"_id": ObjectId(), "uuid": "own-output", "raw_text": "loop",
          "origin_workflow_id": str(wf_id)},
@@ -87,7 +88,7 @@ def _assert_built_by_the_shared_builder(steps_data):
     # Extraction carries per-field constraints -- the copies produced keys only.
     assert extraction["keys"] == ["amount"]
     assert extraction["field_metadata"] == [
-        {"key": "amount", "is_optional": True, "enum_values": []},
+        {"key": "amount", "is_optional": True, "enum_values": [], "description": None},
     ]
     # Trigger docs plus fixed documents, minus the workflow's own output.
     assert extraction["doc_texts"] == ["trigger text", "fixed text"]
@@ -112,7 +113,7 @@ class TestScheduledRunUsesTheSharedBuilder:
         own_output = smart_docs[2]
         db.workflow_trigger_event.find_one.return_value = {
             "_id": ObjectId(), "workflow": workflow["_id"],
-            "documents": [trigger_doc["_id"], own_output["_id"]],
+            "status": "queued", "documents": [trigger_doc["_id"], own_output["_id"]],
             "trigger_type": "folder_watch",
         }
         db.system_config.find_one.return_value = {
@@ -139,7 +140,7 @@ class TestScheduledRunUsesTheSharedBuilder:
         db = _db_for(workflow, step_docs=[], task_docs=[])
         mock_get_db.return_value = db
         db.workflow_trigger_event.find_one.return_value = {
-            "_id": ObjectId(), "workflow": workflow["_id"], "documents": [], "trigger_type": "scheduled",
+            "_id": ObjectId(), "workflow": workflow["_id"], "status": "queued", "documents": [], "trigger_type": "scheduled",
         }
         db.system_config.find_one.return_value = {
             "available_models": [
@@ -179,7 +180,7 @@ class TestScheduledRunUsesTheSharedBuilder:
         db = _db_for(workflow, step_docs=[], task_docs=[])
         mock_get_db.return_value = db
         db.workflow_trigger_event.find_one.return_value = {
-            "_id": ObjectId(), "workflow": workflow["_id"], "documents": [], "trigger_type": "scheduled",
+            "_id": ObjectId(), "workflow": workflow["_id"], "status": "queued", "documents": [], "trigger_type": "scheduled",
         }
         db.system_config.find_one.return_value = {
             "available_models": [{"name": "sys-default"}], "default_model": "sys-default",
@@ -215,6 +216,8 @@ class TestOptimizerTrialUsesTheSharedBuilder:
             patch("app.models.system_config.SystemConfig.get_config", AsyncMock(return_value=None)),
             patch.object(workflow_optimizer, "get_user_model_name", AsyncMock(return_value="m")),
             patch("app.models.user.User") as MockUser,
+            # No database here; this workflow queries no knowledge base.
+            patch("app.services.step_knowledge_access.ensure_workflow_kbs_runnable", AsyncMock()),
             patch("app.services.workflow_engine.build_workflow_engine") as mock_build,
         ):
             MockUser.find_one = AsyncMock(return_value=None)

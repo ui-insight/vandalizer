@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CheckCircle, XCircle, Loader2, Plug } from 'lucide-react'
 import type { CredentialTestResult } from '../../types/credential'
 
@@ -20,6 +20,8 @@ interface Props {
   hideUrlField?: boolean
   disabled?: boolean
   compact?: boolean
+  /** Change when connection fields change, so old test results cannot describe new settings. */
+  revision?: unknown
 }
 
 export function summarizeTest(result: CredentialTestResult): string {
@@ -32,20 +34,34 @@ export function summarizeTest(result: CredentialTestResult): string {
   return failed ? `${failed.step} failed.` : 'Test failed.'
 }
 
-export function CredentialTestPanel({ run, testUrl, onTestUrlChange, hideUrlField, disabled, compact }: Props) {
+export function CredentialTestPanel({ run, testUrl, onTestUrlChange, hideUrlField, disabled, compact, revision }: Props) {
   const [running, setRunning] = useState(false)
   const [result, setResult] = useState<CredentialTestResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const generation = useRef(0)
+  const pending = useRef(false)
+  useEffect(() => {
+    generation.current++
+    setResult(null)
+    setError(null)
+    const requests = generation; return () => { requests.current++ }
+  }, [revision, testUrl])
+
 
   const handleTest = async () => {
+    if (pending.current || disabled) return
+    pending.current = true
+    const testedGeneration = generation.current
     setRunning(true)
     setError(null)
     setResult(null)
     try {
-      setResult(await run(testUrl.trim()))
+      const outcome = await run(testUrl.trim())
+      if (generation.current === testedGeneration) setResult(outcome)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not run the test')
+      if (generation.current === testedGeneration) setError(err instanceof Error ? err.message : 'Could not run the test')
     } finally {
+      pending.current = false
       setRunning(false)
     }
   }
@@ -60,9 +76,9 @@ export function CredentialTestPanel({ run, testUrl, onTestUrlChange, hideUrlFiel
             value={testUrl}
             onChange={e => onTestUrlChange(e.target.value)}
             placeholder="Test URL (optional) — e.g. https://api.example.com/v1/me"
-            disabled={disabled}
+            disabled={disabled || running}
             style={{
-              flex: 1, minWidth: 220, padding: '6px 10px', fontSize: 13, fontFamily: 'inherit',
+              flex: '1 1 180px', minWidth: 0, width: '100%', padding: '6px 10px', fontSize: 13, fontFamily: 'inherit',
               border: '1px solid #d1d5db', borderRadius: 6, outline: 'none', boxSizing: 'border-box',
             }}
           />
@@ -85,7 +101,7 @@ export function CredentialTestPanel({ run, testUrl, onTestUrlChange, hideUrlFiel
       </div>
       {!hideUrlField && !result && !error && (
         <div style={{ fontSize: 11, color: '#6b7280' }}>
-          The test obtains the auth for real (OAuth exchanges a token) and, with a URL, sends one GET with it. Secrets are never shown.
+          Testing checks the connection settings and obtains authorization (OAuth requests an access token). If you supply a test URL, it also sends one authenticated GET request there. Use a service endpoint intended for connection checks. It does not save your changes or run a workflow; secrets are never shown.
         </div>
       )}
       {error && <div role="alert" style={{ fontSize: 12, color: '#b91c1c' }}>{error}</div>}
@@ -100,6 +116,7 @@ export function CredentialTestPanel({ run, testUrl, onTestUrlChange, hideUrlFiel
           <div style={{ fontWeight: 600, color: result.ok ? '#166534' : '#991b1b', marginBottom: 4 }}>
             {summarizeTest(result)}
           </div>
+          <p style={{ margin: '4px 0 8px', color: '#374151' }}>{result.ok ? 'This result covers the tested settings and endpoint. Save changes separately, then check the workflow that uses this connection.' : 'Review the failed step below, correct the connection details or service access, and test again.'}</p>
           <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
             {result.steps.map((s, i) => (
               <li key={i} style={{ display: 'flex', gap: 6, alignItems: 'flex-start', color: '#374151' }}>

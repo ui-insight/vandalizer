@@ -199,6 +199,13 @@ class TestDocumentSearch:
 
 
 class TestDocumentGovernanceAuth:
+    @pytest.fixture(autouse=True)
+    def classification_collection(self):
+        collection = MagicMock()
+        collection.update_one = AsyncMock(return_value=MagicMock(matched_count=1))
+        with patch('app.services.classification_service.SmartDocument.get_motor_collection', return_value=collection):
+            yield collection
+
     @pytest.mark.asyncio
     async def test_owner_can_reclassify_personal_document(self, client):
         user = _make_user("owner1")
@@ -227,7 +234,7 @@ class TestDocumentGovernanceAuth:
         assert resp.json()["classified_by"] == "owner1"
         assert doc.classification == "ferpa"
         assert doc.classified_by == "owner1"
-        doc.save.assert_awaited_once()
+        doc.save.assert_not_awaited()
         mock_log_event.assert_awaited_once()
 
     @pytest.mark.asyncio
@@ -310,7 +317,7 @@ class TestDocumentGovernanceAuth:
         assert resp.status_code == 200
         assert resp.json()["classification"] == "cui"
         assert doc.classification == "cui"
-        doc.save.assert_awaited_once()
+        doc.save.assert_not_awaited()
         mock_log_event.assert_awaited_once()
 
     @pytest.mark.asyncio
@@ -430,14 +437,24 @@ class TestRetryExtractionRoute:
     way — an OCR round-trip to get back text that was already fine is pure
     cost, and on a busy deployment it is cost per impatient click."""
 
-    async def _post(self, client, doc, query=""):
+    async def _post(self, client, doc, claim_failure=None, query=""):
         user = _make_user("owner1")
         doc.path = doc.path if isinstance(getattr(doc, "path", None), str) else "uploads/doc-1.pdf"
         cookies, headers = _auth("owner1")
 
+        # These route tests isolate OCR decisions and error mapping. Real
+        # conditional persistence is covered by the disposable MongoDB suite.
+        async def claim(document, changes):
+            if claim_failure is not None:
+                raise claim_failure
+            for field, value in changes.items():
+                setattr(document, field, value)
+            await document.save()
+
         with patch("app.dependencies.decode_token", return_value={"sub": "owner1", "type": "access"}), \
              patch("app.dependencies.User") as MockUser, \
              patch("app.routers.documents.access_control.get_authorized_document", new_callable=AsyncMock) as mock_get_doc, \
+             patch("app.services.document_service.claim_extraction_restart", side_effect=claim), \
              patch("app.tasks.upload_tasks.dispatch_upload_tasks", return_value="task-id-123") as mock_dispatch, \
              patch("app.services.audit_service.log_event", new_callable=AsyncMock) as mock_log_event:
             MockUser.find_one = AsyncMock(return_value=user)
@@ -492,7 +509,7 @@ class TestRetryExtractionRoute:
         even though its stored text looks fine."""
         doc = _make_document(doc_uuid="doc-1", user_id="owner1", task_status="complete")
         doc.ingestion_warnings = []
-        resp, mock_dispatch, mock_log_event = await self._post(client, doc, "?force_ocr=true")
+        resp, mock_dispatch, mock_log_event = await self._post(client, doc, query="?force_ocr=true")
 
         assert resp.status_code == 200
         assert mock_dispatch.call_args.kwargs["force_ocr"] is True
@@ -503,7 +520,7 @@ class TestRetryExtractionRoute:
         doc = _make_document(doc_uuid="doc-1", user_id="owner1", task_status="complete")
         doc.ingestion_warnings = []
         doc.extension = "docx"
-        resp, mock_dispatch, mock_log_event = await self._post(client, doc, "?force_ocr=true")
+        resp, mock_dispatch, mock_log_event = await self._post(client, doc, query="?force_ocr=true")
 
         assert resp.status_code == 200
         assert mock_dispatch.call_args.kwargs["force_ocr"] is False
@@ -705,6 +722,18 @@ class TestRetryExtractionRoute:
         }
 
 
+    @pytest.mark.asyncio
+    async def test_a_changed_retry_snapshot_returns_conflict_without_dispatch(self, client):
+        from app.services.extraction_restarts import ExtractionRestartConflict
+        doc = _make_document(doc_uuid="doc-1", user_id="owner1", task_status="error")
+        response, dispatch, audit = await self._post(client, doc, ExtractionRestartConflict())
+        assert response.status_code == 409
+        assert "Refresh its status" in response.json()["detail"]
+        dispatch.assert_not_called()
+        audit.assert_not_awaited()
+        doc.save.assert_not_awaited()
+
+
 class TestTextLayerRejectedField:
     """The bit the retry route reads and writes is on the document, not on
     the extraction, so it has to outlive every error write."""
@@ -756,6 +785,9 @@ class TestCancelExtractionRoute:
         # Clearing task_id is what makes a worker the revoke missed drop its result.
         assert update["$set"]["task_id"] is None
         assert update["$set"]["error_retryable"] is True
+        # Like a restart, Stop bumps the revision: the stopped run's later
+        # steps (update, ingestion, cleanup) are filtered on it.
+        assert update["$inc"] == {"_extraction_restart_revision": 1}
         mock_revoke.assert_called_once_with("extract-task-1", terminate=True, signal="SIGTERM")
         assert mock_log_event.call_args.kwargs["action"] == "document.cancel_extraction"
 

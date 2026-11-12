@@ -217,6 +217,43 @@ class TestGetUserModelName:
 
 class TestPerformExtractionTask:
     @patch("app.tasks.extraction_tasks._get_db")
+    def test_fills_pdf_form_with_extracted_values(self, mock_get_db, tmp_path):
+        from pypdf import PdfReader
+        from reportlab.pdfgen import canvas
+
+        uploads = tmp_path / "static" / "uploads"
+        uploads.mkdir(parents=True)
+        template = uploads / "template.pdf"
+        pdf = canvas.Canvas(str(template))
+        pdf.acroForm.textfield(name="principal_investigator", x=40, y=700)
+        pdf.showPage()
+        pdf.save()
+
+        db = mock_get_db.return_value
+        db.activity_event.find_one.return_value = {
+            "_id": ObjectId(_ACTIVITY_ID), "user_id": "user1",
+        }
+        db.system_config.find_one.return_value = {"available_models": [{"name": "gpt-4"}]}
+        db.user_model_config.find_one.return_value = None
+        db.search_set_item.find_one.return_value = {"pdf_binding": "principal_investigator"}
+        engine = MagicMock(tokens_in=10, tokens_out=5)
+        engine.extract.return_value = {"PI": "Alice"}
+
+        with patch("app.services.extraction_engine.ExtractionEngine", return_value=engine):
+            from app.tasks.extraction_tasks import perform_extraction_task
+
+            result = perform_extraction_task(
+                activity_id=_ACTIVITY_ID, searchset_uuid=_SS_UUID,
+                document_uuids=["doc-1"], keys=["PI"], root_path=str(tmp_path),
+                fillable_pdf_url="template.pdf",
+            )
+
+        assert result["status"] == "completed"
+        filled = PdfReader(tmp_path / "static" / "fillable_form.pdf")
+        assert len(filled.pages) == 1
+        assert filled.get_fields()["principal_investigator"]["/V"] == "Alice"
+
+    @patch("app.tasks.extraction_tasks._get_db")
     def test_updates_activity_to_running_then_completed(self, mock_get_db):
         db = MagicMock()
         mock_get_db.return_value = db

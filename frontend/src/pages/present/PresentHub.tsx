@@ -82,7 +82,7 @@ export function PresentHub() {
                   </span>
                   <div>
                     <h3 className="text-lg font-bold text-white">{track.label}</h3>
-                    <p className="text-sm text-gray-500">{track.tagline}</p>
+                    <p className="text-sm text-gray-400">{track.tagline}</p>
                   </div>
                 </div>
                 <ul className="flex-1 space-y-1.5 mb-5">
@@ -125,7 +125,7 @@ export function PresentHub() {
         <h2 className="text-sm font-bold uppercase tracking-wider text-[#f1b300] mb-1">
           Grab a pitch in 10 seconds
         </h2>
-        <p className="text-sm text-gray-500 mb-4">
+        <p className="text-sm text-gray-400 mb-4">
           Copy a ready-made spoken or written pitch for any audience.
         </p>
         <div className="space-y-2.5">

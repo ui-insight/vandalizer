@@ -133,6 +133,7 @@ def _make_run_doc(uuid: str = "opt-1") -> MagicMock:
     rd.optimized_score = None
     rd.optimized_score_train = None
     rd.holdout_default_score = None
+    rd.holdout_optimized_score = None
     rd.score_sample_size = None
     rd.judge_model = None
     rd.judge_variance = None
@@ -943,3 +944,80 @@ async def test_run_post_apply_validation_falls_back_to_accuracy_without_score():
         )
 
     assert run_doc.post_apply_validation["score"] == pytest.approx(0.6)
+
+
+async def _run_with_holdout(holdout_winner_score: float, *, apply_on_finish: bool = True):
+    """Six cases, so a holdout slice is split off; one trial leads on training.
+
+    ``_run_single_config`` returns, in order: the two baselines, the trial,
+    then the winner and the default re-scored on the held-out cases.
+    """
+    run_doc = _make_run_doc()
+    ss = _make_search_set()
+    cases = [_make_test_case(f"tc-{i}") for i in range(6)]
+    results = iter([
+        {"label": "baseline-no-tool", "score": 30.0, "accuracy": 0.3, "consistency": 0.6},
+        {"label": "baseline-default", "score": 62.0, "accuracy": 0.6, "consistency": 0.8},
+        {"label": "winner", "score": 92.0, "accuracy": 0.9, "consistency": 0.95},
+        {"label": "holdout-winner", "score": holdout_winner_score, "accuracy": 0.6, "consistency": 0.8},
+        {"label": "holdout-default", "score": 62.0, "accuracy": 0.6, "consistency": 0.8},
+    ])
+
+    async def fake_run_single_config(**kwargs):
+        return {"model": "m", "config_override": {}, "elapsed_seconds": 1.0, **next(results)}
+
+    candidates = [{"label": "winner", "model": "claude-sonnet", "config_override": {"strategy": "two-pass"}}]
+    with (
+        patch.object(extraction_optimizer, "ExtractionOptimizationRun") as MockRun,
+        patch.object(extraction_optimizer, "ExtractionTestCase") as MockTC,
+        patch.object(extraction_optimizer, "SearchSet") as MockSS,
+        patch.object(extraction_optimizer, "SystemConfig") as MockSC,
+        patch.object(extraction_optimizer, "get_extraction_keys", new=AsyncMock(return_value=["PI Name"])),
+        patch.object(extraction_optimizer, "get_extraction_field_metadata", new=AsyncMock(return_value=[])),
+        patch.object(extraction_optimizer, "get_user_model_name", new=AsyncMock(return_value="claude-haiku")),
+        patch.object(extraction_optimizer, "_build_candidate_configs", return_value=candidates),
+        patch.object(extraction_optimizer, "_run_single_config",
+                     new=AsyncMock(side_effect=fake_run_single_config)),
+        patch.object(extraction_optimizer, "notify_run_terminal", new=AsyncMock()),
+        patch.object(extraction_optimizer, "run_post_apply_validation", new=AsyncMock()),
+    ):
+        MockRun.find_one = AsyncMock(return_value=run_doc)
+        find_call = MagicMock()
+        find_call.to_list = AsyncMock(return_value=cases)
+        MockTC.find = MagicMock(return_value=find_call)
+        MockSS.find_one = AsyncMock(return_value=ss)
+        sys_cfg = MagicMock()
+        sys_cfg.available_models = []
+        sys_cfg.model_dump = MagicMock(return_value={})
+        MockSC.get_config = AsyncMock(return_value=sys_cfg)
+        result = await extraction_optimizer.run_optimization(
+            search_set_uuid="ss-1", user_id="u1", run_uuid="opt-1",
+            apply_on_finish=apply_on_finish, max_candidates=1,
+        )
+    return result, ss
+
+
+@pytest.mark.asyncio
+async def test_a_lead_that_shrinks_to_noise_on_holdout_is_a_tie():
+    """Ticket: chat called 94% vs 92% "a real, if modest, gain" while the
+    editor said +2 pts was inside the judge's noise. The tie was decided on the
+    winner's training score; the run reported its holdout score."""
+    result, ss = await _run_with_holdout(64.0)
+
+    # +30 pts on training, +2 pts on what the run reports (band is 4 pts here:
+    # no judge, so the 0.02 noise floor at N=1).
+    assert result.optimized_score_train is not None
+    assert result.tied_with_baseline is True
+    assert result.winner_selection_reason == "tied_on_reported_score"
+    # And apply_on_finish holds back, as for any tie.
+    assert ss.extraction_config_override is None
+
+
+@pytest.mark.asyncio
+async def test_a_lead_that_holds_on_holdout_is_still_a_win():
+    result, ss = await _run_with_holdout(90.0)
+
+    assert result.tied_with_baseline is False
+    # No judge in this harness, so the reason records the fallback noise floor.
+    assert result.winner_selection_reason == "no_judge_variance"
+    assert ss.extraction_config_override is not None

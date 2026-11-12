@@ -4,6 +4,27 @@ from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def _url_host(url: str) -> str:
+    from urllib.parse import urlsplit
+
+    try:
+        return (urlsplit(url.strip()).hostname or "").lower()
+    except ValueError:
+        return ""
+
+
+def is_local_url(url: str) -> bool:
+    """Whether *url* points at the machine it is opened on, not a site."""
+    host = _url_host(url)
+    # Recognising a local address, not binding to one.
+    return not host or host in {"localhost", "127.0.0.1", "::1", "0.0.0.0"} or host.endswith(".localhost")  # nosec B104
+
+
+def is_placeholder_url(url: str) -> bool:
+    """The .env.example placeholder, which is not anyone's site."""
+    return _url_host(url) in {"your-domain.com", "example.com", "vandalizer.example.edu"}
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
@@ -17,8 +38,20 @@ class Settings(BaseSettings):
     jwt_access_expire_minutes: int = 30
     jwt_refresh_expire_days: int = 60
     upload_dir: str = "../app/static/uploads"
+    # The site's public address, used in every link Vandalizer sends out:
+    # calendar files, reminder and feedback emails, sign-in and reset links,
+    # OAuth redirects. Set FRONTEND_URL; VANDALIZER_BASE_URL (the name the
+    # deploy docs and Office/Teams use) is accepted when FRONTEND_URL is not.
     frontend_url: str = "http://localhost:5173"
+    vandalizer_base_url: str = ""
     environment: str = "development"
+    # Staged rollout: enable only after enrollment rehearsal and all course
+    # surfaces have passed version-aware QA. Publication alone never enables it.
+    certification_versioning_enabled: bool = False
+    # Separate course catalog for a QA staging deployment. Empty means the
+    # repository catalog. Releases published in QA staging mode refuse to
+    # serve learners when environment is "production".
+    certification_catalog_root: str = ""
     # Explicit override for the Secure attribute on auth/CSRF cookies. Leave
     # unset to derive it from environment + frontend_url (see
     # use_secure_cookies): Secure in production, EXCEPT when the deployment is
@@ -50,6 +83,12 @@ class Settings(BaseSettings):
     ocr_all_pdfs: bool = False
     max_upload_size_mb: int = 500
 
+    # SSRF allowlist: comma-separated hostnames that outbound requests may hit
+    # even when they resolve to private/campus IP ranges. For trusted
+    # deployment infrastructure only (e.g. an on-campus search proxy) — the
+    # private-IP block still applies to every other host. Loopback, link-local,
+    # and cloud-metadata addresses stay blocked regardless.
+    ssrf_allowed_hosts: str = "mindrouter.uidaho.edu"
     # Where this process looks for model vocabularies, in the standard
     # HuggingFace cache layout (`<root>/hub/models--Org--Name/snapshots/<rev>/`).
     # Set it to your HF_HOME. Token counting reads `tokenizer.json` from here —
@@ -83,6 +122,9 @@ class Settings(BaseSettings):
     resend_from_email: str = ""
     resend_from_name: str = "Vandalizer"
 
+    # Landing-page demo-request form: where admin-notification emails go.
+    # Falls back to resend_from_email / smtp_from_email if unset.
+    demo_request_to_email: str = ""
     # Master switch for scheduled promotional email (demo recapture drips,
     # onboarding drips, inactivity nudges). Set false to silence all three
     # regardless of per-user preferences — transactional mail is unaffected.
@@ -94,6 +136,7 @@ class Settings(BaseSettings):
 
     # File storage backend ("local" or "s3")
     storage_backend: str = "local"
+    artifact_public_sharing_enabled: bool = True
     s3_bucket: str = ""
     s3_region: str = "us-east-1"
     s3_access_key_id: str | None = None
@@ -246,6 +289,27 @@ class Settings(BaseSettings):
         Path(self.upload_dir).mkdir(parents=True, exist_ok=True)
         Path(self.chromadb_persist_dir).mkdir(parents=True, exist_ok=True)
         return self
+
+    @model_validator(mode="after")
+    def _resolve_frontend_url(self) -> "Settings":
+        # Support ticket: .ics deadline links on vandalizer-dev pointed at
+        # http://localhost:5173. The deploy docs name VANDALIZER_BASE_URL, but
+        # every link builder read FRONTEND_URL, which fell back to localhost.
+        # backend/.env.example ships FRONTEND_URL=http://localhost:5173, so
+        # "unset" is rare: also take a real VANDALIZER_BASE_URL over a local
+        # FRONTEND_URL. Never the template's placeholder.
+        self.frontend_url = self.frontend_url.strip().rstrip("/") or "http://localhost:5173"
+        base = self.vandalizer_base_url.strip().rstrip("/")
+        if base and not is_local_url(base) and not is_placeholder_url(base) and (
+            "frontend_url" not in self.model_fields_set or self.frontend_url_is_local
+        ):
+            self.frontend_url = base
+        return self
+
+    @property
+    def frontend_url_is_local(self) -> bool:
+        """Whether links would point at this machine rather than the site."""
+        return is_local_url(self.frontend_url)
 
     @model_validator(mode="after")
     def _check_jwt_secret(self) -> "Settings":

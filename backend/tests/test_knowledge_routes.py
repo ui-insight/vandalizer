@@ -226,6 +226,7 @@ class TestKnowledgeCloneAuth:
         cloned_kb.created_at = None
         cloned_kb.updated_at = None
         cloned_kb.user_id = "viewer"
+        cloned_kb.team_id = None
 
         with (
             patch("app.dependencies.decode_token", return_value={"sub": "viewer", "type": "access"}),
@@ -879,10 +880,13 @@ class TestKnowledgeCRUD:
 
             resp = await client.post(
                 "/api/knowledge/kb-uuid-1/share",
+                json={"shared_with_team": True, "comment": "Please review"},
                 cookies=cookies,
                 headers=headers,
             )
 
+        assert mock_svc.share_with_team.call_args.kwargs["shared_with_team"] is True
+        assert mock_svc.share_with_team.call_args.kwargs["comment"] == "Please review"
         assert resp.status_code == 200
         assert resp.json()["ok"] is True
         assert resp.json()["shared_with_team"] is True
@@ -1009,7 +1013,7 @@ class TestKnowledgeDocSources:
             patch("app.dependencies.User") as MockUser,
             patch("app.routers.knowledge.svc") as mock_svc,
             patch("app.routers.knowledge.organization_service") as mock_org,
-            patch("app.tasks.kb_validation_tasks.add_urls_task.delay") as mock_delay,
+            patch("app.tasks.kb_validation_tasks.ingest_url_sources_task.apply_async") as mock_delay,
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
@@ -1017,6 +1021,7 @@ class TestKnowledgeDocSources:
             mock_svc.partition_new_urls = AsyncMock(
                 return_value=(["https://example.com", "https://example.org"], []),
             )
+            mock_svc.register_url_sources = AsyncMock(return_value=["s1", "s2"])
 
             resp = await client.post(
                 "/api/knowledge/kb-uuid-1/add_urls",
@@ -1031,10 +1036,11 @@ class TestKnowledgeDocSources:
         assert resp.json() == {"ok": True, "added": 2, "skipped": 0, "skipped_urls": []}
         # Work was handed off to the worker, not run inline.
         mock_svc.add_urls.assert_not_called()
-        mock_delay.assert_called_once()
-        args, kwargs = mock_delay.call_args
-        assert args[0] == kb.uuid
-        assert args[1] == ["https://example.com", "https://example.org"]
+        mock_svc.ingest_url_sources.assert_not_called()
+        assert mock_svc.register_url_sources.await_args.args[1] == ["https://example.com", "https://example.org"]
+        # With crawling on, each URL gets its own task: a crawl fills one.
+        assert [c.kwargs["args"] for c in mock_delay.call_args_list] == [(kb.uuid, ["s1"]), (kb.uuid, ["s2"])]
+        kwargs = mock_delay.call_args.kwargs["kwargs"]
         assert kwargs["crawl_enabled"] is True
         assert kwargs["max_crawl_pages"] == 5
 
@@ -1053,7 +1059,7 @@ class TestKnowledgeDocSources:
             patch("app.dependencies.User") as MockUser,
             patch("app.routers.knowledge.svc") as mock_svc,
             patch("app.routers.knowledge.organization_service") as mock_org,
-            patch("app.tasks.kb_validation_tasks.add_urls_task.delay") as mock_delay,
+            patch("app.tasks.kb_validation_tasks.ingest_url_sources_task.apply_async") as mock_delay,
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
@@ -1091,7 +1097,7 @@ class TestKnowledgeDocSources:
             patch("app.dependencies.User") as MockUser,
             patch("app.routers.knowledge.svc") as mock_svc,
             patch("app.routers.knowledge.organization_service") as mock_org,
-            patch("app.tasks.kb_validation_tasks.add_urls_task.delay") as mock_delay,
+            patch("app.tasks.kb_validation_tasks.ingest_url_sources_task.apply_async") as mock_delay,
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
@@ -1099,6 +1105,7 @@ class TestKnowledgeDocSources:
             mock_svc.partition_new_urls = AsyncMock(
                 return_value=(["https://example.org/new"], ["https://example.org/old"]),
             )
+            mock_svc.register_url_sources = AsyncMock(return_value=["s-new"])
 
             resp = await client.post(
                 "/api/knowledge/kb-uuid-1/add_urls",
@@ -1110,7 +1117,67 @@ class TestKnowledgeDocSources:
         assert resp.status_code == 200
         assert resp.json()["added"] == 1
         assert resp.json()["skipped_urls"] == ["https://example.org/old"]
-        assert mock_delay.call_args.args[1] == ["https://example.org/new"]
+        assert mock_svc.register_url_sources.await_args.args[1] == ["https://example.org/new"]
+        assert mock_delay.call_args.kwargs["args"] == (kb.uuid, ["s-new"])
+
+    @pytest.mark.asyncio
+    async def test_bulk_add_is_split_into_staggered_batches(self, client):
+        """One task used to fetch every URL in turn, so a sitemap's few hundred
+        pages outran its time limit and the rest were never added."""
+        from app.routers import knowledge as router_mod
+
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+        urls = [f"https://example.org/p{i}" for i in range(25)]
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.tasks.kb_validation_tasks.ingest_url_sources_task.apply_async") as mock_delay,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+            mock_svc.partition_new_urls = AsyncMock(return_value=(urls, []))
+            mock_svc.register_url_sources = AsyncMock(return_value=[f"s{i}" for i in range(25)])
+
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/add_urls", json={"urls": urls}, cookies=cookies, headers=headers,
+            )
+
+        assert resp.json()["added"] == 25
+        batch = router_mod.URL_INGEST_BATCH
+        assert [len(c.kwargs["args"][1]) for c in mock_delay.call_args_list] == [batch, batch, 25 - 2 * batch]
+        assert [c.kwargs["countdown"] for c in mock_delay.call_args_list] == [
+            0, router_mod.URL_INGEST_STAGGER_SECONDS, 2 * router_mod.URL_INGEST_STAGGER_SECONDS,
+        ]
+        assert kb.status == "building"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("crawl,count", [(False, 501), (True, 26)])
+    async def test_add_urls_caps_one_request(self, client, crawl, count):
+        user = _make_user()
+        cookies, headers = _auth()
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.tasks.kb_validation_tasks.ingest_url_sources_task.apply_async") as mock_delay,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=_mock_kb())
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/add_urls",
+                json={"urls": [f"https://example.org/{i}" for i in range(count)], "crawl_enabled": crawl},
+                cookies=cookies, headers=headers,
+            )
+        assert resp.status_code == 400 and "at most" in resp.json()["detail"]
+        mock_delay.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_refresh_stamp_keeps_its_timezone_through_save(self, client):
@@ -1787,6 +1854,7 @@ class TestConvertDocumentsToKB:
         fake_kb.created_at = datetime.datetime.now(tz=datetime.timezone.utc)
         fake_kb.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
         fake_kb.user_id = "user1"
+        fake_kb.team_id = None
         fake_kb.save = AsyncMock()
 
         with (
@@ -1859,6 +1927,7 @@ class TestConvertDocumentsToKB:
         fake_kb.created_at = datetime.datetime.now(tz=datetime.timezone.utc)
         fake_kb.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
         fake_kb.user_id = "user1"
+        fake_kb.team_id = None
         fake_kb.save = AsyncMock()
 
         with (
@@ -2330,7 +2399,7 @@ class TestAdminKBInventory:
             patch("app.dependencies.decode_token", return_value={"sub": "plebe", "type": "access"}),
             patch("app.dependencies.User") as MockUser,
             patch(
-                "app.services.knowledge_service.admin_list_all_knowledge_bases",
+                "app.services.knowledge_service.admin_search_knowledge_bases",
                 new_callable=AsyncMock,
             ) as mock_list,
         ):
@@ -2362,14 +2431,14 @@ class TestAdminKBInventory:
             patch("app.dependencies.decode_token", return_value={"sub": "boss", "type": "access"}),
             patch("app.dependencies.User") as MockUser,
             patch(
-                "app.services.knowledge_service.admin_list_all_knowledge_bases",
+                "app.services.knowledge_service.admin_search_knowledge_bases",
                 new_callable=AsyncMock,
             ) as mock_list,
             patch("app.routers.admin.User.find") as mock_user_find,
             patch("app.routers.admin.Team.find") as mock_team_find,
         ):
             MockUser.find_one = AsyncMock(return_value=user)
-            mock_list.return_value = [kb]
+            mock_list.return_value = ([kb], 1)
             mock_user_find.return_value.to_list = AsyncMock(return_value=[])
             mock_team_find.return_value.to_list = AsyncMock(return_value=[])
 
@@ -3082,13 +3151,17 @@ class TestValidateSelectedQueries:
         find = MagicMock()
         find.count = AsyncMock(return_value=owned)
         task = MagicMock()
-        task.delay = MagicMock(return_value=MagicMock(id="task-1"))
+        task.apply_async = MagicMock()
         return kb, find, task
 
     async def _post(self, client, body, owned=2):
         user = _make_user("mgr")
         cookies, headers = _auth("mgr")
         kb, find, task = self._ctx(owned)
+        receipt = MagicMock()
+        receipt.insert = AsyncMock()
+        receipt.uuid = "task-1"
+        receipt.options = {"mode": body.get("mode", "judge"), "skip_judge": False, "query_uuids": list(dict.fromkeys(body["query_uuids"])) if isinstance(body.get("query_uuids"), list) else None}
         with (
             patch("app.dependencies.decode_token", return_value={"sub": "mgr", "type": "access"}),
             patch("app.dependencies.User") as MockUser,
@@ -3099,6 +3172,8 @@ class TestValidateSelectedQueries:
             patch("app.routers.knowledge.svc.get_knowledge_base", new_callable=AsyncMock, return_value=kb),
             patch("app.models.kb_test_query.KBTestQuery.find", return_value=find) as find_mock,
             patch("app.tasks.kb_validation_tasks.validate_kb_task", task),
+            patch("app.services.kb_validation_lifecycle.KBValidationTask", return_value=receipt),
+            patch("app.services.kb_validation_lifecycle.uuid4", return_value="task-1"),
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             resp = await client.post(
@@ -3112,8 +3187,9 @@ class TestValidateSelectedQueries:
             client, {"async": True, "mode": "judge", "query_uuids": ["q-1", "q-2", "q-1"]},
         )
         assert resp.status_code == 200
-        assert resp.json() == {"task_id": "task-1", "status": "queued"}
-        task.delay.assert_called_once_with("kb-1", "mgr", "judge", False, ["q-1", "q-2"])
+        assert resp.json()["task_id"] == "task-1"
+        assert resp.json()["status"] == "queued"
+        task.apply_async.assert_called_once_with(args=["kb-1", "mgr", "judge", False, ["q-1", "q-2"]], task_id="task-1", retry=False)
         # Ownership is checked against this KB's queries before enqueueing.
         find.assert_called_once_with({"knowledge_base_uuid": "kb-1", "uuid": {"$in": ["q-1", "q-2"]}})
 
@@ -3121,7 +3197,7 @@ class TestValidateSelectedQueries:
     async def test_a_full_run_passes_no_selection(self, client):
         resp, find, task = await self._post(client, {"async": True})
         assert resp.status_code == 200
-        task.delay.assert_called_once_with("kb-1", "mgr", "judge", False, None)
+        task.apply_async.assert_called_once_with(args=["kb-1", "mgr", "judge", False, None], task_id="task-1", retry=False)
         find.assert_not_called()
 
     @pytest.mark.asyncio
@@ -3129,7 +3205,7 @@ class TestValidateSelectedQueries:
         for bad in ([], "q-1", [1], [""]):
             resp, _find, task = await self._post(client, {"async": True, "query_uuids": bad})
             assert resp.status_code == 400, bad
-            task.delay.assert_not_called()
+            task.apply_async.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_selection_owned_by_no_query_of_this_kb_is_a_400(self, client):
@@ -3138,7 +3214,7 @@ class TestValidateSelectedQueries:
         )
         assert resp.status_code == 400
         assert "belong" in resp.json()["detail"]
-        task.delay.assert_not_called()
+        task.apply_async.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_selection_over_the_cap_is_a_400_before_any_lookup(self, client):
@@ -3152,7 +3228,7 @@ class TestValidateSelectedQueries:
         assert str(_VALIDATE_SELECTED_MAX + 1) in detail
         # Rejected on size alone — no ``$in`` query of that length hits Mongo.
         find.assert_not_called()
-        task.delay.assert_not_called()
+        task.apply_async.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_selection_exactly_at_the_cap_is_accepted(self, client):
@@ -3163,7 +3239,7 @@ class TestValidateSelectedQueries:
             client, {"async": True, "query_uuids": at_cap}, owned=_VALIDATE_SELECTED_MAX,
         )
         assert resp.status_code == 200
-        task.delay.assert_called_once()
+        task.apply_async.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_partially_stale_selection_is_a_400_naming_the_missing_count(self, client):
@@ -3176,7 +3252,7 @@ class TestValidateSelectedQueries:
         detail = resp.json()["detail"]
         assert "3 of the 5 selected test queries no longer exist" in detail
         assert "refresh" in detail
-        task.delay.assert_not_called()
+        task.apply_async.assert_not_called()
 
 
 class TestValidationRunExport:
@@ -3448,3 +3524,60 @@ class TestKnowledgeOptimizationStatus:
 
         assert resp.status_code == 200
         assert resp.json()["items"][0]["optimization"] is None
+
+
+class TestKnowledgePaginationRecovery:
+    @pytest.mark.asyncio
+    async def test_bookmarks_fill_only_remaining_slots_and_search_the_displayed_name(self):
+        from app.routers.knowledge import list_knowledge_bases_v2
+
+        native = [_mock_kb(uuid=f"native-{i}", team_id="owning-team") for i in range(3)]
+        source = _mock_kb(uuid="source", title="Raw name", user_id="other")
+        source.id = "source-id"
+        ref = SimpleNamespace(uuid="bookmark", source_kb_uuid="source")
+        meta = SimpleNamespace(item_id="source-id", display_name="Curated policy")
+
+        async def native_page(*args, **kwargs):
+            if kwargs["search"]:
+                return [], 0
+            return native[kwargs["skip"]:kwargs["skip"] + kwargs["limit"]], len(native)
+
+        with (
+            patch("app.routers.knowledge.svc.list_knowledge_bases", side_effect=native_page),
+            patch("app.routers.knowledge.svc.list_references", AsyncMock(return_value=[ref])),
+            patch("app.routers.knowledge.svc.resolve_reference", AsyncMock(return_value=source)),
+            patch("app.routers.knowledge.svc.get_kb_usage_map", AsyncMock(return_value={})),
+            patch("app.routers.knowledge.organization_service.get_user_org_ancestry", AsyncMock(return_value=[])),
+            patch("app.routers.knowledge._latest_runs_by_kb", AsyncMock(return_value={})),
+            patch("app.routers.knowledge._manage_flags_by_kb", AsyncMock(return_value={})),
+            patch("app.routers.knowledge.optimization_status_by_kb", AsyncMock(return_value={})),
+            patch("app.routers.knowledge.VerifiedItemMetadata") as metadata,
+        ):
+            metadata.find.return_value.to_list = AsyncMock(return_value=[meta])
+            first = await list_knowledge_bases_v2(scope="mine", search=None, skip=0, limit=2, user=_make_user())
+            second = await list_knowledge_bases_v2(scope="mine", search=None, skip=2, limit=2, user=_make_user())
+            assert [k.uuid for k in first.items + second.items] == ["native-0", "native-1", "native-2", "source"]
+            assert first.total == second.total == 4
+            assert first.items[0].team_id == "owning-team"
+            match = await list_knowledge_bases_v2(scope="mine", search="CURATED", skip=0, limit=2, user=_make_user())
+            assert [k.title for k in match.items] == ["Curated policy"]
+            missing = await list_knowledge_bases_v2(scope="mine", search="unrelated", skip=0, limit=2, user=_make_user())
+            assert missing.total == 0 and missing.items == []
+
+    @pytest.mark.asyncio
+    async def test_visibility_is_applied_before_count_and_offset(self):
+        from app.services.knowledge_service import list_knowledge_bases
+
+        with patch("app.services.knowledge_service.KnowledgeBase") as model:
+            query = model.find.return_value
+            query.count = AsyncMock(return_value=1)
+            query.sort.return_value.skip.return_value.limit.return_value.to_list = AsyncMock(return_value=["visible"])
+            rows, total = await list_knowledge_bases("reader", "team", ["department"], scope="team", skip=20)
+            assert rows == ["visible"] and total == 1
+            count_query = model.find.call_args_list[0].args[0]
+            page_query = model.find.call_args_list[1].args[0]
+            assert count_query == page_query
+            visibility = count_query["$and"][1]["$or"]
+            assert {"user_id": "reader"} in visibility
+            assert {"organization_ids": {"$in": ["department"]}} in visibility
+            query.sort.return_value.skip.assert_called_once_with(20)

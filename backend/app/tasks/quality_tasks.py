@@ -1,15 +1,27 @@
 """Quality monitoring Celery tasks - detect regressions, staleness, config changes."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from celery import Task
+
+from collections.abc import Coroutine
+from typing import Any, TypeVar
+
 import datetime
 import logging
 
 from app.celery_app import celery
 from app.tasks import TRANSIENT_EXCEPTIONS, run_task_async
 
+T = TypeVar("T")
+
 logger = logging.getLogger(__name__)
 
 
-def _run_async(coro):
+def _run_async(coro: Coroutine[Any, Any, T]) -> T:
     """Run an async coroutine from sync Celery task context, releasing the
     loop's pooled LLM HTTP client on teardown (see ``run_task_async``)."""
     return run_task_async(coro)
@@ -23,7 +35,7 @@ def _run_async(coro):
     max_retries=2,
     default_retry_delay=10,
 )
-def quality_monitor(self):
+def quality_monitor(self: Task) -> None:
     """Daily quality monitoring task.
 
     1. Detect config changes since last validation runs
@@ -34,7 +46,7 @@ def quality_monitor(self):
     _run_async(_quality_monitor_async())
 
 
-async def _quality_monitor_async():
+async def _quality_monitor_async() -> None:
     from app.config import Settings
     from app.database import init_db
 
@@ -110,7 +122,7 @@ async def _quality_monitor_async():
     if auto_revalidate:
         cutoff = now - datetime.timedelta(days=revalidate_days)
         items_to_revalidate = await VerifiedItemMetadata.find(
-            VerifiedItemMetadata.last_validated_at < cutoff,
+            {"last_validated_at": {"$lt": cutoff}},
         ).to_list()
 
         from app.models.extraction_test_case import ExtractionTestCase
@@ -461,12 +473,12 @@ async def _quality_monitor_async():
     max_retries=1,
     default_retry_delay=10,
 )
-def auto_validate_extraction(self, search_set_uuid, user_id, model=None):
+def auto_validate_extraction(self: Task, search_set_uuid: str, user_id: str, model: str | None=None) -> None:
     """Auto-run validation after extraction if test cases exist."""
     _run_async(_auto_validate_extraction_async(search_set_uuid, user_id, model))
 
 
-async def _auto_validate_extraction_async(search_set_uuid, user_id, model=None):
+async def _auto_validate_extraction_async(search_set_uuid: str, user_id: str, model: str | None=None) -> None:
     from app.config import Settings
     from app.database import init_db
 
@@ -495,12 +507,12 @@ async def _auto_validate_extraction_async(search_set_uuid, user_id, model=None):
     max_retries=1,
     default_retry_delay=10,
 )
-def auto_validate_workflow(self, workflow_id):
+def auto_validate_workflow(self: Task, workflow_id: str) -> None:
     """Auto-run workflow validation after execution if validation plan exists."""
     _run_async(_auto_validate_workflow_async(workflow_id))
 
 
-async def _auto_validate_workflow_async(workflow_id):
+async def _auto_validate_workflow_async(workflow_id: str) -> None:
     from app.config import Settings
     from app.database import init_db
 
@@ -525,12 +537,12 @@ async def _auto_validate_workflow_async(workflow_id):
     # RegressionSuiteRun document instead.
     max_retries=0,
 )
-def regression_suite_task(self, suite_uuid: str):
+def regression_suite_task(self: Task, suite_uuid: str) -> None:
     """Run the admin regression suite (all verified items) in the background."""
     _run_async(_regression_suite_async(suite_uuid))
 
 
-async def _regression_suite_async(suite_uuid: str):
+async def _regression_suite_async(suite_uuid: str) -> None:
     from app.config import Settings
     from app.database import init_db
 

@@ -377,6 +377,56 @@ class TestValidationReadEndpoints:
         assert resp.json()["page"]["total"] == 0
 
 
+class TestWorkflowRunsFilter:
+    """A workflow_id filter matched nothing: WorkflowResult.workflow is an
+    ObjectId and the filter compared it with the raw string."""
+
+    def _chain(self):
+        chain = MagicMock()
+        chain.count = AsyncMock(return_value=0)
+        chain.sort.return_value.skip.return_value.limit.return_value.to_list = (
+            AsyncMock(return_value=[])
+        )
+        return chain
+
+    @pytest.mark.asyncio
+    async def test_filters_by_object_id(self, client):
+        from beanie import PydanticObjectId
+
+        key = _make_key(scopes=["workflows:read"])
+        wf_id = "69c1cacb087d19fbd759ef8a"
+        with (
+            patch("app.dependencies.ApiKey") as MockKey,
+            patch("app.dependencies.audit_service.log_event", new_callable=AsyncMock),
+            patch("app.routers.mgmt.WorkflowResult") as MockWR,
+        ):
+            MockKey.find_one = AsyncMock(return_value=key)
+            MockWR.find = MagicMock(return_value=self._chain())
+            MockWR.start_time = MagicMock()
+            resp = await client.get(
+                f"/api/mgmt/v1/workflows/runs?workflow_id={wf_id}",
+                headers={"X-API-Key": "vk_live_x"},
+            )
+        assert resp.status_code == 200
+        (filters,), _ = MockWR.find.call_args
+        assert filters["workflow"] == PydanticObjectId(wf_id)
+        assert isinstance(filters["workflow"], PydanticObjectId)
+
+    @pytest.mark.asyncio
+    async def test_rejects_a_malformed_id(self, client):
+        key = _make_key(scopes=["workflows:read"])
+        with (
+            patch("app.dependencies.ApiKey") as MockKey,
+            patch("app.dependencies.audit_service.log_event", new_callable=AsyncMock),
+        ):
+            MockKey.find_one = AsyncMock(return_value=key)
+            resp = await client.get(
+                "/api/mgmt/v1/workflows/runs?workflow_id=not-an-id",
+                headers={"X-API-Key": "vk_live_x"},
+            )
+        assert resp.status_code == 400
+
+
 class TestValidationWriteEndpoints:
     @pytest.mark.asyncio
     async def test_create_test_case(self, client):
@@ -500,3 +550,24 @@ class TestRunEndpoints:
             )
         assert resp.status_code == 403
         assert "issuer" in resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_system_config_redacts_current_secret_fields_without_mutating_storage():
+    from app.models.system_config import SystemConfig
+    from app.routers.mgmt import get_system_config
+
+    config = SystemConfig.model_construct(
+        ocr_api_key='encrypted-ocr-key', web_search_api_key='encrypted-search-key',
+        available_models=[{'name': 'local-model', 'api_key': 'encrypted-model-key'}],
+        oauth_providers=[{'name': 'login', 'client_secret': 'encrypted-oauth-key'}],
+    )
+    with patch.object(SystemConfig, 'get_config', new=AsyncMock(return_value=config)):
+        result = await get_system_config(_=MagicMock())
+    assert result['ocr_api_key'] == '***'
+    assert result['web_search_api_key'] == '***'
+    assert result['available_models'] == [{'name': 'local-model', 'api_key': '***'}]
+    assert result['oauth_providers'][0]['client_secret'] == '***'
+    assert config.ocr_api_key == 'encrypted-ocr-key'
+    assert config.available_models[0]['api_key'] == 'encrypted-model-key'
+    assert config.oauth_providers[0]['client_secret'] == 'encrypted-oauth-key'

@@ -1,0 +1,35 @@
+{
+  "overview": "Recognize unsupported claims, scope changes and decisions that require authorized human judgment. Use the fictional cases provided; the assessment needs no uploaded documents or existing workspace artifacts. An optional scoped chat practice uses one training document from Set Up Lab.",
+  "documents": [
+    "nsf-proposal-alpine-ecology.pdf"
+  ],
+  "instructions": [
+    "Read each fictional scenario and its supplied source. Identify the claim, selected target or proposed action that needs a decision.",
+    "Choose your own answer for every case. Distinguish source support from confident wording, keep the task within its authorized scope and leave institutional judgments to the authorized person.",
+    "Submit your recorded choices explicitly. The assistant may explain the teaching, but it must not invent or submit your assessment answers on your behalf.",
+    "Optional practice in chat: use Set Up Lab, select the training NSF proposal as the chat source and ask \"What total amount does this proposal request?\". Open the passage that supports the answer. Then ask \"What indirect cost rate does this proposal use?\" and check whether the answer cites a passage. Record what you found in the panel's practice check; it saves nothing and awards nothing.",
+    "Read the saved feedback and revisit the relevant lessons before another submission. Your original choices remain in history. These recognition cases prepare you for later practical work; draft feedback does not award module credit."
+  ],
+  "chat_instructions": [
+    "Open the certification panel to record your own scenario answers after reading the lessons.",
+    "Read each fictional scenario and its supplied source. Identify the claim, selected target or proposed action that needs a decision.",
+    "Choose your own answer for every case. Distinguish source support from confident wording, keep the task within its authorized scope and leave institutional judgments to the authorized person.",
+    "Submit your recorded choices explicitly. The assistant may explain the teaching, but it must not invent or submit your assessment answers on your behalf.",
+    "Optional practice in chat: use Set Up Lab, select the training NSF proposal as the chat source and ask \"What total amount does this proposal request?\". Open the passage that supports the answer. Then ask \"What indirect cost rate does this proposal use?\" and check whether the answer cites a passage. Record what you found in the panel's practice check; it saves nothing and awards nothing.",
+    "Read the saved feedback and revisit the relevant lessons before another submission. Your original choices remain in history. These recognition cases prepare you for later practical work; draft feedback does not award module credit."
+  ],
+  "expected_fields": [],
+  "expected_values": {},
+  "star_criteria": {},
+  "assessment_method": "authenticated_scenario_recognition",
+  "scenario_bank_id": "v5.0.ai_literacy.scenarios",
+  "scenario_bank_sha256": "5fa53f02bad9065fd1b97e362acd7ef49a1e5e2e07a85af069c7e9c9b2b1520b",
+  "chat_practice": {
+    "document": "nsf-proposal-alpine-ecology.pdf",
+    "bounded_question": "What total amount does this proposal request?",
+    "expected_value": "485000",
+    "unanswerable_question": "What indirect cost rate does this proposal use?",
+    "expected_judgment": "not_stated_in_source",
+    "rule": "practice_only_no_credit_no_write"
+  }
+}

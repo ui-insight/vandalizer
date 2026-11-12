@@ -1,0 +1,17 @@
+{
+  "mode": "Manually authored expected answers for explicitly fictional QA sources; no model output",
+  "cases": [
+    {"id":"deadline-original","sources":["notice-v1"],"question":"What is the sponsor deadline, including time zone?","expected":"November 12, 2026, 5:00 p.m. Pacific Time","cite":["notice-v1 section 2"]},
+    {"id":"deadline-amended","sources":["notice-v1","amendment-v2","proposal-draft"],"question":"Which sponsor deadline should we use, and why does the proposal show another date?","expected":"November 19, 2026, 5:00 p.m. Pacific Time. The amendment supersedes the original sponsor deadline; the proposal retains the earlier date.","cite":["amendment-v2","proposal-draft"]},
+    {"id":"internal-deadline","sources":["notice-v1","amendment-v2"],"question":"Did the institutional deadline also change?","expected":"No. November 9, 2026 at noon Pacific Time remains unchanged.","cite":["amendment-v2"]},
+    {"id":"project-period","sources":["notice-v1","amendment-v2"],"question":"What are the project start and end dates?","expected":"July 1, 2027 through June 30, 2028; these are not submission deadlines.","cite":["notice-v1 section 2"]},
+    {"id":"direct-cost-cap","sources":["notice-v1"],"question":"What is the maximum direct-cost request?","expected":"$180,000; indirect costs are additional.","cite":["notice-v1 section 3"]},
+    {"id":"budget-exception","sources":["notice-v1","proposal-draft"],"question":"Does this draft fit the direct-cost cap?","expected":"No. $200,000 exceeds the $180,000 direct-cost cap by $20,000. No exception is documented.","cite":["notice-v1 section 3","proposal-draft budget and readiness notes"]},
+    {"id":"budget-arithmetic","sources":["proposal-draft"],"question":"Do the listed direct costs add to the draft total?","expected":"Yes. 120000 + 30000 + 20000 + 30000 = 200000; with 50000 indirect costs the total is 250000. This arithmetic check does not establish sponsor eligibility.","cite":["proposal-draft budget"]},
+    {"id":"indirect-rate","sources":["notice-v1","proposal-draft"],"question":"What indirect-cost rate is used, and does that make the whole budget acceptable?","expected":"50000 / 200000 = 25%, matching the stated indirect rate limit. The direct-cost request still exceeds the sponsor cap.","cite":["notice-v1 section 3","proposal-draft budget"]},
+    {"id":"missing-page-limit","sources":["notice-v1","amendment-v2"],"question":"How many pages may the budget justification contain?","expected":"The supplied sources do not specify a page limit. Do not invent one; obtain sponsor guidance.","cite":["notice-v1 section 4"]},
+    {"id":"missing-eligibility","sources":["notice-v1"],"question":"Is the PI required to be a US citizen?","expected":"The supplied notice does not specify citizenship eligibility. Do not infer a restriction or permission.","cite":["notice-v1 section 1"]},
+    {"id":"required-material","sources":["notice-v1","proposal-draft"],"question":"What required material is still missing?","expected":"The budget justification and signed community-partner letter. A promised letter is not a received signed letter.","cite":["notice-v1 section 4","proposal-draft readiness notes"]},
+    {"id":"missing-exception","sources":["notice-v1","proposal-draft"],"question":"Can we assume a waiver for the excess direct costs?","expected":"No waiver process or granted exception is documented. Ask the sponsor before relying on an exception.","cite":["notice-v1 section 3","proposal-draft readiness notes"]}
+  ]
+}

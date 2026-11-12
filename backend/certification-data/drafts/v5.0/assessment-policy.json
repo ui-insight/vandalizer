@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "policy_id": "automatic-with-learner-revision.1",
+  "grading_mode": "automatic_only",
+  "llm_judgment_allowed": true,
+  "unclear_evidence": "learner_revision",
+  "technical_failure": "retry_grading_without_learner_failure",
+  "staff_queue_enabled": false
+}

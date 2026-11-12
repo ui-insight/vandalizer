@@ -6,10 +6,11 @@ import datetime
 import uuid as uuid_mod
 from typing import TYPE_CHECKING
 
-from beanie import PydanticObjectId
+from beanie import Document, PydanticObjectId
 
 if TYPE_CHECKING:
     from app.models.knowledge import KnowledgeBase
+    from app.models.user import User
 
 from app.models.extraction_test_case import ExtractionTestCase
 from app.models.library import LibraryItemKind
@@ -18,6 +19,12 @@ from app.models.workflow import Workflow, WorkflowStep, WorkflowStepTask
 from app.services import name_conflicts, search_set_service, verification_service, workflow_service
 
 SCHEMA_VERSION = 2
+
+
+def _persisted_id(document: Document) -> PydanticObjectId:
+    if document.id is None:
+        raise ValueError("The imported object has no saved database identity")
+    return document.id
 
 
 # ---------------------------------------------------------------------------
@@ -152,11 +159,15 @@ def plain_extraction_export(data: object, title: str | None = None) -> dict | No
 # ---------------------------------------------------------------------------
 
 
-async def _resolve_task_references(task_data: dict, task_name: str) -> dict:
+async def _resolve_task_references(task_data: dict, task_name: str, user: "User | None" = None) -> dict:
     """Resolve external object references in a task and embed their data inline.
 
     This makes the export self-contained so it can be imported on a different
     system that doesn't share the same database.
+
+    *user* is who is exporting. A knowledge base's or document's title goes
+    into the file only if they can open it themselves: being able to view a
+    workflow doesn't entitle someone to the names of everything it points at.
     """
     data = dict(task_data)
 
@@ -186,6 +197,7 @@ async def _resolve_task_references(task_data: dict, task_name: str) -> dict:
                         "title": it.title,
                         "is_optional": it.is_optional,
                         "enum_values": it.enum_values,
+                        "description": it.description,
                     }
                     for it in items
                 ],
@@ -194,11 +206,18 @@ async def _resolve_task_references(task_data: dict, task_name: str) -> dict:
     # --- KnowledgeBaseQuery tasks: embed KB metadata ---
     if task_name == "KnowledgeBaseQuery" and data.get("kb_uuid"):
         from app.models.knowledge import KnowledgeBase
+        from app.services import access_control
+
         kb = await KnowledgeBase.find_one(KnowledgeBase.uuid == data["kb_uuid"])
         if kb:
+            readable = user is not None and await access_control.get_authorized_knowledge_base(
+                data["kb_uuid"], user, allow_admin=True,
+            )
+            # The block is kept either way: importing relies on it to clear
+            # the id and ask for a local knowledge base.
             data["_embedded_knowledge_base"] = {
-                "title": kb.title,
-                "description": kb.description,
+                "title": kb.title if readable else "Unknown",
+                "description": kb.description if readable else None,
             }
 
     # --- Tasks with selected_document_uuid: embed document title ---
@@ -208,8 +227,13 @@ async def _resolve_task_references(task_data: dict, task_name: str) -> dict:
             SmartDocument.uuid == data["selected_document_uuid"]
         )
         if doc:
+            from app.services import access_control
+
+            readable = user is not None and await access_control.get_authorized_document(
+                data["selected_document_uuid"], user, allow_admin=True,
+            )
             data["_embedded_document_ref"] = {
-                "title": getattr(doc, "title", None) or getattr(doc, "filename", None) or "Unknown",
+                "title": (getattr(doc, "title", None) or getattr(doc, "filename", None) or "Unknown") if readable else "Unknown",
                 "uuid": data["selected_document_uuid"],
                 "_portable": False,
                 "_note": "This task references a specific document that must be re-selected after import.",
@@ -218,7 +242,7 @@ async def _resolve_task_references(task_data: dict, task_name: str) -> dict:
     return data
 
 
-async def export_workflow(workflow_id: str, user_email: str) -> dict:
+async def export_workflow(workflow_id: str, user_email: str, user: "User | None" = None) -> dict:
     wf_data = await workflow_service.get_workflow(workflow_id)
     if not wf_data:
         raise ValueError("Workflow not found")
@@ -231,7 +255,7 @@ async def export_workflow(workflow_id: str, user_email: str) -> dict:
     for step in wf_data.get("steps", []):
         tasks = []
         for t in step.get("tasks", []):
-            resolved_data = await _resolve_task_references(t.get("data", {}), t["name"])
+            resolved_data = await _resolve_task_references(t.get("data", {}), t["name"], user)
             tasks.append({"name": t["name"], "data": resolved_data})
 
             # Collect portability warnings for the user
@@ -276,6 +300,118 @@ async def export_workflow(workflow_id: str, user_email: str) -> dict:
     if portability_warnings:
         item["portability_warnings"] = portability_warnings
     return _envelope("workflow", user_email, [item])
+
+
+_IMPORT_CLEARED_NOTE = (
+    "This step referenced a {what} you don't have access to. Please select one of your own."
+)
+
+
+async def drop_unreadable_import_references(
+    item: dict, user: "User", *, keep_fixed_documents: dict | None = None,
+    keep_documents: "set[str] | None" = None, keep_knowledge_bases: "set[str] | None" = None,
+) -> dict:
+    """Clear, in place, what an import file points at that *user* can't open.
+
+    A file can name a fixed document, a step's document, a Form Filler
+    template or a knowledge base by id. Importing is a way of adding those to
+    a workflow, so each needs the same access as adding it in the editor, and
+    the import goes ahead without the ones the importer can't open:
+
+    * a step's document, template or knowledge base is cleared with a note on
+      the step, the way imports already treat references that don't travel;
+    * a fixed document that exists here but isn't the importer's to read is
+      left out. One that doesn't exist here (a file from another deployment)
+      is kept: the Input tab and the run already report it as missing, which
+      is more honest than quietly running on fewer documents.
+
+    The ``keep_*`` arguments are what the target workflow already uses when
+    importing into an existing one; those are left as they are.
+
+    Raises ``ValueError`` for a file whose settings aren't in the shape the
+    editor writes. Anything else could carry a reference past these checks
+    and still be read back as one when the workflow is saved or run.
+    """
+    from app.services import access_control
+    from app.services.fixed_document_access import fixed_document_uuids
+    from app.services.step_knowledge_access import KB_TASK_NAME
+
+    kept_fixed = set(fixed_document_uuids({**(keep_fixed_documents or {}), "trigger_type": None}))
+    kept_documents = keep_documents or set()
+    kept_kbs = keep_knowledge_bases or set()
+    readable: dict[str, bool] = {}
+
+    async def can_read(doc_uuid: str) -> bool:
+        if doc_uuid not in readable:
+            document = await access_control.get_authorized_document(doc_uuid, user, allow_admin=True)
+            readable[doc_uuid] = bool(document and not document.soft_deleted)
+        return readable[doc_uuid]
+
+    from app.models.document import SmartDocument
+
+    malformed = ValueError("This file isn't a valid workflow export: its settings are not in the expected format.")
+
+    config = item.get("input_config")
+    if config is not None and not isinstance(config, dict):
+        raise malformed
+    if isinstance(config, dict) and config.get("fixed_documents") is not None:
+        if not isinstance(config["fixed_documents"], list):
+            raise malformed
+        allowed = []
+        for entry in config["fixed_documents"]:
+            if not isinstance(entry, (dict, str)):
+                raise malformed
+            doc_uuid = (entry.get("uuid") if isinstance(entry, dict) else entry) or ""
+            if not isinstance(doc_uuid, str) or not doc_uuid:
+                continue
+            if doc_uuid in kept_fixed or await can_read(doc_uuid):
+                allowed.append(entry)
+            elif not await SmartDocument.find_one(
+                {"uuid": doc_uuid, "soft_deleted": {"$ne": True}},
+            ):
+                allowed.append(entry)  # not here at all: reported as missing
+        config["fixed_documents"] = allowed
+
+    async def clear_document(data: dict, key: str) -> None:
+        doc_uuid = data.get(key)
+        if isinstance(doc_uuid, str) and doc_uuid.strip() and doc_uuid not in kept_documents and not await can_read(doc_uuid.strip()):
+            data[key] = ""
+            data["_import_note"] = _IMPORT_CLEARED_NOTE.format(what="document")
+
+    steps = item.get("steps")
+    if steps is not None and not isinstance(steps, list):
+        raise malformed
+    for step in steps or []:
+        if not isinstance(step, dict):
+            raise malformed
+        if step.get("data") is not None and not isinstance(step["data"], dict):
+            raise malformed
+        if isinstance(step.get("data"), dict):
+            await clear_document(step["data"], "selected_document_uuid")
+        tasks = step.get("tasks")
+        if tasks is not None and not isinstance(tasks, list):
+            raise malformed
+        for task in tasks or []:
+            if not isinstance(task, dict):
+                raise malformed
+            data = task.get("data")
+            if data is None:
+                continue
+            # A list of pairs would be turned into a dict when saved.
+            if not isinstance(data, dict):
+                raise malformed
+            await clear_document(data, "selected_document_uuid")
+            await clear_document(data, "template_document_uuid")
+            kb_uuid = data.get("kb_uuid")
+            if (
+                task.get("name") == KB_TASK_NAME and isinstance(kb_uuid, str) and kb_uuid.strip()
+                # With the embedded block the import clears the id itself.
+                and not data.get("_embedded_knowledge_base") and kb_uuid.strip() not in kept_kbs
+                and not await access_control.get_authorized_knowledge_base(kb_uuid.strip(), user, allow_admin=True)
+            ):
+                data["kb_uuid"] = ""
+                data["_import_note"] = _IMPORT_CLEARED_NOTE.format(what="knowledge base")
+    return item
 
 
 async def _reconstruct_task_references(
@@ -325,6 +461,7 @@ async def _reconstruct_task_references(
                 user_id=user_id,
                 is_optional=field.get("is_optional", False),
                 enum_values=field.get("enum_values", []),
+            description=field.get("description"),
             )
             await new_item.insert()
 
@@ -401,7 +538,7 @@ async def import_workflow(
                 data=resolved_data,
             )
             await new_task.insert()
-            new_task_ids.append(new_task.id)
+            new_task_ids.append(_persisted_id(new_task))
 
         new_step = WorkflowStep(
             name=step_data["name"],
@@ -410,7 +547,7 @@ async def import_workflow(
             is_output=step_data.get("is_output", False),
         )
         await new_step.insert()
-        new_step_ids.append(new_step.id)
+        new_step_ids.append(_persisted_id(new_step))
 
     imported_name = await name_conflicts.next_available_name(
         f"{item['name']} (Imported)",
@@ -430,9 +567,12 @@ async def import_workflow(
         validation_inputs=item.get("validation_inputs", []),
     )
     await new_wf.insert()
-    await _bookmark(new_wf.id, LibraryItemKind.WORKFLOW, user_id, team_id)
+    await _bookmark(_persisted_id(new_wf), LibraryItemKind.WORKFLOW, user_id, team_id)
 
-    return await workflow_service.get_workflow(str(new_wf.id))
+    imported = await workflow_service.get_workflow(str(_persisted_id(new_wf)))
+    if imported is None:
+        raise ValueError("The imported workflow could not be read after saving")
+    return imported
 
 
 async def import_into_workflow(
@@ -473,7 +613,7 @@ async def import_into_workflow(
                 data=resolved_data,
             )
             await new_task.insert()
-            new_task_ids.append(new_task.id)
+            new_task_ids.append(_persisted_id(new_task))
 
         new_step = WorkflowStep(
             name=step_data["name"],
@@ -482,7 +622,7 @@ async def import_into_workflow(
             is_output=step_data.get("is_output", False),
         )
         await new_step.insert()
-        new_step_ids.append(new_step.id)
+        new_step_ids.append(_persisted_id(new_step))
 
     old_step_ids = list(target.steps)
 
@@ -504,7 +644,10 @@ async def import_into_workflow(
                     await task.delete()
             await step.delete()
 
-    return await workflow_service.get_workflow(str(target.id))
+    imported = await workflow_service.get_workflow(str(_persisted_id(target)))
+    if imported is None:
+        raise ValueError("The imported workflow could not be read after saving")
+    return imported
 
 
 # ---------------------------------------------------------------------------
@@ -531,6 +674,7 @@ async def export_search_set(search_set_uuid: str, user_email: str) -> dict:
             "title": it.title,
             "is_optional": it.is_optional,
             "enum_values": it.enum_values,
+            "description": it.description,
         })
 
     # Text-only test cases
@@ -627,6 +771,7 @@ async def import_search_set(
             user_id=user_id,
             is_optional=field.get("is_optional", False),
             enum_values=field.get("enum_values", []),
+            description=field.get("description"),
         )
         await new_item.insert()
 
@@ -647,7 +792,7 @@ async def import_search_set(
     # manage but do not own — filing it into their personal library on an
     # import of fields is not something they asked for.
     if target is None:
-        await _bookmark(result.id, LibraryItemKind.SEARCH_SET, user_id, team_id)
+        await _bookmark(_persisted_id(result), LibraryItemKind.SEARCH_SET, user_id, team_id)
     return result
 
 
@@ -731,9 +876,9 @@ async def import_knowledge_base(
 
         # Ingest from cached content or re-fetch
         if src.content:
-            from app.services.document_manager import DocumentManager
+            from app.services.document_manager import get_document_manager
             import asyncio
-            dm = DocumentManager()
+            dm = get_document_manager()
             try:
                 chunk_count = await asyncio.to_thread(
                     dm.add_to_kb, kb.uuid, src.uuid,
@@ -759,7 +904,7 @@ async def import_knowledge_base(
 # ---------------------------------------------------------------------------
 
 
-async def export_catalog(user_email: str) -> dict:
+async def export_catalog(user_email: str, user: "User | None" = None) -> dict:
     """Export all verified catalog items with their full definitions."""
     result = await verification_service.list_verified_items(limit=10000)
     verified = result["items"]
@@ -790,7 +935,7 @@ async def export_catalog(user_email: str) -> dict:
         definition: dict | None = None
         if item_kind == "workflow":
             try:
-                wf_export = await export_workflow(item_id, user_email)
+                wf_export = await export_workflow(item_id, user_email, user)
                 definition = wf_export["items"][0]
             except Exception:
                 continue

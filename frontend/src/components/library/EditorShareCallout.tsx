@@ -1,11 +1,8 @@
 import { useState } from 'react'
-import { Share2, ShieldCheck } from 'lucide-react'
+import { Share2 } from 'lucide-react'
 import { useToast } from '../../contexts/ToastContext'
 import { useShareLabel } from '../../lib/catalogLabels'
 import { VerificationSubmitModal } from './VerificationSubmitModal'
-
-/** Scores at or above this get the "Great results" framing; any score can share. */
-const HIGH_SCORE = 80
 
 /**
  * The editor's way into the share wizard — the same one Library → ⋯ → Share
@@ -37,29 +34,21 @@ export function EditorShareCallout({
 
   if (verified) return null
 
-  const high = score !== null && score >= HIGH_SCORE
-  const rounded = score === null ? null : Math.round(score)
-  const accent = high ? '#059669' : '#374151'
+  const accent = '#374151'
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 12,
+      display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12,
       padding: '12px 16px', borderRadius: 8,
-      backgroundColor: high ? '#ecfdf5' : '#f9fafb',
-      border: `1px solid ${high ? '#a7f3d0' : '#e5e7eb'}`,
+      backgroundColor: '#f9fafb',
+      border: '1px solid #e5e7eb',
     }}>
-      {high
-        ? <ShieldCheck aria-hidden="true" style={{ width: 20, height: 20, color: accent, flexShrink: 0 }} />
-        : <Share2 aria-hidden="true" style={{ width: 20, height: 20, color: '#6b7280', flexShrink: 0 }} />}
-      <div style={{ flex: 1, fontSize: 13, color: high ? '#065f46' : '#374151' }}>
-        {high ? (
-          <><strong>Great results!</strong> This {kindNoun} scored {rounded}%. Share it so colleagues can use it too.</>
-        ) : (
-          <>
-            {rounded !== null && <>This {kindNoun} scored {rounded}%. </>}
-            A low score is worth sharing too: the score travels with it. If you haven’t validated it yet, an examiner can test it for you.
-          </>
-        )}
+      <Share2 aria-hidden="true" style={{ width: 20, height: 20, color: '#6b7280', flexShrink: 0 }} />
+      <div style={{ flex: '1 1 160px', minWidth: 0, fontSize: 13, color: accent }}>
+        <strong>Share this {kindNoun} for review.</strong>{' '}
+        {score != null
+          ? 'Your evaluation results travel with it, so colleagues can review the evidence and help improve it.'
+          : 'Not evaluated yet? An examiner can test it for you.'}
       </div>
       {submitted ? (
         <span style={{ fontSize: 12, fontWeight: 600, color: accent, whiteSpace: 'nowrap' }}>Sent to the examiners</span>
@@ -70,7 +59,7 @@ export function EditorShareCallout({
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
             padding: '6px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-            borderRadius: 6, border: `1px solid ${high ? '#a7f3d0' : '#d1d5db'}`, backgroundColor: '#fff',
+            borderRadius: 6, border: '1px solid #d1d5db', backgroundColor: '#fff',
             color: accent, cursor: 'pointer', whiteSpace: 'nowrap',
           }}
         >

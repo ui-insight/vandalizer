@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import DOMPurify from 'dompurify'
-import { FocusTrap } from 'focus-trap-react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { X, Loader2, AlertCircle, RefreshCw, Download, Square } from 'lucide-react'
 import { marked } from 'marked'
 import { cancelExtraction, pollStatus, retryExtraction } from '../../api/documents'
@@ -16,7 +16,7 @@ interface RawTextModalProps {
 type LoadState =
   | { kind: 'loading' }
   | { kind: 'ok'; text: string; lowQuality: boolean; isPdf: boolean; title: string }
-  | { kind: 'error'; message: string; canRetry: boolean }
+  | { kind: 'error'; message: string; canRetry: boolean; stopped?: boolean }
   | { kind: 'processing'; status: string | null }
 
 export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
@@ -24,6 +24,8 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
   const [retrying, setRetrying] = useState(false)
   const [stopping, setStopping] = useState(false)
   const [stopError, setStopError] = useState<string | null>(null)
+  // Shown after stopping a re-read whose previous text was put back.
+  const [stopNotice, setStopNotice] = useState<string | null>(null)
 
   const renderedHtml = useMemo(() => {
     if (state.kind !== 'ok' || !state.text) return ''
@@ -46,6 +48,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
               "We couldn't extract any text from this document.",
             // A damaged or misnamed file fails the same way every time.
             canRetry: res.error_retryable !== false,
+            stopped: Boolean(res.extraction_stopped),
           })
         } else {
           setState({
@@ -78,6 +81,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
 
   const handleRetry = useCallback(async (forceOcr = false) => {
     setRetrying(true)
+    setStopNotice(null)
     try {
       await retryExtraction(docUuid, { forceOcr })
       setState({ kind: 'processing', status: 'extracting' })
@@ -118,7 +122,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
   const handleStop = useCallback(async () => {
     if (
       !window.confirm(
-        'Stop reading this document? You can retry the extraction afterwards.',
+        'Stop reading this document? If it already had text, that text is kept. You can retry the extraction afterwards.',
       )
     ) {
       return
@@ -126,7 +130,8 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
     setStopping(true)
     setStopError(null)
     try {
-      await cancelExtraction(docUuid)
+      const res = await cancelExtraction(docUuid)
+      setStopNotice(res.restored_previous_text ? 'Stopped. This document still has the text it had before.' : null)
     } catch (err) {
       // A 409 means it finished or failed on its own meanwhile — reloading
       // shows whichever it was.
@@ -176,13 +181,13 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
         aria-labelledby="raw-text-modal-title"
         style={{
           backgroundColor: '#fff',
-          borderRadius: 12,
+          borderRadius: 'var(--workspace-radius-large)',
           maxWidth: 700,
           width: '90%',
           maxHeight: '80vh',
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '0 8px 30px rgba(0,0,0,0.2)',
+          boxShadow: 'var(--workspace-shadow-dialog)',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -192,11 +197,11 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '12px 16px',
+            padding: "var(--workspace-space-12) var(--workspace-space-16)",
             borderBottom: '1px solid #eee',
           }}
         >
-          <span id="raw-text-modal-title" style={{ fontWeight: 600, fontSize: 16 }}>Extracted Text</span>
+          <span id="raw-text-modal-title" style={{ fontWeight: 600, fontSize: 'var(--workspace-font-card-title)' }}>Extracted Text</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {state.kind === 'ok' && state.text && (
             <button
@@ -256,7 +261,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
               background: 'transparent',
               border: 'none',
               cursor: 'pointer',
-              padding: 4,
+              padding: 'var(--workspace-space-4)',
               display: 'flex',
               alignItems: 'center',
             }}
@@ -267,7 +272,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
         </div>
 
         {/* Body */}
-        <div style={{ overflow: 'auto', padding: 16, flex: 1 }}>
+        <div role="region" aria-label="Extracted text content" tabIndex={0} style={{ overflow: 'auto', minHeight: 0, padding: 'var(--workspace-space-16)', flex: 1 }}>
           {state.kind === 'loading' && (
             <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
               <Loader2
@@ -277,11 +282,11 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
           )}
 
           {state.kind === 'processing' && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: 40 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--workspace-space-12)', padding: 40 }}>
               <Loader2
                 style={{ width: 32, height: 32, color: 'var(--highlight-color)', animation: 'spin 1s linear infinite' }}
               />
-              <div style={{ fontSize: 14, color: '#555' }}>
+              <div style={{ fontSize: 'var(--workspace-font-body)', color: '#555' }}>
                 {state.status === 'readying'
                   ? 'Indexing document...'
                   : 'Extracting text from your document...'}
@@ -315,13 +320,22 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
             </div>
           )}
 
+          {stopNotice && state.kind === 'ok' && (
+            <div role="status" style={{ marginBottom: 'var(--workspace-space-12)', padding: 'var(--workspace-space-8) var(--workspace-space-12)', borderRadius: 6, border: '1px solid #d1d5db', background: '#f9fafb', color: '#374151', fontSize: 'var(--workspace-font-body)' }}>
+              {stopNotice}
+            </div>
+          )}
+
           {state.kind === 'error' && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: 32, textAlign: 'center' }}>
-              <AlertCircle style={{ width: 40, height: 40, color: '#dc2626' }} />
-              <div style={{ fontSize: 15, fontWeight: 600, color: '#111' }}>
-                Text extraction failed
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--workspace-space-16)', padding: 'var(--workspace-space-32)', textAlign: 'center' }}>
+              {/* Stopped by a person is not a failure: no red, and it says so. */}
+              {state.stopped
+                ? <Square style={{ width: 36, height: 36, color: '#6b7280' }} />
+                : <AlertCircle style={{ width: 40, height: 40, color: '#dc2626' }} />}
+              <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: '#111' }}>
+                {state.stopped ? 'Text extraction stopped' : 'Text extraction failed'}
               </div>
-              <div style={{ fontSize: 14, color: '#555', maxWidth: 480, lineHeight: 1.5 }}>
+              <div style={{ fontSize: 'var(--workspace-font-body)', color: '#555', maxWidth: 480, lineHeight: 1.5 }}>
                 {state.message}
               </div>
               {state.canRetry && (
@@ -331,14 +345,14 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 6,
-                    padding: '8px 14px',
-                    fontSize: 14,
+                    gap: 'var(--workspace-space-6)',
+                    padding: "var(--workspace-space-8) var(--workspace-space-16)",
+                    fontSize: 'var(--workspace-font-body)',
                     fontWeight: 500,
                     backgroundColor: retrying ? '#9ca3af' : 'var(--highlight-color)',
-                    color: '#fff',
+                    color: 'var(--highlight-text-color, #000)',
                     border: 'none',
-                    borderRadius: 6,
+                    borderRadius: 'var(--workspace-radius-small)',
                     cursor: retrying ? 'not-allowed' : 'pointer',
                   }}
                 >
@@ -365,15 +379,15 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 10,
-                    padding: '10px 12px',
-                    marginBottom: 12,
-                    fontSize: 13,
+                    gap: 'var(--workspace-space-12)',
+                    padding: "var(--workspace-space-12) var(--workspace-space-12)",
+                    marginBottom: 'var(--workspace-space-12)',
+                    fontSize: 'var(--workspace-font-control)',
                     lineHeight: 1.4,
                     color: '#92400e',
                     backgroundColor: '#fffbeb',
                     border: '1px solid #fcd34d',
-                    borderRadius: 6,
+                    borderRadius: 'var(--workspace-radius-small)',
                   }}
                 >
                   <AlertCircle style={{ width: 16, height: 16, flexShrink: 0 }} />
@@ -386,15 +400,15 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: 6,
+                      gap: 'var(--workspace-space-6)',
                       flexShrink: 0,
-                      padding: '5px 10px',
-                      fontSize: 13,
+                      padding: "var(--workspace-space-6) var(--workspace-space-12)",
+                      fontSize: 'var(--workspace-font-control)',
                       fontWeight: 500,
                       backgroundColor: retrying ? '#9ca3af' : 'var(--highlight-color)',
-                      color: '#fff',
+                      color: 'var(--highlight-text-color, #000)',
                       border: 'none',
-                      borderRadius: 6,
+                      borderRadius: 'var(--workspace-radius-small)',
                       cursor: retrying ? 'not-allowed' : 'pointer',
                     }}
                   >
@@ -412,7 +426,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
               <div
                 className="chat-markdown"
                 style={{
-                  fontSize: 14,
+                  fontSize: 'var(--workspace-font-body)',
                   lineHeight: 1.7,
                   color: '#333',
                 }}

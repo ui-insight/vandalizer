@@ -22,27 +22,27 @@ export function ApplyBackButton({
   label = 'Apply optimized settings',
   applyAgainLabel = 'Apply again',
   applyingLabel = 'Applying…',
-  alreadyAppliedNote = '✓ Already applied automatically',
+  alreadyAppliedNote = 'These settings are applied',
 }: ApplyBackButtonProps) {
   return (
-    <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
+    <div style={{ marginTop: 'var(--workspace-space-12)', display: 'flex', gap: 'var(--workspace-space-8)', alignItems: 'center', flexWrap: 'wrap' }}>
       <button
         onClick={onApply}
         disabled={!canApply || applying}
         style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '6px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-          color: !canApply ? '#555' : '#fff',
-          background: !canApply ? '#222' : 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)',
-          border: '1px solid ' + (!canApply ? '#333' : '#7c3aed'),
-          borderRadius: 6, cursor: !canApply || applying ? 'not-allowed' : 'pointer',
+          display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+          padding: "var(--workspace-space-6) var(--workspace-space-16)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+          color: !canApply ? 'var(--workspace-muted)' : 'var(--highlight-text-color, #000)',
+          background: !canApply ? 'var(--workspace-surface)' : 'var(--highlight-color, #eab308)',
+          border: '1px solid ' + (!canApply ? 'var(--workspace-border)' : 'var(--highlight-color, #eab308)'),
+          borderRadius: 'var(--workspace-radius-small)', cursor: !canApply || applying ? 'not-allowed' : 'pointer',
         }}
       >
         {applying ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Sparkles size={12} />}
         {applying ? applyingLabel : isAlreadyApplied ? applyAgainLabel : label}
       </button>
       {isAlreadyApplied && alreadyAppliedNote && (
-        <span style={{ fontSize: 11, color: '#22c55e' }}>
+        <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-success)' }}>
           {alreadyAppliedNote}
         </span>
       )}

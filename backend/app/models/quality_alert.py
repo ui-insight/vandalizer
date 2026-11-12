@@ -22,6 +22,7 @@ class QualityAlert(Document):
     current_score: Optional[float] = None
     previous_tier: Optional[str] = None
     current_tier: Optional[str] = None
+    review_state: str = "new"  # new | in_review; acknowledgement is separate from resolution
     acknowledged: bool = False
     acknowledged_by: Optional[str] = None
     acknowledged_at: Optional[datetime.datetime] = None
@@ -30,7 +31,7 @@ class QualityAlert(Document):
     class Settings:
         name = "quality_alerts"
 
-    def __init__(self, **data):
+    def __init__(self, **data: object) -> None:
         super().__init__(**data)
         if not self.uuid:
             self.uuid = uuid4().hex

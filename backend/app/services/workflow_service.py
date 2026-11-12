@@ -7,7 +7,7 @@ import datetime
 import logging
 import re
 import uuid as uuid_mod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NotRequired, TypedDict
 
 from beanie import PydanticObjectId
 from bson import ObjectId
@@ -31,7 +31,7 @@ from app.services.access_control import (
     get_team_access_context,
     has_open_verification_review_access,
 )
-from app.services import name_conflicts
+from app.services import name_conflicts, step_knowledge_access
 from app.services.config_service import get_user_model_name
 from app.services.run_metadata import describe_run
 
@@ -46,7 +46,14 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-def _sanitize_for_json(value):
+class _ExtractionFieldInfo(TypedDict):
+    key: str
+    description: NotRequired[str]
+    optional: NotRequired[bool]
+    allowed_values: NotRequired[list[str]]
+
+
+def _sanitize_for_json(value: object) -> object:
     """Recursively convert ObjectId → str so free-form dict fields serialize cleanly."""
     if isinstance(value, ObjectId):
         return str(value)
@@ -69,6 +76,8 @@ async def create_workflow(name: str, user_id: str, description: str | None = Non
         created_by_user_id=user_id,
     )
     await wf.insert()
+    if wf.id is None:
+        raise RuntimeError("Inserted workflow has no identity")
 
     # Bookmark here, not in the caller. This is the path that produces the most
     # workflows and it was the last one still leaving the bookmark to a second
@@ -170,7 +179,7 @@ async def get_workflow(
     """
     if user is not None:
         wf = await get_authorized_workflow(workflow_id, user)
-        if wf:
+        if wf and wf.id is not None:
             team_access = await get_team_access_context(user)
             can_manage = can_manage_workflow(wf, user, team_access)
             # Examiners may author validation artifacts on a submission
@@ -238,7 +247,170 @@ async def get_workflow(
         # as the Library menu does.
         "verified": bool(wf.verified),
         "created_by_user_id": wf.created_by_user_id or wf.user_id,
+        # The current entry in the Versions tab; a run whose workflow_version
+        # differs ran an earlier (or replaced) definition.
+        "version": wf.version or 1,
     }
+
+
+class FixedDocumentAccessError(ValueError):
+    """A fixed document was named that the person saving or running can't read."""
+
+
+async def ensure_fixed_documents_readable(
+    input_config: dict | None, user: User, *, already: dict | None = None,
+) -> None:
+    """Refuse fixed documents *user* cannot read.
+
+    A fixed document's text goes into every run, so adding one needs the same
+    access as reading it. Only documents not already on the workflow (*already*) are
+    checked: someone editing a shared workflow's other settings sends back
+    the fixed documents its owner chose, and those are checked when it runs.
+    A missing id is refused the same way, so the answer never says whether a
+    document exists.
+    """
+    from app.services.fixed_document_access import (
+        FIXED_DOCUMENT_ACCESS_MESSAGE,
+        fixed_document_uuids,
+    )
+
+    # Checked whatever the input mode: a saved entry outlives a mode change.
+    def _all(config: dict | None) -> list[str]:
+        return fixed_document_uuids({**(config or {}), "trigger_type": None}) if isinstance(config, dict) else []
+
+    kept = set(_all(already))
+    added = [u for u in _all(input_config) if u not in kept]
+    if not added:
+        return
+    team_access = await get_team_access_context(user)
+    for doc_uuid in added:
+        document = await get_authorized_document(doc_uuid, user, team_access=team_access, allow_admin=True)
+        if not document or document.soft_deleted:
+            raise FixedDocumentAccessError(FIXED_DOCUMENT_ACCESS_MESSAGE)
+
+
+async def ensure_step_document_readable(
+    task_data: dict | None, user: User, *, already: dict | None = None,
+) -> None:
+    """Refuse step or task settings that read a document *user* cannot read.
+
+    The same rule as a fixed document, for a step's selected document and a
+    Form Filler's template PDF. A document the settings already read
+    (*already*) is left alone, so editing a step's other settings isn't
+    blocked by a choice its author made.
+    """
+    from app.services.fixed_document_access import (
+        STEP_DOCUMENT_ACCESS_MESSAGE,
+        task_document_uuids,
+    )
+
+    kept = set(task_document_uuids(already))
+    for doc_uuid in task_document_uuids(task_data):
+        if doc_uuid in kept:
+            continue
+        document = await get_authorized_document(doc_uuid, user, allow_admin=True)
+        if not document or document.soft_deleted:
+            raise FixedDocumentAccessError(STEP_DOCUMENT_ACCESS_MESSAGE)
+
+
+async def ensure_definition_documents_readable(
+    definition: dict | None, user: User, *, already_input_config: dict | None = None,
+    already_step_documents: set[str] | None = None,
+) -> None:
+    """The save-time checks for a whole workflow definition being written at
+    once (an import into a workflow, a restored version): its fixed documents
+    and every document its steps are set to read, whether that is set on the
+    step or on one of its tasks.
+    """
+    from app.services.fixed_document_access import (
+        STEP_DOCUMENT_ACCESS_MESSAGE,
+        selected_document_uuid,
+        step_selected_documents,
+    )
+
+    definition = definition if isinstance(definition, dict) else {}
+    await ensure_fixed_documents_readable(
+        definition.get("input_config"), user, already=already_input_config,
+    )
+    kept = already_step_documents or set()
+    wanted: list[str] = []
+    for step in definition.get("steps") or []:
+        if not isinstance(step, dict):
+            continue
+        step_data = step.get("data")
+        task_datas = [t.get("data") for t in step.get("tasks") or [] if isinstance(t, dict)]
+        # The step's own setting counts even before it has a task to apply to.
+        for doc_uuid in [selected_document_uuid(step_data), *step_selected_documents(step_data, task_datas)]:
+            if doc_uuid and doc_uuid not in kept and doc_uuid not in wanted:
+                wanted.append(doc_uuid)
+    for doc_uuid in wanted:
+        document = await get_authorized_document(doc_uuid, user, allow_admin=True)
+        if not document or document.soft_deleted:
+            raise FixedDocumentAccessError(STEP_DOCUMENT_ACCESS_MESSAGE)
+
+
+async def step_document_uuids(wf: Workflow) -> list[str]:
+    """Documents the workflow's steps are set to read, resolved the way the
+    run builder resolves them (see ``step_selected_documents``)."""
+    from app.services.fixed_document_access import step_selected_documents
+
+    if not wf.steps:
+        return []
+    steps = await WorkflowStep.find({"_id": {"$in": wf.steps}}).to_list()
+    task_ids = [task_id for step in steps for task_id in (step.tasks or [])]
+    tasks = {}
+    if task_ids:
+        tasks = {task.id: task for task in await WorkflowStepTask.find({"_id": {"$in": task_ids}}).to_list()}
+    uuids: list[str] = []
+    for step in steps:
+        task_datas = [tasks[task_id].data for task_id in (step.tasks or []) if task_id in tasks]
+        for doc_uuid in step_selected_documents(step.data, task_datas):
+            if doc_uuid not in uuids:
+                uuids.append(doc_uuid)
+    return uuids
+
+
+async def ensure_fixed_documents_runnable(wf: Workflow, user: User | None, user_id: str | None) -> None:
+    """Refuse to start a run that would read a document from the workflow's
+    setup (a fixed document, or a step's selected document) it shouldn't.
+
+    Readable means the person starting the run, or the workflow's owner, can
+    open it (see ``fixed_document_access``). The worker applies the same rule
+    again before it loads any text; this is the copy that answers the caller.
+    """
+    from app.models.user import User as _User
+    from app.services.fixed_document_access import (
+        fixed_document_uuids,
+        fixed_documents_denied_message,
+    )
+
+    uuids = fixed_document_uuids(wf.input_config)
+    for doc_uuid in await step_document_uuids(wf):
+        if doc_uuid not in uuids:
+            uuids.append(doc_uuid)
+    if not uuids:
+        return
+    people: dict[str, User] = {}
+    if user is not None:
+        people[user.user_id] = user
+    for candidate in (user_id, wf.user_id):
+        if candidate and candidate not in people:
+            found = await _User.find_one(_User.user_id == candidate)
+            if found:
+                people[candidate] = found
+    access = {uid: await get_team_access_context(person) for uid, person in people.items()}
+    denied = 0
+    for doc_uuid in uuids:
+        exists = await SmartDocument.find_one(SmartDocument.uuid == doc_uuid)
+        if not exists or exists.soft_deleted:
+            continue  # A deleted fixed document is reported by the worker's own check.
+        for uid, person in people.items():
+            if await get_authorized_document(doc_uuid, person, team_access=access[uid], allow_admin=True):
+                break
+        else:
+            denied += 1
+    if denied:
+        raise FixedDocumentAccessError(fixed_documents_denied_message(denied))
 
 
 async def update_workflow(
@@ -261,6 +433,7 @@ async def update_workflow(
     if description is not None:
         wf.description = description
     if input_config is not None:
+        await ensure_fixed_documents_readable(input_config, user, already=wf.input_config)
         wf.input_config = input_config
     if output_config is not None:
         wf.output_config = output_config
@@ -313,6 +486,9 @@ async def delete_workflow(workflow_id: str, user: User) -> bool:
         att = await WorkflowAttachment.get(att_id)
         if att:
             await att.delete()
+    from app.services.workflow_versions import delete_versions
+
+    await delete_versions(str(wf.id))
     await wf.delete()
     return True
 
@@ -384,6 +560,8 @@ async def duplicate_workflow(
         validation_inputs=validation_inputs,
     )
     await new_wf.insert()
+    if new_wf.id is None:
+        raise RuntimeError("Inserted workflow has no identity")
     # Bookmark the copy here rather than leaving it to the caller: "Make a copy"
     # in the workflow editor never made that follow-up call, so every copy it
     # produced was invisible in the library while still holding its name.
@@ -400,13 +578,17 @@ async def duplicate_workflow(
 # Authorization helpers for step / task lookups
 # ---------------------------------------------------------------------------
 
-async def _get_workflow_for_step(step_id: PydanticObjectId) -> Workflow | None:
+async def _get_workflow_for_step(step_id: PydanticObjectId | None) -> Workflow | None:
     """Find the parent workflow that contains a given step."""
+    if step_id is None:
+        return None
     return await Workflow.find_one(Workflow.steps == step_id)
 
 
-async def _get_workflow_for_task(task_id: PydanticObjectId) -> Workflow | None:
+async def _get_workflow_for_task(task_id: PydanticObjectId | None) -> Workflow | None:
     """Find the parent workflow that contains a given task (via its step)."""
+    if task_id is None:
+        return None
     step = await WorkflowStep.find_one(WorkflowStep.tasks == task_id)
     if not step:
         return None
@@ -422,8 +604,12 @@ async def add_step(workflow_id: str, name: str, user: User, data: dict = {}, is_
     if not wf:
         return None
 
+    # Input (including a selected document) is set on the step.
+    await ensure_step_document_readable(data, user)
     step = WorkflowStep(name=name, data=data, is_output=is_output)
     await step.insert()
+    if step.id is None:
+        raise RuntimeError("Inserted step has no identity")
     wf.steps.append(step.id)
     wf.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
     await wf.save()
@@ -448,6 +634,7 @@ async def update_step(step_id: str, user: User, name: str | None = None, data: d
     if name is not None:
         step.name = name
     if data is not None:
+        await ensure_step_document_readable(data, user, already=step.data)
         step.data = data
     if is_output is not None:
         step.is_output = is_output
@@ -497,8 +684,12 @@ async def add_task(step_id: str, name: str, user: User, data: dict = {}) -> dict
     if not can_manage_workflow(parent_wf, user, team_access):
         return None
 
+    await ensure_step_document_readable(data, user)
+    await step_knowledge_access.ensure_task_kb_readable(name, data, user)
     task = WorkflowStepTask(name=name, data=data)
     await task.insert()
+    if task.id is None:
+        raise RuntimeError("Inserted task has no identity")
     step.tasks.append(task.id)
     await step.save()
 
@@ -519,6 +710,16 @@ async def update_task(task_id: str, user: User, name: str | None = None, data: d
     if not can_manage_workflow(parent_wf, user, team_access):
         return None
 
+    if data is not None:
+        await ensure_step_document_readable(data, user, already=task.data)
+    if name is not None or data is not None:
+        # Either change can point the task at a knowledge base: new settings,
+        # or a new task type that reads settings already there.
+        await step_knowledge_access.ensure_task_kb_readable(
+            name if name is not None else task.name,
+            data if data is not None else task.data, user,
+            already_name=task.name, already_data=task.data,
+        )
     if name is not None:
         task.name = name
     if data is not None:
@@ -561,8 +762,14 @@ async def run_workflow(
     activity_id: str | None = None,
     user: User | None = None,
     share_token: str | None = None,
+    force_model: bool = False,
+    project_context: dict | None = None,
 ) -> str:
-    """Start workflow execution. Returns session_id for polling."""
+    """Start workflow execution. Returns session_id for polling.
+
+    ``force_model`` runs every step on ``model``, including steps that name
+    their own; without it ``model`` is only the default for steps that don't.
+    """
     if user is not None:
         wf = await get_authorized_workflow(workflow_id, user, share_token=share_token)
         if not wf:
@@ -590,6 +797,9 @@ async def run_workflow(
             "This workflow has no steps yet — add at least one step before running it.",
         )
 
+    await ensure_fixed_documents_runnable(wf, user, user_id)
+    await step_knowledge_access.ensure_kbs_runnable(wf, user, user_id)
+
     # No explicit model → fall back to the workflow's own default (set via the
     # canvas model selector), then to the user's configured default. The engine
     # applies this as the per-step default; steps with their own model win.
@@ -602,18 +812,21 @@ async def run_workflow(
     # It is the handle the cancel endpoint uses to revoke/terminate the run.
     celery_task_id = str(uuid_mod.uuid4())
 
+    # "user_id" is who started the run: the worker checks fixed documents
+    # against them as well as the workflow's owner.
+    trigger_step_data = {"doc_uuids": document_uuids, "user_id": user_id, **({"project_context": project_context} if project_context else {})}
     result = WorkflowResult(
         workflow=wf.id,
         session_id=session_id,
         status="queued",
         num_steps_total=len(wf.steps),
-        input_context={"doc_uuids": document_uuids},
+        input_context=trigger_step_data,
         model=model,
+        model_forced=bool(force_model and model),
         celery_task_id=celery_task_id,
     )
     await result.insert()
 
-    trigger_step_data = {"doc_uuids": document_uuids}
 
     celery_app.send_task(
         "tasks.workflow_next.execution",
@@ -683,13 +896,21 @@ async def get_workflow_status(
         # this the field was write-only and the status poll showed a clean
         # "completed" for a run whose deliverable never left the building.
         "delivery_failures": getattr(result, "delivery_failures", None) or [],
+        "hosted_artifact_uuid": getattr(result, "hosted_artifact_uuid", None),
         "retrieved_sources": result.retrieved_sources,
         "workflow_name": workflow_name,
+        "workflow_id": str(result.workflow) if result.workflow else None,
         "document_title": result.document_title,
         "start_time": result.start_time,
+        "model": result.model,
+        "models_used": list(getattr(result, "models_used", None) or []),
         # Which models actually answered and with what settings, plus the
         # configuration to reproduce the run (services/run_metadata.py).
         "run_metadata": describe_run(result),
+        # The workflow version this run executed (None for runs recorded
+        # before run configs were snapshotted), so the editor can tell a
+        # result from a version that has since been replaced or restored over.
+        "workflow_version": ((getattr(result, "run_config", None) or {}).get("workflow") or {}).get("version"),
     }
 
 
@@ -719,7 +940,7 @@ async def cancel_workflow(
 _TERMINAL_STATUSES = {"completed", "error", "failed", "canceled"}
 
 
-async def _cancel_result(result) -> None:
+async def _cancel_result(result: WorkflowResult) -> None:
     """Flip one WorkflowResult to ``canceled`` and interrupt its worker.
 
     Shared by single-run (:func:`cancel_workflow`) and batch (:func:`cancel_batch`)
@@ -794,6 +1015,7 @@ async def run_workflow_batch(
     activity_id: str | None = None,
     user: User | None = None,
     share_token: str | None = None,
+    project_context: dict | None = None,
 ) -> str:
     """Start a batched workflow execution — one run per document.
 
@@ -826,6 +1048,9 @@ async def run_workflow_batch(
             "This workflow has no steps yet — add at least one step before running it.",
         )
 
+    await ensure_fixed_documents_runnable(wf, user, user_id)
+    await step_knowledge_access.ensure_kbs_runnable(wf, user, user_id)
+
     # No explicit model → fall back to the workflow's own default (set via the
     # canvas model selector), then to the user's configured default. The engine
     # applies this as the per-step default; steps with their own model win.
@@ -847,6 +1072,7 @@ async def run_workflow_batch(
         # run past that point would finish its LLM call regardless of STOP.
         celery_task_id = str(uuid_mod.uuid4())
 
+        trigger_step_data = {"doc_uuids": [doc_uuid], "user_id": user_id, **({"project_context": project_context} if project_context else {})}
         result = WorkflowResult(
             workflow=wf.id,
             session_id=session_id,
@@ -854,12 +1080,12 @@ async def run_workflow_batch(
             num_steps_total=len(wf.steps),
             batch_id=batch_id,
             document_title=doc_title,
+            input_context=trigger_step_data,
             model=model,
             celery_task_id=celery_task_id,
         )
         await result.insert()
 
-        trigger_step_data = {"doc_uuids": [doc_uuid]}
 
         celery_app.send_task(
             "tasks.workflow_next.execution",
@@ -1133,7 +1359,7 @@ async def test_step(
         },
         queue="workflows",
     )
-    return result.id
+    return str(result.id)
 
 
 def get_test_status(task_id: str) -> dict:
@@ -1772,7 +1998,7 @@ async def generate_validation_plan(workflow_id: str, user: User) -> list[dict]:
     # the next step receives — so the LLM can reason about what must appear
     # in the final output.
     steps = wf_data.get("steps", [])
-    all_extracted_fields: list[dict] = []  # accumulate across all extraction steps
+    all_extracted_fields: list[_ExtractionFieldInfo] = []  # accumulate across all extraction steps
     step_analyses = []
     for idx, step in enumerate(steps):
         is_output = step.get("is_output", False)
@@ -1790,7 +2016,7 @@ async def generate_validation_plan(workflow_id: str, user: User) -> list[dict]:
                 fields_detail = []
                 for ext in extractions[:30]:
                     if isinstance(ext, str):
-                        field_info = {"key": ext.strip()}
+                        field_info: _ExtractionFieldInfo = {"key": ext.strip()}
                     else:
                         key = ext.get("key", "")
                         desc = ext.get("description", "")
@@ -1865,6 +2091,29 @@ async def generate_validation_plan(workflow_id: str, user: User) -> list[dict]:
                 url = data.get("url", "")
                 step_desc_parts.append(
                     f"**Website task** — fetches content from `{url}` and passes text to next step."
+                )
+
+            elif task_name == "CreateProject":
+                step_desc_parts.append(
+                    "**Create project task** — creates a project named from the document and moves the run's files into it "
+                    "(or reuses the project a file is already in)."
+                )
+
+            elif task_name == "InboxDeadlines":
+                step_desc_parts.append(
+                    "**Add deadlines to RA inbox task** — reads the files for deadlines, required material and limits, "
+                    "checks each against its quoted page, and adds the ones that pass to the project's RA inbox."
+                )
+
+            elif task_name == "AwardSnapshotPage":
+                step_desc_parts.append(
+                    "**Award snapshot page task** — builds the project's award snapshot and saves it as a project Page."
+                )
+
+            elif task_name == "WebSearch":
+                step_desc_parts.append(
+                    f"**Web Search task** — searches the web for `{data.get('query', '')}` and "
+                    "passes the results, each with its URL, to the next step."
                 )
 
             elif task_name == "AddDocument":
@@ -2187,7 +2436,7 @@ def _text_similarity(a: str, b: str) -> float:
     return len(tokens_a & tokens_b) / len(tokens_a | tokens_b)
 
 
-def _input_doc_key(result) -> str:
+def _input_doc_key(result: WorkflowResult) -> str:
     """Stable key for the input document set a WorkflowResult ran against.
 
     Two runs share a key only when they ran on the exact same set of input
@@ -2289,7 +2538,7 @@ def _structured_field_stability(results: list) -> float | None:
         return None
 
     # Union of all keys
-    all_keys = set()
+    all_keys: set[str] = set()
     for o in outputs:
         all_keys.update(o.keys())
 
@@ -2311,7 +2560,7 @@ _STATUS_TO_SCORE = {"PASS": 1.0, "WARN": 0.5, "FAIL": 0.0}
 async def _run_judge_replay(
     *,
     plan: list[dict],
-    last_result,
+    last_result: WorkflowResult | None,
     wf_data: dict,
     original_checks_per_run: list[list[dict]],
 ) -> list[tuple[dict, dict]] | None:
@@ -2358,7 +2607,7 @@ async def _run_judge_replay(
 async def _sample_workflow_judge_variance(
     *,
     plan: list[dict],
-    last_result,
+    last_result: WorkflowResult | None,
     wf_data: dict,
     original_checks_per_run: list[list[dict]],
 ) -> float | None:
@@ -2394,7 +2643,7 @@ def _stddev_of_deltas(
     ]
     mean = sum(deltas) / len(deltas)
     var = sum((d - mean) ** 2 for d in deltas) / (len(deltas) - 1)
-    return var ** 0.5
+    return float(var ** 0.5)
 
 
 def _compute_per_step_variance(
@@ -2588,7 +2837,7 @@ def _extract_source_text_from_steps(steps_output: dict | None) -> str:
 async def _measure_no_workflow_baseline(
     *,
     wf_data: dict,
-    last_result,
+    last_result: WorkflowResult | None,
     user_id: str | None = None,
 ) -> dict | None:
     """Run a single-shot LLM call as a counterfactual to the workflow.
@@ -2771,6 +3020,8 @@ async def validate_workflow(workflow_id: str, user: User | None = None) -> dict:
 
     wf_data = await get_workflow(workflow_id)
     require_workflow_steps(wf_data, "validating it")
+    if wf_data is None:
+        raise ValueError("Workflow not found")
 
     plan = wf.validation_plan
     if not plan:
@@ -2801,7 +3052,7 @@ async def validate_workflow(workflow_id: str, user: User | None = None) -> dict:
     # runs snapshotted at dispatch — a single unambiguous model when all runs
     # agree, otherwise no single label.
     models_used = sorted({
-        wr.model for wr in last_results if getattr(wr, "model", None)
+        wr.model for wr in last_results if wr.model
     })
 
     # Static diagnostics — these run independent of the validation plan and
@@ -2935,7 +3186,7 @@ def _serialize_output(final_output: dict | None) -> str | None:
     return str(output_data)[:50_000]
 
 
-async def _resolve_run_source_text(result) -> str:
+async def _resolve_run_source_text(result: WorkflowResult) -> str:
     """Resolve a run's ACTUAL source text for the validation judge.
 
     The ``Document`` trigger step only stores document UUIDs (its output is a
@@ -2955,7 +3206,7 @@ async def _resolve_run_source_text(result) -> str:
             doc = await SmartDocument.find_one(SmartDocument.uuid == u)
         except Exception:
             doc = None
-        if doc and getattr(doc, "raw_text", ""):
+        if doc and doc.raw_text:
             parts.append(doc.raw_text)
     for s in (getattr(result, "retrieved_sources", None) or []):
         cp = s.get("content_preview") if isinstance(s, dict) else None

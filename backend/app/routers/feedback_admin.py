@@ -44,12 +44,12 @@ def _item(source: str, sentiment: str, message: Optional[str], feature: Optional
     }
 
 
-@router.get("/positive")
+@router.get("/positive", response_model=None)
 async def list_positive_feedback(
     user: User = Depends(get_current_user),
     limit: int = Query(50, ge=1, le=200),
     source: Optional[str] = Query(None, description="chat | extraction | product"),
-):
+) -> dict[str, object]:
     """Unified reverse-chronological feed of positive feedback across sources.
 
     - chat: thumbs-up ChatFeedback that carries a comment (bare up-votes have
@@ -108,8 +108,8 @@ async def list_positive_feedback(
     return {"items": trimmed, "count": len(trimmed)}
 
 
-@router.get("/stats")
-async def positive_feedback_stats(user: User = Depends(get_current_user)):
+@router.get("/stats", response_model=None)
+async def positive_feedback_stats(user: User = Depends(get_current_user)) -> dict[str, object]:
     """Rollup for the 'What's Working' header: how much positive signal there
     is, where it comes from, and the chat thumbs-up rate (the one sentiment
     metric we already trend elsewhere)."""

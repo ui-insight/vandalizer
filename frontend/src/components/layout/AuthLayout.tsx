@@ -25,7 +25,7 @@ export function AuthLayout({ children, title }: { children: ReactNode; title: st
       </nav>
 
       {/* Centered content */}
-      <div className="relative z-10 flex items-center justify-center" style={{ minHeight: 'calc(100vh - 64px)' }}>
+      <main className="relative z-10 flex items-center justify-center" style={{ minHeight: 'calc(100vh - 64px)' }}>
         <div className="w-full max-w-sm px-4">
           <h1 className="mb-8 text-center text-2xl font-bold text-white">{title}</h1>
           {children}
@@ -35,7 +35,7 @@ export function AuthLayout({ children, title }: { children: ReactNode; title: st
             </Link>
           </p>
         </div>
-      </div>
+      </main>
     </div>
   )
 }

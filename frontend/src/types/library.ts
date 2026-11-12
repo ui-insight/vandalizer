@@ -29,6 +29,8 @@ export interface LibraryItem {
   name: string
   description: string | null
   set_type: string | null
+  /** Skills only: the author's line on which tasks the Skill is for. */
+  when_to_use?: string | null
   tags: string[]
   note: string | null
   folder: string | null
@@ -156,6 +158,8 @@ export interface VerifiedItemMetadata {
 }
 
 export interface VerifiedCatalogItem {
+  set_type?: string | null
+  usage?: { input: string; output: string; output_names: string[]; notes: string[] }
   id: string
   item_id: string
   kind: LibraryItemKind

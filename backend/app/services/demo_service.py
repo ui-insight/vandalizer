@@ -812,12 +812,23 @@ async def self_topup_trial(
     if not app:
         return {"ok": False, "reason": "invalid"}
 
+    return await _grant_topup(app, notes, settings)
+
+
+async def _grant_topup(
+    app: DemoApplication, notes: dict | None, settings: Settings, *, signed_in: bool = False,
+) -> dict:
+    """Grant one top-up to a trial application, from the email link or in the app.
+
+    ``signed_in`` is the in-app path: the session is the credential, so no
+    magic links are minted and no confirmation email is sent.
+    """
     # Persist any notes the user left (reuses the feedback model).
     if notes:
         await PostExperienceResponse(
             uuid=secrets.token_urlsafe(12),
             demo_application_id=app.id,
-            responses={"kind": "renewal_notes", **notes},
+            responses={"kind": "renewal_notes", "source": "in_app" if signed_in else "email_link", **notes},
             created_at=datetime.datetime.now(datetime.timezone.utc),
         ).insert()
 
@@ -856,24 +867,28 @@ async def self_topup_trial(
     # used first.
     email_link = None
     screen_link = None
-    if app.user_id:
-        email_link = await _create_magic_login_token(app.user_id, settings)
-        screen_link = await _create_magic_login_token(app.user_id, settings)
+    if not signed_in:
+        if app.user_id:
+            email_link = await _create_magic_login_token(app.user_id, settings)
+            screen_link = await _create_magic_login_token(app.user_id, settings)
 
-    # Confirmation email
-    subject, html = trial_topup_email(
-        app.name,
-        new_budget or settings.trial_topup_tokens,
-        settings.frontend_url,
-        magic_link=email_link,
-    )
-    await send_email(app.email, subject, html, settings, email_type="trial_topup")
+        # Confirmation email. Not sent for an in-app top-up: the person is
+        # looking at the result, and their address may be the reason they
+        # topped up in the app.
+        subject, html = trial_topup_email(
+            app.name,
+            new_budget or settings.trial_topup_tokens,
+            settings.frontend_url,
+            magic_link=email_link,
+        )
+        await send_email(app.email, subject, html, settings, email_type="trial_topup")
 
     logger.info(
-        "Self-serve token top-up for %s (#%d, new budget %s)",
+        "Self-serve token top-up for %s (#%d, new budget %s, %s)",
         app.email,
         app.trial_extensions_used,
         new_budget,
+        "in app" if signed_in else "from email link",
     )
     return {
         "ok": True,
@@ -881,6 +896,63 @@ async def self_topup_trial(
         "tokens_budget": new_budget,
         "login_url": screen_link,
     }
+
+
+#: Share of the budget an in-app top-up waits for. The email link arrives once
+#: per exhausted budget; letting a signed-in trial top up at any time would
+#: make the allowance meaningless, so the in-app path opens where the
+#: "running low" email does.
+IN_APP_TOPUP_AT_PERCENT = 80
+
+
+async def get_in_app_topup_info(user: User) -> dict:
+    """What the in-app top-up dialog needs for the signed-in trial user."""
+    settings = Settings()
+    usage = await trial_budget.get_trial_usage(user)
+    reason = await _in_app_topup_refusal(user, usage)
+    return {
+        "available": reason is None,
+        "reason": reason,
+        "engagement": await compute_trial_engagement(user.user_id),
+        "tokens_used": usage["used"],
+        "tokens_budget": usage["budget"],
+        "percent": usage["percent"],
+        "topup_tokens": settings.trial_topup_tokens,
+    }
+
+
+async def _in_app_topup_refusal(user: User, usage: dict) -> Optional[str]:
+    """Why the signed-in user can't top up in the app, or None if they can."""
+    if not getattr(user, "is_demo_user", False) or not usage.get("enabled"):
+        return "not_metered"
+    if not usage.get("email_verified"):
+        return "email_unverified"
+    if usage["percent"] < IN_APP_TOPUP_AT_PERCENT:
+        return "not_low"
+    if not await DemoApplication.find_one(DemoApplication.user_id == user.user_id):
+        return "no_application"
+    return None
+
+
+async def topup_signed_in_trial(
+    user: User, notes: dict | None = None, settings: Settings | None = None,
+) -> dict:
+    """In-app token top-up for the signed-in trial user.
+
+    The out-of-tokens email was the only way to top up, and a learner whose
+    address couldn't receive it was stuck mid-certification until an admin
+    promoted the account (support ticket). Same grant and same feedback as the
+    email link; the session stands in for the emailed token.
+    """
+    settings = settings or Settings()
+    usage = await trial_budget.get_trial_usage(user)
+    reason = await _in_app_topup_refusal(user, usage)
+    if reason:
+        return {"ok": False, "reason": reason}
+    app = await DemoApplication.find_one(DemoApplication.user_id == user.user_id)
+    if app is None:
+        return {"ok": False, "reason": "no_application"}
+    return await _grant_topup(app, notes, settings, signed_in=True)
 
 
 async def admin_add_demo_user(
@@ -972,7 +1044,6 @@ _CREDENTIAL_EMAIL_TYPES = (
 
 async def admin_list_applications(status_filter: Optional[str] = None) -> list[dict]:
     """List all demo applications, optionally filtered by status."""
-    query = {}
     if status_filter:
         query = DemoApplication.find(DemoApplication.status == status_filter)
     else:
@@ -1001,7 +1072,7 @@ async def admin_list_applications(status_filter: Optional[str] = None) -> list[d
         from app.models.llm_usage import LlmUsageRecord
 
         usage_rows = await LlmUsageRecord.find(
-            {"user_id": {"$in": user_ids}}
+            {"user_id": {"$in": user_ids}, **trial_budget.BUDGETED_USAGE}
         ).aggregate(
             [{"$group": {"_id": "$user_id", "total": {"$sum": "$total_tokens"}}}]
         ).to_list()
@@ -1110,7 +1181,7 @@ async def process_recapture_drips(settings: Settings | None = None) -> int:
     apps = await DemoApplication.find(
         DemoApplication.status == "active",
         DemoApplication.recapture_step < _RECAPTURE_STEPS,
-        DemoApplication.recapture_next_at <= now,
+        {"recapture_next_at": {"$lte": now}},
     ).to_list()
 
     for app in apps:

@@ -19,10 +19,12 @@ export interface Project {
   uuid: string
   title: string
   description: string | null
+  context?: string | null
   owner_user_id: string
   team_id: string | null
   state: ProjectState
   root_folder_uuid: string
+  default_skill_uuid?: string | null
   kb_uuid: string | null
   created_at: string
   updated_at: string
@@ -73,6 +75,8 @@ export interface ProjectPin {
   pin_type: string // workflow | extraction | automation | knowledge_base
   target_id: string
   name: string
+  /** Pinned by someone else, and not yours to open: shown by type only, so it can be unpinned. */
+  restricted?: boolean
 }
 
 export interface ProjectInviteInfo {

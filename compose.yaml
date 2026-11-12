@@ -37,7 +37,7 @@ services:
   chromadb:
     image: docker.io/chromadb/chroma:0.6.3
     networks:
-      - vandalizer
+      - chroma-private
     volumes:
       - chroma-data:/chroma/chroma
     environment:
@@ -84,6 +84,7 @@ services:
       - UPLOAD_DIR=/app/static/uploads
     networks:
       - vandalizer
+      - chroma-private
     volumes:
       - uploads:/app/static/uploads
       # Model vocabularies, read-only. Token counting reads tokenizer.json —
@@ -138,6 +139,7 @@ services:
       - UPLOAD_DIR=/app/static/uploads
     networks:
       - vandalizer
+      - chroma-private
     volumes:
       - uploads:/app/static/uploads
       # Model vocabularies, read-only. Token counting reads tokenizer.json —
@@ -197,6 +199,11 @@ services:
 networks:
   vandalizer:
     driver: bridge
+  # Only the API and workers can address Chroma. The store performs no
+  # external fetches: embedding runs in the backend with its fixed embedder.
+  chroma-private:
+    driver: bridge
+    internal: true
 
 volumes:
   mongo-data:

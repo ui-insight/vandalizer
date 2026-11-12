@@ -116,3 +116,20 @@ class TestRenderedSnippetsAreNumbered:
         assert "[S1] Source: PAPPG.pdf" in segment.text
         assert "[S2] Source: PAPPG.pdf" in segment.text
         assert sources[1]["cite_label"].startswith("PAPPG.pdf, p.")
+
+
+# #1005 run 3: gpt-oss's other snippet-reference shapes.
+@pytest.mark.parametrize("written", ["(S1)", "[**S1**]", "(S1, S2)", "( S1 )"])
+def test_other_snippet_reference_shapes_are_expanded(written):
+    sources = [
+        {"ref": 1, "cite_label": "notice.pdf, p. 3", "document_title": "notice.pdf"},
+        {"ref": 2, "cite_label": "draft.pdf, p. 2", "document_title": "draft.pdf"},
+    ]
+    out = expand_snippet_refs(f"The cap is $180,000 {written}.", sources)
+    assert "S1" not in out and out.startswith("The cap is $180,000 [Source: notice.pdf, p. 3")
+
+
+def test_parenthesised_words_are_not_snippet_refs():
+    assert expand_snippet_refs("See (Section 1) and (SF-424).", [{"ref": 1, "cite_label": "x"}]) == (
+        "See (Section 1) and (SF-424)."
+    )

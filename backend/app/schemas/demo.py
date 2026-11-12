@@ -49,6 +49,23 @@ class TrialUsageResponse(BaseModel):
     email_verified: bool = True
 
 
+class InAppTopUpInfoResponse(BaseModel):
+    """What the in-app top-up dialog needs for the signed-in trial user.
+
+    ``reason`` says why ``available`` is False: not_metered, email_unverified,
+    not_low (under the share of the budget the top-up waits for) or
+    no_application (the account has no trial record to top up; an admin can).
+    """
+
+    available: bool
+    reason: Optional[str] = None
+    engagement: str
+    tokens_used: int
+    tokens_budget: int
+    percent: int
+    topup_tokens: int
+
+
 class TrialExtensionRequest(BaseModel):
     notes: Optional[dict] = None
 

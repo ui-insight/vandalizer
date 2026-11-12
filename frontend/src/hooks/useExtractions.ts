@@ -65,7 +65,7 @@ export function useSearchSetItems(searchSetUuid: string | null) {
   })
 
   const updateMutation = useMutation({
-    mutationFn: (args: { itemId: string; data: { searchphrase?: string; title?: string; is_optional?: boolean; enum_values?: string[] } }) =>
+    mutationFn: (args: { itemId: string; data: { searchphrase?: string; title?: string; is_optional?: boolean; enum_values?: string[]; description?: string } }) =>
       api.updateItem(args.itemId, args.data),
     onSuccess: () => qc.invalidateQueries({ queryKey }),
   })

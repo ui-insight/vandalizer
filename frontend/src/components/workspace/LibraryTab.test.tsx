@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { LibraryTab } from './LibraryTab'
 import type { LibraryItem } from '../../types/library'
 
@@ -101,7 +101,7 @@ vi.mock('../../api/extractions', () => ({
   addItem: vi.fn(),
 }))
 
-import { listItems as listSearchSetItems } from '../../api/extractions'
+import { listItems as listSearchSetItems, updateSearchSet } from '../../api/extractions'
 import { touchItem } from '../../api/library'
 
 function makePrompt(overrides: Partial<LibraryItem> = {}): LibraryItem {
@@ -134,49 +134,66 @@ beforeEach(() => {
   ] as Awaited<ReturnType<typeof listSearchSetItems>>)
 })
 
-describe('LibraryTab prompt preview', () => {
-  it('opens a preview on row click instead of sending to chat', async () => {
+describe('LibraryTab Skills', () => {
+  it('opens a preview on click, and runs the Skill only from its Run Skill button', async () => {
+    mockItems.current = [makePrompt({ when_to_use: 'summarizing a new award notice' })]
     render(<LibraryTab />)
-    fireEvent.click(screen.getByText('Summarize Award'))
-    expect(await screen.findByText('Summarize the key terms of this award.')).toBeTruthy()
-    expect(screen.getByText('Use in Assistant')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Open Summarize Award' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Preview Summarize Award' })
+    expect(within(dialog).getByText('summarizing a new award notice')).toBeTruthy()
+    expect(await within(dialog).findByText('Summarize the key terms of this award.')).toBeTruthy()
     expect(sendChatMessage).not.toHaveBeenCalled()
     expect(touchItem).not.toHaveBeenCalled()
-  })
 
-  it('sends the prompt to the assistant from the Use in Assistant button', async () => {
-    render(<LibraryTab />)
-    fireEvent.click(screen.getByText('Summarize Award'))
-    await screen.findByText('Summarize the key terms of this award.')
-    fireEvent.click(screen.getByText('Use in Assistant'))
-    expect(sendChatMessage).toHaveBeenCalledWith('Summarize the key terms of this award.', {
-      documentUuids: ['doc-1'],
-      folderUuids: [],
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Run Skill' }))
+    expect(sendChatMessage).toHaveBeenCalledExactlyOnceWith('', {
+      skillUuid: 'ss-uuid-1', documentUuids: ['doc-1'], folderUuids: [],
     })
     expect(touchItem).toHaveBeenCalledWith('li-1')
-    // Modal closes after launching
-    expect(screen.queryByText('Use in Assistant')).toBeNull()
+    expect(screen.queryByRole('dialog', { name: 'Preview Summarize Award' })).toBeNull()
   })
 
-  it('disables Use in Assistant and explains when the prompt has no content', async () => {
-    vi.mocked(listSearchSetItems).mockResolvedValue([] as Awaited<ReturnType<typeof listSearchSetItems>>)
+  it('closing the preview runs nothing', async () => {
     render(<LibraryTab />)
-    fireEvent.click(screen.getByText('Summarize Award'))
-    expect(await screen.findByText('This prompt has no content yet — click Edit to add some.')).toBeTruthy()
-    const useBtn = screen.getByText('Use in Assistant') as HTMLButtonElement
-    expect(useBtn.disabled).toBe(true)
-    fireEvent.click(useBtn)
+    fireEvent.click(screen.getByRole('button', { name: 'Open Summarize Award' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Preview Summarize Award' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
+    expect(screen.queryByRole('dialog', { name: 'Preview Summarize Award' })).toBeNull()
     expect(sendChatMessage).not.toHaveBeenCalled()
   })
 
-  it('switches to the edit form from the preview Edit button', async () => {
+  it('does not run a Skill with no identity', async () => {
+    mockItems.current = [makePrompt({ item_uuid: null, description: 'Summarize the award.' })]
     render(<LibraryTab />)
     fireEvent.click(screen.getByText('Summarize Award'))
-    await screen.findByText('Summarize the key terms of this award.')
+    const dialog = await screen.findByRole('dialog', { name: 'Preview Summarize Award' })
+    expect(within(dialog).getByRole('button', { name: 'Run Skill' })).toBeDisabled()
+    expect(sendChatMessage).not.toHaveBeenCalled()
+  })
+
+  it('keeps editing available in the row menu without running the Skill', async () => {
+    render(<LibraryTab />)
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
     fireEvent.click(screen.getByText('Edit'))
-    expect(await screen.findByText('Edit Prompt')).toBeTruthy()
-    const textarea = screen.getByPlaceholderText('Write your prompt here') as HTMLTextAreaElement
-    expect(textarea.value).toBe('Summarize the key terms of this award.')
+    expect(await screen.findByText('Edit Skill')).toBeTruthy()
+    await waitFor(() => expect(screen.getByPlaceholderText('Write your Skill instructions here')).toHaveValue('Summarize the key terms of this award.'))
+    expect(sendChatMessage).not.toHaveBeenCalled()
+  })
+
+  it('loads a Skill\'s "When to use" line into the editor and saves the edited line', async () => {
+    mockItems.current = [makePrompt({ when_to_use: 'Reviewing a new award notice' })]
+    vi.mocked(updateSearchSet).mockResolvedValue({} as Awaited<ReturnType<typeof updateSearchSet>>)
+    render(<LibraryTab />)
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
+    fireEvent.click(screen.getByText('Edit'))
+    const line = await screen.findByLabelText('When to use (optional)')
+    expect(line).toHaveValue('Reviewing a new award notice')
+    await waitFor(() => expect(screen.getByPlaceholderText('Write your Skill instructions here')).toHaveValue('Summarize the key terms of this award.'))
+    fireEvent.change(line, { target: { value: '  Checking a subaward against intake  ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Update' }))
+    await waitFor(() => expect(updateSearchSet).toHaveBeenCalledWith('ss-uuid-1', {
+      title: 'Summarize Award', when_to_use: 'Checking a subaward against intake',
+    }))
   })
 
   it('still opens the workflow editor directly for workflow items', async () => {
@@ -215,6 +232,35 @@ describe('LibraryTab last used', () => {
     const ran = screen.getByText('Ran Last Month')
     const fresh = screen.getByText('Brand New Workflow')
     expect(ran.compareDocumentPosition(fresh) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+  it('opens legacy extraction entries without a set type or separate UUID', () => {
+    mockItems.current = [makePrompt({ id: 'legacy-item', item_id: 'extraction-id', item_uuid: null, set_type: null, name: 'Legacy extraction' })]
+    render(<LibraryTab />)
+    fireEvent.click(screen.getByRole('button', { name: 'Open Legacy extraction' }))
+    expect(openExtraction).toHaveBeenCalledWith('extraction-id')
+  })
+  it('keeps content failures visible and prevents using a stale description until retry', async () => {
+    mockItems.current = [makePrompt({ description: 'Old fallback', set_type: 'formatter' })]
+    vi.mocked(listSearchSetItems).mockRejectedValueOnce(new Error('Content unavailable'))
+    render(<LibraryTab />)
+    fireEvent.click(screen.getByRole('button', { name: 'Open Summarize Award' }))
+    await screen.findByText('Content unavailable')
+    expect(screen.getByRole('button', { name: 'Use in Assistant' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry item content' }))
+    await screen.findByText('Summarize the key terms of this award.')
+    expect(screen.getByRole('button', { name: 'Use in Assistant' })).toBeEnabled()
+  })
+  it('ignores a late prompt read after closing and opening a different item', async () => {
+    let release!: (value: Awaited<ReturnType<typeof listSearchSetItems>>) => void
+    vi.mocked(listSearchSetItems).mockImplementationOnce(() => new Promise(resolve => { release = resolve }))
+    mockItems.current = [makePrompt({ set_type: 'formatter' }), makePrompt({ id: 'second', item_uuid: 'second-uuid', name: 'Second prompt', set_type: 'formatter' })]
+    render(<LibraryTab />)
+    fireEvent.click(screen.getByRole('button', { name: 'Open Summarize Award' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open Second prompt' }))
+    await screen.findByText('Summarize the key terms of this award.')
+    release([{ id: 'old-item', searchphrase: 'Old response' }] as Awaited<ReturnType<typeof listSearchSetItems>>)
+    await waitFor(() => expect(screen.queryByText('Old response')).not.toBeInTheDocument())
   })
 })
 
@@ -287,8 +333,8 @@ describe('LibraryTab empty state', () => {
   it('suggests the catalog when the library has no items and links to it', async () => {
     mockItems.current = []
     render(<LibraryTab />)
-    expect(screen.getByText('Your library is empty')).toBeTruthy()
-    expect(screen.queryByText('No items found.')).toBeNull()
+    expect(screen.getByText('Your library is ready for its first tool')).toBeTruthy()
+    expect(screen.queryByText('No items match these filters')).toBeNull()
     fireEvent.click(screen.getByText('Browse the catalog →'))
     expect(await screen.findByText('Catalog browser')).toBeTruthy()
   })
@@ -297,14 +343,14 @@ describe('LibraryTab empty state', () => {
     mockItems.current = []
     render(<LibraryTab />)
     fireEvent.change(screen.getByPlaceholderText(/search/i), { target: { value: 'zzz' } })
-    expect(screen.getByText('No items found.')).toBeTruthy()
+    expect(screen.getByText('No items match these filters')).toBeTruthy()
     expect(screen.queryByText('Browse the catalog →')).toBeNull()
   })
 
   it('does not show the nudge when a kind filter hides existing items', () => {
     render(<LibraryTab />)
-    fireEvent.click(screen.getByText(/^Workflows/))
-    expect(screen.getByText('No items found.')).toBeTruthy()
-    expect(screen.queryByText('Your library is empty')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /^Workflows/ }))
+    expect(screen.getByText('No items match these filters')).toBeTruthy()
+    expect(screen.queryByText('Browse the catalog →')).toBeNull()
   })
 })

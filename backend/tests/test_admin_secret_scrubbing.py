@@ -174,6 +174,9 @@ class TestAdminConfigEndpoint:
         ]
         mock_config.ocr_endpoint = ""
         mock_config.ocr_api_key = ""
+        mock_config.web_search_endpoint = ""
+        mock_config.web_search_api_key = ""
+        mock_config.web_search_provider = ""
         mock_config.llm_endpoint = ""
         mock_config.default_model = ""
         mock_config.default_team_id = ""

@@ -1,0 +1,1467 @@
+NIH Grants Policy Statement (FY 2026 revision) — Chapter 2: The National Institutes of Health as a Grant-Making Organization
+Source: https://grants.nih.gov/policy-and-compliance/nihgps
+
+2 THE NATIONAL INSTITUTES OF HEALTH AS A
+GRANT-MAKING ORGANIZATION
+NIH is the steward of medical and behavioral research for the Nation. Its mission is to seek fundamental
+knowledge about the nature and behavior of living systems and the application of that knowledge to
+enhance health, lengthen life, and reduce illness and disability. NIH operates under the general policy
+guidance of the Department in carrying out its mission, which is accomplished through the conduct and
+support of biomedical and behavioral research, research training, research infrastructure, and communications. These efforts take place intramurally (primarily at NIH) and extramurally (through grants,
+cooperative agreements, and contracts awarded to institutions of higher education, governmental organizations, non-profit research organizations, for-profit organizations, and individuals). NIH also works
+closely with other HHS components and other Federal departments and agencies. HHS components
+include SAMHSA, FDA, CDC, IHS, AHRQ, HRSA, ACF, ACL, OASH, and CMS, among others.
+The rules that govern grants and cooperative agreements detailed at 2 CFR Part 200, and in certain cases
+further codified through HHS regulation, provide the framework for the terms and conditions of NIH
+awards, as specified in "Part II: Terms and Conditions of NIH Grant Awards" on page IIA-1.
+NIH is organized into ICs, which have their own mission and functions, separate appropriations, and statutory authorities. The ICs that award grants and their points of contact are listed in Part III. Although the
+ICs operate under the same general grant process and requirements, applicants and recipients need to be
+aware of differences that may exist. This information may be obtained from NIH IC staff. The policies
+generally applicable to NIH grants are set forth in the NIHGPS.
+2.1 ROLES AND RESPONSIBILITIES
+NIH, as a Federal grantor agency, is responsible to Congress and the U.S. taxpayer for carrying out its
+mission in a manner that not only facilitates research but does so cost-effectively and in compliance with
+applicable rules and regulations. NIH seeks to ensure integrity and accountability in its grant award and
+administration processes by relying on a system of checks and balances and separation of responsibilities
+within its own staff and by establishing a similar set of expectations for recipient organizations.
+The following subsections highlight the major functions and areas of responsibility of Federal and recipient staffs. NIH recognizes that additional staff members in a number of different organizations may be
+involved in grant-related activities; however, this section details only the major participants representing
+the Federal government and the recipient. The responsibilities of CSR and IC staff members, who are
+involved only in the initial review phase of the peer review process, are described in The Peer Review
+Process—Initial Review—Responsibilities. The responsibilities of other offices, such as OHRP, are
+described in Part II as applicable.
+2.1.1 NIH and HHS Staff
+The roles and responsibilities of NIH and HHS participants are as follows:
+(GPS page I-48)
+
+l Grants Management Officer. The GMO whose name appears in the NoA is the NIH official
+responsible for the business management and other non-programmatic aspects of the award.
+These activities include, but are not limited to, evaluating grant applications for administrative
+content and compliance with statutes, regulations, and guidelines; negotiating grants; providing
+consultation and technical assistance to applicants and recipients, including interpretation of
+grants administration policies and provisions; and administering and closing out grants. The
+GMO works closely with their counterparts in other NIH ICs and with the designated PO. The
+GMO is the focal point for receiving and acting on requests for NIH prior approval or for
+changes in the terms and conditions of award, and is the only NIH official authorized to obligate
+NIH to the expenditure of Federal funds or to change the funding, duration, or other terms and
+conditions of award. A Chief Grants Management Officer is the principal GMO who provides
+leadership to an organizational component that is responsible for the business and fiscal management of the ICs grant portfolio. Generally, the CGMO will have the authority to appoint and
+exercise line authority over one or more GMOs. At NIH each awarding component has a
+CGMO.
+ l Grants Management Specialist. The GMS whose name appears in the NoA is an agent of the
+GMO and is assigned responsibility for the day-to-day management of a portfolio of grants.
+ l Program Official. The PO is responsible for the programmatic, scientific, and/or technical
+aspects of assigned applications and grants. The PO’s responsibilities include, but are not limited
+to, development of research and research training programs to meet the IC’s mission; coordination with CSR/IC SROs; and post-award administration, including review of progress reports,
+participation in site visits, and other activities complementary to those of the GMO. The PO and
+the GMO work as a team on many of these activities.
+ l Scientific Review Officer. SROs are health science administrators who manage the activities of
+SRGs, including CSR study sections. The SRO is responsible for conduct of the SRG in accordance with applicable laws, regulations, and policies. For the SRG for which they are responsible,
+the SRO reviews applications for completeness and conformity to requirements, ensures that
+adequate numbers of reviewers with appropriate expertise are available for application review,
+assigns applications to individual reviewers as discussion leaders and for preparation of written
+critiques, manages conflicts of interest and confidentiality, and serves as the overall point of contact with applicants during the initial phase of the peer review process, i.e., until the conclusion
+of the SRG meeting.
+ l Other NIH, HHS and Federal Agency Staff. In addition to the GMO and PO, the recipient may
+be required to interact with other NIH or HHS staff members or offices with respect to its organization-wide systems and/or individual transactions. These include the office responsible for
+negotiating indirect costs and research patient care rates, typically the cognizant CAS office,
+ONR, or DFAS; OIG; OHRP; ORI; OLAW; and OPERA. Staff members in these offices generally coordinate with the GMO, but they are responsible for discrete areas of specialization and
+are not required to channel their communications with the recipient through the GMO. Part III
+includes a list of these organizations and their addresses and telephone numbers. ONR is the cognizant agency for negotiation of indirect costs for some NIH recipients.
+2.1.2 Recipient Staff
+Overall responsibility for successfully implementing an NIH grant is a shared responsibility of the PD/PI
+(s), the AOR, and the Research Administrator. As key members of the grant team, they respectively lead
+the scientific and administrative aspects of the grant. While communications can be conducted with
+Research Administrators and other institutional staff, NIH staff members conduct official business only
+(GPS page I-49)
+
+with the designated PD/PI(s) and AORs. The roles and responsibilities of recipient participants are as follows:
+ l Authorized Organization Representative. The AOR is the designated representative of the recipient organization in matters related to the award and administration of its NIH grants, including
+those that require NIH approval. The AOR should ascertain and assure that the materials the
+applicant organization are submitting on behalf of the PD/PI are the original work of the PD/PI
+and have not been used by other individuals in the preparation and submission of a similar grant
+application. In signing a grant application, this individual certifies that the applicant organization
+will comply with all applicable assurances and certifications referenced in the application. This
+individual’s signature on the grant application further certifies that the applicant organization
+will be accountable both for the appropriate use of funds awarded and for the performance of the
+grant-supported project or activities resulting from the application. (Also see Legal Implications
+of Applications.) This individual also is responsible to NIH for ensuring that the organization
+complies with applicable Federal laws and regulations, including required certifications and
+assurances, its application, and the terms and conditions of individual awards. For applications
+submitted electronically through Grants.gov, the signature of the AOR is documented as part of
+the electronic submission process and is authenticated through the Grants.gov registration process. In the eRA Commons, this individual holds the Signing Official role. Although NIH
+requires that the recipient organization designate such an official, NIH does not specify the
+organizational location or full set of responsibilities for this official.
+ l Program Director/Principal Investigator. A PD/PI is an individual designated by the applicant
+organization to have the appropriate level of authority and responsibility to direct the project or
+program supported by the award. The applicant organization may designate multiple individuals
+as PD/PIs who share the authority and responsibility for leading and directing the project, intellectually and logistically. Each PD/PI is responsible and accountable to the recipient organization
+or, as appropriate, to a collaborating organization, for the proper conduct of the project or program, including the submission of all required reports. The presence of more than one identified
+PD/PI on an application diminishes neither the responsibility nor the accountability of any individual PD/PI.
+When a single PD/PI is designated, that individual is not required to be an employee of the
+applicant organization. However, because the grant, if awarded, is made to the organization, the
+applicant organization must have a formal written agreement with the PD/PI that specifies an official relationship between the parties even if the relationship does not involve a salary or other
+form of remuneration. If the PD/PI is not an employee of the applicant organization, NIH will
+assess whether the arrangement will result in the organization being able to fulfill its responsibilities under the grant, if awarded.
+When multiple PD/PIs are designated, NIH requires identification of one PD/PI who will be designated as the Contact PD/PI. This person is responsible for communication between the PD/PIs
+and  NIH. Serving as Contact PD/PI confers no special authorities or responsibilities within the
+project team. The Contact PD/PI must meet all eligibility requirements for PD/PI status. They are
+not required to be an employee of the applicant organization. However, as with the single PD/PI
+model, if the Contact PD/PI is not an employee, the applicant organization must have a formal
+written agreement with the Contact PD/PI that specifies an official relationship between the
+parties. This same principle applies to all PD/PIs at the applicant organization; e.g., they need not
+be employees; however, the applicant organization must have a formal written agreement in
+place.
+(GPS page I-50)
+
+When multiple PD/PIs are involved at different organizations, only the Contact PD/PI is required
+to have the official relationship with the applicant organization. PD/PIs in the leadership team at
+other organizations must have a documented relationship with a consortium organization, but
+need not be employees. Any consortium agreement must address the unique aspects to these individuals holding the PD/PI role. For additional information, see NIHGPS Section 9 Multiple Program Director/Principal Investigator Applications and Awards.
+PD/PIs are members of the recipient team responsible for ensuring compliance with the financial
+and administrative aspects of the award. They work closely with designated officials within the
+recipient organization to create and maintain necessary documentation, including both technical
+and administrative reports; prepare justifications; appropriately acknowledge Federal support of
+research findings in publications, announcements, news programs, and other media; and ensure
+compliance with other Federal and organizational requirements. NIH encourages PD/PIs to maintain contact with the NIH PO with respect to the scientific aspects of the project and the
+GMO/GMS concerning the business and administrative aspects of the award. The NIH staff contacts list  includes contact information for NIH grants management and program staff at each IC.
+ l Research Administrator. The Research Administrator acts as a local agent of the AOR and/or
+PD/PIs providing day-to-day grant-related support. Depending on the structure of the organization, this individual can be located centrally or within an organizational component such as a
+Department.
+2.2 ERA COMMONS
+eRA Commons is an online interface where grant applicants, recipients and Federal staff at NIH and
+grantor agencies can conduct their research administration business electronically as well as access and
+share administrative information relating to research grants. While applicants use Grants.gov to find and
+apply for grants; the eRA Commons retrieves the application or proposal information from Grants.gov,
+compiles it into a consistent application format and then makes it available to applicants and NIH staff
+for electronic research administration purposes.
+Access to the eRA Commons is vital for all steps in the NIH grant administration process. Following
+application submission, the eRA Commons becomes the primary site for accessing grant information
+such as Institute/Center assignments, review outcomes, Summary Statements, and Notices of Award. The
+eRA Commons also provides electronic business processes such as Internet Assisted Review, submission
+of Just-In-Time material, submission of Research Performance Progress Reports (RPPRs), submission of
+notification of extensions without funds, and submission of Closeout documents. Appropriate user roles
+are assigned to registered individuals depending on the responsibilities assigned to them by the recipient
+organization.
+2.2.1 eRA Commons Registration
+An organization and PD/PI(s) must complete a one-time registration in the Commons. Institutional/organizational officials are responsible for registering PD/PI(s)  in the eRA Commons. PD/PI(s)
+should work with their AOR (also known as the Signing Official in the eRA Commons) to determine
+their institutional/organizational process for registration.
+IMPORTANT: Organizations registering in the eRA Commons for the first time should allow 2-4 weeks
+to complete the registration process.
+(GPS page I-51)
+
+2.2.1.1 eRA Commons Registration for the Organization
+Prospective applicant organizations should also see Legal Implications of Applications before beginning
+the eRA Commons registration process.
+To register an Organization in the eRA Commons an AOR should follow the procedures found on the
+Register in eRA Commons page.
+Once an organization is registered, information in the Institutional Profile can be maintained through the
+Commons.
+During this registration process, NIH may make a preliminary assessment of applicant organization eligibility. Applicants should be prepared to establish their eligibility to receive and administer all awards
+(that are applied for), and NIH may deny registration if an organization is determined ineligible. Note,
+acceptance of an organization’s registration in the Commons does not mean an organization is an acceptable recipient for a particular program. That assessment will be made by the NIH awarding component
+prior as part of the pre-award process. See Determining Applicant Organization Eligibility for additional
+information.
+Foundations that represent already existing recipient organizations, or a newly formed consortium where
+the consortium members are already individually recognized as NIH recipient organizations present
+unique and complex situations and should contact the Systems Policy Branch, Division of Grants Systems Integration, OPERA before attempting to separately register as a new applicant organization.
+2.2.1.2 eRA Commons Registration for the PD/PI
+The individual(s) designated as the PD/PI(s) on the application must also be registered in the eRA Commons. The PD/PI(s) must hold a PI eRA Commons role and be affiliated with the applicant organization.
+The initial registration must be done by an AOR who has the SO role in the eRA Commons or
+other authorized accounts administrators at the organization. However, after the initial registration
+process is complete, it becomes the responsibility of each individual to maintain the information in their
+personal profile.
+Designating the PI role in the eRA Commons provides the individual with the administrative authority
+needed to see pertinent information regarding an application (e.g., summary statements, scores, electronic submission status, etc.). The PI role within the eRA Commons is necessary to complete the grant
+application process, to view the impact score and summary statement (the SO role also has this capability), and if an award is made, to complete required post-award actions such as submission of a progress report. The PD/PI may delegate certain authorities to other individuals.
+Users should only have one PD/PI eRA Commons account. If the PD/PI has already been registered in
+eRA Commons by an organization other than the organization submitting an application, a separate eRA
+Commons registration with the submitting organization is not necessary. However, the submitting organization must take steps to affiliate the individual with that organization so that the individual can view
+and access data records for those applications.
+For more information on the features of the eRA Commons, including links to resources such as user
+guides and frequently asked questions, see the eRA Commons webpage.
+2.2.1.3 eRA Commons Registration for Other Individuals Participating in NIH
+Application and Research Performance Progress Reports
+Any individual with an Undergraduate, Graduate Student, and/or Postdoctoral Role who participates in a
+NIH-funded project for at least one person month or more should also be registered in the eRA Commons and should verify that all Personal Information located within the Personal Profile tab in the eRA
+(GPS page I-52)
+
+Commons System is accurate. This is required regardless of whether salary is actually charged to the project. For graduate students supported on a particular research grant, this could include project roles of
+graduate research assistant or graduate student.  For postdoctoral individuals supported on a particular
+research grant, this could include project roles such as Postdoctoral Associate and other similar Postdoctoral positions.
+When an individual is assigned the Undergraduate, Graduate Student, or Postdoctoral Role in the Commons, responses to certain data items in the Personal Profile tab will be required to meet NIH reporting
+requirements to Congress included in the NIH Reform Act, P.L. 109-482. The Commons user name ID
+for those with an Undergraduate, Graduate Student, or Postdoctoral Role is not required at the time of
+application submission, but will be required as part of the Research Performance Progress Report
+(RPPR).
+For individuals at the postdoctoral level, this requirement is already in effect and progress reports will
+not be accepted if the Commons ID is not provided.  For individuals at the undergraduate and graduate
+student levels, a Commons ID is required with RPPRs.  The Undergraduate and Graduate Student Roles
+have been added to the Commons to accommodate this requirement; recipients are encouraged to begin
+registering these individuals now.
+Note, the Graduate Student and Postdoctoral eRA Commons Roles should NOT be used for individuals
+submitting Individual Fellowships; the PD/PI role is used for those submissions.  Nor should they be used
+for individuals supported on institutional training grants and reported using xTrain; the Trainee Role
+must continue to be used for those individuals.
+In addition to the above roles, a Commons ID is required at the time of submission for sponsors in fellowship applications, component leads on multi-project applications, and primary mentors on career
+development applications. A Commons ID is also required at the time of application submission for all
+individuals listed on the R & R Senior / Key Person Profile (Expanded) Form; the requirement applies to
+Senior/Key Personnel as defined in NIHGPS Section 1.2 as well as Other Significant Contributors
+(OSCs). For other roles a Commons ID is strongly encouraged, but currently optional, for all other project personnel.  A general Commons Role of Project Personnel is available for those not assigned other
+Commons Roles.
+2.3 APPLICATION INFORMATION AND PROCESSES
+This section provides an overview of NIH’s grant support mechanisms, types of entities eligible to
+receive grants, types of applications, types of funding opportunities, legal implications of applications,
+policies affecting application preparation and submission, application forms, application receipt information and deadlines, fraud, waste and abuse of NIH grant funds, and availability and confidentiality of
+application information.
+2.3.1 Support Mechanisms
+NIH ICs award grants under multiple programs and subprogram initiatives and use a variety of support
+mechanisms. NIH grants may be distinguished by purpose, type of recipient, amount, or other characteristics. One method NIH uses to differentiate the various support mechanisms is an activity coding
+that indicates the category and specific form of support (e.g., R01, F32, P01, R43). The applicability of
+requirements may vary for different activity codes. Some of the distinctions also are significant for purposes of applying Part II. NIH ICs may vary in the way they use specific activity codes; not all ICs
+accept applications for all types of grant programs and may apply specialized eligibility criteria. See a
+comprehensive list of activity codes on NIH's web site.
+(GPS page I-53)
+
+2.3.2 Eligibility
+In general, NIH grants may be awarded to organizations that are domestic or foreign, public or private,
+or non-profit or for-profit. Eligible organizations include governments, including Federal institutions,
+institutions of higher education, other non-profit organizations, hospitals, and, in rare occasions, individuals (see Completing the Pre-Award Process—Determining Applicant Organization Eligibility). Any
+special criteria for applicant eligibility or requirements concerning the qualifications of the PD/PI or
+other staff or participants will be specified in the NOFO, program guidelines, or other publicly available
+documents. Part IIB includes information on fellow and trainee eligibility.
+2.3.3 Types of Award Instruments
+NIH uses several different extramural award instruments in support of its mission. The Federal Grant and
+Cooperative Agreement Act of 1977 (P.L. 95-224) distinguishes financial assistance between contracts,
+cooperative agreements and grants. The NIHGPS requirements  apply to grants and cooperative agreements. Both grants and cooperative agreements are financial assistance instruments.
+The grant instrument is used to administer awards that do not require NIH involvement beyond standard
+agency monitoring and stewardship. Under a cooperative agreement, NIH expects to be substantially
+involved in carrying out the project. Grants are used both for investigator-initiated research and for more
+targeted research. Cooperative agreements generally do not result from investigator-initiated applications. However, NIH may apply terms and conditions that differ from those in the NIHGPS consistent
+with the nature of its involvement under cooperative agreements.
+2.3.4 Types of Applications
+In the NIH grants process, five types of applications are used most frequently. The first four application
+types described below are considered “competing” because, through the peer review process, the application must compete for available funding with other applications.
+ l New Application (Type 1). A request for financial assistance for a project or activity that is not
+currently receiving NIH support and must compete for support. A new application is being submitted for the first time.
+ l Renewal (Type 2). A request for additional funding for a period subsequent to that provided by a
+current award. A renewal application competes with all other applications and must be fully
+developed as though the applicant is applying for the first time.
+ l Competitive Revision (Type 3). A request for an increase in support in a current project period
+for expansion of the project’s approved scope or research protocol. The request may specify
+budgetary changes required for the remainder of the project period as well as for the current
+budget period. Applications for competitive revisions are not appropriate when the sole purpose
+is to restore awards to the full SRG-recommended level if they were administratively reduced by
+the funding agency. A competitive revision application should not be submitted until after the original application has been awarded and generally, a revision may not extend beyond the term of
+the current award period without a strong justification (e.g., urgent or emergency revision). A
+revision application must have the same title as the currently funded grant. Competitive revisions
+require peer review.
+(GPS page I-54)
+
+l Administrative Supplement (Type 3. A request for additional funds during a current project
+period to provide for an increase in costs due to unforeseen circumstances. All additional costs
+must be within the current scope of the peer reviewed and approved project, and may not extend
+beyond the term of the current award. Administrative supplements do not require peer review.
+[see Administrative Requirements—Changes in Project and Budget—Prior Approval Requirements—Need for Additional NIH Funding without Extension of Budget and Project Period.]).
+ l Resubmission (suffix -A1). An unfunded application that the applicant has modified following
+initial review and resubmitted for new consideration. Before a resubmission application can be
+submitted, the PD/PI must have received the summary statement from the previous review. A
+resubmission application may be submitted for any of the three preceding types of applications
+provided an appropriate NOFO is available. See Application Information and Processes—
+Policies Affecting Applications for other policies affecting Resubmissions. NIH allows only one
+resubmission application.
+ l Non-Competing Continuation Progress Report (Type 5). A non-competing progress report is
+required to continue support of a PHS grant for the second or subsequent budget period within
+an approved competitive segment (see Administrative Requirements—Monitoring—Reporting—
+Non-Competing Continuation Progress Reports).
+In addition to the list above, NIH periodically uses a pre-application (also known as a “white paper” or
+“précis”) to facilitate certain approaches or economies, such as reducing burden on the applicant community, for a funding opportunity. Pre-applications are generally used in combination with a competing
+application in a 2-phase process. Pre-applications do not result in an award; the end result is the opportunity to submit to the subsequent phase of a particular program. Successful applicants to the pre-application phase are notified of the opportunity to submit to the subsequent phase. In addition to the preapplication, NIH may use an application process for prospective applicants to request access to an NIH
+research resource. This process also does not result in an award; the end result is permission to access a
+resource.  NIH uses the numbers shown in parentheses as prefixes to distinguish the application types and
+any resulting awards (e.g., 5R0198765-02 is a non-competing continuation progress report).
+2.3.5 Types of Notices of Funding Opportunities (NOFOs)
+Most applications submitted to NIH under the categories of research and research training (including fellowships) are investigator-initiated. NIH accepts applications on the application due dates noted on the
+submission schedule. NIH generally reviews applications in three review cycles per year; however any
+variations in schedule will be noted in the NOFO. Some ICs review applications for Institutional
+National Research Service Awards (T32) only once a year; such information is generally found in a particular NOFO. The schedules for submission, review, and award of investigator-initiated applications are
+available on the NIH standard due dates web page.
+Notice of Notice of Funding Opportunity (NOFO). In accordance with 2 CFR 200.204, NOFO is an
+umbrella term for a publicly available document in which NIH makes known its intentions to award "Discretionary Award" on page I-18, usually as a result of competition for funds. Each NOFO includes a solicitation identifier, will outline the program goals and objectives, and will include information to allow
+prospective applicants to determine whether the entity is eligible to apply. All applications must be electronically submitted in response to a NOFO.
+NIH NOFOs primarily fall into the categories of Program Announcements, (PAs), which include Parent
+Announcements, and Requests for Applications (RFAs). While individual announcements will continue
+to carry an announcement number reference to PA or RFA, all announcements are NOFOs. NOFO is the
+general term is used to reference any type of funding announcement. NIH uses the PA and RFA references in the actual announcement number to distinguish between the various types of announcements.
+(GPS page I-55)
+
+l Parent Announcement. Electronic submission of applications requires that applications must be
+associated with a specific NOFO. Therefore, NIH omnibus broad parent announcements are
+provided for applicants to submit investigator-initiated (unsolicited) applications. Responding to
+such an omnibus or umbrella parent NOFO ensures that the correct application package is used
+and enables NIH to receive the application from Grants.gov. This process in no way diminishes
+the interest of NIH ICs in investigator-initiated, unsolicited research grant applications. Parent
+announcements are NIH-wide, but some ICs may limit their participation; therefore, prospective
+applicants should check the announcement to determine IC participation. For institute-specific
+opportunities in a particular area of science, visit the NIH Highlighted Topics page.
+ l Program Announcement (PA). A PA is a formal statement about a new or ongoing extramural
+activity or program. It may serve as a reminder of continuing interest in a research area, describe
+modification in an activity or program, and/or invite applications for grant support. Most applications in response to PAs may be submitted to a standing submission date and are reviewed with
+all other applications received at that time using standard peer review processes. NIH may also
+make funds available through PARs (PAs with special receipt, referral, and/or review considerations) and PASs (PAs with set-aside funds).
+ICOs issuing PARs or PASs may now choose to describe within the NOFO criteria that would make an
+application non-responsive to the PAR/PAS. Only applications to PARs and PASs that include nonresponsive criteria will be evaluated by the ICOs upon receipt for non-responsiveness. These nonresponsive criteria will be listed in the Funding Opportunity Description section (Part 2, Section 1).
+Those applications that are deemed non-responsive will be withdrawn from review.
+PAs may be used for any support mechanism other than construction awards. Unless otherwise
+specified in the PA, new applications (and associated renewal and revision applications) submitted in response to PAs are treated as investigator-initiated. PAs also are used to annually solicit applications for the SBIR and STTR programs. Those applications must be received by the
+dates specified in the PA.
+ l Request for Applications (RFA). An RFA is a formal statement that solicits grant or cooperative
+agreement applications in a well-defined scientific area to accomplish specific program objectives. An RFA indicates the estimated amount of funds set aside for the competition, the estimated number of awards to be made, whether cost sharing is required, and the application
+submission date(s). For cooperative agreements, the RFA will describe the responsibilities and
+obligations of NIH and recipients as well as joint responsibilities and obligations. Applications
+submitted in response to an RFA are usually reviewed by an SRG specially convened by the
+awarding component that issued the RFA.
+All applications involving one or more clinical trials must be submitted through a NOFO specifically
+designed for clinical trials. NIH will not process applications that propose one or more clinical trials if
+the NOFO (Part 2, Section 2) indicates clinical trials are “Not Allowed.” Applications that propose clinical trials, including applications with a mix of trial and non-trial aims or a combination of clinical and
+non-clinical studies, must be submitted to NOFOs designated as clinical trial “Optional” or “Required".
+All NIH NOFOs are forecasted on Grants.gov prior to publication and published on Grants.gov under
+Search Grants. NIH may also develop and publicize areas of highlighted topics  to stimulate submission
+of applications in those areas.
+2.3.5.1 Other Funding-Related Notices
+Request for Information (RFI). The purpose of an RFI is to alert the extramural research community to
+a request for comments on a specific issue. A RFI does not include reminders, extensions, or
+(GPS page I-56)
+
+clarifications to RFIs.
+2.3.6 Legal Implications of Applications
+An applicant must be an eligible entity and must submit a complete application in accordance with established receipt (deadline) dates in order to be considered for support. The signature of an AOR on the
+application certifies that the organization will comply with all applicable assurances and certifications referenced in the application. The applicant organization is responsible for verifying conformity with the
+most current guidelines for all administrative, fiscal, and scientific information in the application, including the indirect cost rate. The AOR’s signature further certifies that the applicant organization has the
+ability to provide appropriate administrative and scientific oversight of the project and agrees to be fully
+accountable for the appropriate use of any funds awarded and for the performance of the grant-supported
+project or activities resulting from the application.  NIH will not accept forms or other documentation
+bearing generic departmental signatures or their electronic equivalent (e.g., Department of Sponsored
+Research).  All forms and documentation submitted to NIH must reflect the name of the individual, electronic or otherwise, with the appropriate institutional authority to submit such information.
+Applicants for and recipients of NIH grant funds, whether such funds are received through a grant, indirectly under a contract or consortium agreement, or by a fiscal agent acting on another organization’s
+behalf, or as student assistance under a training grant, are responsible for and must adhere to all applicable Federal statutes, regulations, and policies, including income tax regulations. Questions concerning
+the applicability of income tax regulations to grant funds should be directed to the IRS. The applicant
+also is expected to be in compliance with applicable State and local laws and ordinances.
+Applicants may be required to provide proof of organizational eligibility (such as proof of non-profit
+status), trainee or fellow eligibility and citizenship, or other eligibility information. Applications also
+must demonstrate compliance (or intent to comply), through certification or other means, with a number
+of public policy requirements. The more significant of the public policy requirements for the purpose of
+peer review are those concerning research involving human subjects; inclusion of women, members of
+racial and/or ethnic minority groups, and individuals across the lifespan in clinical research; and research
+involving live vertebrate animals. Part II details public policy requirements and cost and administrative
+policies.
+Affiliate organizations and other similar administrative organizations
+There are times when an institution desires to use an affiliate organization, such as a Foundation or other
+similar organization to provide administrative services for NIH grants. These situations are often complex and each situation is unique when determining which organization is the appropriate applicant institution. Foundations, particularly those associated with institutions already recognized as NIH recipient
+organizations, should contact the Division of Grants Systems Integration, OPERA before attempting to
+separately register as an applicant organization.
+Similarly, when new consortiums are formed where the consortium members are already separately
+recognized as NIH recipient organizations, DGSI/OPERA should be contacted before attempting to separately register as a new applicant organization. See NIHGPS Section 7.8 Services Provided by Affiliated Organizations.
+2.3.7 Policies Affecting Applications
+Application information to be submitted typically includes a project description, budget and budget justification, biographical sketches of senior/key personnel, and other information specified in the application instructions, in the announcement, and/or in program guidelines, if any. Applicants should consult
+(GPS page I-57)
+
+the cost principles and general administrative requirements for grants pertaining to their organizational
+type in order to prepare the budget and complete other parts of the application. This section describes
+NIH policies that affect application preparation and/or submission. Specific details on application content
+are addressed in application instructions and specific NOFOs. Any significant change to the application
+post-submission must be reported immediately to the appropriate NIH official.
+2.3.7.1 Direct Cost Limitations for Applications That Include Consortium/Contractual Indirect Costs
+For NOFOs that include a direct cost limit, NIH policy excludes consortium/contractual indirect costs
+when determining if an applicant is in compliance with the direct cost limitation. This policy extends to
+all solicited and investigator-initiated applications and to all active announcements (Request for Applications and Program Announcements), involving consortium/contractual indirect costs, regardless of
+budget amount or budget format (e.g., modular and non-modular). While consortium indirect costs may
+be requested and awarded, applicants should not consider these costs when determining if a budget
+exceeds a direct cost limit.
+This policy impacts eligibility to submit a modular budget. The modular budget format is used for applications requesting $250,000 or less in direct costs per year. Consortium/contractual indirect costs are not
+factored into this direct cost limit; however, they may be requested in addition to the $250,000.
+This policy  does not affect any specific NOFO that includes a total cost limit.
+This policy does not affect the SBIR and STTR programs since the statutory budget guidelines are based
+on total costs, not direct costs.
+2.3.7.2 Resubmission of Unfunded RFA Applications
+This policy applies to all activity codes that might be solicited via an RFA and to instances where there
+is a change in activity code. Unless a particular NOFO states that resubmissions from an RFA may be
+submitted, unfunded applications should be submitted as new applications if the grant applications fall
+into the following categories:
+ 1. Applications that were originally submitted in response to an RFA and now submitted as an
+investigator-initiated application.
+ 2. Applications that were originally submitted as investigator-initiated applications and subsequently submitted in response to an RFA.
+ 3. Applications that were originally submitted using one grant activity code and subsequently submitted using a different grant activity code (for example, an application that was originally an
+R01 and is now submitted as an R21).
+The new application must be submitted on the scheduled due dates for new applications and follow all
+instructions that apply to new applications. Do not include an Introduction describing the changes and
+improvements made; do not mark text to indicate the changes and do not mention prior review anywhere
+in the application (including the cover letter). In these cases the reviewers will not be provided with the
+previous summary statement.
+2.3.7.3 Resubmission of an Unfunded  Application
+An unfunded competing application (A0) may be resubmitted for future funding opportunities. These
+applications are referred to as a resubmission application (A1). NIH will only accept a single resubmission (A1) application. NIH will accept a new (A0) application following an unsuccessful resubmission (A1) application or a prior A0 application. The subsequent new application need not
+(GPS page I-58)
+
+demonstrate substantial changes in scientific direction compared to previously reviewed submissions,
+and must not contain an introduction to respond to the critiques from the previous review. NIH's policy
+for accepting overlapping applications remains in effect: NIH will not accept duplicate or highly overlapping applications under review at the same time.  This means that  NIH will not review:
+ 1. a new (A0) application that is submitted before issuance of the summary statement from the
+review of an overlapping new (A0) or resubmission (A1) application.
+ 2. a resubmission (A1) application that is submitted before issuance of the summary statement from
+the review of the previous new (A0) application.
+ 3. an application that has substantial overlap with another application pending appeal of initial peer
+review (see Section 2.3.9.4 below)
+NIH policy allows a 37 month window for one resubmission (A1) following the submission of a new,
+renewal, or revision application (A0 application).  The initial submission of a new, renewal or revision
+application constitutes the starting point for the 37 month policy. After 37 months, NIH views a submission as a new application, regardless of whether an unsuccessful resubmission (A1) was submitted
+during the 37 month  period.
+Submission to a different NOFO under review at the same time is not sufficient to make an application
+new. (There are exceptions for applications following an RFA or changing activity code. See Resubmission of Unfunded RFA Applications above). The new application must be submitted on the scheduled
+due dates for new applications. It must not include an Introduction describing the changes and improvements made; and the text must not be marked to indicate the changes.
+2.3.7.4 New Investigators and Early Stage Investigators
+The NIH is committed to identifying and attracting new biomedical researchers and will continue to
+explore novel ways to encourage early transition to independence. NIH has implemented a number of
+policies specific to New Investigators, and in particular the category of New Investigator called Early
+Stage Investigator.
+New Investigator. In general, a PD/PI is considered a New Investigator if they have not previously competed successfully as PD/PI for a substantial NIH independent research award. For example, a PD/PI
+who has previously received a competing NIH R01 research grant is no longer considered a New
+Investigator. See definitions section for additional information and references.
+Early Stage Investigator (ESI). An ESI is a New Investigator who has completed their terminal research
+degree or end of post-graduate clinical training (i.e., completing medical residency, whichever is later,
+within the past 10 years at the time of application submission and who has not previously competed successfully as a PD/PI for a substantial NIH independent research award. Extensions of the end of ESI eligibility date may be requested following the procedures documented on the Early Stage Investigator
+Extensions page on the NIH Grants & Funding website. Please note an investigator will retain their ESI
+status if they receive smaller research grants, training, infrastructure, and career awards appearing on this
+list.
+The NIH intends to support New Investigators at success rates comparable to those for established investigators submitting new applications. ESIs should comprise a majority of the New Investigators supported. Where possible, New Investigator applications will be clustered during review. The applications
+will be given special consideration during peer review and at the time of funding. Peer reviewers will be
+instructed to focus more on the proposed approach than on the track record, and to expect less preliminary data than would be provided by an established investigator.
+(GPS page I-59)
+
+NIH New Investigator policies are limited to applications for traditional research project grant (R01) support. Accordingly, NIH strongly encourages New Investigators, particularly ESIs, to apply for R01
+grants when seeking first-time NIH funding. To determine New Investigator and ESI status, NIH relies
+on the data entered by the individual in their eRA Commons Profile, therefore it is important that PD/PIs
+verify the accuracy of their personal profiles. Particularly key for ESIs are the terminal research degree
+and end date of residency data fields. ESI status and end of eligibility date also appear in the eRA Commons profile for the individual.
+2.3.7.5 Program Director/Principal Investigator, Individual Fellowship and Sponsor
+Assurance
+The applicant organization is required to secure and retain a unique signature and dated assurance from
+the PD/PI for each submitted application, prior to submitting an application to the NIH. This assurance
+must be available to the NIH or other authorized DHHS or Federal officials upon request. Such an assurance must include at least the following certifications: 1) that the information submitted within the application is true, complete and accurate to the best of the PI’s knowledge; 2) that any false, fictitious, or
+fraudulent statements or claims may subject the PI to criminal, civil, or administrative penalties; and 3)
+that the PI agrees to accept responsibility for the scientific conduct of the project and to provide the
+required progress reports if a grant is awarded as a result of the application. If multiple PIs are proposed
+in an application, this assurance must be retained for all named PIs.
+For individual Fellowship applications, this assurance requirement applies to the individual fellow and
+the sponsor. Such an assurance must include at least the follow certifications: (1) that the information
+submitted within the application is true, complete and accurate to the best of the Fellow’s and Sponsor’s
+knowledge; (2) that any false, fictitious, or fraudulent statements or claims may subject the Fellow and
+Sponsor to criminal, civil, or administrative penalties; (3) that the Sponsor will provide appropriate training, adequate facilities, and supervision if a grant is awarded as a result of the application; (4) that the
+Fellow has read the Ruth L. Kirschstein National Research Service Award Payback and will abide by the
+Assurance if an award is made; and (5) that the award will not support residency training.  NIH will not
+accept forms or other documentation bearing generic departmental signatures or their electronic equivalent (e.g., Department of Sponsored Research).  All forms and documentation submitted to the NIH
+must reflect the name of the individual, electronic or otherwise, with the appropriate institutional authority to submit such information.
+2.3.7.6 Post-Submission Grant Application Materials
+Post-submission of application materials is not required. Adding materials to reviewer workload may be
+counterproductive, so applicants should carefully consider the  need to send post-submission materials.
+For materials that are submitted after the initial grant application submission but prior to initial peer
+review, NIH will only accept such materials resulting from unforeseen administrative issues. This policy
+does not modify the Just-in-Time requirements or any other requests for additional information after the
+initial peer review.
+Allowable Post-Submission Materials for All Applications
+For all research and research-related applications, individual fellowship, and individual career development awards, acceptable materials include:
+ l Citations of issued patents
+ l Revised budget page(s) (e.g., due to new funding or institutional acquisition of equipment)
+ l Biographical sketches (e.g., due to the hiring, replacement, or loss of an investigator)
+(GPS page I-60)
+
+l Letters of support or collaboration due to the hiring, replacement or loss of an investigator
+ l Adjustments resulting from natural disasters (e.g., loss of an animal colony)
+ l Adjustments resulting from change of institution [e.g., Program Director/Principal Investigator
+(PD/PI) moves to another university]
+ l News of professional promotion or positive tenure decision for any PD/PI or Senior/Key Personnel
+ l Approval by the NIH Stem Cell Registry of a human embryonic cell line(s) after submission of
+the application
+ l Video and audio files, within defined limits, that demonstrate devices and experimental data with
+a temporal element, which refers to the need to show how something functions or occurs over
+time, or demonstrates movement or change. Special submission procedures are required (See
+‘Non-Traditional Application Materials’).
+ l Other post-submission materials specified in the NOFO for which the application was submitted
+or in a special Guide Notice.
+ l News of an article accepted for publication since submission of the application, which must
+include only:
+ l List of authors and institutional affiliations
+ l Title of the article
+ l Journal or citation (if available)
+Copies of articles, links to articles, or any other materials related to an article accepted for publication
+will not be accepted as post-submission materials, unless specified in the Notice of Funding Opportunity
+(NOFO) for which the application was submitted or a special Guide Notice.
+Additional Materials for Certain Applications
+Preliminary Data NIH will accept preliminary data as post-submission material for Type 1 R01, R21, or
+R03 applications, including resubmissions, if the NOFO used for submission allows preliminary data in
+the application.
+Institutional Training and Training-related Grants (e.g., T32, T34, T35, T90, TU2, T15, D43, K12,
+KM1, UR2): in addition to the materials for All Applications above, news—since the training grant
+application was submitted—of:
+ l A trainee's or former trainee's graduation, employment, promotion, funding, or publications;
+ l A faculty member's promotion, funding, or publications; and
+ l The addition or removal of any faculty member who will be involved in the training program
+(mentors or senior/key persons).
+ l Lists of publications for Training Grant are allowed. Follow the page limits in the NIH Table of
+Page Limits.
+Individual Fellowship (F-Series) and Individual Career Development Award (K-series) Applications: in addition to the materials for All Applications listed above:
+(GPS page I-61)
+
+l New information on the Sponsor/Mentor funding, limited to the project title, funding source
+(e.g., NIH grant number), a brief description of specific aims, and relevance to the  fellowship or
+career development application under review.
+ l News of change in Mentor(s) or other Senior/Key Persons specified in the original application.
+Applications submitted to Requests for Applications (RFAs): the same post-submission materials as
+other applications (see "All Applications" above), for all due dates in the RFA.
+Conference Grant Applications (R13, U13): a one-page explanation of all speakers who accepted invitations to participate in the proposed conference after the application was submitted, plus a one-page
+explanation of all speakers who declined such invitations after the application was submitted. Alternatively, the PD/PI may consider submitting a one-page explanation for each plenary slot on the agenda.
+Any other types of post-submission materials are not likely to be accepted.
+Requirements for Submitting Post-Submission Materials
+All post-submission materials must conform to NIH policies on font size, margins, and paper size as referenced in the applicable application instructions.
+ l Any specified formats (e.g., budgets, biographical sketches) and page limits referenced in the
+applicable application instructions apply.
+ l If post-submission material is not required on a specific format page and does not have a specified page limit, each explanation or letter is limited to one page.
+ l If the application has multiple components (subprojects or cores), each subproject or core is
+allowed explanations or letters, but each explanation or letter is limited to one page.
+Post-submission materials must be received by the  NIH Scientific Review Officer (SRO) no later than 30
+calendar days prior to the peer review meeting. Post-submission materials will not be accepted if fewer
+than 30 calendar days remain before the peer review meeting, unless specifically stated otherwise in the
+NOFO for which the application was submitted or in a special Guide Notice.
+Concurrence from the Authorized Organization Representative (AOR) of the applicant organization is
+required. Although the post-submission materials may originate from the PD/PI, Contact PD/PI, or organizational officials, the AOR must send the materials directly to the SRO or must send their concurrence
+to the PD/PI who will forward the materials and concurrence to the  SRO. A communication from the
+PD/PI only or with a copy to the AOR will not be accepted.
+Post-submission materials can only be submitted as a PDF attachment, except for video submissions.
+The SRO is responsible for uploading acceptable materials into the official electronic grant file maintained in the eRA Commons. The PD/PI can check their application via the Commons to see these materials in the section titled "Additions for Review". This procedure provides the information to reviewers in
+a secure manner.
+Non-traditional Application Materials
+NIH will accept only video and audio files as digital files submitted via email, non-traditional application
+materials. No devices or other media will be accepted unless specified in the Notice of Funding Opportunity  (NOFO). These guidelines may be superseded by instructions in specific NOFOs.
+Acceptable video content. The only acceptable content for videos is demonstrations of devices and experimental data with a temporal element, which refers to the need to show how something functions or
+occurs over time; or demonstrates movement or change. No demonstrations of data that could be feasibly
+presented in figures or tables will be accepted.
+(GPS page I-62)
+
+l Examples of acceptable content include: unusual interventions or surgical procedures, prototype
+model use, visualization of 3-D structures or structural changes in molecules or cells, temporal
+changes in cell migration or interactions, demonstrations of interventions on animal behavior or
+kinetic physiopathology, software, database or mobile app demonstrations, educational materials
+or video games.
+ l Examples of unacceptable content include virtual tours of laboratories, equipment in place, platform presentations, testimonials, advertisements, or commercials, research or outreach presentations  [unless requested by the Scientific Review Officer (SRO) in lieu of a site visit].
+Application requirements. The application must be structured at the time of submission to indicate that a
+video will be submitted subsequently as post-submission materials. Key images/“stills” and a brief
+description of each video must be included within the page limits of the research strategy. Sufficient
+descriptive information must be provided within the research strategy to understand the information
+presented in the video, as not all reviewers may be able to access the video, depending on technological
+constraints. A cover letter that includes information about the intent to submit a video should also be submitted with the application.
+When human subjects or personally identifiable information is represented in a video, the applicant
+organization is responsible for ensuring that human subjects have consented and are protected appropriately. Submission through the Authorized Organizational Representative (AOR) certifies acceptance
+of this responsibility.
+Video formats. Multiple videos may be submitted per application but their aggregate length (at normal
+speed) must not exceed 2 minutes for single-project applications and 5 minutes for multi-component
+applications. The maximum file size for all videos combined is 35 MB. Closed captioning is recommended as an optional component of the video to assist reviewers evaluating the application.
+Video submission. Post-submission video files should be sent via email as a digital file for upload to the
+application grant folder by the SRO. Acceptable digital formats are WMV, AVI, MOV, and MP4. To
+avoid technical issues, digital files should not be embedded in another file format, e.g., PDF.
+As with all other post-submission materials, videos must be received by the SRO one month (30 calendar
+days) prior to the peer review meeting. Videos will not be accepted if fewer than 30 calendar days
+remain before the peer review meeting.
+Concurrence from the Authorized Organization Representative (AOR) of the applicant organization is
+required. The AOR must send the materials directly to the SRO, or must send their concurrence to the
+PD/PI who will forward the materials and concurrence to the SRO. A communication from the PD/PI
+only or with a “cc” to the AOR will not be accepted.
+Video files containing unacceptable content or exceeding the time or size limits will not be accepted.
+Applications submitted with hypertext (e.g., hyperlinks and URLs) to videos or with videos embedded in
+the research strategy will be considered in violation of page limits and may be withdrawn before review.
+Additional information on post-submission videos can be found on the NIH Format Attachments
+webpage.
+Note: Due to technological constraints, the NIH cannot guarantee that reviewers will be able to view
+videos.
+The opportunity to submit additional materials should not be a means of circumventing submission deadlines, page limitations, or content requirements and should not substantially enhance, alter or add to the
+originally submitted application.
+(GPS page I-63)
+
+After the initial peer review phase is completed, the Chief GMO of the IC is the NIH official responsible
+for accepting additional materials. Most of the material submitted after peer review can be submitted as
+part of the Just-in-Time process.
+2.3.7.7 SAM Registration and Unique Entity Identifier (UEI) Requirements
+All applicant organizations must register in the System for Award Management (SAM), in accordance
+with Appendix I to 2 CFR Part 200(D.)(3.), and always maintain a current and active registration  at all
+times during which such organizations have an application under consideration for funding by NIH and,
+if an award is made, until a final financial report is submitted or the final payment is received, whichever
+is later. The applicant organization or recipient must review and update its information in SAM.gov annually from the date of initial registration or subsequent updates to ensure it is current, accurate, and complete. If applicable, this includes identifying the applicant’s or recipient’s immediate and highest-level
+owner and subsidiaries, as well as providing information on all predecessors that have received a Federal
+award or contract within the last three years. SAM is the primary registrant database for the Federal government and is the repository into which an entity must provide information required for the conduct of
+business as a recipient. SAM is the central repository for common government-wide certifications and
+representations required of NIH applicants and recipients. Additional information about registration procedures may be found at the SAM.gov internet site.
+A Unique Entity Identifier (UEI) is issued as part of the SAM.gov registration process. The UEI must be
+provided on application forms; the same UEI must be used for all registrations, as well as on the grant
+application.
+2.3.7.8 Graduate Student Compensation
+The maximum amount NIH will award for the support of a graduate student on a research grant or
+cooperative agreement is tied to the National Research Service Award (NRSA) zero-level stipend for
+postdoctoral fellows in effect at the time the grant award is issued on the Federal award date. Stipend
+levels are updated periodically in conjunction with an NIH annual appropriation and are published in the
+NIH Guide for Grants and Contracts. Consistent with cost principles for Institutions of Higher Education
+(IHEs) described in 2 CFR Part 200.431(j) and 200.466, the compensation of graduate students supported by research grants must be reasonable.  The amount provided for compensation includes salary or
+wages, fringe benefits, and tuition remission.
+These guidelines apply to graduate students at the recipient institution who are supported by NIH
+research grants and cooperative agreements and not to individuals supported by NRSA training grants
+and fellowships. NIH has separate appropriations to support research training under the NRSA authorization at Section 487 of the Public Health Service Act.
+The stipends provided to recipients of NRSA support offset the cost-of-living during the period of training and are not considered equivalent to salaries or other forms of compensation provided to individuals
+supported on research grants. Nevertheless, the entry-level postdoctoral NRSA stipend provides a useful
+benchmark for an award amount that approximates a reasonable rate of compensation for graduate students. Expected future increases in NRSA stipends, to adjust for inflation, should permit annual increases
+in the maximum award for such individuals.
+For all new and competing grant and cooperative agreement awards, the NIH will provide reasonable
+amounts for graduate compensation, consistent with the requested budget for the position(s) and up to
+the currently effective NRSA zero postdoctoral stipend level. NIH staff will review the compensation
+requested for graduate students on competing and cooperative agreement applications for which a
+detailed budget is submitted. NIH will neither request nor accept budgets for those applications using a
+(GPS page I-64)
+
+modular budget format solely for the purpose of reviewing graduate student compensation. However,
+applicants should use this policy when estimating the number of modules.
+When submitting detailed budgets that request support for a graduate student, recipients are reminded to
+request actual institutional-based compensation and to provide information justifying the requested compensation level. If this information is not provided, NIH staff will obtain this information from the institution's business office for any request that appears excessive.
+NIH Institutes and Centers will review the requested compensation level and, if considered reasonable,
+will award the actual amount requested, up to a maximum equal to the NRSA zero level postdoctoral stipend. Revised budgets submitted solely to adjust requested levels for graduate students will not be accepted.
+Institutions may continue to rebudget funds to charge more than the awarded amount provided that OMB
+cost principles requiring reasonable compensation are observed. In general, graduate student compensation will not be considered reasonable if in excess of the amount paid to a first-year postdoctoral
+scientist at the same institution performing comparable work.
+2.3.7.9 NIH Data Management and Sharing and Genomic Data Sharing
+NIH issued the Data Management and Sharing (DMS) policy to promote the sharing of scientific data.
+Sharing scientific data accelerates biomedical research discovery, in part, by enabling validation of
+research results, providing accessibility to high-value datasets, and promoting data reuse for future
+research studies. Applicant projects that generate scientific data are subject to the DMS Policy. Additionally, if applicable, genomic data sharing considerations must be submitted with the application.
+Please refer to Section 8.2.3.1 Policy for Data Management and Sharing (DMS Policy) for more information.
+2.3.7.10 Human Fetal Tissue from elective abortions
+Effective January 22, 2026, NIH funds are not permitted for research using Human Fetal Tissue (HFT)
+from elective abortions. For ongoing projects as of January 22, organizations may rebudget released
+funds to support research under the same project that is not unallowable under this policy.
+2.3.7.11 Biographical Sketches (Biosketches)
+NIH requires submission of a biographical sketch (also referred to as biosketch) for each proposed senior/key personnel and other significant contributor.
+Applicants and recipients are required to submit biosketches in 1) competing applications for all types of
+grant programs; 2) in progress reports when new senior/key personnel or other significant contributors
+are identified; and 3) to support prior approval requests for changes in senior/key personnel status and
+changes of recipient organization.
+NIH staff and peer reviewers utilize the biosketch to ensure that individuals included on the applications
+are equipped with the skills, knowledge, and resources necessary to carry out the proposed research.
+Applications containing one or more biosketches that do not conform to the required format may be withdrawn.
+See the NIH Biosketch page for format pages, instructions and the NIH disclosure table.
+2.3.7.12 NIH Application Submission Limits
+NIH will only accept six new, renewal, resubmission, or revision applications from an individual Principal Investigator/Program Director or Multiple Principal Investigator for all council rounds in a  calendar
+year beginning with applications submitted for the September 25, 2025 due date. This policy applies to
+(GPS page I-65)
+
+all activity codes with the exception of T (Training grants), R25 (Research Education Grants) and R13
+(Conference Grants). See FAQs for more information on the process.
+2.3.7.13 Appropriate Use of Artificial Intelligence (AI)
+While NIH recognizes that AI tools may be appropriate to assist in limited aspects of application preparation, researchers should be aware that using AI comes with its own risks: AI use may result in plagiarism or possibly other kinds of research misconduct. NIH will not consider applications that are either
+substantially developed by AI, or contain sections substantially developed by AI, to be original ideas of
+applicants. If NIH identifies evidence of plagiarism, fabrication, or falsification, NIH will refer the matter to the HHS Office of Research Integrity for review.
+2.3.8 Application Forms
+Exhibit 3 lists the required application forms for competing applications, which vary by support mechanism. These forms and associated instructions are available on the NIH Forms and Format Pages..
+Exhibit 3.  Required Forms for Competing Applications
+Application Title
+Form Number
+Use
+SF424 (R&R) Application
+Guide for NIH and Other
+PHS Agencies
+SF424 (R&R)
+The SF424 (R&R) form set, combined with PHS
+398 components, is used for electronic submission.
+SF424 (R&R) Individual
+Fellowship  Application
+Guide for NIH and AHRQ
+SF424 (R&R)
+and
+PHS 416-1
+The SF424 (R&R) form set, combined with a PHS
+Fellowship Supplemental form component, is used
+for electronic submission of individual fellowship
+applications. The PHS 416-1 may be used for email form submissions of a change of sponsoring
+recipient organization application.
+Application for a Public
+Health Service Grant
+PHS 398
+Form PHS 398 is used for paper submission for
+those programs that have not yet transitioned to
+electronic submission.
+The NIH competing applications now require electronic application submission.  Questions about application forms and instructions may be directed to DGSI/OPERA, OER, NIH; see Part III for contact
+information.
+2.3.9 Application Receipt Information and Deadlines
+The NIH generally requires electronic submission of all competing and administrative supplement applications. Applicants should carefully read instructions in the NOFO and the application guide to determine
+submission requirements. The NOFO will either provide unique application deadlines or refer to NIH’s
+standard due dates.
+NIH expects all applications  to be submitted on time. Permission is not granted in advance for submission of a late application. Late applications are accepted only in extenuating circumstances and limited to two weeks past the due date. If an application is submitted late, a cover letter explaining the
+reasons for the delay must be included with the signed, completed application. Late applications are evaluated on an individual basis considering the reasons provided. Only DRR, CSR has the authority to
+(GPS page I-66)
+
+accept a late application; however, contacting DRR in advance will not influence the acceptance of a late
+application. The NIH policy on late applications is stated in the applicable application instructions.  Also
+see  Late Applications below.
+2.3.9.1 Electronic Submission Requirements
+NIH requires electronic submission of:
+• All competing (Type 1, Type 2) and administrative supplement (Type 3) applications;
+• All Research Performance Progress Reports (RPPRs), including interim and final RPPRs (submitted
+electronically through the eRA Commons RPPR module);
+• Change of recipient organization (Type 7) and successor-in-interest (Type 6) applications (may be submitted electronically via email).
+
+All applications, regardless of the NOFO type, must be successfully submitted electronically to Grants.gov on or before 5:00 p.m. local time (of the applicant organization) on the appropriate date listed in
+the funding opportunity.
+If an application due date falls on a weekend, it will be extended to the following Monday; any time the
+date falls on a Federal holiday, the due date will be extended to the following business day. The application will be on time if it is submitted on or before the following business day.
+Questions about application forms and instructions may be directed to DGSI/OPERA, OER, NIH; see
+Part III for contact information.
+2.3.9.2 Late Applications
+There is a two-week window of consideration after the application due date, during which time NIH
+might consider accepting a late application (see details below). When the application due date falls on a
+weekend or Federal holiday, and is extended to the next business day, the window of consideration for
+late submission of applications will be calculated from that business day. Acceptance of late applications
+will be made on a case-by-case basis, dependent upon the explanation provided in a cover letter submitted with the application.
+Generally, when an applicant organization is closed due to natural disaster or other emergency situation,
+applications must include a cover letter indicating the reasons for the delay. In general, the delay should
+not exceed the time period that the applicant organization is closed, unless otherwise notified by the
+agency. Additional information can be found on the NIH Extramural Response to Natural Disasters and
+Other Emergencies webpage.
+NIH will not consider accepting late applications under the following circumstances:
+ l Submissions to RFAs that must be reviewed on a compressed timeline and that have declared, in
+the Application Due Date field, “No late applications will be accepted for this Funding Opportunity”.
+ l Submissions to  any NOFOs (RFAs, PAs, PARs, PASs) after the two-week window of consideration.
+Please be aware that any reasons for late submission must be in relation to the individual(s) with the
+PD/PI role on the application. For multiple PD/PI (MPI) applications, the reasons may apply to any or all
+(GPS page I-67)
+
+of the PD/PIs. This accommodation does not apply to co-Investigators, project leaders in a multi-component application, or other Key Persons listed in an application (unless they also have MPI status).
+Examples of acceptable and unacceptable reasons for submission of a late application can be found in
+the NIH Submission Policies web page.
+The windows of time for consideration of late applications have been carefully chosen so that the late
+applications can be processed with the cohort of on-time applications.
+Late applications are evaluated on an individual basis considering the reasons provided. Contacting the
+Division of Receipt and Referral, Center for Scientific Review (CSR), NIH in advance will not influence
+the acceptance of a late application. Additional information on submission of electronic applications can
+be found in the applicable SF424 (R&R) Application Guide.
+2.3.9.3 Continuous Submission  for Appointed Members of NIH Federal Advisory
+Committees
+ Continuous Submission allows eligible members of NIH Federal Advisory Committees to submit applications for certain grant activity codes after the standard due date, until last day of the receipt period for
+each Advisory Council Round.
+ PD/PI individuals serving as appointed members of the following categories of NIH Federal Advisory
+Committees are eligible:
+ l Chartered NIH Initial / Integrated Review Groups (IRGs),
+ l NIH Boards of Scientific Counselors,
+ l NIH Advisory Boards or Councils,
+ l NIH Program Advisory Committees.
+Eligibility begins on the date the appointment becomes active and continues for six weeks after the official date of retirement from appointed committee service. Thus, if retirement from appointed service
+occurs on June 30, continuous submission is permitted until August 16th of that year.
+Continuous submission eligibility can be viewed in the reviewer's eRA Commons Personal Profile, in the
+Reviewer Information section.
+eRA Commons users with account administration roles (e.g., SO – Signing Official, AO – Administrative Official, AA – Account Administrator, BO – Business Official) can check an investigator’s eligibility using the Advanced Search feature in the Admin module.
+Under Continuous Submission, applications received after the Advisory Council Round continuous submission period end dates will be assigned to the next Advisory Council Round, as described on the NIH
+Continuous Submission website. Please direct any continuous submission issues, including Grants.gov
+rejection messages, to the eRA Service Desk.
+See NIH Continuous Submission website for details and procedures..
+2.3.9.4 Similar, Essentially Identical, or Identical Applications
+Simultaneous submissions of identical applications to one or more components of the PHS are not
+allowed, and the NIH will not accept similar grant applications with essentially the same research focus
+from the same applicant organization for the same receipt date. This includes derivative or multiple
+applications that propose to develop a single product, process, or service that, with non-substantive modifications, can be applied to a variety of purposes. Likewise, identical or essentially identical grant applications submitted by different applicant organizations will not be accepted for the same receipt date.
+(GPS page I-68)
+
+Applicant organizations should ascertain and assure that the materials they are submitting on behalf of
+the principal investigator are the original work of the principal investigator and have not been used elsewhere in the preparation and submission of a similar grant application. Applications to the NIH are
+grouped by scientific discipline for review by individual Scientific Review Groups and not by disease or
+disease state. The reviewers can thus easily identify multiple grant applications for essentially the same
+project. In these cases, application processing may be delayed, or the application(s) may not be
+reviewed.
+Essentially identical applications will not be reviewed except for: 1) individuals submitting an application for an Independent Scientist Award (K02) proposing essentially identical research in an application
+for an individual research project; or 2) individuals submitting an individual research project identical to
+a subproject that is part of a program project or center grant application.
+2.3.9.5 Application Non-conformity
+Applicants are reminded that non-conformity with application requirements can have serious consequences. NIH may withdraw any application identified during the receipt, referral and review process
+that does not conform with the instructions in the SF424 (R&R) Application Guide, the Notice of Funding Opportunity, and relevant NIH Guide Notices.
+Some examples of how this policy is applied to NIH applications include but are not limited to:
+ l Applications containing  biosketches that do not conform to the required format may be withdrawn.
+ l Applications that do not conform to the page limit requirements because inappropriate materials
+have been included in other parts of the application may be withdrawn.
+ l Applications submitted as new but containing elements of a resubmission or renewal application
+that do not conform with the resubmission policy and may be withdrawn.
+ l Applications submitted after 5 PM local (applicant organization) time on the application due date
+may be withdrawn.
+It is important to remember that these are just examples, and that all requirements specified in the SF424
+(R&R) Application Guide, the Notice of Funding Opportunity, and relevant NIH Guide Notices are to be
+followed.  Questions about application requirements can be directed to NIH "Grants Info" or the Division
+of Receipt and Referral.
+If an application is withdrawn because it does not conform to the application preparation and submission
+instructions, a letter will be placed in the eRA Commons Status page for that application.
+2.3.9.6 Natural Disasters and Other Emergencies
+For major disasters impacting many organizations, NIH will coordinate with other HHS components and
+Federal agencies (such as FEMA and OMB), as well as with state, local, and institutional representatives, to develop any additional response. NIH will consider such issues as whether a Federal
+Disaster is declared; the severity of damage inflicted; the length of time an organization may be required
+to close or that is required for recovery; the impact on investigators, human research subjects, and animal
+subjects; and the overall impact on the community.
+Late applications due to natural disasters or other emergency situations are subject to the late application
+policy found in NIHGPS Section 2.3.9.2.1.
+NIH responses to specific events will be issued in the form of an NIH Guide Notice published in the
+NIH Guide for Grants and Contracts.
+(GPS page I-69)
+
+2.3.10 Fraud, Waste and Abuse of NIH Grant Funds
+Any individual who becomes aware of the existence (or apparent existence) of fraud, waste, or abuse
+related to NIH grants or grant funds should consider contact:
+ l Your institution’s Office of Sponsored Research, Compliance Office, or other responsible office,
+ l The NIH CGMO listed in the NoA for the IC that funded the grant,
+ l The DGCO/OPERA/OER.
+In addition, allegations of criminal offenses should be reported to the Department of Health and Human
+Services, OIG Hotline.
+The OIG has authority within HHS to conduct criminal investigations. The HHS OIG maintains a post
+office box and a toll-free hotline for receiving information from individuals concerning fraud, waste, or
+abuse under HHS grants and cooperative agreements. The identity of the caller is kept confidential, and
+callers are not required to give their names. The address and telephone number of the OIG and the OIG
+hotline are included in Part III.
+Further allegations of non-criminal misuse of grant funds, and recipient conflict of interest should be
+reported to the NIH OMA.
+OMA provides a centralized management survey and review capability to promote program integrity,
+conducts appraisals of alleged incidents of waste, fraud, and abuse and has lead responsibility for cases
+received through the Office of Inspector General (OIG) Hotline that are referred to NIH for action. OMA
+has no authority to undertake criminal investigations. OMA refers all allegations of criminal offenses to
+the OIG for investigation. The address and telephone number for the OMA, DPI are included in Part III.
+False statements involving falsified, fabricated, or plagiarized information identified during research misconduct proceedings should be reported to the NIH Extramural Research Integrity Officer.
+Examples of fraud, waste, and abuse that should be reported include, but are not limited to, embezzlement, misuse, or misappropriation of grant funds or property, and false statements, whether by organizations or individuals. Other examples include theft of grant funds for personal use; using funds for nongrant-related purposes; theft of federally owned property or property acquired or leased under a grant;
+charging the Federal government for the services of “ghost” individuals; charging inflated building rental
+fees for a building owned by the recipient; submitting false financial reports; and submitting false financial data in bids submitted to the recipient (for eventual payment under the grant).
+The Federal government may pursue administrative, civil, or criminal action under a variety of statutes
+relating to fraud and making false statement or claims. Part II includes administrative and other remedies
+the Federal government may use if a recipient deliberately withholds information or submits fraudulent
+information or does not comply with applicable requirements. Even if a grant is not awarded, the applicant may be subject to penalties if the information contained in or submitted as part of an application,
+including its certifications and assurances, is found to be false, fictitious, or fraudulent.
+The Program Fraud Civil Remedies Act of 1986, 31 U.S.C. 3801 et seq., provides for the administrative
+imposition by HHS of civil penalties and assessments against any person who knowingly makes false,
+fictitious, or fraudulent claims to the Federal government for money, including money representing
+grants, loans, or benefits. A civil penalty of not more than $5,500 may be assessed for each such claim.
+If a grant is awarded and payment is made on a false or fraudulent claim, an assessment of not more than
+twice the amount of the claim, up to $150,000, may be made in lieu of damages. Regulations established
+by HHS at 45 CFR Part 79 specify the review process for imposing civil penalties and assessments,
+including hearing and appeal rights.
+(GPS page I-70)
+
+The Criminal False Claims Act, 18 U.S.C. 287, and 18 U.S.C. 1001, provides for criminal prosecution of
+a person who knowingly makes or presents any false, fictitious, or fraudulent statements or representations or claims against the United States. Violations of these statutes carry a maximum sentence
+of five and eight years imprisonment, respectively.
+The Civil False Claims Act, 31 U.S.C. 3729(a), provides for imposition of penalties and damages by the
+United States, through civil litigation, against any person who knowingly makes a false or fraudulent
+claim for payment, makes or uses a false record or false statement to get a false claim paid or approved,
+or conspires to defraud the Federal government to get a false claim paid. A “claim” includes any request
+or demand for money or property made to the United States or to a contractor, recipient, or other recipient, if the Federal government provides or will reimburse any portion of the funds claimed. Civil penalties of $5,500 to $11,000 may be imposed for each false claim, plus damages of up to three times the
+amount of the damages the government sustains because of the violation, and the costs of any civil
+action brought to recover such penalties and damages.
+NIH also may administratively recover misspent grant funds pursuant to the authorities contained in 2
+CFR Part 200.
+2.3.11 Availability and Confidentiality of Information
+2.3.11.1 Availability of Information
+Except for certain types of information that may be considered proprietary or private information that
+cannot be released, most grant-related information submitted to NIH by the applicant or recipient in the
+application or in the post-award phase is considered public information and, once an award is made, is
+subject to possible release to individuals or organizations outside NIH. The statutes and policies that
+require this information to be made public are intended to foster an open system of government and
+accountability for governmental programs and expenditures and, in the case of research, to provide
+information about federally funded activities.
+NIH routinely places information about awarded grants, including project title, the name of the PD/PI,
+and the project description, on the RePORT Web site. For funded research grant applications, NIH also
+sends the project description provided by an applicant to the DoC’s NTIS. NTIS disseminates scientific
+information for classification and program analysis. The public may obtain the project descriptions from
+RePORT or request them from NTIS. Other information may be released case by case as described in
+this subsection.
+Several policies require acknowledgment of support and a disclaimer for publications, inventions, and
+other research products, as provided in Administrative Requirements—Availability of Research Results:
+Publications, Intellectual Property Rights, and Sharing Research Resources and elsewhere in the
+NIHGPS.
+2.3.11.2 Confidentiality of Information
+Applicants are discouraged from submitting information considered proprietary unless it is deemed essential for proper evaluation of the application. However, if the application contains information that the
+applicant organization considers to be trade secrets, information that is commercial or financial, or
+information that is privileged or confidential, the pages containing that information should be identified
+as specified in the application instructions.
+When such information is included in the application, it is furnished to the Federal government in confidence, with the understanding that the information will be used or disclosed only for evaluation of the
+application. The information contained in an application will be protected by NIH from unauthorized
+(GPS page I-71)
+
+disclosure, consistent with the need for peer review of the application (including the agreement by peer
+reviewers and Advisory Council members to the NIH confidentiality and nondisclosure rules); and the
+requirements of the FOIA and Privacy Act (5 U.S.C. 552 as discussed below). However, if a grant is
+awarded as a result of or in connection with an application, the Federal government has the right to use
+or disclose the information to the extent authorized by law. This restriction does not limit the Federal
+government’s right to use the information if it is obtained without restriction from another source.
+2.3.11.2.1 Privacy Act
+The Privacy Act of 1974, 5 U.S.C. 552a (as amended), and its implementing regulations (45 CFR Part
+5b) provide certain safeguards for information about individuals maintained in a system of records (i.e.,
+information may be retrieved by the individual’s name or other identifying information). These safeguards include the rights of individuals to know what information about them is maintained in Federal
+agencies’ files (hard copy or electronic) and how it is used, how they may obtain access to their records,
+and how to correct, amend, or request deletion of information in their records that is factually incorrect.
+The NIH maintains application and grant records as part of a system of records as defined by the Privacy
+Act: NIH 09-25-0225.
+This system of record provides guidance on requirements for the management of applicable grant records
+in NIH’s possession and include appropriate routine uses of such information. It also includes requirements for safeguarding the records and for record retention and disposal.
+Parties other than PD/PIs may request the release of Privacy Act grant records. Such requests are processed under FOIA. For example, information requested by co-investigators in grant applications is
+released to them only when required under FOIA because they have no right of access under the Privacy
+Act. When releasing information about an individual to a party other than the subject of the file, NIH
+will balance the individual’s right to privacy with the public’s right to know as provided by the FOIA.
+Records maintained by recipients ordinarily are not subject to the requirements of 45 CFR Part 5b.
+2.3.11.2.2 The Freedom of Information Act
+The Freedom of Information Act, 5 U.S.C. 552, and implementing HHS regulations (45 CFR Part 5)
+require NIH to release certain grant documents and records requested by members of the public, regardless of the intended use of the information. These policies and regulations apply to information in the
+possession of NIH. Generally, NIH cannot require recipients or contractors under grants to permit public
+access to their records. An exception related to certain research data is described in this subsection.
+NIH generally will release the following types of records pursuant to a FOIA request:
+ l Funded applications and funded progress reports, including award data.
+ l Final reports that have been transmitted to the recipient organization of any audit, survey,
+review, or evaluation of recipient performance.
+NIH generally will withhold the following types of records or information in response to a FOIA
+request:
+ l Pending competing grant applications
+ l Unfunded new, renewal, and revision applications
+ l Financial information pertaining to project personnel, such as institutional base salary information
+(GPS page I-72)
+
+l Information pertaining to an individual, the disclosure of which would constitute a clearly unwarranted invasion of personal privacy
+ l Predecisional opinions in interagency or intraagency memorandums or letters expressed by
+Federal government officers, employees, or consultants
+ l Evaluative portions of site visit reports and peer review summary statements, including impact
+scores
+ l Trade secrets and commercial, financial, and otherwise intrinsically valuable items of information that are obtained from a person or organization and are privileged or confidential
+ l Information which, if released, would adversely affect the competitive position of the person or
+organization
+ l Patent or other valuable commercial rights of the person or organization
+Applicants are instructed to identify proprietary information at the time of submission of an application.
+If, after receiving a FOIA request, NIH has substantial reason to believe that information in its records
+could reasonably be considered exempt from release, the appropriate NIH FOI office will notify the
+applicant or recipient, through the PD/PI, before the information is released. In the case of multiple
+PD/PI’s the Contact PD/PI will be notified and is responsible for coordinating any response to the notice.
+Multiple responses to the notice will not be accepted. If an applicant fails to identify proprietary information at the time of submission as instructed in the application guide, a significant substantive justification will be required to withhold the information if requested under FOIA. The PD/PI will be given
+five (5) working days to identify potentially patentable or commercially valuable information that the
+PD/PI believes should not be disclosed. Any such submission must be specific as to the nature and type
+of commercial harm that will result if the requested information is released. Submissions that merely
+state in general terms that the grant application or portions should not be released will not be honored. If
+the PD/PI does not respond within that time period, the grant will be prepared for release in accordance
+with applicable FOIA policies and released to the requester. If the PD/PI does identify commercial or
+proprietary information an NIH official will review that response. After NIH consideration of the
+response, the PD/PI and recipient will be informed if NIH does not agree with the PD/PI’s position. If a
+document contains both disclosable and non-disclosable information, the non-disclosable information
+will be redacted and the balance of the document will be disclosed.
+The HHS regulations implementing FOIA provide that only the NIH FOI Officer may deny requests for
+information. Requests for information, the release of which is believed to be exempt under FOIA, are
+referred to the NIH FOI Officer along with written documentation of the rationale for nondisclosure. If
+the NIH FOI Officer determines that the requested information is exempt from release under FOIA, the
+requester may appeal that determination to the Deputy Assistant Secretary for Public Affairs (Media),
+HHS. Additional information on the FOIA process is available at the NIH FOI Office Web site.
+2.3.11.2.3 Release of Research Data
+NIH handles requests for the release of research data by certain types of recipients as FOIA requests.
+The term “research data” is defined as the recorded factual material commonly accepted in the scientific
+community as necessary to validate research findings. It does not include preliminary analyses; drafts of
+scientific papers; plans for future research; peer reviews; communications with colleagues; physical
+objects (e.g., laboratory samples, audio or video tapes); trade secrets; commercial information; materials
+necessary to be held confidential by a researcher until publication in a peer-reviewed journal; information that is protected under the law (e.g., intellectual property); personnel and medical files and similar
+files, the disclosure of which would constitute an unwarranted invasion of personal privacy; or information that could be used to identify a particular person in a research study.
+(GPS page I-73)
+
+As required by 2 CFR Part 200.315, recipients that are institutions of higher education, hospitals, or nonprofit organizations must release research data first produced in a project supported in whole or in part
+with Federal funds that are cited publicly and officially by a Federal agency in support of an action that
+has the force and effect of law (i.e., regulations and administrative orders). If the data are publicly available, NIH directs the requester to the public source. Otherwise, the IC FOI coordinator handles the
+request, consulting with the affected recipient and the PD/PI. This requirement also provides for assessment of a reasonable fee to cover recipient costs and (separately) the NIH costs of responding.
+This requirement to release research data does not apply to for-profit organizations or to research data
+produced by State or local governments. However, if a State or local governmental recipient contracts
+with an IHE, hospital, or non-profit organization, and the contract results in covered research data, those
+data are subject to the disclosure requirement.
+Additional information is available on the Data Management & Sharing Policy Overview web page.
+(Also see Administrative Requirements—Availability of Research Results: Publications, Intellectual
+Property Rights, and Sharing Research Resources.)
+2.3.12 Protecting Sensitive Data and Information Used in Research
+Recipients of NIH funds have a vital responsibility to protect sensitive and confidential data as part of
+proper stewardship of federally funded research, and take all reasonable and appropriate cybersecurity
+and other actions to prevent the inadvertent disclosure, release or loss of sensitive personal information.
+NIH advises that personally identifiable, sensitive, and confidential information about NIH-supported
+research or research participants not be housed on portable electronic devices. If portable electronic
+devices must be used, they should be encrypted to safeguard data and information. These devices include
+laptops, tablets, mobile devices, CDs, disc drives, flash drives, etc. Researchers and institutions also
+should limit access to personally identifiable information through proper access controls such as password protection and other means. Research data should be transmitted only when the security of the
+recipient’s systems is known and is satisfactory to the transmitter. See also Public Policy Requirements
+and Objectives—Federal Information Security Management Act.
+2.4 THE PEER REVIEW PROCESS
+NIH policy is intended to ensure that applications for funding submitted to NIH are evaluated on the
+basis of a process that is fair,  timely, and conducted in a manner that strives to eliminate bias. Competing
+applications for NIH grants and cooperative agreements, including renewals and revisions, are subject to
+peer review as required by sections 406 and 492 of the PHS Act, as amended by the NIH Reform Act of
+2006 and 21st Century Cures Act. The peer review system used by NIH, often referred to as the “dual
+review system,” is based on two sequential levels of review for each application—initial review for scientific and technical merit by NIH’s Center for Scientific Review (CSR), and a second level of review
+for mission relevance by the IC National Advisory Council / Board.
+The NIH peer review process has evolved over the years to accommodate increasingly collaborative and
+multi-disciplinary research, changes in workload, resource constraints, and recommendations of various
+scientific and professional groups. However, the underlying basis for the system—to provide a fair and
+objective review process in the overall interest of science—has not changed. Information concerning
+NIH's peer review process may be found at NIH's web site or Peer Review Policies and Practices on the
+NIH Grants & Funding web site.
+(GPS page I-74)
+
+2.4.1 Initial Review
+2.4.1.1 Responsibilities
+The Division of Receipt and Referral (DRR) within the CSR receives all competing grant applications
+submitted to NIH.
+CSR centrally reviews the application for completeness and  responsiveness to the NOFO, as applicable,
+conducts the initial technical review for scientific merit and prepares the summary statements.
+CSR Referral Officers, who are senior health scientist administrators with both research and scientific
+review experience, assign each application to one or more ICs for potential funding and to a specific
+study section  for initial review of the scientific merit of the application. These assignments are made on
+the basis of the application’s contents and  referral guidelines.
+CSR's study sections are organized into Review Branches by scientific discipline or current research
+areas and are managed by health scientist administrators functioning as SROs. Generally, study sections
+are chartered groups composed of formally appointed members serving multiyear terms, to which the
+SRO often adds temporary members or other additional reviewers. Ad hoc Special Emphasis Panels
+(SEPs) are formed to review applications that cannot be reviewed by a standing review group or study
+section because they require special expertise or involve other special circumstances.
+SRGs, whether study sections or SEPs, are primarily composed of non-federal scientists who have expertise in relevant scientific disciplines and are actively engaged in research. NIH’s conflict-of-interest and
+confidentiality of information requirements for reviewers are intended to promote an unbiased review
+process by minimizing even the appearance of a conflict of interest and by restricting the use of privileged application information.
+Applicants are notified by e-mail that their application has been received and that they can find information about the application's SRO, SRG, and IC assignments in eRA Commons. At this time, applicants
+may request reconsideration of the SRG and IC assignment. Applicants also are notified by e-mail to
+check eRA Commons for any change in the application’s SRG or IC assignment, as well as a change in
+Council date. Once the assignment process is completed, the SRO, not the PO, is the primary contact for
+communication with the applicant until the summary statement is released. An applicant organization
+may withdraw an application from consideration at any time during the review process. A request to
+withdraw an application must be signed by the PD/PI and an AOR, and submitted to the SRO.
+In preparation for the initial review, SROs review applications to determine whether they are complete
+and conform to administrative requirements. For each reviewable application, they then assign (from
+among the standing and temporary members) at least three reviewers to write a critique of the application, provide initial scores, and to be prepared to discuss the application in detail.
+Following the initial review, the SRO prepares a summary statement for most applications reviewed. The
+summary statement includes the reviewers’ written comments, and, for scored applications, a summary
+of the discussion, and an overall impact score. Summary statements are then  provided to the IC’s  Advisory Councils, the PD(s)/PI(s), and applicant institution's Authorized Organization Representative.
+2.4.1.2 Overall Impact
+Reviewers assess overall impact in the determination of scientific and technical merit; overall impact is
+defined based on the different types of applications.  When considering applications for research grants
+and cooperative agreements, reviewers will provide an overall impact score to reflect their assessment of
+the likelihood for the project to exert a sustained, powerful influence on the research field(s) involved, in
+consideration of the five scored review criteria, and additional review criteria (as applicable for the
+(GPS page I-75)
+
+project proposed). These criteria are evaluated and scored in accordance with the applicable peer review
+framework (standard or Simplified Review Framework (SRF.)
+NIH utilizes SRF for the peer review of the majority of competing research project grants (applications
+under the following activity codes: R01, R03, R15, R16, R21, R33, R34, R36, R61, RC1, RC2, RC4,
+RF1, RL1, RL2, U01, U34, U3R, UA5, UC1, UC2, UC4, UF1, UG3, UH2, UH3, UH5, (including the
+following phased awards: R21/R33, UH2/UH3, UG3/UH3, R61/R33).
+All other research project grant applications utilize the standard peer review criteria.
+2.4.1.3 Standard Scored Review Criteria (Non SRF-applicable activity codes)
+The goals of NIH-supported research are to advance the understanding of biological systems, improve
+the control of disease, enhance health, and reduce illness and disability. For research grant applications,
+and most other types of applications, reviewers evaluate the overall impact of the proposed project based
+on five regulatory criteria: Significance, Investigator(s), Innovation, Approach, and Environment.
+For non SRF-applicable activity codes, reviewers will consider each of the five criteria below in the
+determination of scientific and technical merit, and determine a separate score for each. An application
+does not need to be strong in all categories to be evaluated likely to have a major scientific impact. For
+example, a project that by its nature is not innovative may be essential to advance a field.
+ l Significance
+ l Investigator(s)
+ l Innovation
+ l Approach
+ l Environment
+The NOFO should be consulted for additional information describing each of the scored review criteria.
+2.4.1.4 Standard Additional Review Criteria (Non SRF-applicable activity codes)
+As applicable for the project proposed, reviewers will consider the following additional items in the
+determination of scientific and technical merit, and in providing an overall impact score, but will not
+give separate scores for these items.
+ l Protections for Human Subjects
+ l Inclusion of Human Subjects, Policies
+ l Vertebrate Animals
+ l Biohazards
+ l Resubmission /Renewal / Revision Applications
+The NOFO should be consulted for additional information describing each of the relevant additional
+review criteria.
+2.4.1.5 Standard Additional Review Considerations (Non SRF-applicable activity
+codes)
+As applicable for the project proposed, reviewers will consider each of the following items, but will not
+give scores for these items and  should not consider them in providing an overall impact score.
+(GPS page I-76)
+
+l Provision of Family Care Facilities (for Conference Grant Applications)
+ l Select Agent Research
+ l Resource Sharing Plans
+ l Authentication of Key Biological and/or Chemical Resources
+ l Budget and Period of Support
+The NOFO should be consulted for additional information describing each of the relevant additional
+review considerations.
+Although these review criteria are intended for use primarily with investigator-initiated research project
+grant applications (e.g., R24 and P01), including those in response to PAs, to the extent reasonable, the
+criteria also will form the basis of the review of solicited applications and research related activities.
+However, for some activities (e.g., construction grants and research project grants subject to the Simplified Review Framework), the use of these criteria may not be feasible. Applications also may be
+reviewed against other pertinent factors as stated in NOFOs.
+2.4.1.6 Simplified Review Framework (SRF)
+Due to the inherent complexity of the peer review process, NIH utilizes the Simplified Review Framework (SRF) for the peer review of the majority of competing research project grants (applications under
+the following activity codes: R01, R03, R15, R16, R21, R33, R34, R36, R61, RC1, RC2, RC4, RF1,
+RL1, RL2, U01, U34, U3R, UA5, UC1, UC2, UC4, UF1, UG3, UH2, UH3, UH5, (including the following phased awards: R21/R33, UH2/UH3, UG3/UH3, R61/R33). The SRF enables peer reviewers to
+better focus on the central questions necessary to assess the scientific and technical merit of a proposed
+research project: the importance of the proposed research, whether the proposed research methods are rigorous and feasible, and whether the investigators and institution have the expertise and resources necessary to carry out the project as proposed. Additionally, the use of the SRF aids NIH in mitigating the
+effect of reputational bias by refocusing the evaluation of the investigator/environment to within the context of the proposed and research and also reduces burden on the reviewer by shifting policy compliance
+activities to NIH staff.
+SRF Review Criteria
+The SRF reorganizes the five regulatory criteria into three factors as listed below. Each factor is evaluated by the Reviewer in the determination of scientific merit, and in providing an overall impact score.
+Factors 1 and 2 will each receive a separate criterion score; Factor 3 will be evaluated for sufficiency.
+An application does not need to be strong in all categories to be judged likely to have major scientific
+impact.
+Factor 1. Importance of the Research (scored 1-9):
+ l Significance
+ l Innovation
+Factor 2. Rigor and Feasibility (Scored 1-9)
+ l Approach (also includes Inclusion and Clinical Trial Study Timeline)
+Factor 3. Expertise and Resources (considered in overall impact: no individual score provided)
+ l Investigator(s), Environment
+ o Evaluated as 'appropriate' or 'gaps identified'
+ o Reviewer is required to provide further explanation, if gaps are defined.
+(GPS page I-77)
+
+SRF Additional Review Criteria (can affect overall impact score)
+As applicable for the project proposed, reviewers will consider the following additional items in the
+determination of scientific and technical merit, and in providing an overall impact score, but will not
+give separate scores for these items:
+ l Protections for Human Subjects
+ l Vertebrate Animals
+ l Biohazards
+ l Resubmission / Renewal / Revision Applications
+The NOFO should be consulted for additional information describing each of the relevant additional
+review criteria.
+SRF Additional Review Considerations (No effect on overall impact score)
+As applicable for the project proposed, reviewers will consider each of the following items, but will not
+give scores for these items, and should not consider them in providing an overall impact score.
+ l Authentication of Key Biological and/or Chemical Resources
+ l Budget and Period of Support
+2.4.2 Appeals of Initial Scientific Review
+To preserve and underscore the fairness of the NIH peer review process, NIH has established a peer
+review appeal system to provide applicants the opportunity to seek reconsideration of the initial review
+results if, after consideration of the summary statement, they believe the review process was procedurally flawed. The NIH policy for appeals of initial peer review does not apply to appeals of the technical evaluation of Research and Development contract projects through the NIH peer review process,
+appeals of NIH funding decisions, or appeals of decisions concerning extensions of MERIT awards. In
+addition, NIH will not review a resubmission application when an appeal of initial peer review is
+pending on the original application. As stated in the Notice of Funding Opportunity, appeals of initial
+peer review outcome will not be accepted for applications in response to an RFA.
+An appeal is a written communication from a Program Director/Principal Investigator (PD/PI) and/or
+applicant institution that meets the following four criteria: 1) is received after issuance of the summary
+statement and up to 30 calendar days after the second level of peer review, 2) describes a flaw or perceived flaw in the review process for a particular application, 3) is based on one or more of four allowable issues (described below), and 4) displays concurrence from the Authorized Organization
+Representative (AOR).
+An applicant who is concerned about procedural aspects related to the completed initial peer review of
+their application first should consider the comments in the summary statement, and then should contact
+the appropriate NIH Program Official (PO). Following discussion of concerns with the PO, if the PD/PI
+and/or an official of the applicant organization wishes to appeal the outcome of the initial peer review
+process, an appeal letter must be submitted, either in hard copy or electronically, to the PO. The appeal
+letter must display concurrence from the AOR of the applicant organization for the application. Although
+the content of the appeal letter may originate from the PD/PI, Contact PD/PI for multiple PD/PI applications, or an organizational official(s) (not necessarily the AOR), the AOR must send the letter directly
+to the PO, or must send their concurrence to the PD/PI who will forward the materials and AOR concurrence to the PO. A communication from the PD/PI or official of the applicant organization (other than
+(GPS page I-78)
+
+the AOR) only or with a “cc” to the AOR will not be accepted. The PO will send the PD/PI and/or institutional official, and AOR, an acknowledgement letter within 10 days of receipt of the appeal letter.
+An appeal letter will be accepted only if the letter 1) describes the flaws in the review process for the
+application in question, 2) explains the reasons for the appeal, and 3) is based on one or more of the following issues related to the process of the initial peer review:
+ l Evidence of bias on the part of one or more peer reviewers.
+ l Conflict of interest, as specified in regulation at 42 CFR Part 52h.5 “Scientific Peer Review of
+Research Grant Applications and Research and Development Contract Projects”, on the part of
+one or more non-Federal peer reviewers.
+ l Lack of appropriate expertise within the SRG.
+ l Factual error(s) made by one or more reviewers that could have altered the outcome of review
+substantially.
+Appeal letters based solely on differences of scientific opinion will not be accepted. A letter that does
+not meet these criteria and/or does not include the concurrence of the AOR will not be considered an
+appeal letter, but rather a grievance. The IC will handle grievances according to IC-specific procedures.
+If review staff and program staff do not support the appeal, or do not agree on its merit, the PD/PI and/or
+an institutional official (not necessarily the AOR) may elect to withdraw the appeal letter. The request to
+withdraw an appeal letter must be submitted either in hard copy or electronically to the PO, and must display concurrence from the AOR of the applicant organization for the application. Although the content
+of the request may originate from the PD/PI, Contact PD/PI for multiple PD/PI applications, or an organizational official(s) (not necessarily the AOR), the AOR must send the request directly to the PO, or
+must send their concurrence to the PD/PI who will forward the materials and their concurrence to the
+PO. A communication from the PD/PI or institutional official (other than the AOR) only or with a “cc”
+to the AOR will not be accepted.
+If review staff and program staff do not support the appeal, or do not agree on its merit, and the appeal
+letter is not withdrawn, the appeal letter will be made available to Council. The IC may not deny the
+PD/PI or applicant organization the opportunity to have an appeal letter made available to Council. Only
+two outcomes are possible following consideration of an appeal letter by Council:
+ l The Council may concur with the appeal, and recommend that the application be re-reviewed.
+ l The Council may concur with the SRG's recommendation and deny the appeal. Although factual
+errors or other issues may be evident, the Council may determine that these factors were unlikely
+to alter the final outcome of the SRG and deny the appeal. No action by the Council is equivalent to concurrence with the SRG’s recommendation and denial of the appeal.
+The recommendation of Council concerning resolution of an appeal is final and will not be considered
+again by the NIH through this or another process.
+The Executive Secretary for the Council will communicate the Council recommendation concerning an
+appeal to the PD/PI, AOR, and NIH staff with a need to know. If the appeal letter was received by the IC
+deadline, the PD/PI and AOR will receive a written explanation of the resolution no later than 30 calendar days after the Council meeting. If the appeal letter was received after the IC deadline, the Executive Secretary will provide, no more than 30 calendar days after the date when the appeal letter was
+received, a written explanation of the IC’s plan for making the appeal available to Council.
+If the Council recommended that the application be re-reviewed, the original application will be rereviewed without additional materials or modifications. The application may be re-reviewed by the same
+(GPS page I-79)
+
+or a different SRG, depending on the flaws in the original review process that led to the appeal. In most
+cases, the re-review will entail re-assignment to a subsequent review round and delay in the final funding
+decision. The outcome of the re-review is final and cannot be appealed again.
+On occasion, and for specific circumstances, the NIH may suspend temporarily the policy and process
+for handling appeals of NIH initial peer review. Such decisions will be announced in NIH Guide Notices
+and/or the relevant Notice of Funding Opportunity.
+2.4.3 National Advisory Council or Board Review
+The IC National Advisory Council or Board (hereafter “Council”) provides the second level peer review
+of applications for grants and cooperative agreements. The Council members review the summary statement and are asked to concur with the initial peer review for scientific and technical merit, as judged by
+the SRG, and to consider relevance to the IC’s programs and priorities.  Council members include senior
+scientists with broad experience and members of the public with general knowledge of, and interest in,
+the IC’s mission. The Council may concur with the SRG’s recommendation, may decide not to recommend an application on the basis of program or policy considerations, or may recommend deferral of an
+application and refer it back to the SRG for re-review.
+In addition, Council members will receive a list of competing applications that will be considered for
+funding from PD/PIs that meet the threshold for Special Council Review. These are investigators who
+currently receive $2 million or more in total costs (inclusive of direct and indirect) per year of NIH funding to support Research Project Grants. Council members will be asked to recommend consideration of
+funding for applications that afford a unique opportunity to advance research which is both highly promising and distinct from the other funded projects from the PD/PI. This does not represent a cap to NIH
+funding.
+With very limited exception, an application may not be considered for funding unless it has received a
+favorable recommendation by both the SRG and the Council. For some applications (e.g., Kirschstein
+NRSA Fellowship applications) the second level of review is conducted by senior level IC staff.
+2.4.4 Disposition of Applications
+Consistent with 2 CFR 200.204 and 200.205, all incomplete applications, non-compliant applications,
+and applications determined to be nonresponsive to NOFO requirements will not be reviewed. If the
+NOFO remains open with subsequent submission dates, the applicant may resubmit a corrected or complete version of an investigator-initiated application for consideration in the next review cycle. An application may resubmit one application may be submitted for an appropriate due date up to 37 months after
+the application due date of the initial application, provided the NOFO allows resubmission applications.
+Any application on the same topic proposed as a resubmission more than 37 months from the initial
+receipt date will not be accepted; it must be formatted and submitted as a new application.
+For complete, compliant and responsive applications, following the initial scientific peer review, the summary statement will be available to the PD/PI and AORs of the applicant organization with the Signing
+Official (SO) user role in the eRA Commons. Applicants just receiving their summary statements should
+consult the NIH Next Steps page for detailed guidance. If an application does not result in funding, there
+may be an opportunity to respond to the reviewers’ comments and resubmit the application, provided the
+NOFO allows resubmission applications.  Applicants seeking advice beyond that available online may
+want to contact the NIH Program Officer listed at the top of the summary statement.
+The IC Director or designee is the official who has the authority to make final award decisions from
+among those applications receiving a favorable initial review and Council recommendation. If an
+(GPS page I-80)
+
+application has been recommended for further consideration but is not expected to be funded in the current cycle, the application may be held by NIH for one or more additional cycles and will compete with
+other applications submitted for that cycle. If an application is unsuccessful, the applicant may subsequently submit one revised version of the application (referred to as a resubmission) for review in a
+future cycle.
+Some of the ICs publish paylines as part of their funding strategies to guide applicants on their likelihood of receiving funding.  Application scores can only be compared against the payline for the fiscal
+year when the application will be considered for funding, which is not necessarily the year when it was
+submitted.  At the beginning of fiscal years when the agency awaits an actual budget, there may be a
+delay of several months to determine paylines.  If the application is assigned to an IC that does not
+announce a payline, the Program Officer listed at the top of the summary statement may be able to
+provide guidance on the likelihood of funding.
+Successful applicants will be notified of additional information that may be required or other actions leading to an award. The process leading to an award, including the business management review performed
+by the GMO, is described in Completing the Pre-Award Process below.
+For unsuccessful applicants, the NIH will send a centralized, automated correspondence to the applicant
+organizations to notify them of NIH's intent not to fund the indicated applications.
+The decision not to award a grant, or to award a grant at a particular funding level, is discretionary and is
+not subject to appeal to any NIH or HHS official or board.
+2.5 COMPLETING THE PRE-AWARD PROCESS
+Following the peer review process, applications that an IC may fund are reviewed for a number of other
+considerations. These include, as applicable, alignment with NIH’s funding principles, review of the project budget, assessment of the applicant’s management systems, determination of applicant eligibility,
+and compliance with public policy requirements. The applicant may be asked to submit additional
+information (such as other support or verification of IACUC approval) or to undertake certain activities
+(such as negotiation of an indirect cost rate) in anticipation of an award. However, such requests by NIH
+do not guarantee that an award will be made. Following review of all applicable information, the IC will
+determine whether an award can be made, if specific award conditions are required, and what level of
+funding is appropriate.
+Although these reviews and determinations occur before NIH makes a new award, recipients must continue to comply with eligibility and public policy requirements and maintain adequate management systems throughout the period of support. The pre-award process for non-competing continuation awards is
+a streamlined version of this process, including an assessment of progress (see Administrative Requirements—Monitoring—Reporting—Non-Competing Continuation Progress Reports).
+2.5.1 Just-in-Time Procedures
+NIH uses Just-in-Time procedures for certain programs and award mechanisms (each NOFO will include
+specific guidance on the use). These procedures allow certain elements of an application to be submitted
+later in the application process, after review when the application is under consideration for funding. The
+standard application elements include other support information (both active and pending) for senior/key
+personnel; certification of IRB approval of the project’s proposed use of human subjects; verification of
+IACUC approval of the project’s proposed use of live vertebrate animals; and evidence of compliance
+with the education in the protection of human research participants requirement. Other program-specific
+information may also be requested using this procedure. (Applications in response to RFAs also may be
+subject to these procedures. The RFA will specify the timing and nature of required submissions.)
+(GPS page I-81)
+
+Applicants will be notified (primarily by e-mail) when Just-in-Time information is needed. This notification is not a Notice of Award nor should it be construed to be an indicator of possible funding.
+Applicants should only submit this information when requested. Information must be submitted electronically using the Just-in-Time feature in the eRA Commons. In some circumstances the GMO may
+ask for information in addition to the descriptions below, e.g., if the application involves hESCs and the
+applicant did not identify a hESC from the NIH Registry in the application.
+The requirement for applicants to verify the accuracy and validity of all administrative, fiscal, and programmatic information extends to information submitted through the Just-in-Time process. Applicants
+are responsible for promptly notifying NIH of any substantive changes to previously submitted Just-in-
+Time information up to the time of award. This includes items such as Other Support changes that could
+lead to budgetary overlap, scientific overlap, or commitment of effort greater than 12 person-months for
+the PD/PI(s) or any Senior/Key Personnel; or any changes in the use or approval of vertebrate animals or
+human subjects. Similar to the NIH public policy requirements, applicants are responsible for establishing and maintaining the necessary processes to monitor its compliance and informing NIH of any
+problems or concerns. Failure to address changes to Just-in-Time submissions prior to award does not
+diminish the applicant’s responsibility to address changes post-award by submitting a prior approval
+request to NIH in accord with Administrative Requirements—Changes in Project and Budget—NIH
+Standard Terms of Award.
+Other Support.  Information on other active and pending support will be requested as part of the Just-in-
+Time procedures. Other support includes all resources made available to a researcher in support of and/or
+related to all of their research endeavors, regardless of whether or not they have monetary value and
+regardless of whether they are based at the institution the researcher identifies for the current grant. This
+includes:
+ l Resources and/or financial support from all foreign and domestic entities that are available to the
+researcher. This includes but not limited to, financial support for laboratory personnel, and provision of high-value materials that are not freely available (e.g., biologics, chemical, model systems, technology, etc.).  Institutional resources, such as core facilities or shared equipment that is
+made broadly available, should not be included in Other Support, but rather listed under Facilities and Other Resources.
+ l Consulting agreements, when the PD/PI or other senior/key personnel will be conducting
+research as part of the consulting activities and the activities fall outside of their appointment at
+the applicant or recipient institution.
+ l In-kind contributions, e.g., office/laboratory space, equipment, supplies, or employees or students supported by an outside source. If the time commitment or dollar value of the in-kind contribution is not readily ascertainable, the recipient must provide reasonable estimates.
+Other support does not include training awards, prizes, or gifts. Gifts are resources provided where there
+is no expectation of anything (e.g., time, services, specific research activities, money, etc.) in return. An
+item or service given with the expectation of an associated time commitment is not a gift and is instead
+an in-kind contribution and must be reported as Other Support.
+Reporting of other support is required for all individuals designated in an application as senior/key personnel—those devoting measurable effort to a project. Each PD/PI or other senior/key personnel must
+electronically sign their respective Other Support form prior to submission. This signature certifies that
+the statements are true, complete, and accurate. Information on Other Support is not specifically requested for Program Directors, training faculty, and other individuals involved in the oversight of training
+grants since applicable information is collected in other sections of a training grant application. It is also
+not requested for individuals categorized as Other Significant Contributors.
+(GPS page I-82)
+
+To promote compliance with all Other Support requirements, NIH requires recipients  to establish and
+maintain effective internal controls (e.g. policies, trainings, and procedures) to ensure that individuals
+designated in applications as senior/key personnel fully disclose all Other Support information to their
+institution as soon as it becomes known.
+For Other Support submissions that include foreign activities and resources, recipients are required to
+submit copies of contracts, grants, or any other agreement specific to senior/key personnel foreign
+appointments and/or employment with a foreign institution as supporting documentation. If they are not
+in English, recipients must provide translated copies. This does not include personal service contracts, or
+employment contracts for fellows supported by foreign entities.
+The supporting documentation must be provided as part of the Other Support PDF following the Other
+Support Format page. See NIH Other Support page for forms, instructions, and other resources.
+IC scientific program and grants management staff will review this information before award to ensure
+the following:
+ l Sufficient levels of effort are committed to the project.
+ l There is no scientific, budgetary, or commitment overlap.
+ o Scientific overlap occurs when (1) substantially the same research is proposed in more
+than one application or is submitted to two or more funding sources for review and funding consideration or (2) a specific research objective and the research design for accomplishing the objective are the same or closely related in two or more applications or
+awards, regardless of the funding source.
+ o Budgetary overlap occurs when duplicate or equivalent budgetary items (e.g., equipment, salaries) are requested in an application but already are provided by another
+source.
+ o Commitment overlap occurs when an individual’s time commitment exceeds 100 percent
+(i.e., 12 person months), whether or not salary support is requested in the application.
+ o Overlap, whether scientific, budgetary, or commitment of an individual’s effort greater
+than 100 percent, is not permitted. Any overlap will be resolved by the IC with the
+applicant and the PD/PI at the time of award
+ l Only funds necessary for the approved project are included in the award.
+ l Any foreign resources that meet the definition of a non-monetary foreign component have
+received appropriate prior approval.
+See NIH Other Support for format page, instructions and the NIH disclosure table.
+Certification of IRB Approval. If the proposed project involves human subjects research, a certification
+to NIH that all non-exempt research involving human subjects has been reviewed and approved by an
+appropriate IRB  must be submitted. Pending or expired approvals are not acceptable. See Public Policy
+Requirements/Human Subjects for additional information.
+Verification of IACUC Approval. If the proposed project involves research with live vertebrate animals,
+verification of the date of IACUC approval of those sections of the application that involve use of vertebrate animals along with any IACUC-imposed changes must be submitted. Pending or out-of-date
+approvals are not acceptable. See Public Policy Requirements/Animal Welfare for additional information.
+Human Subjects Research Education Requirement. If the proposed project involves human subjects
+research, certification that any person identified as senior/key personnel involved in human subjects
+(GPS page I-83)
+
+research has completed an education program in the protection of human subjects must be submitted. See
+Public Policy Requirements/Human Subjects/Education in the Protection of Human Research Participants for additional information.
+Human Embryonic Stem Cells (hESCs). If the proposed project involves hESCs and the applicant did
+not identify a hESC line from the NIH Human Embryonic Stem Cell Registry in the application, the line
+(s) should be included in the Just-in-Time submission.
+Genomic Data Sharing Institutional Certification. If the proposed project involves research subject to
+the Genomic Data Sharing policy for the generation of human genomic data (including within the Data
+Management and Sharing Plan, as applicable), investigators must submit an Institutional Certification,
+or, in some cases, a Provisional Institutional Certification. Institutional certification forms and directions
+for completing them are available on the NIH GDS Data Sharing website. This certification must be submitted as a “Genome Data Sharing Certification” filein the eRA Commons Just-in-Time module.
+SBIR / STTR Foreign Disclosure Form.  For SBIR and STTR competing applications, applicants must
+submit the Required Disclosure of Foreign Affiliations or Relationships to Foreign Countries form. See
+NIH SBIR and STTR Foreign Disclosure requirements for more information. This form must be submitted as an “SBIR STTR Foreign Disclosure Form” file in the eRA Commons Just-in-Time module.
+SBIR Funding Agreement Certification.  For SBIR applicants, provide only upon request the SBIR
+Funding Agreement Certification described in Section 2.18 of the Supplemental Grant Application
+Instructions.  The certification is available in fillable formats at: https://grants.nih.gov/grants-process/write-application/forms-directory/sbir-funding-agreement-certification.  This should be submitted as
+an “Other Upload” in the eRA Commons Just-in-Time module.
+STTR Funding Agreement Certification.  For STTR applicants, provide only upon request the STTR
+Funding Agreement Certification described in Section 2.19 of the Supplemental Grant Application
+Instructions.  The certification is available in fillable formats at: https://grants.nih.gov/grants-process/write-application/forms-directory/sttr-funding-agreement-certification.  This should be submitted as
+an “Other Upload” in the eRA Commons Just-in-Time module.
+My Bibliography Report of Publications.  For renewal applicants to research training programs, a My
+Bibliography Report of Publications arising from work conducted by trainees while supported by the
+training grant will be collected in the Interim/Final Research Performance Progress Report.
+Other Information Requested by the Awarding IC. NIH IC’s may also request additional Just-in-Time
+information on a case-by-case basis, such as revised budgets or changes to the human subjects or vertebrate animals sections of the application. If required, these changes must be submitted as an “Other
+Upload” file in the eRA Commons Just-In-Time module.
+2.5.2 Submitting Revised Project Summary/Abstracts, Specific Aims,
+and/or Public Health Relevance Statement
+When requested by NIH as part of the pre-award process, PD/PIs and the AOR should discuss potential
+changes in scope with NIH PO and revise the Project Summary/Abstract, Specific Aims, and/or Public
+Health Relevance sections of their application as appropriate. Once all issues are resolved, applicants
+should e-mail a document with final versions of the revised sections to the IC-designated e-mail address
+(normally a Program Official, Grants Management Official, or centralized e-mail box) as a single
+Microsoft Word file only. Be reminded that all revised application information submitted to the NIH
+must be approved by an AOR. Applicants should use this template. The template includes specific headings that must be used for each section. All three headings must be included in the document that is submitted even if a particular section had no changes from the previous submission. If there are no changes
+(GPS page I-84)
+
+for a section include the header but leave the text area blank to ensure appropriate processing of this
+information by NIH’s electronic systems.
+2.5.3 Determining Applicant Organization Eligibility
+All applicant organizations must complete the one-time eRA Commons registration process (see
+NIHGPS 2.2.1 eRA Commons Registration) prior to submitting any application (paper or electronic) to
+the NIH. During the registration process, NIH may make a preliminary assessment of applicant organization eligibility. In an effort to streamline the registration requirements and reduce the administrative
+burden (i.e., time between registration submission and NIH’s final determination), NIH urges potential
+applicants to consider the following eligibility considerations:
+ l What is the nature of the research and business that your organization performs and how does
+that fit within the NIH mission?
+ l Is your organization professionally responsible for the research?
+ l How many people are in your organization?
+ l Are the researchers employed by your organization?
+ l Where will the proposed research physically be conducted?
+ l Can you identify a Notice of Funding Opportunity that you would apply for?
+ l Has your organization applied to and/or been directly funded by any other Federal agency?
+ Applicants should be prepared to establish their eligibility to receive and administer all awards (that are
+applied for), and NIH reserves the right to deny registration if an organization is determined not to be an
+appropriate applicant for a particular NOFO.  NIH will not accept forms or other documentation bearing
+generic departmental signatures or their electronic equivalent (e.g., Department of Sponsored Research).
+All forms and documentation submitted to the NIH must reflect the name of the individual, electronic or
+otherwise, with the appropriate institutional authority to submit such information.
+NIH awards may be made only to eligible applicants. Continued funding is dependent on the recipient’s
+continued eligibility. In general, domestic or foreign, public or private, non-profit or for-profit organizations and individuals are eligible to receive NIH grants. However, on the basis of statutory, regulatory, or published policy limitations, under certain programs or types of awards, NIH may limit
+eligibility to, or exclude from eligibility, classes or types of entities. Examples are limitations on the participation of foreign entities, and programs under which only small businesses are eligible applicants.
+The determination of eligibility includes verification of the applicant’s status. The applicant may be
+required to provide proof of its status by submitting documentation; otherwise, the AOR’s signature on
+the application certifies that the applicant is eligible to apply for and receive an award (e.g., a small business applying under the SBIR or STTR programs).
+In addition to reviewing organizational eligibility, NIH may consider other factors relating to the applicant’s ability to responsibly handle and account for Federal funds and to carry out the project. These
+factors include the applicant’s intended role in the project, the location where the project will be performed, the role of the PD/PI in the project, and the PD/PI’s employment and citizenship status.
+Although some of these same considerations are reviewed as part of the peer review, NIH’s concern at
+this stage in the process is making an award to a legal entity that will be accountable for both the performance of the approved project or activity and the appropriate expenditure of funds. NIH will not
+make an award to an applicant that does not have a substantive role in the project and would simply
+serve as a conduit for another entity.
+(GPS page I-85)
+
+2.5.4 Determining Eligibility of Individuals
+It is the responsibility of the applicant organization to select the individuals who have the appropriate
+expertise to manage the scientific and administrative aspects of the project. The eligibility of these individuals to complete the project will be evaluated during peer review and at the IC level by grants management and program staff.
+The GMO will verify whether the proposed PD/PI or other senior/key personnel are debarred or suspended from participation in Federal assistance programs (see Public Policy Requirements and Objectives—Debarment and Suspension for certification requirements).
+Generally, PD/PIs and other personnel supported by NIH research grants are not required to hold any particular educational degree, and are not required to be U.S. citizens. However, some NIH programs/mechanisms have a citizenship requirement. Any citizenship requirement will be stated in the
+NOFO. In these cases, individuals are required to have the appropriate citizenship status when the award
+is made rather than when the application is submitted. For example, under most career development
+awards or Kirschstein-NRSA individual fellowships, the individual to be trained must be a citizen or a
+non-citizen national of the United States or have been lawfully admitted for permanent residence at the
+time of award.
+NIH requires the applicant to determine that individuals’ visas will allow them to remain in this country
+long enough for them to be productive on the research project, but NIH does not provide guidance on or
+assess the different types of visas. NIH expects recipient organizations to have policies, consistently
+applied regardless of the source of funds, to address this area. If a grant is awarded and an individual’s
+visa will not allow a long enough stay to be productive on the project, NIH may terminate the grant (see
+Administrative Requirements—Changes in Project and Budget and Administrative Requirements—
+Enforcement Actions—Suspension, Termination, and Withholding of Support).
+The eligibility requirements for trainees and additional eligibility requirements for fellows are addressed
+in Ruth L. Kirschstein National Research Service Awards chapter in IIB.
+In the post-award phase, NIH monitors changes in recipient and project status to ensure they meet legal
+and programmatic requirements and takes actions necessary to protect the Federal government’s
+interests.
+2.5.5 Cost Analysis and Assessment of Management Systems
+The GMO will ensure that a cost analysis is performed on any application that requires a detailed budget.
+Cost analysis involves obtaining cost breakdowns, validating cost data, evaluating specific elements of
+cost, and examining data to determine the necessity for, and the reasonableness and allowability of, the
+costs included in the application budget. The extent of cost analysis will depend on the type of funding
+instrument and award mechanism, the complexity of the project, prior experience with the applicant, and
+other factors. Information on the applicable cost principles and on allowable and unallowable costs under
+NIH grants is provided in the Cost Considerations chapter.
+The amount of NIH funding is based on reasonable and allowable costs consistent with the principles of
+sound cost management, considering IC priorities (e.g., program relevance), constraints on the growth of
+average grant costs, and available funds.
+In addition to considering the specific information provided in the application, the GMO determines the
+adequacy of the applicant’s financial and business management systems that will support the expenditure
+of and accountability for NIH funds. When an applicant has had no prior Federal grants or cost-reimbursement contracts, the GMO may review the applicant’s financial management and other management
+(GPS page I-86)
+
+systems before award, or within a reasonable time after award, to determine their adequacy and acceptability. For an applicant with prior NIH or other Federal cost-reimbursement awards, the GMO may
+review recent audit reports and other relevant available information to determine whether the applicant’s
+management systems meet the standards established in 2 CFR Part 200. The GMO will advise the applicant if additional information is required. Based on the results of the review results, the GMO will determine the need for any corrective action and may impose specific award conditions on the award.
+(GPS page I-87)

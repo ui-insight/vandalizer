@@ -5,6 +5,8 @@ update_document_fields, _check_folder_watch_automations, cleanup_document,
 perform_semantic_ingestion.
 """
 
+import json
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -43,6 +45,69 @@ def _status_sequence(db):
 
 
 class TestPerformExtractionAndUpdate:
+    def test_ocr_envelope_is_decoded_before_storage_and_citations(self, tmp_path):
+        import httpx
+        import pymupdf
+
+        from app.services.chat_service import derive_document_citations
+        from app.services.document_readers import _interpolate_page_markers
+        from app.tasks.document_tasks import perform_extraction_and_update
+
+        # Visible marks with no text layer force this fixture to rely on OCR.
+        pdf_path = tmp_path / "subaward.pdf"
+        with pymupdf.open() as pdf:
+            for _ in range(2):
+                pdf.new_page().draw_rect(pymupdf.Rect(50, 50, 400, 500))
+            pdf.save(pdf_path)
+
+        content = (
+            "# RESEARCH SUBAWARD AGREEMENT\n\n"
+            "Federal Subaward under the sponsor's research program.\n\n"
+            "The parties agree to conduct the research described in the statement of work.\n\n"
+            "Total subaward amount: $250,000.\n\n"
+            "## Period of Performance\n\n"
+            "The period of performance is July 1, 2025 through June 30, 2026.\n\n"
+            "The recipient must provide progress reports and a final accounting of expenditures."
+        )
+        response = httpx.Response(200, json={
+            "id": "ocr-regression", "object": "ocr.result", "created": 1791837603,
+            "model": "dots.MOCR", "content": content,
+        })
+        db = MagicMock()
+        db.smart_document.find_one.return_value = {"uuid": "doc-ocr", "path": str(pdf_path)}
+        db.system_config.find_one.return_value = {
+            "ocr_endpoint": "https://ocr.example", "ocr_api_key": "", "ocr_provider": "raw",
+        }
+        with patch("app.tasks.document_tasks.get_sync_db", return_value=db), \
+             patch("app.tasks.get_sync_db", return_value=db), \
+             patch("httpx.Client") as client:
+            client.return_value.__enter__.return_value.post.return_value = response
+            result = perform_extraction_and_update(
+                document_uuid="doc-ocr", extension="pdf", force_ocr=True,
+            )
+
+        stored = _set_containing(db, "raw_text")
+        assert result == stored["raw_text"] == content
+        assert stored["text_markers"] == _interpolate_page_markers(content, 2)
+        assert stored["token_count"] > 0
+
+        doc = SimpleNamespace(
+            uuid="doc-ocr", title="subaward.pdf",
+            raw_text=stored["raw_text"], text_markers=stored["text_markers"],
+        )
+        citations = derive_document_citations(
+            "The total subaward amount is $250,000 (p. ~1).\n"
+            "The period of performance is July 1, 2025 through June 30, 2026 (p. ~2).",
+            [doc],
+        )
+        assert len(citations) == 2
+        assert all(c["grounding"] == "found" and c["page_approximate"] for c in citations)
+        assert citations[0]["content_preview"] == "Total subaward amount: $250,000."
+        assert citations[1]["content_preview"] == (
+            "The period of performance is July 1, 2025 through June 30, 2026."
+        )
+        assert "dots.MOCR" not in json.dumps(citations)
+
     @patch("app.tasks.document_tasks.get_sync_db")
     def test_returns_empty_when_doc_not_found(self, mock_get_db):
         from app.tasks.document_tasks import perform_extraction_and_update
@@ -1941,6 +2006,9 @@ class _FakeSmartDocuments:
                 elif op == "$lt":
                     if not present or value is None or not value < arg:
                         return False
+                elif op == "$exists":
+                    if present != arg:
+                        return False
                 else:
                     raise NotImplementedError(op)
             return True
@@ -1969,6 +2037,8 @@ class _FakeSmartDocuments:
         for row in self.rows:
             if self._matches(row, query):
                 row.update(update["$set"])
+                for key, increment in update.get('$inc', {}).items():
+                    row[key] = row.get(key, 0) + increment
                 return MagicMock(matched_count=1, modified_count=1)
         return MagicMock(matched_count=0, modified_count=0)
 
@@ -2210,8 +2280,6 @@ class TestExtractionOwnership:
     def test_result_is_dropped_once_the_run_no_longer_owns_the_document(
         self, mock_extract, MockSettings, mock_get_db, mock_notify,
     ):
-        from celery.exceptions import Ignore
-
         from app.tasks.document_tasks import perform_extraction_and_update
 
         db = MagicMock()
@@ -2226,13 +2294,16 @@ class TestExtractionOwnership:
 
         db.smart_document.update_one.side_effect = update_one
 
-        with pytest.raises(Ignore):
-            perform_extraction_and_update(document_uuid="doc-1", extension="pdf")
+        # Dropped quietly: the rest of the chain is fenced by the revision.
+        assert perform_extraction_and_update(document_uuid="doc-1", extension="pdf") == ""
 
         lock_set = db.smart_document.update_one.call_args_list[0][0][1]["$set"]
         assert "task_id" in lock_set
         owned_filter = db.smart_document.update_one.call_args_list[-1][0][0]
-        assert owned_filter == {"uuid": "doc-1", "task_id": lock_set["task_id"]}
+        # Owned by this run's task id, within this extraction's revision.
+        assert owned_filter["uuid"] == "doc-1"
+        assert owned_filter["task_id"] == lock_set["task_id"]
+        assert "_extraction_restart_revision" in str(owned_filter)
         mock_notify.assert_not_called()
 
     @patch("app.tasks.document_tasks._notify_document_processing_failed")
@@ -2245,8 +2316,6 @@ class TestExtractionOwnership:
     def test_error_from_a_stopped_run_does_not_overwrite_the_stop(
         self, mock_extract, MockSettings, mock_get_db, mock_notify,
     ):
-        from celery.exceptions import Ignore
-
         from app.tasks.document_tasks import perform_extraction_and_update
 
         db = MagicMock()
@@ -2257,6 +2326,6 @@ class TestExtractionOwnership:
             lambda f, u: MagicMock(matched_count=0 if "task_id" in f else 1)
         )
 
-        with pytest.raises(Ignore):
-            perform_extraction_and_update(document_uuid="doc-1", extension="pdf")
+        # Dropped quietly: the rest of the chain is fenced by the revision.
+        assert perform_extraction_and_update(document_uuid="doc-1", extension="pdf") == ""
         mock_notify.assert_not_called()

@@ -1,0 +1,181 @@
+NIH Grants Policy Statement (FY 2026 revision) — Chapter 17: Grants to Federal Institutions and Payments to Federal Employees Under Grants
+Source: https://grants.nih.gov/policy-and-compliance/nihgps
+
+17 GRANTS TO FEDERAL INSTITUTIONS AND
+PAYMENTS TO FEDERAL EMPLOYEES UNDER
+GRANTS
+17.1 GENERAL
+NIH may award grants to Federal entities. Although the activity under these grants will take place in a
+research environment, certain terms and conditions vary from those included in IIA due to the recipient’s
+status as a Federal institution. This chapter specifies those differences as well as differences in treatment
+among different Federal institutions. This chapter does not apply to Federally Funded Research and
+Development Centers (also known as Government Owned Contract Operated facilities) since the recipient institution is the institution operating the facility. In addition, this chapter addresses the policies that
+apply to payments to (or on behalf of) Federal employees under grants, including grants awarded to
+organizations other than Federal institutions.
+17.2 ELIGIBILITY
+In general, Federal institutions are eligible to apply for NIH grants, including research project grants.
+Specific eligibility will be stated in each NOFO. Federal institutions also must meet the eligibility
+requirements of the grant program from which support is sought. PHS organizational segments, other
+than IHS hospitals, may receive NIH grant support under exceptional circumstances only. Such circumstances may include situations where a project cannot be supported within the mission of the applicant PHS agency or organizational segment, the activity cannot be performed elsewhere, or its nonpursuit
+would have an adverse impact or potentially important effect on the NIH mission, and NIH determines a
+grant is the appropriate means of carrying out the activity. However, NIH may not award a grant to an
+NIH component.
+Although the performance site may be at a level lower than the agency or department level of the
+Federal institution, when an award is made to an eligible Federal institution, the Federal agency or department will be the recipient of record and must assume responsibility for the project. A Federal institution
+also must ensure that its own authorizing legislation will allow it to receive NIH grants and to be able to
+comply with the award terms and conditions.
+A document that assures both the assumption of responsibility and authority to receive a grant must
+accompany each new and competing continuation application. The assurance must be signed by the head
+of the responsible Federal department or independent agency or a designee who reports directly to the
+department or agency head. (In the case of the DoD, the Departments of the Army, Navy, and Air Force
+are considered the Federal department, and their Secretaries the responsible Department head.) This
+assurance is in addition to those made by the AOR’s signature on the face page of the application. The
+assurance requirement does not apply to VAMCs, Bureau of Prisons’ (Department of Justice) hospitals,
+IHS hospitals, or other PHS organizational segments.
+17.3 VA-UNIVERSITY AFFILIATIONS
+Investigators with joint appointments at a VAMC (VA hospital) and an affiliated university must have a
+valid MOU that specifies (at both the university and the VAMC) the title of the investigator’s appointment, distribution of compensation, the responsibilities of the proposed investigator, and the percentage
+of effort available for research at each institution. The MOU must be signed by the appropriate officials
+of the recipient and the VAMC, and must be updated with each significant change of the investigator’s
+(GPS page IIB-123)
+
+responsibilities or distribution of effort and, without a significant change, not less than annually. The
+joint VA/university appointment of the investigator constitutes 100 percent of their total professional
+responsibilities. However, NIH will recognize such a joint appointment only when a university and an
+affiliated VA hospital are the parties involved.
+A grant application from a university may request the university’s share of an investigator’s salary in proportion to the effort devoted to the research project. The institutional base salary as contained in the individual’s university appointment determines the base for computing that request.
+The signature of the AOR of the submitting university on an application to NIH that includes such an
+arrangement certifies that
+ l the individual whose salary is included in the application serves under a joint appointment documented in a formal MOU between the university and the VA, and
+ l there is no possibility of dual compensation for the same work or of an actual or apparent conflict of interest.
+Under the above-described arrangement, there is no involvement of a VA-affiliated non-profit research
+corporation, which is eligible to apply for and receive NIH grants in its own right as a non-profit organization. The limitations on the payment of Federal salaries apply (see Allowable and Unallowable Costs
+in this chapter).
+17.4 PUBLIC POLICY REQUIREMENTS AND OBJECTIVES
+The requirements concerning disclosure of financial conflicts of interest (see Public Policy Requirements, Objectives, and Other Appropriation Mandates—Financial Conflict of Interest in IIA) do not
+apply to Federal employees and/or Federal agencies. All other Public Policy Requirements described in
+IIA apply to Federal recipients.
+17.5 PAYMENT
+The NIH Office of Financial Management (OFM) will pay grants and cooperative agreements to Federal
+departments and agencies through the Interagency Payment and Collection method (IPAC).  Upon receipt
+of an NIH award, in order to be reimbursed, Federal recipient institutions may send IPACs to NIH
+Agency Location Code (ALC) 75080031 for payment.
+17.6 ALLOWABLE AND UNALLOWABLE COSTS
+Allowable and unallowable costs under grants to Federal institutions will be determined by the established policies of the institution, consistently applied to both its own activities and to grant-supported
+activities, and the requirements of this subsection. In the absence of a governing organizational policy,
+the cost principles in 2 CFR Part 200, Subpart E,  will apply.
+Salaries. See Federal (U.S. Government) Employees below.
+Institutional Allowances Under Kirschstein-NRSA Individual Fellowships. Institutional allowances
+may be requested by Federal institutions sponsoring a predoctoral or postdoctoral fellow.
+indirect costs. indirect costs will not be provided to Federal institutions.
+Federal (U.S. Government) Employees. Whether or not costs will be charged to the grant, when a
+Federal employee will be involved in an NIH grant-supported activity in any capacity other than as an
+employee working on a grant to a Federal institution, or a study subject, specified conditions apply as
+provided in this subsection. The limitations in this subsection do not apply to individuals that are
+(GPS page IIB-124)
+
+classified as special government employees because of service on advisory groups or as a result of a
+formal consulting arrangement with a Federal agency. (See the HHS Standards of Conduct at 45 CFR
+Part 73, Subpart J for additional guidance.) The Federal employee should consult with their agency ethics officials to determine whether outside activity approval is required by their employing agency.
+Only four types of costs—consultant fees, subject costs, salary or fringe benefits, and travel costs—can
+be charged to NIH grants on behalf of Federal employees, whether by a recipient or a consortium participant, and under the conditions specified only. Applicants/recipients should advise any Federal
+employee with whom these types of arrangements may be made to consult with their employing agency
+concerning their ability to participate and to meet the required conditions for payment. The applicant
+organization must submit, as part of the grant application, any letters or documentation specified below,
+and that documentation must be deemed acceptable by the GMO before the Federal employee’s involvement in the project.
+Consultant Fees. Consultant fees are allowable only for medical personnel of the Uniformed Services of
+the United States (excluding PHS Commissioned Officers) and when all of the following conditions are
+present:
+ l The employees are providing the kind and extent of medical services approved in the grant
+award.
+ l Adequate numbers of qualified civilian personnel are not available to provide these services, and
+eligible Federal medical personnel are hired only in addition to those qualified civilian medical
+personnel, if any, who are available.
+ l The applicant organization provides prior written authorization from the proposed consultant’s
+commanding officer that they are authorized to work on the grant-supported activity during nonduty hours or while on authorized leave, and can be paid for their efforts.
+Outpatient or Subject Costs. These costs are allowable when the federal employee is an outpatient or
+subject under study in connection with grant-supported activities.
+Salary or Fringe Benefits. In most circumstances no salary or fringe benefit payments may be made
+from NIH grant funds to support Federal employees. While the level of effort required for the research
+project must be allowed by the employing agency as part of the individuals’ official duties, salary and
+fringe benefit costs associated with an individual participating in an official capacity as a career, careerconditional, or other Federal employees (civilian or uniformed services) are not allowable. Salary and
+fringe benefits payments may only be made when prior approval is obtained from an authorized official
+of the employee’s agency and the employee is one of the following:
+ l A temporary employee specifically hired to assist in the performance of an NIH grant.
+ l A PHS Commissioned Officer or a civil service employee carrying out duties for which specific
+statutory authorization exists permitting direct Federal assistance in lieu of cash under the grant,
+or where the government is reimbursed for services rendered subject to restrictions applicable to
+such personnel, including the applicable Federal standards of conduct (for HHS, 45 CFR Part
+73).
+(GPS page IIB-125)
+
+l A PHS Commissioned Officer on LWOP if the
+ o recipient has obtained written prior approval from the NIH awarding IC;
+ o total amount of salary paid from NIH grant funds is proportional to the time devoted to
+the project and does not exceed the total annual amount of pay and allowances the individual would have received if not in LWOP status; and
+ o parties concerned have made a prior determination that there is no possibility of dual
+compensation and there is no actual or apparent conflict of interest or other violation of
+the applicable standards of conduct.
+ l A civil service employee participating in a grant to a non-Federal organization and all of the following conditions are met:
+ o The individual is participating as part of an approved IPA assignment in a role other
+than as PD/PI. IPA assignments generally do not exceed 2 years and may not exceed 4
+years of continuous duration (5 U.S.C. 3372). Based on this statutory time restriction,
+the involvement of the civil service employee should be limited in scope. Therefore, the
+proposed PD/PI for an NIH grant may not be participating through an IPA. On a caseby-case basis, the NIH awarding IC may determine that certain other senior/key personnel on the project are sufficiently critical to its long-term success that participation
+through an IPA is not appropriate. Note, a Federal agency may not send or receive on
+assignment an employee who has served under the mobility authority for 4 continuous
+years without at least a 12-month return to duty with the organization from which originally assigned (5 CFR Part 334).
+ o Before making any payment from NIH grant funds to such an employee, the recipient
+must certify that the employee is on an IPA assignment and must provide adequate documentation, as determined by NIH, of the IPA assignment and information about its
+nature and duration.
+ o The level of effort required for the research project must be allowed by the employing
+agency as part of the individual’s official duties. Salary payments from NIH grant funds
+must be proportional to the time an individual devotes to the grant-supported project.
+The total salary support may not exceed the normal level of compensation from Federal
+salary if the individual were not participating in the grant.
+ o The parties concerned have made a prior determination that there is no possibility of
+dual compensation and there is no actual or apparent conflict of interest or other violation of the applicable standards of conduct.
+ l A part-time VA employee at VANPCs for which NIH grant funds are used to pay the differential
+between the individual’s VA part-time salary and the salary level for a full-time VANPC commitment in proportion to the level of effort devoted to the project. Compensation must be in
+accordance with the established policies and salary structure of the VANPC and the total number
+of VA and VANPC hours should not exceed a full time position. Therefore, if the PD/PI has a
+part-time appointment with the VANPC, an appropriate portion of the individual’s salary that
+would otherwise be supported by the non-profit VANPC may be charged to the NIH grant. The
+work paid for by the VANPC must not be for the same project paid for by VA time for VA
+salary in accordance with the VA policy set forth in the VHA Handbook 1200.17.
+Travel Costs. Travel costs are allowable if the employee is
+(GPS page IIB-126)
+
+l working under a grant to a Federal institution;
+ l performing allowable reimbursable services as specified under Salary or Fringe Benefits immediately above; or
+ l attending an NIH grant-supported conference
+ o during non-duty hours,
+ o while in a preexisting LWOP status or one that continues beyond the conference, or
+ o while on detail to a State or local government, Institution of Higher Education (IHE), or
+other non-profit organization.
+Such payments must be made in accordance with established organizational policy and consistently
+applied regardless of the source of funds, and the parties concerned must take reasonable steps to ensure
+that there is no actual or apparent conflict of interest.
+17.7 ADMINISTRATIVE REQUIREMENTS
+17.7.1 Equipment Accountability
+NIH will consider all nonexpendable personal property acquired under a grant awarded to a Federal institution as exempt (see 2 CFR Part 200.312) for purposes of determining the accountability requirements
+of 2 CFR Part 200.313. However, NIH has the right to require transfer of equipment, including title, to
+NIH or an eligible third party named by the NIH awarding IC under the conditions specified in 2 CFR
+Part 200.313.
+17.7.2 Procurement Requirements
+Procurement under grants to Federal institutions is governed by the FAR and the recipient agency’s FAR
+supplement.
+17.7.3 Intellectual Property
+Inventions resulting from grants supporting the activities of Federal employees under grants to Federal
+institutions must be reported simultaneously to NIH and to the employing agency under the terms of EO
+10096, as amended, and are subject to the government assignment of rights in invention of government
+employee requirements of 37 CFR Part 401. (See Interagency Edison for reporting requirements.) Any
+resulting patent applications and patents must identify the NIH award, consistent with the language of 37
+CFR Part 401.14(f)(4). In cases where the VA is involved with the invention but is not the grant recipient, and the recipient institution chooses not to elect title or pursue practical application of an invention,
+the recipient must note VA’s involvement on its notice to NIH and provide a courtesy copy of the NIH
+notification to the appropriate VA office. NIH will notify the recipient and the VA whether NIH has an
+interest in taking title and/or continuing the pursuit of practical application of the invention.
+17.7.4 Reporting Requirements
+Federal institutions must electronically submit annual expenditure FFRs regardless of whether the award
+is subject to SNAP.
+(GPS page IIB-127)

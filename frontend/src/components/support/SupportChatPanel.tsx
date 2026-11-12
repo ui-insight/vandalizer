@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
+import { createPortal } from '../shared/panelPortal'
 import {
   ArrowLeft,
   Check,
@@ -27,6 +27,7 @@ import { useConfirm } from '../shared/useConfirm'
 import * as supportApi from '../../api/support'
 import { submitProductFeedback } from '../../api/feedback'
 import type { SupportTicket, SupportTicketSummary } from '../../types/support'
+import type { SupportDraftContext } from '../../utils/supportPanel'
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 
@@ -135,8 +136,8 @@ const STATUS_DOT = {
 
 const PRIORITY_COLORS = {
   low: 'text-gray-500',
-  normal: 'text-blue-500',
-  high: 'text-red-500',
+  normal: 'text-blue-700',
+  high: 'text-red-700',
 } as const
 
 const CLASSIFICATION_LABELS = {
@@ -189,7 +190,7 @@ function TicketListView({
       <div className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+            <Loader2 className="h-5 w-5 animate-spin text-gray-600" />
           </div>
         ) : tickets.length === 0 ? (
           <div className="flex flex-col items-center gap-3 px-4 py-12 text-center">
@@ -200,7 +201,7 @@ function TicketListView({
             {!isSupportAgent && (
               <button
                 onClick={onNew}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                className="rounded-lg bg-highlight px-4 py-2 text-sm font-semibold text-highlight-text hover:brightness-90"
               >
                 Create your first ticket
               </button>
@@ -322,7 +323,7 @@ function TicketListView({
           {tickets.length > 0 && (
             <button
               onClick={onNew}
-              className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-highlight px-3 py-2 text-sm font-semibold text-highlight-text hover:brightness-90"
             >
               <Plus className="h-4 w-4" />
               New Ticket
@@ -395,7 +396,7 @@ function PraiseView({ onBack }: { onBack: () => void }) {
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <div className="flex items-center gap-2 border-b px-4 py-2">
-        <button type="button" onClick={onBack} aria-label="Back" className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+        <button type="button" onClick={onBack} aria-label="Back" className="rounded p-1 text-gray-600 hover:bg-gray-100 hover:text-gray-600">
           <ArrowLeft className="h-4 w-4" />
         </button>
         <span className="text-sm font-medium text-gray-900">Share what&rsquo;s working</span>
@@ -426,6 +427,7 @@ function PraiseView({ onBack }: { onBack: () => void }) {
           })}
         </div>
         <textarea
+          aria-label="Feedback message"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           rows={5}
@@ -450,19 +452,30 @@ function PraiseView({ onBack }: { onBack: () => void }) {
   )
 }
 
+type TicketDraft = { subject: string; message: string; priority: string; classification: string; files: File[] }
+const emptyTicketDraft = (): TicketDraft => ({ subject: '', message: '', priority: 'normal', classification: 'bug', files: [] })
+
 function NewTicketView({
   onBack,
   onCreated,
+  draft,
+  setDraft,
+  submitting,
+  setSubmitting,
 }: {
   onBack: () => void
   onCreated: (ticket: SupportTicket) => void
+  submitting: boolean
+  setSubmitting: (pending: boolean) => void
+  draft: TicketDraft
+  setDraft: Dispatch<SetStateAction<TicketDraft>>
 }) {
-  const [subject, setSubject] = useState('')
-  const [message, setMessage] = useState('')
-  const [priority, setPriority] = useState('normal')
-  const [classification, setClassification] = useState('bug')
-  const [files, setFiles] = useState<File[]>([])
-  const [submitting, setSubmitting] = useState(false)
+  const { subject, message, priority, classification, files } = draft
+  const setSubject = (subject: string) => setDraft(d => ({ ...d, subject }))
+  const setMessage = (message: string) => setDraft(d => ({ ...d, message }))
+  const setPriority = (priority: string) => setDraft(d => ({ ...d, priority }))
+  const setClassification = (classification: string) => setDraft(d => ({ ...d, classification }))
+  const setFiles = useCallback((next: SetStateAction<File[]>) => setDraft(d => ({ ...d, files: typeof next === 'function' ? next(d.files) : next })), [setDraft])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
@@ -476,7 +489,7 @@ function NewTicketView({
       accepted.push(f)
     }
     if (accepted.length) setFiles((prev) => [...prev, ...accepted])
-  }, [toast])
+  }, [toast, setFiles])
 
   const { dragOver, dropRef } = useFileDropZone(acceptFiles)
 
@@ -491,7 +504,7 @@ function NewTicketView({
   }
 
   const handleSubmit = async () => {
-    if (!subject.trim() || !message.trim()) return
+    if (submitting || !subject.trim() || !message.trim()) return
     setSubmitting(true)
     try {
       const ticket = await supportApi.createTicket(
@@ -515,12 +528,13 @@ function NewTicketView({
     <div ref={dropRef} className="relative flex flex-1 flex-col overflow-hidden">
       <DropOverlay show={dragOver} />
       <div className="flex items-center gap-2 border-b px-4 py-2">
-        <button type="button" onClick={onBack} aria-label="Back" className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+        <button type="button" onClick={onBack} aria-label="Back" className="rounded p-1 text-gray-600 hover:bg-gray-100 hover:text-gray-600">
           <ArrowLeft className="h-4 w-4" />
         </button>
         <span className="text-sm font-medium text-gray-900">New Ticket</span>
       </div>
       <div className="flex-1 overflow-y-auto space-y-3 p-4">
+        <p className="text-sm text-gray-600">Describe what happened and what you expected. Your description and attachments go to Support; reopen this panel to read replies.</p>
         <div>
           <label htmlFor="support-new-subject" className="mb-1 block text-xs font-medium text-gray-600">Subject</label>
           <input
@@ -532,6 +546,20 @@ function NewTicketView({
             autoFocus
           />
         </div>
+        <div>
+          <label htmlFor="support-new-description" className="mb-1 block text-xs font-medium text-gray-600">Description</label>
+          <textarea
+            id="support-new-description"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            rows={4}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Tell us what's happening, or what you'd like to see..."
+          />
+        </div>
+        <details className="rounded-lg border border-gray-200 p-3">
+          <summary className="cursor-pointer text-sm font-medium">Ticket options · normal priority by default</summary>
+          <div className="mt-3 space-y-3">
         <div>
           <label htmlFor="support-new-priority" className="mb-1 block text-xs font-medium text-gray-600">Priority</label>
           <select
@@ -558,24 +586,15 @@ function NewTicketView({
             <option value="feature_request">Feature Request</option>
           </select>
         </div>
-        <div>
-          <label htmlFor="support-new-description" className="mb-1 block text-xs font-medium text-gray-600">Description</label>
-          <textarea
-            id="support-new-description"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            rows={4}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Tell us what's happening, or what you'd like to see..."
-          />
-        </div>
+          </div>
+        </details>
         <div>
           <div className="flex items-center justify-between">
             <label className="text-xs font-medium text-gray-600">Attachments</label>
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="inline-flex items-center gap-1 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              className="inline-flex items-center gap-1 rounded p-1 text-gray-600 hover:bg-gray-100 hover:text-gray-600"
               title="Attach file"
             >
               <Paperclip className="h-4 w-4" />
@@ -600,7 +619,7 @@ function NewTicketView({
                   <button
                     type="button"
                     onClick={() => removeFile(i)}
-                    className="shrink-0 rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600"
+                    className="shrink-0 rounded p-0.5 text-gray-600 hover:bg-gray-200 hover:text-gray-600"
                     title="Remove"
                   >
                     <X className="h-3 w-3" />
@@ -615,7 +634,7 @@ function NewTicketView({
         <button
           onClick={handleSubmit}
           disabled={!subject.trim() || !message.trim() || submitting}
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-highlight px-3 py-2 text-sm font-semibold text-highlight-text hover:brightness-90 disabled:opacity-50"
         >
           {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
           Submit Ticket
@@ -685,14 +704,21 @@ function AttachmentChip({
   )
 }
 
+type ReplyDraft = { message: string; isInternalNote: boolean; failedFiles: File[]; sending: boolean; uploading: boolean }
+const emptyReplyDraft = (): ReplyDraft => ({ message: '', isInternalNote: false, failedFiles: [], sending: false, uploading: false })
+
 function ChatView({
   ticketUuid,
+  draft,
+  setDraft,
   isSupportAgent,
   onBack,
   onTicketUpdated,
   onDismissPrompt,
 }: {
   ticketUuid: string
+  draft: ReplyDraft
+  setDraft: Dispatch<SetStateAction<ReplyDraft>>
   isSupportAgent: boolean
   onBack: () => void
   onTicketUpdated: () => void
@@ -703,9 +729,13 @@ function ChatView({
   const confirm = useConfirm()
   const [ticket, setTicket] = useState<SupportTicket | null>(null)
   const [loading, setLoading] = useState(true)
-  const [message, setMessage] = useState('')
-  const [isInternalNote, setIsInternalNote] = useState(false)
-  const [sending, setSending] = useState(false)
+  const { message, isInternalNote, sending, uploading, failedFiles } = draft
+  const setMessage = (message: string) => setDraft(d => ({ ...d, message }))
+  const setIsInternalNote = (isInternalNote: boolean) => setDraft(d => ({ ...d, isInternalNote }))
+  const setSending = (sending: boolean) => setDraft(d => ({ ...d, sending }))
+  const sendingRef = useRef(false)
+  const uploadingRef = useRef(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [previewAttachment, setPreviewAttachment] = useState<import('../../types/support').SupportAttachment | null>(null)
   const [editingMessageUuid, setEditingMessageUuid] = useState<string | null>(null)
@@ -728,16 +758,17 @@ function ChatView({
 
   // Error toasts persist until dismissed, so the 15s refresh stays silent on
   // failure — only the initial load reports.
-  const loadTicket = useCallback(async (isPoll = false) => {
+  const loadTicket = useCallback(async () => {
     try {
       const data = await supportApi.getTicket(ticketUuid)
       setTicket(data)
+      setLoadError(null)
     } catch {
-      if (!isPoll) toast('Failed to load ticket', 'error')
+      setLoadError('Could not refresh this ticket. Your draft is kept.')
     } finally {
       setLoading(false)
     }
-  }, [ticketUuid, toast])
+  }, [ticketUuid])
 
   useEffect(() => {
     loadTicket()
@@ -746,7 +777,7 @@ function ChatView({
     import('../../api/notifications').then(({ markReadForItem }) => {
       markReadForItem('support_ticket', ticketUuid).catch(() => {})
     }).catch(() => {})
-    const interval = setInterval(() => loadTicket(true), 15000)
+    const interval = setInterval(() => loadTicket(), 15000)
     return () => clearInterval(interval)
   }, [loadTicket, ticketUuid])
 
@@ -755,19 +786,20 @@ function ChatView({
   }, [ticket?.messages.length])
 
   const handleSend = async () => {
-    if (!message.trim() || sending) return
+    if (!message.trim() || sending || sendingRef.current) return
+    sendingRef.current = true
     setSending(true)
     try {
       const updated = await supportApi.addMessage(ticketUuid, message.trim(), {
         isInternalNote,
       })
       setTicket(updated)
-      setMessage('')
-      setIsInternalNote(false)
+      setDraft(d => ({ ...d, message: '', isInternalNote: false }))
       onTicketUpdated()
     } catch {
       toast('Failed to send message', 'error')
     } finally {
+      sendingRef.current = false
       setSending(false)
     }
   }
@@ -781,6 +813,10 @@ function ChatView({
 
   const uploadFiles = useCallback(async (picked: File[]) => {
     if (picked.length === 0) return
+    if (uploading || uploadingRef.current) {
+      setDraft(d => ({ ...d, failedFiles: [...new Set([...d.failedFiles, ...picked])] }))
+      return
+    }
     const accepted: File[] = []
     for (const f of picked) {
       const sizeMB = (f.size / (1024 * 1024)).toFixed(1)
@@ -791,6 +827,8 @@ function ChatView({
       accepted.push(f)
     }
     if (accepted.length === 0) return
+    uploadingRef.current = true
+    setDraft(d => ({ ...d, uploading: true }))
     toast(
       accepted.length === 1
         ? `Uploading ${accepted[0].name}...`
@@ -800,15 +838,20 @@ function ChatView({
     try {
       const updated = await supportApi.addAttachment(ticketUuid, accepted)
       setTicket(updated)
+      setDraft(d => ({ ...d, failedFiles: d.failedFiles.filter(f => !accepted.includes(f)) }))
       toast(
         accepted.length === 1 ? 'File attached' : `${accepted.length} files attached`,
         'success',
       )
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Upload failed'
+      setDraft(d => ({ ...d, failedFiles: [...new Set([...d.failedFiles, ...accepted])] }))
       toast(`Failed to upload file: ${msg}`, 'error')
+    } finally {
+      uploadingRef.current = false
+      setDraft(d => ({ ...d, uploading: false }))
     }
-  }, [ticketUuid, toast])
+  }, [ticketUuid, toast, uploading, setDraft])
 
   const { dragOver, dropRef } = useFileDropZone(uploadFiles)
 
@@ -925,7 +968,7 @@ function ChatView({
   if (loading) {
     return (
       <div className="flex flex-1 items-center justify-center">
-        <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+        <Loader2 className="h-5 w-5 animate-spin text-gray-600" />
       </div>
     )
   }
@@ -933,7 +976,8 @@ function ChatView({
   if (!ticket) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-2 text-gray-500">
-        <p className="text-sm">Ticket not found</p>
+        <p role="alert" className="text-sm">{loadError || 'Ticket not found'}</p>
+        {loadError && <button type="button" onClick={() => { setLoading(true); void loadTicket() }} className="text-xs text-blue-700 underline">Retry ticket</button>}
         <button onClick={onBack} className="text-xs text-blue-600 hover:underline">Back</button>
       </div>
     )
@@ -947,14 +991,14 @@ function ChatView({
       {/* Chat header */}
       <div className="border-b px-4 py-2">
         <div className="flex items-center gap-2">
-          <button type="button" onClick={onBack} aria-label="Back" className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+          <button type="button" onClick={onBack} aria-label="Back" className="rounded p-1 text-gray-600 hover:bg-gray-100 hover:text-gray-600">
             <ArrowLeft className="h-4 w-4" />
           </button>
           <div className="min-w-0 flex-1">
             {editingSubject ? (
               <div className="flex items-center gap-1">
                 {ticket.ticket_number != null && (
-                  <span className="font-mono text-[11px] text-gray-400">#{ticket.ticket_number}</span>
+                  <span className="font-mono text-[11px] text-gray-600">#{ticket.ticket_number}</span>
                 )}
                 <input
                   autoFocus
@@ -975,7 +1019,7 @@ function ChatView({
               <div className="flex items-center gap-1">
                 <p className="truncate text-sm font-medium text-gray-900">
                   {ticket.ticket_number != null && (
-                    <span className="mr-1 font-mono text-[11px] text-gray-400">#{ticket.ticket_number}</span>
+                    <span className="mr-1 font-mono text-[11px] text-gray-600">#{ticket.ticket_number}</span>
                   )}
                   {ticket.subject}
                 </p>
@@ -994,9 +1038,9 @@ function ChatView({
             )}
             <div className="flex items-center gap-2">
               <StatusIcon className={`h-3 w-3 ${
-                ticket.status === 'closed' ? 'text-gray-400' : ticket.status === 'in_progress' ? 'text-blue-500' : 'text-yellow-500'
+                ticket.status === 'closed' ? 'text-gray-600' : ticket.status === 'in_progress' ? 'text-blue-500' : 'text-yellow-500'
               }`} />
-              <span className="text-[10px] text-gray-400">
+              <span className="text-[10px] text-gray-600">
                 {ticket.status === 'closed' ? 'Closed' : ticket.status === 'in_progress' ? 'In progress' : 'Open'}
               </span>
               {isSupportAgent && (
@@ -1137,7 +1181,7 @@ function ChatView({
                         className={
                           isInternal
                             ? 'rounded px-2 py-0.5 text-[11px] font-medium text-yellow-900 hover:bg-yellow-200 disabled:opacity-50'
-                            : 'rounded px-2 py-0.5 text-[11px] font-medium text-white/90 hover:bg-white/10 disabled:opacity-50'
+                            : 'rounded px-2 py-0.5 text-[11px] font-medium text-white hover:bg-blue-700 disabled:opacity-50'
                         }
                       >
                         Cancel
@@ -1147,8 +1191,8 @@ function ChatView({
                         disabled={savingEdit || !editDraft.trim()}
                         className={
                           isInternal
-                            ? 'inline-flex items-center gap-1 rounded bg-yellow-500 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-yellow-600 disabled:opacity-50'
-                            : 'inline-flex items-center gap-1 rounded bg-white/20 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-white/30 disabled:opacity-50'
+                            ? 'inline-flex items-center gap-1 rounded bg-yellow-800 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-yellow-900 disabled:opacity-50'
+                            : 'inline-flex items-center gap-1 rounded bg-blue-800 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-blue-900 disabled:opacity-50'
                         }
                       >
                         {savingEdit ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
@@ -1159,7 +1203,7 @@ function ChatView({
                 ) : (
                   <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
                 )}
-                <p className={`mt-1 text-[10px] ${isInternal ? 'text-yellow-800' : (isMe ? 'text-blue-200' : 'text-gray-500')}`}>
+                <p className={`mt-1 text-[10px] ${isInternal ? 'text-yellow-800' : (isMe ? 'text-white' : 'text-gray-600')}`}>
                   {timeAgo(msg.created_at)}
                   {msg.edited_at && <span className="ml-1 italic">(edited)</span>}
                 </p>
@@ -1169,7 +1213,7 @@ function ChatView({
                   {isMe && (
                     <button
                       onClick={() => startEdit(msg)}
-                      className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] text-gray-500 opacity-0 transition-opacity hover:bg-gray-100 hover:text-gray-600 group-hover:opacity-100"
+                      className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] text-gray-600 hover:bg-gray-100 hover:text-gray-800"
                       title="Edit message"
                     >
                       <Pencil className="h-2.5 w-2.5" />
@@ -1179,7 +1223,7 @@ function ChatView({
                   {canDeleteMsg && (
                     <button
                       onClick={() => handleDeleteMessage(msg.uuid)}
-                      className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] text-gray-500 opacity-0 transition-opacity hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
+                      className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] text-gray-600 hover:bg-red-50 hover:text-red-700"
                       title="Delete message"
                     >
                       <Trash2 className="h-2.5 w-2.5" />
@@ -1258,7 +1302,7 @@ function ChatView({
               onDismissPrompt()
               onBack()
             }}
-            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-xs text-gray-600 hover:text-gray-600 transition-colors"
           >
             Not now
           </button>
@@ -1266,15 +1310,19 @@ function ChatView({
       )}
 
       {/* Input */}
+      {loadError && <div role="alert" className="px-3 py-2 text-xs text-red-800">{loadError} <button type="button" className="underline" onClick={() => void loadTicket()}>Retry ticket</button></div>}
+      {uploading && <p role="status" className="px-3 text-xs text-gray-700">Uploading attachments…</p>}
+      {failedFiles.length > 0 && <div role="alert" className="px-3 py-2 text-xs text-red-800">Not uploaded: {failedFiles.map(f => f.name).join(', ')}. <button type="button" disabled={uploading} className="underline" onClick={() => void uploadFiles(failedFiles)}>Retry attachments</button></div>}
       <div className={`border-t px-3 py-2 ${isInternalNote ? 'bg-yellow-100' : ''}`}>
         {isSupportAgent && (
           <div className="mb-1.5 flex items-center justify-between">
             <button
               type="button"
-              onClick={() => setIsInternalNote((v) => !v)}
+              disabled={sending}
+              onClick={() => setIsInternalNote(!isInternalNote)}
               title={isInternalNote
                 ? 'Only other support agents will see this'
-                : 'Switch to an internal note — visible only to support agents'}
+                : 'Switch to an internal note, visible only to support agents'}
               className={
                 isInternalNote
                   ? 'inline-flex items-center gap-1 rounded-full border border-yellow-500 bg-yellow-200 px-2 py-0.5 text-[10px] font-semibold text-yellow-900'
@@ -1293,7 +1341,7 @@ function ChatView({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            className="rounded p-1.5 text-gray-600 hover:bg-gray-100 hover:text-gray-600"
             title="Attach file"
             aria-label="Attach file"
           >
@@ -1303,6 +1351,7 @@ function ChatView({
           <textarea
             ref={messageRef}
             aria-label="Message"
+            disabled={sending}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -1326,7 +1375,7 @@ function ChatView({
             disabled={!message.trim() || sending}
             aria-label={isInternalNote ? 'Add internal note' : 'Send message'}
             className={`rounded-lg p-1.5 text-white disabled:opacity-50 ${
-              isInternalNote ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-blue-600 hover:bg-blue-700'
+              isInternalNote ? 'bg-yellow-800 hover:bg-yellow-900' : 'bg-blue-600 hover:bg-blue-700'
             }`}
           >
             {sending ? (
@@ -1474,9 +1523,15 @@ export function SupportChatPanel({
   const isSupportAgent = user?.is_support_agent ?? false
 
   const [view, setView] = useState<View>(initialTicket ? 'chat' : 'list')
+  const [draft, setDraft] = useState<TicketDraft>(emptyTicketDraft)
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, ReplyDraft>>({})
+  const [ticketSubmitting, setTicketSubmitting] = useState(false)
+  const [pendingContext, setPendingContext] = useState<SupportDraftContext | null>(null)
+  const addedContexts = useRef(new Set<string>())
   const [activeTicket, setActiveTicket] = useState<string | null>(initialTicket || null)
   const [tickets, setTickets] = useState<SupportTicketSummary[]>([])
   const [loading, setLoading] = useState(true)
+  const [ticketsError, setTicketsError] = useState<string | null>(null)
   const panelRef = useRef<HTMLDivElement>(null)
 
   const currentUserId = user?.user_id ?? ''
@@ -1485,8 +1540,9 @@ export function SupportChatPanel({
     try {
       const data = await supportApi.listTickets(undefined, 50)
       setTickets(data.tickets)
+      setTicketsError(null)
     } catch {
-      // silent on poll
+      setTicketsError('Could not refresh your tickets.')
     } finally {
       setLoading(false)
     }
@@ -1506,9 +1562,6 @@ export function SupportChatPanel({
     if (initialTicket) {
       setActiveTicket(initialTicket)
       setView('chat')
-    } else {
-      setActiveTicket(null)
-      setView('list')
     }
   }, [open, initialTicket])
 
@@ -1524,21 +1577,43 @@ export function SupportChatPanel({
       if (ticketUuid) {
         setActiveTicket(ticketUuid)
         setView('chat')
+      } else if (detail?.draft) {
+        setPendingContext(detail.draft)
       }
     }
     window.addEventListener('open-support-panel', handler)
     return () => window.removeEventListener('open-support-panel', handler)
   }, [])
 
-  // Close on Escape
+  // Keep an outgoing ticket's draft untouched until its request settles. New
+  // context is then added to the remaining draft, preserving text and files.
+  useEffect(() => {
+    if (!pendingContext || ticketSubmitting) return
+    if (!addedContexts.current.has(pendingContext.key)) {
+      addedContexts.current.add(pendingContext.key)
+      setDraft(current => ({
+        ...current,
+        subject: current.subject.trim() ? current.subject : pendingContext.subject,
+        message: current.message.trim() ? `${current.message}\n\n${pendingContext.message}` : pendingContext.message,
+      }))
+    }
+    setView('new')
+    setPendingContext(null)
+  }, [pendingContext, ticketSubmitting])
+
+  // This panel is nonmodal: users may still read the workspace. Return focus
+  // only when closing from inside it, without stealing focus from other work.
   useEffect(() => {
     if (!open) return
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const panel = panelRef.current
+    panel?.focus({ preventScroll: true })
+    return () => {
+      if (panel?.contains(document.activeElement) || document.activeElement === document.body) {
+        previous?.focus({ preventScroll: true })
+      }
     }
-    document.addEventListener('keydown', handler)
-    return () => document.removeEventListener('keydown', handler)
-  }, [open, onClose])
+  }, [open])
 
   if (!open) return null
 
@@ -1556,11 +1631,13 @@ export function SupportChatPanel({
   return createPortal(
     <div
       ref={panelRef}
+      role="region" aria-label="Support" tabIndex={-1}
+      onKeyDown={e => { if (e.key === 'Escape' && !e.defaultPrevented) { e.stopPropagation(); onClose() } }}
       className="fixed bottom-4 right-4 z-[9998] flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl"
-      style={{ width: 380, height: 520 }}
+      style={{ width: 'min(380px, calc(100vw - 32px))', height: 'min(520px, calc(100dvh - 32px))' }}
     >
       {/* Title bar */}
-      <div className="flex items-center justify-between bg-blue-600 px-4 py-3 text-white">
+      <div className="flex items-center justify-between bg-panel-dark px-4 py-3 text-white">
         <div className="flex items-center gap-2">
           <MessageSquare className="h-4 w-4" />
           <span className="text-sm font-semibold">
@@ -1572,13 +1649,14 @@ export function SupportChatPanel({
             </span>
           )}
         </div>
-        <button onClick={onClose} className="rounded p-0.5 hover:bg-blue-500">
+        <button type="button" aria-label="Close support" onClick={onClose} className="rounded p-2 hover:bg-white/10">
           <X className="h-4 w-4" />
         </button>
       </div>
 
       {/* Content area */}
-      {view === 'list' && (
+      {view === 'list' && ticketsError && <div role="alert" className="p-3 text-sm text-red-800">{ticketsError} {tickets.length > 0 ? 'Showing the last loaded list.' : ''} <button type="button" className="underline" onClick={() => void loadTickets()}>Retry tickets</button></div>}
+      {view === 'list' && (!ticketsError || tickets.length > 0) && (
         <TicketListView
           tickets={tickets}
           loading={loading}
@@ -1599,8 +1677,14 @@ export function SupportChatPanel({
 
       {view === 'new' && (
         <NewTicketView
+          submitting={ticketSubmitting}
+          setSubmitting={setTicketSubmitting}
+          draft={draft}
+          setDraft={setDraft}
           onBack={() => setView('list')}
           onCreated={(ticket) => {
+            setDraft(emptyTicketDraft())
+            addedContexts.current.clear()
             setActiveTicket(ticket.uuid)
             setView('chat')
             loadTickets()
@@ -1612,6 +1696,8 @@ export function SupportChatPanel({
         <ChatView
           key={activeTicket}
           ticketUuid={activeTicket}
+          draft={replyDrafts[activeTicket] ?? emptyReplyDraft()}
+          setDraft={update => setReplyDrafts(all => ({ ...all, [activeTicket]: typeof update === 'function' ? update(all[activeTicket] ?? emptyReplyDraft()) : update }))}
           isSupportAgent={isSupportAgent}
           onBack={() => {
             setView('list')

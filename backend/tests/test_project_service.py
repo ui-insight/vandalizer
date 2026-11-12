@@ -135,7 +135,7 @@ async def test_overview_and_summary_share_capability_counts():
 async def test_duplicate_project_creates_personal_copy_and_copies_pins():
     """The shell copy is scoped to the caller (personal, "(Copy)" title) and
     duplicates the pin *references* — re-owned by the caller, targets intact."""
-    source = _project(uuid="src", title="Grant A", description="desc",
+    source = _project(uuid="src", title="Grant A", description="desc", context="Write for reviewers",
                       team_id="teamX", state="closeout")
     user = SimpleNamespace(user_id="u2", current_team=None, is_admin=False)
 
@@ -166,6 +166,7 @@ async def test_duplicate_project_creates_personal_copy_and_copies_pins():
     assert new.team_id is None          # personal, even though source was a team project
     assert new.state == "active"        # a duplicate is a fresh working copy
     assert new.description == "desc"
+    assert new.context == "Write for reviewers"
     assert new.kb_uuid == "newkb"
     # Root folder scoped to the caller.
     assert folders[0].user_id == "u2" and folders[0].team_id is None

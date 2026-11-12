@@ -43,7 +43,7 @@ export function CrossFieldViolationsPanel({ searchSetUuid, canManage, summary, r
       setMarkedIds(prev => new Set(prev).add(ruleId))
       if (res.rule.auto_disabled) {
         toast(
-          `Rule auto-disabled after ${res.rule.fp_count} false alarms — fix or re-enable it on the Rules card.`,
+          `Rule auto-disabled after ${res.rule.fp_count} false alarms. Fix or re-enable it on the Rules card.`,
           'info',
         )
       } else {
@@ -62,18 +62,18 @@ export function CrossFieldViolationsPanel({ searchSetUuid, canManage, summary, r
   return (
     <div
       style={{
-        border: '1px solid #e5e7eb',
-        borderRadius: 8,
-        padding: '12px 16px',
+        border: "1px solid var(--workspace-border)",
+        borderRadius: 'var(--workspace-radius-medium)',
+        padding: "var(--workspace-space-12) var(--workspace-space-16)",
         backgroundColor: '#fff',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#202124' }}>Cross-Field Rules</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--workspace-space-12)' }}>
+        <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#202124' }}>Cross-Field Rules</div>
         {passRate != null && (
           <div
             style={{
-              fontSize: 12,
+              fontSize: 'var(--workspace-font-meta)',
               fontWeight: 600,
               color: passRate >= 90 ? '#059669' : passRate >= 70 ? '#d97706' : '#dc2626',
             }}
@@ -83,7 +83,7 @@ export function CrossFieldViolationsPanel({ searchSetUuid, canManage, summary, r
         )}
       </div>
 
-      <div style={{ display: 'flex', gap: 12, fontSize: 12, marginBottom: failures.length > 0 || unparseables.length > 0 ? 12 : 0 }}>
+      <div style={{ display: 'flex', gap: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', marginBottom: failures.length > 0 || unparseables.length > 0 ? 12 : 0 }}>
         <Stat icon={<CheckCircle size={12} color="#059669" />} label="Pass" value={summary.pass} color="#059669" />
         <Stat icon={<AlertTriangle size={12} color="#dc2626" />} label="Fail" value={summary.fail} color="#dc2626" />
         {summary.unparseable > 0 && (
@@ -99,10 +99,10 @@ export function CrossFieldViolationsPanel({ searchSetUuid, canManage, summary, r
 
       {failures.length > 0 && (
         <div style={{ marginBottom: unparseables.length > 0 ? 12 : 0 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 4, textTransform: 'uppercase' }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', marginBottom: 'var(--workspace-space-4)', textTransform: 'uppercase' }}>
             Violations
           </div>
-          <ul style={{ display: 'flex', flexDirection: 'column', gap: 4, listStyle: 'none', padding: 0, margin: 0 }}>
+          <ul style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)', listStyle: 'none', padding: 0, margin: 0 }}>
             {failures.map((r, i) => {
               const ruleId = r.rule_id || r.rule.id
               const marked = ruleId ? markedIds.has(ruleId) : false
@@ -113,21 +113,21 @@ export function CrossFieldViolationsPanel({ searchSetUuid, canManage, summary, r
                     display: 'flex',
                     alignItems: 'flex-start',
                     justifyContent: 'space-between',
-                    gap: 8,
-                    fontSize: 12,
-                    padding: '6px 8px',
+                    gap: 'var(--workspace-space-8)',
+                    fontSize: 'var(--workspace-font-meta)',
+                    padding: "var(--workspace-space-6) var(--workspace-space-8)",
                     backgroundColor: '#fef2f2',
                     border: '1px solid #fecaca',
-                    borderRadius: 6,
+                    borderRadius: 'var(--workspace-radius-small)',
                   }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontFamily: 'ui-monospace, monospace', color: '#991b1b', wordBreak: 'break-word' }}>
                       {describeRule(r.rule)}
                     </div>
-                    <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{r.message}</div>
+                    <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-2)' }}>{r.message}</div>
                     {(r.test_case_label || r.source_label) && (
-                      <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
+                      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-2)' }}>
                         on {r.test_case_label || r.source_label}
                       </div>
                     )}
@@ -137,17 +137,17 @@ export function CrossFieldViolationsPanel({ searchSetUuid, canManage, summary, r
                       onClick={() => handleMark(r)}
                       disabled={busyId === ruleId || marked}
                       style={{
-                        padding: '3px 8px',
-                        fontSize: 11,
+                        padding: "var(--workspace-space-4) var(--workspace-space-8)",
+                        fontSize: 'var(--workspace-font-meta)',
                         fontWeight: 600,
                         backgroundColor: marked ? '#e5e7eb' : '#fff',
                         color: marked ? '#6b7280' : '#dc2626',
                         border: `1px solid ${marked ? '#d1d5db' : '#fca5a5'}`,
-                        borderRadius: 4,
+                        borderRadius: 'var(--workspace-radius-small)',
                         cursor: marked || busyId === ruleId ? 'default' : 'pointer',
                         whiteSpace: 'nowrap',
                       }}
-                      title={marked ? 'Already marked' : 'Mark as false alarm — increments the rule\'s FP counter'}
+                      title={marked ? 'Already marked' : 'Mark as false alarm: increments the rule\'s FP counter'}
                     >
                       {marked ? 'Marked' : busyId === ruleId ? '…' : 'False alarm'}
                     </button>
@@ -160,14 +160,14 @@ export function CrossFieldViolationsPanel({ searchSetUuid, canManage, summary, r
       )}
 
       {unparseables.length > 0 && (
-        <details style={{ fontSize: 12, color: '#6b7280' }}>
+        <details style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
           <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
             {unparseables.length} rule{unparseables.length === 1 ? '' : 's'} couldn't be evaluated
           </summary>
-          <ul style={{ marginTop: 6, paddingLeft: 16, listStyle: 'disc' }}>
+          <ul style={{ marginTop: 'var(--workspace-space-6)', paddingLeft: 'var(--workspace-space-16)', listStyle: 'disc' }}>
             {unparseables.map((r, i) => (
-              <li key={i} style={{ marginBottom: 2 }}>
-                <code>{describeRule(r.rule)}</code> — {r.message}
+              <li key={i} style={{ marginBottom: 'var(--workspace-space-2)' }}>
+                <code>{describeRule(r.rule)}</code>: {r.message}
               </li>
             ))}
           </ul>
@@ -192,7 +192,7 @@ function Stat({
 }) {
   return (
     <div
-      style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+      style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)' }}
       title={tooltip}
     >
       {icon}

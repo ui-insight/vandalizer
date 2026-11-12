@@ -97,8 +97,34 @@
       ],
       "input_config": {},
       "output_config": {},
-      "validation_plan": [],
-      "validation_inputs": []
+      "validation_plan": [
+        {
+          "id": "f7da08cd-03b9-55d6-9b92-7110354603bb",
+          "name": "Figures match the source",
+          "category": "accuracy",
+          "description": "Every deadline, time, time zone, page limit, font size, dollar limit and award count in the output appears in the source document with the same value, unit and (for dates) year. A figure the output calculated says how it was calculated and the arithmetic is right. FAIL if any value differs from the source, or appears with no basis in it."
+        },
+        {
+          "id": "a18575a7-5a59-5549-8feb-3bf9156ffb3d",
+          "name": "Every date and deadline is listed",
+          "category": "completeness",
+          "description": "Every date the announcement states (letters of intent, institutional or internal deadlines, application deadline, anticipated start, project period) appears with its time and time zone as written. When an amendment changes a date, the amended date is used and the change is noted. FAIL for an omitted date or a superseded date presented as current."
+        },
+        {
+          "id": "050720e8-0d18-5281-8bc3-8ff3e88e7a65",
+          "name": "Says when the document is silent",
+          "category": "content",
+          "description": "For each formatting rule, page limit, eligibility criterion or required form that the source document does not state, the output says it is not stated (or not found) instead of filling in a typical value, a common practice or a figure from memory, and instead of leaving it out without comment. FAIL if a missing item is given a value the document does not contain."
+        }
+      ],
+      "validation_inputs": [
+        {
+          "id": "97ffe843-d365-5e1f-bcae-ce86fa99833d",
+          "type": "text",
+          "label": "Fictional solicitation and amendment. Answer key: sponsor deadline November 19, 2026, 5:00 p.m. Pacific Time (amended from November 12); institutional deadline November 9, 2026 at noon Pacific Time (unchanged); project period July 1, 2027 to June 30, 2028; direct costs capped at $180,000; indirect costs additional, at most 25% of direct; no equipment; one application per university; required: narrative, itemized budget, budget justification, one signed community-partner letter. Not stated: a page limit, citizenship eligibility, a waiver process.",
+          "text": "FICTIONAL QA MATERIAL — NOT A REAL FUNDING OPPORTUNITY\nSource ID: notice-v1\nCommunity Resilience Pilot — original notice, October 1, 2026\n\n1. Eligibility\nAn application must be submitted by a university research office. Each university\nmay submit one application. This notice does not specify citizenship eligibility.\n\n2. Dates\nThe sponsor deadline is November 12, 2026 at 5:00 p.m. Pacific Time.\nThe institutional review deadline is November 9, 2026 at noon Pacific Time.\nThe project period is July 1, 2027 through June 30, 2028.\n\n3. Budget\nThe maximum direct-cost request is $180,000. Indirect costs are additional and\nmay not exceed 25% of direct costs. Equipment purchases are not permitted.\nTravel and subaward costs are allowed within the direct-cost limit.\nThis notice does not give an exception or waiver process.\n\n4. Required material\nInclude a project narrative, an itemized budget, a budget justification and one\nsigned community-partner letter. The letter must arrive with the application.\nThe notice does not specify a page limit for the budget justification.\n\nFICTIONAL QA MATERIAL — NOT A REAL FUNDING OPPORTUNITY\nSource ID: amendment-v2\nCommunity Resilience Pilot — official amendment, October 8, 2026\n\nThis amendment supersedes the sponsor deadline in section 2 of notice-v1.\nThe new sponsor deadline is November 19, 2026 at 5:00 p.m. Pacific Time.\nThe institutional review deadline remains November 9, 2026 at noon Pacific Time.\nAll other requirements, limits and project dates in notice-v1 remain unchanged."
+        }
+      ]
     }
   ]
 }

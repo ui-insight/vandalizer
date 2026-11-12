@@ -18,21 +18,21 @@ export function CrossJudgeNote({ crossJudge, primaryScore, primaryJudge }: Props
   // "Large" disagreement = 10pts. Arbitrary but matches the common case where
   // a single judge swing is news-worthy.
   const tone: 'good' | 'warn' = absDeltaPts > 10 ? 'warn' : 'good'
-  const fg = tone === 'good' ? '#86efac' : '#fbbf24'
+  const fg = tone === 'good' ? 'var(--workspace-success)' : 'var(--workspace-warning)'
   const bg = tone === 'good' ? 'rgba(34, 197, 94, 0.08)' : 'rgba(245, 158, 11, 0.08)'
   const border = tone === 'good' ? 'rgba(34, 197, 94, 0.25)' : 'rgba(245, 158, 11, 0.3)'
 
   return (
     <div style={{
-      padding: '10px 14px', backgroundColor: bg, border: `1px solid ${border}`,
-      borderRadius: 8, display: 'flex', alignItems: 'center', gap: 12,
+      padding: "var(--workspace-space-12) var(--workspace-space-16)", backgroundColor: bg, border: `1px solid ${border}`,
+      borderRadius: 'var(--workspace-radius-medium)', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)',
     }}>
       <Scale size={16} style={{ color: fg }} />
       <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: fg }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: fg }}>
           Cross-judge check: {tone === 'good' ? 'judges agree' : 'judges disagree'}
         </div>
-        <div style={{ fontSize: 11, color: '#aaa', marginTop: 2, lineHeight: 1.4 }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginTop: 'var(--workspace-space-2)', lineHeight: 1.4 }}>
           <strong>{primaryJudge || 'primary'}</strong> scored {(primaryScore * 100).toFixed(0)}% ·{' '}
           <strong>{crossJudge.model}</strong> scored {(crossJudge.score * 100).toFixed(0)}%{' '}
           ({deltaPts >= 0 ? '+' : ''}{deltaPts.toFixed(0)}pts).

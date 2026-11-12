@@ -11,7 +11,7 @@ from app.exceptions import TrialBudgetExceededError
 from app.tasks import upload_validation_tasks as uv
 
 
-def _budget_exhausted(user_id):
+def _budget_exhausted(user_id, **_):
     raise TrialBudgetExceededError("nope")
 
 
@@ -67,7 +67,7 @@ def test_summarize_reports_skipped_sections_without_spending_more():
 # ---------------------------------------------------------------------------
 
 
-def _unverified(user_id):
+def _unverified(user_id, **_):
     from app.exceptions import TrialUnverifiedError
 
     raise TrialUnverifiedError("confirm your email")

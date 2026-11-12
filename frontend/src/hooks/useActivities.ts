@@ -8,6 +8,8 @@ const DEFAULT_STALE_THRESHOLD_MINUTES = 30
 export function useActivities(externalSignal?: number) {
   const [activities, setActivities] = useState<ActivityEvent[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const fetching = useRef(false)
   const [freshTitleIds, setFreshTitleIds] = useState<Set<string>>(new Set())
   const [staleThresholdMinutes, setStaleThresholdMinutes] = useState<number>(
     DEFAULT_STALE_THRESHOLD_MINUTES,
@@ -28,6 +30,9 @@ export function useActivities(externalSignal?: number) {
   }, [])
 
   const refresh = useCallback(async () => {
+    if (fetching.current) return
+    fetching.current = true
+    setLoading(true)
     try {
       const data = await listActivities(50)
       const newActivities = data.events
@@ -65,6 +70,7 @@ export function useActivities(externalSignal?: number) {
         }),
       )
       setActivities(newActivities)
+      setError(null)
 
       if (typeof data.stale_threshold_minutes === 'number' && data.stale_threshold_minutes > 0) {
         setStaleThresholdMinutes(data.stale_threshold_minutes)
@@ -77,9 +83,10 @@ export function useActivities(externalSignal?: number) {
           return next
         })
       }
-    } catch {
-      // silently fail
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Could not refresh activity.')
     } finally {
+      fetching.current = false
       setLoading(false)
     }
   }, [])
@@ -142,6 +149,7 @@ export function useActivities(externalSignal?: number) {
   return {
     activities,
     loading,
+    error,
     refresh,
     freshTitleIds,
     markTitleShimmered,

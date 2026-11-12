@@ -1,0 +1,28 @@
+NSF PAPPG (NSF 24-1) — Chapter V: Renewal Proposals
+Source: https://www.nsf.gov/policies/pappg/24-1/ch-5-renewal-proposals
+
+A renewal proposal is a request for additional funding for a support period subsequent to that provided by a standard or continuing grant. A renewal proposal competes with all other proposals and must be developed as fully as though the proposer is applying for the first time. Renewal proposals must be submitted at least six months before additional funding is required or consistent with an established deadline, target date or submission window. In preparing a renewal proposal, proposers should assume that reviewers will not have access to previously submitted versions of the proposal. Please note the National Science Board affirms that merit-reviewed competition is the foundation for the NSF’s grant/award making process so there should be a presumption that expiring awards are to be recompeted.[59]
+
+All proposals for renewed support of research projects, from academic institutions only, must include information on human resources development at the postdoctoral, graduate, and undergraduate levels as part of Results from Prior NSF Support.[60] This may involve, but is not limited to, the role of research in student training, course preparation and seminars (particularly for undergraduates). Special accomplishments in the development of professional scientists and engineers from underrepresented groups should be described. Graduate students who participated in the research should be identified by name. This requirement does not apply to non-academic organizations.
+
+PIs are encouraged to discuss renewal proposals with the program prior to submission of a proposal. Unless precluded by individual program requirements, PIs may choose either of the following two formats for preparation of a renewal proposal.
+
+A. Traditional Renewal. The “traditional” renewal proposal is developed as fully as though the proposer were applying for the first time. It covers all the information required in a proposal for a new project, including Results from Prior NSF Support. The 15-page limitation on the Project Description applies.
+
+B. Accomplishment-Based Renewal. In an "Accomplishment-Based Renewal" (ABR) proposal, the Project Description (including the Results from Prior NSF Support) is replaced with the following items:
+
+- a brief summary (not to exceed four pages) of plans for the proposed support period.
+- information on human resources development at the postdoctoral, graduate, and undergraduate levels; and
+- copies of no more than six reprints[61] of publications resulting from the research supported by NSF (including research supported by other sources that is closely related to the NSF-supported research) during the preceding period of NSF support. Of the six publications, two preprints (accepted for publication) may be included.
+
+All other information required for NSF proposal submission remains the same.
+
+It must be clearly indicated in the proposal that it is an ABR submission and the box for "Accomplishment-Based Renewal" must be checked on the Cover Sheet. ABR proposals may not be submitted for consecutive renewals.
+
+#### Footnotes to Chapter V
+
+[59] Reference National Science Board Policy Statement (NSB-2015-45) on Recompetition of Major Facilities and Resolution (NSB-2015-46) entitled, Recompetition of Ongoing Facilities. For the operation of a major facility, the National Science Board has endorsed the principle that NSF should perform a rigorous review prior to the end date of an award to determine whether it is in the best interest of US science and engineering to recompete that award.
+
+[60] This requirement applies to both types of renewal proposals: Traditional Renewal and Accomplishment-Based Renewal.
+
+[61] Reprints should be provided as supplementary documentation and should be submitted via the Proposal Preparation Module in Research.gov.

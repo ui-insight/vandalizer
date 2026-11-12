@@ -155,3 +155,20 @@ def test_catalog_reads_map_legacy_tiers():
     assert svc_normalize("gold") == "excellent"
     assert svc_normalize("bronze") == "fair"
     assert svc_normalize("good") == "good"
+
+
+@pytest.mark.parametrize('tier,score,regression,group,expected', [
+    ('excellent', 95, False, 'strong', True),
+    ('good', 80, False, 'strong', True),
+    ('fair', 95, False, 'strong', False),  # obey configured tier, not a new numeric cutoff
+    ('excellent', None, False, 'strong', False),
+    ('excellent', None, False, 'unevaluated', True),
+    (None, 0, False, 'improvement', True),
+    (None, None, False, 'improvement', False),
+    ('fair', 60, False, 'mixed', True),
+    ('excellent', 99, True, 'strong', False),
+    ('excellent', 99, True, 'review', True),
+])
+def test_presentation_quality_filter_preserves_measurement_and_review_boundaries(tier, score, regression, group, expected):
+    from app.services.verification_service import matches_quality_filter
+    assert matches_quality_filter(tier, score, regression, group) is expected

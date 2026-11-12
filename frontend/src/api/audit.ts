@@ -55,3 +55,53 @@ export function exportAuditLog(params?: {
   }
   return `/api/audit/export?${qs.toString()}`
 }
+
+// Web searches sent to the deployment's search provider (web_search_usage).
+
+export interface WebSearchEntry {
+  id: string
+  timestamp: string | null
+  feature: string
+  user_id: string | null
+  team_id: string | null
+  activity_id: string | null
+  provider: string | null
+  query: string
+  result_count: number
+  status: 'ok' | 'error' | 'not_configured' | string
+  error: string | null
+}
+
+export interface WebSearchResponse {
+  entries: WebSearchEntry[]
+  total: number
+  skip: number
+  limit: number
+  by_feature: Record<string, number>
+  by_status: Record<string, number>
+}
+
+export interface WebSearchFilters {
+  feature?: string
+  status?: string
+  provider?: string
+  user_id?: string
+  start_time?: string
+  end_time?: string
+}
+
+function webSearchQuery(params: WebSearchFilters & { skip?: number; limit?: number }): string {
+  const qs = new URLSearchParams()
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== '') qs.set(k, String(v))
+  })
+  return qs.toString()
+}
+
+export function queryWebSearches(params: WebSearchFilters & { skip?: number; limit?: number }): Promise<WebSearchResponse> {
+  return apiFetch(`/api/audit/web-searches?${webSearchQuery(params)}`)
+}
+
+export function exportWebSearches(params: WebSearchFilters = {}): string {
+  return `/api/audit/web-searches/export?${webSearchQuery(params)}`
+}

@@ -178,7 +178,9 @@ async def test_workflow_history_names_the_models_per_step():
     from app.routers import workflows
 
     with patch.object(workflows, "get_authorized_workflow", AsyncMock(return_value=SimpleNamespace(id="wf"))), \
-         patch("app.models.activity.ActivityEvent", _activity_cls([_event(), _event(model_usage=[])])):
+         patch("app.models.activity.ActivityEvent", _activity_cls([_event(), _event(model_usage=[])])), \
+         patch("app.models.workflow.WorkflowResult") as results:
+        results.find.return_value.to_list = AsyncMock(return_value=[])
         out = await workflows.get_workflow_history("wf", user=SimpleNamespace(user_id="u"))
     run, old = out["runs"]
     assert run["models"] == ["gpt-oss-120b", "glm-5.3-flash"]
