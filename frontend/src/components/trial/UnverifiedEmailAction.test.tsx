@@ -57,4 +57,17 @@ describe('UnverifiedEmailAction', () => {
 
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Your email is confirmed'))
   })
+
+  it('offers to send the message again once the address is confirmed', async () => {
+    mockResend.mockResolvedValue({ ok: true, already_verified: true })
+    const onRetry = vi.fn()
+    render(<UnverifiedEmailAction onRetry={onRetry} />)
+
+    // Not before: a retry can't succeed while the account is unverified.
+    expect(screen.queryByRole('button', { name: 'Send my message again' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Resend link' }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Send my message again' }))
+    expect(onRetry).toHaveBeenCalledOnce()
+  })
 })

@@ -1448,7 +1448,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                 </span>
               </div>
             ) : errorDetails?.code === 'trial_email_unverified' ? (
-              <UnverifiedEmailAction />
+              <UnverifiedEmailAction onRetry={retry} />
             ) : errorDetails?.suggestedAction === 'continue' ? (
               <div className="mt-2 flex items-center gap-2">
                 <button

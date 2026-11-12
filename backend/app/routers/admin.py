@@ -1432,13 +1432,24 @@ async def mark_user_email_verified(
     The confirmation email is the only thing that switches AI features on for
     a self-registered account, so when it never arrives the user has no way
     forward. An admin (or staff, who run the trial programme) who knows the
-    person can vouch for the address here instead.
+    person can vouch for the address here instead. It is a vouch: the account
+    is then treated as owning that address everywhere, not only for AI.
     """
     await _require_admin(user)
 
     target = await User.find_one(User.user_id == user_id)
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
+
+    # Only where it unblocks something: a trial account waiting on its
+    # confirmation. ``email_verified`` is also what proves an account owns its
+    # address (links shared with named people rely on it), so it is not handed
+    # out to accounts that aren't held back by it.
+    if not target.is_demo_user:
+        raise HTTPException(
+            status_code=400,
+            detail="Only a trial account waiting on its confirmation email can be marked as verified here.",
+        )
 
     if not target.email_verified:
         target.email_verified = True

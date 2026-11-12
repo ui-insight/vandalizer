@@ -523,3 +523,42 @@ def test_only_an_unconfirmed_trial_account_is_reported_as_unverified():
     assert not _email_unverified(SimpleNamespace(is_demo_user=True, email_verified=True))
     # Regular accounts are never gated on this flag, whatever it holds.
     assert not _email_unverified(SimpleNamespace(is_demo_user=False, email_verified=False))
+
+
+async def test_staff_can_mark_a_trial_users_email_as_verified():
+    from app.routers import admin
+
+    target = SimpleNamespace(
+        user_id="new@example.test", is_demo_user=True, email_verified=False,
+        save=AsyncMock(),
+    )
+    with patch.object(admin, "User", fake_model(find_one_result=target)), \
+         patch.object(admin, "_audit", AsyncMock()):
+        result = await admin.mark_user_email_verified(
+            "new@example.test", user=_admin(is_admin=False, is_staff=True)
+        )
+    assert result["ok"] is True
+    assert target.email_verified is True
+
+
+async def test_an_account_that_is_not_a_trial_cannot_be_vouched_for_here():
+    """``email_verified`` also proves an account owns its address (links shared
+    with named people rely on it), so it is only set where it unblocks AI."""
+    from fastapi import HTTPException
+
+    from app.routers import admin
+
+    target = SimpleNamespace(
+        user_id="local@example.test", is_demo_user=False, email_verified=False,
+        save=AsyncMock(),
+    )
+    audit = AsyncMock()
+    with patch.object(admin, "User", fake_model(find_one_result=target)), \
+         patch.object(admin, "_audit", audit):
+        with pytest.raises(HTTPException) as refused:
+            await admin.mark_user_email_verified("local@example.test", user=_admin())
+
+    assert refused.value.status_code == 400
+    assert target.email_verified is False
+    target.save.assert_not_awaited()
+    audit.assert_not_awaited()

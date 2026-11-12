@@ -81,7 +81,7 @@ function UserDrillDown({ userId, onBack }: { userId: string; onBack: () => void 
           <div style={{ flex: 1, minWidth: 260 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#92400e' }}>Email not verified</div>
             <div style={{ fontSize: 13, color: '#78350f', marginTop: 4 }}>
-              This person hasn't opened the confirmation link, so AI features are off for their account. If the email didn't reach them, you can confirm the address yourself.
+              This person hasn't opened the confirmation link, so AI features are off for their account. If the email didn't reach them and you know the address is theirs, you can confirm it yourself.
             </div>
           </div>
           <button
@@ -94,6 +94,8 @@ function UserDrillDown({ userId, onBack }: { userId: string; onBack: () => void 
                 message: (
                   <>
                     Confirm <strong>{data.email || userId}</strong> as the email address for <strong>{who}</strong>? AI features turn on for their account straight away, without them opening the emailed link.
+                    <br /><br />
+                    Only do this if you know this person owns that address. The account will be treated as its owner everywhere, including for links shared with that address.
                   </>
                 ),
                 confirmLabel: 'Mark as verified',
