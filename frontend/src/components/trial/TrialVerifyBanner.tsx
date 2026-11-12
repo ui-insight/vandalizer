@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { MailCheck, Loader2 } from 'lucide-react'
-import { getTrialUsage, resendVerificationEmail } from '../../api/demo'
+import { getTrialUsage } from '../../api/demo'
 import { useAuth } from '../../hooks/useAuth'
+import { useResendVerification } from '../../hooks/useResendVerification'
 
 /**
  * Tells an unconfirmed trial user why AI features aren't responding, and gives
@@ -16,9 +17,8 @@ export function TrialVerifyBanner() {
   const { user } = useAuth()
   const isTrialUser = Boolean(user?.is_demo_user)
   const [needsVerify, setNeedsVerify] = useState(false)
-  const [sending, setSending] = useState(false)
-  const [sent, setSent] = useState(false)
-  const [error, setError] = useState('')
+  const hide = useCallback(() => setNeedsVerify(false), [])
+  const { resend, sending, sent, error } = useResendVerification(hide)
 
   useEffect(() => {
     // The session already says whether this is a trial account, so only trial
@@ -46,28 +46,10 @@ export function TrialVerifyBanner() {
 
   if (!needsVerify) return null
 
-  async function handleResend() {
-    setSending(true)
-    setError('')
-    try {
-      const result = await resendVerificationEmail()
-      if (result.already_verified) {
-        setNeedsVerify(false)
-        return
-      }
-      if (result.ok) setSent(true)
-      else setError("We couldn't send it just now — please try again in a moment.")
-    } catch {
-      setError("We couldn't send it just now — please try again in a moment.")
-    } finally {
-      setSending(false)
-    }
-  }
-
   return (
     <div
       role="status"
-      className="flex flex-wrap items-center gap-3 border-b border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-200"
+      className="flex flex-wrap items-center gap-3 border-b border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-950"
     >
       <MailCheck className="h-4 w-4 shrink-0" aria-hidden="true" />
       <span className="flex-1 min-w-[16rem]">
@@ -79,15 +61,15 @@ export function TrialVerifyBanner() {
       ) : (
         <button
           type="button"
-          onClick={handleResend}
+          onClick={resend}
           disabled={sending}
-          className="inline-flex items-center gap-1.5 rounded-md border border-amber-400/40 px-3 py-1 font-semibold hover:bg-amber-500/20 disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-md border border-amber-700 bg-white px-3 py-1 font-semibold text-amber-950 hover:bg-amber-100 disabled:opacity-50"
         >
           {sending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
           Resend link
         </button>
       )}
-      {error && <span className="text-red-300">{error}</span>}
+      {error && <span role="alert" className="basis-full text-red-800">{error}</span>}
     </div>
   )
 }

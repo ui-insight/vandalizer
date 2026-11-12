@@ -1,8 +1,10 @@
-import { documentReadinessMessage, type DocumentReadiness } from '../../utils/documentReadiness'
+import { documentIssue, documentReadinessMessage, documentReadinessState, type DocumentReadiness } from '../../utils/documentReadiness'
 import { WorkspaceSectionHeader } from '../shared/WorkspaceSectionHeader'
-import { useCallback, useMemo, useState, useRef, useEffect, type ReactNode, type DragEvent } from 'react'
+import { useCallback, useMemo, useState, useRef, useEffect, type ReactNode, type DragEvent, type Ref } from 'react'
 import { Plus, Folder as FolderIcon, Upload, Trash2, Download, FolderInput } from 'lucide-react'
 import { useTeams } from '../../hooks/useTeams'
+import { useAuth } from '../../hooks/useAuth'
+import { formatContentsSummary } from '../../utils/fileDisplay'
 import { useDocuments } from '../../hooks/useDocuments'
 import { useBreadcrumbs } from '../../hooks/useFolders'
 import { useUpload, fileToBase64 } from '../../hooks/useUpload'
@@ -24,11 +26,12 @@ import { DocumentUsageDialog, UsageSummaryList, UsageCheckFailedNote, RemoveFrom
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { createFolder, renameFolder, deleteFolder, convertFolderToTeam, moveFolder, exportFolder } from '../../api/folders'
 import { listAutomations } from '../../api/automations'
+import { retryExtraction } from '../../api/documents'
 import type { Document, Folder } from '../../types/document'
 import { isDocReady } from '../../utils/processingStatus'
 import { SUPPORTED_ACCEPT_ATTR } from '../../utils/fileTypes'
 
-export type SortColumn = 'name' | 'modified'
+export type SortColumn = 'name' | 'size' | 'modified'
 export type SortDirection = 'asc' | 'desc'
 export interface SortState {
   column: SortColumn
@@ -55,7 +58,10 @@ export interface ContentMatch {
 }
 
 interface FileBrowserProps {
-  searchAction?: ReactNode
+  // The file rows are the only part of the panel that scrolls. The owner can
+  // hold that region (to restore its position) and hear how far it has moved.
+  listScrollRef?: Ref<HTMLDivElement>
+  onListScroll?: (scrollTop: number) => void
   searchField?: ReactNode
   selectedDocumentUuids?: string[]
   selectedFolderUuids?: string[]
@@ -116,8 +122,9 @@ function keptKnowledgeBasesMessage(results: DeleteFileResult[]): string | null {
 // The delete confirmation names what it deletes; past this many, "and N more".
 const DELETE_NAME_CAP = 8
 
-export function FileBrowser({ searchAction, searchField, selectedDocumentUuids, selectedFolderUuids, onDocClick, searchQuery = '', contentMatches, contentSearchState, onRetryContentSearch, onSelectionChange, onDocNamesChange, onDocumentReadinessChange, onFolderSelectionChange, onFolderNamesChange, onSelectionProcessingChange, currentFolder: controlledFolder, onFolderNavigate, onAskAboutFolder, onRunWorkflowOnFolder, onAddFolderToKB, rootFolder = null, rootLabel, teamScopeUuid }: FileBrowserProps) {
+export function FileBrowser({ listScrollRef, onListScroll, searchField, selectedDocumentUuids, selectedFolderUuids, onDocClick, searchQuery = '', contentMatches, contentSearchState, onRetryContentSearch, onSelectionChange, onDocNamesChange, onDocumentReadinessChange, onFolderSelectionChange, onFolderNamesChange, onSelectionProcessingChange, currentFolder: controlledFolder, onFolderNavigate, onAskAboutFolder, onRunWorkflowOnFolder, onAddFolderToKB, rootFolder = null, rootLabel, teamScopeUuid }: FileBrowserProps) {
   const { currentTeam } = useTeams()
+  const { user } = useAuth()
   const confirm = useConfirm()
   const { toast } = useToast()
 
@@ -211,7 +218,7 @@ export function FileBrowser({ searchAction, searchField, selectedDocumentUuids, 
   }, [selectedUuids, documents, onSelectionChange, onDocNamesChange, onSelectionProcessingChange])
 
   useEffect(() => {
-    onDocumentReadinessChange?.([...documents, ...(contentMatches ?? [])].map(doc => ({ uuid: doc.uuid, title: doc.title, message: documentReadinessMessage(doc) })))
+    onDocumentReadinessChange?.([...documents, ...(contentMatches ?? [])].map(doc => ({ uuid: doc.uuid, title: doc.title, message: documentReadinessMessage(doc), state: documentReadinessState(doc) })))
   }, [documents, contentMatches, onDocumentReadinessChange])
 
   // Sync selected folder UUIDs to parent
@@ -309,6 +316,8 @@ export function FileBrowser({ searchAction, searchField, selectedDocumentUuids, 
           const bTime = b.updated_at ? new Date(b.updated_at).getTime() : 0
           return aTime - bTime
         }
+        case 'size':
+          return (a.size_bytes ?? -1) - (b.size_bytes ?? -1)
         default:
           return 0
       }
@@ -406,6 +415,33 @@ export function FileBrowser({ searchAction, searchField, selectedDocumentUuids, 
       setBulkDeleting(false)
     }
   }, [selectedUuids, folders, documents, refresh, confirm, setSelectedUuids, toast])
+
+  // Retry from the row: the same re-run the open file offers. It re-reads the
+  // text and rebuilds the search index, so it clears both kinds of failure.
+  const [retryingUuids, setRetryingUuids] = useState<Set<string>>(() => new Set())
+  const handleRetryDoc = useCallback(async (doc: Document) => {
+    // A re-read clears the stored text before it starts. That costs nothing
+    // for a file with no text, but one that only failed indexing or read
+    // poorly still has text chat can use: say so before replacing it.
+    if (!['no_text', 'stopped'].includes(documentIssue(doc)?.kind ?? '')) {
+      const ok = await confirm({
+        title: `Read ${doc.title} again?`,
+        message: 'This reads the file again and rebuilds its search index. Its current text is replaced, and if the new read fails the file will have no text until it is retried.',
+        confirmLabel: 'Read again',
+      })
+      if (!ok) return
+    }
+    setRetryingUuids(prev => new Set(prev).add(doc.uuid))
+    try {
+      await retryExtraction(doc.uuid)
+      // The list polls while a file is processing, so the row updates itself.
+      await refresh()
+    } catch (err) {
+      toast(err instanceof Error ? `Could not retry ${doc.title}: ${err.message}` : `Could not retry ${doc.title}`, 'error')
+    } finally {
+      setRetryingUuids(prev => { const next = new Set(prev); next.delete(doc.uuid); return next })
+    }
+  }, [refresh, toast, confirm])
 
   const handleDropFile = useCallback(async (fileUuid: string, folderUuid: string) => {
     try {
@@ -660,7 +696,7 @@ export function FileBrowser({ searchAction, searchField, selectedDocumentUuids, 
       onDragLeave={handlePanelDragLeave}
       onDrop={handlePanelDrop}
     >
-      <WorkspaceSectionHeader title="Files" actions={<>{searchAction}
+      <WorkspaceSectionHeader title="Files" actions={<>
       <div ref={addMenuRef} className="relative inline-block">
         <button
           type="button"
@@ -759,6 +795,7 @@ export function FileBrowser({ searchAction, searchField, selectedDocumentUuids, 
         floor={rootFolder}
         homeLabel={rootFolder ? (rootLabel ?? 'Project') : 'Home'}
         onDropFile={handleDropFile}
+        summary={contentsError ? undefined : formatContentsSummary(folders.length, documents.length)}
       />
 
       {breadcrumbError && <p role="alert" className="mt-2 text-sm text-red-800">Folder path unavailable. {breadcrumbError} <button type="button" className="underline" onClick={() => void refreshBreadcrumbs()}>Retry folder path</button></p>}
@@ -820,9 +857,11 @@ export function FileBrowser({ searchAction, searchField, selectedDocumentUuids, 
       {contentsError && <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">Could not load this folder. {documents.length || folders.length ? 'Previously loaded items are shown.' : 'Its contents are unavailable.'} <button onClick={() => refresh()} className="ml-2 rounded border border-red-300 px-2 py-1 underline">Retry folder</button></div>}
       {/* File list surface */}
       <div
+        ref={listScrollRef}
+        onScroll={onListScroll ? (event) => onListScroll(event.currentTarget.scrollTop) : undefined}
         className="file-list-surface"
       >
-        {contentsError && !documents.length && !folders.length ? null : searchQuery.trim() && !sortedFolders.length && !sortedDocuments.length ? <p role="status" className="p-6 text-sm text-gray-600">{contentSearchState === 'loading' ? 'Searching document contents…' : contentSearchState === 'error' ? 'No matching names in this folder. Retry content search above, or change the search.' : <>No files or folders match “{searchQuery}”. Change the search or use Close search to see this folder again.</>}</p> : currentFolder && !sortedFolders.length && !sortedDocuments.length ? <p role="status" className="p-6 text-sm text-gray-600">{rootFolder ? 'This folder is empty. Use Add → From my files to move existing files here, or upload new files.' : 'This folder is empty. Upload files here or use Add to create a folder.'}</p> : <FileList
+        {contentsError && !documents.length && !folders.length ? null : searchQuery.trim() && !sortedFolders.length && !sortedDocuments.length ? <p role="status" className="p-6 text-sm text-gray-600">{contentSearchState === 'loading' ? 'Searching document contents…' : contentSearchState === 'error' ? 'No matching names in this folder. Retry content search above, or change the search.' : <>No files or folders match “{searchQuery}”. Change the search or clear it to see this folder again.</>}</p> : currentFolder && !sortedFolders.length && !sortedDocuments.length ? <p role="status" className="p-6 text-sm text-gray-600">{rootFolder ? 'This folder is empty. Use Add → From my files to move existing files here, or upload new files.' : 'This folder is empty. Upload files here or use Add to create a folder.'}</p> : <FileList
           folders={sortedFolders}
           documents={sortedDocuments}
           onFolderClick={setCurrentFolder}
@@ -838,6 +877,8 @@ export function FileBrowser({ searchAction, searchField, selectedDocumentUuids, 
           sort={sort}
           onSort={handleSort}
           watchedFolderUuids={watchedFolderUuids}
+          onRetryDoc={handleRetryDoc}
+          retryingUuids={retryingUuids}
         />}
       </div>
 
@@ -919,9 +960,12 @@ export function FileBrowser({ searchAction, searchField, selectedDocumentUuids, 
                 }
               : undefined
           }
-          onCopyUuid={() => {
-            navigator.clipboard.writeText(contextMenu.item.uuid)
-          }}
+          // An identifier only someone working with the API needs.
+          onCopyUuid={
+            user?.is_admin
+              ? () => { navigator.clipboard.writeText(contextMenu.item.uuid) }
+              : undefined
+          }
           onShowUsage={
             contextMenu.type === 'doc'
               ? () => setUsageTarget({ uuid: contextMenu.item.uuid, title: contextMenu.item.title })

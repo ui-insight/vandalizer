@@ -549,6 +549,58 @@ html {
   font-size: 13px;
 }
 
+/* Phones: the links the top bar has no room for. */
+.launch-menu-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin-right: -8px;
+  border-radius: 10px;
+  color: #e4e4e7;
+}
+
+.launch-menu-button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.launch-menu {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 20px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: #080808;
+}
+
+.launch-menu a {
+  padding: 12px 4px;
+  color: #d4d4d8;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.launch-menu a:hover {
+  color: #fff;
+}
+
+.launch-menu a.launch-menu-cta {
+  margin-top: 8px;
+  padding: 12px 16px;
+  border-radius: 999px;
+  background: #fff;
+  color: #09090b;
+  font-weight: 650;
+  text-align: center;
+}
+
+/* 48rem, not 768px: the desktop links appear at Tailwind's md (rem-based), and the two must switch together at any browser font size. */
+@media (min-width: 48rem) {
+  .launch-menu-button,
+  .launch-menu { display: none; }
+}
+
 .launch-nav-cta:hover,
 .launch-light-button:hover {
   transform: translateY(-1px);
@@ -1483,6 +1535,9 @@ html {
 }
 
 /* Activity is a quiet history surface; color is reserved for work needing attention. */
+/* Grip on a draggable divider: wider than the 6px line so it reads as a handle. */
+.workspace-panel-resizer__grip { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; justify-content: center; width: 14px; height: 40px; border: 1px solid #cbd5e1; border-radius: 7px; background: #fff; color: #64748b; box-shadow: 0 1px 2px #172a4318; pointer-events: none; }
+.workspace-panel-resizer:hover .workspace-panel-resizer__grip, .workspace-panel-resizer:focus-visible .workspace-panel-resizer__grip, .workspace-panel-resizer__grip[data-active] { border-color: #b17b00; color: #191919; }
 .activity-rail { display: flex; flex-direction: column; height: 100%; border-left: 1px solid #dde2e8; background: #f9fafb; color: #273343; }
 .activity-rail button:focus-visible, .activity-rail summary:focus-visible { outline: 2px solid #b17b00; outline-offset: 2px; }
 .activity-rail__header { padding: 16px; border-bottom: 1px solid #e5e9ee; min-height: 78px; flex-shrink: 0; }

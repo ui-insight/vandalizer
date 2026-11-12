@@ -66,7 +66,8 @@ def _workflow_with_linked_prompt_and_extraction():
     ]
     smart_docs = [
         {"_id": ObjectId(), "uuid": "trigger-doc", "raw_text": "trigger text"},
-        {"_id": ObjectId(), "uuid": "fixed", "raw_text": "fixed text"},
+        # The workflow owner's own file: fixed documents are access-checked.
+        {"_id": ObjectId(), "uuid": "fixed", "raw_text": "fixed text", "user_id": "owner"},
         # Written by this very workflow: must not feed back into it.
         {"_id": ObjectId(), "uuid": "own-output", "raw_text": "loop",
          "origin_workflow_id": str(wf_id)},
@@ -215,6 +216,8 @@ class TestOptimizerTrialUsesTheSharedBuilder:
             patch("app.models.system_config.SystemConfig.get_config", AsyncMock(return_value=None)),
             patch.object(workflow_optimizer, "get_user_model_name", AsyncMock(return_value="m")),
             patch("app.models.user.User") as MockUser,
+            # No database here; this workflow queries no knowledge base.
+            patch("app.services.step_knowledge_access.ensure_workflow_kbs_runnable", AsyncMock()),
             patch("app.services.workflow_engine.build_workflow_engine") as mock_build,
         ):
             MockUser.find_one = AsyncMock(return_value=None)

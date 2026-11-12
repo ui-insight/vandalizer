@@ -40,8 +40,9 @@ EXCEEDED_MESSAGE = (
 
 UNVERIFIED_MESSAGE = (
     "Please confirm your email address before using AI features — click the "
-    "sign-in link we emailed you. Need a new one? Request it from the trial "
-    "status page."
+    "link we emailed you. Didn't get it? Choose Resend link in the banner at "
+    "the top of the page. If it still doesn't arrive, contact your "
+    "administrator, who can confirm your account for you."
 )
 
 FLEET_PAUSED_MESSAGE = (

@@ -407,7 +407,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [documentReadiness, setDocumentReadiness] = useState<Record<string, DocumentReadiness>>({})
   const updateDocumentReadiness = useCallback((docs: DocumentReadiness[]) => {
     setDocumentReadiness(previous => {
-      const changed = docs.filter(doc => previous[doc.uuid]?.title !== doc.title || previous[doc.uuid]?.message !== doc.message)
+      const changed = docs.filter(doc => previous[doc.uuid]?.title !== doc.title || previous[doc.uuid]?.message !== doc.message || previous[doc.uuid]?.state !== doc.state)
       if (!changed.length) return previous
       return { ...previous, ...Object.fromEntries(changed.map(doc => [doc.uuid, doc])) }
     })
@@ -930,7 +930,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setFocusedObligationUuid(id)
     void getObligation(id).then((item) => {
       const source = item.sources[0]
-      if (source) viewDocument(source.document_uuid, source.document_title, { terms: [quoteSearchTerms(source.quote)], page: source.page })
+      // A deleted file has nothing to open; the inbox row says so.
+      if (source && !source.deleted) viewDocument(source.document_uuid, source.document_title, { terms: [quoteSearchTerms(source.quote)], page: source.page })
     }).catch(() => { /* The inbox says when the item is no longer open. */ })
   }, [search.deadline, resetToHome, viewDocument])
 

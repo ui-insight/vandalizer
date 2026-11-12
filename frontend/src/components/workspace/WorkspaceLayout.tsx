@@ -2,12 +2,13 @@ import { CourseEditorReturn } from '../certification/CourseEditorReturn'
 import { InputReadinessNotice } from './InputReadinessNotice'
 import { RetainedPanel } from '../shared/PanelVisibility'
 import { FocusTrap } from '../shared/PanelFocusTrap'
-import { fitPanelSplit, panelSplitBounds, readCompactPanelChoices, saveCompactPanelChoices } from '../../utils/workspaceLayout'
+import { DEFAULT_RAIL_WIDTH, fitPanelSplit, fitRailWidth, panelSplitBounds, railWidthBounds, readCompactPanelChoices, readRailWidth, saveCompactPanelChoices, saveRailWidth } from '../../utils/workspaceLayout'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { Header } from '../layout/Header'
 import { ActivityRail } from './ActivityRail'
 import { PanelResizer } from './PanelResizer'
+import { RailResizer } from './RailResizer'
 import { LeftPanel } from './LeftPanel'
 import { RightPanel } from './RightPanel'
 import { UtilityBar } from './UtilityBar'
@@ -41,6 +42,9 @@ export function WorkspaceLayout() {
   const { toast } = useToast()
   const containerRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
+  // The preferred Activity panel width; what is shown is fitted to the window.
+  const [railPreferred, setRailPreferred] = useState(readRailWidth)
+  const [railDragging, setRailDragging] = useState(false)
   const [manageOpen, setManageOpen] = useState(false)
   const [isCompact, setIsCompact] = useState(false)
   const [activityOpen, setActivityOpen] = useState(false)
@@ -139,7 +143,9 @@ export function WorkspaceLayout() {
   const isKnowledge = workspaceMode === 'knowledge'
   const autoDockRail = !isCompact && viewportWidth < 1100
   const drawerOpen = (isCompact || autoDockRail) && activityOpen
-  const railWidth = isCompact ? 0 : railDocked || autoDockRail ? 64 : 320
+  const railExpanded = !isCompact && !railDocked && !autoDockRail
+  const railBounds = railWidthBounds(viewportWidth)
+  const railWidth = isCompact ? 0 : railExpanded ? fitRailWidth(railPreferred, viewportWidth) : 64
   const availableWidth = Math.max(1, viewportWidth - 88 - railWidth - 6)
   const visibleSplit = fitPanelSplit(panelSplit, availableWidth)
   const splitBounds = panelSplitBounds(availableWidth)
@@ -175,7 +181,7 @@ export function WorkspaceLayout() {
           className="flex min-w-0 flex-1 flex-col overflow-hidden relative"
           style={{
             marginRight: `${railWidth}px`,
-            transition: 'margin-right 0.3s ease',
+            transition: railDragging ? 'none' : 'margin-right 0.3s ease',
           }}
         >
           <CourseEditorReturn />
@@ -251,7 +257,7 @@ export function WorkspaceLayout() {
             bottom: 0,
             width: drawerOpen || isCompact ? 'min(320px, calc(100vw - 48px))' : railWidth,
             zIndex: 650,
-            transition: 'width 0.3s ease, transform 0.25s ease',
+            transition: railDragging ? 'none' : 'width 0.3s ease, transform 0.25s ease',
             transform: isCompact && !activityOpen ? 'translateX(100%)' : undefined,
             visibility: isCompact && !activityOpen ? 'hidden' : undefined,
           }}
@@ -266,6 +272,17 @@ export function WorkspaceLayout() {
             >
               <X className="h-4 w-4" />
             </button>
+          )}
+          {railExpanded && (
+            <RailResizer
+              value={railWidth}
+              min={railBounds.min}
+              max={railBounds.max}
+              onChange={(width, commit) => { setRailPreferred(width); if (commit) saveRailWidth(width) }}
+              onReset={() => { setRailPreferred(DEFAULT_RAIL_WIDTH); saveRailWidth(DEFAULT_RAIL_WIDTH) }}
+              onDragStart={() => setRailDragging(true)}
+              onDragEnd={() => setRailDragging(false)}
+            />
           )}
           <ActivityRail forceExpanded={drawerOpen} forceDocked={autoDockRail} onExpand={openActivity} onNavigate={() => { activityNavigating.current = true; setActivityOpen(false) }} />
         </div>

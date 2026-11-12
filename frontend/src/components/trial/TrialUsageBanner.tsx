@@ -48,7 +48,7 @@ export function TrialUsageBanner() {
   return (
     <>
       {show && usage && (
-        <div role="status" className="flex flex-wrap items-center gap-3 border-b border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-200">
+        <div role="status" className="flex flex-wrap items-center gap-3 border-b border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-950">
           <Gauge className="h-4 w-4 shrink-0" aria-hidden="true" />
           <span className="flex-1 min-w-[16rem]">
             {usage.remaining > 0
@@ -58,7 +58,7 @@ export function TrialUsageBanner() {
           <button
             type="button"
             onClick={() => setDialogOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-md border border-amber-400/40 px-3 py-1 font-semibold hover:bg-amber-500/20"
+            className="inline-flex items-center gap-1.5 rounded-md border border-amber-700 bg-white px-3 py-1 font-semibold text-amber-950 hover:bg-amber-100"
           >
             Top up
           </button>

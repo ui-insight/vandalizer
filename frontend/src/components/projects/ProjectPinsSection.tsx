@@ -44,7 +44,7 @@ export function ProjectPinsSection({ projectUuid, onChange, onOpen }: { projectU
   const { automations } = useAutomations()
   const { knowledgeBases } = useKnowledgeBases()
   const projectPins = useProjectPins(projectUuid)
-  const { pins: allPins, loading, error, refresh } = projectPins
+  const { pins: allPins, restrictedPins, loading, error, refresh } = projectPins
   const pins = allPins.filter(p => !['skill', 'artifact'].includes(p.pin_type))
   const [adding, setAdding] = useState(false)
   const [mutationError, setMutationError] = useState<string | null>(null)
@@ -115,7 +115,7 @@ export function ProjectPinsSection({ projectUuid, onChange, onOpen }: { projectU
         </div>
       )}
 
-      {loading ? <p role="status" className="text-sm text-gray-600">Loading pinned tools…</p> : error ? <p role="alert" className="text-sm text-red-800">{error} <button type="button" className="underline" onClick={() => void refresh()}>Retry pins</button></p> : pins.length === 0 ? (
+      {loading ? <p role="status" className="text-sm text-gray-600">Loading pinned tools…</p> : error ? <p role="alert" className="text-sm text-red-800">{error} <button type="button" className="underline" onClick={() => void refresh()}>Retry pins</button></p> : pins.length + restrictedPins.length === 0 ? (
         <div className="rounded-lg border border-dashed border-gray-200 p-4 text-center text-sm text-gray-500">
           No pinned tools. Pin the workflows, extractions, automations, and knowledge bases you use for this project.
         </div>
@@ -131,6 +131,24 @@ export function ProjectPinsSection({ projectUuid, onChange, onOpen }: { projectU
                   <div className="break-words text-sm font-medium text-gray-900">{p.name}</div>
                   <div className="text-xs text-gray-500">{meta.label}</div>
                 </button>
+                <button type="button" onClick={() => unpin(p)} title="Unpin" aria-label={`Unpin ${p.name}`} disabled={pending} className="p-1 text-gray-500 hover:text-red-500">
+                  <X size={14} />
+                </button>
+              </div>
+            )
+          })}
+          {restrictedPins.map(p => {
+            // Pinned by someone else on the project; this person can't open
+            // it, so it has no name and nothing to open. It can be unpinned.
+            const meta = TYPE_META[p.pin_type] ?? TYPE_META.workflow
+            const Icon = meta.icon
+            return (
+              <div key={key(p)} className="flex items-center gap-2 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-3">
+                <Icon size={16} className="shrink-0 text-gray-400" />
+                <div className="min-w-0 flex-1">
+                  <div className="break-words text-sm text-gray-700">{p.name}</div>
+                  <div className="text-xs text-gray-500">{meta.label} · pinned by someone else on this project</div>
+                </div>
                 <button type="button" onClick={() => unpin(p)} title="Unpin" aria-label={`Unpin ${p.name}`} disabled={pending} className="p-1 text-gray-500 hover:text-red-500">
                   <X size={14} />
                 </button>

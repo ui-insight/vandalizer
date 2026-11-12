@@ -23,9 +23,9 @@ export function AssistantSettingsLink({ pausedCount = 0, unavailable = false }: 
   const attention = unavailable ? 'Core Skill availability could not be checked.' : pausedCount ? `${pausedCount} core Skill${pausedCount === 1 ? ' is' : 's are'} paused.` : ''
   return (
     <AssistantSettingsAnchor title={`Assistant settings: Core Skills and what chat can use${attention ? `. ${attention}` : ''}`} label={`Assistant settings: Core Skills and what chat can use${attention ? `. ${attention}` : ''}`}
-      className="flex min-h-9 items-center justify-center gap-1.5 rounded-[var(--ui-radius)] px-2 py-1.5 text-gray-700 hover:bg-gray-100">
+      className="chat-composer-tool">
       <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
-      <span className="text-xs font-medium">Settings</span>
+      <span className="chat-composer-tool-label">Settings</span>
       {(pausedCount > 0 || unavailable) && <span aria-hidden="true" className="rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-900">{unavailable ? '!' : pausedCount}</span>}
     </AssistantSettingsAnchor>
   )
