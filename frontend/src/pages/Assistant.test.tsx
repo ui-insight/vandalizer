@@ -138,4 +138,59 @@ describe('Assistant settings page', () => {
     await waitFor(() => expect(confirm).toHaveBeenCalled())
     expect(confirm.mock.calls[0][0].message).toContain('An administrator has blocked it for all users')
   })
+
+  it('does not refresh behind an open confirmation, so the save that follows is not left loading', async () => {
+    let answer: (ok: boolean) => void = () => {}
+    confirm.mockImplementation(() => new Promise<boolean>(resolve => { answer = resolve }))
+    render(<Assistant />)
+    fireEvent.click(await screen.findByRole('switch', { name: 'Search the web' }))
+    await waitFor(() => expect(confirm).toHaveBeenCalled())
+
+    // Coming back to the window normally refreshes the saved settings.
+    fireEvent.focus(window)
+    expect(getAssistantCapabilities).toHaveBeenCalledTimes(1)
+
+    answer(true)
+    expect(await screen.findByText(/^Saved\. Search the web/)).toBeTruthy()
+    expect(screen.getByRole('switch', { name: 'Search the web' })).not.toHaveAttribute('aria-disabled')
+
+    // With no dialog open, focus refreshes again.
+    fireEvent.focus(window)
+    await waitFor(() => expect(getAssistantCapabilities).toHaveBeenCalledTimes(2))
+  })
+
+  it('saves nothing when the confirmation is answered after leaving the page', async () => {
+    let answer: (ok: boolean) => void = () => {}
+    confirm.mockImplementation(() => new Promise<boolean>(resolve => { answer = resolve }))
+    const { unmount } = render(<Assistant />)
+    fireEvent.click(await screen.findByRole('switch', { name: 'Search the web' }))
+    await waitFor(() => expect(confirm).toHaveBeenCalled())
+    unmount()
+    answer(true)
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(setAssistantCapability).not.toHaveBeenCalled()
+  })
+
+  it('tells an administrator when allowing a feature that is not set up changes nothing yet', async () => {
+    vi.mocked(getAssistantCapabilities).mockResolvedValue(page({
+      can_set_limits: true,
+      capabilities: [{ id: 'web_search', label: 'Search the web', description: 'd', enabled: true, allowed: false, available: false, active: false }],
+    }))
+    render(<Assistant />)
+    fireEvent.click(await screen.findByText('Settings for all users — administrators'))
+    fireEvent.click(screen.getByRole('switch', { name: 'Allow Search the web for everyone' }))
+    await waitFor(() => expect(confirm).toHaveBeenCalled())
+    expect(confirm.mock.calls[0][0].message).toContain('It isn’t set up on this site yet')
+  })
+
+  it('says when your own switch is for a feature that is not set up', async () => {
+    vi.mocked(getAssistantCapabilities).mockResolvedValue(page({
+      capabilities: [{ id: 'web_search', label: 'Search the web', description: 'd', enabled: false, allowed: true, available: false, active: false }],
+    }))
+    render(<Assistant />)
+    fireEvent.click(await screen.findByRole('switch', { name: 'Search the web' }))
+    await waitFor(() => expect(confirm).toHaveBeenCalled())
+    expect(confirm.mock.calls[0][0].message).toContain('It isn’t set up on this site yet')
+  })
 })

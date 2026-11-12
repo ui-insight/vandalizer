@@ -36,7 +36,7 @@ export function changeConfirmation(c: AssistantCapability, next: boolean, everyo
     return {
       title: `${next ? 'Allow' : 'Block'} “${c.label}” for all users?`,
       message: next
-        ? `This will change it for all users. Everyone on this Vandalizer site will be able to use ${c.label} in chat again, according to their own saved choice.`
+        ? `This will change it for all users. Everyone on this Vandalizer site will be able to use ${c.label} in chat again, according to their own saved choice.${c.available ? '' : ' It isn’t set up on this site yet, so it stays unavailable until that is done in Admin.'}`
         : `This will change it for all users. ${c.label} will be blocked in everyone’s chats on this Vandalizer site, whatever their own saved choice is.`,
       confirmLabel: next ? 'Allow for all users' : 'Block for all users',
       destructive: !next,
@@ -62,6 +62,11 @@ export default function Assistant() {
   const [notice, setNotice] = useState('')
   const pending = useRef(false)
   const sequence = useRef(0)
+  // True while a confirmation is open. A refresh then would be thrown away by
+  // the save that follows, leaving the page stuck on "Loading saved settings…".
+  const confirming = useRef(false)
+  const mounted = useRef(true)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
 
   const load = useCallback(async () => {
     const request = ++sequence.current
@@ -84,7 +89,7 @@ export default function Assistant() {
 
   useEffect(() => {
     void load()
-    const refreshVisible = () => { if (!pending.current && document.visibilityState !== 'hidden') void load() }
+    const refreshVisible = () => { if (!pending.current && !confirming.current && document.visibilityState !== 'hidden') void load() }
     window.addEventListener('focus', refreshVisible)
     return () => { sequence.current++; window.removeEventListener('focus', refreshVisible) }
   }, [load])
@@ -119,8 +124,17 @@ export default function Assistant() {
   // Every switch asks first: a click changes what chat can do, and for an
   // administrator it changes it for everyone on the site.
   const change = async (c: AssistantCapability, next: boolean, everyone: boolean) => {
-    if (pending.current || !verified || refreshing) return
-    if (!await confirm(changeConfirmation(c, next, everyone))) return
+    if (pending.current || confirming.current || !verified || refreshing) return
+    confirming.current = true
+    let confirmed = false
+    try {
+      confirmed = await confirm(changeConfirmation(c, next, everyone))
+    } finally {
+      confirming.current = false
+    }
+    // The dialog outlives this page (it is mounted above the router): a
+    // confirmation given after leaving must not change anything.
+    if (!confirmed || !mounted.current) return
     await save(c, next, everyone)
   }
 
