@@ -8,9 +8,15 @@ function sessionRequest(key: string) {
 }
 
 
-export function useCertification() {
+/**
+ * *enabled* is false while nobody is signed in. The provider wraps every
+ * page, the public landing page included, and progress is per account: with
+ * no session the read can only 401, and the failure was then reported as a
+ * journey event that 401s too (support ticket).
+ */
+export function useCertification(enabled = true) {
   const [progress, setProgress] = useState<CertificationProgress | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(enabled)
   const [course, setCourse] = useState<CourseDefinition | null>(null)
   const cachedCourse = useRef<CourseDefinition | null>(null)
   const hasLoadedProgress = useRef(false)
@@ -27,6 +33,7 @@ export function useCertification() {
   const [, setCompletionRevision] = useState(0)
 
   const refresh = useCallback(async () => {
+    if (!enabled) return
     const version = ++requestVersion.current
     setLoading(true)
     let observationIdentity: Pick<CertificationProgress, 'enrollment_id' | 'manifest_sha256'> | null = cachedCourse.current
@@ -59,14 +66,28 @@ export function useCertification() {
     } finally {
       if (version === requestVersion.current) setLoading(false)
     }
-  }, [])
+  }, [enabled])
 
   const refreshAfterWrite = useCallback(async () => {
     setSavedWritePendingRefresh(true)
     await refresh()
   }, [refresh])
 
-  useEffect(() => { refresh() }, [refresh])
+  useEffect(() => {
+    if (enabled) {
+      void refresh()
+      return
+    }
+    // Signed out: drop any read in flight and the last account's progress.
+    requestVersion.current += 1
+    cachedCourse.current = null
+    hasLoadedProgress.current = false
+    setCourse(null)
+    setProgress(null)
+    setRefreshError(null)
+    setSavedWritePendingRefresh(false)
+    setLoading(false)
+  }, [enabled, refresh])
 
   function sharePendingAction<T>(kind: string, moduleId: string, body: string, action: () => Promise<T>): Promise<T> {
     if (!progress?.id || !progress.user_id) return Promise.reject(new Error('Load course progress before continuing'))

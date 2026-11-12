@@ -84,3 +84,40 @@ describe('Landing — trial signup form', () => {
     expect(document.querySelector('#landing-register-email')).toBeNull()
   })
 })
+
+// Support ticket: on a phone only the logo and Sign in showed; the other
+// top-bar links were hidden with no menu to reach them.
+describe('Landing — phone menu', () => {
+  beforeEach(() => {
+    mockSearch = {}
+    mockGetAuthConfig.mockResolvedValue({ auth_methods: ['password'], oauth_providers: [] })
+  })
+
+  it('opens a menu with the top-bar links and the walkthrough request', async () => {
+    render(<Landing />)
+    const toggle = screen.getByRole('button', { name: 'Open menu' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('navigation', { name: 'Menu' })).not.toBeInTheDocument()
+
+    fireEvent.click(toggle)
+
+    const menu = screen.getByRole('navigation', { name: 'Menu' })
+    expect(screen.getByRole('button', { name: 'Close menu' })).toHaveAttribute('aria-expanded', 'true')
+    const links = Array.from(menu.querySelectorAll('a')).map(a => a.textContent?.replace('→', '').trim())
+    expect(links).toEqual(["What's new", 'Projects', 'Trust', 'Docs', 'Request a walkthrough'])
+    expect(menu.querySelector('a[href="#demo"]')).not.toBeNull()
+    await waitFor(() => expect(mockGetAuthConfig).toHaveBeenCalled())
+  })
+
+  it('closes when a link is chosen or Escape is pressed', async () => {
+    render(<Landing />)
+    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
+    fireEvent.click(screen.getByRole('navigation', { name: 'Menu' }).querySelector('a[href="#trust"]')!)
+    expect(screen.queryByRole('navigation', { name: 'Menu' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.queryByRole('navigation', { name: 'Menu' })).not.toBeInTheDocument()
+    await waitFor(() => expect(mockGetAuthConfig).toHaveBeenCalled())
+  })
+})

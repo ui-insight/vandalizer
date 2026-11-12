@@ -432,3 +432,21 @@ it('cannot reuse an in-memory completion counter for a different resume referenc
   await act(async () => { await expect(result.current.complete('ai_literacy', 'f'.repeat(32))).rejects.toThrow('does not match this request') })
   expect(api.completeModule).toHaveBeenCalledOnce()
 })
+
+// Support ticket: the provider wraps the public landing page, where the
+// progress read 401'd and the failure report 401'd after it.
+it('asks for nothing while signed out, then loads once someone signs in', async () => {
+  const { result, rerender } = renderHook(({ enabled }) => useCertification(enabled), { initialProps: { enabled: false } })
+  expect(result.current.loading).toBe(false)
+  await act(async () => { await result.current.refresh() })
+  expect(api.getProgress).not.toHaveBeenCalled()
+  expect(observeCertificationJourney).not.toHaveBeenCalled()
+
+  rerender({ enabled: true })
+  await waitFor(() => expect(result.current.progress).toEqual(progress))
+  expect(api.getProgress).toHaveBeenCalledTimes(1)
+
+  // Signing out drops that account's progress.
+  rerender({ enabled: false })
+  await waitFor(() => expect(result.current.progress).toBeNull())
+})
