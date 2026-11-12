@@ -331,6 +331,13 @@ export function LeftPanel() {
         <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
           <DocumentViewer
             docUuid={viewingDoc.uuid}
+            // Opening a source also puts it in chat's scope. A file that
+            // turns out to be gone must not stay there reading "Ready".
+            onMissing={() => {
+              const gone = viewingDoc.uuid
+              setSelectedDocUuids(current => current.filter(uuid => uuid !== gone))
+              setSelectedDocNames(current => Object.fromEntries(Object.entries(current).filter(([uuid]) => uuid !== gone)))
+            }}
             highlightTerms={highlightTerms}
             highlightPage={highlightPage}
             highlightPageApproximate={highlightPageApproximate}

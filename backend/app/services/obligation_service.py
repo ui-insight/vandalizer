@@ -12,7 +12,7 @@ import datetime
 import html
 import re
 import uuid as uuid_mod
-from typing import Any, Optional
+from typing import Any, Collection, Iterable, Optional
 
 from app.models.document import SmartDocument
 from app.models.obligation import (
@@ -645,7 +645,46 @@ def _sort_key(ob: Obligation) -> tuple[int, datetime.datetime, datetime.datetime
     return (rank, due, ob.created_at)
 
 
-def serialize(ob: Obligation, user: User, project_title: str | None = None) -> dict:
+async def deleted_source_uuids(obligations: Iterable[Obligation]) -> set[str]:
+    """Cited document uuids that no longer exist (support ticket).
+
+    Deleting a project's file leaves the items taken from it in place, still
+    quoting it. Checked when the items are read rather than when a file is
+    deleted, so every way a file can go (Files, folder delete, retention,
+    account deletion) is covered without each one knowing about the inbox.
+    """
+    cited = {s.document_uuid for o in obligations for s in (o.sources or [])}
+    if not cited:
+        return set()
+    found = await SmartDocument.find(
+        {"uuid": {"$in": list(cited)}, "soft_deleted": {"$ne": True}},
+    ).to_list()
+    return cited - {d.uuid for d in found}
+
+
+def source_deleted(ob: Obligation, deleted: Collection[str]) -> bool:
+    return any(s.document_uuid in deleted for s in (ob.sources or []))
+
+
+def awaiting_source_decision(ob: Obligation, deleted: Collection[str]) -> bool:
+    """A cited file is gone and nobody has said to keep the item.
+
+    Such an item is flagged in the inbox ("keep or dismiss?") and sends no
+    reminders: its date can no longer be checked against the document.
+    """
+    return source_deleted(ob, deleted) and not getattr(ob, "kept_without_source", False)
+
+
+async def serialize_checked(ob: Obligation, user: User, project_title: str | None = None) -> dict:
+    """``serialize`` for one item, with its sources checked for deletion."""
+    return serialize(ob, user, project_title, await deleted_source_uuids([ob]))
+
+
+def serialize(
+    ob: Obligation, user: User, project_title: str | None = None,
+    deleted: Collection[str] = (),
+) -> dict:
+    """*deleted* is ``deleted_source_uuids`` for the items being listed."""
     return {
         "uuid": ob.uuid,
         "project_uuid": ob.project_uuid,
@@ -660,7 +699,9 @@ def serialize(ob: Obligation, user: User, project_title: str | None = None) -> d
         "observed_value": ob.observed_value,
         "unit": ob.unit,
         "in_conflict": ob.in_conflict,
-        "sources": [s.model_dump() for s in ob.sources],
+        "sources": [{**s.model_dump(), "deleted": s.document_uuid in deleted} for s in ob.sources],
+        "source_deleted": source_deleted(ob, deleted),
+        "kept_without_source": bool(getattr(ob, "kept_without_source", False)),
         "status": ob.status,
         "supersedes": ob.supersedes,
         "superseded_by": ob.superseded_by,
@@ -692,13 +733,26 @@ async def inbox(
     if not include_dismissed:
         obligations = [o for o in obligations if user.user_id not in (o.dismissed_by or [])]
     obligations.sort(key=_sort_key)
-    return [serialize(o, user, projects[o.project_uuid].title) for o in obligations]
+    deleted = await deleted_source_uuids(obligations)
+    return [serialize(o, user, projects[o.project_uuid].title, deleted) for o in obligations]
 
 
 async def project_obligations(project: Project, user: User) -> list[dict]:
     obligations = await Obligation.find(Obligation.project_uuid == project.uuid).to_list()
     obligations.sort(key=lambda o: ({"open": 0, "done": 1, "superseded": 2}.get(o.status, 3), _sort_key(o)))
-    return [serialize(o, user, project.title) for o in obligations]
+    deleted = await deleted_source_uuids(obligations)
+    return [serialize(o, user, project.title, deleted) for o in obligations]
+
+
+async def set_kept_without_source(ob: Obligation, keep: bool) -> Obligation:
+    """Keep an item whose source file was deleted, for everyone on the project.
+
+    Reminders resume; the item still says its file is gone.
+    """
+    ob.kept_without_source = keep
+    ob.updated_at = _now()
+    await ob.save()
+    return ob
 
 
 async def set_done(ob: Obligation, user: User, done: bool) -> Obligation:

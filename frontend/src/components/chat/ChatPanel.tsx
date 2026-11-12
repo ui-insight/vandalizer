@@ -54,6 +54,7 @@ import type { CardDecision, FileAttachment, UrlAttachment } from '../../types/ch
 import { useChatModelPreference } from '../../hooks/useChatModelPreference'
 import { stageCopy, isDocReady } from '../../utils/processingStatus'
 import { partitionNewFiles } from './attachmentDedup'
+import { missingFilesMessage } from './missingFiles'
 import { shouldAutoContinueAfterAttach } from './autoContinue'
 
 interface ChatPanelProps {
@@ -88,6 +89,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     errorDetails,
     clearError,
     retry,
+    retryWithoutDocuments,
     continueRun,
     contextTokens,
     contextMode,
@@ -264,6 +266,26 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const handleUseSuggestedModel = async (name: string) => {
     modelPreference.select(name, false)
   }
+
+  // Files the server could not find (deleted, or access changed) come off the
+  // chat, and the error names them: a chip that still reads "Ready" would
+  // fail the next message the same way (support ticket).
+  const [missingFilesNotice, setMissingFilesNotice] = useState<string | null>(null)
+  useEffect(() => {
+    if (errorDetails?.code !== 'document_missing') {
+      setMissingFilesNotice(null)
+      return
+    }
+    const gone = new Set(errorDetails.missingDocuments ?? [])
+    const attached = selectedDocUuids.filter(uuid => gone.has(uuid))
+    // Nothing left to remove: either already done, or the server named none.
+    if (!attached.length) return
+    setMissingFilesNotice(missingFilesMessage(
+      attached.map(uuid => selectedDocNames[uuid]).filter(Boolean), gone.size, errorDetails.missingReason,
+    ))
+    setSelectedDocUuids(selectedDocUuids.filter(uuid => !gone.has(uuid)))
+    setSelectedDocNames(Object.fromEntries(Object.entries(selectedDocNames).filter(([uuid]) => !gone.has(uuid))))
+  }, [errorDetails, selectedDocUuids, selectedDocNames, setSelectedDocUuids, setSelectedDocNames])
 
   const handleConvertToKB = async () => {
     const docs = errorDetails?.oversizeDocuments ?? []
@@ -1402,7 +1424,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         {error && (
           <div role="alert" className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 border border-red-200">
             <div className="flex items-start gap-2">
-              <div className="flex-1">{error}</div>
+              <div className="flex-1">{missingFilesNotice ?? error}</div>
               <button
                 onClick={clearError}
                 aria-label="Dismiss error"
@@ -1434,6 +1456,19 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                   Builds a searchable index so chat can read the document a chunk at a time.
                 </span>
               </div>
+            ) : errorDetails?.code === 'document_missing' ? (
+              // Retry would send the same missing file again. Once it is off
+              // the chat, the message can go without it.
+              missingFilesNotice && (
+                <div className="mt-2">
+                  <button
+                    onClick={() => retryWithoutDocuments(errorDetails.missingDocuments ?? [])}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-700"
+                  >
+                    {(errorDetails.missingDocuments?.length ?? 0) > 1 ? 'Send without them' : 'Send without it'}
+                  </button>
+                </div>
+              )
             ) : errorDetails?.code === 'trial_budget_exhausted' ? (
               <div className="mt-2 flex items-center gap-2">
                 <button

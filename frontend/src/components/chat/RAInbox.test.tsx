@@ -17,6 +17,7 @@ const api = vi.hoisted(() => ({
   getInbox: vi.fn(),
   setObligationDone: vi.fn(),
   setObligationDismissed: vi.fn(),
+  setObligationKept: vi.fn(),
   setInboxHidden: vi.fn(),
   downloadDeadlineCalendar: vi.fn(),
 }))
@@ -274,5 +275,53 @@ describe('RA inbox inside a project', () => {
     await screen.findByText('Sponsor deadline')
     expect(api.getInbox).toHaveBeenCalledWith(false, undefined)
     expect(screen.getByText('All your projects')).toBeInTheDocument()
+  })
+})
+
+describe('RA inbox item whose source file was deleted', () => {
+  const GONE = item({
+    sources: [{ ...source, document_uuid: 'gone', document_title: '16-delete-test.pdf', deleted: true }],
+    source_deleted: true, kept_without_source: false,
+  })
+
+  it('flags the item and does not offer the deleted file to open', async () => {
+    api.getInbox.mockResolvedValue({ items: [GONE], inbox_hidden: false })
+    render(<RAInbox />)
+
+    const flag = await screen.findByRole('group', { name: 'Source file deleted for "Sponsor deadline"' })
+    expect(flag).toHaveTextContent('Source file deleted. Reminders are paused. Keep this item or dismiss it?')
+    // The chip is text, not a button: clicking a source attaches it to chat.
+    expect(screen.getByText('16-delete-test.pdf')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Open 16-delete-test\.pdf/ })).not.toBeInTheDocument()
+    expect(viewDocument).not.toHaveBeenCalled()
+  })
+
+  it('Keep clears the question and leaves the item in the list', async () => {
+    api.getInbox.mockResolvedValue({ items: [GONE], inbox_hidden: false })
+    api.setObligationKept.mockResolvedValue({})
+    render(<RAInbox />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Keep "Sponsor deadline" for everyone on the project' }))
+
+    await waitFor(() => expect(screen.queryByRole('group', { name: /Source file deleted/ })).not.toBeInTheDocument())
+    expect(api.setObligationKept).toHaveBeenCalledWith('ob-1', true)
+    expect(screen.getByText('Sponsor deadline')).toBeInTheDocument()
+    expect(screen.getByText(/file deleted/)).toBeInTheDocument()
+  })
+
+  it('Dismiss hides the item from this Home', async () => {
+    api.getInbox.mockResolvedValue({ items: [GONE], inbox_hidden: false })
+    render(<RAInbox />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Dismiss "Sponsor deadline" from your Home' }))
+
+    await waitFor(() => expect(api.setObligationDismissed).toHaveBeenCalledWith('ob-1', true))
+    await waitFor(() => expect(screen.queryByText('Sponsor deadline')).not.toBeInTheDocument())
+  })
+
+  it('asks nothing of an item whose file is still there', async () => {
+    render(<RAInbox />)
+    await screen.findByText('Sponsor deadline')
+    expect(screen.queryByRole('group', { name: /Source file deleted/ })).not.toBeInTheDocument()
   })
 })
