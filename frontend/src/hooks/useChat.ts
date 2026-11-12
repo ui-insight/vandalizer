@@ -3,6 +3,7 @@ import { isPagePreparation } from '../lib/chatProgress'
 import { getProjectDefaultSkill } from '../api/projects'
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { streamChat, getHistory, previewSkill, selectConversationSkill, stopChatTurn, type ChatHistory } from '../api/chat'
+import { MissingDocumentsError } from '../api/chatErrors'
 import type { CardDecision, ChatActivity, SkillSnapshot } from '../types/chat'
 import { expandSnippetRefs, markUsed } from '../utils/snippetRefs'
 import { completedSkillSelection } from '../lib/skillSelection'
@@ -19,6 +20,9 @@ export interface ChatError {
   code?: string
   suggestedAction?: 'convert_to_kb' | 'continue'
   oversizeDocuments?: OversizeDocument[]
+  /** code "document_missing": the attached files the server could not find. */
+  missingDocuments?: string[]
+  missingReason?: 'deleted' | 'unavailable'
 }
 
 /** Longest Stop waits for the server to record it before aborting anyway. */
@@ -543,6 +547,11 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
           // Keep partial output locally. Stopping the stream does not establish
           // whether an already-started server action completed or was canceled.
           commitAssistantMessage('stopped')
+        } else if (e instanceof MissingDocumentsError) {
+          // Refused before anything ran. The same request can't succeed, so
+          // the panel takes the files off the chat instead of offering Retry.
+          setError(e.message)
+          setErrorDetails({ message: e.message, code: 'document_missing', missingDocuments: e.documentUuids, missingReason: e.reason })
         } else {
           // Network drop or stalled stream. Preserve the partial response (same
           // as the Stop path) so the user doesn't lose a half-written answer,
@@ -678,6 +687,16 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
     void send(...args, true)
   }, [send])
 
+  /** Re-send the last message without files that can no longer be read. */
+  const retryWithoutDocuments = useCallback((uuids: string[]) => {
+    const args = lastSendArgsRef.current
+    if (!args) return
+    const gone = new Set(uuids)
+    const next = [...args] as SendArgs
+    next[1] = (next[1] ?? []).filter(uuid => !gone.has(uuid))
+    void send(...next, true)
+  }, [send])
+
   /** Resume a turn that stopped at the tool budget (usage_limit_resumable).
    * Unlike retry(), this keeps the partial exchange — the backend armed a
    * one-shot "resume directly, no recap" instruction for the next turn. */
@@ -719,6 +738,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
     errorDetails,
     clearError,
     retry,
+    retryWithoutDocuments,
     continueRun,
     contextTokens,
     contextMode,
