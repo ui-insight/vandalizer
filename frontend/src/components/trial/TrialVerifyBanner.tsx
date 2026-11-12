@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { MailCheck, Loader2 } from 'lucide-react'
-import { getTrialUsage, resendVerificationEmail } from '../../api/demo'
+import { getTrialUsage } from '../../api/demo'
 import { useAuth } from '../../hooks/useAuth'
+import { useResendVerification } from '../../hooks/useResendVerification'
 
 /**
  * Tells an unconfirmed trial user why AI features aren't responding, and gives
@@ -16,9 +17,8 @@ export function TrialVerifyBanner() {
   const { user } = useAuth()
   const isTrialUser = Boolean(user?.is_demo_user)
   const [needsVerify, setNeedsVerify] = useState(false)
-  const [sending, setSending] = useState(false)
-  const [sent, setSent] = useState(false)
-  const [error, setError] = useState('')
+  const hide = useCallback(() => setNeedsVerify(false), [])
+  const { resend, sending, sent, error } = useResendVerification(hide)
 
   useEffect(() => {
     // The session already says whether this is a trial account, so only trial
@@ -46,24 +46,6 @@ export function TrialVerifyBanner() {
 
   if (!needsVerify) return null
 
-  async function handleResend() {
-    setSending(true)
-    setError('')
-    try {
-      const result = await resendVerificationEmail()
-      if (result.already_verified) {
-        setNeedsVerify(false)
-        return
-      }
-      if (result.ok) setSent(true)
-      else setError("We couldn't send it just now — please try again in a moment.")
-    } catch {
-      setError("We couldn't send it just now — please try again in a moment.")
-    } finally {
-      setSending(false)
-    }
-  }
-
   return (
     <div
       role="status"
@@ -79,7 +61,7 @@ export function TrialVerifyBanner() {
       ) : (
         <button
           type="button"
-          onClick={handleResend}
+          onClick={resend}
           disabled={sending}
           className="inline-flex items-center gap-1.5 rounded-md border border-amber-400/40 px-3 py-1 font-semibold hover:bg-amber-500/20 disabled:opacity-50"
         >
@@ -87,7 +69,7 @@ export function TrialVerifyBanner() {
           Resend link
         </button>
       )}
-      {error && <span className="text-red-300">{error}</span>}
+      {error && <span role="alert" className="basis-full text-red-300">{error}</span>}
     </div>
   )
 }

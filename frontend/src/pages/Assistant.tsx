@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Check, LockKeyhole } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
 import { CoreSkillsSection } from '../components/assistant/CoreSkillsSection'
+import { useConfirm } from '../components/shared/useConfirm'
 import {
   getAssistantCapabilities, setAssistantCapability, setAssistantCapabilityLimit,
   type AssistantCapability, type AssistantPage,
@@ -28,7 +29,31 @@ function status(c: AssistantCapability): string | null {
   return null
 }
 
+/** What the confirmation says before a switch is saved: which feature, which
+ *  way, and whose chats it changes. */
+export function changeConfirmation(c: AssistantCapability, next: boolean, everyone: boolean) {
+  if (everyone) {
+    return {
+      title: `${next ? 'Allow' : 'Block'} “${c.label}” for all users?`,
+      message: next
+        ? `This will change it for all users. Everyone on this Vandalizer site will be able to use ${c.label} in chat again, according to their own saved choice.${c.available ? '' : ' It isn’t set up on this site yet, so it stays unavailable until that is done in Admin.'}`
+        : `This will change it for all users. ${c.label} will be blocked in everyone’s chats on this Vandalizer site, whatever their own saved choice is.`,
+      confirmLabel: next ? 'Allow for all users' : 'Block for all users',
+      destructive: !next,
+    }
+  }
+  const held = !c.allowed
+    ? ' An administrator has blocked it for all users, so it stays off until they allow it.'
+    : !c.available ? ' It isn’t set up on this site yet, so it stays off until an administrator sets it up.' : ''
+  return {
+    title: `Turn ${next ? 'on' : 'off'} “${c.label}”?`,
+    message: `Are you sure you want to turn this ${next ? 'on' : 'off'}? This changes your own chats only, starting with your next message.${next ? held : ''}`,
+    confirmLabel: next ? 'Turn on' : 'Turn off',
+  }
+}
+
 export default function Assistant() {
+  const confirm = useConfirm()
   const [page, setPage] = useState<AssistantPage | null>(null)
   const [loadError, setLoadError] = useState('')
   const [verified, setVerified] = useState(false)
@@ -37,6 +62,11 @@ export default function Assistant() {
   const [notice, setNotice] = useState('')
   const pending = useRef(false)
   const sequence = useRef(0)
+  // True while a confirmation is open. A refresh then would be thrown away by
+  // the save that follows, leaving the page stuck on "Loading saved settings…".
+  const confirming = useRef(false)
+  const mounted = useRef(true)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
 
   const load = useCallback(async () => {
     const request = ++sequence.current
@@ -59,7 +89,7 @@ export default function Assistant() {
 
   useEffect(() => {
     void load()
-    const refreshVisible = () => { if (!pending.current && document.visibilityState !== 'hidden') void load() }
+    const refreshVisible = () => { if (!pending.current && !confirming.current && document.visibilityState !== 'hidden') void load() }
     window.addEventListener('focus', refreshVisible)
     return () => { sequence.current++; window.removeEventListener('focus', refreshVisible) }
   }, [load])
@@ -89,6 +119,23 @@ export default function Assistant() {
       pending.current = false
       setSaving(null)
     }
+  }
+
+  // Every switch asks first: a click changes what chat can do, and for an
+  // administrator it changes it for everyone on the site.
+  const change = async (c: AssistantCapability, next: boolean, everyone: boolean) => {
+    if (pending.current || confirming.current || !verified || refreshing) return
+    confirming.current = true
+    let confirmed = false
+    try {
+      confirmed = await confirm(changeConfirmation(c, next, everyone))
+    } finally {
+      confirming.current = false
+    }
+    // The dialog outlives this page (it is mounted above the router): a
+    // confirmation given after leaving must not change anything.
+    if (!confirmed || !mounted.current) return
+    await save(c, next, everyone)
   }
 
   const busy = saving !== null || refreshing
@@ -129,7 +176,7 @@ export default function Assistant() {
                 <span className="block text-xs text-gray-600">{saving === `own:${c.id}` ? 'Saving…' : !verified ? 'Unconfirmed' : !c.allowed ? 'Blocked' : !c.available ? 'Not set up' : 'Saved choice'}</span>
                 <Switch on={c.enabled} busy={busy} unavailable={!verified} muted={!c.allowed || !c.available} label={c.label}
                   describedBy={[`assistant-description-${c.id}`, note ? `assistant-note-${c.id}` : '', loadError ? 'assistant-settings-unconfirmed' : '', busy ? 'assistant-settings-status' : ''].filter(Boolean).join(' ')}
-                  onChange={next => void save(c, next, false)} />
+                  onChange={next => void change(c, next, false)} />
               </div>
             </li>
           })}
@@ -143,7 +190,7 @@ export default function Assistant() {
           {page.capabilities.map(c => <li key={c.id} className="flex items-center gap-3 px-3 py-2">
             <span className="min-w-0 flex-1 text-sm font-medium text-gray-900">{c.label}</span>
             <div className="shrink-0 text-right"><span className="block text-xs text-gray-600">{saving === `limit:${c.id}` ? 'Saving…' : !verified ? 'Unconfirmed' : c.allowed ? 'Allowed' : 'Blocked'}</span>
-              <Switch on={c.allowed} busy={busy} unavailable={!verified} label={`Allow ${c.label} for everyone`} describedBy={`assistant-limits-help${loadError ? ' assistant-settings-unconfirmed' : ''}${busy ? ' assistant-settings-status' : ''}`} onChange={next => void save(c, next, true)} />
+              <Switch on={c.allowed} busy={busy} unavailable={!verified} label={`Allow ${c.label} for everyone`} describedBy={`assistant-limits-help${loadError ? ' assistant-settings-unconfirmed' : ''}${busy ? ' assistant-settings-status' : ''}`} onChange={next => void change(c, next, true)} />
             </div>
           </li>)}
         </ul>
