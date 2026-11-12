@@ -18,6 +18,8 @@ describe('WorkspaceSearchBar', () => {
     const onChange = vi.fn()
     render(<WorkspaceSearchBar value="budget" onChange={onChange} label="Search files and content" placeholder="Search files and content…" />)
     fireEvent.click(screen.getByRole('button', { name: 'Clear search' }))
+    // Focus returns to the box, not to a button that is about to disappear.
+    expect(screen.getByRole('searchbox')).toHaveFocus()
     fireEvent.keyDown(screen.getByRole('searchbox'), { key: 'Escape' })
     expect(onChange.mock.calls).toEqual([[''], ['']])
   })

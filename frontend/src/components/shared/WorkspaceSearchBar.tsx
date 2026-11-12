@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { Search, X } from 'lucide-react'
 
 /**
@@ -12,10 +13,12 @@ export function WorkspaceSearchBar({ value, onChange, label, placeholder }: {
   label: string
   placeholder: string
 }) {
+  const input = useRef<HTMLInputElement>(null)
   return (
     <div className="workspace-search-bar">
       <Search size={16} aria-hidden="true" />
       <input
+        ref={input}
         type="search"
         aria-label={label}
         placeholder={placeholder}
@@ -31,7 +34,9 @@ export function WorkspaceSearchBar({ value, onChange, label, placeholder }: {
         }}
       />
       {value && (
-        <button type="button" aria-label="Clear search" onClick={() => onChange('')}>
+        // The button goes away once the box is empty, so hand focus back to
+        // the box: ready to type again, and never lost to the page.
+        <button type="button" aria-label="Clear search" onClick={() => { onChange(''); input.current?.focus() }}>
           <X size={14} aria-hidden="true" />
         </button>
       )}

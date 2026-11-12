@@ -312,9 +312,10 @@
 /* One search box for workspace panels. Width is capped so it does not follow the panel divider. */
 .workspace-search-bar { position: relative; display: flex; align-items: center; width: 100%; max-width: 480px; min-width: 0; }
 .workspace-search-bar > svg { position: absolute; left: 12px; color: #5f6368; pointer-events: none; }
-.workspace-search-bar input { width: 100%; min-width: 0; padding: 8px 40px 8px 38px; border: 1px solid transparent; border-radius: var(--workspace-radius-medium); background: #f1f3f4; color: var(--workspace-text); font: inherit; font-size: var(--workspace-font-body); outline: none; transition: background-color .2s, border-color .2s, box-shadow .2s; }
+.workspace-search-bar input { width: 100%; min-width: 0; padding: 8px 40px 8px 38px; border: 1px solid transparent; border-radius: var(--workspace-radius-medium); background: #f1f3f4; color: var(--workspace-text); font: inherit; font-size: var(--workspace-font-body); outline: none; transition: background-color .2s, border-color .2s; }
 .workspace-search-bar input::placeholder { color: #5f6368; }
-.workspace-search-bar input:focus { border-color: #dadce0; background: #fff; box-shadow: 0 1px 2px rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15); }
+/* The shared :focus-visible outline below is the focus ring. */
+.workspace-search-bar input:focus { border-color: #dadce0; background: #fff; }
 .workspace-search-bar input::-webkit-search-cancel-button { display: none; -webkit-appearance: none; }
 .workspace-search-bar button { position: absolute; right: 4px; display: inline-flex; align-items: center; justify-content: center; width: 28px; min-width: 28px; height: 28px; min-height: 28px; padding: 0; border: 0; border-radius: 999px; background: transparent; color: #5f6368; cursor: pointer; }
 .workspace-search-bar button:hover { background: rgba(60,64,67,.1); color: var(--workspace-text); }
