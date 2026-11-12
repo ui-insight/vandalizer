@@ -56,6 +56,7 @@
 .file-upload-title, .file-upload-description { grid-column: 2; text-align: left; }
 .file-modified-label { display: block; padding-right: 44px; }
 .file-table col:last-child { width: 140px !important; }
+.file-table .file-size-cell { padding-left: 8px !important; padding-right: 8px !important; }
 .project-list-tools { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 24px; }
 .project-list-tools input, .project-list-tools select { padding: 9px 12px; border: 1px solid #d1d5db; border-radius: 8px; font: inherit; font-size: var(--workspace-font-control); min-width: 0; background: white; color: #374151; }
 .project-list-tools input { flex: 1 1 180px; }
@@ -112,6 +113,9 @@
   .file-table th:last-child button svg { width: 18px; height: 18px; }
   .file-table td:last-child { padding: 0 !important; }
   .file-modified-label { display: none; }
+  /* Take the Size column out of the table entirely (its col and every cell in it). A zero-width column in a
+     fixed-layout table is not reliably collapsed, and would leave Name sharing its space with a blank gap. */
+  .file-table col.file-size-col, .file-table .file-size-cell { display: none !important; }
   .file-name { white-space: normal !important; overflow-wrap: anywhere; }
 }
 @container files (max-width: 400px) {

@@ -13,6 +13,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Upgrade audited frontend and Python dependencies, including the compatible MSAL/cryptography and FastAPI/Starlette stacks. Replace unmaintained PyPDF2 with pypdf and verify saved PDF form values. Chroma's development port now binds to localhost. Three Chroma advisories still have no published fix; see `docs/v5-release-readiness.md` for residual risk and release gates.
 
 ### Added
+- **Files screen: counts, folder details, sizes, file-type icons, and a grouped ⋯ menu.** The Files screen gave no count of what a folder held, folder rows had no Modified date, there was no Size column, every file had the same icon, and the **⋯** menu was one flat list with Delete directly under an everyday action.
+  - **Count in the header.** The folder trail ends with what the current folder holds, for example "Home · 6 folders, 10 files".
+  - **Folder rows.** Each folder shows its item count ("12 items", "1 item" or "Empty") and a Modified date. Folders store no dates, so Modified is worked out when the list loads: the newest of the folder being created, a file in it being added or changed, or a subfolder being created in it. Renaming a folder does not change it.
+  - **Size column** for files, sortable. Read from the stored file, so it covers files uploaded before this change; blank if the stored file is missing.
+  - **Icons by file type**: PDF, document, spreadsheet, presentation, image and web page each have their own icon and colour.
+  - **⋯ menu in groups** with dividers: use it (Ask, Run workflow, Add to knowledge base), organize (Rename, Move, Convert to team folder), copies and versions (Download, Export, Upload new version, Version history, Where is this used?), then Delete on its own. **Copy UUID** is shown to administrators only.
+
+  API: `GET /api/documents/list` folders add `item_count` and `updated_at`; documents add `size_bytes`.
 - **Core Skills: Skills chat keeps on hand in every conversation.** A Skill applied only after it was picked for a conversation, so an office's standard review method had to be selected in every new chat. **Assistant settings** now starts with **Core Skills**: up to five Library Skills chat always has available.
   - **Matched, not always loaded.** Chat sees each core Skill's name and **When to use** line. When a request matches, it loads that Skill's instructions for the reply and says which Skill it used. The chat step names the Skill for that reply, with recorded instructions and version details available to inspect.
   - **Needs a When to use line.** A Skill without one cannot be added, and the picker says how to add the line in the Library.

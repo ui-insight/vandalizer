@@ -43,6 +43,27 @@ function renderFileRow(props: Partial<Parameters<typeof FileRow>[0]> = {}) {
 }
 
 describe('FileRow', () => {
+  it('shows the file size, and nothing when it is unknown', () => {
+    const { unmount } = renderFileRow({ doc: makeDoc({ size_bytes: 4.2 * 1024 * 1024 }) })
+    expect(screen.getByText('4.2 MB')).toBeTruthy()
+    unmount()
+    renderFileRow({ doc: makeDoc({ size_bytes: null }) })
+    expect(screen.queryByText(/\b(B|KB|MB)$/)).toBeNull()
+  })
+
+  it('uses a different icon for each kind of file', () => {
+    const kindOf = (extension: string) => {
+      const { container, unmount } = renderFileRow({ doc: makeDoc({ extension }) })
+      const kind = container.querySelector('[data-file-kind]')?.getAttribute('data-file-kind')
+      const drawing = container.querySelector('[data-file-kind] svg')?.innerHTML
+      unmount()
+      return { kind, drawing }
+    }
+    const pdf = kindOf('pdf'), sheet = kindOf('xlsx'), doc = kindOf('docx')
+    expect([pdf.kind, sheet.kind, doc.kind]).toEqual(['pdf', 'spreadsheet', 'document'])
+    expect(new Set([pdf.drawing, sheet.drawing, doc.drawing]).size).toBe(3)
+  })
+
   it('renders document title', () => {
     renderFileRow({ doc: makeDoc({ title: 'Annual Report 2025.pdf' }) })
     expect(screen.getByText('Annual Report 2025.pdf')).toBeTruthy()

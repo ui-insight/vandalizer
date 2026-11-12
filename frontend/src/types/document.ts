@@ -10,6 +10,8 @@ export interface Document {
   folder: string | null
   created_at: string
   updated_at: string
+  /** Size of the stored file; null when it is not on disk to measure. */
+  size_bytes?: number | null
   token_count: number
   num_pages: number
   classification?: string | null
@@ -40,6 +42,10 @@ export interface Folder {
   parent_id: string
   is_shared_team_root: boolean
   team_id?: string | null
+  /** Files and folders directly inside, as this viewer would see them. */
+  item_count?: number
+  /** Derived: newest of the folder's creation and changes to what is in it. */
+  updated_at?: string
 }
 
 export interface ListContentsResponse {

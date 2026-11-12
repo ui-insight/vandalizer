@@ -6,6 +6,7 @@ import { searchDocuments, type SearchResult } from '../../api/documents'
 import { moveFile } from '../../api/files'
 
 vi.mock('../../hooks/useTeams', () => ({ useTeams: () => ({ currentTeam: null }) }))
+vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ user: { is_admin: false } }) }))
 vi.mock('../../hooks/useDocuments', () => ({ useDocuments: () => ({ documents: [], folders: [], refresh: vi.fn(), loading: false }) }))
 vi.mock('../../hooks/useFolders', () => ({ useBreadcrumbs: () => ({ breadcrumbs: [{ uuid: 'project-root', title: 'Subaward' }, { uuid: 'project-child', title: 'Budget files' }] }) }))
 vi.mock('../../hooks/useUpload', () => ({ useUpload: () => ({ uploads: [], upload: vi.fn() }) }))

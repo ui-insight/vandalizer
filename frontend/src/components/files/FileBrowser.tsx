@@ -3,6 +3,8 @@ import { WorkspaceSectionHeader } from '../shared/WorkspaceSectionHeader'
 import { useCallback, useMemo, useState, useRef, useEffect, type ReactNode, type DragEvent, type Ref } from 'react'
 import { Plus, Folder as FolderIcon, Upload, Trash2, Download, FolderInput } from 'lucide-react'
 import { useTeams } from '../../hooks/useTeams'
+import { useAuth } from '../../hooks/useAuth'
+import { formatContentsSummary } from '../../utils/fileDisplay'
 import { useDocuments } from '../../hooks/useDocuments'
 import { useBreadcrumbs } from '../../hooks/useFolders'
 import { useUpload, fileToBase64 } from '../../hooks/useUpload'
@@ -28,7 +30,7 @@ import type { Document, Folder } from '../../types/document'
 import { isDocReady } from '../../utils/processingStatus'
 import { SUPPORTED_ACCEPT_ATTR } from '../../utils/fileTypes'
 
-export type SortColumn = 'name' | 'modified'
+export type SortColumn = 'name' | 'size' | 'modified'
 export type SortDirection = 'asc' | 'desc'
 export interface SortState {
   column: SortColumn
@@ -121,6 +123,7 @@ const DELETE_NAME_CAP = 8
 
 export function FileBrowser({ listScrollRef, onListScroll, searchField, selectedDocumentUuids, selectedFolderUuids, onDocClick, searchQuery = '', contentMatches, contentSearchState, onRetryContentSearch, onSelectionChange, onDocNamesChange, onDocumentReadinessChange, onFolderSelectionChange, onFolderNamesChange, onSelectionProcessingChange, currentFolder: controlledFolder, onFolderNavigate, onAskAboutFolder, onRunWorkflowOnFolder, onAddFolderToKB, rootFolder = null, rootLabel, teamScopeUuid }: FileBrowserProps) {
   const { currentTeam } = useTeams()
+  const { user } = useAuth()
   const confirm = useConfirm()
   const { toast } = useToast()
 
@@ -312,6 +315,8 @@ export function FileBrowser({ listScrollRef, onListScroll, searchField, selected
           const bTime = b.updated_at ? new Date(b.updated_at).getTime() : 0
           return aTime - bTime
         }
+        case 'size':
+          return (a.size_bytes ?? -1) - (b.size_bytes ?? -1)
         default:
           return 0
       }
@@ -762,6 +767,7 @@ export function FileBrowser({ listScrollRef, onListScroll, searchField, selected
         floor={rootFolder}
         homeLabel={rootFolder ? (rootLabel ?? 'Project') : 'Home'}
         onDropFile={handleDropFile}
+        summary={contentsError ? undefined : formatContentsSummary(folders.length, documents.length)}
       />
 
       {breadcrumbError && <p role="alert" className="mt-2 text-sm text-red-800">Folder path unavailable. {breadcrumbError} <button type="button" className="underline" onClick={() => void refreshBreadcrumbs()}>Retry folder path</button></p>}
@@ -924,9 +930,12 @@ export function FileBrowser({ listScrollRef, onListScroll, searchField, selected
                 }
               : undefined
           }
-          onCopyUuid={() => {
-            navigator.clipboard.writeText(contextMenu.item.uuid)
-          }}
+          // An identifier only someone working with the API needs.
+          onCopyUuid={
+            user?.is_admin
+              ? () => { navigator.clipboard.writeText(contextMenu.item.uuid) }
+              : undefined
+          }
           onShowUsage={
             contextMenu.type === 'doc'
               ? () => setUsageTarget({ uuid: contextMenu.item.uuid, title: contextMenu.item.title })

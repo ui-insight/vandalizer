@@ -1,5 +1,7 @@
 import { documentReadinessMessage } from '../../utils/documentReadiness'
-import { Loader2, FileText, MoreHorizontal, AlertTriangle, Shield, AlertCircle } from 'lucide-react'
+import { Loader2, MoreHorizontal, AlertTriangle, Shield, AlertCircle } from 'lucide-react'
+import { FileTypeIcon } from './FileTypeIcon'
+import { formatFileSize } from '../../utils/fileDisplay'
 import type { Document } from '../../types/document'
 import { formatFileDate } from '../../utils/time'
 import { stageCopy, isDocReady } from '../../utils/processingStatus'
@@ -139,7 +141,7 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
             >
               <AlertCircle className="h-4 w-4 text-amber-500" />
             </span>
-          ) : <FileText className="h-4 w-4 shrink-0 mr-2.5 text-gray-500" aria-hidden="true" />}
+          ) : <FileTypeIcon extension={doc.extension} />}
           <div style={{ minWidth: 0, flex: 1 }}>
             <span className="flex items-center gap-1.5">
               <span className="file-name" title={doc.title}
@@ -197,6 +199,21 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
             )}
           </div>
         </div>
+      </td>
+
+      {/* Size */}
+      <td
+        className="file-size-cell"
+        style={{
+          padding: "var(--workspace-space-12) 15px",
+          color: '#59616b',
+          fontSize: 'var(--workspace-font-meta)',
+          fontWeight: 300,
+          whiteSpace: 'nowrap',
+          textAlign: 'right',
+        }}
+      >
+        {formatFileSize(doc.size_bytes)}
       </td>
 
       {/* Modified — right-aligned, with hover-revealed action overlay */}
