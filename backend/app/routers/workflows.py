@@ -808,7 +808,7 @@ async def export_workflow(workflow_id: str, user: User = Depends(get_current_use
     from app.services import export_import_service as eis
 
     try:
-        data = await eis.export_workflow(workflow_id, user.email or user.user_id)
+        data = await eis.export_workflow(workflow_id, user.email or user.user_id, user)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -837,6 +837,11 @@ async def import_workflow(
 
     try:
         team_id = str(user.current_team) if user.current_team else None
+        # What the file points at is added to a workflow by importing it, so
+        # anything the importer can't open is cleared first.
+        items = data.get("items") if isinstance(data, dict) else None
+        if isinstance(items, list) and items and isinstance(items[0], dict):
+            await eis.drop_unreadable_import_references(items[0], user)
         wf = await eis.import_workflow(data, user.user_id, team_id=team_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -869,16 +874,15 @@ async def import_into_workflow(
 
     try:
         team_id = str(user.current_team) if user.current_team else None
-        # The file replaces the workflow's input settings and steps, so the
-        # documents it names are checked like any others being added.
+        # The file replaces the workflow's input settings and steps. Anything
+        # it points at that the importer can't open is cleared first; what the
+        # workflow already uses stays.
         items = data.get("items") if isinstance(data, dict) else None
         if isinstance(items, list) and items and isinstance(items[0], dict):
-            await svc.ensure_definition_documents_readable(
-                items[0], user, already_input_config=target.input_config,
-                already_step_documents=set(await svc.step_document_uuids(target)),
-            )
-            await step_knowledge_access.ensure_definition_kbs_readable(
-                items[0], user, already=await step_knowledge_access.workflow_kb_uuids(target),
+            await eis.drop_unreadable_import_references(
+                items[0], user, keep_fixed_documents=target.input_config,
+                keep_documents=set(await svc.step_document_uuids(target)),
+                keep_knowledge_bases=set(await step_knowledge_access.workflow_kb_uuids(target)),
             )
         wf = await eis.import_into_workflow(workflow_id, data, user.user_id, team_id=team_id)
     except FixedDocumentAccessError as e:

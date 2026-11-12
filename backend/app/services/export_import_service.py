@@ -10,6 +10,7 @@ from beanie import Document, PydanticObjectId
 
 if TYPE_CHECKING:
     from app.models.knowledge import KnowledgeBase
+    from app.models.user import User
 
 from app.models.extraction_test_case import ExtractionTestCase
 from app.models.library import LibraryItemKind
@@ -158,11 +159,15 @@ def plain_extraction_export(data: object, title: str | None = None) -> dict | No
 # ---------------------------------------------------------------------------
 
 
-async def _resolve_task_references(task_data: dict, task_name: str) -> dict:
+async def _resolve_task_references(task_data: dict, task_name: str, user: "User | None" = None) -> dict:
     """Resolve external object references in a task and embed their data inline.
 
     This makes the export self-contained so it can be imported on a different
     system that doesn't share the same database.
+
+    *user* is who is exporting. A knowledge base's or document's title goes
+    into the file only if they can open it themselves: being able to view a
+    workflow doesn't entitle someone to the names of everything it points at.
     """
     data = dict(task_data)
 
@@ -201,11 +206,18 @@ async def _resolve_task_references(task_data: dict, task_name: str) -> dict:
     # --- KnowledgeBaseQuery tasks: embed KB metadata ---
     if task_name == "KnowledgeBaseQuery" and data.get("kb_uuid"):
         from app.models.knowledge import KnowledgeBase
+        from app.services import access_control
+
         kb = await KnowledgeBase.find_one(KnowledgeBase.uuid == data["kb_uuid"])
         if kb:
+            readable = user is not None and await access_control.get_authorized_knowledge_base(
+                data["kb_uuid"], user, allow_admin=True,
+            )
+            # The block is kept either way: importing relies on it to clear
+            # the id and ask for a local knowledge base.
             data["_embedded_knowledge_base"] = {
-                "title": kb.title,
-                "description": kb.description,
+                "title": kb.title if readable else "Unknown",
+                "description": kb.description if readable else None,
             }
 
     # --- Tasks with selected_document_uuid: embed document title ---
@@ -215,8 +227,13 @@ async def _resolve_task_references(task_data: dict, task_name: str) -> dict:
             SmartDocument.uuid == data["selected_document_uuid"]
         )
         if doc:
+            from app.services import access_control
+
+            readable = user is not None and await access_control.get_authorized_document(
+                data["selected_document_uuid"], user, allow_admin=True,
+            )
             data["_embedded_document_ref"] = {
-                "title": getattr(doc, "title", None) or getattr(doc, "filename", None) or "Unknown",
+                "title": (getattr(doc, "title", None) or getattr(doc, "filename", None) or "Unknown") if readable else "Unknown",
                 "uuid": data["selected_document_uuid"],
                 "_portable": False,
                 "_note": "This task references a specific document that must be re-selected after import.",
@@ -225,7 +242,7 @@ async def _resolve_task_references(task_data: dict, task_name: str) -> dict:
     return data
 
 
-async def export_workflow(workflow_id: str, user_email: str) -> dict:
+async def export_workflow(workflow_id: str, user_email: str, user: "User | None" = None) -> dict:
     wf_data = await workflow_service.get_workflow(workflow_id)
     if not wf_data:
         raise ValueError("Workflow not found")
@@ -238,7 +255,7 @@ async def export_workflow(workflow_id: str, user_email: str) -> dict:
     for step in wf_data.get("steps", []):
         tasks = []
         for t in step.get("tasks", []):
-            resolved_data = await _resolve_task_references(t.get("data", {}), t["name"])
+            resolved_data = await _resolve_task_references(t.get("data", {}), t["name"], user)
             tasks.append({"name": t["name"], "data": resolved_data})
 
             # Collect portability warnings for the user
@@ -283,6 +300,80 @@ async def export_workflow(workflow_id: str, user_email: str) -> dict:
     if portability_warnings:
         item["portability_warnings"] = portability_warnings
     return _envelope("workflow", user_email, [item])
+
+
+_IMPORT_CLEARED_NOTE = (
+    "This step referenced a {what} you don't have access to. Please select one of your own."
+)
+
+
+async def drop_unreadable_import_references(
+    item: dict, user: "User", *, keep_fixed_documents: dict | None = None,
+    keep_documents: "set[str] | None" = None, keep_knowledge_bases: "set[str] | None" = None,
+) -> dict:
+    """Clear, in place, what an import file points at that *user* can't open.
+
+    A file can name a fixed document, a step's document, a Form Filler
+    template or a knowledge base by id. Importing is a way of adding those to
+    a workflow, so each needs the same access as adding it in the editor. One
+    the importer can't open (or that doesn't exist here, as in a file from
+    another deployment) is cleared with a note on the step, the way imports
+    already treat references that don't travel, and the import goes ahead.
+
+    The ``keep_*`` arguments are what the target workflow already uses when
+    importing into an existing one; those are left as they are.
+    """
+    from app.services import access_control
+    from app.services.fixed_document_access import fixed_document_uuids
+    from app.services.step_knowledge_access import KB_TASK_NAME
+
+    kept_fixed = set(fixed_document_uuids({**(keep_fixed_documents or {}), "trigger_type": None}))
+    kept_documents = keep_documents or set()
+    kept_kbs = keep_knowledge_bases or set()
+    readable: dict[str, bool] = {}
+
+    async def can_read(doc_uuid: str) -> bool:
+        if doc_uuid not in readable:
+            document = await access_control.get_authorized_document(doc_uuid, user, allow_admin=True)
+            readable[doc_uuid] = bool(document and not document.soft_deleted)
+        return readable[doc_uuid]
+
+    config = item.get("input_config")
+    if isinstance(config, dict) and isinstance(config.get("fixed_documents"), list):
+        allowed = []
+        for entry in config["fixed_documents"]:
+            doc_uuid = (entry.get("uuid") if isinstance(entry, dict) else str(entry)) or ""
+            if doc_uuid and (doc_uuid in kept_fixed or await can_read(doc_uuid)):
+                allowed.append(entry)
+        config["fixed_documents"] = allowed
+
+    async def clear_document(data: dict, key: str) -> None:
+        doc_uuid = data.get(key)
+        if isinstance(doc_uuid, str) and doc_uuid.strip() and doc_uuid not in kept_documents and not await can_read(doc_uuid.strip()):
+            data[key] = ""
+            data["_import_note"] = _IMPORT_CLEARED_NOTE.format(what="document")
+
+    for step in item.get("steps") or []:
+        if not isinstance(step, dict):
+            continue
+        if isinstance(step.get("data"), dict):
+            await clear_document(step["data"], "selected_document_uuid")
+        for task in step.get("tasks") or []:
+            data = task.get("data") if isinstance(task, dict) else None
+            if not isinstance(data, dict):
+                continue
+            await clear_document(data, "selected_document_uuid")
+            await clear_document(data, "template_document_uuid")
+            kb_uuid = data.get("kb_uuid")
+            if (
+                task.get("name") == KB_TASK_NAME and isinstance(kb_uuid, str) and kb_uuid.strip()
+                # With the embedded block the import clears the id itself.
+                and not data.get("_embedded_knowledge_base") and kb_uuid.strip() not in kept_kbs
+                and not await access_control.get_authorized_knowledge_base(kb_uuid.strip(), user, allow_admin=True)
+            ):
+                data["kb_uuid"] = ""
+                data["_import_note"] = _IMPORT_CLEARED_NOTE.format(what="knowledge base")
+    return item
 
 
 async def _reconstruct_task_references(
@@ -775,7 +866,7 @@ async def import_knowledge_base(
 # ---------------------------------------------------------------------------
 
 
-async def export_catalog(user_email: str) -> dict:
+async def export_catalog(user_email: str, user: "User | None" = None) -> dict:
     """Export all verified catalog items with their full definitions."""
     result = await verification_service.list_verified_items(limit=10000)
     verified = result["items"]
@@ -806,7 +897,7 @@ async def export_catalog(user_email: str) -> dict:
         definition: dict | None = None
         if item_kind == "workflow":
             try:
-                wf_export = await export_workflow(item_id, user_email)
+                wf_export = await export_workflow(item_id, user_email, user)
                 definition = wf_export["items"][0]
             except Exception:
                 continue

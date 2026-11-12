@@ -140,8 +140,8 @@ def test_the_worker_refuses_the_run_before_any_step_executes():
     assert denied == ["kb-a"]
     # Checked against the owner, the starter on the trigger, and the activity's owner.
     assert check.call_args.args == (["kb-a"], ["bob", "bob", "amir"])
-    assert "1 knowledge base" not in workflow_tasks.knowledge_bases_denied_message(1)
-    assert "2 knowledge bases" in workflow_tasks.knowledge_bases_denied_message(2)
+    assert "a step that queries a knowledge base" in workflow_tasks.knowledge_bases_denied_message(1)
+    assert "steps that query 2 knowledge bases" in workflow_tasks.knowledge_bases_denied_message(2)
 
 
 async def test_adding_or_changing_a_task_checks_its_knowledge_base_before_saving():
@@ -194,3 +194,103 @@ async def test_optimizer_trials_are_refused_like_any_run():
          patch.object(kb_access, "ensure_kbs_runnable", AsyncMock()) as ensure:
         await kb_access.ensure_workflow_kbs_runnable("wf-1", BOB, "bob")
     ensure.assert_awaited_once_with(wf, BOB, "bob")
+
+
+# ---------------------------------------------------------------------------
+# Export and import files
+# ---------------------------------------------------------------------------
+
+
+async def test_an_export_names_a_knowledge_base_only_for_someone_who_can_open_it():
+    from app.services import export_import_service as eis
+
+    kb = SimpleNamespace(uuid="kb-a", title="Alice's private notes", description="Sensitive")
+    model = MagicMock()
+    model.find_one = AsyncMock(return_value=kb)
+    with patch("app.models.knowledge.KnowledgeBase", model), \
+         patch.object(access_control, "get_authorized_knowledge_base", _can_open({"alice": {"kb-a"}})):
+        own = await eis._resolve_task_references(KB_TASK, "KnowledgeBaseQuery", ALICE)
+        other = await eis._resolve_task_references(KB_TASK, "KnowledgeBaseQuery", BOB)
+        nobody = await eis._resolve_task_references(KB_TASK, "KnowledgeBaseQuery")
+
+    assert own["_embedded_knowledge_base"] == {"title": "Alice's private notes", "description": "Sensitive"}
+    # The block stays (importing relies on it), without the name.
+    assert other["_embedded_knowledge_base"] == {"title": "Unknown", "description": None}
+    assert nobody["_embedded_knowledge_base"] == {"title": "Unknown", "description": None}
+
+
+async def test_an_export_names_a_steps_document_only_for_someone_who_can_open_it():
+    from app.services import export_import_service as eis
+
+    data = {"input_source": "select_document", "selected_document_uuid": "doc-a"}
+    document = MagicMock()
+    document.find_one = AsyncMock(return_value=SimpleNamespace(title="secret-A.md"))
+
+    async def authorized(doc_uuid, user, **_):
+        return SimpleNamespace(uuid=doc_uuid) if user.user_id == "alice" else None
+
+    with patch("app.models.document.SmartDocument", document), \
+         patch.object(access_control, "get_authorized_document", AsyncMock(side_effect=authorized)):
+        own = await eis._resolve_task_references(data, "Prompt", ALICE)
+        other = await eis._resolve_task_references(data, "Prompt", BOB)
+
+    assert own["_embedded_document_ref"]["title"] == "secret-A.md"
+    assert other["_embedded_document_ref"]["title"] == "Unknown"
+
+
+async def test_an_import_clears_what_the_importer_cannot_open_and_goes_ahead():
+    from app.services import export_import_service as eis
+
+    item = {
+        "input_config": {"fixed_documents": [{"uuid": "doc-bob", "title": "Mine"}, {"uuid": "doc-a", "title": "Theirs"}, "from-elsewhere"]},
+        "steps": [
+            {"data": {"input_sources": ["select_document"], "selected_document_uuid": "doc-a"},
+             "tasks": [
+                 {"name": "KnowledgeBaseQuery", "data": {"kb_uuid": "kb-a", "query": "q"}},
+                 {"name": "KnowledgeBaseQuery", "data": {"kb_uuid": "kb-bob", "query": "q"}},
+                 # From another deployment: the import clears this id itself.
+                 {"name": "KnowledgeBaseQuery", "data": {"kb_uuid": "kb-x", "_embedded_knowledge_base": {"title": "T"}}},
+                 {"name": "FormFiller", "data": {"template_source": "pdf", "template_document_uuid": "doc-a"}},
+                 {"name": "Prompt", "data": {"input_source": "select_document", "selected_document_uuid": "doc-bob"}},
+             ]},
+        ],
+    }
+
+    async def document(doc_uuid, user, **_):
+        return SimpleNamespace(uuid=doc_uuid, soft_deleted=False) if doc_uuid == "doc-bob" else None
+
+    with patch.object(access_control, "get_authorized_document", AsyncMock(side_effect=document)), \
+         patch.object(access_control, "get_authorized_knowledge_base", _can_open({"bob": {"kb-bob"}})):
+        await eis.drop_unreadable_import_references(item, BOB)
+
+    assert item["input_config"]["fixed_documents"] == [{"uuid": "doc-bob", "title": "Mine"}]
+    step = item["steps"][0]
+    assert step["data"]["selected_document_uuid"] == ""
+    tasks = step["tasks"]
+    assert tasks[0]["data"]["kb_uuid"] == "" and "knowledge base" in tasks[0]["data"]["_import_note"]
+    assert tasks[1]["data"]["kb_uuid"] == "kb-bob"
+    assert tasks[2]["data"]["kb_uuid"] == "kb-x"
+    assert tasks[3]["data"]["template_document_uuid"] == ""
+    assert tasks[4]["data"]["selected_document_uuid"] == "doc-bob"
+
+
+async def test_importing_into_a_workflow_keeps_what_it_already_uses():
+    from app.services import export_import_service as eis
+
+    item = {
+        "input_config": {"fixed_documents": [{"uuid": "owners-file"}]},
+        "steps": [{"tasks": [
+            {"name": "KnowledgeBaseQuery", "data": {"kb_uuid": "kb-a"}},
+            {"name": "Prompt", "data": {"input_source": "select_document", "selected_document_uuid": "owners-doc"}},
+        ]}],
+    }
+    with patch.object(access_control, "get_authorized_document", AsyncMock(return_value=None)), \
+         patch.object(access_control, "get_authorized_knowledge_base", _can_open({})):
+        await eis.drop_unreadable_import_references(
+            item, BOB, keep_fixed_documents={"fixed_documents": ["owners-file"]},
+            keep_documents={"owners-doc"}, keep_knowledge_bases={"kb-a"},
+        )
+
+    assert item["input_config"]["fixed_documents"] == [{"uuid": "owners-file"}]
+    assert item["steps"][0]["tasks"][0]["data"]["kb_uuid"] == "kb-a"
+    assert item["steps"][0]["tasks"][1]["data"]["selected_document_uuid"] == "owners-doc"
