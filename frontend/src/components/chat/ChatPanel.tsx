@@ -997,7 +997,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
             <AssistantSettingsLink pausedCount={coreSkillsNeedingAttention(coreSkills.page).length} unavailable={!!coreSkills.error} />
           </>}
           activityControl={<ChatActivityPanel conversationUuid={conversationUuid ?? null} refreshKey={`${messages.length}:${pendingApprovals.join(',')}`} busy={isStreaming || isLoadingHistory} onDecide={(m, pageApproval, decision) => handleSend(m, undefined, pageApproval, decision)} />}
-          navigationControl={showScrollDown ? <button type="button" onClick={scrollToBottom} aria-label="Scroll to bottom" title="Latest message" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-700 hover:bg-gray-100"><ArrowDown size={18} /></button> : null}
+          navigationControl={showScrollDown ? <button type="button" onClick={scrollToBottom} aria-label="Scroll to bottom" title="Latest message" className="chat-composer-tool chat-composer-icon"><ArrowDown size={16} /></button> : null}
           focusSignal={focusChatSignal}
           contextMeter={
             messages.length > 0 && (contextMeter || contextTokens > 0) ? (
