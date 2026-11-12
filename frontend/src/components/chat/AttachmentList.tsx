@@ -31,6 +31,8 @@ interface Props {
   /** uuid → true while a selected doc is still extracting text (OCR/indexing). */
   processingByUuid?: Record<string, boolean>
   documentErrors?: Record<string, string>
+  /** Selected files with no usable text: extraction failed, or was stopped. */
+  documentStates?: Record<string, 'failed' | 'stopped' | undefined>
   selectedFolderUuids?: string[]
   selectedFolderNames?: Record<string, string>
   knowledgeBases?: AttachedKB[]
@@ -47,7 +49,7 @@ interface Props {
 
 export function AttachmentList({
   activeSkill, skillBusy, onChangeSkill, onRemoveSkill, onInspectSkill,
-  fileAttachments, urlAttachments, selectedDocUuids, selectedDocNames, processingByUuid, documentErrors,
+  fileAttachments, urlAttachments, selectedDocUuids, selectedDocNames, processingByUuid, documentErrors, documentStates,
   selectedFolderUuids, selectedFolderNames, knowledgeBases, knowledgeHealth,
   onRemoveFile, onRemoveUrl, onDeselectDoc, onDeselectFolder, onDetachKB, onShareKB, onShareSetup,
 }: Props) {
@@ -147,6 +149,9 @@ export function AttachmentList({
           <span className="max-w-full break-words">{name}</span>
           {documentErrors?.[uuid] ? <span className="text-xs text-red-700" title={documentErrors[uuid]}>Processing failed · open Files to retry</span> : processing
             ? <span className="text-xs italic text-gray-500">processing…</span>
+            // A file whose text is missing is not "Ready", whatever stage it stopped at.
+            : documentStates?.[uuid] === 'stopped' ? <span className="text-xs text-gray-600" title="Text extraction was stopped, so chat has no text to read from this file.">Stopped · open Files to retry</span>
+            : documentStates?.[uuid] === 'failed' ? <span className="text-xs text-red-700" title="Text extraction failed, so chat has no text to read from this file.">Text extraction failed · open Files to retry</span>
             : processingByUuid && <span className="inline-flex items-center gap-1 text-xs text-green-700"><Check className="h-3 w-3 shrink-0" />Ready</span>}
           {onDeselectDoc && (
             <button

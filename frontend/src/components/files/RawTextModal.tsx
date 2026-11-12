@@ -16,7 +16,7 @@ interface RawTextModalProps {
 type LoadState =
   | { kind: 'loading' }
   | { kind: 'ok'; text: string; lowQuality: boolean; isPdf: boolean; title: string }
-  | { kind: 'error'; message: string; canRetry: boolean }
+  | { kind: 'error'; message: string; canRetry: boolean; stopped?: boolean }
   | { kind: 'processing'; status: string | null }
 
 export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
@@ -24,6 +24,8 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
   const [retrying, setRetrying] = useState(false)
   const [stopping, setStopping] = useState(false)
   const [stopError, setStopError] = useState<string | null>(null)
+  // Shown after stopping a re-read whose previous text was put back.
+  const [stopNotice, setStopNotice] = useState<string | null>(null)
 
   const renderedHtml = useMemo(() => {
     if (state.kind !== 'ok' || !state.text) return ''
@@ -46,6 +48,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
               "We couldn't extract any text from this document.",
             // A damaged or misnamed file fails the same way every time.
             canRetry: res.error_retryable !== false,
+            stopped: Boolean(res.extraction_stopped),
           })
         } else {
           setState({
@@ -78,6 +81,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
 
   const handleRetry = useCallback(async (forceOcr = false) => {
     setRetrying(true)
+    setStopNotice(null)
     try {
       await retryExtraction(docUuid, { forceOcr })
       setState({ kind: 'processing', status: 'extracting' })
@@ -118,7 +122,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
   const handleStop = useCallback(async () => {
     if (
       !window.confirm(
-        'Stop reading this document? You can retry the extraction afterwards.',
+        'Stop reading this document? If it already had text, that text is kept. You can retry the extraction afterwards.',
       )
     ) {
       return
@@ -126,7 +130,8 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
     setStopping(true)
     setStopError(null)
     try {
-      await cancelExtraction(docUuid)
+      const res = await cancelExtraction(docUuid)
+      setStopNotice(res.restored_previous_text ? 'Stopped. This document still has the text it had before.' : null)
     } catch (err) {
       // A 409 means it finished or failed on its own meanwhile — reloading
       // shows whichever it was.
@@ -315,11 +320,20 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
             </div>
           )}
 
+          {stopNotice && state.kind === 'ok' && (
+            <div role="status" style={{ marginBottom: 'var(--workspace-space-12)', padding: 'var(--workspace-space-8) var(--workspace-space-12)', borderRadius: 6, border: '1px solid #d1d5db', background: '#f9fafb', color: '#374151', fontSize: 'var(--workspace-font-body)' }}>
+              {stopNotice}
+            </div>
+          )}
+
           {state.kind === 'error' && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--workspace-space-16)', padding: 'var(--workspace-space-32)', textAlign: 'center' }}>
-              <AlertCircle style={{ width: 40, height: 40, color: '#dc2626' }} />
+              {/* Stopped by a person is not a failure: no red, and it says so. */}
+              {state.stopped
+                ? <Square style={{ width: 36, height: 36, color: '#6b7280' }} />
+                : <AlertCircle style={{ width: 40, height: 40, color: '#dc2626' }} />}
               <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: '#111' }}>
-                Text extraction failed
+                {state.stopped ? 'Text extraction stopped' : 'Text extraction failed'}
               </div>
               <div style={{ fontSize: 'var(--workspace-font-body)', color: '#555', maxWidth: 480, lineHeight: 1.5 }}>
                 {state.message}

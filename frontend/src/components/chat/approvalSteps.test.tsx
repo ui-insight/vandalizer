@@ -39,6 +39,14 @@ describe('isPlainApproval', () => {
   it.each(['No, cancel that', 'yes but change the title', "don't", 'add the deadlines', 'what is due next?', ''])('%s is not', text => {
     expect(isPlainApproval(text)).toBe(false)
   })
+  // Support ticket: "ok thanks", sent after an unrelated answer, approved a
+  // waiting Create project card. A polite acknowledgement is not a yes.
+  it.each(['ok thanks', 'Ok, thanks!', 'ok', 'okay', 'thanks', 'thank you', 'sounds good', 'great, thanks', 'ok great', 'sure, thanks'])('%s is an acknowledgement, not an approval', text => {
+    expect(isPlainApproval(text)).toBe(false)
+  })
+  it.each(['yes thanks', 'Yes please, thank you', 'ok go ahead, thanks', 'okay do it', 'approve it, thanks'])('%s is still a clear yes', text => {
+    expect(isPlainApproval(text)).toBe(true)
+  })
 })
 
 const cards: ChatMessage = {
@@ -73,7 +81,8 @@ describe('a typed yes', () => {
   })
 
   it('approves a Page step with its stored preview', () => {
-    expect(typedApprovalTarget('ok', [cards], ['page', 'move'])).toEqual({ approve: expect.objectContaining({ id: 'page', pageApproval: 'pv1' }) })
+    expect(typedApprovalTarget('ok thanks', [cards], ['page', 'move'])).toBeNull()
+    expect(typedApprovalTarget('yes', [cards], ['page', 'move'])).toEqual({ approve: expect.objectContaining({ id: 'page', pageApproval: 'pv1' }) })
   })
 
   it('asks which one only when the current step is not in this chat', () => {

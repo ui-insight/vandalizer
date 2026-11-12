@@ -814,3 +814,122 @@ def require_honest_completion(ctx: RunContext["AgenticChatDeps"], output: str) -
     deps.completion_claim_retry_used = True
     labels = sorted({approve_button_label(tool) for tool in waiting})
     raise ModelRetry(COMPLETION_RETRY_INSTRUCTION.format(cards=", ".join(f"“{label}”" for label in labels)))
+
+
+# An action the user approved this turn that the reply never carried out.
+# Support ticket: a Create project card was approved, the model answered "The
+# project was created and is ready" without calling the tool, no project
+# existed, and the chat's own Activity log said "Approved, not run". The gate
+# removes an action from the waiting list only when it actually executes, so
+# an approved action still on the list at the end of the reply did not run.
+
+UNRUN_RETRY_INSTRUCTION = (
+    "The user approved {cards}, but you have not carried it out: you ended your reply without "
+    "calling its tool, so nothing has been created, saved or changed. Call {tools} now with the "
+    "same arguments as the preview and confirmed=true. If you cannot, say in one sentence that "
+    "it has not been done and why. Never say it was done. Do not repeat your previous reply."
+)
+# No instruction to call the tool here. A typed message reaches this point
+# without having been recognised as an approval (those arrive as a card
+# decision), so telling the model to run {tools} would have it act on a
+# thank-you, or on a question about something else.
+UNRUN_CLAIM_RETRY_INSTRUCTION = (
+    "Your reply says something was created, saved, added or finished, but {cards} is still "
+    "waiting for approval and has not run. A thank-you, an acknowledgement of your last answer, "
+    "or a question about something else is not an approval. Do not call {tools} in this reply. "
+    "Say it has not been done yet and point to its card, where the user can approve it. Never "
+    "say it was done. Do not repeat your previous reply."
+)
+
+# Words too general to tie a reply to one particular waiting action.
+_GENERIC_ACTION_WORDS = frozenset({
+    "approve", "create", "created", "save", "saved", "add", "added", "update", "updated",
+    "delete", "deleted", "remove", "removed", "run", "send", "share", "new", "with", "from",
+    "this", "that", "the", "and", "for",
+})
+
+
+def _names_action(text: str, entry: dict) -> bool:
+    """Whether *text* is talking about this waiting action.
+
+    A reply can report something as done that has nothing to do with the
+    card: "Three files were added last week." while a Create project card
+    waits. Only a reply that names what the card would act on (its label or
+    its tool, minus the general verbs) is a claim about that card.
+    """
+    from app.services.chat_tools import approve_button_label
+
+    label = str(entry.get("label") or approve_button_label(str(entry.get("tool") or "")))
+    words = {w for w in re.findall(r"[a-z]+", f"{label} {entry.get('tool') or ''}".lower()) if len(w) >= 4}
+    specific = words - _GENERIC_ACTION_WORDS
+    lowered = (text or "").lower()
+    return any(re.search(rf"\b{re.escape(word)}", lowered) for word in (specific or words))
+
+
+def approved_but_not_run(deps: "AgenticChatDeps | None") -> list[dict]:
+    """Waiting-list entries this turn was allowed to run and did not."""
+    approved = getattr(deps, "approved_confirmations", None) if deps is not None else None
+    if not approved:
+        return []
+    conversation = getattr(deps, "conversation", None)
+    return [
+        p for p in (getattr(conversation, "pending_confirmations", None) or [])
+        if isinstance(p, dict) and p.get("fp") in approved
+    ]
+
+
+def _unrun_to_report(deps: "AgenticChatDeps | None", text: str) -> list[dict]:
+    """The unrun actions *text* has to answer for.
+
+    A card's button is an explicit approval, so the action not running is
+    always wrong. A typed message may not have been an approval at all; it
+    only counts when the reply goes on to say that action was done: a
+    done-claim about something else (an answer to an unrelated question) is
+    not about the card.
+    """
+    unrun = approved_but_not_run(deps)
+    if not unrun:
+        return []
+    mode = getattr(deps, "approval_mode", "none")
+    if mode == "card":
+        return unrun
+    if mode == "typed_single" and claims_done(text):
+        return [entry for entry in unrun if _names_action(text, entry)]
+    return []
+
+
+def _card_names(entries: list[dict]) -> str:
+    return ", ".join(f"“{p.get('label') or approve_button_label(str(p.get('tool') or ''))}”" for p in entries)
+
+
+def require_approved_action_ran(ctx: RunContext["AgenticChatDeps"], output: str) -> str:
+    """Output validator: send back, once per turn, a reply that skipped the approved action."""
+    deps = ctx.deps
+    if ctx.partial_output or deps is None or getattr(deps, "unrun_approval_retry_used", False):
+        return output
+    unrun = _unrun_to_report(deps, output)
+    if not unrun:
+        return output
+    # Once only: a second miss is accepted, and the note below tells the user.
+    deps.unrun_approval_retry_used = True
+    template = UNRUN_RETRY_INSTRUCTION if getattr(deps, "approval_mode", "none") == "card" else UNRUN_CLAIM_RETRY_INSTRUCTION
+    raise ModelRetry(template.format(
+        cards=_card_names(unrun), tools=", ".join(sorted({str(p.get("tool") or "the tool") for p in unrun})),
+    ))
+
+
+def unrun_approval_note(text: str, deps: "AgenticChatDeps | None") -> str | None:
+    """What to add when the final reply still leaves an approved action unrun.
+
+    The streamed text can't be taken back, so the user is told plainly, and
+    told the card is still there to approve.
+    """
+    unrun = _unrun_to_report(deps, text)
+    if not unrun:
+        return None
+    one = len(unrun) == 1
+    return (
+        f"\n\n_Note: {_card_names(unrun)} did not run, so nothing was created or changed by "
+        f"{'it' if one else 'them'}. {'Its card is' if one else 'Their cards are'} still waiting: "
+        f"approve {'it' if one else 'each one'} again to carry {'it' if one else 'them'} out._"
+    )

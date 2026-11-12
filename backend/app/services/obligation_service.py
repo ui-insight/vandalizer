@@ -288,6 +288,18 @@ def _units_of(value: float, text: str) -> set[str]:
     return units
 
 
+def format_limit_figure(value: float, unit: Optional[str]) -> str:
+    """A limit figure as the inbox shows it: "$9,555", "22.5%", "1,200".
+
+    Exact, never rounded: the approval card must show the figure that is
+    about to be saved.
+    """
+    if unit == "$":
+        return f"${value:,.0f}" if float(value).is_integer() else f"${value:,.2f}"
+    number = f"{int(value):,}" if float(value).is_integer() else f"{value:,.6f}".rstrip("0").rstrip(".")
+    return f"{number}%" if unit == "%" else number
+
+
 def _limit_unit(
     limit_value: float, limit_quote: str, observed: float, observed_quote: str, claimed: str,
 ) -> tuple[Optional[str], Optional[str]]:
@@ -313,8 +325,8 @@ def _limit_unit(
         return None, (
             f"the limit is {limit_kind} ({say(limit_value, limit_units)}) but the observed value is "
             f"{observed_kind} ({say(observed, observed_units)}); a limit can only be compared with a "
-            f"value in the same unit. Use the observed figure the document states in that unit "
-            f"(for a rate limit, the rate), or leave this limit out"
+            f"value in the same unit. Use a different figure the document states in that unit, "
+            f"or give the limit alone, without observed_value"
         )
     if True in shared:
         return "%", None
@@ -486,20 +498,33 @@ async def check_proposal(item: dict, user: User, project: Project) -> tuple[Opti
             clean.update(**checked)
     elif kind == "limit":
         limit_value = _as_number(item.get("limit_value"))
+        if limit_value is None:
+            return None, "a limit needs limit_value as a number"
         observed = _as_number(item.get("observed_value"))
-        if limit_value is None or observed is None:
-            return None, "a limit needs limit_value and observed_value as numbers"
         by_role = {s.role: s.quote for s in sources}
         limit_quote = by_role.get("limit", quotes)
-        observed_quote = by_role.get("observed", quotes)
         if limit_value not in _figures_in(limit_quote):
             return None, "the limit's quote does not state the limit value"
-        if observed not in _figures_in(observed_quote):
-            return None, "the observed value is not stated in its quote"
-        unit, reason = _limit_unit(limit_value, limit_quote, observed, observed_quote, str(item.get("unit") or ""))
-        if reason:
-            return None, reason
-        clean.update(limit_value=limit_value, observed_value=observed, unit=unit)
+        claimed = str(item.get("unit") or "")
+        if observed is None or observed == limit_value:
+            # A plain limit. Support ticket: with observed_value required, the
+            # limit was repeated as its own observed value and every item read
+            # "$9,555 within the $9,555 limit". A comparison is only kept when
+            # the document gives a different figure to compare.
+            units = _units_of(limit_value, limit_quote)
+            unit = "%" if "%" in units else "$" if "$" in units or claimed.strip() == "$" else None
+            clean["sources"] = [
+                s.model_copy(update={"role": "evidence"}) if s.role == "observed" else s for s in sources
+            ]
+            clean.update(limit_value=limit_value, observed_value=None, unit=unit)
+        else:
+            observed_quote = by_role.get("observed", quotes)
+            if observed not in _figures_in(observed_quote):
+                return None, "the observed value is not stated in its quote"
+            unit, reason = _limit_unit(limit_value, limit_quote, observed, observed_quote, claimed)
+            if reason:
+                return None, reason
+            clean.update(limit_value=limit_value, observed_value=observed, unit=unit)
     return clean, None
 
 
@@ -578,19 +603,46 @@ def _norm_title(title: str) -> str:
     return (title or "").strip().lower()
 
 
-async def is_duplicate(project_uuid: str, clean: dict) -> bool:
+#: Statuses a proposal is checked against. A superseded item was replaced by
+#: an amendment and is not "in the inbox" any more.
+_KNOWN_STATUSES = ("open", "done")
+
+
+async def find_existing(project_uuid: str, clean: dict) -> Optional[Obligation]:
+    """The inbox item a proposal repeats, open or already marked done.
+
+    Support ticket: only open items were compared, so a deadline marked Done
+    was proposed again on the next run and would have come back as open, with
+    its reminders starting over.
+    """
     existing = await Obligation.find(
-        Obligation.project_uuid == project_uuid,
-        Obligation.kind == clean["kind"],
-        Obligation.status == "open",
+        {"project_uuid": project_uuid, "kind": clean["kind"], "status": {"$in": list(_KNOWN_STATUSES)}}
     ).to_list()
+    matches = []
     for ob in existing:
+        if ob.status not in _KNOWN_STATUSES:
+            continue
         if clean["kind"] == "deadline" and ob.due_at and clean.get("due_at"):
             if _same_deadline(ob, clean):
-                return True
+                matches.append(ob)
         elif _norm_title(ob.title) == _norm_title(clean["title"]):
-            return True
-    return False
+            matches.append(ob)
+    # An open copy is the one the inbox is showing.
+    return next((ob for ob in matches if ob.status == "open"), matches[0] if matches else None)
+
+
+async def is_duplicate(project_uuid: str, clean: dict) -> bool:
+    return await find_existing(project_uuid, clean) is not None
+
+
+def _already_reason(ob: Obligation, user: User) -> str:
+    """Why a repeated proposal is left out. Every variant keeps the words
+    "already in this project's inbox", which callers match on."""
+    if ob.status == "done":
+        return "already in this project's inbox, marked done"
+    if user.user_id in (ob.dismissed_by or []):
+        return "already in this project's inbox, dismissed by you"
+    return "already in this project's inbox or proposal"
 
 
 async def save_checked(project: Project, user: User, clean: dict) -> Obligation:
@@ -632,8 +684,12 @@ async def propose(project: Project, user: User, items: list[dict]) -> dict:
             continue
         for occurrence in occurrences:
             row = {**clean, **occurrence}
-            if any(a["clean"] == row for a in accepted) or await is_duplicate(project.uuid, row):
+            if any(a["clean"] == row for a in accepted):
                 rejected.append({"title": row["title"], "reason": "already in this project's inbox or proposal"})
+                continue
+            existing = await find_existing(project.uuid, row)
+            if existing is not None:
+                rejected.append({"title": row["title"], "reason": _already_reason(existing, user)})
                 continue
             replaced = await find_replaced(project.uuid, row)
             accepted.append({"clean": row, "replaces": serialize(replaced, user) if replaced else None})

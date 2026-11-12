@@ -407,7 +407,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [documentReadiness, setDocumentReadiness] = useState<Record<string, DocumentReadiness>>({})
   const updateDocumentReadiness = useCallback((docs: DocumentReadiness[]) => {
     setDocumentReadiness(previous => {
-      const changed = docs.filter(doc => previous[doc.uuid]?.title !== doc.title || previous[doc.uuid]?.message !== doc.message)
+      const changed = docs.filter(doc => previous[doc.uuid]?.title !== doc.title || previous[doc.uuid]?.message !== doc.message || previous[doc.uuid]?.state !== doc.state)
       if (!changed.length) return previous
       return { ...previous, ...Object.fromEntries(changed.map(doc => [doc.uuid, doc])) }
     })

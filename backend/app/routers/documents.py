@@ -272,11 +272,14 @@ async def cancel_extraction(
     request: Request,
     doc_uuid: str,
     user: User = Depends(get_current_user),
-) -> dict[str, str]:
+) -> dict:
     """Stop a document's in-flight text extraction (e.g. an OCR read that is
-    stuck). The document is left in a retryable error state, so
-    ``retry-extraction`` restarts it right away rather than waiting out the
-    staleness window.
+    stuck).
+
+    A stopped re-read of a document that already had text gets that text back
+    (``restored_previous_text``). Otherwise the document is left in a
+    retryable error state, so ``retry-extraction`` restarts it right away
+    rather than waiting out the staleness window.
     """
     doc = await access_control.get_authorized_document(
         doc_uuid, user, manage=True, allow_admin=True
@@ -284,7 +287,8 @@ async def cancel_extraction(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    if not await document_service.cancel_extraction(doc):
+    outcome = await document_service.cancel_extraction(doc)
+    if not outcome:
         raise HTTPException(
             status_code=409,
             detail="No extraction is in progress for this document",
@@ -296,10 +300,11 @@ async def cancel_extraction(
         resource_type="document",
         resource_id=doc_uuid,
         resource_name=doc.title,
-        detail={"previous_task_status": doc.task_status},
+        detail={"previous_task_status": doc.task_status, "restored_previous_text": outcome == "restored"},
     )
 
-    return {"uuid": doc_uuid, "status": "error"}
+    restored = outcome == "restored"
+    return {"uuid": doc_uuid, "status": "restored" if restored else "error", "restored_previous_text": restored}
 
 
 # ---------------------------------------------------------------------------

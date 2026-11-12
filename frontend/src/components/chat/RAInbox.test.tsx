@@ -203,6 +203,18 @@ describe('RA inbox', () => {
     expect(screen.queryByRole('region', { name: 'RA inbox' })).not.toBeInTheDocument()
   })
 
+  it('shows a limit with nothing to compare as the limit alone, exactly as saved', async () => {
+    api.getInbox.mockResolvedValue({ items: [
+      item({ uuid: 'ob-7', kind: 'limit', title: 'Indirect cost rate limit', due_at: null, due_text: null, limit_value: 22.5, unit: '%' }),
+      item({ uuid: 'ob-8', kind: 'limit', title: 'Indirect cost cap', due_at: null, due_text: null, limit_value: 9555, unit: '$' }),
+    ], inbox_hidden: false })
+    render(<RAInbox />)
+    const inbox = await screen.findByRole('region', { name: 'RA inbox' })
+    expect(inbox).toHaveTextContent('22.5% limit')
+    expect(inbox).toHaveTextContent('$9,555 limit')
+    expect(inbox).not.toHaveTextContent('within')
+  })
+
   it('opens both the limit and the figure that breaks it (#1014 item 33)', async () => {
     const limitSource = { document_uuid: 'notice', document_title: 'sponsor-notice.pdf', page: 3, quote: 'The maximum direct-cost request is $180,000.', role: 'limit' }
     const observedSource = { document_uuid: 'prop', document_title: 'proposal-draft.pdf', page: 2, quote: 'Direct-cost total: $200,000', role: 'observed' }

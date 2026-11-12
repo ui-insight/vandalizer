@@ -49,7 +49,7 @@ class TestApprovalReminder:
 
     def test_a_typed_reply_with_one_waiting_names_it(self):
         note = approval_reminder(decide([INBOX]), [INBOX])
-        assert '"Add to inbox"' in note and "If the user's message approves it" in note
+        assert '"Add to inbox"' in note and "If the user's message clearly approves it" in note
 
     def test_entries_saved_before_labels_still_read(self):
         old = {"fp": "fp-x", "turn": 2, "tool": "save_to_folder", "call_id": "call-x"}

@@ -119,9 +119,12 @@ def approval_reminder(
         if only is None:
             return ""
         return (
-            f"One step is waiting for approval: {_label(only)}. If the user's message approves "
-            f"it, run it now (call {only.get('tool')} with the same arguments and confirmed=true). "
-            f"Otherwise answer them and end by pointing to that card as the next step. {_SHORT_REPLY}"
+            f"One step is waiting for approval: {_label(only)}. If the user's message clearly "
+            f"approves it (yes, go ahead, do it, approve), run it now (call {only.get('tool')} "
+            f"with the same arguments and confirmed=true). A thank-you or an acknowledgement of "
+            f"your last answer (ok, thanks, got it) is not an approval. Otherwise answer them and "
+            f"end by pointing to that card as the next step. Never say the step was done unless "
+            f"you ran it in this reply. {_SHORT_REPLY}"
         )
     if decision.mode == "typed_ambiguous":
         latest = max(int(p.get("turn", 0) or 0) for p in entries)

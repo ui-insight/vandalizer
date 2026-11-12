@@ -1187,6 +1187,10 @@ async def _inject_queued_user_parts(ctx: RunContext[AgenticChatDeps], messages: 
     return messages[:-1] + [dataclass_replace(last, parts=parts)]
 
 
+#: How many times one chat turn may send a reply back for correction.
+CHAT_OUTPUT_RETRIES = 3
+
+
 def create_agentic_chat_agent(
     agent_model: str,
     thinking_override: Optional[bool] = None,
@@ -1234,6 +1238,12 @@ def create_agentic_chat_agent(
                 agent_model, system_config_doc
             ) or None,
             capabilities=[ProcessHistory(_inject_queued_user_parts)],
+            # The reply checks registered below each send a reply back at most
+            # once per turn, but the library's budget for that is one retry
+            # for the whole turn by default. Two different checks failing in
+            # a row then ended the turn with an error instead of a reply.
+            # Three covers that without letting a turn loop.
+            retries={"output": CHAT_OUTPUT_RETRIES},
         )
         from app.services import assistant_capabilities
 
@@ -1287,8 +1297,10 @@ def create_agentic_chat_agent(
         from app.services.chat_spreadsheet_figures import require_spreadsheet_figures
         agent.output_validator(require_spreadsheet_figures)
         # "All steps completed / saved" while this reply's approval cards wait.
-        from app.services.approval_claims import require_honest_completion
+        from app.services.approval_claims import require_approved_action_ran, require_honest_completion
         agent.output_validator(require_honest_completion)
+        # An approved card whose action the reply never carried out.
+        agent.output_validator(require_approved_action_ran)
         _agentic_chat_agent_cache[cache_key] = agent
 
     return _agentic_chat_agent_cache[cache_key]

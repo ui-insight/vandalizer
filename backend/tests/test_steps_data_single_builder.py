@@ -216,6 +216,8 @@ class TestOptimizerTrialUsesTheSharedBuilder:
             patch("app.models.system_config.SystemConfig.get_config", AsyncMock(return_value=None)),
             patch.object(workflow_optimizer, "get_user_model_name", AsyncMock(return_value="m")),
             patch("app.models.user.User") as MockUser,
+            # No database here; this workflow queries no knowledge base.
+            patch("app.services.step_knowledge_access.ensure_workflow_kbs_runnable", AsyncMock()),
             patch("app.services.workflow_engine.build_workflow_engine") as mock_build,
         ):
             MockUser.find_one = AsyncMock(return_value=None)

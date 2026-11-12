@@ -375,8 +375,13 @@ export function LeftPanel() {
           )}
         </div>
       )}
-        <div ref={listScroller} onScroll={event => { if (!viewingDoc) listPosition.current = event.currentTarget.scrollTop }} className="overflow-auto hide-scrollbar" style={{ display: viewingDoc ? 'none' : undefined, flex: 1, minHeight: 0, paddingBottom: 60 }}>
+        {/* The panel itself no longer scrolls: FileBrowser fills it and scrolls
+            only its rows, so the upload area and column headers stay put. The
+            overflow here is the fallback for a window too short to fit them. */}
+        <div className="overflow-auto hide-scrollbar" style={{ display: viewingDoc ? 'none' : 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
           <FileBrowser
+            listScrollRef={listScroller}
+            onListScroll={top => { if (!viewingDoc) listPosition.current = top }}
             searchField={<WorkspaceSearchBar value={searchQuery} onChange={setSearchQuery} label="Search files and content" placeholder="Search files and content…" />}
             selectedDocumentUuids={selectedDocUuids}
             selectedFolderUuids={selectedFolderUuids}

@@ -5347,13 +5347,21 @@ def _describe_obligation(clean: dict) -> str:
                     f'Anchor day excluded; no weekend/holiday adjustment.\n{evidence}')
         return f'{clean["title"]}: {when} ({where})'
     if clean["kind"] == "limit":
-        unit = clean.get("unit") or ""
-        return f'{clean["title"]}: {clean["observed_value"]:,.0f}{unit} against a limit of {clean["limit_value"]:,.0f}{unit} ({where})'
+        unit = clean.get("unit")
+        limit = obligation_service.format_limit_figure(clean["limit_value"], unit)
+        if clean.get("observed_value") is None:
+            return f'{clean["title"]}: {limit} ({where})'
+        observed = obligation_service.format_limit_figure(clean["observed_value"], unit)
+        return f'{clean["title"]}: {observed} against a limit of {limit} ({where})'
     return f'{clean["title"]} ({where})'
 
 
 def _obligation_review_reason(reason: str) -> str:
     """User-facing explanation; checker instructions stay in the tool result."""
+    if "marked done" in reason:
+        return "Already marked done in this inbox."
+    if "dismissed by you" in reason:
+        return "Already in this inbox; you dismissed it."
     if "already in" in reason:
         return "Already included in this inbox or proposal."
     if "can't open" in reason:
@@ -5465,9 +5473,11 @@ async def propose_obligations(
       it replacing the old one.
     - A promised item is not a received one: a letter that is "promised" is
       still required material.
-    - For a limit, cite the limit (role "limit", e.g. the solicitation's cap)
-      and the value that exceeds or meets it (role "observed", e.g. the draft
-      budget) as two sources.
+    - For a limit, cite the limit (role "limit", e.g. the solicitation's cap).
+      Add an observed value (role "observed", e.g. the draft budget total, as
+      a second source) only when a document states a different figure to
+      compare with it. Never repeat the limit as its own observed value: a
+      limit with nothing to compare is saved as a plain limit.
 
     Args:
         context: The call context.
@@ -5490,9 +5500,10 @@ async def propose_obligations(
             When the dates are in a table, quote the header row with the
             Start/End Date labels and the row with their dates.
             Business-day rules, exceptions, and missing period dates need clarification.
-            Limits add "limit_value", "observed_value" and "unit" ("$" or "%").
-            Both values must be in the same unit: compare a rate limit (22.5% of
-            TDC) with the rate the document states, never with a dollar amount.
+            Limits add "limit_value" (the exact figure, e.g. 22.5) and "unit"
+            ("$" or "%"), plus "observed_value" only when there is a different
+            figure to compare. Both values must be in the same unit: never
+            compare a rate limit (22.5% of TDC) with a dollar amount.
         project_uuid: The project; defaults to the one open in chat.
         confirmed: Must be true to save; false returns a preview.
     """
@@ -5555,6 +5566,22 @@ async def propose_obligations(
     ]
     lines = [f"Add: {description}" for description in descriptions]
     lines += [f"Not included: {r['title']} — {r['explanation']}" for r in excluded]
+    if not accepted and rejected and all("already in" in (r.get("reason") or "") for r in rejected):
+        # Nothing failed: every item is in the inbox already, open or done.
+        # Support ticket: a re-run after marking a deadline Done offered it
+        # again. Saying "couldn't be checked" here would send the model off
+        # to re-quote items that need nothing.
+        return {
+            "ok": True,
+            "project": project.title,
+            "added": [],
+            "already_in_inbox": excluded,
+            "message": (
+                f'Nothing new to add: all {len(excluded)} item{"s are" if len(excluded) != 1 else " is"} already in the RA inbox '
+                f'for "{project.title}". ' + " ".join(f"{r['title']}: {r['explanation']}" for r in excluded)
+                + " Tell the user this; do not propose these again or reopen items marked done."
+            ),
+        }
     if not accepted:
         context.deps.obligation_failures = failures + 1
         return {
@@ -6011,8 +6038,10 @@ async def _build_workflow_step_data(
             return None, "a knowledge_base_query step needs a 'kb_uuid'"
         if not query:
             return None, "a knowledge_base_query step needs a 'query'"
-        kb = await KnowledgeBase.find_one(KnowledgeBase.uuid == kb_uuid)
-        if not kb or not (kb.verified or _kb_access_ok(kb, context.deps.user_id, context.deps.team_id)):
+        # The same rule the editor and the run apply to a step's knowledge base.
+        from app.services import access_control as _access_control
+
+        if not await _access_control.get_authorized_knowledge_base(kb_uuid, context.deps.user, allow_admin=True):
             return None, f"knowledge base '{kb_uuid}' not found or not accessible"
         mode = step.get("mode") if step.get("mode") in ("passages", "answer") else "answer"
         return {"kb_uuid": kb_uuid, "query": query, "mode": mode, "model": model}, None

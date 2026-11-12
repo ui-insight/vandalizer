@@ -1,6 +1,8 @@
 import { useState, useRef } from 'react'
 import { Folder as FolderIcon, Users, MoreHorizontal, Eye } from 'lucide-react'
 import type { Folder } from '../../types/document'
+import { formatFileDate } from '../../utils/time'
+import { formatItemCount } from '../../utils/fileDisplay'
 
 interface FolderRowProps {
   folder: Folder
@@ -136,8 +138,37 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
         </div>
       </td>
 
-      {/* Modified (empty for folders) — with hover-revealed action overlay */}
-      <td style={{ padding: "var(--workspace-space-12) 15px", position: 'relative' }}>
+      {/* A folder has no size; this column says how much is in it. */}
+      <td
+        className="file-size-cell"
+        style={{
+          padding: "var(--workspace-space-12) 15px",
+          color: '#59616b',
+          fontSize: 'var(--workspace-font-meta)',
+          fontWeight: 300,
+          whiteSpace: 'nowrap',
+          textAlign: 'right',
+        }}
+      >
+        {formatItemCount(folder.item_count)}
+      </td>
+
+      {/* Modified — with hover-revealed action overlay */}
+      <td
+        style={{
+          padding: "var(--workspace-space-12) 15px",
+          color: '#59616b',
+          fontSize: 'var(--workspace-font-meta)',
+          fontWeight: 300,
+          whiteSpace: 'nowrap',
+          textAlign: 'right',
+          position: 'relative',
+        }}
+        title={folder.updated_at || undefined}
+      >
+        <span className="file-modified-label">
+          {folder.updated_at && formatFileDate(folder.updated_at)}
+        </span>
         <div
           onClick={(e) => e.stopPropagation()}
           className="file-row-actions"
