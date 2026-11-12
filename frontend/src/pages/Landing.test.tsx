@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import Landing from './Landing'
 import type { AuthConfig } from '../api/auth'
@@ -83,6 +83,75 @@ describe('Landing — trial signup form', () => {
     await waitFor(() => expect(document.querySelector('#landing-login-email')).not.toBeNull())
     expect(document.querySelector('#landing-register-email')).toBeNull()
   })
+})
+
+
+describe('Landing — Request a walkthrough form (support ticket: "[object Object]")', () => {
+  const fill = (email: string) => {
+    fireEvent.change(document.querySelector('#demo-name')!, { target: { value: 'QA test' } })
+    fireEvent.change(document.querySelector('#demo-email')!, { target: { value: email } })
+    fireEvent.change(document.querySelector('#demo-institution')!, { target: { value: 'QA test' } })
+    fireEvent.change(document.querySelector('#demo-role')!, { target: { value: 'research_admin' } })
+    fireEvent.submit(document.querySelector('#demo-email')!.closest('form')!)
+  }
+  const EMAIL_HELP = 'Please enter a valid email address (like name@university.edu).'
+
+  beforeEach(() => {
+    mockSearch = {}
+    mockGetAuthConfig.mockReset()
+    mockGetAuthConfig.mockResolvedValue(config())
+    vi.unstubAllGlobals()
+  })
+
+  it('tells the visitor what is wrong with "a@b" next to the email field, without sending it', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    render(<Landing />)
+    fill('a@b')
+    const message = await screen.findByText(EMAIL_HELP)
+    expect(message.id).toBe('demo-email-error')
+    const input = document.querySelector('#demo-email')!
+    expect(input).toHaveAttribute('aria-invalid', 'true')
+    expect(input).toHaveAttribute('aria-describedby', 'demo-email-error')
+    expect(fetchMock).not.toHaveBeenCalled()
+    // Fixing the address clears the message.
+    fireEvent.change(input, { target: { value: 'qa@university.edu' } })
+    expect(screen.queryByText(EMAIL_HELP)).toBeNull()
+  })
+
+  it('reads a field rejection from the server instead of printing "[object Object]"', async () => {
+    // An address that passes the check here but the server still refuses.
+    const rejected = { detail: [{ type: 'value_error', loc: ['body', 'email'], msg: 'Value error, Not a valid email address', input: 'x' }] }
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 422, json: async () => rejected }))
+    render(<Landing />)
+    fill('qa@university.edu')
+    expect(await screen.findByText(EMAIL_HELP)).toBeInTheDocument()
+    expect(document.body.textContent).not.toContain('[object Object]')
+  })
+
+  it('names another rejected field, and shows a plain server message as written', async () => {
+    const tooLong = { detail: [{ type: 'string_too_long', loc: ['body', 'institution'], msg: 'String should have at most 300 characters' }] }
+    const fetchMock = vi.fn().mockResolvedValueOnce({ ok: false, status: 422, json: async () => tooLong })
+      .mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({ detail: 'Demo requests are temporarily unavailable. Please email us directly.' }) })
+    vi.stubGlobal('fetch', fetchMock)
+    render(<Landing />)
+    fill('qa@university.edu')
+    expect(await screen.findByText('Please check your institution, then try again.')).toBeInTheDocument()
+    fill('qa@university.edu')
+    expect(await screen.findByText('Demo requests are temporarily unavailable. Please email us directly.')).toBeInTheDocument()
+    expect(document.body.textContent).not.toContain('[object Object]')
+  })
+
+  it('says the request could not be sent when the network fails, not the browser\'s wording', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
+    render(<Landing />)
+    fill('qa@university.edu')
+    expect(await screen.findByText('We couldn’t send your request. Check your connection and try again.')).toBeInTheDocument()
+    expect(document.body.textContent).not.toContain('Failed to fetch')
+  })
+
+  // Leave nothing stubbed for the tests that follow.
+  afterEach(() => { vi.unstubAllGlobals() })
 })
 
 // Support ticket: on a phone only the logo and Sign in showed; the other
