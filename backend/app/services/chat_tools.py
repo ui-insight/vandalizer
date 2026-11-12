@@ -2098,8 +2098,8 @@ async def _execute_extraction(
     """Run an already-authorized extraction set against documents.
 
     Shared by ``run_extraction`` (after it authorizes the set) and
-    ``run_pin_on_project`` (where the project pin is the authorization
-    boundary). Each document is still authorized against the caller. Returns
+    ``run_pin_on_project`` (after it authorizes the pinned set for the
+    caller). Each document is still authorized against the caller. Returns
     the same response shape as ``run_extraction``, including the quality
     sidecar. Caps at 10 documents and 50 entities.
 
@@ -5091,15 +5091,17 @@ async def run_pin_on_project(
     if not await project_service.can_manage_project(project, context.deps.user):
         return {"error": "You need edit access to this project to run its tools."}
 
-    # The pin must exist on this project — that's the authorization boundary for
-    # the referenced workflow/extraction (the user reaches it via the project).
-    pins = await project_service.list_pins(project)
+    # The pin must exist on this project AND be something this user can open
+    # themselves: a pin is a shortcut, never permission.
+    # list_pins leaves out pins the user can't access, so one answer covers
+    # both and the target's name is never revealed.
+    pins = await project_service.list_pins(project, context.deps.user)
     match = next(
         (p for p in pins if p["pin_type"] == pin_type and p["target_id"] == target_id),
         None,
     )
     if not match:
-        return {"error": f"That {pin_type} is not pinned to this project."}
+        return {"error": f"That {pin_type} is not pinned to this project, or you don't have access to it."}
 
     doc_uuids = await project_service.get_project_document_uuids(project)
     if not doc_uuids:
@@ -5133,15 +5135,19 @@ async def run_pin_on_project(
     if gate is not None:
         return gate
 
+    # Loaded through the access check, not by id: approval may have waited,
+    # and _execute_extraction trusts what it is handed.
+    from app.services import access_control
+
     if pin_type == "extraction":
-        ss = await SearchSet.find_one(SearchSet.uuid == target_id)
+        ss = await access_control.get_authorized_search_set(target_id, context.deps.user)
         if not ss:
-            return {"error": "The pinned extraction no longer exists."}
+            return {"error": project_service.pin_access_denied_message("extraction")}
         result = await _execute_extraction(context, ss, doc_uuids)
     else:  # workflow
-        wf = await Workflow.get(target_id)
+        wf = await access_control.get_authorized_workflow(target_id, context.deps.user)
         if not wf:
-            return {"error": "The pinned workflow no longer exists."}
+            return {"error": project_service.pin_access_denied_message("workflow")}
         project_options: WorkflowProjectOptions = {"project_context": project_context} if project_context else {}
         result = await _execute_workflow(context, wf, doc_uuids, **project_options)
         if len(doc_uuids) > 10 and "error" not in result:
@@ -5182,6 +5188,11 @@ async def pin_to_project(
         return {"error": f"Invalid pin type. Must be one of: {', '.join(PIN_TYPES)}."}
     if not await project_service.can_manage_project(project, context.deps.user):
         return {"error": "You need edit access to this project to pin items."}
+    # Refused before the approval card: there is nothing to approve.
+    if pin_type in ("workflow", "extraction", "automation", "knowledge_base") and (
+        await project_service.authorized_pin_name(pin_type, target_id, context.deps.user) is None
+    ):
+        return {"error": f"{project_service.pin_access_denied_message(pin_type)} Nothing was pinned."}
 
     gate = await _confirm_gate(
         context,

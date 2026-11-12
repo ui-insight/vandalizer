@@ -4917,7 +4917,7 @@ async def _build_project_context(project_uuid: str, user: User) -> str:
     if not project:
         return ""
     overview = await project_service.get_project_overview(project, user)
-    pins = await project_service.list_pins(project)
+    pins = await project_service.list_pins(project, user)
     caps = overview["capabilities"]
 
     lines = [
