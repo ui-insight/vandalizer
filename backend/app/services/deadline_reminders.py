@@ -227,10 +227,19 @@ async def _claim(ob_uuid: str, user_id: str, stage: str, day: str, channels: lis
 
 
 async def _open_deadlines(projects: Iterable[str] | None = None) -> list[Obligation]:
+    """Open, dated deadlines that should still be reminded about.
+
+    One whose source file was deleted is left out until someone keeps it: the
+    inbox asks "keep or dismiss?" and a reminder shouldn't answer for them.
+    """
+    from app.services.obligation_service import awaiting_source_decision, deleted_source_uuids
+
     query: dict[str, Any] = {"kind": "deadline", "status": "open", "due_at": {"$ne": None}}
     if projects is not None:
         query["project_uuid"] = {"$in": list(projects)}
-    return await Obligation.find(query).to_list()
+    obligations = await Obligation.find(query).to_list()
+    deleted = await deleted_source_uuids(obligations)
+    return [o for o in obligations if not awaiting_source_decision(o, deleted)]
 
 
 async def send_due_reminders(today: datetime.date | None = None) -> dict[str, int]:

@@ -930,7 +930,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setFocusedObligationUuid(id)
     void getObligation(id).then((item) => {
       const source = item.sources[0]
-      if (source) viewDocument(source.document_uuid, source.document_title, { terms: [quoteSearchTerms(source.quote)], page: source.page })
+      // A deleted file has nothing to open; the inbox row says so.
+      if (source && !source.deleted) viewDocument(source.document_uuid, source.document_title, { terms: [quoteSearchTerms(source.quote)], page: source.page })
     }).catch(() => { /* The inbox says when the item is no longer open. */ })
   }, [search.deadline, resetToHome, viewDocument])
 

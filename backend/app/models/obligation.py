@@ -63,6 +63,10 @@ class Obligation(Document):
     superseded_by: Optional[str] = None
     supersedes: Optional[str] = None
     dismissed_by: list[str] = []
+    # A cited file was deleted and someone who manages the project chose to
+    # keep the item anyway. Until then it waits for that decision and sends
+    # no reminders (see obligation_service.awaiting_source_decision).
+    kept_without_source: bool = False
     created_by: str
     created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc))
     updated_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc))

@@ -168,6 +168,31 @@ async def test_propose_skips_already_saved():
 
 
 @pytest.mark.asyncio
+async def test_propose_ignores_runs_without_a_session_id():
+    # Runs from before session_id existed load with "" and can't be saved as
+    # a test case (saving looks the run up by session_id).
+    wf = _make_workflow()
+    user = MagicMock(); user.user_id = "u"
+    chain = MagicMock()
+    chain.sort.return_value.limit.return_value.to_list = AsyncMock(
+        return_value=[_make_result(""), _make_result("s2")]
+    )
+    score = AsyncMock(return_value=[])
+
+    with (
+        patch("app.services.workflow_test_case_generator.WorkflowResult.find", return_value=chain),
+        patch("app.services.workflow_test_case_generator._score_candidates_with_llm", new=score),
+        patch("app.services.workflow_service.get_authorized_workflow",
+              new=AsyncMock(return_value=wf)),
+    ):
+        await propose_from_history("wfid", user)
+
+    call = score.call_args
+    candidates = next(a for a in (*call.args, *call.kwargs.values()) if isinstance(a, list))
+    assert [c["session_id"] for c in candidates] == ["s2"]
+
+
+@pytest.mark.asyncio
 async def test_propose_filters_empty_and_error_outputs():
     wf = _make_workflow()
     user = MagicMock(); user.user_id = "u"

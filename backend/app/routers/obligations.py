@@ -145,7 +145,7 @@ async def download_calendar(
 async def get_obligation(obligation_uuid: str, user: User = Depends(get_current_user)) -> dict:
     """One item, for a reminder's link to it."""
     ob, project = await _obligation_for(obligation_uuid, user, manage=False)
-    return obligation_service.serialize(ob, user, project.title)
+    return await obligation_service.serialize_checked(ob, user, project.title)
 
 
 @router.get("/{obligation_uuid}/calendar.ics", response_model=None)
@@ -194,7 +194,19 @@ async def mark_done(obligation_uuid: str, body: DoneRequest, user: User = Depend
     if ob.status == "superseded":
         raise HTTPException(status_code=409, detail="An amendment replaced this item; update the newer one instead.")
     ob = await obligation_service.set_done(ob, user, body.done)
-    return obligation_service.serialize(ob, user, project.title)
+    return await obligation_service.serialize_checked(ob, user, project.title)
+
+
+class KeepRequest(BaseModel):
+    keep: bool
+
+
+@router.post("/{obligation_uuid}/keep", response_model=None)
+async def keep_without_source(obligation_uuid: str, body: KeepRequest, user: User = Depends(get_current_user)) -> dict:
+    """Keep an item whose source file was deleted, for everyone on the project."""
+    ob, project = await _obligation_for(obligation_uuid, user, manage=True)
+    ob = await obligation_service.set_kept_without_source(ob, body.keep)
+    return await obligation_service.serialize_checked(ob, user, project.title)
 
 
 class DismissRequest(BaseModel):
@@ -206,7 +218,7 @@ async def dismiss(obligation_uuid: str, body: DismissRequest, user: User = Depen
     """Hide (or restore) an item on your own Home. Teammates still see it."""
     ob, project = await _obligation_for(obligation_uuid, user, manage=False)
     ob = await obligation_service.set_dismissed(ob, user, body.dismissed)
-    return obligation_service.serialize(ob, user, project.title)
+    return await obligation_service.serialize_checked(ob, user, project.title)
 
 
 class InboxSettingsRequest(BaseModel):

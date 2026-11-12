@@ -1,0 +1,103 @@
+.chat-composer { position: relative; }
+
+.chat-composer-tool {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #59616b;
+  font-size: var(--workspace-font-meta, .75rem);
+  font-weight: 500;
+  line-height: 1.5;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color .15s, background-color .15s;
+}
+
+.chat-composer-tool:not(:disabled):hover,
+.chat-composer-tool[aria-expanded="true"] {
+  background: #1919190a;
+  color: #374151;
+}
+
+.chat-composer-tool > svg {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  stroke-width: 1.75;
+}
+
+.chat-composer-tool > .lucide-chevron-down {
+  width: 12px;
+  height: 12px;
+}
+
+.chat-composer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  max-width: 100%;
+  margin-inline-start: auto;
+}
+
+.chat-composer-icon {
+  min-width: 32px;
+  padding-inline: 7px;
+}
+
+.chat-composer-tool-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.chat-composer-tool-group:empty {
+  display: none;
+}
+
+.chat-composer-conversation-tools {
+  gap: 4px;
+  padding-inline-start: 8px;
+  border-inline-start: 1px solid #d2d7dd;
+}
+
+.chat-composer-send {
+  width: 36px;
+  height: 36px;
+  margin-inline-start: 4px;
+  cursor: pointer;
+}
+
+@container chat (max-width: 620px) {
+  .chat-composer-tool-label { display: none; }
+  .chat-composer-memory { position: static; }
+  .chat-composer-memory-dialog { right: 8px; max-width: calc(100% - 16px); }
+}
+
+@container chat (max-width: 380px) {
+  .chat-composer-actions { column-gap: 4px; }
+  .chat-composer-conversation-tools { padding-inline-start: 0; border-inline-start: 0; }
+  .chat-composer-new-chat > svg { display: none; }
+}
+
+@media (pointer: coarse) {
+  .chat-composer-tool,
+  .chat-composer-send { min-width: 44px; min-height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-composer-tool { transition: none; }
+}
+

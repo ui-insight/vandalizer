@@ -282,7 +282,8 @@ def describe_deadlines(result: dict) -> tuple[str, Optional[str]]:
     if not result["saved"]:
         lines.append("- nothing new")
     if result["already"]:
-        lines.append(f"Already in the inbox: {len(result['already'])}.")
+        done = sum("marked done" in (r.get("reason") or "") for r in result["already"])
+        lines.append(f"Already in the inbox: {len(result['already'])}" + (f" ({done} marked done)." if done else "."))
     warning = None
     if result["refused"]:
         reasons = [f"{r.get('title') or 'Item'} ({_obligation_review_reason(r.get('reason') or '')})" for r in result["refused"]]

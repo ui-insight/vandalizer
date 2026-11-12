@@ -15,10 +15,29 @@
 .context-assistant-launcher { position: absolute; right: 20px; bottom: 20px; z-index: 25; display: flex; align-items: center; gap: 8px; padding: 12px 16px; border: 1px solid #cbd2d9; border-radius: 12px; background: white; color: #242b32; box-shadow: 0 4px 16px #17212b18; font: inherit; font-size: var(--workspace-font-control); font-weight: 600; cursor: pointer; }
 .context-assistant-close { width: 100%; padding: 8px 12px; background: #f4f5f6; color: #414b55; border: 0; font: inherit; font-size: var(--workspace-font-meta); cursor: pointer; }
 .header-activity { display: grid; place-items: center; width: 32px; background: white; border: 1px solid #d1d5db; border-radius: 50%; cursor: pointer; color: #4b5563; }
-.file-browser { container: files / inline-size; }
-.file-list-surface { margin-top: 10px; border: 1px solid #dce1e5; border-radius: 10px; overflow: hidden; background: #fff; }
+/* The Files panel is a column that fills its pane: header, upload area and
+   folder trail keep their height, and the list takes what is left and is the
+   only part that scrolls, with a scrollbar that shows. */
+/* No min-height: 0 here. In a pane too short for the header, upload area and a few rows, the browser keeps its
+   natural height and the pane scrolls instead, so its bottom padding (room for the assistant button) still applies. */
+.file-browser { container: files / inline-size; display: flex; flex-direction: column; flex: 1 1 auto; box-sizing: border-box; }
+.file-browser > * { flex-shrink: 0; }
+/* scroll-padding-top keeps a row focused by keyboard from landing under the sticky column headers. */
+.file-list-surface { flex: 1 1 0; min-height: 132px; scroll-padding-top: 44px; margin-top: 10px; border: 1px solid #dce1e5; border-radius: 10px; overflow-x: hidden; overflow-y: auto; background: #fff; }
+/* Chrome, Edge and Safari ignore ::-webkit-scrollbar once scrollbar-width or
+   scrollbar-color is set, and on macOS then fall back to a scrollbar that
+   hides until you scroll. So those two go only to browsers without the
+   pseudo-element (Firefox). */
+@supports not selector(::-webkit-scrollbar) { .file-list-surface { scrollbar-width: thin; scrollbar-color: #aab4c0 transparent; } }
+.file-list-surface::-webkit-scrollbar { width: 10px; }
+.file-list-surface::-webkit-scrollbar-thumb { background: #aab4c0; border-radius: 8px; border: 2px solid #fff; }
+.file-list-surface::-webkit-scrollbar-track { background: transparent; }
 .file-table { color: var(--workspace-text); }
 .file-table thead { background: #f8f9fa; }
+/* Name / Modified stay at the top of the list while rows scroll under them.
+   A collapsed table border does not travel with a sticky cell, so the rule
+   under the header is drawn as a shadow. */
+.file-table thead th { position: sticky; top: 0; z-index: 2; background: #f8f9fa; box-shadow: inset 0 -1px 0 #dddddd; }
 .file-table tbody tr:last-child { border-bottom: 0 !important; }
 .file-table tbody tr:hover { background: var(--workspace-hover); }
 .file-table tbody tr:has(input:checked) { background: var(--workspace-selected); }
@@ -313,8 +332,16 @@
 .workspace-document-header h2 { flex: 1; min-width: 100px; font-size: var(--workspace-font-section-title); }
 .workspace-header-icon { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 36px; height: 36px; border: 1px solid var(--workspace-border); border-radius: 6px; background: var(--workspace-surface); color: var(--workspace-muted); cursor: pointer; }
 .workspace-header-icon:hover { background: var(--workspace-hover); color: var(--workspace-text); }
-.workspace-file-search { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.workspace-file-search input { min-width: 0; flex: 1; padding: 8px; border: 1px solid var(--workspace-border); border-radius: 6px; background: var(--workspace-surface); color: var(--workspace-text); font: inherit; font-size: var(--workspace-font-body); }
+/* One search box for workspace panels. Width is capped so it does not follow the panel divider. */
+.workspace-search-bar { position: relative; display: flex; align-items: center; width: 100%; max-width: 480px; min-width: 0; }
+.workspace-search-bar > svg { position: absolute; left: 12px; color: #5f6368; pointer-events: none; }
+.workspace-search-bar input { width: 100%; min-width: 0; padding: 8px 40px 8px 38px; border: 1px solid transparent; border-radius: var(--workspace-radius-medium); background: #f1f3f4; color: var(--workspace-text); font: inherit; font-size: var(--workspace-font-body); outline: none; transition: background-color .2s, border-color .2s; }
+.workspace-search-bar input::placeholder { color: #5f6368; }
+/* The shared :focus-visible outline below is the focus ring. */
+.workspace-search-bar input:focus { border-color: #dadce0; background: #fff; }
+.workspace-search-bar input::-webkit-search-cancel-button { display: none; -webkit-appearance: none; }
+.workspace-search-bar button { position: absolute; right: 4px; display: inline-flex; align-items: center; justify-content: center; width: 28px; min-width: 28px; height: 28px; min-height: 28px; padding: 0; border: 0; border-radius: 999px; background: transparent; color: #5f6368; cursor: pointer; }
+.workspace-search-bar button:hover { background: rgba(60,64,67,.1); color: var(--workspace-text); }
 .file-browser > .workspace-section-header { margin: 0 -24px 12px; }
 @media (max-width: 767px) { .file-browser > .workspace-section-header { margin-inline: -12px; } }
 

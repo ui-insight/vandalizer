@@ -11,10 +11,15 @@ import { ChatScrollRegion } from './ChatScrollRegion'
 import { ChatInput } from './ChatInput'
 import { AttachmentList } from './AttachmentList'
 import { ChatSkillDialog } from './ChatSkillDialog'
+import { AssistantSettingsLink } from '../assistant/AssistantSettingsLink'
+import { CoreSkillsNotice } from '../assistant/CoreSkillsNotice'
+import { useCoreSkills } from '../../hooks/useCoreSkills'
+import { coreSkillsNeedingAttention } from '../../api/assistant'
 import { ExistingFilesDialog } from '../files/ExistingFilesDialog'
 import { FileProcessingCell, type ProcessingCellDoc } from './FileProcessingCell'
 import { ChatExportActions } from './ChatExportActions'
 import { TrialTopUpDialog } from '../trial/TrialTopUpDialog'
+import { UnverifiedEmailAction } from '../trial/UnverifiedEmailAction'
 import { FirstSessionHome, ReturningHome } from './HomeExperience'
 import { RAInbox } from './RAInbox'
 import { HomeWorkQueue } from './HomeWorkQueue'
@@ -50,6 +55,7 @@ import type { CardDecision, FileAttachment, UrlAttachment } from '../../types/ch
 import { useChatModelPreference } from '../../hooks/useChatModelPreference'
 import { stageCopy, isDocReady } from '../../utils/processingStatus'
 import { partitionNewFiles } from './attachmentDedup'
+import { missingFilesMessage } from './missingFiles'
 import { shouldAutoContinueAfterAttach } from './autoContinue'
 
 interface ChatPanelProps {
@@ -62,6 +68,7 @@ interface ChatPanelProps {
 }
 
 export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessageConsumed, initialDraft, onDraftChange, workspaceLabel }: ChatPanelProps) {
+  const coreSkills = useCoreSkills()
   const certification = useCertificationPanelOptional()
   const announceChatWrite = useChatWriteAnnouncer()
   const branding = useBranding()
@@ -83,6 +90,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     errorDetails,
     clearError,
     retry,
+    retryWithoutDocuments,
     continueRun,
     contextTokens,
     contextMode,
@@ -259,6 +267,26 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const handleUseSuggestedModel = async (name: string) => {
     modelPreference.select(name, false)
   }
+
+  // Files the server could not find (deleted, or access changed) come off the
+  // chat, and the error names them: a chip that still reads "Ready" would
+  // fail the next message the same way (support ticket).
+  const [missingFilesNotice, setMissingFilesNotice] = useState<string | null>(null)
+  useEffect(() => {
+    if (errorDetails?.code !== 'document_missing') {
+      setMissingFilesNotice(null)
+      return
+    }
+    const gone = new Set(errorDetails.missingDocuments ?? [])
+    const attached = selectedDocUuids.filter(uuid => gone.has(uuid))
+    // Nothing left to remove: either already done, or the server named none.
+    if (!attached.length) return
+    setMissingFilesNotice(missingFilesMessage(
+      attached.map(uuid => selectedDocNames[uuid]).filter(Boolean), gone.size, errorDetails.missingReason,
+    ))
+    setSelectedDocUuids(selectedDocUuids.filter(uuid => !gone.has(uuid)))
+    setSelectedDocNames(Object.fromEntries(Object.entries(selectedDocNames).filter(([uuid]) => !gone.has(uuid))))
+  }, [errorDetails, selectedDocUuids, selectedDocNames, setSelectedDocUuids, setSelectedDocNames])
 
   const handleConvertToKB = async () => {
     const docs = errorDetails?.oversizeDocuments ?? []
@@ -962,6 +990,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
             </div>
           </div>
         )}
+        <CoreSkillsNotice page={coreSkills.page} error={coreSkills.error} selectedSkill={activeSkill?.title} />
         <ChatInput
           initialDraft={initialDraft}
           draftInsertion={draftInsertion}
@@ -986,9 +1015,12 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           onNewChat={() => { triggerNewChat(); focusChat() }}
           hasMessages={messages.length > 0}
           hasDocuments={fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0 || selectedFolderUuids.length > 0}
-          memoryControl={<MemoryPanel />}
+          memoryControl={<>
+            <MemoryPanel />
+            <AssistantSettingsLink pausedCount={coreSkillsNeedingAttention(coreSkills.page).length} unavailable={!!coreSkills.error} />
+          </>}
           activityControl={<ChatActivityPanel conversationUuid={conversationUuid ?? null} refreshKey={`${messages.length}:${pendingApprovals.join(',')}`} busy={isStreaming || isLoadingHistory} onDecide={(m, pageApproval, decision) => handleSend(m, undefined, pageApproval, decision)} />}
-          navigationControl={showScrollDown ? <button type="button" onClick={scrollToBottom} aria-label="Scroll to bottom" title="Latest message" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-700 hover:bg-gray-100"><ArrowDown size={18} /></button> : null}
+          navigationControl={showScrollDown ? <button type="button" onClick={scrollToBottom} aria-label="Scroll to bottom" title="Latest message" className="chat-composer-tool chat-composer-icon"><ArrowDown size={16} /></button> : null}
           focusSignal={focusChatSignal}
           contextMeter={
             messages.length > 0 && (contextMeter || contextTokens > 0) ? (
@@ -1393,7 +1425,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         {error && (
           <div role="alert" className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 border border-red-200">
             <div className="flex items-start gap-2">
-              <div className="flex-1">{error}</div>
+              <div className="flex-1">{missingFilesNotice ?? error}</div>
               <button
                 onClick={clearError}
                 aria-label="Dismiss error"
@@ -1425,6 +1457,20 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                   Builds a searchable index so chat can read the document a chunk at a time.
                 </span>
               </div>
+            ) : errorDetails?.code === 'document_missing' ? (
+              // Retry would send the same missing file again; this sends the
+              // message without it. Offered even when the file has no chip
+              // here (a queued or handed-over message carried it).
+              (errorDetails.missingDocuments?.length ?? 0) > 0 && (
+                <div className="mt-2">
+                  <button
+                    onClick={() => retryWithoutDocuments(errorDetails.missingDocuments ?? [])}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-700"
+                  >
+                    {(errorDetails.missingDocuments?.length ?? 0) > 1 ? 'Send without them' : 'Send without it'}
+                  </button>
+                </div>
+              )
             ) : errorDetails?.code === 'trial_budget_exhausted' ? (
               <div className="mt-2 flex items-center gap-2">
                 <button
@@ -1437,6 +1483,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                   Your last message wasn't carried out. Top up here and it's sent again, including an approval or button you just clicked.
                 </span>
               </div>
+            ) : errorDetails?.code === 'trial_email_unverified' ? (
+              <UnverifiedEmailAction onRetry={retry} />
             ) : errorDetails?.suggestedAction === 'continue' ? (
               <div className="mt-2 flex items-center gap-2">
                 <button

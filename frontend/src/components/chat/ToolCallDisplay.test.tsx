@@ -16,6 +16,19 @@ const result = (content: unknown) => ({tool_name:'create_workflow',tool_call_id:
 beforeEach(() => { vi.clearAllMocks() })
 
 describe('tool states and recovery', () => {
+  it('lets a person inspect the instruction version recorded for a core Skill reply', () => {
+    const version = 'a'.repeat(64)
+    render(<ToolStatusLine result={{ tool_name: 'use_core_skill', tool_call_id: 'core', quality: null, content: {
+      status: 'completed', skill: { title: 'Award review', version, when_to_use: 'Reviewing an award', instructions: 'Check the original reporting deadline.' },
+    } }} />)
+    expect(screen.getByText('Used “Award review” for this reply.')).toBeVisible()
+    fireEvent.click(screen.getByText('View instructions'))
+    expect(screen.getByRole('region', { name: 'Instructions used for this reply' })).toHaveTextContent('Check the original reporting deadline.')
+    fireEvent.click(screen.getByText('Version details'))
+    expect(screen.getByText(version)).toBeVisible()
+    expect(screen.getByRole('link', { name: 'Manage core Skills' })).toHaveAttribute('href', '/assistant#assistant-core-skills')
+  })
+
   it('shows a readable mixed obligation batch once without raw checker text or IDs', () => {
     const onConfirm = vi.fn()
     const descriptions = ['Final report: Jun 30, 2026 (Award.pdf, p. 2)', 'Invoice: Aug 31, 2026 (Award.pdf, p. 3)', 'Closeout: Sep 30, 2026 (Award.pdf, p. 4)']

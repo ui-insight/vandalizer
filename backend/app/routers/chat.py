@@ -4,6 +4,7 @@ from collections.abc import AsyncGenerator
 import io
 import logging
 import os
+import re
 import tempfile
 import uuid
 from datetime import datetime, timezone
@@ -70,6 +71,42 @@ async def _get_authorized_activity(activity_id: str, user: User) -> ActivityEven
     return activity
 
 
+async def _missing_documents_error(document_uuids: list[str]) -> HTTPException:
+    """Why attached files can't be used, in words, never as a raw id.
+
+    Support ticket: a deleted file still attached to chat answered "Document
+    not found: 81C2C3…" with a Retry that could never work. The headers let
+    the client name the file, take it off the chat and drop Retry; the detail
+    stands on its own for any other caller.
+    """
+    from app.models.document import SmartDocument
+
+    # Counted, not loaded: only whether any of them still exists matters.
+    still_there = await SmartDocument.find(
+        {"uuid": {"$in": document_uuids}, "soft_deleted": {"$ne": True}},
+    ).count()
+    deleted = not still_there
+    several = len(document_uuids) > 1
+    if deleted:
+        what = "Files attached to this chat were deleted." if several else "A file attached to this chat was deleted."
+    else:
+        what = (
+            ("Files attached to this chat are" if several else "A file attached to this chat is")
+            + " no longer available to you. They may have been deleted, or your access may have changed."
+        )
+    remove = "Remove them from the chat" if several else "Remove it from the chat"
+    safe = [u for u in document_uuids if re.fullmatch(r"[A-Za-z0-9_-]{1,64}", u)]
+    return HTTPException(
+        status_code=404,
+        detail=f"{what} {remove}, then send your message again.",
+        headers={
+            "X-Chat-Error": "document_missing",
+            "X-Missing-Documents": ",".join(safe),
+            "X-Missing-Reason": "deleted" if deleted else "unavailable",
+        },
+    )
+
+
 @router.post("", response_model=None)
 @limiter.limit("30/minute")
 async def chat(
@@ -90,6 +127,7 @@ async def chat(
     # lookups. Titles go in alongside the uuids because a uuid stops resolving
     # once the document is deleted, which is when the record matters most.
     source_documents: list[dict] = []
+    missing_document_uuids: list[str] = []
     for doc_uuid in document_uuids:
         doc = await access_control.get_authorized_document(
             doc_uuid,
@@ -98,9 +136,12 @@ async def chat(
             allow_admin=True,
         )
         if not doc:
-            raise HTTPException(status_code=404, detail=f"Document not found: {doc_uuid}")
+            missing_document_uuids.append(doc_uuid)
+            continue
         authorized_document_uuids.append(doc.uuid)
         source_documents.append({"uuid": doc.uuid, "title": doc.title or doc.uuid})
+    if missing_document_uuids:
+        raise await _missing_documents_error(missing_document_uuids)
     # The selection as the user made it, before folders expand into it — what
     # reopening the conversation re-attaches.
     selected_document_uuids = list(authorized_document_uuids)
@@ -216,8 +257,14 @@ async def chat(
     if body.page_approval:
         if not conversation:
             raise HTTPException(404, "Conversation not found")
-        from app.services import chat_page_previews
+        from app.models.system_config import SystemConfig
+        from app.services import assistant_capabilities, chat_page_previews
         from app.services.chat_artifact_tools import _call
+        # Save on a Page preview runs without the model, so the Pages switch
+        # is checked here: the tool gate never sees this path.
+        config = await SystemConfig.get_config()
+        if "pages" in assistant_capabilities.off_for(user, config.model_dump()):
+            raise HTTPException(409, "Pages are turned off in Assistant settings, so this page was not saved.")
         page_preview = await _call(chat_page_previews.get, user_id, conversation.uuid, body.page_approval)
     current_skill = getattr(conversation, "active_skill", None)
     requested_skill = body.skill_uuid

@@ -23,7 +23,7 @@ def _render_chainable_text(output_data: object, workflow_name: str) -> str:
     """Render workflow output as markdown so the saved doc is chainable as text."""
     import io
     buf = io.StringIO()
-    if isinstance(output_data, list) and output_data and isinstance(output_data[0], dict):
+    if isinstance(output_data, list) and output_data and all(isinstance(r, dict) for r in output_data):
         headers = list(dict.fromkeys(k for row in output_data for k in row.keys()))
         buf.write(f"# {workflow_name.replace('_', ' ')}\n\n")
         buf.write("| " + " | ".join(headers) + " |\n")
@@ -177,7 +177,7 @@ def _save_as_csv(file_path: Path, data: object) -> None:
     if not data:
         file_path.write_text("")
         return
-    if isinstance(data, list) and data and isinstance(data[0], dict):
+    if isinstance(data, list) and data and all(isinstance(r, dict) for r in data):
         # Collect keys from ALL items so no columns are missing
         all_keys = list(dict.fromkeys(k for row in data for k in row.keys()))
         with open(file_path, "w", newline="") as f:
@@ -204,7 +204,7 @@ def _save_as_json(file_path: Path, data: object) -> None:
 def _save_workflow_as_text(file_path: Path, data: object) -> None:
     """Save workflow output as human-readable plain text."""
     with open(file_path, "w") as f:
-        if isinstance(data, list) and data and isinstance(data[0], dict):
+        if isinstance(data, list) and data and all(isinstance(r, dict) for r in data):
             for i, row in enumerate(data):
                 if i > 0:
                     f.write("\n---\n\n")
@@ -221,7 +221,7 @@ def render_workflow_markdown(data: object, title: str = "Results") -> str:
     """Render workflow output as Markdown — shared by the download endpoint and
     the save-to-folder .md writer so both surfaces produce identical files."""
     lines = [f"# {title.replace('_', ' ')}", ""]
-    if isinstance(data, list) and data and isinstance(data[0], dict):
+    if isinstance(data, list) and data and all(isinstance(r, dict) for r in data):
         # Collect keys from ALL rows so no columns are missing
         headers = list(dict.fromkeys(k for row in data for k in row.keys()))
         lines.append("| " + " | ".join(headers) + " |")

@@ -36,6 +36,9 @@ class AgenticChatDeps:
     # the project from here. Existing tools ignore it — they range the whole
     # workspace regardless, by design.
     active_project_uuid: Optional[str] = None
+    # Capabilities switched off for this person (their own choice plus the
+    # admin's limit); each tool's prepare hook withholds its tools.
+    capabilities_off: frozenset[str] = frozenset()
 
     # Sidecar for quality metadata — tools write here keyed by tool_call_id,
     # and the streaming layer pops entries when emitting tool_result events.

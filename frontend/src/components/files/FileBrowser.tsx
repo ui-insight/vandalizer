@@ -1,6 +1,6 @@
 import { documentReadinessMessage, type DocumentReadiness } from '../../utils/documentReadiness'
 import { WorkspaceSectionHeader } from '../shared/WorkspaceSectionHeader'
-import { useCallback, useMemo, useState, useRef, useEffect, type ReactNode, type DragEvent } from 'react'
+import { useCallback, useMemo, useState, useRef, useEffect, type ReactNode, type DragEvent, type Ref } from 'react'
 import { Plus, Folder as FolderIcon, Upload, Trash2, Download, FolderInput } from 'lucide-react'
 import { useTeams } from '../../hooks/useTeams'
 import { useAuth } from '../../hooks/useAuth'
@@ -57,7 +57,10 @@ export interface ContentMatch {
 }
 
 interface FileBrowserProps {
-  searchAction?: ReactNode
+  // The file rows are the only part of the panel that scrolls. The owner can
+  // hold that region (to restore its position) and hear how far it has moved.
+  listScrollRef?: Ref<HTMLDivElement>
+  onListScroll?: (scrollTop: number) => void
   searchField?: ReactNode
   selectedDocumentUuids?: string[]
   selectedFolderUuids?: string[]
@@ -118,7 +121,7 @@ function keptKnowledgeBasesMessage(results: DeleteFileResult[]): string | null {
 // The delete confirmation names what it deletes; past this many, "and N more".
 const DELETE_NAME_CAP = 8
 
-export function FileBrowser({ searchAction, searchField, selectedDocumentUuids, selectedFolderUuids, onDocClick, searchQuery = '', contentMatches, contentSearchState, onRetryContentSearch, onSelectionChange, onDocNamesChange, onDocumentReadinessChange, onFolderSelectionChange, onFolderNamesChange, onSelectionProcessingChange, currentFolder: controlledFolder, onFolderNavigate, onAskAboutFolder, onRunWorkflowOnFolder, onAddFolderToKB, rootFolder = null, rootLabel, teamScopeUuid }: FileBrowserProps) {
+export function FileBrowser({ listScrollRef, onListScroll, searchField, selectedDocumentUuids, selectedFolderUuids, onDocClick, searchQuery = '', contentMatches, contentSearchState, onRetryContentSearch, onSelectionChange, onDocNamesChange, onDocumentReadinessChange, onFolderSelectionChange, onFolderNamesChange, onSelectionProcessingChange, currentFolder: controlledFolder, onFolderNavigate, onAskAboutFolder, onRunWorkflowOnFolder, onAddFolderToKB, rootFolder = null, rootLabel, teamScopeUuid }: FileBrowserProps) {
   const { currentTeam } = useTeams()
   const { user } = useAuth()
   const confirm = useConfirm()
@@ -665,7 +668,7 @@ export function FileBrowser({ searchAction, searchField, selectedDocumentUuids, 
       onDragLeave={handlePanelDragLeave}
       onDrop={handlePanelDrop}
     >
-      <WorkspaceSectionHeader title="Files" actions={<>{searchAction}
+      <WorkspaceSectionHeader title="Files" actions={<>
       <div ref={addMenuRef} className="relative inline-block">
         <button
           type="button"
@@ -826,9 +829,11 @@ export function FileBrowser({ searchAction, searchField, selectedDocumentUuids, 
       {contentsError && <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">Could not load this folder. {documents.length || folders.length ? 'Previously loaded items are shown.' : 'Its contents are unavailable.'} <button onClick={() => refresh()} className="ml-2 rounded border border-red-300 px-2 py-1 underline">Retry folder</button></div>}
       {/* File list surface */}
       <div
+        ref={listScrollRef}
+        onScroll={onListScroll ? (event) => onListScroll(event.currentTarget.scrollTop) : undefined}
         className="file-list-surface"
       >
-        {contentsError && !documents.length && !folders.length ? null : searchQuery.trim() && !sortedFolders.length && !sortedDocuments.length ? <p role="status" className="p-6 text-sm text-gray-600">{contentSearchState === 'loading' ? 'Searching document contents…' : contentSearchState === 'error' ? 'No matching names in this folder. Retry content search above, or change the search.' : <>No files or folders match “{searchQuery}”. Change the search or use Close search to see this folder again.</>}</p> : currentFolder && !sortedFolders.length && !sortedDocuments.length ? <p role="status" className="p-6 text-sm text-gray-600">{rootFolder ? 'This folder is empty. Use Add → From my files to move existing files here, or upload new files.' : 'This folder is empty. Upload files here or use Add to create a folder.'}</p> : <FileList
+        {contentsError && !documents.length && !folders.length ? null : searchQuery.trim() && !sortedFolders.length && !sortedDocuments.length ? <p role="status" className="p-6 text-sm text-gray-600">{contentSearchState === 'loading' ? 'Searching document contents…' : contentSearchState === 'error' ? 'No matching names in this folder. Retry content search above, or change the search.' : <>No files or folders match “{searchQuery}”. Change the search or clear it to see this folder again.</>}</p> : currentFolder && !sortedFolders.length && !sortedDocuments.length ? <p role="status" className="p-6 text-sm text-gray-600">{rootFolder ? 'This folder is empty. Use Add → From my files to move existing files here, or upload new files.' : 'This folder is empty. Upload files here or use Add to create a folder.'}</p> : <FileList
           folders={sortedFolders}
           documents={sortedDocuments}
           onFolderClick={setCurrentFolder}
