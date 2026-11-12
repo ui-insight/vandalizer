@@ -68,6 +68,21 @@ describe('Landing — trial signup form', () => {
     expect(screen.getByRole('button', { name: 'Create account' })).toBeInTheDocument()
   })
 
+  it('greets a new user on the Create account form, not with "Welcome back" (support ticket)', async () => {
+    mockGetAuthConfig.mockResolvedValue(config({ auth_methods: ['password'] }))
+    render(<Landing />)
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog).toHaveTextContent('Welcome back')
+    expect(dialog).toHaveTextContent('Continue with Vandalizer.')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Create account' }))
+    await waitFor(() => expect(document.querySelector('#landing-register-email')).not.toBeNull())
+    expect(dialog).toHaveTextContent('Get started')
+    expect(screen.getByRole('heading', { name: 'Create your Vandalizer account.' })).toBeInTheDocument()
+    expect(dialog).not.toHaveTextContent('Welcome back')
+  })
+
   it('opens in register mode when the URL carries register=1', async () => {
     mockSearch = { register: '1' }
     mockGetAuthConfig.mockResolvedValue(config({ auth_methods: ['password'] }))

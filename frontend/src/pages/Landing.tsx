@@ -197,14 +197,12 @@ function LandingRegisterForm({ onSwitch }: { onSwitch: () => void }) {
   )
 }
 
-function AuthBlock({ config }: { config: AuthConfig | null }) {
+type AuthMode = 'login' | 'register'
+
+// The dialog owns the mode so its heading can follow the form: "Welcome back"
+// over a Create account form greeted people who had never been here.
+function AuthBlock({ config, mode, setMode }: { config: AuthConfig | null; mode: AuthMode; setMode: (mode: AuthMode) => void }) {
   const search = useSearch({ strict: false }) as Record<string, string | undefined>
-  // `/landing?register=1` opens in register mode. The trial CTA on /demo and
-  // the /register redirect deep-link here; without it a would-be signup
-  // landed on the login form and had to find the small "Create account" toggle.
-  const [mode, setMode] = useState<'login' | 'register'>(
-    search?.register === '1' ? 'register' : 'login',
-  )
   const oauthError = search?.error
   const adminOverride = search?.admin === '1'
 
@@ -292,6 +290,12 @@ function AuthBlock({ config }: { config: AuthConfig | null }) {
 }
 
 function AccessDialog({ config, orgName, onClose }: { config: AuthConfig | null; orgName: string; onClose: () => void }) {
+  const search = useSearch({ strict: false }) as Record<string, string | undefined>
+  // `/landing?register=1` opens in register mode. The trial CTA on /demo and
+  // the /register redirect deep-link here; without it a would-be signup
+  // landed on the login form and had to find the small "Create account" toggle.
+  const [mode, setMode] = useState<AuthMode>(search?.register === '1' ? 'register' : 'login')
+  const creating = mode === 'register'
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose()
@@ -312,11 +316,11 @@ function AccessDialog({ config, orgName, onClose }: { config: AuthConfig | null;
       >
         <button type="button" onClick={onClose} className="launch-dialog-close" aria-label="Close sign-in dialog">Close</button>
         <div className="mx-auto max-w-sm text-center">
-          <p className="launch-eyebrow"><MessageSquare className="h-4 w-4" /> Welcome back</p>
-          <h2 id="access-dialog-title" className="mt-5 text-3xl font-semibold tracking-[-0.045em] text-white">Continue with {orgName}.</h2>
-          <p className="mt-3 text-sm leading-6 text-zinc-400">Sign in to your workspace or create an account to get started.</p>
+          <p className="launch-eyebrow"><MessageSquare className="h-4 w-4" /> {creating ? 'Get started' : 'Welcome back'}</p>
+          <h2 id="access-dialog-title" className="mt-5 text-3xl font-semibold tracking-[-0.045em] text-white">{creating ? `Create your ${orgName} account.` : `Continue with ${orgName}.`}</h2>
+          <p className="mt-3 text-sm leading-6 text-zinc-400">{creating ? 'Set up your account to open your workspace.' : 'Sign in to your workspace or create an account to get started.'}</p>
         </div>
-        <div className="mt-8"><AuthBlock config={config} /></div>
+        <div className="mt-8"><AuthBlock config={config} mode={mode} setMode={setMode} /></div>
       </section>
     </div>
     </FocusTrap>
