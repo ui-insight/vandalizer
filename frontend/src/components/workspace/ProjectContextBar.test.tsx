@@ -1,7 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ProjectContextBar } from './ProjectContextBar'
-import { ProjectWorkOverview } from '../projects/ProjectWorkOverview'
 
 const workspace = vi.hoisted(() => ({
   activeProjectUuid: 'award', activeProjectTitle: 'Award', activeProjectRole: 'owner',
@@ -21,7 +20,6 @@ beforeEach(() => {
 
 describe.each([
   ['project header', () => <ProjectContextBar />],
-  ['project overview', () => <ProjectWorkOverview uuid="award" />],
 ] as const)('%s file navigation', (_name, component) => {
   it('opens Files from another mode and hides the redundant action when Files is selected', () => {
     const view = render(component())

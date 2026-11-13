@@ -26,7 +26,7 @@ import type { AutomationStarted } from '../../hooks/useAutomationActivity'
 import type { CompletedAutomation } from '../../api/automations'
 
 export function WorkspaceLayout() {
-  const { railDocked, panelSplit, chatSplitOpen, workspaceMode, viewDocument, setWorkspaceMode, activeProjectUuid, openAutomationId, openWorkflowId, openExtractionId, focusChatSignal, activeRightTab, setActiveRightTab, sendChatMessage } = useWorkspace()
+  const { railDocked, panelSplit, chatSplitOpen, workspaceMode, viewDocument, setWorkspaceMode, activeProjectUuid, activeProjectTitle, openAutomationId, openWorkflowId, openExtractionId, focusChatSignal, activeRightTab, setActiveRightTab, sendChatMessage } = useWorkspace()
   // Certification opens in chat: whichever entry point asked (the /certification
   // URL, rail badge, account menu, a stale course card) queued its kickoff
   // message on the certification context; send it here, in chat mode.
@@ -150,7 +150,7 @@ export function WorkspaceLayout() {
   const visibleSplit = fitPanelSplit(panelSplit, availableWidth)
   const splitBounds = panelSplitBounds(availableWidth)
   useEffect(() => { setActivityOpen(false) }, [isCompact, autoDockRail])
-  const workspaceHeading = isChat
+  const workspaceHeading = activeProjectUuid ? (activeProjectTitle || 'Project workspace') : isChat
     ? 'Assistant workspace'
     : isProjects
       ? 'Projects workspace'

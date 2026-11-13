@@ -123,7 +123,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     announceChatWrite(result)
   } })
 
-  const { setWorkspaceMode, openWorkflow, openExtraction, workspaceMode, activeRightTab, openWorkflowId, openExtractionId, openAutomationId, bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, setSelectedFolderUuids, selectedFolderNames, setSelectedFolderNames, activeKBs, activeKBUuid, activeKBTitle, activateKB, attachKBs, replaceKBs, detachKB, activeProjectUuid, activeProjectTitle, activeProjectRole, exitProject, setCurrentConversationUuid, focusChatSignal, focusChat, triggerNewChat } = useWorkspace()
+  const { setWorkspaceMode, openWorkflow, openExtraction, workspaceMode, activeRightTab, openWorkflowId, openExtractionId, openAutomationId, bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, setSelectedFolderUuids, selectedFolderNames, setSelectedFolderNames, activeKBs, activeKBUuid, activeKBTitle, activateKB, attachKBs, replaceKBs, detachKB, activeProjectUuid, activeProjectTitle, activeProjectRole, setCurrentConversationUuid, focusChatSignal, focusChat, triggerNewChat } = useWorkspace()
 
   // When scoped to a project, surface its file/index status so the empty state
   // reflects the project (not a generic assistant) and sets honest expectations.
@@ -1044,6 +1044,12 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         />
       </div>
 
+      {/* Interim project inbox: independent of chat history and scroll position.
+          Reuse RAInbox so project actions (including Add deadline) travel with it. */}
+      {activeProjectUuid && <section aria-label="Project due and needed" className="project-inbox-slot">
+        <RAInbox key={activeProjectUuid} projectUuid={activeProjectUuid} />
+      </section>}
+
       {/* Messages area */}
       <ChatScrollRegion
         scrollRef={scrollContainerRef}
@@ -1209,7 +1215,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
             </div>
 
             {/* What each proposal or award needs, from its documents (#999). */}
-            <RAInbox projectUuid={activeProjectUuid} />
+            {!activeProjectUuid && <RAInbox />}
 
             <div style={{ marginTop: 'var(--workspace-space-16)', display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-8)' }}>
               {/* Inside a project, surface project-specific actions (run pinned
@@ -1705,7 +1711,6 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         <ProjectChatBadge
           projectUuid={activeProjectUuid}
           fallbackTitle={activeProjectTitle}
-          onExit={exitProject}
         />
       )}
 

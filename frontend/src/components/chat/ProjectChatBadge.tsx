@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { PageDialog } from '../artifacts/PagePrimitives'
-import { BookOpen, LogOut } from 'lucide-react'
+import { BookOpen } from 'lucide-react'
 import { useProject } from '../../hooks/useProjects'
 
 /**
@@ -15,11 +15,9 @@ import { useProject } from '../../hooks/useProjects'
 export function ProjectChatBadge({
   projectUuid,
   fallbackTitle,
-  onExit,
 }: {
   projectUuid: string
   fallbackTitle: string | null
-  onExit: () => void
 }) {
   const { project } = useProject(projectUuid)
   const [viewingContext, setViewingContext] = useState(false)
@@ -40,14 +38,6 @@ export function ProjectChatBadge({
         {project?.context && <button type="button" className="min-h-9 rounded border border-slate-300 bg-white px-2 text-xs font-medium text-slate-700" onClick={() => setViewingContext(true)} aria-label="View project context">Project context on</button>}
       </div>
       {viewingContext && project?.context && <PageDialog title="Project context" onClose={() => setViewingContext(false)}><p>Saved guidance for <strong>{title}</strong>. Your current request takes precedence. Edit this brief in Manage project.</p><p className="whitespace-pre-wrap break-words rounded-lg border border-slate-200 bg-slate-50 p-4">{project.context}</p></PageDialog>}
-      <button
-        onClick={onExit}
-        title="Exit project scope"
-        aria-label="Exit project scope"
-        className="project-source-exit"
-      >
-        <LogOut size={14} aria-hidden="true" /> Exit project
-      </button>
     </div>
   )
 }

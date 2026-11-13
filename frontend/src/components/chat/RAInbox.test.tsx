@@ -7,12 +7,12 @@ import type { Obligation } from '../../api/obligations'
 
 const navigate = vi.fn()
 const viewDocument = vi.fn()
-const workspace = vi.hoisted(() => ({ focusedObligationUuid: null as string | null }))
+const workspace = vi.hoisted(() => ({ focusedObligationUuid: null as string | null, activeProjectRole: 'owner' }))
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => navigate,
   Link: ({ children, to, hash, ...rest }: { children: React.ReactNode; to: string; hash?: string }) => <a href={`${to}${hash ? `#${hash}` : ''}`} {...rest}>{children}</a>,
 }))
-vi.mock('../../contexts/WorkspaceContext', () => ({ useWorkspace: () => ({ viewDocument, focusedObligationUuid: workspace.focusedObligationUuid }) }))
+vi.mock('../../contexts/WorkspaceContext', () => ({ useWorkspace: () => ({ viewDocument, ...workspace }) }))
 const api = vi.hoisted(() => ({
   getInbox: vi.fn(),
   setObligationDone: vi.fn(),
@@ -40,6 +40,7 @@ const LETTER = item({ uuid: 'ob-3', kind: 'required_material', title: 'Signed co
 beforeEach(() => {
   vi.clearAllMocks()
   localStorage.clear()
+  workspace.activeProjectRole = 'owner'
   workspace.focusedObligationUuid = null
   api.downloadDeadlineCalendar.mockResolvedValue(undefined)
   api.getInbox.mockResolvedValue({ items: [DEADLINE, CAP, LETTER], inbox_hidden: false })
@@ -335,5 +336,29 @@ describe('RA inbox item whose source file was deleted', () => {
     render(<RAInbox />)
     await screen.findByText('Sponsor deadline')
     expect(screen.queryByRole('group', { name: /Source file deleted/ })).not.toBeInTheDocument()
+  })
+})
+
+describe('project workspace inbox', () => {
+  it('omits project links only inside the scoped project and retains source links', async () => {
+    const view = render(<RAInbox projectUuid="proj-1" />)
+    await screen.findByText('Sponsor deadline')
+    expect(screen.queryByRole('button', { name: 'Community Resilience Pilot' })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /Open sponsor-amendment.pdf/ })).toHaveLength(3)
+    view.unmount()
+    render(<RAInbox />)
+    expect((await screen.findAllByRole('button', { name: 'Community Resilience Pilot' }))).toHaveLength(3)
+  })
+  it('keeps personal dismiss and calendar for viewers while hiding shared mutations', async () => {
+    workspace.activeProjectRole = 'viewer'
+    api.getInbox.mockResolvedValue({ items: [DEADLINE, item({ uuid: 'deleted', source_deleted: true })], inbox_hidden: false })
+    render(<RAInbox projectUuid="proj-1" />)
+    await screen.findAllByText('Sponsor deadline')
+    expect(screen.queryByRole('button', { name: /Mark .* done/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Keep .* everyone/ })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /Add .* to your calendar/ })).toHaveLength(2)
+    fireEvent.click(screen.getAllByRole('button', { name: /Hide .* from your Home/ })[0])
+    await waitFor(() => expect(api.setObligationDismissed).toHaveBeenCalledWith('ob-1', true))
+    expect(api.setObligationDone).not.toHaveBeenCalled()
   })
 })
