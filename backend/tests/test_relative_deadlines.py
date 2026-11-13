@@ -381,3 +381,180 @@ def test_the_card_says_already_done():
     assert _obligation_review_reason("already in this project's inbox, marked done") == "Already marked done in this inbox."
     assert _obligation_review_reason("already in this project's inbox, dismissed by you") == "Already in this inbox; you dismissed it."
     assert _obligation_review_reason("already in this project's inbox or proposal") == "Already included in this inbox or proposal."
+
+
+# ── Retests on builds 718 and 825 (support ticket, reopened) ────────────────
+# An End Date cell with a remark after the date, "(18 months)", wasn't read as
+# a date; the NIFA file's stored text also ran two rows together, so the cell
+# beside "End Date" was another label.
+
+NIFA_MERGED = "End Date|Federal Funds Obligated|August 31, 2027 (18 months) $95,550"
+SIMPLE_18 = "| Start Date: | January 15, 2027 |\n| End Date: | July 14, 2028 (18 months) |"
+
+
+@pytest.mark.parametrize("quote,end", [
+    (NIFA_MERGED, "2027-08-31"),
+    ("| Start Date | March 1, 2026 |\n" + NIFA_MERGED, "2027-08-31"),
+    (SIMPLE_18, "2028-07-14"),
+    ("| Start Date | End Date |\n| --- | --- |\n| Sep 1, 2025 | Aug 31, 2027 (24 months) |", "2027-08-31"),
+    ("<tr><td>End Date</td><td>August 31, 2027 (18 months).</td></tr>", "2027-08-31"),
+    ("Start Date\nEnd Date\nMarch 1, 2026\nAugust 31, 2027 (18 months)", "2027-08-31"),
+])
+def test_an_end_date_with_a_remark_or_in_a_merged_row_is_read(quote, end):
+    (row,) = calculate_deadlines([FINAL_120, source(quote, "period_of_performance")])
+    anchor = datetime.date.fromisoformat(end)
+    assert row["deadline_calculation"].anchor_date == end
+    assert row["due_at"].date() == anchor + datetime.timedelta(days=120)
+
+
+@pytest.mark.parametrize("quote", [
+    # Words other than a bracketed remark: not a plain End Date.
+    "| End Date | Aug 31, 2027 or upon termination |",
+    # A bracketed remark holding another date.
+    "| End Date | Aug 31, 2027 (extended from Feb 28, 2027) |",
+    # A merged row with two dates: which one is the End Date is unknown.
+    "End Date|Signed|August 31, 2027 March 1, 2026",
+    # A merged row naming another period label.
+    "End Date|Start Date|August 31, 2027",
+    # Only a bracketed duration may follow the date: these make it conditional.
+    "| End Date | Aug 31, 2027 (or upon termination, whichever is earlier) |",
+    "| End Date | Aug 31, 2027 (unless extended) |",
+    # The cell beside the label is a value, not another column label.
+    "| End Date | Upon termination | Invoice due Sep 30, 2027 |",
+    "End Date|TBD|Signed March 1, 2026",
+    "End Date|TBD|March 1, 2026",
+    "End Date|Upon Termination|August 31, 2027",
+    # A label beside, but words before the date in the value cell.
+    "End Date|Federal Funds Obligated|Invoice due Sep 30, 2027",
+    # The other label is itself a date, so the date may be its value.
+    "End Date|Signature Date|March 1, 2026",
+    # More cells than the merged layout has.
+    "End Date|Federal Funds Obligated|August 31, 2027|$95,550",
+])
+def test_an_unclear_end_date_cell_is_still_refused(quote):
+    with pytest.raises(ValueError):
+        calculate_deadlines([FINAL_120, source(quote, "period_of_performance")])
+
+
+START_90 = source("The Subrecipient Kickoff Plan is due 90 days after the Start Date.", "timing")
+
+
+def test_a_deadline_counted_from_the_start_date_is_calculated():
+    (row,) = calculate_deadlines([START_90, source(SIMPLE_18, "period_of_performance")])
+    assert row["due_at"] == datetime.datetime(2027, 4, 15)
+    calc = row["deadline_calculation"]
+    assert calc.anchor_kind == "performance_period_start" and calc.anchor_date == "2027-01-15"
+    assert calc.formula == "2027-01-15 + 90 calendar days = 2027-04-15"
+
+
+def test_a_merged_start_date_row_needs_the_same_layout():
+    rule = source("The Subrecipient Kickoff Plan is due 90 days after the Start Date.", "timing")
+    quote = "Start Date|Total Amount Obligated|January 15, 2027 $95,550\n| End Date | July 14, 2028 |"
+    (row,) = calculate_deadlines([rule, source(quote, "period_of_performance")])
+    assert row["deadline_calculation"].anchor_date == "2027-01-15"
+    with pytest.raises(ValueError):
+        calculate_deadlines([rule, source("Start Date|TBD|Signed January 15, 2027\n| End Date | July 14, 2028 |",
+                                          "period_of_performance")])
+
+
+@pytest.mark.parametrize("rule", [
+    "due 90 days after the start of the period of performance.",
+    "due 90 days after the beginning of the Period of Performance.",
+    "due 90 days after the Subaward Start Date.",
+])
+def test_start_of_period_wordings_count_from_the_start_date(rule):
+    (row,) = calculate_deadlines([source(rule, "timing"), source(SIMPLE_18, "period_of_performance")])
+    assert row["deadline_calculation"].anchor_date == "2027-01-15"
+
+
+@pytest.mark.parametrize("rule,quote,reason", [
+    ("due 90 days after the Start Date.", "| End Date | Aug 31, 2027 |", "Start Date"),
+    ("due within 90 days of the Start Date.", SIMPLE_18, "before or after"),
+    # A subaward's effective date can differ from its start date.
+    ("due 90 days after the Effective Date.", SIMPLE_18, "unsupported relative anchor"),
+    ("due 90 days after the effective date of this subaward.", SIMPLE_18, "unsupported relative anchor"),
+])
+def test_a_start_date_rule_needs_the_start_date_and_a_direction(rule, quote, reason):
+    with pytest.raises(ValueError, match=reason):
+        calculate_deadlines([source(rule, "timing"), source(quote, "period_of_performance")])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("model_quote", [
+    "End Date August 31, 2027",
+    "End Date Federal Funds Obligated August 31, 2027 (18 months) $95,550",
+])
+async def test_the_nifa_merged_row_adds_both_final_reports_with_a_page(monkeypatch, model_quote):
+    """Chat and the workflow both go through propose: the same row gives Dec 29, 2027."""
+    project = SimpleNamespace(uuid="project", title="NIFA Subaward", team_id=None)
+    text = ("SUBAWARD AGREEMENT\nStart Date|March 1, 2026\n" + NIFA_MERGED + "\n"
+            "ARTICLE 2\n3. Final technical and financial reports are due 120 days after the End Date.\n")
+    doc = SimpleNamespace(uuid="subaward", title="sample-subaward-NIFA-UI-OSU-2026-0412.pdf",
+                          raw_text=text, text_markers=None)
+    monkeypatch.setattr(service, "_readable_document", AsyncMock(return_value=doc))
+    monkeypatch.setattr(service, "Obligation", fake_model([]))
+    items = [{"kind": "deadline", "deadline_type": "report_due", "title": title, "relative_deadline": True,
+              "sources": [FINAL_120.model_dump(), {**source(model_quote, "period_of_performance").model_dump(), "page": None}]}
+             for title in ("Final technical report and dataset", "Final financial report and final invoice")]
+    checked = await service.propose(project, SimpleNamespace(user_id="user1"), items)
+    assert checked["rejected"] == []
+    assert [a["clean"]["due_at"] for a in checked["accepted"]] == [CLOSEOUT, CLOSEOUT]
+    assert all("August 31, 2027" in a["clean"]["sources"][1].quote for a in checked["accepted"])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("model_quote", [
+    "End Date August 31, 2027 (18 months)",
+    "End Date August 31, 2028",          # a date the row doesn't give
+    "Final technical report August 31, 2027",  # words that aren't in the row
+])
+async def test_a_period_quote_skipping_cells_matches_only_a_real_row(monkeypatch, model_quote):
+    project = SimpleNamespace(uuid="project", title="NIFA Subaward", team_id=None)
+    text = "Start Date|March 1, 2026\n" + NIFA_MERGED + "\n" + FINAL_120.quote + "\n"
+    doc = SimpleNamespace(uuid="subaward", title="Subaward.pdf", raw_text=text, text_markers=None)
+    monkeypatch.setattr(service, "_readable_document", AsyncMock(return_value=doc))
+    monkeypatch.setattr(service, "Obligation", fake_model([]))
+    item = {"kind": "deadline", "deadline_type": "report_due", "title": "Final report", "relative_deadline": True,
+            "sources": [FINAL_120.model_dump(), {**source(model_quote, "period_of_performance").model_dump(), "page": None}]}
+    checked = await service.propose(project, SimpleNamespace(user_id="user1"), [item])
+    if model_quote.endswith("(18 months)"):
+        assert checked["rejected"] == []
+        assert checked["accepted"][0]["clean"]["sources"][1].quote == NIFA_MERGED
+    else:
+        assert checked["accepted"] == [] and "not found" in checked["rejected"][0]["reason"]
+
+
+@pytest.mark.asyncio
+async def test_a_quote_matching_two_rows_is_not_guessed(monkeypatch):
+    text = "End Date|Year 1|August 31, 2027\nEnd Date|Year 2|August 31, 2027 (revised)\n" + FINAL_120.quote
+    assert service._row_holding(text, "End Date August 31, 2027") is None
+    # A timing quote never gets this leeway.
+    assert service._document_span(text, "Final reports due 120 days after the End Date", "timing") is None
+
+
+@pytest.mark.asyncio
+async def test_a_start_date_rule_quoting_the_start_and_merged_end_rows_is_added(monkeypatch):
+    """A Start Date rule needs both dates: a quote running from the Start Date
+    row into the merged End Date row matches those two rows of the document."""
+    project = SimpleNamespace(uuid="project", title="NIFA Subaward", team_id=None)
+    text = "SUBAWARD AGREEMENT\nStart Date|March 1, 2026\n" + NIFA_MERGED + "\n" + START_90.quote + "\n"
+    doc = SimpleNamespace(uuid="subaward", title="Subaward.pdf", raw_text=text, text_markers=None)
+    monkeypatch.setattr(service, "_readable_document", AsyncMock(return_value=doc))
+    monkeypatch.setattr(service, "Obligation", fake_model([]))
+    item = {"kind": "deadline", "deadline_type": "report_due", "title": "Kickoff plan", "relative_deadline": True,
+            "sources": [START_90.model_dump(), {**source("Start Date March 1, 2026 End Date August 31, 2027",
+                                                        "period_of_performance").model_dump(), "page": None}]}
+    checked = await service.propose(project, SimpleNamespace(user_id="user1"), [item])
+    assert checked["rejected"] == []
+    (accepted,) = checked["accepted"]
+    assert accepted["clean"]["due_at"] == datetime.datetime(2026, 5, 30)
+    assert accepted["clean"]["sources"][1].quote == "Start Date|March 1, 2026\n" + NIFA_MERGED
+
+
+def test_a_quote_spanning_rows_needs_consecutive_table_rows():
+    text = "Start Date|March 1, 2026\nSome paragraph text.\n" + NIFA_MERGED
+    assert service._row_holding(text, "Start Date March 1, 2026 End Date August 31, 2027") is None
+    # The shortest run is the one returned: not the rows above it.
+    text = "Prime Award|NIFA-2025\nStart Date|March 1, 2026\n" + NIFA_MERGED
+    assert service._row_holding(text, "Start Date March 1, 2026 End Date August 31, 2027") == (
+        "Start Date|March 1, 2026\n" + NIFA_MERGED)
