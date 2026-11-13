@@ -5,7 +5,8 @@ its quote must be on the cited page, a deadline's date must be in its quote
 or calculated from a verified relative rule and period dates,
 and a limit's figures must be in their quotes. A proposal that fails is
 returned with the reason, never saved, so the inbox cannot hold a deadline
-the documents don't state.
+the documents don't state. The exception is ``add_by_hand``: a deadline a
+person enters in the inbox, saved as unchecked and labeled that way.
 """
 
 import datetime
@@ -696,6 +697,62 @@ async def propose(project: Project, user: User, items: list[dict]) -> dict:
     return {"accepted": accepted, "rejected": rejected}
 
 
+_MAX_NOTE = 300
+
+
+async def add_by_hand(
+    project: Project, user: User, *, title: str, due_date: str, source_note: Optional[str] = None,
+) -> tuple[Optional[Obligation], Optional[str]]:
+    """Save a deadline typed into the inbox. Returns ``(obligation, None)`` or ``(None, reason)``.
+
+    Support ticket: chat refuses a deadline it can't verify against the
+    document and says to add it in the inbox, which had no way to add one. The
+    item is saved as ``entered_by_hand``, with the person's own note on where it
+    comes from, and never replaces a document-backed deadline.
+    """
+    clean_title = " ".join((title or "").split())[:200]
+    if not clean_title:
+        return None, "Give the deadline a title."
+    if not isinstance(due_date, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", due_date.strip()):
+        return None, "Give the due date as YYYY-MM-DD."
+    try:
+        due = datetime.datetime.fromisoformat(due_date.strip())
+    except ValueError:
+        return None, "That due date is not a real date."
+    note = " ".join((source_note or "").split())[:_MAX_NOTE] or None
+    clean: dict[str, Any] = {
+        "kind": "deadline", "title": clean_title, "deadline_type": "other",
+        "due_at": due, "due_text": None, "sources": [],
+    }
+    # Same date and same title only. find_existing also treats any two
+    # "other" deadlines on one day as the same, which would refuse a second,
+    # different deadline someone types for that day.
+    candidates = await Obligation.find(
+        {"project_uuid": project.uuid, "kind": "deadline", "status": {"$in": list(_KNOWN_STATUSES)}},
+    ).to_list()
+    existing = next((
+        ob for ob in sorted(candidates, key=lambda o: o.status != "open")
+        if ob.due_at and ob.due_at.date() == due.date()
+        and (_title_words(ob.title) or {_norm_title(ob.title)}) == (_title_words(clean_title) or {_norm_title(clean_title)})
+    ), None)
+    if existing is not None:
+        where = ("marked done" if existing.status == "done"
+                 else "dismissed from your Home" if user.user_id in (existing.dismissed_by or [])
+                 else "open")
+        return None, f'"{existing.title}" on that date is already in this project\'s inbox ({where}).'
+    ob = Obligation(
+        uuid=uuid_mod.uuid4().hex,
+        project_uuid=project.uuid,
+        team_id=project.team_id,
+        created_by=user.user_id,
+        entered_by_hand=True,
+        source_note=note,
+        **clean,
+    )
+    await ob.insert()
+    return ob, None
+
+
 def _sort_key(ob: Obligation) -> tuple[int, datetime.datetime, datetime.datetime]:
     far = datetime.datetime.max.replace(tzinfo=datetime.timezone.utc)
     due = ob.due_at.replace(tzinfo=ob.due_at.tzinfo or datetime.timezone.utc) if ob.due_at else far
@@ -766,6 +823,8 @@ def serialize(
         "sources": [{**s.model_dump(), "deleted": s.document_uuid in deleted} for s in ob.sources],
         "source_deleted": source_deleted(ob, deleted),
         "kept_without_source": bool(getattr(ob, "kept_without_source", False)),
+        "entered_by_hand": bool(getattr(ob, "entered_by_hand", False)),
+        "source_note": getattr(ob, "source_note", None),
         "status": ob.status,
         "supersedes": ob.supersedes,
         "superseded_by": ob.superseded_by,

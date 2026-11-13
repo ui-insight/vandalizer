@@ -5377,6 +5377,16 @@ def _obligation_review_reason(reason: str) -> str:
 
 _MAX_OBLIGATION_FAILURES = 2
 
+# Support ticket: chat told users to add refused deadlines "manually in the
+# project's RA inbox panel", which had no way to add one. It has an Add
+# deadline form now; this is the one wording chat is given for it.
+_ADD_BY_HAND = (
+    "If the user still wants a refused deadline tracked, tell them they can enter it themselves with "
+    "Add deadline in the project's RA inbox (Due and needed): title, due date and an optional note on "
+    "where it comes from. It is saved as added by hand, not checked against a document. Only deadlines "
+    "can be added that way; don't suggest it for required material or limits."
+)
+
 
 async def list_project_inbox(
     context: RunContext[AgenticChatDeps],
@@ -5390,8 +5400,10 @@ async def list_project_inbox(
     propose_obligations unless the user asks to add or track items.
 
     Describe items as "from the RA inbox" only when they came from this result, and
-    name the document each came from (its sources). Done items are listed with
-    status "done"; replaced ones are left out.
+    name the document each came from (its sources). An item with added_by_hand
+    was entered by a person and not checked against a document: say so, and
+    give its source_note as their note, not as a citation. Done items are
+    listed with status "done"; replaced ones are left out.
 
     Args:
         context: The call context.
@@ -5427,6 +5439,8 @@ async def list_project_inbox(
                 {"document_title": s.get("document_title"), "page": s.get("page")}
                 for s in row.get("sources") or []
             ],
+            # No document behind it: say so rather than citing one.
+            **({"added_by_hand": True, "source_note": row.get("source_note")} if row.get("entered_by_hand") else {}),
         })
     return {
         "project": project.title,
@@ -5547,7 +5561,8 @@ async def propose_obligations(
             "error": "Stopped: the inbox items couldn't be verified after repeated attempts in this reply.",
             "hint": (
                 "Do not call propose_obligations again in this reply. Tell the user which items "
-                "couldn't be checked against their documents and why, and ask how to proceed."
+                "couldn't be checked against their documents and why, and ask how to proceed. "
+                + _ADD_BY_HAND
             ),
         }
 
@@ -5588,10 +5603,12 @@ async def propose_obligations(
             "error": "None of the proposed items could be checked against their documents.",
             "rejected": rejected,
             "hint": "Fix each item using its reason (usually the exact quote or its page) and propose again.",
+            "if_still_refused": _ADD_BY_HAND,
         }
 
     from fastapi.encoders import jsonable_encoder
 
+    refused = any("already in" not in (r.get("reason") or "") for r in rejected)
     # Approval covers the actual write, not rejected inputs or model formatting.
     # Rechecking still enforces access and source evidence. Changed accepted
     # dates, sources, or replacements require a fresh preview; dropping rejected
@@ -5611,6 +5628,7 @@ async def propose_obligations(
             "rejected": rejected,
             "approval_key": approval_key,
             "obligation_review": {"project": project.title, "items": descriptions, "excluded": excluded},
+            **({"if_still_refused": _ADD_BY_HAND} if refused else {}),
         },
         confirmed=confirmed,
     )
@@ -5628,6 +5646,7 @@ async def propose_obligations(
             f'Added {len(saved)} item{"s" if len(saved) != 1 else ""} to the RA inbox for "{project.title}". '
             "They're on Home, where each can be marked done or dismissed."
         ),
+        **({"if_still_refused": _ADD_BY_HAND} if refused else {}),
     }
 
 
