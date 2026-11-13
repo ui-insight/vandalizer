@@ -68,6 +68,7 @@ from app.services.citation_grounding import ground_citation, normalize_citation_
 from app.services.approval_claims import announces_unfinished_action, unprepared_card_note, unrun_approval_note
 from app.services.page_authoring import declares_page_too_large, requests_page
 from app.services.chat_output import public_chat_text
+from app.services.hidden_drafts import had_hidden_retry, without_draft_corrections, without_refuted_figures
 from app.services.chat_budget_tables import reconcile_budget_tables
 from app.services.chat_source_claims import attachment_sources, ground_source_checks
 from app.services.chat_spreadsheet_figures import spreadsheet_figures_note
@@ -2975,6 +2976,11 @@ async def chat_stream(
                     attachment_sources(documents, file_attachments, compacted.documents, compacted.attachments),
                     streamed_tool_results,
                 ))
+                # A draft sent back by an output validator was never shown:
+                # "My earlier figures were wrong… $304,000 (not $253,000)"
+                # describes a reply the user never saw (support ticket).
+                if had_hidden_retry(agent_run.result.new_messages()):
+                    answer = without_draft_corrections(answer)
                 # "Mentioned in the document" is not "compliant", and a
                 # threshold the 2024 Uniform Guidance replaced is not current.
                 answer = relabel_presence_checks(answer, streamed_tool_results)
@@ -3142,7 +3148,7 @@ async def chat_stream(
                 # same label (support ticket: flagged once, then all 16
                 # figures, then none).
                 unsupported, calculated = (
-                    check_figures(assistant_message, "\n".join(
+                    check_figures(without_refuted_figures(assistant_message), "\n".join(
                         workspace_sources
                         + [tool_output_as_source(t) for name, t in named_outputs if name != "calculate"]
                     ))
