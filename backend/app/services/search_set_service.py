@@ -53,12 +53,15 @@ async def create_search_set(
 
     # Same reasoning as create_workflow: extraction sets are listed only through
     # library bookmarks, and LibraryTab made the bookmark in a second request
-    # guarded on a personal library being loaded.
+    # guarded on a personal library being loaded. A new set goes in the
+    # creator's personal library even when stamped with their current team:
+    # it reaches the team's library only when its owner shares it (support
+    # ticket: a new Skill appeared in teammates' Team tab unshared).
     from app.models.library import LibraryItemKind
     from app.services import library_service
 
     await library_service.ensure_bookmark(
-        library_service._persisted_id(ss), LibraryItemKind.SEARCH_SET, user_id, team_id=team_id,
+        library_service._persisted_id(ss), LibraryItemKind.SEARCH_SET, user_id,
     )
     return ss
 

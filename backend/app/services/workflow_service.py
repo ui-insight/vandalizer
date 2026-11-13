@@ -85,11 +85,14 @@ async def create_workflow(name: str, user_id: str, description: str | None = Non
     # happens to be loaded, and useWorkflows.create never made it at all — so a
     # workflow created through that hook was born invisible while still holding
     # its name against name_conflicts, which is the whole defect.
+    #
+    # The bookmark is personal even when the workflow carries the creator's
+    # current team: a new workflow reaches the team's library only when its
+    # owner shares it (support ticket: new items showed up in teammates' Team
+    # tab without being shared).
     from app.services import library_service
 
-    await library_service.ensure_bookmark(
-        wf.id, LibraryItemKind.WORKFLOW, user_id, team_id=team_id,
-    )
+    await library_service.ensure_bookmark(wf.id, LibraryItemKind.WORKFLOW, user_id)
     return wf
 
 
