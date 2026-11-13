@@ -62,16 +62,58 @@ def _table_rows(text: str) -> list[list[str]] | None:
     return [_split_cells(ln) for ln in lines if not _MD_SEPARATOR.fullmatch(ln)]
 
 
-def _cell_date(cell: str) -> datetime.date | None:
-    from app.services.obligation_service import _DATE_IN_TEXT, _dates_in
+# A remark in brackets after a period date: "July 14, 2028 (18 months)".
+_DATE_REMARK = re.compile(r"\s*\((?P<remark>[^()]*)\)\s*$")
 
-    match = _DATE_IN_TEXT.fullmatch(cell.strip().rstrip("."))
-    if not match:
-        return None
-    year, month, day = next(iter(_dates_in(match.group())))
+
+def _as_date(text: str) -> datetime.date:
+    from app.services.obligation_service import _dates_in
+
+    year, month, day = next(iter(_dates_in(text)))
     if year is None:
         raise ValueError("period dates must include their years")
     return datetime.date(year, month, day)
+
+
+def _cell_date(cell: str) -> datetime.date | None:
+    """The date a cell holds, alone or with a bracketed remark after it.
+
+    Support ticket: an End Date cell reading "July 14, 2028 (18 months)" was
+    not read as a date, so every deadline counted from it was refused. Any
+    other words after the date still don't count: "Aug 31, 2027 or upon
+    termination" is not a plain End Date.
+    """
+    from app.services.obligation_service import _DATE_IN_TEXT
+
+    text = cell.strip().rstrip(".")
+    remark = _DATE_REMARK.search(text)
+    if remark and not _DATE_IN_TEXT.search(remark["remark"]):
+        text = text[:remark.start()].rstrip().rstrip(".")
+    match = _DATE_IN_TEXT.fullmatch(text)
+    return _as_date(match.group()) if match else None
+
+
+def _merged_row_date(cells: list[str]) -> datetime.date | None:
+    """The one date in the rest of a row whose labels and values were merged.
+
+    Support ticket: the stored text of a NIFA subaward ran two table rows
+    together, "End Date|Federal Funds Obligated|August 31, 2027 (18 months)
+    $95,550", so the cell beside End Date was another label. Read only when
+    the rest of the row names no other Start or End Date and holds exactly one
+    date; anything else stays unresolved.
+    """
+    from app.services.obligation_service import _DATE_IN_TEXT
+
+    if any(p.search(c) for c in cells for p in _TABLE_LABELS.values()):
+        return None
+    # The cell beside the label must be another label, not a value: a date
+    # with other words after it ("Aug 31, 2027 or upon termination") stays
+    # unreadable rather than being taken from its own cell here.
+    beside = next((c for c in cells if c), "")
+    if _DATE_IN_TEXT.search(beside):
+        return None
+    dates = [m.group() for c in cells for m in _DATE_IN_TEXT.finditer(c)]
+    return _as_date(dates[0]) if len(dates) == 1 else None
 
 
 def _labeled_dates(rows: list[list[str]], label: re.Pattern) -> set[datetime.date]:
@@ -95,7 +137,12 @@ def _labeled_dates(rows: list[list[str]], label: re.Pattern) -> set[datetime.dat
             # the rows line up, so a quote cut mid-row can't shift a column.
             below = rows[r + 1:]
             if below and all(len(b) == len(row) for b in below):
-                found.update(d for b in below if (d := _cell_date(b[c])))
+                column = {d for b in below if (d := _cell_date(b[c]))}
+                if column:
+                    found.update(column)
+                    continue
+            if (merged := _merged_row_date(row[c + 1:])) is not None:
+                found.add(merged)
     return found
 
 
@@ -241,6 +288,19 @@ def calculate_deadlines(sources: list[ObligationSource]) -> list[dict]:
             raise ValueError("the rule must specify before or after the performance-period end")
         anchors = [end]
         anchor_kind = "performance_period_end"
+    elif re.fullmatch(
+        # "within 30 days after the Start Date". Support ticket: deadlines
+        # counted from a subaward table's Start Date were all refused.
+        r"(?:the\s+)?(?:start\s+of\s+(?:the\s+)?(?:period\s+of\s+performance|performance\s+period)"
+        r"|(?:(?:sub)?award\s+|project\s+)?(?:start|begin(?:ning)?|effective)\s+date(?:\s+of\s+(?:this|the)\s+(?:sub)?award)?)",
+        tail, re.I,
+    ):
+        if direction == "of":
+            raise ValueError("the rule must specify before or after the performance-period start")
+        if start is None:
+            raise ValueError("the period quote must give the Start Date this rule counts from")
+        anchors = [start]
+        anchor_kind = "performance_period_start"
     else:
         # Fixed annual dates are bounded by the quoted performance period.
         # Require the entire tail to be dates and separators, not an unparsed

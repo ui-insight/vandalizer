@@ -393,11 +393,35 @@ def _document_span(text: str, quote: str, role: str) -> Optional[str]:
     norm_quote, _ = normalize_with_map(_blank_markup(quote))
     i = norm_doc.find(norm_quote) if norm_quote else -1
     if i == -1:
-        return None
+        return _row_holding(text, quote) if role in _PERIOD_ROLES else None
     start, end = index_map[i], index_map[i + len(norm_quote) - 1] + 1
     if role in _PERIOD_ROLES:
         start, end = _whole_rows(text, start, end)
     return text[start:end].strip()
+
+
+def _row_holding(text: str, quote: str) -> Optional[str]:
+    """The one table row whose cells hold a period quote's words, in order.
+
+    Support ticket: a NIFA subaward's stored text ran two rows together,
+    "End Date|Federal Funds Obligated|August 31, 2027 (18 months) $95,550".
+    A model quoting "End Date August 31, 2027" skips the other label, so the
+    quote wasn't found and both final reports were refused. Only a single row
+    (a line of pipe- or tab-separated cells) that contains every word of the
+    quote in order counts, and the document's row is what gets stored and
+    read for dates, never the model's wording.
+    """
+    words = re.findall(r"[a-z0-9]+", plain_quote(quote).lower())
+    if len(words) < 3:
+        return None
+    rows = set()
+    for line in text.splitlines():
+        if "|" not in line and "\t" not in line:
+            continue
+        cells = iter(re.findall(r"[a-z0-9]+", plain_quote(line.replace("|", " ")).lower()))
+        if all(word in cells for word in words):
+            rows.add(line.strip())
+    return rows.pop() if len(rows) == 1 else None
 
 
 def _whole_rows(text: str, start: int, end: int) -> tuple[int, int]:
