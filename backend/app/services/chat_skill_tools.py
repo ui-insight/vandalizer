@@ -158,6 +158,10 @@ async def select_skill(
                                   preview=preview, stash={"skill": snapshot})
     if pending is not None:
         return pending
+    if selected is not None:
+        # The approval card showed these exact instructions, so approving it
+        # accepts them, as the review dialog does for a shared Skill.
+        await skill_service.accept_skill(context.deps.user, selected)
     await conversation.set({"active_skill": snapshot, "last_context_tokens": 0, "last_context_message_count": -1})
     # Keep the live typed model in sync for dynamic instructions and message provenance.
     conversation.active_skill = selected

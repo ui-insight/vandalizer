@@ -19,6 +19,14 @@ def snapshot(title="Review", **overrides):
                             "instructions": "NEW_REVIEW_GUIDANCE", **overrides})
 
 
+@pytest.fixture(autouse=True)
+def accepted(monkeypatch):
+    """Approving select_skill's card accepts the Skill; the write is stubbed here."""
+    accept = AsyncMock()
+    monkeypatch.setattr(skill_service, "accept_skill", accept)
+    return accept
+
+
 def conversation():
     return SimpleNamespace(user_id="user1", active_skill=snapshot(instructions="OLD_GUIDANCE"),
                            pending_confirmations=[], save=AsyncMock(), set=AsyncMock())
@@ -81,7 +89,7 @@ async def test_inspection_does_not_select_and_reports_inaccessible_skills():
 
 
 @pytest.mark.asyncio
-async def test_selection_requires_prior_turn_and_pins_exact_preview_despite_library_edits():
+async def test_selection_requires_prior_turn_and_pins_exact_preview_despite_library_edits(accepted):
     conv = conversation()
     ctx = _make_context(conversation=conv, turn_marker=5)
     with patch.object(skill_service, "snapshot_skill", AsyncMock(return_value=snapshot())) as read, \
@@ -98,6 +106,8 @@ async def test_selection_requires_prior_turn_and_pins_exact_preview_despite_libr
     assert selected["active_skill"] == snapshot().model_dump()
     assert conv.active_skill == snapshot()
     assert conv.set.await_args.args[0]["active_skill"]["version"] == "v1"
+    # The card showed v1's instructions, so v1 (not the unreviewed v2) is accepted.
+    accepted.assert_awaited_once_with(ctx.deps.user, snapshot())
 
 
 @pytest.mark.asyncio

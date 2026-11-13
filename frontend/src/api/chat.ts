@@ -287,8 +287,20 @@ export function getChatActivity(conversationUuid: string) {
   return apiFetch<ChatActivityLog>(`/api/chat/history/${encodeURIComponent(conversationUuid)}/activity`)
 }
 
+/** A Skill's current text; needs_review when it was shared with the user (or
+ * edited since they accepted it) and must be accepted before chat uses it. */
+export type SkillPreview = SkillSnapshot & { needs_review?: boolean }
+
 export function previewSkill(skillUuid: string) {
-  return apiFetch<SkillSnapshot>(`/api/chat/skills/${encodeURIComponent(skillUuid)}`)
+  return apiFetch<SkillPreview>(`/api/chat/skills/${encodeURIComponent(skillUuid)}`)
+}
+
+/** Accept a shared Skill's instructions at the version the user was shown. */
+export function acceptSkill(skillUuid: string, version: string) {
+  return apiFetch<SkillPreview>(`/api/chat/skills/${encodeURIComponent(skillUuid)}/accept`, {
+    method: 'POST',
+    body: JSON.stringify({ version }),
+  })
 }
 
 export function selectConversationSkill(conversationUuid: string, skillUuid: string | null) {

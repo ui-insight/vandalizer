@@ -61,14 +61,95 @@ async def snapshot_skill(skill_uuid: str, user: User) -> SkillSnapshot:
     return _snapshot(skill, await skill.get_items())
 
 
+# ── Reviewing shared Skills ─────────────────────────────────────────────────
+# Suggestion ticket: a Skill shared with the team started in a teammate's
+# chat without them ever seeing its instructions, and chat followed them as
+# written. A Skill someone else wrote is now used in a person's chats only at
+# a version they read and accepted; an edit asks them again. Their own Skills
+# need no review. (Core Skills keep their own accepted version on the core
+# list; chat's select_skill card shows the instructions, so approving it is
+# accepting them.)
+
+MAX_ACCEPTED_SKILLS = 500
+
+REVIEW_REQUIRED = "skill_review_required"
+
+
+def _is_own(skill: SearchSet, user: User) -> bool:
+    return bool(skill.user_id) and skill.user_id == user.user_id
+
+
+def _accepted(user: User, snapshot: SkillSnapshot) -> bool:
+    entries = getattr(user, "accepted_skills", None)
+    if not isinstance(entries, list):
+        return False
+    return any(
+        isinstance(entry, dict) and entry.get("uuid") == snapshot.uuid and entry.get("version") == snapshot.version
+        for entry in entries
+    )
+
+
+def needs_review(skill: SearchSet, user: User, snapshot: SkillSnapshot) -> bool:
+    """Whether *user* must read and accept this text before chat uses it."""
+    return not _is_own(skill, user) and not _accepted(user, snapshot)
+
+
+def review_required_error(snapshot: SkillSnapshot, *, pinned: bool = False) -> HTTPException:
+    then = (" Remove it from this chat and select it again to review its instructions." if pinned else "")
+    return HTTPException(status_code=409, detail={
+        "code": REVIEW_REQUIRED,
+        "message": f'Review and accept the instructions of "{snapshot.title}" before using it. '
+                   "It was shared with you, or edited since you accepted it." + then,
+        "skill_uuid": snapshot.uuid,
+    })
+
+
+async def skill_for_review(skill_uuid: str, user: User) -> tuple[SkillSnapshot, bool]:
+    """The Skill's current text, and whether the person must accept it first."""
+    skill = await authorize_skill(skill_uuid, user)
+    snapshot = _snapshot(skill, await skill.get_items())
+    return snapshot, needs_review(skill, user, snapshot)
+
+
+async def usable_skill(skill_uuid: str, user: User) -> SkillSnapshot:
+    """The Skill's current text, refused until the person has accepted it."""
+    snapshot, review = await skill_for_review(skill_uuid, user)
+    if review:
+        raise review_required_error(snapshot)
+    return snapshot
+
+
+async def require_reviewed(snapshot: SkillSnapshot, user: User) -> None:
+    """A pinned version is used only if it is the person's own Skill or they accepted it."""
+    skill = await authorize_skill(snapshot.uuid, user)
+    if needs_review(skill, user, snapshot):
+        raise review_required_error(snapshot, pinned=True)
+
+
+async def accept_skill(user: User, snapshot: SkillSnapshot) -> None:
+    """Record that the person read and accepted this exact text."""
+    if _accepted(user, snapshot):
+        return
+    entry = {"uuid": snapshot.uuid, "version": snapshot.version}
+    await _users().update_one(
+        {"_id": user.id},
+        {"$push": {"accepted_skills": {"$each": [entry], "$slice": -MAX_ACCEPTED_SKILLS}}},
+    )
+    accepted = getattr(user, "accepted_skills", None)
+    user.accepted_skills = [*(accepted if isinstance(accepted, list) else []), entry][-MAX_ACCEPTED_SKILLS:]
+
+
 async def resolve_active_skill(user: User, current: SkillSnapshot | None, requested_uuid: str | None = None, *, explicit: bool = False) -> SkillSnapshot | None:
-    """Omitted selection retains the pin; explicit null removes it."""
+    """Omitted selection retains the pin; explicit null removes it.
+
+    Either way the Skill must be the person's own or a version they accepted.
+    """
     if explicit and requested_uuid is None:
         return None
     if explicit and requested_uuid is not None and (current is None or current.uuid != requested_uuid):
-        return await snapshot_skill(requested_uuid, user)
+        return await usable_skill(requested_uuid, user)
     if current is not None:
-        await authorize_skill(current.uuid, user)
+        await require_reviewed(current, user)
     return current
 
 
