@@ -266,3 +266,21 @@ def test_batch_processing_steps_are_plain_and_name_no_internal_checks():
     assert notice_id not in {n['id'] for n in corrections.module_notices_for(None, 'batch_processing', description)}
     # ...while learners pinned to the frozen course keep it.
     assert notice_id in {n['id'] for n in corrections.module_notices_for(package.manifest_sha256, 'batch_processing')}
+
+
+def test_the_batch_lesson_retries_the_whole_batch_for_the_course_check():
+    """#1154 grades the most recent finished batch of 3+ documents, so the
+    lesson can't tell learners to rerun only the failed document (review of
+    #1155)."""
+    lesson_id = 'batch_processing.run-your-first-batch'
+    current = json.loads((corrections.SOURCE.parent / 'lessons.json').read_text())
+    body = next(l['content'] for l in current['batch_processing']['lessons'] if l['id'] == lesson_id)
+    assert 'select only the affected document' not in body
+    assert 'run all three documents again as one batch' in body
+
+    notice_id = 'batch_processing-lab-controls-2026-10-09.1'
+    # Its "use only affected inputs" advice no longer reaches the current lesson...
+    assert notice_id not in {n['id'] for n in corrections.notices_for(None, lesson_id, body)}
+    # ...while learners pinned to the frozen course keep it.
+    package = CourseCatalog().load(VERSION, preview=True)
+    assert notice_id in {n['id'] for n in corrections.notices_for(package.manifest_sha256, lesson_id)}
