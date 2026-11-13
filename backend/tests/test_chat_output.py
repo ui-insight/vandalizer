@@ -54,28 +54,103 @@ def test_user_facing_answers_are_unchanged(answer):
     assert public_chat_text(answer) == answer
 
 
+TICKET_BLOB = 'Version:1.1:{"model":"openai/gpt-oss-120b","name":"VandalAI"}'
+
+
 @pytest.mark.parametrize("blob", [
-    'Version:1.1:{"model":"openai/gpt-oss-120b","name":"VandalAI"}',
+    TICKET_BLOB,
     'Version:1.1:{“model”:”openai/gpt-oss-120b”,”name”:”VandalAI”}',  # as the ticket quoted it
-    "Version: 2.0: {\"model\": \"x\"}",
-    "Version:1.1:",
+    'Version: 2.0: {"model": "x"}',
+    'Version:1.1:{"model":"openai/gpt-oss-120b","meta":{"name":"VandalAI"}}',
+    'Version:1.1:\n{"model":"openai/gpt-oss-120b"}',
 ])
 def test_leaked_model_metadata_is_removed(blob):
     """Support ticket: "…let me retry with different evidence phrasing.Version:1.1:{…}"."""
     answer = "The 3 reporting deadlines were added to the RA inbox."
     assert public_chat_text(answer + blob) == answer
     assert public_chat_text(answer + " " + blob + "\n\nNext steps follow.") == answer + "\n\nNext steps follow."
-    narrated = "The first proposal couldn't be verified, so let me retry with different evidence phrasing." + blob
-    assert public_chat_text(narrated + "\n\n" + answer) == answer
-    assert "gpt-oss" not in public_chat_text(narrated)
+    assert public_chat_text("Before " + blob + " after.") == "Before after."
+    assert public_chat_text(blob + "\n\n" + answer) == answer
 
 
-@pytest.mark.parametrize("answer", [
-    "You can retry the upload once the file is under 50 MB.",
-    "The sponsor's template (Version 1.1: March 2026) is attached.",
+def test_bare_model_object_paragraph_is_removed():
+    answer = "The 3 reporting deadlines were added to the RA inbox."
+    assert public_chat_text(answer + '\n\n{"model":"openai/gpt-oss-120b","name":"VandalAI"}') == answer
+
+
+def test_ticket_reply_keeps_the_answer_it_narrates_beside():
+    """The ticket's shape: answer and retry narration in one paragraph, then the header.
+
+    The narration stays visible rather than risk deleting the answer with it.
+    """
+    reply = (
+        "I added 3 deadlines to the RA inbox. The fourth could not be verified, "
+        "so let me retry with different evidence phrasing."
+    )
+    assert public_chat_text(reply + TICKET_BLOB) == reply
+    assert public_chat_text(reply) == reply
+    assert public_chat_text("Let me try again: the rate is 52.5%.") == "Let me try again: the rate is 52.5%."
+
+
+@pytest.mark.parametrize("narration", [
+    "Let me retry with different evidence phrasing.",
+    "OK, let me try again.",
+    "let me retry",
 ])
-def test_ordinary_mentions_of_retry_and_versions_are_kept(answer):
+def test_paragraph_of_only_retry_narration_is_removed(narration):
+    answer = "The rate is 52.5%."
+    assert public_chat_text(narration + "\n\n" + answer) == answer
+    assert public_chat_text(answer + "\n\n" + narration) == answer
+
+
+CODE = (
+    "```python\n"
+    "# let me retry the request\n"
+    'messages = [{"role": "user", "content": "retry"}]\n'
+    "\n"
+    "    tool_call = None\n"
+    "\n"
+    '{"model": "openai/gpt-oss-120b"}\n'
+    'Version:1.1:{"model":"x"}\n'
+    "```"
+)
+
+NORMAL_REPLIES = [
+    "The indirect cost rate is 52.5% of MTDC.",
+    "The award is $1.5 million over five years; Year 1 is $304,000.50.",
+    "Some costs, e.g. equipment, are excluded.",
+    "Indirect costs are governed by 2 C.F.R. 200.414.",
+    "See https://www.ecfr.gov/current/title-2/section-200.414#p-200.414(f) for details.",
+    "## Deadlines\n\n| Report | Due |\n| --- | --- |\n| Annual | May 1 |\n\nSee (Award.pdf, p. 3).",
+    "1. First item\n   continued on an indented line\n2. Second item\n\n- Bullet\n  - Nested bullet",
+    "Here is the request:\n\n" + CODE + "\n\nRun it once.",
+    CODE,
+    "Version 1.1: March 2026",
+    "The template (Version: 1.1: March 2026) is attached.",
+    "Model Version: 2: approved by sponsor.",
+    "version:12:30 deadline",
+    "- Version:2: report due Jan 5",
+    'The reply ended with `Version:1.1:{"model":"openai/gpt-oss-120b","name":"VandalAI"}`.',
+    "You can retry the upload once the file is under 50 MB.",
+    "Summary\n\n\n    Indented continuation after extra blank lines.",
+]
+
+
+@pytest.mark.parametrize("answer", NORMAL_REPLIES)
+def test_normal_replies_come_back_byte_identical(answer):
     assert public_chat_text(answer) == answer
+
+
+@pytest.mark.parametrize("answer", NORMAL_REPLIES)
+@pytest.mark.parametrize("noise", [
+    TICKET_BLOB,
+    "Let me retry with different evidence phrasing.",
+    '{"model":"openai/gpt-oss-120b","name":"VandalAI"}',
+])
+def test_removing_a_leak_never_changes_the_text_beside_it(answer, noise):
+    assert public_chat_text(noise + "\n\n" + answer) == answer
+    assert public_chat_text(answer + "\n\n" + noise) == answer
+    assert public_chat_text(answer + "\n\n" + noise + "\n\n" + answer) == answer + "\n\n" + answer
 
 
 @pytest.fixture
