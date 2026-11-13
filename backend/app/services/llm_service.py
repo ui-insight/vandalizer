@@ -1260,6 +1260,8 @@ def create_agentic_chat_agent(
         # "Click the Create workflow button" with no tool call leaves the user
         # hunting for a card that never rendered, and "Running a preview of…"
         # with no tool call leaves the chat stopped; send either reply back once.
+        # Every check below sends a finished draft back; the user never saw it.
+        from app.services.hidden_drafts import unseen_draft_retry
         from app.services.approval_claims import (
             require_announced_action,
             require_approval_card,
@@ -1271,36 +1273,36 @@ def create_agentic_chat_agent(
             require_honest_validation,
             require_learner_route,
         )
-        agent.output_validator(require_approval_card)
-        agent.output_validator(require_announced_action)
+        agent.output_validator(unseen_draft_retry(require_approval_card))
+        agent.output_validator(unseen_draft_retry(require_announced_action))
         # "Validated" for a knowledge base no one validated (no chat tool can).
-        agent.output_validator(require_honest_validation)
+        agent.output_validator(unseen_draft_retry(require_honest_validation))
         # Instructions for a node the editor does not offer (Code, Browser Automation…).
-        agent.output_validator(require_available_nodes)
+        agent.output_validator(unseen_draft_retry(require_available_nodes))
         # Approve/share requests for course work must name the learner's real route.
-        agent.output_validator(require_learner_route)
+        agent.output_validator(unseen_draft_retry(require_learner_route))
         # A course-entry message must be answered from the learner's enrollment.
-        agent.output_validator(require_course_read)
+        agent.output_validator(unseen_draft_retry(require_course_read))
         # Skipping to a module's exercise with lessons unread, unasked.
-        agent.output_validator(require_lessons_in_order)
+        agent.output_validator(unseen_draft_retry(require_lessons_in_order))
         # A module the learner chose ("from 1 AI Literacy") that wasn't opened.
-        agent.output_validator(require_chosen_module)
+        agent.output_validator(unseen_draft_retry(require_chosen_module))
         # A summary of the lesson card it sits under, which can reverse it.
-        agent.output_validator(require_lesson_not_restated)
+        agent.output_validator(unseen_draft_retry(require_lesson_not_restated))
         # Totals and differences about a document worked out in the model's
         # head (budget ticket): redo them with the calculate tool.
         from app.services.calculation_claims import require_calculated_figures
-        agent.output_validator(require_calculated_figures)
+        agent.output_validator(unseen_draft_retry(require_calculated_figures))
         # One year's figure shown for another, or years that don't add up to
         # the total beside them (budget summary ticket): every number is in
         # the file, so only a check by row and year catches it.
         from app.services.chat_spreadsheet_figures import require_spreadsheet_figures
-        agent.output_validator(require_spreadsheet_figures)
+        agent.output_validator(unseen_draft_retry(require_spreadsheet_figures))
         # "All steps completed / saved" while this reply's approval cards wait.
         from app.services.approval_claims import require_approved_action_ran, require_honest_completion
-        agent.output_validator(require_honest_completion)
+        agent.output_validator(unseen_draft_retry(require_honest_completion))
         # An approved card whose action the reply never carried out.
-        agent.output_validator(require_approved_action_ran)
+        agent.output_validator(unseen_draft_retry(require_approved_action_ran))
         _agentic_chat_agent_cache[cache_key] = agent
 
     return _agentic_chat_agent_cache[cache_key]
