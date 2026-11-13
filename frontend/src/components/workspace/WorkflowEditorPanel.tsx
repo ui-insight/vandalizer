@@ -257,7 +257,7 @@ export function WorkflowEditorPanel() {
   const { user } = useAuth()
   const shareLink = useShareLink()
   const confirm = useConfirm()
-  const { openWorkflowId, workflowOpenSignal, openWorkflowShareToken, openWorkflow, closeWorkflow, consumeWorkflowSession, selectedDocUuids, bumpActivitySignal, activeProjectUuid } = useWorkspace()
+  const { openWorkflowId, workflowOpenSignal, openWorkflowShareToken, openWorkflow, closeWorkflow, consumeWorkflowSession, selectedDocUuids, selectedFolderUuids, bumpActivitySignal, activeProjectUuid } = useWorkspace()
   const [workflow, setWorkflow] = useState<Workflow | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -625,6 +625,7 @@ export function WorkflowEditorPanel() {
   const runInput = describeRunInput({
     triggerType: workflow?.input_config?.trigger_type as string | undefined,
     selectedCount: selectedDocUuids.length,
+    selectedFolderCount: selectedFolderUuids.length,
     fixedCount: fixedDocCount,
     hasProject: !!activeProjectUuid,
     textInput,
@@ -652,9 +653,13 @@ export function WorkflowEditorPanel() {
     // system default. The engine applies it to steps without their own model.
     const runModel = (workflow?.input_config?.default_model as string) || undefined
 
-    const startRun = (uuids: string[], batch: boolean) => useProjectContext && activeProjectUuid
-      ? runner.start(openWorkflowId, uuids, runModel, batch, activeProjectUuid)
-      : runner.start(openWorkflowId, uuids, runModel, batch)
+    // Ticked folders go to the server, which runs on the documents inside
+    // them (subfolders included), as "Run workflow on folder" and chat do.
+    const startRun = (uuids: string[], batch: boolean) => runner.start(
+      openWorkflowId, uuids, runModel, batch,
+      useProjectContext && activeProjectUuid ? activeProjectUuid : undefined,
+      runFolderUuids(workflow?.input_config?.trigger_type as string | undefined, selectedFolderUuids),
+    )
     try {
       if (isNoInput) {
         // Run with no documents and no text — the steps generate/fetch their
@@ -675,7 +680,7 @@ export function WorkflowEditorPanel() {
         // failing that, the fixed documents alone (the run loader merges them
         // in, so an empty explicit selection is a valid run).
         let uuids = selectedDocUuids
-        if (uuids.length === 0) {
+        if (uuids.length === 0 && selectedFolderUuids.length === 0) {
           if (activeProjectUuid) {
             uuids = (await getProjectDocuments(activeProjectUuid)).document_uuids
             if (uuids.length === 0 && fixedDocCount === 0) {
@@ -1031,6 +1036,7 @@ export function WorkflowEditorPanel() {
             <DesignCanvas
               workflow={workflow}
               selectedDocCount={selectedDocUuids.length}
+              selectedFolderCount={selectedFolderUuids.length}
               runnerStatus={runner.status}
               runnerRunning={runner.running}
               runnerSessionId={runner.sessionId}
@@ -1244,15 +1250,18 @@ export function WorkflowEditorPanel() {
                 resize: 'vertical', boxSizing: 'border-box',
               }}
             />
-            {selectedDocUuids.length > 0 && (
+            {(selectedDocUuids.length > 0 || selectedFolderUuids.length > 0) && (
               <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-6)', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)' }}>
                 <FileText style={{ width: 12, height: 12 }} />
-                + {selectedDocUuids.length} document{selectedDocUuids.length !== 1 ? 's' : ''} selected
+                {/* Ticked folders' documents are sent with the text too. */}
+                + {selectedFolderUuids.length > 0
+                  ? describeSelectionCount(selectedDocUuids.length, selectedFolderUuids.length)
+                  : `${selectedDocUuids.length} document${selectedDocUuids.length !== 1 ? 's' : ''} selected`}
               </div>
             )}
           </div>
         ) : (
-          selectedDocUuids.length > 1 && (
+          (selectedDocUuids.length > 1 || selectedFolderUuids.length > 0) && (
             <label style={{
               display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-12)',
               fontSize: 'var(--workspace-font-control)', color: '#374151', cursor: 'pointer', userSelect: 'none',
@@ -1263,7 +1272,7 @@ export function WorkflowEditorPanel() {
                 onChange={e => setBatchMode(e.target.checked)}
                 style={{ accentColor: 'var(--highlight-color, #eab308)' }}
               />
-              Run per document ({selectedDocUuids.length} runs)
+              {selectedFolderUuids.length > 0 ? 'Run per document (one run for each document in the selection)' : `Run per document (${selectedDocUuids.length} runs)`}
             </label>
           )
         )}
@@ -1528,6 +1537,7 @@ function PanelHeader({ title, onClose }: { title: string; onClose: () => void })
 function DesignCanvas({
   workflow,
   selectedDocCount,
+  selectedFolderCount,
   runnerStatus,
   runnerRunning,
   runnerSessionId,
@@ -1549,6 +1559,7 @@ function DesignCanvas({
   restoredSinceRun?: boolean
   workflow: Workflow
   selectedDocCount: number
+  selectedFolderCount: number
   runnerStatus: WorkflowStatus | null
   runnerRunning: boolean
   runnerSessionId: string | null
@@ -1588,7 +1599,7 @@ function DesignCanvas({
       <div className="workflow-input-summary">
         <FileText size={16} aria-hidden="true" />
         <strong>{workflow.input_config?.trigger_type === 'no_input' ? 'Run directly' : workflow.input_config?.trigger_type === 'text_input' ? 'Text input' : 'Documents'}</strong>
-        <span>{workflow.input_config?.trigger_type === 'no_input' ? 'No input needed' : workflow.input_config?.trigger_type === 'text_input' ? 'Provided when you run' : `${selectedDocCount} selected · ${workflow.input_config?.fixed_documents?.length || 0} fixed`}</span>
+        <span>{workflow.input_config?.trigger_type === 'no_input' ? 'No input needed' : workflow.input_config?.trigger_type === 'text_input' ? 'Provided when you run' : `${describeSelectionCount(selectedDocCount, selectedFolderCount)} · ${workflow.input_config?.fixed_documents?.length || 0} fixed`}</span>
         <button type="button" onClick={onEditInput}>Configure</button>
       </div>
       <details className="workflow-model">
@@ -2683,13 +2694,22 @@ function ExtractionTagInput({ tags, onChange }: { tags: string[]; onChange: (tag
 export function describeRunInput(input: {
   triggerType: string | undefined
   selectedCount: number
+  /** Folders ticked in Files: the run uses the documents inside them. */
+  selectedFolderCount?: number
   fixedCount: number
   hasProject: boolean
   textInput: string
 }): { missing: boolean; hint: string | null } {
-  const { triggerType, selectedCount, fixedCount, hasProject, textInput } = input
+  const { triggerType, selectedCount, selectedFolderCount = 0, fixedCount, hasProject, textInput } = input
   if (triggerType === 'no_input') return { missing: false, hint: null }
   if (triggerType === 'text_input') return { missing: !textInput.trim(), hint: null }
+  // Ticked folders count as a selection, as they do in chat. They used to be
+  // ignored: Files said "2 selected", the workflow "0 selected", and Run
+  // stayed disabled with no reason given (support ticket).
+  if (selectedFolderCount > 0) {
+    const folders = selectedFolderCount === 1 ? 'the selected folder' : `the ${selectedFolderCount} selected folders`
+    return { missing: false, hint: `Will run on the documents in ${folders}, including subfolders` }
+  }
   if (selectedCount > 0) return { missing: false, hint: null }
   if (hasProject) return { missing: false, hint: 'Will run on all files in this project' }
   if (fixedCount > 0) {
@@ -2699,6 +2719,21 @@ export function describeRunInput(input: {
     }
   }
   return { missing: true, hint: 'Select a document to run this workflow' }
+}
+
+/** The folders ticked in Files that a run sends: every trigger that takes
+ * documents (a document run, or a text-input run, which takes documents
+ * alongside the text). A no-input run takes none. */
+export function runFolderUuids(triggerType: string | undefined, selectedFolderUuids: string[]): string[] {
+  return triggerType === 'no_input' ? [] : selectedFolderUuids
+}
+
+/** The Documents line's count: "2 selected", or "2 folders, 1 document selected". */
+export function describeSelectionCount(docCount: number, folderCount: number): string {
+  if (folderCount === 0) return `${docCount} selected`
+  const parts = [`${folderCount} folder${folderCount !== 1 ? 's' : ''}`]
+  if (docCount > 0) parts.push(`${docCount} document${docCount !== 1 ? 's' : ''}`)
+  return `${parts.join(', ')} selected`
 }
 
 /** Which document a Test Step result came from, shown under its heading. */
