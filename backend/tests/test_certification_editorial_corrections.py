@@ -16,6 +16,11 @@ from app.services.chat_tools import get_certification_lesson
 
 VERSION = 'legacy-2026-10-02.1'
 
+# Exercises rewritten as plain steps for the current course. Their
+# "Original exercise guidance and limits" notice describes the original
+# course's internal checks, so it is no longer shown with them.
+PLAIN_EXERCISES = {'batch_processing'}
+
 
 def test_corrections_are_bound_to_real_frozen_lessons_and_share_one_export():
     package = CourseCatalog().load(VERSION, preview=True)
@@ -218,9 +223,15 @@ async def test_current_exercise_editorial_changes_preserve_original_requirements
             assert chat.get('error') is None
             assert chat['instructions'] == current[module_id]['chat_instructions']
             assert chat['star_criteria'] == original[module_id]['star_criteria']
-            assert chat['editorial_notices'] == exercise['editorial_notices']
+            # get_exercise leaves the key out when nothing matches; chat sends [].
+            assert chat['editorial_notices'] == exercise.get('editorial_notices', [])
             notice_id = module_id + '-exercise-guidance-2026-10-09.1'
-            assert notice_id in {notice['id'] for notice in chat['editorial_notices']}
+            if module_id in PLAIN_EXERCISES:
+                # Rewritten in plain steps; the notice about the original
+                # checks stays with the frozen course only (support ticket).
+                assert notice_id not in {notice['id'] for notice in chat['editorial_notices']}
+            else:
+                assert notice_id in {notice['id'] for notice in chat['editorial_notices']}
             assert all(notice['identity_basis'] == 'preserved_module_description' for notice in chat['editorial_notices'])
             projected[module_id] = chat
     finally:
@@ -228,3 +239,30 @@ async def test_current_exercise_editorial_changes_preserve_original_requirements
     if path := os.environ.get('CERTIFICATION_CURRENT_EXERCISE_EXPORT'):
         Path(path).write_text(json.dumps({'course': {**package.summary(), **package.json('course-structure.json'), 'modules': modules},
             'exercises': current, 'tools': projected}, indent=2) + '\n')
+
+
+def test_batch_processing_steps_are_plain_and_name_no_internal_checks():
+    """Support ticket: the steps talked about how the course is checked
+    ("size thresholds of three, five and ten", "Original size-based stars")
+    instead of what to do."""
+    current = json.loads((corrections.SOURCE.parent / 'exercises.json').read_text())['batch_processing']
+    text = ' '.join([current['overview'], *current['instructions'], *current['chat_instructions']]).lower()
+    for phrase in ('threshold', 'counter', 'size-based stars', 'original', 'source identity', 'reconcile', 'aggregate terminal', 'teaching targets'):
+        assert phrase not in text, phrase
+    for steps in (current['instructions'], current['chat_instructions']):
+        assert len(steps) == 8 and all(len(step) <= 200 for step in steps)
+        assert 'Maria Lopez, Robert Kim and Amara Okafor' in steps[4]
+        # A retry must be a fresh batch of all three (PR #1154's grading reads
+        # the most recent batch of 3+), and the star batches are spelled out.
+        assert steps[5] == 'If a document failed, fix the problem and run all three again.'
+        assert '5 or more, or 10 or more' in steps[7]
+    assert '**Run per document (3 runs)**' in current['instructions'][2]
+
+    package = CourseCatalog().load(VERSION, preview=True)
+    notice_id = 'batch_processing-exercise-guidance-2026-10-09.1'
+    # The current course no longer shows it, by overview or by description...
+    assert notice_id not in {n['id'] for n in corrections.module_notices_for(None, 'batch_processing', current['overview'])}
+    description = next(m for m in public_modules(package) if m['id'] == 'batch_processing')['description']
+    assert notice_id not in {n['id'] for n in corrections.module_notices_for(None, 'batch_processing', description)}
+    # ...while learners pinned to the frozen course keep it.
+    assert notice_id in {n['id'] for n in corrections.module_notices_for(package.manifest_sha256, 'batch_processing')}
