@@ -410,9 +410,63 @@ describe('LibraryTab sidebar', () => {
   })
 
   it('does not snap shut while folders load for someone who has them', () => {
-    localStorage.setItem('library:hasFolders:personal', '1')
+    localStorage.setItem('library:hasFolders:personal:none', '1')
     mockFolders.loading = true
     const { container } = render(<LibraryTab />)
     expect(body(container).dataset.sidebar).toBe('expanded')
+  })
+
+  it('moves focus to the compact bar when deleting the last folder collapses the sidebar', () => {
+    mockFolders.current = [folder('Awards')]
+    const { container, rerender } = render(<LibraryTab />)
+    screen.getByRole('button', { name: 'Open folder Awards' }).focus()
+    mockFolders.current = []
+    rerender(<LibraryTab />)
+    expect(body(container).dataset.sidebar).toBe('collapsed')
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'View: All items · Change' }))
+  })
+
+  it('does not take focus when the sidebar collapses as folders first load', () => {
+    localStorage.setItem('library:hasFolders:personal:none', '1')
+    mockFolders.loading = true
+    const { container, rerender } = render(<LibraryTab />)
+    expect(body(container).dataset.sidebar).toBe('expanded')
+    mockFolders.loading = false
+    rerender(<LibraryTab />)
+    expect(body(container).dataset.sidebar).toBe('collapsed')
+    expect(document.activeElement).toBe(document.body)
+  })
+
+  it('closes the compact menu when a first folder expands the sidebar on a wide panel', () => {
+    // Stand-in for the wide-panel CSS: the compact bar is hidden while expanded.
+    const style = document.createElement('style')
+    style.textContent = '.library-body[data-sidebar="expanded"] .library-views-bar { display: none; }'
+    document.head.appendChild(style)
+    try {
+      const { container, rerender } = render(<LibraryTab />)
+      const sidebar = container.querySelector('#library-saved-views') as HTMLElement
+      fireEvent.click(screen.getByRole('button', { name: 'View: All items · Change' }))
+      expect(sidebar.dataset.open).toBe('true')
+      mockFolders.current = [folder('Awards')]
+      rerender(<LibraryTab />)
+      expect(body(container).dataset.sidebar).toBe('expanded')
+      expect(sidebar.dataset.open).toBe('false')
+    } finally {
+      style.remove()
+    }
+  })
+
+  it('renders and toggles when site storage is blocked', () => {
+    const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new DOMException('blocked', 'SecurityError') })
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new DOMException('blocked', 'SecurityError') })
+    try {
+      const { container } = render(<LibraryTab />)
+      expect(body(container).dataset.sidebar).toBe('collapsed')
+      fireEvent.click(screen.getByRole('button', { name: 'Show views and folders' }))
+      expect(body(container).dataset.sidebar).toBe('expanded')
+    } finally {
+      getItem.mockRestore()
+      setItem.mockRestore()
+    }
   })
 })

@@ -13,7 +13,7 @@ import { useLibraries, useLibraryItems } from '../../hooks/useLibrary'
 import { LibraryItemRow } from '../library/LibraryItemRow'
 import { ExploreTab } from '../library/ExploreTab'
 import { OrganizationHelp } from '../library/OrganizationHelp'
-import { useLibrarySidebar } from '../library/useLibrarySidebar'
+import { readStored, useLibrarySidebar, writeStored } from '../library/useLibrarySidebar'
 import { ShareWithTeamDialog } from '../library/ShareWithTeamDialog'
 import { useConfirm } from '../shared/useConfirm'
 
@@ -99,7 +99,7 @@ export function LibraryTab() {
   const SIDEBAR_MIN = 148
   const SIDEBAR_MAX = 420
   const [sidebarWidth, setSidebarWidth] = useState(() => {
-    const stored = Number(localStorage.getItem('library:sidebarWidth'))
+    const stored = Number(readStored('library:sidebarWidth'))
     return stored >= SIDEBAR_MIN && stored <= SIDEBAR_MAX ? stored : SIDEBAR_MIN
   })
   const [resizing, setResizing] = useState(false)
@@ -125,7 +125,7 @@ export function LibraryTab() {
     }
   }, [resizing])
   useEffect(() => {
-    localStorage.setItem('library:sidebarWidth', String(sidebarWidth))
+    writeStored('library:sidebarWidth', String(sidebarWidth))
   }, [sidebarWidth])
   const sidebarRef = useRef<HTMLDivElement>(null)
   const sidebarLeftRef = useRef(0)
@@ -134,18 +134,37 @@ export function LibraryTab() {
   const folderScope = scope === 'team' ? 'team' : 'personal'
   const { folders, loading: foldersLoading, error: foldersError, refresh: refreshFolders, create: createFolder, rename: renameFolder, remove: removeFolder, moveItems: moveFolderItems } = useLibraryFolders(folderScope, teamId)
   // Collapsible on wide panels; starts collapsed when this scope has no folders.
-  const sidebar = useLibrarySidebar({ scope: folderScope, folderCount: folders.length, loading: foldersLoading, error: !!foldersError })
+  const sidebar = useLibrarySidebar({ scope: folderScope, teamId, folderCount: folders.length, loading: foldersLoading, error: !!foldersError })
+  const viewsBarRef = useRef<HTMLDivElement>(null)
   const viewsToggleRef = useRef<HTMLButtonElement>(null)
   const sidebarExpandRef = useRef<HTMLButtonElement>(null)
   const sidebarCollapseRef = useRef<HTMLButtonElement>(null)
   // Keep focus on the control that toggled the sidebar, now in its new place.
   const focusAfterToggle = useRef<'expand' | 'collapse' | null>(null)
+  const previousSidebar = useRef({ collapsed: sidebar.collapsed, loading: foldersLoading })
   useEffect(() => {
+    const previous = previousSidebar.current
+    previousSidebar.current = { collapsed: sidebar.collapsed, loading: foldersLoading }
     const target = focusAfterToggle.current
     focusAfterToggle.current = null
-    if (target === 'expand') sidebarExpandRef.current?.focus()
-    else if (target === 'collapse') sidebarCollapseRef.current?.focus()
-  }, [sidebar.collapsed])
+    if (target === 'expand') { sidebarExpandRef.current?.focus(); return }
+    if (target === 'collapse') { sidebarCollapseRef.current?.focus(); return }
+    if (sidebar.collapsed === previous.collapsed) return
+    const isHidden = (element: Element | null) => !element || getComputedStyle(element).display === 'none'
+    if (!sidebar.collapsed) {
+      // Expanded on its own (a first folder): close a compact menu left open
+      // behind the now-hidden bar, so it doesn't reappear open on collapse.
+      if (isHidden(viewsBarRef.current)) setViewsMenuOpen(false)
+      return
+    }
+    // Collapsed on its own (the last folder deleted). If that hid or removed
+    // the focused control, move focus to the compact bar. Not on first load.
+    if (previous.loading || foldersLoading) return
+    const active = document.activeElement
+    const lost = !active || active === document.body
+      || (!!sidebarRef.current?.contains(active) && isHidden(sidebarRef.current))
+    if (lost) viewsToggleRef.current?.focus()
+  }, [sidebar.collapsed, foldersLoading])
   const collapseSidebar = (collapsed: boolean) => {
     setViewsMenuOpen(false)
     focusAfterToggle.current = collapsed ? 'expand' : 'collapse'
@@ -921,7 +940,7 @@ export function LibraryTab() {
       ) : (
       <div className="library-body" data-sidebar={sidebar.collapsed ? 'collapsed' : 'expanded'} style={{ display: 'flex', flex: '1 0 0', minHeight: 'min(240px, 100%)', overflow: 'hidden' }}>
         {/* The compact bar: on narrow panels, and on wide ones while the sidebar is collapsed. */}
-        <div className="library-views-bar">
+        <div ref={viewsBarRef} className="library-views-bar">
         <button ref={viewsToggleRef} type="button" className="library-views-toggle" aria-expanded={viewsMenuOpen} aria-controls="library-saved-views" onClick={() => setViewsMenuOpen(open => !open)}>{viewsMenuOpen ? 'Close views & folders' : `View: ${viewFilter === 'all' ? 'All items' : viewFilter === 'favorites' ? 'Favorites' : viewFilter === 'pinned' ? 'Pinned' : folders.find(folder => folder.uuid === selectedFolder)?.name || 'Folder'} · Change`}</button>
         <button ref={sidebarExpandRef} type="button" className="library-sidebar-expand" aria-label="Show views and folders" title="Show views and folders" aria-expanded={false} aria-controls="library-saved-views" onClick={() => collapseSidebar(false)}>
           <PanelLeftOpen aria-hidden="true" style={{ width: 16, height: 16 }} />

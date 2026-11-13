@@ -12,49 +12,51 @@ import { useCallback, useEffect, useState } from 'react'
  *   Team): collapsed with none, expanded with some. So creating a first
  *   folder expands it, and an error loading folders keeps it open so the
  *   Retry is visible.
- * - While folders load, the scope's last known state is used, so the
+ * - While folders load, the scope and team's last known state is used, so the
  *   sidebar doesn't open and then snap shut on every visit.
  */
 
 export type SidebarPreference = 'collapsed' | 'expanded'
 
 export const PREFERENCE_KEY = 'library:sidebar'
-export const hasFoldersKey = (scope: string) => `library:hasFolders:${scope}`
+// Folders are listed per scope and team, so the hint is too.
+export const hasFoldersKey = (scope: string, teamId?: string) => `library:hasFolders:${scope}:${teamId ?? 'none'}`
 
 // Storage can be unavailable (private windows, blocked site data): the
 // sidebar still works, it just isn't remembered.
-function read(key: string): string | null {
+export function readStored(key: string): string | null {
   try { return localStorage.getItem(key) } catch { return null }
 }
-function write(key: string, value: string) {
+export function writeStored(key: string, value: string) {
   try { localStorage.setItem(key, value) } catch { /* not remembered */ }
 }
 
 interface Folders {
   scope: string
+  teamId?: string
   folderCount: number
   loading: boolean
   error: boolean
 }
 
-export function useLibrarySidebar({ scope, folderCount, loading, error }: Folders) {
+export function useLibrarySidebar({ scope, teamId, folderCount, loading, error }: Folders) {
   const [preference, setPreference] = useState<SidebarPreference | null>(() => {
-    const stored = read(PREFERENCE_KEY)
+    const stored = readStored(PREFERENCE_KEY)
     return stored === 'collapsed' || stored === 'expanded' ? stored : null
   })
   const settled = !loading && !error
   useEffect(() => {
-    if (settled) write(hasFoldersKey(scope), folderCount > 0 ? '1' : '0')
-  }, [scope, settled, folderCount])
+    if (settled) writeStored(hasFoldersKey(scope, teamId), folderCount > 0 ? '1' : '0')
+  }, [scope, teamId, settled, folderCount])
 
   const automatic = error ? false
-    : loading ? read(hasFoldersKey(scope)) !== '1'
+    : loading ? readStored(hasFoldersKey(scope, teamId)) !== '1'
     : folderCount === 0
   const collapsed = preference ? preference === 'collapsed' : automatic
 
   const setCollapsed = useCallback((next: boolean) => {
     const value: SidebarPreference = next ? 'collapsed' : 'expanded'
-    write(PREFERENCE_KEY, value)
+    writeStored(PREFERENCE_KEY, value)
     setPreference(value)
   }, [])
 

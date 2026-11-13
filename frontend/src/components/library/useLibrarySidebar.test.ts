@@ -32,12 +32,13 @@ it('stays open when folders fail to load, so Retry is visible', () => {
   expect(renderHook(() => useLibrarySidebar({ ...settled, error: true })).result.current.collapsed).toBe(false)
 })
 
-it('uses each scope\'s last known folders while loading', () => {
-  renderHook(() => useLibrarySidebar({ ...settled, scope: 'team', folderCount: 2 }))
-  expect(localStorage.getItem(hasFoldersKey('team'))).toBe('1')
+it('uses each scope and team\'s last known folders while loading', () => {
+  renderHook(() => useLibrarySidebar({ ...settled, scope: 'team', teamId: 't1', folderCount: 2 }))
+  expect(localStorage.getItem(hasFoldersKey('team', 't1'))).toBe('1')
   const loading = { ...settled, loading: true }
-  expect(renderHook(() => useLibrarySidebar({ ...loading, scope: 'team' })).result.current.collapsed).toBe(false)
-  expect(renderHook(() => useLibrarySidebar({ ...loading, scope: 'personal' })).result.current.collapsed).toBe(true)
+  expect(renderHook(() => useLibrarySidebar({ ...loading, scope: 'team', teamId: 't1' })).result.current.collapsed).toBe(false)
+  expect(renderHook(() => useLibrarySidebar({ ...loading, scope: 'team', teamId: 't2' })).result.current.collapsed).toBe(true)
+  expect(renderHook(() => useLibrarySidebar({ ...loading, scope: 'personal', teamId: 't1' })).result.current.collapsed).toBe(true)
 })
 
 it('works when storage is unavailable', () => {
