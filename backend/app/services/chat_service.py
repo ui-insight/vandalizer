@@ -2988,9 +2988,10 @@ async def chat_stream(
                 # match the spreadsheet's own row and year, or years that don't
                 # add up to the total beside them. If the reply still has them,
                 # list them under it: each number is in the file somewhere, so
-                # the figure check below has nothing to flag.
+                # the figure check below has nothing to flag. Checked on the
+                # text the user sees, not the model's raw output.
                 if answer:
-                    answer += spreadsheet_figures_note(agent_run.result.output, [
+                    answer += spreadsheet_figures_note(answer, [
                         *(getattr(d, "raw_text", None) or "" for d in documents or []),
                         *(a.content or "" for a in file_attachments),
                     ])

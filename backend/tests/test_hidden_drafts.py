@@ -59,31 +59,66 @@ def test_draft_corrections_are_removed_and_the_answer_kept():
     ("Year 1 is $304,000, not $253,000.", "Year 1 is $304,000."),
     ("Year 1 is $304,000 instead of $253,000; Year 2 is $240,000.", "Year 1 is $304,000; Year 2 is $240,000."),
     ("Apologies for the confusion. Year 1 is $304,000.", "Year 1 is $304,000."),
-    ("| Year | Total |\n| --- | --- |\n| 1 | $304,000 (previously $253,000) |",
+    ("Year 1 is $304,000. Sorry for the confusion.\n", "Year 1 is $304,000.\n"),
+    ("- My earlier figures were off. Y1 is $304,000.\n- Y2 is $240,000.", "- Y1 is $304,000.\n- Y2 is $240,000."),
+    ("Here are the corrected figures:\n\n| Year | Total |\n| --- | --- |\n| 1 | $304,000 (not $253,000) |",
      "| Year | Total |\n| --- | --- |\n| 1 | $304,000 |"),
 ])
 def test_draft_correction_forms(text, expected):
     assert without_draft_corrections(text) == expected
 
 
-@pytest.mark.parametrize("answer", [
+# Replies a cleanup after a hidden retry must return byte for byte.
+ORDINARY = [
     "Year 2 is $240,000, down from $304,000 in Year 1.",
     "The first year's total is $304,000.",
     "Indirect costs are not included in the first table.",
     "The sponsor's earlier version of the form is attached (Version 2).",
-])
+    "The indirect rate is 52.5% of MTDC.",
+    "See 2 C.F.R. 200.414 now. Costs are allowable, e.g. travel and supplies.",
+    "Year 1 totals $304,000.50 and Year 2 $1.2 million.",
+    "The guidance is at https://grants.nih.gov/policy/index.htm. It was updated in 2024.",
+    "The original figures submitted to NIH were $250,000. The revised budget is $230,000.",
+    "## Original vs revised budget\n\n| Item | Original budget | Revised |\n| --- | --- | --- |\n"
+    "| Previous totals | $250,000 | $230,000 |",
+    "Rent is $2,000 (was $1,800 in the prior award; Year 1 total is $999,999).",
+    "Totals rose to $500,000 but not $600,000 in Year 5.",
+    "We recommend $5,000 rather than the full request.",
+    "1. Personnel\n   - Salary: $120,000\n   - Fringe: $36,000\n2. Travel\n\n    indented code line\n",
+    "```python\n# sorry, my earlier figures were wrong\nprint('Apologies')\n```\nDone.",
+    "> Sorry, the PI's earlier summary was late.\n\nThe award starts July 1.",
+    "  Indented continuation. With two sentences.  \n\n\nTrailing blank lines above.\n\n",
+    "The previous summary statement scored 25. The initial totals were $1,000.",
+    "Mr. Smith approved it at 3 p.m. Dr. Jones agreed.",
+]
+
+
+@pytest.mark.parametrize("answer", ORDINARY)
 def test_ordinary_answers_are_unchanged(answer):
     assert without_draft_corrections(answer) == answer
 
 
 def test_refuted_figures_are_not_claims():
-    assert without_refuted_figures("Y1 is $304,000 (not $253,000).") == "Y1 is $304,000."
+    assert without_refuted_figures("Y1 is $304,000 (not $253,000).") == "Y1 is $304,000 (not )."
+    assert without_refuted_figures("Y1 is $304,000, not $253,000.") == "Y1 is $304,000, not ."
+
+
+@pytest.mark.parametrize("text", [
+    "Rent is $2,000 (was $1,800 in the prior award; Year 1 total is $999,999).",
+    "Rent is $2,000 (previously $1,800).",
+    "Totals rose to $500,000 but not $600,000 in Year 5.",
+])
+def test_every_other_figure_is_still_checked(text):
+    assert without_refuted_figures(text) == text
 
 
 def test_only_a_rejected_answer_counts_as_a_hidden_draft():
     tool_retry = ModelRequest(parts=[RetryPromptPart(content="bad args", tool_name="calculate")])
-    answer_retry = ModelRequest(parts=[RetryPromptPart(content="figures don't match")])
-    assert not had_hidden_retry([ModelRequest(parts=[UserPromptPart(content="hi")]), tool_retry])
+    # pydantic-ai's own retry after a response with only thinking.
+    empty_retry = ModelRequest(parts=[RetryPromptPart(content="Please return text or call a tool.")])
+    answer_retry = ModelRequest(parts=[RetryPromptPart(
+        content=f"figures don't match\n\n{UNSEEN_DRAFT_INSTRUCTION}")])
+    assert not had_hidden_retry([ModelRequest(parts=[UserPromptPart(content="hi")]), tool_retry, empty_retry])
     assert had_hidden_retry([tool_retry, answer_retry])
 
 
@@ -142,3 +177,27 @@ async def test_without_a_hidden_draft_the_reply_is_left_as_written(chat_harness,
     answer, flagged, _ = await _run(chat_harness, sheet, [CORRECTED])
     assert answer == CORRECTED
     assert not flagged
+
+
+async def test_a_retried_reply_keeps_every_sentence_it_does_not_remove(chat_harness, sheet):
+    """Review: decimals and abbreviations once cut "52.5%" down to "5%"."""
+    reply = "The indirect rate is 52.5% of MTDC. See 2 C.F.R. 200.414 and e.g. Year 1, $304,000.50 total."
+    calls = []
+
+    def once(ctx: RunContext[None], output: str) -> str:
+        calls.append(output)
+        if len(calls) == 1:
+            raise ModelRetry("Year 1 does not match the spreadsheet.")
+        return output
+
+    answer, _, prompts = await _run(chat_harness, sheet, [DRAFT, reply], once)
+    assert len(prompts) == 2
+    assert answer == reply
+
+
+async def test_figures_beside_a_previous_figure_are_still_flagged(chat_harness, sheet):
+    """Review: "(was $1,800 …; Year 1 total is $999,999)" once hid $999,999 from the check."""
+    answer, flagged, _ = await _run(
+        chat_harness, sheet, ["Year 1 is $304,000 (was $1,800 in the prior award; Year 1 total is $999,999)."])
+    assert "$999,999" in str(flagged)
+    assert "$1,800" in str(flagged)
