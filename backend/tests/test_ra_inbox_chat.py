@@ -222,3 +222,34 @@ async def test_a_rerun_that_finds_only_done_items_says_nothing_new_instead_of_fa
     ]
     assert "Nothing new to add" in result["message"]
     assert getattr(ctx.deps, "obligation_failures", 0) == 0
+
+
+@pytest.mark.asyncio
+async def test_a_rule_deadline_retitled_with_its_timing_is_already_in_the_inbox(project_env, monkeypatch):
+    """Support ticket: asking again added "Annual progress report for the NIFA
+    REEport submission (60 days after March 1, 2027)" beside the inbox's
+    "Annual progress report for NIFA REEport (deliverable)", same date and rule."""
+    project, user, _ = project_env
+    first = "Annual progress report for NIFA REEport (deliverable)"
+    row = (await service.propose(project, user, [proposal(title=first)]))["accepted"][0]["clean"]
+    old = Obligation.model_construct(uuid="old", project_uuid=project.uuid, created_by=user.user_id, status="open", **row)
+    monkeypatch.setattr(service, "Obligation", fake_model([old]))
+    again = await service.propose(project, user, [proposal(
+        title="Annual progress report for the NIFA REEport submission (60 days after March 1, 2027)")])
+    assert again["accepted"] == []
+    assert [r["reason"] for r in again["rejected"]] == ["already in this project's inbox or proposal"]
+    assert chat_tools._obligation_review_reason(again["rejected"][0]["reason"]).startswith("Already included in this inbox")
+
+
+@pytest.mark.parametrize("a,b,same", [
+    ("Annual progress report for NIFA REEport (deliverable)",
+     "Annual progress report for the NIFA REEport submission (60 days after March 1, 2027)", True),
+    ("Final report", "Final report due 60 days after December 31", True),
+    ("Semi-annual results due", "Semi-annual results report", True),
+    ("Final invoice", "Final report", False),
+    ("Final financial report", "Final technical report", False),
+    ("Final report (60 days)", "Final invoice (60 days)", False),
+])
+def test_similar_titles(a, b, same):
+    assert service._similar_titles(a, b) is same
+    assert service._similar_titles(b, a) is same

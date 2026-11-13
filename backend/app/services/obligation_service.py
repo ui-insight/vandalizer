@@ -558,12 +558,32 @@ def _title_words(title: str) -> set[str]:
     return {w for w in re.findall(r"[a-z0-9]+", (title or "").lower()) if w not in _TITLE_FILLER}
 
 
+#: Words chat adds around a deliverable's name that don't name a different
+#: deliverable: the timing it restates and labels like "(deliverable)".
+_TITLE_NOISE = frozenset({
+    "days", "day", "calendar", "business", "after", "before", "within", "following", "prior",
+    "each", "every", "end", "submission", "submit", "submitted", "deliverable", "required",
+}) | frozenset(_MONTHS)
+_PARENTHETICAL = re.compile(r"\([^)]*\)|\[[^\]]*\]")
+
+
+def _deliverable_words(title: str) -> set[str]:
+    words = _title_words(_PARENTHETICAL.sub(" ", title or ""))
+    return {w for w in words if w not in _TITLE_NOISE and not w.isdigit()}
+
+
 def _similar_titles(a: str, b: str) -> bool:
     """"Semi-annual results due" and "Semi-annual results report": yes.
-    "Final invoice" and "Final report": no."""
-    wa, wb = _title_words(a), _title_words(b)
+    "Annual progress report for NIFA REEport (deliverable)" and "Annual
+    progress report for the NIFA REEport submission (60 days after March 1,
+    2027)": yes, one names nothing the other doesn't.
+    "Final invoice" and "Final report", "Final financial report" and "Final
+    technical report": no, each names something the other doesn't."""
+    wa, wb = _deliverable_words(a), _deliverable_words(b)
     if not wa or not wb:
         return False
+    if len(wa & wb) >= 2 and (wa <= wb or wb <= wa):
+        return True
     return len(wa & wb) / len(wa | wb) > 0.5
 
 
