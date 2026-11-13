@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { FormEvent } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { AlertTriangle, CalendarClock, CalendarPlus, Check, ChevronDown, ChevronRight, EyeOff, FileText, Inbox } from 'lucide-react'
-import { downloadDeadlineCalendar, getInbox, plainQuote, quoteSearchTerms, setObligationDismissed, setObligationDone, setObligationKept } from '../../api/obligations'
+import { AlertTriangle, CalendarClock, CalendarPlus, Check, ChevronDown, ChevronRight, EyeOff, FileText, Inbox, Plus } from 'lucide-react'
+import { addDeadlineByHand, downloadDeadlineCalendar, getInbox, plainQuote, quoteSearchTerms, setObligationDismissed, setObligationDone, setObligationKept } from '../../api/obligations'
 import type { Obligation } from '../../api/obligations'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 
@@ -13,6 +14,11 @@ import { useWorkspace } from '../../contexts/WorkspaceContext'
 // the same place (support ticket: it used to turn the inbox off for the
 // account, leaving nothing on screen to bring it back). Collapsed is
 // remembered in this browser; Account → Home turns the inbox off for good.
+//
+// Inside a project, Add deadline records a deadline by hand (support ticket:
+// chat refuses a deadline it can't verify in the document and pointed people
+// here, where nothing could be added). Such a row says it was added by hand
+// and shows the person's note instead of a cited page.
 
 const COLLAPSED_KEY = 'home:ra-inbox-collapsed'
 
@@ -158,6 +164,9 @@ function InboxRow({ item, focused, onChanged, onError }: {
         <div style={{ fontSize: 'var(--workspace-font-meta)', color: item.in_conflict ? '#92400e' : '#4b5563' }}>
           {summary(item)}
         </div>
+        {item.entered_by_hand && <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
+          Added by hand · not checked against a document{item.source_note ? <> · Source: {item.source_note}</> : null}
+        </div>}
         {item.deadline_calculation && <details style={{ fontSize: 'var(--workspace-font-meta)', color: '#4b5563' }}>
           <summary>How this date was calculated</summary>
           <p>{item.deadline_calculation.rule}</p>
@@ -236,6 +245,75 @@ function InboxRow({ item, focused, onChanged, onError }: {
   )
 }
 
+const FIELD = {
+  padding: 'var(--workspace-space-4) var(--workspace-space-8)', fontSize: 'var(--workspace-font-control)',
+  fontFamily: 'inherit', borderRadius: 'var(--workspace-radius-small)', border: '1px solid var(--workspace-border)',
+} as const
+
+/** Add a deadline the documents don't let chat verify: title, date, optional note on where it comes from. */
+export function AddDeadlineForm({ projectUuid, onAdded, onCancel }: {
+  projectUuid: string
+  onAdded: (item: Obligation) => void
+  onCancel: () => void
+}) {
+  const [title, setTitle] = useState('')
+  const [dueDate, setDueDate] = useState('')
+  const [note, setNote] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const titleRef = useRef<HTMLInputElement>(null)
+  useEffect(() => { titleRef.current?.focus() }, [])
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault()
+    if (saving) return
+    if (!title.trim()) { setError('Give the deadline a title.'); return }
+    if (!dueDate) { setError('Choose the due date.'); return }
+    setSaving(true)
+    setError(null)
+    try {
+      onAdded(await addDeadlineByHand(projectUuid, title.trim(), dueDate, note.trim() || undefined))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'The deadline could not be added.')
+      setSaving(false)
+    }
+  }
+
+  return (
+    <form aria-label="Add deadline" onSubmit={submit} onKeyDown={e => { if (e.key === 'Escape') onCancel() }} style={{
+      display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-6)', margin: 'var(--workspace-space-8) var(--workspace-space-12) 0',
+      padding: 'var(--workspace-space-8) var(--workspace-space-12)', borderRadius: 'var(--workspace-radius-medium)',
+      border: '1px solid var(--workspace-border)', backgroundColor: '#f9fafb', fontSize: 'var(--workspace-font-meta)', color: '#374151',
+    }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-8)' }}>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)', flex: '2 1 14rem' }}>
+          Title
+          <input ref={titleRef} type="text" value={title} maxLength={200} required style={FIELD}
+            placeholder="Final technical report" onChange={e => setTitle(e.target.value)} />
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)', flex: '1 1 9rem' }}>
+          Due date
+          <input type="date" value={dueDate} required style={FIELD} min="1900-01-01" max="2999-12-31"
+            onChange={e => setDueDate(e.target.value)} />
+        </label>
+      </div>
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)' }}>
+        Source (optional)
+        <input type="text" value={note} maxLength={300} style={FIELD}
+          placeholder="Subaward agreement, section 5" onChange={e => setNote(e.target.value)} />
+      </label>
+      <p style={{ margin: 0, color: '#6b7280' }}>Saved as added by hand. It isn't checked against a document.</p>
+      {error && <p role="alert" style={{ margin: 0, color: '#b91c1c' }}>{error}</p>}
+      <div style={{ display: 'flex', gap: 'var(--workspace-space-6)', justifyContent: 'flex-end' }}>
+        <button type="button" style={BUTTON} onClick={onCancel} disabled={saving}>Cancel</button>
+        <button type="submit" style={{ ...BUTTON, backgroundColor: '#111827', color: '#fff', borderColor: '#111827' }} disabled={saving}>
+          {saving ? 'Adding…' : 'Add deadline'}
+        </button>
+      </div>
+    </form>
+  )
+}
+
 /** "Due and needed": Home's list across your projects, or, inside a project,
  * only that project's (support ticket: a project chat listed another
  * project's deadlines above its own). */
@@ -247,6 +325,8 @@ export function RAInbox({ projectUuid }: { projectUuid?: string | null } = {}) {
   const [projectCount, setProjectCount] = useState(0)
   const [showDismissed, setShowDismissed] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [adding, setAdding] = useState(false)
+  const addButton = useRef<HTMLButtonElement>(null)
   const [collapsed, setCollapsed] = useState(readCollapsed)
   // Keep focus on the toggle as the box collapses or expands.
   const toggleFocus = useRef<'show' | 'hide' | null>(null)
@@ -323,12 +403,12 @@ export function RAInbox({ projectUuid }: { projectUuid?: string | null } = {}) {
   }
   // With projects to cover, an empty inbox says what it checked: silence
   // would read as "nothing is due", which it can't know about unsaved work.
-  if (visible.length === 0 && !showDismissed) {
+  // Inside a project the box stays, so Add deadline is there when it's empty.
+  const empty = visible.length === 0 && !showDismissed
+  if (empty && !projectUuid) {
     if (projectCount === 0) return null
     return <p role="status" className="home-meta">
-      {projectUuid
-        ? 'Nothing due or missing in this project. Only deadlines and materials saved to it appear here.'
-        : `Nothing due or missing in your ${projectCount === 1 ? 'project' : `${projectCount} projects`}. Only deadlines and materials saved to a project appear here.`}
+      {`Nothing due or missing in your ${projectCount === 1 ? 'project' : `${projectCount} projects`}. Only deadlines and materials saved to a project appear here.`}
     </p>
   }
 
@@ -338,6 +418,15 @@ export function RAInbox({ projectUuid }: { projectUuid?: string | null } = {}) {
     change === 'done'
       ? (current ?? []).filter(i => i.uuid !== uuid)
       : (current ?? []).map(i => (i.uuid === uuid ? { ...i, ...(change === 'kept' ? { kept_without_source: true } : { dismissed: true }) } : i)))
+  const closeAdd = () => {
+    setAdding(false)
+    window.setTimeout(() => addButton.current?.focus(), 0)
+  }
+  const added = (item: Obligation) => {
+    setItems(current => [...(current ?? []), item])
+    setError(null)
+    closeAdd()
+  }
   const restore = async (uuid: string) => {
     try {
       await setObligationDismissed(uuid, false)
@@ -371,6 +460,10 @@ export function RAInbox({ projectUuid }: { projectUuid?: string | null } = {}) {
             <CalendarPlus size={12} aria-hidden /> Calendar
           </button>
         )}
+        {projectUuid && <button ref={addButton} type="button" style={{ ...BUTTON, border: 'none' }} aria-expanded={adding}
+          onClick={() => setAdding(true)} disabled={adding}>
+          <Plus size={12} aria-hidden /> Add deadline
+        </button>}
         <Link to="/account" hash="deadline-reminders" style={{ ...BUTTON, border: 'none', textDecoration: 'none' }}
           aria-label="Deadline reminder settings">
           Reminders
@@ -381,6 +474,10 @@ export function RAInbox({ projectUuid }: { projectUuid?: string | null } = {}) {
         </button>}
       </div>
       {error && <p role="alert" style={{ margin: 'var(--workspace-space-4) var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: '#b91c1c' }}>{error}</p>}
+      {adding && projectUuid && <AddDeadlineForm projectUuid={projectUuid} onAdded={added} onCancel={closeAdd} />}
+      {empty && <p role="status" className="home-meta" style={{ margin: 'var(--workspace-space-8) var(--workspace-space-12) 0' }}>
+        Nothing due or missing in this project. Only deadlines and materials saved to it appear here.
+      </p>}
       {focusMissing && <p role="status" style={{ margin: 'var(--workspace-space-4) var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: '#4b5563' }}>
         The deadline from that reminder is no longer open here: it was marked done, replaced by an amendment, or dismissed.
       </p>}

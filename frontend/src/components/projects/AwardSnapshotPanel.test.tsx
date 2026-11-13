@@ -69,6 +69,18 @@ describe('Award snapshot panel', () => {
     expect(navigate).toHaveBeenCalledWith({ to: '/', search: { deadline: 'qpcr' } })
   })
 
+  it('labels a deadline added by hand as not checked against a document', async () => {
+    api.getAwardSnapshot.mockResolvedValue({ ...SNAPSHOT, deadlines: { ...SNAPSHOT.deadlines, upcoming: [
+      { uuid: 'hand', title: 'Final report', due_at: '2026-12-01T00:00:00', due_text: null, days_until: 28, sources: [],
+        entered_by_hand: true, source_note: 'Sponsor email' } as never,
+    ] } })
+    renderPanel()
+    fireEvent.click(await screen.findByRole('button', { name: /Award snapshot/ }))
+    expect(screen.getByRole('group', { name: 'Upcoming' }))
+      .toHaveTextContent('Added by hand · not checked against a document · Source: Sponsor email')
+    expect(screen.getByRole('group', { name: 'Overdue' })).not.toHaveTextContent('Added by hand')
+  })
+
   it('builds, and shares as a Page that opens', async () => {
     api.getAwardSnapshot.mockResolvedValue({ ...SNAPSHOT, status: 'not_built', facts: [], budget_years: [], built_at: null })
     api.buildAwardSnapshot.mockResolvedValue({ ...SNAPSHOT, status: 'building' })
