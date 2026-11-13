@@ -221,7 +221,11 @@ async def update_search_set(uuid: str, req: UpdateSearchSetRequest, user: User =
         raise HTTPException(status_code=409, detail=str(e))
     if not ss:
         raise HTTPException(status_code=404, detail="SearchSet not found")
-    await skill_service.keep_own_edit_accepted(user, uuid, core_before)
+    # A new extraction_config replaces the stored instructions and line too.
+    edited = skill_service.SKILL_PARTS if req.extraction_config is not None else frozenset(
+        part for part, value in (("title", req.title), ("when_to_use", req.when_to_use)) if value is not None
+    )
+    await skill_service.keep_own_edit_accepted(user, uuid, core_before, edited)
     # Flag stale verification if this search set was verified
     from app.services.verification_service import check_and_flag_stale_verification
     await check_and_flag_stale_verification("search_set", str(ss.id))
@@ -901,7 +905,7 @@ async def add_item(uuid: str, req: SearchSetItemRequest, user: User = Depends(ge
         is_optional=req.is_optional, enum_values=req.enum_values or [],
         description=req.description,
     )
-    await skill_service.keep_own_edit_accepted(user, uuid, core_before)
+    await skill_service.keep_own_edit_accepted(user, uuid, core_before, frozenset({"instructions"}))
     return SearchSetItemResponse(
         id=str(item.id), searchphrase=item.searchphrase, searchset=item.searchset,
         searchtype=item.searchtype, title=item.title,
@@ -937,7 +941,7 @@ async def update_item(item_id: str, req: UpdateSearchSetItemRequest, user: User 
     )
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
-    await skill_service.keep_own_edit_accepted(user, parent_uuid, core_before)
+    await skill_service.keep_own_edit_accepted(user, parent_uuid, core_before, frozenset({"instructions"}))
     # Flag stale verification on parent search set
     if item.searchset:
         from app.models.search_set import SearchSet
