@@ -6,6 +6,9 @@ import tempfile
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
+
+from pydantic import BaseModel
 from pymongo.errors import DuplicateKeyError
 
 from app.config import Settings
@@ -428,11 +431,24 @@ async def rename_document(doc_uuid: str, new_title: str, *, user: User) -> bool:
     return True
 
 
-def _copy_title(title: str, n: int) -> str:
-    """``Report.pdf`` -> ``Report (Copy).pdf``, then ``Report (Copy 2).pdf``."""
+class DuplicateNotQueuedError(RuntimeError):
+    """The copy's processing could not be queued, so the copy was taken back out."""
+
+
+class _TitleOnly(BaseModel):
+    title: Optional[str] = None
+
+
+def _copy_title(title: str, n: int, extension: str | None = None) -> str:
+    """``Report.pdf`` -> ``Report (Copy).pdf``, then ``Report (Copy 2).pdf``.
+
+    The label goes before the suffix only when that suffix is the document's
+    extension: a file renamed "Q3 Report v1.2" becomes "Q3 Report v1.2 (Copy)",
+    not "Q3 Report v1 (Copy).2".
+    """
     label = "(Copy)" if n == 1 else f"(Copy {n})"
     stem, dot, ext = title.rpartition(".")
-    if dot and stem:
+    if dot and stem and extension and ext.lower() == extension.lower():
         return f"{stem} {label}.{ext}"
     return f"{title} {label}"
 
@@ -442,9 +458,12 @@ async def duplicate_document(doc_uuid: str, settings: Settings, *, user: User) -
 
     The copy gets its own stored file (deleting either must not take the
     other's bytes) and carries the original's extracted text, so it is not
-    read again; only search indexing runs for it. It starts a version history
-    of its own and joins no knowledge base. Returns None when the caller
-    cannot see the document.
+    read again; it then runs the steps an upload runs after reading (folder
+    watch automations, search indexing). It starts a version history of its
+    own and joins no knowledge base, and keeps the original's scheduled
+    deletion and retention hold. Returns None when the caller cannot see the
+    document; raises DuplicateNotQueuedError when its processing could not be
+    queued (nothing is left behind).
     """
     doc = await access_control.get_authorized_document(doc_uuid, user)
     if not doc or doc.soft_deleted:
@@ -474,12 +493,12 @@ async def duplicate_document(doc_uuid: str, settings: Settings, *, user: User) -
         "folder": target_folder,
         "soft_deleted": {"$ne": True},
         "superseded_by": None,
-    }).to_list()
+    }).project(_TitleOnly).to_list()
     taken = {d.title for d in siblings}
     n = 1
-    while _copy_title(doc.title, n) in taken:
+    while _copy_title(doc.title, n, doc.extension) in taken:
         n += 1
-    title = _copy_title(doc.title, n)
+    title = _copy_title(doc.title, n, doc.extension)
 
     from app.services.storage import get_storage
 
@@ -496,7 +515,8 @@ async def duplicate_document(doc_uuid: str, settings: Settings, *, user: User) -
 
     # Only a successful reading is indexed. A failed one (even one that kept
     # some text) stays failed on the copy; Retry works on the copy's own file.
-    index = bool((doc.raw_text or "").strip()) and doc.task_status != "error"
+    failed = doc.task_status == "error"
+    index = bool((doc.raw_text or "").strip()) and not failed
     copy = SmartDocument(
         title=title,
         path=new_path,
@@ -525,9 +545,17 @@ async def duplicate_document(doc_uuid: str, settings: Settings, *, user: User) -
         classified_by=doc.classified_by,
         # A copy of a file Vandalizer wrote is still one.
         generated_by=doc.generated_by,
+        # Retention: the copy must not outlive the original's scheduled
+        # deletion, and a hold on the original holds the copy too.
+        scheduled_deletion_at=doc.scheduled_deletion_at,
+        retention_hold=bool(doc.retention_hold),
+        retention_hold_reason=doc.retention_hold_reason,
         processing=False,
-        # Indexing is all that is left, and it marks the copy complete.
-        task_status="readying" if index else doc.task_status,
+        # Reading is done: the copy is where an upload stands once its text
+        # is in. Not an in-progress status, so the stuck-document sweep
+        # leaves it alone while its steps are queued; indexing below moves it
+        # through "readying" back to complete, as it does an upload.
+        task_status="error" if failed else "complete",
         chromadb_ready=False,
         chunk_count=0,
     )
@@ -540,12 +568,37 @@ async def duplicate_document(doc_uuid: str, settings: Settings, *, user: User) -
             logger.exception("Could not remove unused duplicate file %s", new_path)
         raise
 
-    if index:
-        # Also mirrors the copy into the project's knowledge base when its
-        # folder belongs to a project, as an upload there would be.
-        from app.tasks.document_tasks import perform_semantic_ingestion
+    if not failed:
+        # The steps an upload runs once its text is in: update_document_fields
+        # (which starts folder-watch automations, so a copy placed in a
+        # watched folder counts as a new file there, as an upload does) and
+        # then indexing, which also mirrors the copy into the project's
+        # knowledge base when its folder belongs to one.
+        from app.tasks.document_tasks import perform_semantic_ingestion, update_document_fields
 
-        perform_semantic_ingestion.delay(doc.raw_text, uid, user.user_id)
+        steps = update_document_fields.si(document_uuid=uid)
+        if index:
+            # The task reads the text from the copy; no need to queue it.
+            steps = steps | perform_semantic_ingestion.si(
+                raw_text="", document_uuid=uid, user_id=user.user_id,
+            )
+        try:
+            steps.apply_async()
+        except Exception:
+            # Without its steps the copy would sit unindexed, and a retry
+            # would make "(Copy 2)". Take it back out and say so.
+            logger.exception("Could not queue processing for duplicate %s", uid)
+            try:
+                await copy.delete()
+            except Exception:
+                logger.exception("Could not remove unqueued duplicate %s", uid)
+            try:
+                await storage.delete(new_path)
+            except Exception:
+                logger.exception("Could not remove unused duplicate file %s", new_path)
+            raise DuplicateNotQueuedError(
+                "The copy could not be queued for processing, so it wasn't made. Try again in a moment."
+            )
 
     return {"uuid": uid, "title": title}
 

@@ -24,17 +24,26 @@ def _doc(**overrides):
         text_layer_rejected=False, ingestion_warnings=["partial_ocr"], unread_pages=[],
         classification="internal", classification_confidence=0.9, classified_at=None,
         classified_by="auto", generated_by=None, soft_deleted=False, processing=False,
-        task_status="complete",
+        task_status="complete", scheduled_deletion_at=None, retention_hold=False,
+        retention_hold_reason=None,
     )
     base.update(overrides)
     return SimpleNamespace(**base)
 
 
 def test_copy_title_keeps_the_extension_and_counts_up():
-    assert _copy_title("R4-inbox-test.pdf", 1) == "R4-inbox-test (Copy).pdf"
-    assert _copy_title("R4-inbox-test.pdf", 2) == "R4-inbox-test (Copy 2).pdf"
-    assert _copy_title("notes", 1) == "notes (Copy)"
-    assert _copy_title(".env", 1) == ".env (Copy)"
+    assert _copy_title("R4-inbox-test.pdf", 1, "pdf") == "R4-inbox-test (Copy).pdf"
+    assert _copy_title("R4-inbox-test.pdf", 2, "pdf") == "R4-inbox-test (Copy 2).pdf"
+    assert _copy_title("Scan.PDF", 1, "pdf") == "Scan (Copy).PDF"
+    assert _copy_title("notes", 1, "txt") == "notes (Copy)"
+    assert _copy_title(".env", 1, "env") == ".env (Copy)"
+
+
+def test_copy_title_splits_only_on_the_documents_extension():
+    # A renamed file whose title has a dot that isn't its extension.
+    assert _copy_title("Q3 Report v1.2", 1, "pdf") == "Q3 Report v1.2 (Copy)"
+    assert _copy_title("Q3 Report v1.2", 1, None) == "Q3 Report v1.2 (Copy)"
+    assert _copy_title("Q3 Report v1.2.pdf", 1, "pdf") == "Q3 Report v1.2 (Copy).pdf"
 
 
 class _Env:
@@ -44,11 +53,15 @@ class _Env:
         self.storage.write = AsyncMock()
         self.storage.delete = AsyncMock()
         self.Model = MagicMock()
-        self.Model.find.return_value.to_list = AsyncMock(
+        self.Model.find.return_value.project.return_value.to_list = AsyncMock(
             return_value=[SimpleNamespace(title=t) for t in siblings])
-        self.instance = MagicMock(insert=AsyncMock())
+        self.instance = MagicMock(insert=AsyncMock(), delete=AsyncMock())
         self.Model.return_value = self.instance
-        self.ingest = MagicMock()
+        # update_document_fields.si(...) [| perform_semantic_ingestion.si(...)]
+        self.update_si = MagicMock()
+        self.ingest_si = MagicMock()
+        self.chain = self.update_si.return_value
+        self.chain.__or__ = MagicMock(return_value=self.chain)
 
         async def get_doc(uuid, user, *, manage=False, **_):
             return doc if (manage_ok or not manage) else None
@@ -59,7 +72,8 @@ class _Env:
             patch("app.services.access_control.get_authorized_folder", AsyncMock(return_value=folder)),
             patch("app.services.file_service.SmartDocument", self.Model),
             patch("app.services.storage.get_storage", return_value=self.storage),
-            patch("app.tasks.document_tasks.perform_semantic_ingestion.delay", self.ingest),
+            patch("app.tasks.document_tasks.update_document_fields.si", self.update_si),
+            patch("app.tasks.document_tasks.perform_semantic_ingestion.si", self.ingest_si),
         ]
 
     def __enter__(self):
@@ -70,6 +84,14 @@ class _Env:
     def __exit__(self, *exc):
         for p in reversed(self.patches):
             p.stop()
+
+    @property
+    def queued(self):
+        return self.chain.apply_async.called
+
+    @property
+    def indexed(self):
+        return self.ingest_si.called
 
     @property
     def fields(self):
@@ -94,12 +116,18 @@ async def test_copies_file_and_text_into_the_same_folder():
     # Not read again: same text and caveats; only indexing is left.
     assert f["raw_text"] == "Award text" and f["text_markers"] == doc.text_markers
     assert f["ingestion_warnings"] == ["partial_ocr"]
-    assert f["task_status"] == "readying" and f["processing"] is False
+    # Not an in-progress status: the stuck-document sweep must not finish the
+    # copy while its steps are still queued.
+    assert f["task_status"] == "complete" and f["processing"] is False
     assert f["chromadb_ready"] is False
     # A fresh document: no version chain, no knowledge base.
     assert "version_root" not in f and "previous_version_uuid" not in f
     env.instance.insert.assert_awaited_once()
-    env.ingest.assert_called_once_with("Award text", result["uuid"], "dup-user")
+    # The steps an upload runs after reading: folder-watch check, then indexing.
+    env.update_si.assert_called_once_with(document_uuid=result["uuid"])
+    env.ingest_si.assert_called_once_with(raw_text="", document_uuid=result["uuid"], user_id="dup-user")
+    env.chain.__or__.assert_called_once_with(env.ingest_si.return_value)
+    env.chain.apply_async.assert_called_once_with()
 
 
 @pytest.mark.asyncio
@@ -153,7 +181,7 @@ async def test_failed_reading_is_copied_without_indexing():
         await file_service.duplicate_document("SRC", _SETTINGS, user=_make_user())
     assert env.fields["task_status"] == "error"
     assert env.fields["error_message"] == "Could not read"
-    env.ingest.assert_not_called()
+    assert not env.queued and not env.indexed
 
 
 @pytest.mark.asyncio
@@ -161,7 +189,7 @@ async def test_failed_reading_with_some_text_is_not_marked_ready():
     with _Env(_doc(task_status="error", error_message="Garbled text layer")) as env:
         await file_service.duplicate_document("SRC", _SETTINGS, user=_make_user())
     assert env.fields["task_status"] == "error"
-    env.ingest.assert_not_called()
+    assert not env.queued and not env.indexed
 
 
 @pytest.mark.asyncio
@@ -180,7 +208,51 @@ async def test_failed_insert_removes_the_copied_file():
         with pytest.raises(RuntimeError):
             await file_service.duplicate_document("SRC", _SETTINGS, user=_make_user())
     env.storage.delete.assert_awaited_once_with(env.storage.write.await_args.args[0])
-    env.ingest.assert_not_called()
+    assert not env.queued
+
+
+@pytest.mark.asyncio
+async def test_textless_copy_still_runs_folder_watch_but_is_not_indexed():
+    with _Env(_doc(raw_text="")) as env:
+        await file_service.duplicate_document("SRC", _SETTINGS, user=_make_user())
+    assert env.fields["task_status"] == "complete"
+    assert env.queued and not env.indexed
+
+
+@pytest.mark.asyncio
+async def test_queue_failure_takes_the_copy_back_out():
+    with _Env(_doc()) as env:
+        env.chain.apply_async.side_effect = ConnectionError("broker down")
+        with pytest.raises(file_service.DuplicateNotQueuedError, match="could not be queued"):
+            await file_service.duplicate_document("SRC", _SETTINGS, user=_make_user())
+    env.instance.insert.assert_awaited_once()
+    env.instance.delete.assert_awaited_once()
+    env.storage.delete.assert_awaited_once_with(env.storage.write.await_args.args[0])
+
+
+@pytest.mark.asyncio
+async def test_copy_keeps_the_originals_scheduled_deletion_and_hold():
+    import datetime
+
+    when = datetime.datetime(2026, 12, 1, tzinfo=datetime.timezone.utc)
+    with _Env(_doc(scheduled_deletion_at=when)) as env:
+        await file_service.duplicate_document("SRC", _SETTINGS, user=_make_user())
+    assert env.fields["scheduled_deletion_at"] == when
+    assert env.fields["retention_hold"] is False
+
+    with _Env(_doc(retention_hold=True, retention_hold_reason="Audit")) as env:
+        await file_service.duplicate_document("SRC", _SETTINGS, user=_make_user())
+    assert env.fields["retention_hold"] is True
+    assert env.fields["retention_hold_reason"] == "Audit"
+    assert env.fields["scheduled_deletion_at"] is None
+
+
+@pytest.mark.asyncio
+async def test_title_with_a_dot_that_isnt_the_extension():
+    with _Env(_doc(title="Q3 Report v1.2")) as env:
+        result = await file_service.duplicate_document("SRC", _SETTINGS, user=_make_user())
+    assert result["title"] == "Q3 Report v1.2 (Copy)"
+    assert env.Model.find.return_value.project.called
 
 
 class TestDuplicateRoute:
@@ -194,6 +266,7 @@ class TestDuplicateRoute:
         ({"uuid": "NEW", "title": "A (Copy).pdf"}, 200),
         (None, 404),
         (ValueError("This file is still being read."), 400),
+        (file_service.DuplicateNotQueuedError("could not be queued"), 503),
     ])
     async def test_maps_service_outcomes(self, client, outcome, status):  # noqa: F811
         user = _make_user()

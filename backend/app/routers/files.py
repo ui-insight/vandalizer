@@ -269,6 +269,8 @@ async def duplicate(
     """Copy ``doc_uuid`` into its own folder as "<name> (Copy)"."""
     try:
         result = await file_service.duplicate_document(doc_uuid, settings, user=user)
+    except file_service.DuplicateNotQueuedError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     if result is None:
