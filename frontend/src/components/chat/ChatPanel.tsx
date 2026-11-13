@@ -127,7 +127,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     announceChatWrite(result)
   } })
 
-  const { setWorkspaceMode, openWorkflow, openExtraction, workspaceMode, activeRightTab, openWorkflowId, openExtractionId, openAutomationId, bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, setSelectedFolderUuids, selectedFolderNames, setSelectedFolderNames, activeKBs, activeKBUuid, activeKBTitle, activateKB, attachKBs, replaceKBs, detachKB, activeProjectUuid, activeProjectTitle, activeProjectRole, exitProject, setCurrentConversationUuid, focusChatSignal, focusChat, triggerNewChat } = useWorkspace()
+  const { setWorkspaceMode, openWorkflow, openExtraction, workspaceMode, activeRightTab, openWorkflowId, openExtractionId, openAutomationId, bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, setSelectedFolderUuids, selectedFolderNames, setSelectedFolderNames, activeKBs, activeKBUuid, activeKBTitle, activateKB, attachKBs, replaceKBs, detachKB, activeProjectUuid, activeProjectTitle, activeProjectRole, exitProject, setCurrentConversationUuid, focusChatSignal, focusChat, triggerNewChat, reapplyRestoredAttachments } = useWorkspace()
 
   // When scoped to a project, surface its file/index status so the empty state
   // reflects the project (not a generic assistant) and sets honest expectations.
@@ -445,6 +445,9 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
             setSelectedFolderNames(Object.fromEntries(scope.folders.map(f => [f.uuid, f.title])))
           }
           if (scope?.knowledge_bases) replaceKBs(scope.knowledge_bases)
+          // An attachment the user made before leaving the workspace and has
+          // not sent yet is newer than the conversation's saved scope.
+          reapplyRestoredAttachments?.(conversationToLoad)
           if (scope?.unavailable) {
             const n = scope.unavailable
             toast(
@@ -462,7 +465,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         // history fetch doesn't surface as an unhandled promise rejection.
       })
     }
-  }, [conversationToLoad, conversationUuid, loadHistory, setSelectedDocUuids, setSelectedDocNames, setSelectedFolderUuids, setSelectedFolderNames, replaceKBs, toast, applyDraftAttach])
+  }, [conversationToLoad, conversationUuid, loadHistory, setSelectedDocUuids, setSelectedDocNames, setSelectedFolderUuids, setSelectedFolderNames, replaceKBs, toast, applyDraftAttach, reapplyRestoredAttachments])
 
   const pendingHandled = useRef<PendingChatMessage | null>(null)
   useEffect(() => {
