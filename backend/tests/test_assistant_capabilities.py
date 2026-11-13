@@ -57,6 +57,32 @@ def test_chat_is_told_what_is_off_and_who_can_turn_it_back_on():
     assert "Turned off by this person" not in only_locked and "(/assistant)" not in only_locked
 
 
+def test_chat_is_told_a_link_cannot_go_into_a_knowledge_base_while_reading_pages_is_off():
+    """Support ticket: with Read a web page off, chat promised twice to add a
+    link to a knowledge base, created it empty, then said it had no tool."""
+    note = caps.instructions(frozenset({"web_pages"}))
+    assert "cannot add a link (URL) to a knowledge base" in note
+    assert "“Read a web page” is off" in note and "“Knowledge bases” is on" in note
+    assert "first reply, before creating" in note and "Do not promise" in note
+    assert "[Assistant settings](/assistant)" in note.split("Because", 1)[1]
+
+    locked = caps.instructions(frozenset(), frozenset({"web_pages"}))
+    assert "cannot add a link (URL) to a knowledge base" in locked
+    assert "only an administrator can turn it on" in locked
+    assert "(/assistant)" not in locked
+
+    # Knowledge bases off already covers it; nothing off covers nothing.
+    both = caps.instructions(frozenset({"web_pages", "knowledge_bases"}))
+    assert "cannot add a link" not in both
+    assert "cannot add a link" not in caps.instructions(frozenset({"pages"}))
+
+
+def test_the_settings_page_says_read_a_web_page_also_covers_knowledge_base_links():
+    rows = {r["id"]: r for r in caps.describe(SimpleNamespace(assistant_capabilities_off=[]), {})["capabilities"]}
+    assert "add a link to a knowledge base" in rows["web_pages"]["description"]
+    assert "Read a web page" in rows["knowledge_bases"]["description"]
+
+
 @pytest.mark.asyncio
 async def test_a_tool_that_does_another_capabilitys_work_needs_both_on():
     # Adding a URL to a knowledge base fetches the page.

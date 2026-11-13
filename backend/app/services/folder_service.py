@@ -9,6 +9,10 @@ from app.services import access_control, audit_service
 
 logger = logging.getLogger(__name__)
 
+# Documents a folder expansion hands on: not retention soft-deleted, and the
+# current version of each document (older versions point at their successor).
+LIVE_DOCUMENT_FILTER: dict[str, object] = {"soft_deleted": {"$ne": True}, "superseded_by": None}
+
 
 def _safe_component(name: str) -> str:
     """Make a folder/file title safe to use as a single zip path segment."""
@@ -250,8 +254,9 @@ async def expand_folders_to_document_uuids(
 
     Each root folder must be viewable by the user (raises ValueError otherwise);
     documents are additionally filtered by per-document view access. Returns a
-    de-duplicated, order-preserving list. Used by "Run workflow on folder" and
-    "Add folder to knowledge base".
+    de-duplicated, order-preserving list. Superseded versions and soft-deleted
+    documents are left out. Used by "Run workflow on folder", folders ticked in
+    Files for a workflow run, and "Add folder to knowledge base".
     """
     team_access = await access_control.get_team_access_context(user)
 
@@ -275,8 +280,10 @@ async def expand_folders_to_document_uuids(
             ).to_list()
             frontier = [c.uuid for c in children if c.uuid not in seen_folders]
 
+    # Current versions only, and nothing retention has soft-deleted: the same
+    # documents Files lists and chat's folder expansion uses.
     docs = await SmartDocument.find(
-        {"folder": {"$in": folder_uuid_set}}
+        {"folder": {"$in": folder_uuid_set}, **LIVE_DOCUMENT_FILTER}
     ).to_list()
     result: list[str] = []
     seen_docs: set[str] = set()

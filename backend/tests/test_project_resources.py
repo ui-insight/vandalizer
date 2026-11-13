@@ -126,7 +126,7 @@ async def test_project_pages_include_generated_and_pinned_without_granting_acces
 async def test_project_default_requires_edit_role_and_accessible_skill(client, route_env):
     project = SimpleNamespace(uuid='p1', default_skill_uuid='skill-1', set=AsyncMock())
     cookies, headers = _auth()
-    with patch.object(project_service, 'get_authorized_project', AsyncMock(return_value=project)), patch.object(project_service, 'can_manage_project', AsyncMock(return_value=False)) as manage, patch.object(project_service, 'add_pin', AsyncMock()) as pin, patch('app.services.skill_service.snapshot_skill', AsyncMock(return_value=snapshot())) as read:
+    with patch.object(project_service, 'get_authorized_project', AsyncMock(return_value=project)), patch.object(project_service, 'can_manage_project', AsyncMock(return_value=False)) as manage, patch.object(project_service, 'add_pin', AsyncMock()) as pin, patch('app.services.skill_service.snapshot_skill', AsyncMock(return_value=snapshot())) as read, patch('app.services.skill_service.skill_for_review', AsyncMock(return_value=(snapshot(), False))) as review:
         response = await client.put('/api/projects/p1/default-skill', json={'skill_uuid': 'skill-1'}, cookies=cookies, headers=headers)
         assert response.status_code == 403
         read.assert_not_awaited()
@@ -135,8 +135,11 @@ async def test_project_default_requires_edit_role_and_accessible_skill(client, r
         assert response.status_code == 200
         pin.assert_awaited_once_with(project, 'skill', 'skill-1', route_env.user)
         project.set.assert_awaited_with({'default_skill_uuid': 'skill-1'})
-        assert (await client.get('/api/projects/p1/default-skill')).json()['active_skill']['version'] == 'pinned-v1'
-        read.side_effect = HTTPException(404, 'Skill no longer accessible')
+        assert (await client.get('/api/projects/p1/default-skill')).json() == {'active_skill': snapshot().model_dump(), 'needs_review': False}
+        # A default someone else wrote is offered for review, not applied.
+        review.return_value = (snapshot(), True)
+        assert (await client.get('/api/projects/p1/default-skill')).json()['needs_review'] is True
+        review.side_effect = HTTPException(404, 'Skill no longer accessible')
         assert (await client.get('/api/projects/p1/default-skill')).status_code == 404
         assert (await client.put('/api/projects/p1/default-skill', json={'skill_uuid': None}, cookies=cookies, headers=headers)).status_code == 200
         project.set.assert_awaited_with({'default_skill_uuid': None})

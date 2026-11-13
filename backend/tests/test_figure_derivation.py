@@ -120,3 +120,78 @@ async def test_chat_checks_an_attached_file_without_any_tool_call(chat_harness):
     kwargs = chat_harness.finalize.call_args.kwargs
     assert kwargs["unsupported_figures"] == ["$199,300"]
     assert {"figure": "$131,560", "formula": "52% × $253,000 = $131,560"} in kwargs["calculated_figures"]
+
+
+# Support ticket (NIH_R01_Budget_Clean.xlsx, "Which budget category is the
+# largest?"): the working was written without "$", and the warning said "Not
+# in the retrieved sources: 50.0%, $360,000".
+CATEGORY_SHEET = """Category Y1 Y2 Y3 Y4 Y5 Total
+Personnel 120000 124000 128000 132000 121000 625000
+Indirect (52% rate) 51000 53000 55000 57000 49000 265000
+Total 304000 240000 241000 246000 219000 1250000"""
+LARGEST = """**Personnel** is the largest category at **$625,000**, which is:
+- 625,000 ÷ 1,250,000 = **50.0%** of the total budget
+- 625,000 − 265,000 = **$360,000 more** than the next largest (Indirect)"""
+
+
+def _as_sources(text: str) -> str:
+    from app.services.kb_answer_grounding import bare_amounts_as_money
+    return text + "\n" + bare_amounts_as_money(text)
+
+
+def test_working_written_without_dollar_signs_counts_as_calculated():
+    missing, calculated = check_figures(LARGEST, _as_sources(CATEGORY_SHEET))
+    assert missing == []
+    formulas = {d.label: d.formula for d in calculated}
+    assert formulas["50.0%"] == "625,000 ÷ 1,250,000 = 50.0%"
+    assert formulas["$360,000"] == "625,000 − 265,000 = $360,000"
+
+
+@pytest.mark.parametrize("answer,flagged", [
+    # Wrong arithmetic over bare amounts is still flagged.
+    ("625,000 − 265,000 = $370,000 more than Indirect.", ["$370,000"]),
+    # Bare inputs that aren't in the sources don't make a figure calculated.
+    ("700,000 − 265,000 = $435,000 more.", ["$435,000"]),
+    # A year is not an amount: "2027 − 2026" doesn't explain $1.
+    ("Between 2026 and 2027 it grew by $1.", ["$1"]),
+])
+def test_bare_operands_do_not_excuse_unsupported_figures(answer, flagged):
+    assert check_figures(answer, _as_sources(CATEGORY_SHEET))[0] == flagged
+
+
+@pytest.mark.parametrize("answer,flagged", [
+    # Review of #1152: bare numbers listed in a sentence are not operands.
+    # $0.9M is invented; 240,000 + 241,000 + 246,000 + 219,000 is near it only
+    # within "$0.9M"'s ±$50K rounding.
+    ("Yearly totals are 304,000, 240,000, 241,000, 246,000 and 219,000; equipment adds roughly $0.9M.", ["$0.9M"]),
+    # Years 1-3 are $785K; "$1M" is within ±$500K of 304,000 + 240,000.
+    ("Years 1-3 (304,000, 240,000 and 241,000) cost about $1M.", ["$1M"]),
+    # Written working must equal the figure, not just round to it.
+    ("Years 1-3: 304,000 + 240,000 = $1M.", ["$1M"]),
+    # A leading minus is kept: -265,000 + 625,000 is $360,000, not $890,000.
+    ("-265,000 + 625,000 = $890,000 net.", ["$890,000"]),
+    # Another currency is not dollars.
+    ("€625,000 − 265,000 = $360,000 more.", ["$360,000"]),
+    # A percentage needs working that divides.
+    ("625,000 + 265,000 = 50% of the budget.", ["50%"]),
+    # The 100× error: 625,000 ÷ 1,250,000 is 50%, not 0.5%.
+    ("625,000 ÷ 1,250,000 = 0.5% of the budget.", ["0.5%"]),
+])
+def test_bare_numbers_do_not_clear_invented_figures(answer, flagged):
+    sources = _as_sources(CATEGORY_SHEET)
+    assert check_figures(answer, sources)[0] == flagged
+    # The same derivation backs Page figure checks and citation verdicts.
+    assert _formulas(answer, sources) == {}
+
+
+@pytest.mark.parametrize("answer,figure,formula", [
+    ("-265,000 + 625,000 = $360,000 net.", "$360,000", "-265,000 + 625,000 = $360,000"),
+    ("625,000 minus 265,000 is $360,000.", "$360,000", "625,000 minus 265,000 = $360,000"),
+    ("Years 1-3: 304,000 + 240,000 + 241,000 = $785K.", "$785K", "304,000 + 240,000 + 241,000 = $785K"),
+    ("625,000 divided by 1,250,000 is 50%.", "50%", "625,000 divided by 1,250,000 = 50%"),
+])
+def test_written_working_is_evaluated_as_written(answer, figure, formula):
+    sources = _as_sources(CATEGORY_SHEET)
+    assert check_figures(answer, sources)[0] == []
+    assert _formulas(answer, sources) == {figure: formula}
+

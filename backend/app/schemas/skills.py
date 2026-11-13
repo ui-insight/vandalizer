@@ -25,3 +25,9 @@ class SkillSnapshot(BaseModel):
 
 class SelectSkillRequest(BaseModel):
     skill_uuid: str | None = Field(min_length=1, max_length=200)
+
+
+class AcceptSkillRequest(BaseModel):
+    """The version of a shared Skill's text the person was shown and accepted."""
+
+    version: str = Field(min_length=1, max_length=200)

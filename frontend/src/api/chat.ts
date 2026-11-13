@@ -1,4 +1,4 @@
-import { apiFetch, rawFetch } from './client'
+import { apiFetch, errorDetailMessage, rawFetch } from './client'
 import { MissingDocumentsError } from './chatErrors'
 import type { CardDecision, ChatMessage, UrlAttachment, FileAttachment, PlanTask, StreamChunk, SkillSnapshot } from '../types/chat'
 
@@ -80,7 +80,8 @@ export async function streamChat(
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ detail: 'Chat request failed' }))
-    const message = typeof body.detail === 'string' && body.detail ? body.detail : 'Chat request failed'
+    // Structured details ({code, message}), such as a shared Skill awaiting review, carry their text in `message`.
+    const message = errorDetailMessage(body?.detail, 'Chat request failed')
     if (res.headers.get('X-Chat-Error') === 'document_missing') {
       throw new MissingDocumentsError(
         message,
@@ -287,8 +288,20 @@ export function getChatActivity(conversationUuid: string) {
   return apiFetch<ChatActivityLog>(`/api/chat/history/${encodeURIComponent(conversationUuid)}/activity`)
 }
 
+/** A Skill's current text; needs_review when it was shared with the user (or
+ * edited since they accepted it) and must be accepted before chat uses it. */
+export type SkillPreview = SkillSnapshot & { needs_review?: boolean }
+
 export function previewSkill(skillUuid: string) {
-  return apiFetch<SkillSnapshot>(`/api/chat/skills/${encodeURIComponent(skillUuid)}`)
+  return apiFetch<SkillPreview>(`/api/chat/skills/${encodeURIComponent(skillUuid)}`)
+}
+
+/** Accept a shared Skill's instructions at the version the user was shown. */
+export function acceptSkill(skillUuid: string, version: string) {
+  return apiFetch<SkillPreview>(`/api/chat/skills/${encodeURIComponent(skillUuid)}/accept`, {
+    method: 'POST',
+    body: JSON.stringify({ version }),
+  })
 }
 
 export function selectConversationSkill(conversationUuid: string, skillUuid: string | null) {

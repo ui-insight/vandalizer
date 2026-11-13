@@ -13,6 +13,7 @@ import { useLibraries, useLibraryItems } from '../../hooks/useLibrary'
 import { LibraryItemRow } from '../library/LibraryItemRow'
 import { ExploreTab } from '../library/ExploreTab'
 import { OrganizationHelp } from '../library/OrganizationHelp'
+import { readStored, useLibrarySidebar, writeStored } from '../library/useLibrarySidebar'
 import { ShareWithTeamDialog } from '../library/ShareWithTeamDialog'
 import { useConfirm } from '../shared/useConfirm'
 
@@ -39,6 +40,8 @@ import {
   FolderOpen,
   FolderPlus,
   MoreHorizontal,
+  PanelLeftClose,
+  PanelLeftOpen,
   Pencil,
   Trash2,
   Upload,
@@ -85,7 +88,7 @@ export function LibraryTab() {
 
   const [scope, setScope] = useState('mine' as ScopeTab)
   const [search, setSearch] = useState('')
-  const [mobileViewsOpen, setMobileViewsOpen] = useState(false)
+  const [viewsMenuOpen, setViewsMenuOpen] = useState(false)
   const [viewFilter, setViewFilter] = useState<ViewFilter>('all')
   const [kindFilter, setKindFilter] = useState<KindFilter>('all')
   const [sortOption, setSortOption] = useState<SortOption>('recent')
@@ -96,7 +99,7 @@ export function LibraryTab() {
   const SIDEBAR_MIN = 148
   const SIDEBAR_MAX = 420
   const [sidebarWidth, setSidebarWidth] = useState(() => {
-    const stored = Number(localStorage.getItem('library:sidebarWidth'))
+    const stored = Number(readStored('library:sidebarWidth'))
     return stored >= SIDEBAR_MIN && stored <= SIDEBAR_MAX ? stored : SIDEBAR_MIN
   })
   const [resizing, setResizing] = useState(false)
@@ -122,7 +125,7 @@ export function LibraryTab() {
     }
   }, [resizing])
   useEffect(() => {
-    localStorage.setItem('library:sidebarWidth', String(sidebarWidth))
+    writeStored('library:sidebarWidth', String(sidebarWidth))
   }, [sidebarWidth])
   const sidebarRef = useRef<HTMLDivElement>(null)
   const sidebarLeftRef = useRef(0)
@@ -130,6 +133,43 @@ export function LibraryTab() {
   // Folder system
   const folderScope = scope === 'team' ? 'team' : 'personal'
   const { folders, loading: foldersLoading, error: foldersError, refresh: refreshFolders, create: createFolder, rename: renameFolder, remove: removeFolder, moveItems: moveFolderItems } = useLibraryFolders(folderScope, teamId)
+  // Collapsible on wide panels; starts collapsed when this scope has no folders.
+  const sidebar = useLibrarySidebar({ scope: folderScope, teamId, folderCount: folders.length, loading: foldersLoading, error: !!foldersError })
+  const viewsBarRef = useRef<HTMLDivElement>(null)
+  const viewsToggleRef = useRef<HTMLButtonElement>(null)
+  const sidebarExpandRef = useRef<HTMLButtonElement>(null)
+  const sidebarCollapseRef = useRef<HTMLButtonElement>(null)
+  // Keep focus on the control that toggled the sidebar, now in its new place.
+  const focusAfterToggle = useRef<'expand' | 'collapse' | null>(null)
+  const previousSidebar = useRef({ collapsed: sidebar.collapsed, loading: foldersLoading })
+  useEffect(() => {
+    const previous = previousSidebar.current
+    previousSidebar.current = { collapsed: sidebar.collapsed, loading: foldersLoading }
+    const target = focusAfterToggle.current
+    focusAfterToggle.current = null
+    if (target === 'expand') { sidebarExpandRef.current?.focus(); return }
+    if (target === 'collapse') { sidebarCollapseRef.current?.focus(); return }
+    if (sidebar.collapsed === previous.collapsed) return
+    const isHidden = (element: Element | null) => !element || getComputedStyle(element).display === 'none'
+    if (!sidebar.collapsed) {
+      // Expanded on its own (a first folder): close a compact menu left open
+      // behind the now-hidden bar, so it doesn't reappear open on collapse.
+      if (isHidden(viewsBarRef.current)) setViewsMenuOpen(false)
+      return
+    }
+    // Collapsed on its own (the last folder deleted). If that hid or removed
+    // the focused control, move focus to the compact bar. Not on first load.
+    if (previous.loading || foldersLoading) return
+    const active = document.activeElement
+    const lost = !active || active === document.body
+      || (!!sidebarRef.current?.contains(active) && isHidden(sidebarRef.current))
+    if (lost) viewsToggleRef.current?.focus()
+  }, [sidebar.collapsed, foldersLoading])
+  const collapseSidebar = (collapsed: boolean) => {
+    setViewsMenuOpen(false)
+    focusAfterToggle.current = collapsed ? 'expand' : 'collapse'
+    sidebar.setCollapsed(collapsed)
+  }
   const [folderMenuOpen, setFolderMenuOpen] = useState<string | null>(null)
   const [folderMenuPos, setFolderMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 }) // folder uuid with open menu
   const [renamingFolder, setRenamingFolder] = useState<string | null>(null)
@@ -489,6 +529,10 @@ export function LibraryTab() {
   const [editTitle, setEditTitle] = useState('')
   const [editContent, setEditContent] = useState('')
   const [editWhen, setEditWhen] = useState('')
+  // The line the window opened with. Update sends when_to_use only when the
+  // field changed, so a line the list didn't deliver is never saved over as
+  // empty (support ticket: every Edit → Update erased it).
+  const editWhenLoaded = useRef('')
   const [editItemId, setEditItemId] = useState<string | null>(null) // SearchSetItem ID
   const [editLoading, setEditLoading] = useState(false)
   const [editSaving, setEditSaving] = useState(false)
@@ -507,6 +551,7 @@ export function LibraryTab() {
     // authoritative searchphrase loads.
     setEditContent(item.description || '')
     setEditWhen(item.when_to_use || '')
+    editWhenLoaded.current = (item.when_to_use || '').trim()
     setEditError(null)
     setEditLoadError(null)
     setEditItemId(null)
@@ -576,7 +621,8 @@ export function LibraryTab() {
     setEditSaving(true)
     setEditError(null)
     try {
-      await updateSearchSet(editingItem.item_uuid, editKind === 'prompt' ? { title: cleanTitle, when_to_use: editWhen.trim() } : { title: cleanTitle })
+      const whenChanged = editKind === 'prompt' && editWhen.trim() !== editWhenLoaded.current
+      await updateSearchSet(editingItem.item_uuid, whenChanged ? { title: cleanTitle, when_to_use: editWhen.trim() } : { title: cleanTitle })
       if (editItemId) {
         await updateSearchSetItem(editItemId, { searchphrase: editContent, title: cleanTitle })
       } else {
@@ -778,7 +824,7 @@ export function LibraryTab() {
                 aria-pressed={active}
                 onClick={() => {
                   setScope(key)
-                  setMobileViewsOpen(false)
+                  setViewsMenuOpen(false)
                   setViewFilter('all')
                   setFolderMenuOpen(null)
                   setRenamingFolder(null)
@@ -898,14 +944,26 @@ export function LibraryTab() {
           <ExploreTab />
         </div>
       ) : (
-      <div className="library-body" style={{ display: 'flex', flex: '1 0 0', minHeight: 'min(240px, 100%)', overflow: 'hidden' }}>
-        <button type="button" className="library-views-toggle" aria-expanded={mobileViewsOpen} aria-controls="library-saved-views" onClick={() => setMobileViewsOpen(open => !open)}>{mobileViewsOpen ? 'Close views & folders' : `View: ${viewFilter === 'all' ? 'All items' : viewFilter === 'favorites' ? 'Favorites' : viewFilter === 'pinned' ? 'Pinned' : folders.find(folder => folder.uuid === selectedFolder)?.name || 'Folder'} · Change`}</button>
+      <div className="library-body" data-sidebar={sidebar.collapsed ? 'collapsed' : 'expanded'} style={{ display: 'flex', flex: '1 0 0', minHeight: 'min(240px, 100%)', overflow: 'hidden' }}>
+        {/* The compact bar: on narrow panels, and on wide ones while the sidebar is collapsed. */}
+        <div ref={viewsBarRef} className="library-views-bar">
+        <button ref={viewsToggleRef} type="button" className="library-views-toggle" aria-expanded={viewsMenuOpen} aria-controls="library-saved-views" onClick={() => setViewsMenuOpen(open => !open)}>{viewsMenuOpen ? 'Close views & folders' : `View: ${viewFilter === 'all' ? 'All items' : viewFilter === 'favorites' ? 'Favorites' : viewFilter === 'pinned' ? 'Pinned' : folders.find(folder => folder.uuid === selectedFolder)?.name || 'Folder'} · Change`}</button>
+        <button ref={sidebarExpandRef} type="button" className="library-sidebar-expand" aria-label="Show views and folders" title="Show views and folders" aria-expanded={false} aria-controls="library-saved-views" onClick={() => collapseSidebar(false)}>
+          <PanelLeftOpen aria-hidden="true" style={{ width: 16, height: 16 }} />
+        </button>
+        </div>
         {/* Sidebar */}
         <div
           ref={sidebarRef}
           id="library-saved-views"
           className="library-sidebar"
-          data-open={mobileViewsOpen}
+          data-open={viewsMenuOpen}
+          onKeyDown={(event) => {
+            // Escape closes the compact menu, except while naming a folder.
+            if (event.key !== 'Escape' || !viewsMenuOpen || (event.target as HTMLElement).tagName === 'INPUT') return
+            setViewsMenuOpen(false)
+            viewsToggleRef.current?.focus()
+          }}
           style={{
             width: sidebarWidth,
             flexShrink: 0,
@@ -919,16 +977,20 @@ export function LibraryTab() {
           {/* Saved Views */}
           <div
             style={{
-              padding: "0 var(--workspace-space-12)",
+              padding: "0 var(--workspace-space-8) 0 var(--workspace-space-12)",
               marginBottom: 'var(--workspace-space-6)',
-              fontSize: 'var(--workspace-font-meta)',
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              color: '#666',
-              letterSpacing: '0.5px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 'var(--workspace-space-4)',
             }}
           >
-            Saved Views
+            <span style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 700, textTransform: 'uppercase', color: '#666', letterSpacing: '0.5px' }}>
+              Saved Views
+            </span>
+            <button ref={sidebarCollapseRef} type="button" className="library-sidebar-collapse" aria-label="Hide views and folders" title="Hide views and folders" aria-expanded={true} aria-controls="library-saved-views" onClick={() => collapseSidebar(true)}>
+              <PanelLeftClose aria-hidden="true" style={{ width: 15, height: 15 }} />
+            </button>
           </div>
 
           {([
@@ -948,7 +1010,7 @@ export function LibraryTab() {
                 type="button"
                 key={view}
                 aria-pressed={isActive}
-                onClick={() => { setViewFilter(view); setMobileViewsOpen(false) }}
+                onClick={() => { setViewFilter(view); setViewsMenuOpen(false) }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -1126,7 +1188,7 @@ export function LibraryTab() {
                           }
                         }}
                       >
-                        <button type="button" aria-label={`Open folder ${folder.name}`} aria-pressed={isActive} onClick={() => { setViewFilter(folder.uuid); setMobileViewsOpen(false) }} style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0, background: 'none', border: 0, padding: "var(--workspace-space-4) 0", textAlign: 'left', color: 'inherit', font: 'inherit', cursor: 'pointer' }}>
+                        <button type="button" aria-label={`Open folder ${folder.name}`} aria-pressed={isActive} onClick={() => { setViewFilter(folder.uuid); setViewsMenuOpen(false) }} style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0, background: 'none', border: 0, padding: "var(--workspace-space-4) 0", textAlign: 'left', color: 'inherit', font: 'inherit', cursor: 'pointer' }}>
                         {isActive
                           ? <FolderOpen style={{ width: 13, height: 13, marginRight: 7, flexShrink: 0 }} />
                           : <Folder style={{ width: 13, height: 13, marginRight: 7, flexShrink: 0 }} />
@@ -1913,6 +1975,13 @@ export function LibraryTab() {
               <div id="library-edit-when-help" style={{ marginTop: 'var(--workspace-space-4)', fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>
                 Describe the task this Skill is for. Chat uses this description to find a matching Skill. Required to add the Skill to Core Skills in Assistant settings; optional when choosing it for one conversation.
               </div>
+              {scope === 'team' && (
+                // Your own edit stays in use as your core Skill; a teammate's
+                // core copy pauses until they review it (support ticket).
+                <div data-testid="team-core-skill-note" style={{ marginTop: 'var(--workspace-space-8)', fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>
+                  Teammates who use this as a core Skill will need to review the new text in Assistant settings before their chat uses it again.
+                </div>
+              )}
               </div>
             )}
             <div style={{ marginBottom: 'var(--workspace-space-20)' }}>

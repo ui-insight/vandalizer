@@ -48,3 +48,52 @@ class TestExpandFoldersToDocumentUuids:
              patch.object(folder_service.access_control, "get_authorized_folder", AsyncMock(return_value=None)):
             with pytest.raises(ValueError, match="Folder not found"):
                 await folder_service.expand_folders_to_document_uuids(["missing"], user)
+
+
+def _matches(doc: dict, query: dict) -> bool:
+    """The subset of MongoDB matching the expansion query uses: equality
+    (a missing field equals None), ``$in`` and ``$ne``."""
+    for field, cond in query.items():
+        value = doc.get(field)
+        if isinstance(cond, dict):
+            if "$in" in cond and value not in cond["$in"]:
+                return False
+            if "$ne" in cond and value == cond["$ne"]:
+                return False
+        elif value != cond:
+            return False
+    return True
+
+
+class TestExpansionSkipsOldVersionsAndDeletedDocuments:
+    """A ticked folder used to run a workflow on every version of a revised
+    file and on documents retention had soft-deleted. The query itself is
+    applied here to a set of stored rows, so a dropped filter fails the test."""
+
+    @pytest.mark.asyncio
+    async def test_only_current_live_documents_are_returned(self):
+        user = MagicMock(user_id="u1", is_admin=False)
+        rows = [
+            {"uuid": "plain", "folder": "root"},
+            {"uuid": "v1", "folder": "root", "superseded_by": "v2"},
+            {"uuid": "v2", "folder": "root", "superseded_by": None},
+            {"uuid": "deleted", "folder": "root", "soft_deleted": True},
+            {"uuid": "kept", "folder": "root", "soft_deleted": False},
+            {"uuid": "elsewhere", "folder": "other"},
+        ]
+
+        def find(query):
+            cursor = MagicMock()
+            cursor.to_list = AsyncMock(return_value=[_doc(r["uuid"]) for r in rows if _matches(r, query)])
+            return cursor
+
+        folder_find = MagicMock()
+        folder_find.to_list = AsyncMock(return_value=[])
+        with patch.object(folder_service.access_control, "get_team_access_context", AsyncMock(return_value=MagicMock())), \
+             patch.object(folder_service.access_control, "get_authorized_folder", AsyncMock(return_value=MagicMock(uuid="root"))), \
+             patch.object(folder_service.access_control, "get_authorized_document", AsyncMock(return_value=True)), \
+             patch.object(folder_service, "SmartFolder", MagicMock(find=MagicMock(return_value=folder_find))), \
+             patch.object(folder_service, "SmartDocument", MagicMock(find=find)):
+            result = await folder_service.expand_folders_to_document_uuids(["root"], user)
+
+        assert result == ["plain", "v2", "kept"]

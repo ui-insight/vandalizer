@@ -356,3 +356,47 @@ class TestImportPlainDefinitions:
         assert target.extraction_config == {"mode": "two_pass"}
         target.save.assert_not_awaited()
         assert item_cls.call_args.kwargs["searchset"] == "ss-1"
+
+
+class TestImportBookmarksPersonally:
+    """Support ticket: a new Skill sits in Mine until shared, but an import
+    filed its object in the importer's current team library, so it showed in
+    every teammate's Library → Team without being shared. The object keeps
+    its team stamp; the bookmark is personal."""
+
+    @pytest.mark.asyncio
+    async def test_an_imported_set_is_bookmarked_personally(self):
+        from contextlib import ExitStack
+        ss_cls, _item_cls, cms = _import_patches()
+        ensure = AsyncMock()
+        with ExitStack() as stack:
+            for cm in cms:
+                if getattr(cm, "attribute", None) == "_bookmark":
+                    continue
+                stack.enter_context(cm)
+            stack.enter_context(patch("app.services.library_service.ensure_bookmark", ensure))
+            await eis.import_search_set(
+                CHAT_JSON, "u1", team_id="team1", title="Imported", accept_plain=True,
+            )
+        assert ss_cls.call_args.kwargs["team_id"] == "team1"
+        ensure.assert_awaited_once()
+        assert ensure.await_args.args[2] == "u1"
+        assert ensure.await_args.kwargs.get("team_id") is None
+
+    @pytest.mark.asyncio
+    async def test_an_imported_workflow_is_bookmarked_personally(self):
+        wf_cls = MagicMock()
+        wf_cls.return_value.insert = AsyncMock()
+        ensure = AsyncMock()
+        data = eis._envelope("workflow", "", [{"name": "Budget", "steps": []}])
+        with (
+            patch.object(eis, "Workflow", wf_cls),
+            patch.object(eis.name_conflicts, "next_available_name", AsyncMock(side_effect=lambda name, taken: name)),
+            patch.object(eis.workflow_service, "get_workflow", AsyncMock(return_value={"id": "w1", "name": "Budget (Imported)"})),
+            patch("app.services.library_service.ensure_bookmark", ensure),
+        ):
+            await eis.import_workflow(data, "u1", team_id="team1")
+        assert wf_cls.call_args.kwargs["team_id"] == "team1"
+        ensure.assert_awaited_once()
+        assert ensure.await_args.args[2] == "u1"
+        assert ensure.await_args.kwargs.get("team_id") is None

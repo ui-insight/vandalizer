@@ -5,7 +5,23 @@
 .account-name { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .library-workspace { container: library / inline-size; min-width: 0; }
 .library-body { position: relative; }
-.library-views-toggle { display: none; }
+.library-views-bar { display: none; }
+.library-views-toggle { flex: 1; min-width: 0; padding: 10px 14px; background: none; border: 0; text-align: left; font: inherit; font-size: var(--workspace-font-control); color: #30363d; cursor: pointer; }
+.library-sidebar-expand, .library-sidebar-collapse { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; flex-shrink: 0; padding: 0; border: 0; border-radius: 6px; background: none; color: #6b7280; cursor: pointer; }
+.library-sidebar-expand { margin-right: 8px; }
+.library-sidebar-expand:hover, .library-sidebar-collapse:hover { background: #e8eaed; color: #30363d; }
+.library-sidebar-expand:focus-visible, .library-sidebar-collapse:focus-visible, .library-views-toggle:focus-visible { outline: 2px solid var(--library-highlight); outline-offset: -2px; }
+/* Collapsed on a wide panel: the narrow layout's compact bar, with the views
+   and folders opening below it, and a button to bring the sidebar back.
+   Wide panels only, so the narrow layout below is unchanged. */
+@container library (width > 650px) {
+  .library-body[data-sidebar="collapsed"] { flex-direction: column; }
+  .library-body[data-sidebar="collapsed"] .library-views-bar { display: flex; align-items: center; flex-shrink: 0; background: #f5f6f7; border-bottom: 1px solid #dfe3e6; }
+  .library-body[data-sidebar="collapsed"] .library-sidebar { display: none; }
+  .library-body[data-sidebar="collapsed"] .library-sidebar[data-open="true"] { display: block; width: 100% !important; max-height: 260px; border-right: 0 !important; border-bottom: 1px solid #dfe3e6; }
+  .library-body[data-sidebar="collapsed"] .library-sidebar-resizer,
+  .library-body[data-sidebar="collapsed"] .library-sidebar-collapse { display: none; }
+}
 .library-kind-select { display: none; }
 .library-list-header { flex-shrink: 0; }
 .library-item-actions { opacity: 0; pointer-events: none; }
@@ -57,6 +73,25 @@
 .file-modified-label { display: block; padding-right: 44px; }
 .file-table col:last-child { width: 140px !important; }
 .file-table .file-size-cell { padding-left: 8px !important; padding-right: 8px !important; }
+/* Files panel sections: a "Folders" and a "Documents" heading row inside the one
+   table, so both share the column widths and the sticky column header. */
+.file-table tr.file-section-row, .file-table tbody tr.file-section-row:hover { background: #fbfbfc; }
+.file-table tr.file-section-row > th { padding: 8px 10px !important; text-align: left; font-weight: 400; border-bottom: 1px solid #dddddd; }
+.file-table tbody + tbody tr.file-section-row > th { border-top: 1px solid #dddddd; }
+.file-section-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.file-section-title, .file-section-toggle { display: inline-flex; align-items: center; gap: 4px; font-size: var(--workspace-font-meta); font-weight: 600; color: var(--workspace-text); white-space: nowrap; }
+.file-section-toggle { font-family: inherit; background: none; border: 0; padding: 2px 6px 2px 2px; margin: 0; border-radius: 6px; cursor: pointer; }
+.file-section-toggle:hover { background: var(--workspace-hover); }
+.file-section-count { font-weight: 400; color: var(--workspace-muted); }
+.file-filter-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.file-filter-chip { display: inline-flex; align-items: center; gap: 4px; font-family: inherit; font-size: var(--workspace-font-meta); line-height: 1.4; padding: 2px 9px; border-radius: 999px; border: 1px solid #d5dae0; background: #fff; color: var(--workspace-text); cursor: pointer; white-space: nowrap; }
+.file-filter-chip:hover { background: var(--workspace-hover); }
+.file-filter-chip[aria-pressed="true"] { border-color: color-mix(in srgb, var(--highlight-color, #eab308) 70%, #6b7280); background: color-mix(in srgb, var(--highlight-color, #eab308) 16%, white); font-weight: 600; }
+.file-filter-chip[data-tone="attention"] { color: #92400e; border-color: #fcd34d; background: #fffbeb; }
+.file-filter-chip[data-tone="attention"][aria-pressed="true"] { border-color: #d97706; background: #fef3c7; }
+.file-filter-count { color: var(--workspace-muted); font-weight: 400; }
+.file-filter-chip[data-tone="attention"] .file-filter-count { color: inherit; }
+.file-section-note { display: flex; align-items: center; gap: 6px; margin: 6px 0 0; font-size: var(--workspace-font-meta); color: #92400e; }
 .project-list-tools { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 24px; }
 .project-list-tools input, .project-list-tools select { padding: 9px 12px; border: 1px solid #d1d5db; border-radius: 8px; font: inherit; font-size: var(--workspace-font-control); min-width: 0; background: white; color: #374151; }
 .project-list-tools input { flex: 1 1 180px; }
@@ -108,9 +143,9 @@
 }
 @container files (max-width: 560px) {
   .file-table col:last-child { width: 42px !important; }
-  .file-table th:last-child { font-size: 0 !important; padding: 0 !important; }
-  .file-table th:last-child button { font-size: 0 !important; }
-  .file-table th:last-child button svg { width: 18px; height: 18px; }
+  .file-table thead th:last-child { font-size: 0 !important; padding: 0 !important; }
+  .file-table thead th:last-child button { font-size: 0 !important; }
+  .file-table thead th:last-child button svg { width: 18px; height: 18px; }
   .file-table td:last-child { padding: 0 !important; }
   .file-modified-label { display: none; }
   /* Take the Size column out of the table entirely (its col and every cell in it). A zero-width column in a
@@ -136,7 +171,9 @@
   .library-filters > div:last-child { min-width: 0 !important; }
   .library-filters > div:last-child select { height: 36px !important; padding: 0 8px !important; }
   .library-body { flex-direction: column; }
-  .library-views-toggle { display: block; flex-shrink: 0; padding: 10px 14px; background: #f5f6f7; border: 0; border-bottom: 1px solid #dfe3e6; text-align: left; font: inherit; font-size: var(--workspace-font-control); color: #30363d; cursor: pointer; }
+  .library-views-bar { display: flex; align-items: center; flex-shrink: 0; background: #f5f6f7; border-bottom: 1px solid #dfe3e6; }
+  /* Narrow panels are always compact: nothing to collapse or expand. */
+  .library-sidebar-expand, .library-sidebar-collapse { display: none !important; }
   .library-sidebar { display: none; }
   .library-sidebar[data-open="true"] { display: block; width: 100% !important; max-height: 220px; }
   .library-sidebar-resizer { display: none; }

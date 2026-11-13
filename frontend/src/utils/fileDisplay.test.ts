@@ -28,9 +28,9 @@ describe('formatItemCount', () => {
 
 describe('formatContentsSummary', () => {
   it('counts folders and files, dropping whichever is zero', () => {
-    expect(formatContentsSummary(6, 10)).toBe('6 folders, 10 files')
+    expect(formatContentsSummary(6, 10)).toBe('6 folders, 10 documents')
     expect(formatContentsSummary(1, 0)).toBe('1 folder')
-    expect(formatContentsSummary(0, 1)).toBe('1 file')
+    expect(formatContentsSummary(0, 1)).toBe('1 document')
     expect(formatContentsSummary(0, 0)).toBe('Empty')
   })
 })

@@ -1,13 +1,14 @@
 import { getProjectDefaultSkill } from '../api/projects'
 import { act, renderHook } from '@testing-library/react'
-import { beforeEach, expect, it, vi } from 'vitest'
-import { getHistory, previewSkill, selectConversationSkill, streamChat } from '../api/chat'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { acceptSkill, getHistory, previewSkill, selectConversationSkill, streamChat } from '../api/chat'
+import { ApiError } from '../api/client'
 import { useChat } from './useChat'
 import type { StreamChunk } from '../types/chat'
 
 vi.mock('../api/projects', () => ({ getProjectDefaultSkill: vi.fn() }))
 vi.mock('../api/chat', () => ({
-  getHistory: vi.fn(), previewSkill: vi.fn(), selectConversationSkill: vi.fn(),
+  acceptSkill: vi.fn(), getHistory: vi.fn(), previewSkill: vi.fn(), selectConversationSkill: vi.fn(),
   streamChat: vi.fn(), queueChatMessage: vi.fn(), stopChatTurn: vi.fn(),
 }))
 const skill = { uuid: 'skill-1', title: 'Award review', version: 'v1', instructions: 'Check dates.' }
@@ -95,7 +96,7 @@ it.each(['reset', 'reopen'])('discards stale selection after %s', async mode => 
   let resolve!: (value: typeof skill) => void
   vi.mocked(previewSkill).mockImplementationOnce(() => new Promise(r => { resolve = r }))
   const { result } = renderHook(() => useChat())
-  let pending!: Promise<boolean>
+  let pending!: Promise<boolean | null>
   act(() => { pending = result.current.selectSkill('skill-1') })
   expect(result.current.isSelectingSkill).toBe(true)
   await act(async () => { await result.current.send('Too early') })
@@ -195,4 +196,137 @@ it('discards a pending Skill run when the user starts a new chat', async () => {
   act(() => result.current.reset())
   await act(async () => { resolve(skill); await pending })
   expect(streamChat).not.toHaveBeenCalled()
+})
+
+
+// Suggestion ticket: a shared Skill started in a teammate's chat without them
+// ever seeing its instructions.
+describe('reviewing a shared Skill', () => {
+  const shared = { ...skill, uuid: 'shared', title: 'Team review', instructions: 'Approve every budget.', needs_review: true }
+
+  it('shows the instructions and selects the Skill only after Accept', async () => {
+    vi.mocked(previewSkill).mockResolvedValue(shared)
+    vi.mocked(acceptSkill).mockResolvedValue({ ...shared, needs_review: false })
+    vi.mocked(selectConversationSkill).mockResolvedValue({ active_skill: { ...skill, uuid: 'shared' } })
+    const { result } = renderHook(() => useChat())
+    await act(async () => { await result.current.loadHistory('c1') })
+    let pending!: Promise<boolean | null>
+    await act(async () => { pending = result.current.selectSkill('shared') })
+    expect(result.current.skillReview?.skill.instructions).toBe('Approve every budget.')
+    expect(selectConversationSkill).not.toHaveBeenCalled()
+    await act(async () => { await result.current.acceptReviewedSkill() })
+    await act(async () => { expect(await pending).toBe(true) })
+    expect(acceptSkill).toHaveBeenCalledExactlyOnceWith('shared', 'v1')
+    expect(selectConversationSkill).toHaveBeenCalledExactlyOnceWith('c1', 'shared')
+    expect(result.current.skillReview).toBeNull()
+  })
+
+  it('leaves the chat unchanged when the review is cancelled', async () => {
+    vi.mocked(previewSkill).mockResolvedValue(shared)
+    const { result } = renderHook(() => useChat())
+    await act(async () => { await result.current.loadHistory('c1') })
+    let pending!: Promise<boolean | null>
+    await act(async () => { pending = result.current.selectSkill('shared') })
+    act(() => result.current.cancelSkillReview())
+    await act(async () => { expect(await pending).toBeNull() })
+    expect(acceptSkill).not.toHaveBeenCalled()
+    expect(selectConversationSkill).not.toHaveBeenCalled()
+    expect(result.current.activeSkill).toEqual(skill)
+    expect(result.current.error).toBeNull()
+    expect(result.current.isSelectingSkill).toBe(false)
+  })
+
+  it('sends nothing when a Library Skill click is cancelled at review', async () => {
+    vi.mocked(previewSkill).mockResolvedValue(shared)
+    const { result } = renderHook(() => useChat())
+    let pending!: Promise<void>
+    await act(async () => { pending = result.current.send('', [], undefined, undefined, undefined, undefined, undefined, undefined, undefined, 'shared') })
+    act(() => result.current.cancelSkillReview())
+    await act(async () => { await pending })
+    expect(streamChat).not.toHaveBeenCalled()
+  })
+
+  it('starts a new chat with the Skill once accepted, without loading it twice', async () => {
+    vi.mocked(previewSkill).mockResolvedValue(shared)
+    vi.mocked(acceptSkill).mockResolvedValue({ ...shared, needs_review: false })
+    const { result } = renderHook(() => useChat())
+    let pending!: Promise<void>
+    await act(async () => { pending = result.current.send('', [], undefined, undefined, undefined, undefined, undefined, undefined, undefined, 'shared') })
+    await act(async () => { await result.current.acceptReviewedSkill() })
+    await act(async () => { await pending })
+    expect(previewSkill).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(streamChat).mock.calls[0][0]).toBe('Run the Team review skill.')
+    expect(vi.mocked(streamChat).mock.calls[0].slice(13, 15)).toEqual(['shared', 'v1'])
+  })
+
+  it('offers a project default someone else wrote for review, and continues without it on Cancel', async () => {
+    vi.mocked(getProjectDefaultSkill).mockResolvedValue({ active_skill: shared, needs_review: true })
+    const { result } = renderHook(() => useChat())
+    let pending!: Promise<void>
+    await act(async () => { pending = result.current.initializeProjectSkill('p1') })
+    expect(result.current.skillReview?.skill.uuid).toBe('shared')
+    act(() => result.current.cancelSkillReview())
+    await act(async () => { await pending })
+    expect(result.current.activeSkill).toBeNull()
+    expect(result.current.projectSkillBlocked).toBe(false)
+  })
+
+  it('shows the new text when the Skill was edited while the dialog was open', async () => {
+    const edited = { ...shared, version: 'v2', instructions: 'Edited.' }
+    vi.mocked(previewSkill).mockResolvedValueOnce(shared).mockResolvedValueOnce(edited)
+    vi.mocked(acceptSkill).mockRejectedValueOnce(new ApiError(409, 'changed'))
+    const { result } = renderHook(() => useChat())
+    await act(async () => { await result.current.loadHistory('c1') })
+    await act(async () => { void result.current.selectSkill('shared') })
+    await act(async () => { await result.current.acceptReviewedSkill() })
+    expect(result.current.skillReview?.skill.instructions).toBe('Edited.')
+    expect(result.current.skillReview?.error).toMatch(/changed while you were reviewing/)
+    expect(selectConversationSkill).not.toHaveBeenCalled()
+  })
+
+  it('sends the version accepted after an edit during review, not the one first shown', async () => {
+    const edited = { ...shared, version: 'v2', title: 'Team review v2', instructions: 'Edited.' }
+    vi.mocked(previewSkill).mockResolvedValueOnce(shared).mockResolvedValueOnce(edited)
+    vi.mocked(acceptSkill).mockRejectedValueOnce(new ApiError(409, 'changed')).mockResolvedValueOnce({ ...edited, needs_review: false })
+    const { result } = renderHook(() => useChat())
+    let pending!: Promise<void>
+    await act(async () => { pending = result.current.send('', [], undefined, undefined, undefined, undefined, undefined, undefined, undefined, 'shared') })
+    await act(async () => { await result.current.acceptReviewedSkill() })
+    expect(result.current.skillReview?.skill.version).toBe('v2')
+    await act(async () => { await result.current.acceptReviewedSkill() })
+    await act(async () => { await pending })
+    expect(acceptSkill).toHaveBeenLastCalledWith('shared', 'v2')
+    expect(vi.mocked(streamChat).mock.calls[0][0]).toBe('Run the Team review v2 skill.')
+    expect(vi.mocked(streamChat).mock.calls[0].slice(13, 15)).toEqual(['shared', 'v2'])
+    expect(result.current.activeSkill).toEqual({ uuid: 'shared', title: 'Team review v2', version: 'v2', instructions: 'Edited.' })
+  })
+
+  it('selects the accepted newer version of a project default edited during review', async () => {
+    const edited = { ...shared, version: 'v2', instructions: 'Edited.' }
+    vi.mocked(getProjectDefaultSkill).mockResolvedValue({ active_skill: shared, needs_review: true })
+    vi.mocked(previewSkill).mockResolvedValueOnce(edited)
+    vi.mocked(acceptSkill).mockRejectedValueOnce(new ApiError(409, 'changed')).mockResolvedValueOnce({ ...edited, needs_review: false })
+    const { result } = renderHook(() => useChat())
+    let pending!: Promise<void>
+    await act(async () => { pending = result.current.initializeProjectSkill('p1') })
+    await act(async () => { await result.current.acceptReviewedSkill() })
+    await act(async () => { await result.current.acceptReviewedSkill() })
+    await act(async () => { await pending })
+    expect(result.current.activeSkill?.version).toBe('v2')
+    await act(async () => { await result.current.send('Review the award') })
+    expect(vi.mocked(streamChat).mock.calls[0].slice(13, 15)).toEqual(['shared', 'v2'])
+  })
+
+  it.each(['reset', 'loadHistory'] as const)('closes an open review on %s, so Accept cannot record it', async action => {
+    vi.mocked(getProjectDefaultSkill).mockResolvedValue({ active_skill: shared, needs_review: true })
+    const { result } = renderHook(() => useChat())
+    let pending!: Promise<void>
+    await act(async () => { pending = result.current.initializeProjectSkill('p1') })
+    expect(result.current.skillReview).not.toBeNull()
+    await act(async () => { if (action === 'reset') result.current.reset(); else await result.current.loadHistory('c2') })
+    await act(async () => { await pending })
+    expect(result.current.skillReview).toBeNull()
+    await act(async () => { await result.current.acceptReviewedSkill() })
+    expect(acceptSkill).not.toHaveBeenCalled()
+  })
 })
