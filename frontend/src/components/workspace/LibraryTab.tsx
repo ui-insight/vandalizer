@@ -13,6 +13,7 @@ import { useLibraries, useLibraryItems } from '../../hooks/useLibrary'
 import { LibraryItemRow } from '../library/LibraryItemRow'
 import { ExploreTab } from '../library/ExploreTab'
 import { OrganizationHelp } from '../library/OrganizationHelp'
+import { useLibrarySidebar } from '../library/useLibrarySidebar'
 import { ShareWithTeamDialog } from '../library/ShareWithTeamDialog'
 import { useConfirm } from '../shared/useConfirm'
 
@@ -39,6 +40,8 @@ import {
   FolderOpen,
   FolderPlus,
   MoreHorizontal,
+  PanelLeftClose,
+  PanelLeftOpen,
   Pencil,
   Trash2,
   Upload,
@@ -85,7 +88,7 @@ export function LibraryTab() {
 
   const [scope, setScope] = useState('mine' as ScopeTab)
   const [search, setSearch] = useState('')
-  const [mobileViewsOpen, setMobileViewsOpen] = useState(false)
+  const [viewsMenuOpen, setViewsMenuOpen] = useState(false)
   const [viewFilter, setViewFilter] = useState<ViewFilter>('all')
   const [kindFilter, setKindFilter] = useState<KindFilter>('all')
   const [sortOption, setSortOption] = useState<SortOption>('recent')
@@ -130,6 +133,24 @@ export function LibraryTab() {
   // Folder system
   const folderScope = scope === 'team' ? 'team' : 'personal'
   const { folders, loading: foldersLoading, error: foldersError, refresh: refreshFolders, create: createFolder, rename: renameFolder, remove: removeFolder, moveItems: moveFolderItems } = useLibraryFolders(folderScope, teamId)
+  // Collapsible on wide panels; starts collapsed when this scope has no folders.
+  const sidebar = useLibrarySidebar({ scope: folderScope, folderCount: folders.length, loading: foldersLoading, error: !!foldersError })
+  const viewsToggleRef = useRef<HTMLButtonElement>(null)
+  const sidebarExpandRef = useRef<HTMLButtonElement>(null)
+  const sidebarCollapseRef = useRef<HTMLButtonElement>(null)
+  // Keep focus on the control that toggled the sidebar, now in its new place.
+  const focusAfterToggle = useRef<'expand' | 'collapse' | null>(null)
+  useEffect(() => {
+    const target = focusAfterToggle.current
+    focusAfterToggle.current = null
+    if (target === 'expand') sidebarExpandRef.current?.focus()
+    else if (target === 'collapse') sidebarCollapseRef.current?.focus()
+  }, [sidebar.collapsed])
+  const collapseSidebar = (collapsed: boolean) => {
+    setViewsMenuOpen(false)
+    focusAfterToggle.current = collapsed ? 'expand' : 'collapse'
+    sidebar.setCollapsed(collapsed)
+  }
   const [folderMenuOpen, setFolderMenuOpen] = useState<string | null>(null)
   const [folderMenuPos, setFolderMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 }) // folder uuid with open menu
   const [renamingFolder, setRenamingFolder] = useState<string | null>(null)
@@ -778,7 +799,7 @@ export function LibraryTab() {
                 aria-pressed={active}
                 onClick={() => {
                   setScope(key)
-                  setMobileViewsOpen(false)
+                  setViewsMenuOpen(false)
                   setViewFilter('all')
                   setFolderMenuOpen(null)
                   setRenamingFolder(null)
@@ -898,14 +919,26 @@ export function LibraryTab() {
           <ExploreTab />
         </div>
       ) : (
-      <div className="library-body" style={{ display: 'flex', flex: '1 0 0', minHeight: 'min(240px, 100%)', overflow: 'hidden' }}>
-        <button type="button" className="library-views-toggle" aria-expanded={mobileViewsOpen} aria-controls="library-saved-views" onClick={() => setMobileViewsOpen(open => !open)}>{mobileViewsOpen ? 'Close views & folders' : `View: ${viewFilter === 'all' ? 'All items' : viewFilter === 'favorites' ? 'Favorites' : viewFilter === 'pinned' ? 'Pinned' : folders.find(folder => folder.uuid === selectedFolder)?.name || 'Folder'} · Change`}</button>
+      <div className="library-body" data-sidebar={sidebar.collapsed ? 'collapsed' : 'expanded'} style={{ display: 'flex', flex: '1 0 0', minHeight: 'min(240px, 100%)', overflow: 'hidden' }}>
+        {/* The compact bar: on narrow panels, and on wide ones while the sidebar is collapsed. */}
+        <div className="library-views-bar">
+        <button ref={viewsToggleRef} type="button" className="library-views-toggle" aria-expanded={viewsMenuOpen} aria-controls="library-saved-views" onClick={() => setViewsMenuOpen(open => !open)}>{viewsMenuOpen ? 'Close views & folders' : `View: ${viewFilter === 'all' ? 'All items' : viewFilter === 'favorites' ? 'Favorites' : viewFilter === 'pinned' ? 'Pinned' : folders.find(folder => folder.uuid === selectedFolder)?.name || 'Folder'} · Change`}</button>
+        <button ref={sidebarExpandRef} type="button" className="library-sidebar-expand" aria-label="Show views and folders" title="Show views and folders" aria-expanded={false} aria-controls="library-saved-views" onClick={() => collapseSidebar(false)}>
+          <PanelLeftOpen aria-hidden="true" style={{ width: 16, height: 16 }} />
+        </button>
+        </div>
         {/* Sidebar */}
         <div
           ref={sidebarRef}
           id="library-saved-views"
           className="library-sidebar"
-          data-open={mobileViewsOpen}
+          data-open={viewsMenuOpen}
+          onKeyDown={(event) => {
+            // Escape closes the compact menu, except while naming a folder.
+            if (event.key !== 'Escape' || !viewsMenuOpen || (event.target as HTMLElement).tagName === 'INPUT') return
+            setViewsMenuOpen(false)
+            viewsToggleRef.current?.focus()
+          }}
           style={{
             width: sidebarWidth,
             flexShrink: 0,
@@ -919,16 +952,20 @@ export function LibraryTab() {
           {/* Saved Views */}
           <div
             style={{
-              padding: "0 var(--workspace-space-12)",
+              padding: "0 var(--workspace-space-8) 0 var(--workspace-space-12)",
               marginBottom: 'var(--workspace-space-6)',
-              fontSize: 'var(--workspace-font-meta)',
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              color: '#666',
-              letterSpacing: '0.5px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 'var(--workspace-space-4)',
             }}
           >
-            Saved Views
+            <span style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 700, textTransform: 'uppercase', color: '#666', letterSpacing: '0.5px' }}>
+              Saved Views
+            </span>
+            <button ref={sidebarCollapseRef} type="button" className="library-sidebar-collapse" aria-label="Hide views and folders" title="Hide views and folders" aria-expanded={true} aria-controls="library-saved-views" onClick={() => collapseSidebar(true)}>
+              <PanelLeftClose aria-hidden="true" style={{ width: 15, height: 15 }} />
+            </button>
           </div>
 
           {([
@@ -948,7 +985,7 @@ export function LibraryTab() {
                 type="button"
                 key={view}
                 aria-pressed={isActive}
-                onClick={() => { setViewFilter(view); setMobileViewsOpen(false) }}
+                onClick={() => { setViewFilter(view); setViewsMenuOpen(false) }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -1126,7 +1163,7 @@ export function LibraryTab() {
                           }
                         }}
                       >
-                        <button type="button" aria-label={`Open folder ${folder.name}`} aria-pressed={isActive} onClick={() => { setViewFilter(folder.uuid); setMobileViewsOpen(false) }} style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0, background: 'none', border: 0, padding: "var(--workspace-space-4) 0", textAlign: 'left', color: 'inherit', font: 'inherit', cursor: 'pointer' }}>
+                        <button type="button" aria-label={`Open folder ${folder.name}`} aria-pressed={isActive} onClick={() => { setViewFilter(folder.uuid); setViewsMenuOpen(false) }} style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0, background: 'none', border: 0, padding: "var(--workspace-space-4) 0", textAlign: 'left', color: 'inherit', font: 'inherit', cursor: 'pointer' }}>
                         {isActive
                           ? <FolderOpen style={{ width: 13, height: 13, marginRight: 7, flexShrink: 0 }} />
                           : <Folder style={{ width: 13, height: 13, marginRight: 7, flexShrink: 0 }} />

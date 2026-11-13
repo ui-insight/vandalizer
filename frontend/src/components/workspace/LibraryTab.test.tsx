@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { LibraryTab } from './LibraryTab'
-import type { LibraryItem } from '../../types/library'
+import type { LibraryFolder, LibraryItem } from '../../types/library'
 
 const sendChatMessage = vi.fn()
 const openWorkflow = vi.fn()
@@ -50,6 +50,7 @@ vi.mock('../library/ExploreTab', () => ({ ExploreTab: () => <div>Catalog browser
 vi.mock('../library/ShareWithTeamDialog', () => ({ ShareWithTeamDialog: () => null }))
 
 const mockItems: { current: LibraryItem[] } = { current: [] }
+const mockFolders: { current: LibraryFolder[]; loading: boolean } = { current: [], loading: false }
 const removeItemMock = vi.fn()
 
 vi.mock('../../hooks/useLibrary', () => ({
@@ -68,8 +69,8 @@ vi.mock('../../hooks/useLibrary', () => ({
     update: vi.fn(),
   }),
   useLibraryFolders: () => ({
-    folders: [],
-    loading: false,
+    folders: mockFolders.current,
+    loading: mockFolders.loading,
     refresh: vi.fn(),
     create: vi.fn(),
     rename: vi.fn(),
@@ -128,6 +129,9 @@ function makePrompt(overrides: Partial<LibraryItem> = {}): LibraryItem {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  localStorage.clear()
+  mockFolders.current = []
+  mockFolders.loading = false
   mockItems.current = [makePrompt()]
   vi.mocked(listSearchSetItems).mockResolvedValue([
     { id: 'ssi-1', searchphrase: 'Summarize the key terms of this award.' },
@@ -352,5 +356,63 @@ describe('LibraryTab empty state', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Workflows/ }))
     expect(screen.getByText('No items match these filters')).toBeTruthy()
     expect(screen.queryByText('Browse the catalog →')).toBeNull()
+  })
+})
+
+
+// UI suggestion ticket: the sidebar took a third of the panel for people with
+// no folders and squeezed the tool list.
+describe('LibraryTab sidebar', () => {
+  const folder = (name: string): LibraryFolder => ({ uuid: name, name, parent_id: null, scope: 'personal', item_count: 0 })
+  const body = (container: HTMLElement) => container.querySelector('.library-body') as HTMLElement
+
+  it('starts collapsed with no folders, showing the compact view bar', () => {
+    const { container } = render(<LibraryTab />)
+    expect(body(container).dataset.sidebar).toBe('collapsed')
+    expect(screen.getByRole('button', { name: 'View: All items · Change' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Show views and folders' })).toBeTruthy()
+  })
+
+  it('starts expanded when there are folders', () => {
+    mockFolders.current = [folder('Awards')]
+    const { container } = render(<LibraryTab />)
+    expect(body(container).dataset.sidebar).toBe('expanded')
+  })
+
+  it('expands and collapses, keeps focus on the control, and remembers the choice', () => {
+    const { container, unmount } = render(<LibraryTab />)
+    fireEvent.click(screen.getByRole('button', { name: 'Show views and folders' }))
+    expect(body(container).dataset.sidebar).toBe('expanded')
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Hide views and folders' }))
+    expect(localStorage.getItem('library:sidebar')).toBe('expanded')
+    unmount()
+    // Remembered over the no-folders default.
+    const again = render(<LibraryTab />)
+    expect(body(again.container).dataset.sidebar).toBe('expanded')
+    fireEvent.click(screen.getByRole('button', { name: 'Hide views and folders' }))
+    expect(body(again.container).dataset.sidebar).toBe('collapsed')
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Show views and folders' }))
+  })
+
+  it('opens views from the compact bar, and closes on a choice or Escape', () => {
+    const { container } = render(<LibraryTab />)
+    const sidebar = container.querySelector('#library-saved-views') as HTMLElement
+    const toggle = screen.getByRole('button', { name: 'View: All items · Change' })
+    fireEvent.click(toggle)
+    expect(sidebar.dataset.open).toBe('true')
+    fireEvent.click(screen.getByRole('button', { name: /Favorites/ }))
+    expect(sidebar.dataset.open).toBe('false')
+    expect(screen.getByRole('button', { name: 'View: Favorites · Change' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'View: Favorites · Change' }))
+    fireEvent.keyDown(screen.getByRole('button', { name: /Pinned/ }), { key: 'Escape' })
+    expect(sidebar.dataset.open).toBe('false')
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'View: Favorites · Change' }))
+  })
+
+  it('does not snap shut while folders load for someone who has them', () => {
+    localStorage.setItem('library:hasFolders:personal', '1')
+    mockFolders.loading = true
+    const { container } = render(<LibraryTab />)
+    expect(body(container).dataset.sidebar).toBe('expanded')
   })
 })
