@@ -928,7 +928,8 @@ async def list_items(uuid: str, user: User = Depends(get_current_user)) -> list[
 @router.patch("/items/{item_id}", response_model=SearchSetItemResponse)
 async def update_item(item_id: str, req: UpdateSearchSetItemRequest, user: User = Depends(get_current_user)) -> SearchSetItemResponse:
     existing = await _get_search_set_item_or_404(item_id, user)
-    core_before = await skill_service.core_version_before_edit(user, existing.searchset)
+    parent_uuid = str(existing.searchset)  # the guard 404s an item with no set
+    core_before = await skill_service.core_version_before_edit(user, parent_uuid)
     item = await svc.update_item(
         item_id, searchphrase=req.searchphrase, title=req.title,
         is_optional=req.is_optional, enum_values=req.enum_values,
@@ -936,7 +937,7 @@ async def update_item(item_id: str, req: UpdateSearchSetItemRequest, user: User 
     )
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
-    await skill_service.keep_own_edit_accepted(user, existing.searchset, core_before)
+    await skill_service.keep_own_edit_accepted(user, parent_uuid, core_before)
     # Flag stale verification on parent search set
     if item.searchset:
         from app.models.search_set import SearchSet
