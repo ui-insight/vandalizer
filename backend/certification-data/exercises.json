@@ -406,8 +406,7 @@
       "Inspect actual per-document status and retain the intended input list and run identities. Streaming activity or a combined table alone does not prove all inputs completed.",
       "Compare the returned PI names with each assigned source: Maria Lopez, Robert Kim and Amara Okafor are teaching targets, not a substitute for actual evidence.",
       "Preserve successful results, inspect failures and verify repairs before a targeted retry. An aggregate terminal batch can contain failures.",
-      "Reconcile all assigned inputs and unresolved results before checking course completion. Original size-based stars remain separate from the new course’s assessed coverage outcomes.",
-      "If a document fails, fix the problem and run the batch again: the check reads your most recent batch of three or more documents, so a retry that completes fully clears the earlier failure. The three assigned files earn one star. Two and three stars need a batch of 5+ or 10+ documents that all complete, so add proposals of your own; the course provides only three."
+      "Reconcile all assigned inputs and unresolved results before checking course completion. Original size-based stars remain separate from the new course’s assessed coverage outcomes."
     ],
     "chat_instructions": [
       "Ask chat for this module’s saved original requirements. Ask chat to prepare the three assigned files: **proposal-batch-1.pdf**, **proposal-batch-2.pdf** and **proposal-batch-3.pdf**. Verify each distinct source identity.",
@@ -416,8 +415,7 @@
       "Inspect actual per-document status and retain the intended input list and run identities. Streaming activity or a combined table alone does not prove all inputs completed.",
       "Compare the returned PI names with each assigned source: Maria Lopez, Robert Kim and Amara Okafor are teaching targets, not a substitute for actual evidence.",
       "Preserve successful results, inspect failures and verify repairs before a targeted retry. An aggregate terminal batch can contain failures.",
-      "Reconcile all assigned inputs and unresolved results before checking course completion. Original size-based stars remain separate from the new course’s assessed coverage outcomes.",
-      "If a document fails, fix the problem and run the batch again: the check reads your most recent batch of three or more documents, so a retry that completes fully clears the earlier failure. The three assigned files earn one star. Two and three stars need a batch of 5+ or 10+ documents that all complete, so add proposals of your own; the course provides only three."
+      "Reconcile all assigned inputs and unresolved results before checking course completion. Original size-based stars remain separate from the new course’s assessed coverage outcomes."
     ],
     "expected_fields": [
       "PI Name",
