@@ -31,6 +31,9 @@ const mocks = vi.hoisted(() => ({
   loadHistory: vi.fn(),
   blocked: false,
   workspace: {
+    activeProjectUuid: null as string | null,
+    activeProjectTitle: 'Grant',
+    activeProjectRole: 'owner',
     workspaceMode: 'chat',
     bumpActivitySignal: vi.fn(),
     focusChat: vi.fn(),
@@ -68,6 +71,8 @@ vi.mock('../../hooks/useChatUploads', () => ({ useChatUploads: (onUploaded: (uui
 vi.mock('../../api/config', () => ({ getUserConfig: async () => ({}), markFirstSessionComplete: async () => {} }))
 vi.mock('../../api/documents', () => ({ pollStatus: vi.fn(), searchDocuments: vi.fn() }))
 vi.mock('../../api/knowledge', () => ({ getKnowledgeBase: async () => ({ sources_ready: 1, total_sources: 1 }) }))
+vi.mock('./RAInbox', () => ({ RAInbox: ({ projectUuid }: { projectUuid?: string }) => <div data-testid="inbox">Due and needed: {projectUuid || 'Home'}</div> }))
+vi.mock('../projects/ProjectSuggestedActions', () => ({ ProjectSuggestedActions: ({ onSend }: { onSend: (message: string) => void }) => <button onClick={() => onSend('Summarize this project')}>Summarize project</button> }))
 vi.mock('./ChatInput', () => ({ ChatInput: ({ onAddExistingFiles }: { onAddExistingFiles: () => void }) => <button onClick={onAddExistingFiles}>From my files</button> }))
 vi.mock('./ContextLimitDialog', () => ({ ContextLimitDialog: () => null }))
 vi.mock('./HomeExperience', () => ({
@@ -105,6 +110,7 @@ beforeEach(() => {
   mocks.loadHistory.mockResolvedValue(null)
   mocks.uploading = false
   mocks.blocked = false
+  mocks.workspace.activeProjectUuid = null
   mocks.workspace.workspaceMode = 'chat'
   mocks.workspace.selectedDocUuids = []
   mocks.workspace.selectedDocNames = {}
@@ -441,4 +447,20 @@ it('explains why a queued edit waits and keeps Save available', () => {
   expect(screen.queryByRole('button', { name: 'Send queued messages' })).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Save new version' })).toBeEnabled()
   expect(screen.queryByText('Earlier action preview')).not.toBeInTheDocument()
+})
+
+it('keeps the same project inbox mounted after sending a chat message', async () => {
+  mocks.workspace.activeProjectUuid = 'award'
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const view = render(<QueryClientProvider client={client}><ChatPanel /></QueryClientProvider>)
+  const inbox = screen.getByTestId('inbox')
+  expect(inbox).toHaveTextContent('Due and needed: award')
+  fireEvent.click(screen.getByRole('button', { name: 'Summarize project' }))
+  await waitFor(() => expect(mocks.send).toHaveBeenCalled())
+  mocks.messages = [{ role: 'user', content: 'Summarize this project' }]
+  view.rerender(<QueryClientProvider client={client}><ChatPanel /></QueryClientProvider>)
+  expect(screen.getByTestId('inbox')).toBe(inbox)
+  expect(inbox).toBeVisible()
+  expect(screen.getAllByTestId('inbox')).toHaveLength(1)
+  expect(screen.queryByRole('button', { name: 'Summarize project' })).not.toBeInTheDocument()
 })

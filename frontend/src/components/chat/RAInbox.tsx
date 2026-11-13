@@ -112,8 +112,10 @@ export function upcomingGroup(item: Obligation): GroupKey {
   return 'later'
 }
 
-function InboxRow({ item, focused, onChanged, onError }: {
+function InboxRow({ item, focused, projectScoped, canManage, onChanged, onError }: {
   item: Obligation
+  projectScoped: boolean
+  canManage: boolean
   focused: boolean
   onChanged: (uuid: string, change: 'done' | 'dismissed' | 'kept') => void
   onError: (message: string) => void
@@ -171,13 +173,13 @@ function InboxRow({ item, focused, onChanged, onError }: {
         }}>
           <AlertTriangle size={12} aria-hidden style={{ flexShrink: 0 }} />
           <span style={{ flex: 1, minWidth: '12rem' }}>
-            Source file deleted. {item.kind === 'deadline' && item.due_at ? 'Reminders are paused. ' : ''}Keep this item or dismiss it?
+            Source file deleted. {item.kind === 'deadline' && item.due_at ? 'Reminders are paused. ' : ''}{canManage ? 'Keep this item or dismiss it?' : 'An editor can keep this item; you can dismiss it for yourself.'}
           </span>
-          <button type="button" style={BUTTON} disabled={busy}
+          {canManage && <button type="button" style={BUTTON} disabled={busy}
             aria-label={`Keep "${item.title}" for everyone on the project`}
             onClick={() => act('kept', () => setObligationKept(item.uuid, true))}>
             Keep
-          </button>
+          </button>}
           <button type="button" style={BUTTON} disabled={busy}
             aria-label={`Dismiss "${item.title}" from your Home`}
             onClick={() => act('dismissed', () => setObligationDismissed(item.uuid, true))}>
@@ -185,10 +187,10 @@ function InboxRow({ item, focused, onChanged, onError }: {
           </button>
         </div>}
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-6)', marginTop: 'var(--workspace-space-4)' }}>
-          <button type="button" style={{ ...BUTTON, border: 'none', padding: 0, color: '#2563eb', textDecoration: 'underline' }}
+          {!projectScoped && <button type="button" style={{ ...BUTTON, border: 'none', padding: 0, color: '#2563eb', textDecoration: 'underline' }}
             onClick={() => navigate({ to: '/', search: { project: item.project_uuid } as never })}>
             {item.project_title || 'Project'}
-          </button>
+          </button>}
           {item.sources.map((source, i) => {
             // A limit cites the sponsor's limit and the figure that breaks it,
             // often in different documents; both open at their passage.
@@ -220,11 +222,11 @@ function InboxRow({ item, focused, onChanged, onError }: {
             onClick={() => { downloadDeadlineCalendar({ obligation: item.uuid }).catch((e: unknown) => onError(e instanceof Error ? e.message : 'The calendar file could not be downloaded.')) }}>
             <CalendarPlus size={12} aria-hidden /> Add to calendar
           </button>}
-          <button type="button" style={QUIET} disabled={busy}
+          {canManage && <button type="button" style={QUIET} disabled={busy}
             aria-label={`Mark "${item.title}" done for everyone on the project`}
             onClick={() => act('done', () => setObligationDone(item.uuid, true))}>
             <Check size={12} aria-hidden /> Done
-          </button>
+          </button>}
           <button type="button" style={QUIET} disabled={busy}
             aria-label={`Hide "${item.title}" from your Home`}
             onClick={() => act('dismissed', () => setObligationDismissed(item.uuid, true))}>
@@ -240,7 +242,7 @@ function InboxRow({ item, focused, onChanged, onError }: {
  * only that project's (support ticket: a project chat listed another
  * project's deadlines above its own). */
 export function RAInbox({ projectUuid }: { projectUuid?: string | null } = {}) {
-  const { focusedObligationUuid } = useWorkspace()
+  const { focusedObligationUuid, activeProjectRole } = useWorkspace()
   const [items, setItems] = useState<Obligation[] | null>(null)
   const [loadError, setLoadError] = useState(false)
   const [hidden, setHidden] = useState(false)
@@ -392,7 +394,7 @@ export function RAInbox({ projectUuid }: { projectUuid?: string | null } = {}) {
             {group.label} <span style={{ fontWeight: 400 }}>({rows.length})</span>
           </h3>
           <ul style={{ margin: 'var(--workspace-space-4) 0 0', padding: 0 }}>
-            {rows.map(item => <InboxRow key={item.uuid} item={item} focused={item.uuid === focusedObligationUuid} onChanged={changed} onError={setError} />)}
+            {rows.map(item => <InboxRow key={item.uuid} item={item} projectScoped={!!projectUuid} canManage={!projectUuid || activeProjectRole === 'owner' || activeProjectRole === 'editor'} focused={item.uuid === focusedObligationUuid} onChanged={changed} onError={setError} />)}
           </ul>
         </div>
       })}

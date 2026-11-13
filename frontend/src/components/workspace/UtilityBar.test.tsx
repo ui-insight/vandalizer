@@ -10,10 +10,18 @@ it('selecting Chat does not reset the conversation or attached documents', () =>
   expect(mocks.setMode).toHaveBeenCalledWith('chat')
   expect(mocks.reset).not.toHaveBeenCalled()
 })
-it('identifies the chat surface when a project is opened from the project picker', () => {
+it('identifies Projects when a project is opened from the project picker', () => {
   mocks.mode = 'projects'
   mocks.project = 'project-1'
   render(<UtilityBar />)
-  expect(screen.getByRole('button', { name: 'Chat' }).getAttribute('aria-current')).toBe('page')
-  expect(screen.getByRole('button', { name: 'Projects' }).getAttribute('aria-current')).toBeNull()
+  expect(screen.getByRole('button', { name: 'Projects' }).getAttribute('aria-current')).toBe('page')
+  expect(screen.getByRole('button', { name: 'Chat' }).getAttribute('aria-current')).toBeNull()
+})
+
+it.each(['chat', 'files', 'automations', 'knowledge'])('keeps Projects highlighted in project %s mode without navigating', mode => {
+  mocks.mode = mode; mocks.project = 'project-1'
+  render(<UtilityBar />)
+  expect(screen.getByRole('button', { name: 'Projects' })).toHaveAttribute('aria-current', 'page')
+  expect(screen.getAllByRole('button').filter(button => button.hasAttribute('aria-current'))).toHaveLength(1)
+  expect(mocks.setMode).not.toHaveBeenCalled()
 })

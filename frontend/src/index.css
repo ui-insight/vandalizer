@@ -1649,13 +1649,6 @@ html {
   .workflow-editor [role="tab"] > svg { display: none; }
 }
 
-.project-work-overview { flex-basis: 100%; min-width: 0; color: #475569; font-size: 12px; }
-.project-work-overview__summary, .project-work-overview__actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.project-work-overview__summary > .project-work-overview__actions { margin-left: auto; }
-.project-work-overview__actions button { min-height: 32px; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; color: #334155; text-align: left; overflow-wrap: anywhere; }
-.project-work-overview__pins { max-height: 180px; overflow-y: auto; padding: 8px 0; }
-.project-work-overview__pins p { margin: 0 0 8px; }
-@media (max-width: 767px) { .project-work-overview__summary > .project-work-overview__actions { margin-left: 0; } }
 
 @media (max-width: 639px) {
   .launch-nav .launch-nav-cta { display: none; }
@@ -1682,4 +1675,22 @@ html {
 .chat-composer-editor textarea:focus-visible {
   outline: none !important;
   box-shadow: none !important;
+}
+
+/* Slice 1: keep project obligations reachable independently of conversation history. */
+.project-inbox-slot {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 35%;
+  overflow: auto;
+  padding: var(--workspace-space-8) var(--workspace-space-12);
+  border-bottom: 1px solid var(--workspace-border);
+  overflow-wrap: anywhere;
+}
+.project-inbox-slot section[aria-label="RA inbox"] > div:first-child {
+  flex-wrap: wrap;
+}
+.project-inbox-slot section[aria-label="RA inbox"] > div:first-child > * {
+  flex-shrink: 0;
+  overflow-wrap: normal;
 }
