@@ -756,6 +756,10 @@ async def _validate_validation_qa(user_id: str) -> dict:
     return {"passed": passed, "stars": stars, "checks": checks}
 
 
+# Rows of a batch that has not finished yet; such a batch is not judged.
+_BATCH_UNFINISHED = {"queued", "running", "pending_approval"}
+
+
 def _as_utc(moment: datetime.datetime | None) -> datetime.datetime:
     """Mongo returns naive UTC datetimes; tests and new rows may be aware."""
     if moment is None:
@@ -764,9 +768,10 @@ def _as_utc(moment: datetime.datetime | None) -> datetime.datetime:
 
 
 async def _validate_batch_processing(user_id: str) -> dict:
-    """The learner's most recent batch of 3+ documents decides "All succeeded",
-    so fixing a failure and running the batch again clears it. Stars come from
-    the largest batch that fully succeeded.
+    """The learner's most recent finished batch of 3+ documents decides "All
+    succeeded", so fixing a failure and running the batch again clears it. A
+    batch still in progress is not judged yet. Stars come from the largest
+    batch that fully succeeded.
     """
     checks = []
     # WorkflowResult has no user_id field, so scope by the user's workflows
@@ -786,9 +791,13 @@ async def _validate_batch_processing(user_id: str) -> dict:
         if r.batch_id:
             by_batch.setdefault(r.batch_id, []).append(r)
 
-    # (started, size, completed documents) for each batch.
+    # (started, size, completed documents) for each finished batch.
     runs: list[tuple[datetime.datetime, int, int]] = []
+    in_progress = 0
     for batch_results in by_batch.values():
+        if any(r.status in _BATCH_UNFINISHED for r in batch_results):
+            in_progress += 1
+            continue
         started = min(_as_utc(getattr(r, "start_time", None)) for r in batch_results)
         done = sum(1 for r in batch_results if r.status == "completed")
         runs.append((started, len(batch_results), done))
@@ -800,7 +809,9 @@ async def _validate_batch_processing(user_id: str) -> dict:
     best_successful = max((size for _, size, done in batch_runs if done == size), default=0)
 
     checks.append({"name": "Batch execution", "passed": latest is not None, "detail": f"Largest batch has {largest} documents (need 3+)"})
-    if latest is None:
+    if latest is None and in_progress:
+        detail = "Your batch is still running; check again when it finishes"
+    elif latest is None:
         detail = "All documents in batch must complete successfully"
     elif latest_ok:
         detail = f"Your most recent batch of 3+ documents: all {latest[1]} completed"

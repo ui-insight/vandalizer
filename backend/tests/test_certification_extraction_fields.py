@@ -171,3 +171,16 @@ async def test_batch_stars_come_from_the_largest_fully_successful_batch():
     result = await _grade_batches(big_failed + five + three)
     assert result["passed"] is True
     assert result["stars"] == 2
+
+
+async def test_batch_still_running_is_not_judged_yet():
+    # Checking while a new batch runs must not say "fix the problem".
+    ok = _batch("b1", ["completed"] * 3, day=10)
+    running = _batch("b2", ["completed", "running", "queued"], day=11)
+    result = await _grade_batches(ok + running)
+    assert result["passed"] is True
+
+    result = await _grade_batches(running)
+    assert result["passed"] is False
+    all_ok = next(c for c in result["checks"] if c["name"] == "All succeeded")
+    assert all_ok["detail"] == "Your batch is still running; check again when it finishes"
