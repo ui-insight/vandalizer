@@ -489,6 +489,10 @@ export function LibraryTab() {
   const [editTitle, setEditTitle] = useState('')
   const [editContent, setEditContent] = useState('')
   const [editWhen, setEditWhen] = useState('')
+  // The line the window opened with. Update sends when_to_use only when the
+  // field changed, so a line the list didn't deliver is never saved over as
+  // empty (support ticket: every Edit → Update erased it).
+  const editWhenLoaded = useRef('')
   const [editItemId, setEditItemId] = useState<string | null>(null) // SearchSetItem ID
   const [editLoading, setEditLoading] = useState(false)
   const [editSaving, setEditSaving] = useState(false)
@@ -507,6 +511,7 @@ export function LibraryTab() {
     // authoritative searchphrase loads.
     setEditContent(item.description || '')
     setEditWhen(item.when_to_use || '')
+    editWhenLoaded.current = (item.when_to_use || '').trim()
     setEditError(null)
     setEditLoadError(null)
     setEditItemId(null)
@@ -576,7 +581,8 @@ export function LibraryTab() {
     setEditSaving(true)
     setEditError(null)
     try {
-      await updateSearchSet(editingItem.item_uuid, editKind === 'prompt' ? { title: cleanTitle, when_to_use: editWhen.trim() } : { title: cleanTitle })
+      const whenChanged = editKind === 'prompt' && editWhen.trim() !== editWhenLoaded.current
+      await updateSearchSet(editingItem.item_uuid, whenChanged ? { title: cleanTitle, when_to_use: editWhen.trim() } : { title: cleanTitle })
       if (editItemId) {
         await updateSearchSetItem(editItemId, { searchphrase: editContent, title: cleanTitle })
       } else {
@@ -1913,6 +1919,13 @@ export function LibraryTab() {
               <div id="library-edit-when-help" style={{ marginTop: 'var(--workspace-space-4)', fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>
                 Describe the task this Skill is for. Chat uses this description to find a matching Skill. Required to add the Skill to Core Skills in Assistant settings; optional when choosing it for one conversation.
               </div>
+              {scope === 'team' && (
+                // Your own edit stays in use as your core Skill; a teammate's
+                // core copy pauses until they review it (support ticket).
+                <div data-testid="team-core-skill-note" style={{ marginTop: 'var(--workspace-space-8)', fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>
+                  Teammates who use this as a core Skill will need to review the new text in Assistant settings before their chat uses it again.
+                </div>
+              )}
               </div>
             )}
             <div style={{ marginBottom: 'var(--workspace-space-20)' }}>

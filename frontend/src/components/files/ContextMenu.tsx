@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useLayoutEffect } from 'react'
-import { Download, Edit2, Trash2, Copy, Users, FolderInput, FolderDown, MessageSquareText, Play, Library, Link2, Upload, History } from 'lucide-react'
+import { Download, Edit2, Trash2, Copy, Users, FolderInput, FolderDown, MessageSquareText, Play, Library, Link2, Upload, History, CopyPlus } from 'lucide-react'
 
 interface ContextMenuProps {
   x: number
@@ -10,6 +10,7 @@ interface ContextMenuProps {
   onAddToKB?: () => void
   onRename?: () => void
   onMove?: () => void
+  onDuplicate?: () => void
   onDelete?: () => void
   onDownload?: () => void
   onExport?: () => void
@@ -29,6 +30,7 @@ export function ContextMenu({
   onAddToKB,
   onRename,
   onMove,
+  onDuplicate,
   onDelete,
   onDownload,
   onExport,
@@ -76,6 +78,7 @@ export function ContextMenu({
     group(
       onRename && { label: 'Rename', icon: Edit2, action: onRename },
       onMove && { label: 'Move to…', icon: FolderInput, action: onMove },
+      onDuplicate && { label: 'Duplicate', icon: CopyPlus, action: onDuplicate },
       onConvertToTeam && { label: 'Convert to team folder', icon: Users, action: onConvertToTeam },
     ),
     // Copies, versions and where it is used

@@ -24,11 +24,12 @@ export function formatItemCount(count: number | null | undefined): string {
   return `${count} ${count === 1 ? 'item' : 'items'}`
 }
 
-/** "6 folders, 10 files", "1 file", "Empty". */
+/** "6 folders, 10 documents", "1 document", "Empty" — the words the list's
+ *  section headings use. */
 export function formatContentsSummary(folderCount: number, fileCount: number): string {
   const parts: string[] = []
   if (folderCount > 0) parts.push(`${folderCount} ${folderCount === 1 ? 'folder' : 'folders'}`)
-  if (fileCount > 0) parts.push(`${fileCount} ${fileCount === 1 ? 'file' : 'files'}`)
+  if (fileCount > 0) parts.push(`${fileCount} ${fileCount === 1 ? 'document' : 'documents'}`)
   return parts.length ? parts.join(', ') : 'Empty'
 }
 

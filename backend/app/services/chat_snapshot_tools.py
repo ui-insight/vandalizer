@@ -40,6 +40,9 @@ def _deadline(d: dict[str, Any]) -> dict[str, Any]:
         **({"due_text": d["due_text"]} if d.get("due_text") else {}),
         **({"days_until": d["days_until"]} if "days_until" in d else {}),
         "source": f"{src.get('document_title')}, p. {src.get('page')}" if src.get("page") else src.get("document_title"),
+        # Not from a document: chat must not present it as cited.
+        **({"source": "Added by hand · not checked against a document", "added_by_hand": True,
+            "source_note": d.get("source_note")} if d.get("entered_by_hand") else {}),
     }
 
 
@@ -56,7 +59,9 @@ async def get_award_snapshot(
     - key facts and budget: read from the project's documents; cite each fact's
       source page as given, and say so when a fact is not confirmed;
     - deadlines: live from the project's RA inbox (upcoming, overdue with days
-      past, done) — say they are from the RA inbox;
+      past, done) — say they are from the RA inbox. One with added_by_hand was
+      typed in by a person and not checked against a document: say so, and give
+      its source_note as their note, not as a citation;
     - status, last run and saved pages: the project's own records.
 
     When facts is empty because the snapshot was never built, say so and suggest

@@ -20,6 +20,7 @@ const api = vi.hoisted(() => ({
   setObligationKept: vi.fn(),
   setInboxHidden: vi.fn(),
   downloadDeadlineCalendar: vi.fn(),
+  addDeadlineByHand: vi.fn(),
 }))
 vi.mock('../../api/obligations', async (actual) => {
   const real = await actual<typeof import('../../api/obligations')>()
@@ -335,5 +336,63 @@ describe('RA inbox item whose source file was deleted', () => {
     render(<RAInbox />)
     await screen.findByText('Sponsor deadline')
     expect(screen.queryByRole('group', { name: /Source file deleted/ })).not.toBeInTheDocument()
+  })
+})
+
+// Support ticket: chat said to add a deadline it couldn't verify "manually in
+// the project's RA inbox panel", which had no way to add an item.
+describe('Add deadline by hand', () => {
+  const HAND = item({
+    uuid: 'hand-1', title: 'Final financial report', deadline_type: 'other', due_at: '2099-03-31T00:00:00', due_text: null,
+    sources: [], entered_by_hand: true, source_note: 'Subaward agreement, section 5',
+  })
+
+  it('adds a deadline from the project inbox, even when the inbox is empty', async () => {
+    api.getInbox.mockResolvedValue({ items: [], inbox_hidden: false, project_count: 1 })
+    api.addDeadlineByHand.mockResolvedValue(HAND)
+    render(<RAInbox projectUuid="proj-1" />)
+    expect(await screen.findByText(/Nothing due or missing in this project/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Add deadline/ }))
+    const form = screen.getByRole('form', { name: 'Add deadline' })
+    expect(form).toHaveTextContent("It isn't checked against a document")
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: '  Final financial report ' } })
+    fireEvent.change(screen.getByLabelText('Due date'), { target: { value: '2099-03-31' } })
+    fireEvent.change(screen.getByLabelText('Source (optional)'), { target: { value: 'Subaward agreement, section 5' } })
+    fireEvent.submit(form)
+
+    await waitFor(() => expect(api.addDeadlineByHand).toHaveBeenCalledWith('proj-1', 'Final financial report', '2099-03-31', 'Subaward agreement, section 5'))
+    expect(await screen.findByText('Final financial report')).toBeInTheDocument()
+    expect(screen.queryByRole('form', { name: 'Add deadline' })).not.toBeInTheDocument()
+    expect(screen.getByText(/Added by hand · not checked against a document/)).toHaveTextContent('Source: Subaward agreement, section 5')
+    expect(screen.queryByText(/Nothing due or missing/)).not.toBeInTheDocument()
+  })
+
+  it("shows the server's reason and keeps the form when a deadline can't be added", async () => {
+    api.getInbox.mockResolvedValue({ items: [DEADLINE], inbox_hidden: false, project_count: 1 })
+    api.addDeadlineByHand.mockRejectedValue(new Error('"Sponsor deadline" on that date is already in this project\'s inbox (open).'))
+    render(<RAInbox projectUuid="proj-1" />)
+    fireEvent.click(await screen.findByRole('button', { name: /Add deadline/ }))
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Sponsor deadline' } })
+    fireEvent.change(screen.getByLabelText('Due date'), { target: { value: '2099-11-19' } })
+    fireEvent.submit(screen.getByRole('form', { name: 'Add deadline' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('already in this project')
+    expect(screen.getByRole('form', { name: 'Add deadline' })).toBeInTheDocument()
+  })
+
+  it('needs a title and a date before calling the server', async () => {
+    api.getInbox.mockResolvedValue({ items: [DEADLINE], inbox_hidden: false, project_count: 1 })
+    render(<RAInbox projectUuid="proj-1" />)
+    fireEvent.click(await screen.findByRole('button', { name: /Add deadline/ }))
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Report' } })
+    fireEvent.submit(screen.getByRole('form', { name: 'Add deadline' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Choose the due date.')
+    expect(api.addDeadlineByHand).not.toHaveBeenCalled()
+  })
+
+  it('is offered inside a project only: Home spans several projects', async () => {
+    render(<RAInbox />)
+    await screen.findByText('Sponsor deadline')
+    expect(screen.queryByRole('button', { name: /Add deadline/ })).not.toBeInTheDocument()
   })
 })
