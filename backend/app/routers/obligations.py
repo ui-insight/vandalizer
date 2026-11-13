@@ -183,6 +183,25 @@ async def create_obligations(body: CreateObligationsRequest, user: User = Depend
     }
 
 
+class AddByHandRequest(BaseModel):
+    project_uuid: str
+    title: str
+    due_date: str
+    source_note: Optional[str] = None
+
+
+@router.post("/by-hand", response_model=None)
+async def add_by_hand(body: AddByHandRequest, user: User = Depends(get_current_user)) -> dict:
+    """Add a deadline typed into the project's inbox, saved as not checked against a document."""
+    project = await _project_for(body.project_uuid, user, manage=True)
+    ob, reason = await obligation_service.add_by_hand(
+        project, user, title=body.title, due_date=body.due_date, source_note=body.source_note,
+    )
+    if ob is None:
+        raise HTTPException(status_code=422, detail=reason)
+    return obligation_service.serialize(ob, user, project.title)
+
+
 class DoneRequest(BaseModel):
     done: bool
 
