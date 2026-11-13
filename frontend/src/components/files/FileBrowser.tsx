@@ -5,6 +5,7 @@ import { Plus, Folder as FolderIcon, Upload, Trash2, Download, FolderInput } fro
 import { useTeams } from '../../hooks/useTeams'
 import { useAuth } from '../../hooks/useAuth'
 import { formatContentsSummary } from '../../utils/fileDisplay'
+import { documentFilterCounts, matchesDocumentFilter, type DocumentFilter } from '../../utils/documentFilters'
 import { useDocuments } from '../../hooks/useDocuments'
 import { useBreadcrumbs } from '../../hooks/useFolders'
 import { useUpload, fileToBase64 } from '../../hooks/useUpload'
@@ -30,6 +31,13 @@ import { retryExtraction } from '../../api/documents'
 import type { Document, Folder } from '../../types/document'
 import { isDocReady } from '../../utils/processingStatus'
 import { SUPPORTED_ACCEPT_ATTR } from '../../utils/fileTypes'
+
+// Remembered per browser: someone who keeps folders out of the way wants
+// them out of the way in the next folder and the next visit too.
+const FOLDERS_COLLAPSED_KEY = 'files:foldersCollapsed'
+function readFoldersCollapsed(): boolean {
+  try { return localStorage.getItem(FOLDERS_COLLAPSED_KEY) === '1' } catch { return false }
+}
 
 export type SortColumn = 'name' | 'size' | 'modified'
 export type SortDirection = 'asc' | 'desc'
@@ -237,6 +245,7 @@ export function FileBrowser({ listScrollRef, onListScroll, searchField, selected
     if (previousFolder.current === currentFolder) return
     previousFolder.current = currentFolder
     setSelectedUuids(new Set())
+    setDocumentFilter('all')
   }, [currentFolder, setSelectedUuids])
 
   // Search (query provided via prop, content matches from API)
@@ -325,6 +334,48 @@ export function FileBrowser({ listScrollRef, onListScroll, searchField, selected
     return sort.direction === 'desc' ? sorted.reverse() : sorted
   }, [filteredDocuments, sort])
 
+  // Folders section collapse, and the chips on the Documents heading.
+  const [foldersCollapsed, setFoldersCollapsed] = useState(readFoldersCollapsed)
+  const toggleFoldersCollapsed = useCallback(() => {
+    setFoldersCollapsed(previous => {
+      const next = !previous
+      try { localStorage.setItem(FOLDERS_COLLAPSED_KEY, next ? '1' : '0') } catch { /* stays for this visit */ }
+      return next
+    })
+  }, [])
+  const [chosenFilter, setDocumentFilter] = useState<DocumentFilter>('all')
+  const filterCounts = useMemo(() => documentFilterCounts(sortedDocuments), [sortedDocuments])
+  // A chip whose count reaches 0 (the last failing file was retried, or a
+  // search left none of that type) falls back to All, never an empty list.
+  const documentFilter: DocumentFilter = filterCounts[chosenFilter] > 0 ? chosenFilter : 'all'
+  // Forget the fallen-back choice too, so a later failure or a cleared search
+  // can't narrow the list again without the user asking.
+  if (documentFilter !== chosenFilter) setDocumentFilter('all')
+  const shownDocuments = useMemo(
+    () => documentFilter === 'all' ? sortedDocuments : sortedDocuments.filter(d => matchesDocumentFilter(d, documentFilter)),
+    [sortedDocuments, documentFilter],
+  )
+  const shownFolders = useMemo(() => foldersCollapsed ? [] : sortedFolders, [foldersCollapsed, sortedFolders])
+  // What the rows on screen are. The selection itself can hold more (chat
+  // attachments, or rows a chip has since hidden) and must keep them, since it
+  // is also the chat's scope; bulk actions act on the visible part only.
+  const shownUuids = useMemo(
+    () => new Set([...shownFolders, ...shownDocuments].map(item => item.uuid)),
+    [shownFolders, shownDocuments],
+  )
+  const actionableUuids = useMemo(
+    () => new Set([...selectedUuids].filter(uuid => shownUuids.has(uuid))),
+    [selectedUuids, shownUuids],
+  )
+  const hiddenSelection = useMemo(() => {
+    const hidden = (items: { uuid: string }[]) => items.filter(item => selectedUuids.has(item.uuid) && !shownUuids.has(item.uuid)).length
+    const folders = hidden(sortedFolders)
+    const documents = hidden(sortedDocuments)
+    // The rest of the hidden selection is what the search leaves out.
+    const search = [...selectedUuids].filter(uuid => !shownUuids.has(uuid)).length - folders - documents
+    return { folders, documents, search }
+  }, [selectedUuids, sortedFolders, sortedDocuments, shownUuids])
+
   const handleToggleSelect = useCallback((uuid: string) => {
     setSelectedUuids(prev => {
       const next = new Set(prev)
@@ -334,18 +385,25 @@ export function FileBrowser({ listScrollRef, onListScroll, searchField, selected
     })
   }, [setSelectedUuids])
 
+  // Select all covers the rows on screen; anything a chip or the collapsed
+  // Folders section hides keeps whatever state it had.
   const handleToggleAll = useCallback(() => {
-    const allUuids = [...filteredFolders.map(f => f.uuid), ...filteredDocuments.map(d => d.uuid)]
+    const allUuids = [...shownUuids]
     setSelectedUuids(prev => {
       const allSelected = allUuids.every(u => prev.has(u))
-      return allSelected ? new Set() : new Set(allUuids)
+      const next = new Set(prev)
+      for (const uuid of allUuids) {
+        if (allSelected) next.delete(uuid)
+        else next.add(uuid)
+      }
+      return next
     })
-  }, [filteredFolders, filteredDocuments, setSelectedUuids])
+  }, [shownUuids, setSelectedUuids])
 
   const handleBulkDelete = useCallback(async () => {
-    if (selectedUuids.size === 0) return
-    const folderCount = [...selectedUuids].filter(u => folders.some(f => f.uuid === u)).length
-    const fileCount = selectedUuids.size - folderCount
+    if (actionableUuids.size === 0) return
+    const folderCount = [...actionableUuids].filter(u => folders.some(f => f.uuid === u)).length
+    const fileCount = actionableUuids.size - folderCount
     const parts: string[] = []
     if (fileCount > 0) parts.push(`${fileCount} file${fileCount === 1 ? '' : 's'}`)
     if (folderCount > 0) parts.push(`${folderCount} folder${folderCount === 1 ? '' : 's'}`)
@@ -354,8 +412,8 @@ export function FileBrowser({ listScrollRef, onListScroll, searchField, selected
     // let a wrong selection through, and a file can be a knowledge-base
     // source, an extraction test case, or a workflow's fixed document
     // without anything here saying so.
-    const selectedFolderNames = folders.filter(f => selectedUuids.has(f.uuid)).map(f => f.title)
-    const selectedDocs = documents.filter(d => selectedUuids.has(d.uuid))
+    const selectedFolderNames = folders.filter(f => actionableUuids.has(f.uuid)).map(f => f.title)
+    const selectedDocs = documents.filter(d => actionableUuids.has(d.uuid))
     const docUuids = selectedDocs.map(d => d.uuid)
     const names = [...selectedDocs.map(d => d.title), ...selectedFolderNames]
     const shownNames = names.slice(0, DELETE_NAME_CAP)
@@ -387,7 +445,7 @@ export function FileBrowser({ listScrollRef, onListScroll, searchField, selected
     if (!ok) return
     setBulkDeleting(true)
     try {
-      const targets = [...selectedUuids].map(uuid => ({ uuid, folder: folders.some(f => f.uuid === uuid) }))
+      const targets = [...actionableUuids].map(uuid => ({ uuid, folder: folders.some(f => f.uuid === uuid) }))
       const outcomes = await Promise.allSettled(targets.map(async target => {
         const result = target.folder
           ? await deleteFolder(target.uuid)
@@ -401,7 +459,9 @@ export function FileBrowser({ listScrollRef, onListScroll, searchField, selected
       if (kept) toast(kept, 'info')
       // Keep failed items selected so retry targets only those items. Wait for
       // every request before reconciling; a fast failure must not hide siblings.
-      setSelectedUuids(new Set(failed.map(target => target.uuid)))
+      // Selected rows a chip hides were not part of this delete and stay selected.
+      const deleted = new Set(targets.filter((_, index) => outcomes[index].status === 'fulfilled').map(target => target.uuid))
+      setSelectedUuids(prev => new Set([...prev].filter(uuid => !deleted.has(uuid))))
       if (failed.length) {
         const failedNames = failed.map(target => [...documents, ...folders].find(item => item.uuid === target.uuid)?.title || target.uuid)
         const firstFailure = outcomes.find(outcome => outcome.status === 'rejected') as PromiseRejectedResult
@@ -414,7 +474,7 @@ export function FileBrowser({ listScrollRef, onListScroll, searchField, selected
       refresh()
       setBulkDeleting(false)
     }
-  }, [selectedUuids, folders, documents, refresh, confirm, setSelectedUuids, toast])
+  }, [actionableUuids, folders, documents, refresh, confirm, setSelectedUuids, toast])
 
   // Retry from the row: the same re-run the open file offers. It re-reads the
   // text and rebuilds the search index, so it clears both kinds of failure.
@@ -453,14 +513,14 @@ export function FileBrowser({ listScrollRef, onListScroll, searchField, selected
   }, [refresh, toast])
 
   const handleBulkDownload = useCallback(() => {
-    const docUuids = [...selectedUuids].filter(u => documents.some(d => d.uuid === u))
+    const docUuids = [...actionableUuids].filter(u => documents.some(d => d.uuid === u))
     if (docUuids.length === 0) return
     if (docUuids.length === 1) {
       downloadFile(docUuids[0])
     } else {
       downloadFilesAsZip(docUuids)
     }
-  }, [selectedUuids, documents])
+  }, [actionableUuids, documents])
 
   // Context menu state
   const [usageTarget, setUsageTarget] = useState<{ uuid: string; title: string } | null>(null)
@@ -808,12 +868,21 @@ export function FileBrowser({ listScrollRef, onListScroll, searchField, selected
           style={{ backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 10%, white)', border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 30%, white)' }}
         >
           <span className="text-sm font-medium" style={{ color: '#374151' }}>
-            {selectedUuids.size} selected
+            {actionableUuids.size} selected
+            {hiddenSelection.folders + hiddenSelection.documents + hiddenSelection.search > 0 && (
+              <span className="font-normal text-gray-500">
+                {' · '}{[
+                  hiddenSelection.search > 0 && `${hiddenSelection.search} hidden by the search`,
+                  hiddenSelection.documents > 0 && `${hiddenSelection.documents} hidden by the filter`,
+                  hiddenSelection.folders > 0 && `${hiddenSelection.folders} in collapsed Folders`,
+                ].filter(Boolean).join(', ')} (not included)
+              </span>
+            )}
           </span>
           <div className="ml-auto flex max-w-full flex-wrap items-center gap-2">
             <button
               onClick={handleBulkDownload}
-              disabled={![...selectedUuids].some(u => documents.some(d => d.uuid === u))}
+              disabled={![...actionableUuids].some(u => documents.some(d => d.uuid === u))}
               className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               <Download className="h-3.5 w-3.5" />
@@ -821,7 +890,7 @@ export function FileBrowser({ listScrollRef, onListScroll, searchField, selected
             </button>
             <button
               onClick={() => {
-                const docs = documents.filter(d => selectedUuids.has(d.uuid))
+                const docs = documents.filter(d => actionableUuids.has(d.uuid))
                 if (docs.length === 0) return
                 setMoveFileTarget({
                   uuids: docs.map(d => d.uuid),
@@ -829,7 +898,7 @@ export function FileBrowser({ listScrollRef, onListScroll, searchField, selected
                   fromFolderId: currentFolder,
                 })
               }}
-              disabled={![...selectedUuids].some(u => documents.some(d => d.uuid === u))}
+              disabled={![...actionableUuids].some(u => documents.some(d => d.uuid === u))}
               className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               <FolderInput className="h-3.5 w-3.5" />
@@ -837,7 +906,7 @@ export function FileBrowser({ listScrollRef, onListScroll, searchField, selected
             </button>
             <button
               onClick={handleBulkDelete}
-              disabled={bulkDeleting}
+              disabled={bulkDeleting || actionableUuids.size === 0}
               className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-50 transition-colors"
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -863,7 +932,12 @@ export function FileBrowser({ listScrollRef, onListScroll, searchField, selected
       >
         {contentsError && !documents.length && !folders.length ? null : searchQuery.trim() && !sortedFolders.length && !sortedDocuments.length ? <p role="status" className="p-6 text-sm text-gray-600">{contentSearchState === 'loading' ? 'Searching document contents…' : contentSearchState === 'error' ? 'No matching names in this folder. Retry content search above, or change the search.' : <>No files or folders match “{searchQuery}”. Change the search or clear it to see this folder again.</>}</p> : currentFolder && !sortedFolders.length && !sortedDocuments.length ? <p role="status" className="p-6 text-sm text-gray-600">{rootFolder ? 'This folder is empty. Use Add → From my files to move existing files here, or upload new files.' : 'This folder is empty. Upload files here or use Add to create a folder.'}</p> : <FileList
           folders={sortedFolders}
-          documents={sortedDocuments}
+          documents={shownDocuments}
+          allDocuments={sortedDocuments}
+          documentFilter={documentFilter}
+          onDocumentFilterChange={setDocumentFilter}
+          foldersCollapsed={foldersCollapsed}
+          onToggleFoldersCollapsed={toggleFoldersCollapsed}
           onFolderClick={setCurrentFolder}
           onFolderContextMenu={handleFolderContextMenu}
           onDocContextMenu={handleDocContextMenu}
