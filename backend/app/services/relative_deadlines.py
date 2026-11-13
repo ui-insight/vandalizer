@@ -62,16 +62,80 @@ def _table_rows(text: str) -> list[list[str]] | None:
     return [_split_cells(ln) for ln in lines if not _MD_SEPARATOR.fullmatch(ln)]
 
 
-def _cell_date(cell: str) -> datetime.date | None:
-    from app.services.obligation_service import _DATE_IN_TEXT, _dates_in
+# A duration in brackets after a period date: "July 14, 2028 (18 months)".
+# Only a length of time: "(or upon termination)" or "(unless extended)" makes
+# the date conditional, so such a cell stays unclear.
+_DURATION_REMARK = r"\(\s*\d{1,3}\s*(?:months?|mos?\.?|years?|yrs?\.?|weeks?|days?)\s*\)"
+_DATE_REMARK = re.compile(r"\s*" + _DURATION_REMARK + r"\s*$", re.I)
 
-    match = _DATE_IN_TEXT.fullmatch(cell.strip().rstrip("."))
-    if not match:
-        return None
-    year, month, day = next(iter(_dates_in(match.group())))
+
+def _as_date(text: str) -> datetime.date:
+    from app.services.obligation_service import _dates_in
+
+    year, month, day = next(iter(_dates_in(text)))
     if year is None:
         raise ValueError("period dates must include their years")
     return datetime.date(year, month, day)
+
+
+def _cell_date(cell: str) -> datetime.date | None:
+    """The date a cell holds, alone or with a bracketed remark after it.
+
+    Support ticket: an End Date cell reading "July 14, 2028 (18 months)" was
+    not read as a date, so every deadline counted from it was refused. Only a
+    bracketed duration may follow the date: "Aug 31, 2027 or upon
+    termination" and "Aug 31, 2027 (unless extended)" are not plain End Dates.
+    """
+    from app.services.obligation_service import _DATE_IN_TEXT
+
+    text = cell.strip().rstrip(".")
+    if remark := _DATE_REMARK.search(text):
+        text = text[:remark.start()].rstrip().rstrip(".")
+    match = _DATE_IN_TEXT.fullmatch(text)
+    return _as_date(match.group()) if match else None
+
+
+# Words that make a cell a value or a condition rather than a column label,
+# or a label whose own value could be the merged row's date ("Signature Date").
+_NOT_A_LABEL = re.compile(
+    r"\b(?:upon|until|unless|termination|terminated|completion|completed|pending|tbd|tba|n/?a|none"
+    r"|see|signed|executed|due|extended|whichever|after|before|or|dated?|period|term)\b", re.I,
+)
+
+
+def _column_label(cell: str) -> bool:
+    """Whether a cell reads as a column label ("Federal Funds Obligated")."""
+    words = cell.split()
+    return (
+        2 <= len(words) <= 6
+        and not re.search(r"[\d$%()]", cell)
+        and not _NOT_A_LABEL.search(cell)
+        and all(w[0].isupper() or w.lower() in {"of", "and", "to", "the", "for", "&"} for w in words)
+    )
+
+
+def _merged_row_date(cells: list[str]) -> datetime.date | None:
+    """The End/Start Date of a row whose labels and values were merged.
+
+    Support ticket: the stored text of a NIFA subaward ran two table rows
+    together, "End Date|Federal Funds Obligated|August 31, 2027 (18 months)
+    $95,550", so the cell beside End Date was another column label. Read only
+    that layout: exactly a label cell, then a cell that starts with the date,
+    optionally followed by a bracketed duration and a dollar amount (the other
+    label's value). A value beside the label ("Upon termination", "TBD") or
+    words before the date ("Invoice due Sep 30, 2027") stay unresolved.
+    """
+    from app.services.obligation_service import _DATE_IN_TEXT
+
+    cells = [c for c in cells if c]
+    if len(cells) != 2 or not _column_label(cells[0]):
+        return None
+    m = re.fullmatch(
+        r"(?P<date>" + _DATE_IN_TEXT.pattern + r")\.?(?:\s*" + _DURATION_REMARK + r")?"
+        r"(?:\s+\$\s?\d[\d,]*(?:\.\d{2})?)?",
+        cells[1].strip(), re.I,
+    )
+    return _as_date(m["date"]) if m else None
 
 
 def _labeled_dates(rows: list[list[str]], label: re.Pattern) -> set[datetime.date]:
@@ -95,7 +159,12 @@ def _labeled_dates(rows: list[list[str]], label: re.Pattern) -> set[datetime.dat
             # the rows line up, so a quote cut mid-row can't shift a column.
             below = rows[r + 1:]
             if below and all(len(b) == len(row) for b in below):
-                found.update(d for b in below if (d := _cell_date(b[c])))
+                column = {d for b in below if (d := _cell_date(b[c]))}
+                if column:
+                    found.update(column)
+                    continue
+            if (merged := _merged_row_date(row[c + 1:])) is not None:
+                found.add(merged)
     return found
 
 
@@ -241,6 +310,21 @@ def calculate_deadlines(sources: list[ObligationSource]) -> list[dict]:
             raise ValueError("the rule must specify before or after the performance-period end")
         anchors = [end]
         anchor_kind = "performance_period_end"
+    elif re.fullmatch(
+        # "within 30 days after the Start Date". Support ticket: deadlines
+        # counted from a subaward table's Start Date were all refused.
+        # Not "the Effective Date": a subaward's effective date often differs
+        # from its start date and no source states it, so it stays refused.
+        r"(?:the\s+)?(?:(?:start|beginning)\s+of\s+(?:the\s+)?(?:period\s+of\s+performance|performance\s+period)"
+        r"|(?:(?:sub)?award\s+|project\s+)?(?:start|begin(?:ning)?)\s+date(?:\s+of\s+(?:this|the)\s+(?:sub)?award)?)",
+        tail, re.I,
+    ):
+        if direction == "of":
+            raise ValueError("the rule must specify before or after the performance-period start")
+        if start is None:
+            raise ValueError("the period quote must give the Start Date this rule counts from")
+        anchors = [start]
+        anchor_kind = "performance_period_start"
     else:
         # Fixed annual dates are bounded by the quoted performance period.
         # Require the entire tail to be dates and separators, not an unparsed

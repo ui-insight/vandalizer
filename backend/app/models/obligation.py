@@ -2,7 +2,9 @@
 
 An obligation is a deadline, a required piece of material, or a sponsor limit
 found in a project's solicitation, amendment, draft or award, always with the
-document, page and quote it came from. They feed the RA inbox on Home.
+document, page and quote it came from. They feed the RA inbox on Home. The one
+exception is a deadline someone on the project adds by hand
+(``entered_by_hand``): it has no checked source, and the inbox says so.
 
 ``status`` is a fact about the project, shared by everyone on it: ``open``,
 ``done``, or ``superseded`` (an amendment replaced it). Hiding an item from
@@ -67,6 +69,14 @@ class Obligation(Document):
     # keep the item anyway. Until then it waits for that decision and sends
     # no reminders (see obligation_service.awaiting_source_decision).
     kept_without_source: bool = False
+    # Added in the inbox by someone who manages the project rather than found
+    # in a document: never checked against a source, and shown that way.
+    # Support ticket: a deadline the document check refused could not be
+    # recorded at all.
+    entered_by_hand: bool = False
+    # Where that person says it comes from ("Subaward §5"), as typed. Not a
+    # verified citation.
+    source_note: Optional[str] = None
     created_by: str
     created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc))
     updated_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc))
