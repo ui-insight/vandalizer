@@ -558,13 +558,100 @@ def _title_words(title: str) -> set[str]:
     return {w for w in re.findall(r"[a-z0-9]+", (title or "").lower()) if w not in _TITLE_FILLER}
 
 
+#: Words chat adds around a deliverable's name that don't name a different
+#: deliverable: the timing it restates and labels like "(deliverable)".
+_TITLE_NOISE = frozenset({
+    "days", "day", "calendar", "business", "week", "weeks", "month", "months", "year", "years",
+    "after", "before", "within", "following", "prior", "each", "every", "end", "period", "expiration",
+    "termination", "completion", "submission", "submit", "submitted", "deliverable", "required",
+}) | frozenset(_MONTHS)
+#: Words that, inside brackets, only point at the rule or its anchor:
+#: "(see Section 5.2)", "(per the award terms)", "(from the budget period end)".
+_BRACKET_LABEL = frozenset({
+    "see", "per", "from", "in", "at", "as", "with", "under", "or", "is", "are", "section", "sec",
+    "article", "clause", "paragraph", "para", "page", "pp", "p", "attachment", "exhibit", "appendix",
+    "term", "terms", "condition", "conditions", "agreement", "award", "subaward", "budget", "project",
+    "performance", "start", "anchor", "rule",
+})
+#: Words that name a different deliverable when only one of two titles has
+#: them: "Final report" is not "Final financial report" or "Final patent report".
+_DISTINGUISHING = frozenset({
+    "financial", "technical", "scientific", "patent", "invention", "property", "inventory", "equipment",
+    "cost", "share", "sharing", "invoice", "audit", "federal", "sf", "rppr", "ffr", "fsr", "expenditure",
+    "progress", "performance", "final", "interim", "annual", "quarterly", "monthly", "closeout", "budget",
+    "subcontract", "subaward", "data", "publication", "disclosure", "certification",
+})
+_BRACKETED = re.compile(r"\(([^)]*)\)|\[([^\]]*)\]")
+_NUMERIC_DATE = re.compile(r"\b\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?\b")
+_TIMING_AFTER_NUMBER = frozenset({"day", "days", "calendar", "business", "week", "weeks", "month", "months", "year", "years"})
+
+
+def _singular(word: str) -> str:
+    return word[:-1] if len(word) > 3 and word.endswith("s") and not word.endswith("ss") else word
+
+
+def _content_words(text: str, labels: frozenset[str] = frozenset()) -> set[str]:
+    """Words naming the deliverable. Numbers that are timing ("60 days",
+    "March 1", "2027") are dropped; any other number ("Year 2", "SF-425")
+    tells deliverables apart and is kept."""
+    tokens = re.findall(r"[a-z0-9]+", _NUMERIC_DATE.sub(" ", (text or "").lower()))
+    words = set()
+    reference = False  # numbers after "Section", "Article": "(see Section 5.2)"
+    for i, w in enumerate(tokens):
+        number = re.fullmatch(r"(\d+)(?:st|nd|rd|th)?", w)
+        if not number:
+            reference = w in labels
+        if w in _TITLE_FILLER or w in _TITLE_NOISE or w in labels:
+            continue
+        if number:
+            after = tokens[i + 1] if i + 1 < len(tokens) else ""
+            before = tokens[i - 1] if i else ""
+            if reference or after in _TIMING_AFTER_NUMBER or before in _MONTHS or re.fullmatch(r"(19|20)\d\d", w):
+                continue
+            w = number.group(1)
+        words.add(_singular(w))
+    return words
+
+
+def _deliverable_words(title: str) -> tuple[set[str], set[str]]:
+    """(all words naming the deliverable, those from its brackets). A
+    bracket holding only timing or a label is dropped; one naming something
+    ("(financial)", "(SF-425)") counts like the rest of the title."""
+    bracketed: set[str] = set()
+    for m in _BRACKETED.finditer(title or ""):
+        bracketed |= _content_words(m.group(1) or m.group(2) or "", _BRACKET_LABEL)
+    return _content_words(_BRACKETED.sub(" ", title or "")) | bracketed, bracketed
+
+
+_DISTINGUISHING_WORDS = frozenset(_singular(w) for w in _DISTINGUISHING)
+
+
 def _similar_titles(a: str, b: str) -> bool:
     """"Semi-annual results due" and "Semi-annual results report": yes.
-    "Final invoice" and "Final report": no."""
-    wa, wb = _title_words(a), _title_words(b)
+    "Annual progress report for NIFA REEport (deliverable)" and "Annual
+    progress report for the NIFA REEport submission (60 days after March 1,
+    2027)": yes, they differ only in timing and labels.
+
+    When in doubt, no: merging two different deadlines hides one, a missed
+    duplicate is only one more item to reject. "Final invoice" and "Final
+    report", "Final report (financial)" and "Final report (technical)",
+    "Final report" and "Final Federal Financial Report (SF-425)", "Year 1
+    progress report" and "Year 2 progress report": no, one names a
+    deliverable or number the other doesn't."""
+    (wa, ba), (wb, bb) = _deliverable_words(a), _deliverable_words(b)
     if not wa or not wb:
         return False
-    return len(wa & wb) / len(wa | wb) > 0.5
+    if wa == wb:
+        return True
+    if ba and bb and ba != bb:
+        return False
+    extra = wa ^ wb
+    if any(w.isdigit() or w in _DISTINGUISHING_WORDS for w in extra):
+        return False
+    common = wa & wb
+    if len(min(wa, wb, key=len)) >= 3 and (wa <= wb or wb <= wa):
+        return True
+    return len(common) / len(wa | wb) > 0.5
 
 
 def _same_rule(a: str, b: str) -> bool:
