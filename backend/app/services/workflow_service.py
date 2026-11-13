@@ -76,11 +76,14 @@ async def create_workflow(name: str, user_id: str, description: str | None = Non
     # happens to be loaded, and useWorkflows.create never made it at all — so a
     # workflow created through that hook was born invisible while still holding
     # its name against name_conflicts, which is the whole defect.
+    #
+    # The bookmark is personal even when the workflow carries the creator's
+    # current team: a new workflow reaches the team's library only when its
+    # owner shares it (support ticket: new items showed up in teammates' Team
+    # tab without being shared).
     from app.services import library_service
 
-    await library_service.ensure_bookmark(
-        wf.id, LibraryItemKind.WORKFLOW, user_id, team_id=team_id,
-    )
+    await library_service.ensure_bookmark(wf.id, LibraryItemKind.WORKFLOW, user_id)
     return wf
 
 
@@ -387,10 +390,19 @@ async def duplicate_workflow(
     # Bookmark the copy here rather than leaving it to the caller: "Make a copy"
     # in the workflow editor never made that follow-up call, so every copy it
     # produced was invisible in the library while still holding its name.
+    #
+    # The copy joins the team library only when the original is already there
+    # (a copy of a shared workflow). Every workflow carries its creator's
+    # current team, so the team stamp alone would put a copy of an unshared
+    # workflow in every teammate's Team tab.
     from app.services import library_service
 
+    shared = await library_service.in_team_library(
+        PydanticObjectId(workflow_id), LibraryItemKind.WORKFLOW, team_id,
+    )
     await library_service.ensure_bookmark(
-        new_wf.id, LibraryItemKind.WORKFLOW, user_id, team_id=team_id,
+        new_wf.id, LibraryItemKind.WORKFLOW, user_id,
+        team_id=team_id if shared else None,
     )
 
     return await get_workflow(str(new_wf.id))
