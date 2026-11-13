@@ -1479,6 +1479,10 @@ async def _validate_validation_qa(user_id: str) -> dict:
     return {"passed": passed, "stars": stars, "checks": checks}
 
 
+# Rows of a batch that has not finished yet; such a batch is not judged.
+_BATCH_UNFINISHED = {"queued", "running", "pending_approval"}
+
+
 def _as_utc(moment: datetime.datetime | None) -> datetime.datetime:
     """Mongo returns naive UTC datetimes; tests and new rows may be aware."""
     if moment is None:
@@ -1490,9 +1494,10 @@ async def _validate_batch_processing(user_id: str) -> dict:
     """Accept either the classical batched-workflow path or a v5 chat-driven
     run_extraction call that touched 3+ documents in a single invocation.
 
-    The learner's most recent run of 3+ documents decides "All succeeded", so
-    fixing a failure and running the batch again clears it, as the exercise
-    asks. Stars come from the largest batch that fully succeeded.
+    The learner's most recent finished run of 3+ documents decides "All
+    succeeded", so fixing a failure and running the batch again clears it, as
+    the exercise asks. A batch still in progress is not judged yet. Stars come
+    from the largest batch that fully succeeded.
     """
     from app.models.activity import ActivityEvent, ActivityStatus, ActivityType
 
@@ -1514,15 +1519,22 @@ async def _validate_batch_processing(user_id: str) -> dict:
         if r.batch_id:
             by_batch.setdefault(r.batch_id, []).append(r)
 
-    # (started, size, completed documents) for each batch-sized run.
+    # (started, size, completed documents) for each finished batch-sized run.
     runs: list[tuple[datetime.datetime, int, int]] = []
+    in_progress = 0
     for batch_results in by_batch.values():
+        if any(r.status in _BATCH_UNFINISHED for r in batch_results):
+            in_progress += 1
+            continue
         started = min(_as_utc(getattr(r, "start_time", None)) for r in batch_results)
         done = sum(1 for r in batch_results if r.status == "completed")
         runs.append((started, len(batch_results), done))
 
     # Chat-driven path: one extraction run over 3+ documents counts as a batch.
-    # A completed run read every document; a failed or canceled one did not.
+    # A failed run counts at the size it was started on: one that raised is
+    # finished before documents_touched is written, but its document titles
+    # were recorded at the start. A completed run is credited in full; the
+    # activity record does not say which documents yielded values.
     events = await ActivityEvent.find(
         ActivityEvent.user_id == user_id,
         ActivityEvent.type == ActivityType.SEARCH_SET_RUN.value,
@@ -1533,7 +1545,7 @@ async def _validate_batch_processing(user_id: str) -> dict:
         ]}},
     ).to_list()
     for e in events:
-        size = e.documents_touched or 0
+        size = max(e.documents_touched or 0, len(getattr(e, "document_titles", None) or []))
         succeeded = getattr(e, "status", ActivityStatus.COMPLETED.value) == ActivityStatus.COMPLETED.value
         runs.append((_as_utc(getattr(e, "started_at", None)), size, size if succeeded else 0))
 
@@ -1548,7 +1560,9 @@ async def _validate_batch_processing(user_id: str) -> dict:
         "passed": latest is not None,
         "detail": f"Largest batch has {largest} documents (need 3+)",
     })
-    if latest is None:
+    if latest is None and in_progress:
+        detail = "Your batch is still running; check again when it finishes"
+    elif latest is None:
         detail = "All documents in the batch must complete successfully"
     elif latest_ok:
         detail = f"Your most recent batch of 3+ documents: all {latest[1]} completed"
