@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING
 from pydantic_ai import ModelRetry, RunContext
 from pydantic_ai.messages import ToolReturnPart
 
+from app.services.hidden_drafts import without_refuted_figures
 from app.services.kb_answer_grounding import (
     bare_amounts_as_money,
     calculated_only,
@@ -77,7 +78,8 @@ async def require_calculated_figures(ctx: RunContext["AgenticChatDeps"], output:
     documents = await _document_texts(uuids)
     sources = [*documents, *(bare_amounts_as_money(t) for t in documents), getattr(deps, "user_message", "") or "",
                *(tool_output_as_source(text) for name, text in tools if name != "calculate")]
-    missing = unsupported_figures(output, "\n".join(sources))
+    # "$304,000 (not $253,000)": the refuted figure is not a claim.
+    missing = unsupported_figures(without_refuted_figures(output), "\n".join(sources))
     calculated = calculated_only(missing, output, [text for name, text in tools if name == "calculate"])
     missing = [figure for figure in missing if figure not in calculated]
     if not missing:

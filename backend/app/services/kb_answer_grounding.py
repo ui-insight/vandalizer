@@ -216,9 +216,11 @@ def _figure_value_and_unit(label: str) -> tuple[float, float] | None:
     return None
 
 
-def _calculated_steps(outputs: list[str]) -> list[tuple[float, str]]:
-    """Each numeric calculate step's value and its working ("label: terms = result")."""
-    steps: list[tuple[float, str]] = []
+def _calculated_steps(outputs: list[str]) -> list[tuple[float, str, bool]]:
+    """Each numeric calculate step's value, its working ("label: terms = result")
+    and whether it is a share (divides, not already ×100), which the reply
+    may state as a percentage."""
+    steps: list[tuple[float, str, bool]] = []
     for text in outputs:
         try:
             parsed = json.loads(text)
@@ -231,7 +233,10 @@ def _calculated_steps(outputs: list[str]) -> list[tuple[float, str]]:
                     value = float(result.replace(",", ""))
                 except ValueError:
                     continue
-                steps.append((value, f"{step.get('label') or 'Step'}: {step.get('expression') or ''} = {result}"))
+                expression = str(step.get("expression") or "")
+                # A share unless the step already scales it ("a / b * 100").
+                share = "/" in expression and not re.search(r"\*\s*100(?![\d.])|100\s*\*", expression)
+                steps.append((value, f"{step.get('label') or 'Step'}: {expression} = {result}", share))
     return steps
 
 
@@ -255,7 +260,14 @@ def calculation_formulas(figures: list[str], calculate_outputs: list[str]) -> di
             continue
         value, unit = parsed
         tolerance = unit / 2 + 1e-9
-        match = next((formula for candidate, formula in steps if abs(candidate - value) <= tolerance), None)
+        percent = bool(_PERCENT_RE.search(label)) and not _MONEY_RE.search(label)
+        # Support ticket: "625000 / 1250000 = 0.5", stated as "50.0%". A
+        # dividing step's result is a share, so a percentage matches it only
+        # ×100: "0.5%" from 0.5 is a 100× error, not the step's result.
+        match = next((
+            formula for candidate, formula, divides in steps
+            if abs((candidate * 100 if percent and divides else candidate) - value) <= tolerance
+        ), None)
         if match is not None:
             out[label] = match
     return out
