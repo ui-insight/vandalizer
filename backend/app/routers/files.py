@@ -258,6 +258,26 @@ async def upload_version(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.post("/{doc_uuid}/duplicate", response_model=None)
+@limiter.limit("30/minute")
+async def duplicate(
+    request: Request,
+    doc_uuid: str,
+    user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> dict:
+    """Copy ``doc_uuid`` into its own folder as "<name> (Copy)"."""
+    try:
+        result = await file_service.duplicate_document(doc_uuid, settings, user=user)
+    except file_service.DuplicateNotQueuedError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if result is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return result
+
+
 @router.get("/{doc_uuid}/versions", response_model=None)
 async def versions(doc_uuid: str, user: User = Depends(get_current_user)) -> dict:
     document = await access_control.get_authorized_document(doc_uuid, user)
