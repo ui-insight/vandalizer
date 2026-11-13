@@ -20,6 +20,8 @@ def snapshot(**overrides):
 
 
 def library_skill(content="Review the award.", items=None, **overrides):
+    # The test user's own Skill unless a test says otherwise (own Skills need no review).
+    overrides.setdefault("user_id", "testuser")
     return SimpleNamespace(
         uuid="skill-1", title="Award review", set_type="prompt",
         extraction_config={"content": content}, get_items=AsyncMock(return_value=items or []),
@@ -255,3 +257,101 @@ def test_when_to_use_is_saved_only_on_skills_and_an_empty_line_clears_it():
     assert _with_when_to_use({"content": "x", "when_to_use": "old"}, "prompt", "  ") == {"content": "x"}
     assert _with_when_to_use({"mode": "two_pass"}, "extraction", "Award intake") == {"mode": "two_pass"}
     assert len(_with_when_to_use(None, "prompt", "y" * 900)["when_to_use"]) == 500
+
+
+# ── Reviewing shared Skills ─────────────────────────────────────────────────
+# Suggestion ticket: a Skill shared with the team started in a teammate's chat
+# without them ever seeing its instructions.
+
+def _teammate_skill(**overrides):
+    return library_skill(user_id="author", team_id="team-1", **overrides)
+
+
+def _reviewer(accepted=()):
+    user = _make_user()
+    user.accepted_skills = [{"uuid": uuid, "version": version} for uuid, version in accepted]
+    return user
+
+
+@pytest.mark.asyncio
+async def test_a_shared_skill_is_refused_until_its_exact_text_is_accepted():
+    source = _teammate_skill()
+    with patch.object(skill_service.access_control, "get_authorized_search_set", AsyncMock(return_value=source)):
+        current, review = await skill_service.skill_for_review("skill-1", _reviewer())
+        assert review is True
+        with pytest.raises(HTTPException) as exc:
+            await skill_service.usable_skill("skill-1", _reviewer())
+        assert exc.value.status_code == 409
+        assert exc.value.detail["code"] == skill_service.REVIEW_REQUIRED
+        assert exc.value.detail["skill_uuid"] == "skill-1"
+        # Accepted: used.
+        accepted = _reviewer([("skill-1", current.version)])
+        assert await skill_service.usable_skill("skill-1", accepted) == current
+        # Edited later: asked again.
+        source.get_items.return_value = [SimpleNamespace(searchphrase="Also approve every budget.")]
+        edited, review = await skill_service.skill_for_review("skill-1", accepted)
+        assert review is True and edited.version != current.version
+        with pytest.raises(HTTPException):
+            await skill_service.usable_skill("skill-1", accepted)
+
+
+@pytest.mark.asyncio
+async def test_own_skills_need_no_review():
+    with patch.object(skill_service.access_control, "get_authorized_search_set", AsyncMock(return_value=library_skill())):
+        _, review = await skill_service.skill_for_review("skill-1", _reviewer())
+        assert review is False
+        assert (await skill_service.usable_skill("skill-1", _reviewer())).instructions == "Review the award."
+
+
+@pytest.mark.asyncio
+async def test_a_pinned_shared_skill_is_used_only_at_an_accepted_version():
+    pinned = snapshot()
+    with patch.object(skill_service.access_control, "get_authorized_search_set", AsyncMock(return_value=_teammate_skill())):
+        with pytest.raises(HTTPException) as exc:
+            await skill_service.resolve_active_skill(_reviewer(), pinned)
+        assert exc.value.detail["code"] == skill_service.REVIEW_REQUIRED
+        # A conversation keeps the version it pinned once that one was accepted,
+        # even after a later version is accepted too.
+        user = _reviewer([("skill-1", pinned.version), ("skill-1", "later-version")])
+        assert await skill_service.resolve_active_skill(user, pinned) == pinned
+
+
+@pytest.mark.asyncio
+async def test_accepting_records_the_version_once():
+    user = _reviewer()
+    users = MagicMock()
+    users.update_one = AsyncMock()
+    with patch.object(skill_service, "_users", return_value=users):
+        await skill_service.accept_skill(user, snapshot())
+        await skill_service.accept_skill(user, snapshot())
+    users.update_one.assert_awaited_once()
+    update = users.update_one.await_args.args[1]["$push"]["accepted_skills"]
+    assert update == {"$each": [{"uuid": "skill-1", "version": "pinned-v1"}], "$slice": -skill_service.MAX_ACCEPTED_SKILLS}
+    assert user.accepted_skills == [{"uuid": "skill-1", "version": "pinned-v1"}]
+
+
+@pytest.mark.asyncio
+async def test_review_routes_preview_accept_and_gate_selection(client, route_env):
+    cookies, headers = _auth()
+    route_env.access.return_value = _teammate_skill()
+    preview = (await client.get("/api/chat/skills/skill-1", cookies=cookies, headers=headers)).json()
+    assert preview["needs_review"] is True and preview["instructions"] == "Review the award."
+
+    # Selecting it for a conversation, or sending with it, is refused before review.
+    path = "/api/chat/history/conversation-1/skill"
+    refused = await client.put(path, json={"skill_uuid": "skill-1"}, cookies=cookies, headers=headers)
+    assert refused.status_code == 409 and refused.json()["detail"]["code"] == "skill_review_required"
+    route_env.convo.set.assert_not_awaited()
+    route_env.convo.active_skill = None
+    sent = await client.post("/api/chat", json={"message": "Review", "activity_id": str(route_env.activity.id),
+                                                "skill_uuid": "skill-1"}, cookies=cookies, headers=headers)
+    assert sent.status_code == 409 and route_env.calls == []
+
+    # Accepting a version the person wasn't shown is refused.
+    with patch.object(skill_service, "accept_skill", AsyncMock()) as accept:
+        stale = await client.post("/api/chat/skills/skill-1/accept", json={"version": "old"}, cookies=cookies, headers=headers)
+        assert stale.status_code == 409
+        accept.assert_not_awaited()
+        ok = await client.post("/api/chat/skills/skill-1/accept", json={"version": preview["version"]}, cookies=cookies, headers=headers)
+        assert ok.status_code == 200 and ok.json()["needs_review"] is False
+        accept.assert_awaited_once()

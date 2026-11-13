@@ -1073,21 +1073,6 @@ async def _user_ran_search_set(user_id: str, search_set_uuids: list[str]) -> boo
     return evt is not None
 
 
-async def _user_ran_search_set_on_n_docs(user_id: str, min_docs: int) -> int:
-    """Return the largest single-run document count across completed chat extractions."""
-    from app.models.activity import ActivityEvent, ActivityType, ActivityStatus
-
-    evts = await ActivityEvent.find(
-        ActivityEvent.user_id == user_id,
-        ActivityEvent.type == ActivityType.SEARCH_SET_RUN.value,
-        ActivityEvent.status == ActivityStatus.COMPLETED.value,
-    ).to_list()
-    best = 0
-    for e in evts:
-        best = max(best, e.documents_touched or 0)
-    return best
-
-
 async def _collect_searchset_fields(user_id: str) -> list[str]:
     """Field names from the user's own standalone Extractions (SearchSets).
 
@@ -1494,10 +1479,28 @@ async def _validate_validation_qa(user_id: str) -> dict:
     return {"passed": passed, "stars": stars, "checks": checks}
 
 
+# Rows of a batch that has not finished yet; such a batch is not judged.
+_BATCH_UNFINISHED = {"queued", "running", "pending_approval"}
+
+
+def _as_utc(moment: datetime.datetime | None) -> datetime.datetime:
+    """Mongo returns naive UTC datetimes; tests and new rows may be aware."""
+    if moment is None:
+        return datetime.datetime.min.replace(tzinfo=datetime.timezone.utc)
+    return moment if moment.tzinfo else moment.replace(tzinfo=datetime.timezone.utc)
+
+
 async def _validate_batch_processing(user_id: str) -> dict:
     """Accept either the classical batched-workflow path or a v5 chat-driven
     run_extraction call that touched 3+ documents in a single invocation.
+
+    The learner's most recent finished run of 3+ documents decides "All
+    succeeded", so fixing a failure and running the batch again clears it, as
+    the exercise asks. A batch still in progress is not judged yet. Stars come
+    from the largest batch that fully succeeded.
     """
+    from app.models.activity import ActivityEvent, ActivityStatus, ActivityType
+
     checks = []
     # WorkflowResult has no user_id field, so scope by the user's workflows
     # (the same way every other validator scopes its data). Querying a
@@ -1511,41 +1514,70 @@ async def _validate_batch_processing(user_id: str) -> dict:
         else []
     )
 
-    batch_ids: dict[str, list] = {}
+    by_batch: dict[str, list] = {}
     for r in results:
         if r.batch_id:
-            batch_ids.setdefault(r.batch_id, []).append(r)
+            by_batch.setdefault(r.batch_id, []).append(r)
 
-    best_batch_size = 0
-    best_batch_all_ok = False
-    for bid, batch_results in batch_ids.items():
-        count = len(batch_results)
-        if count > best_batch_size:
-            best_batch_size = count
-            best_batch_all_ok = all(r.status == "completed" for r in batch_results)
+    # (started, size, completed documents) for each finished batch-sized run.
+    runs: list[tuple[datetime.datetime, int, int]] = []
+    in_progress = 0
+    for batch_results in by_batch.values():
+        if any(r.status in _BATCH_UNFINISHED for r in batch_results):
+            in_progress += 1
+            continue
+        started = min(_as_utc(getattr(r, "start_time", None)) for r in batch_results)
+        done = sum(1 for r in batch_results if r.status == "completed")
+        runs.append((started, len(batch_results), done))
 
-    # Chat-driven path: a single SEARCH_SET_RUN with 3+ documents counts as a batch.
-    chat_batch_size = await _user_ran_search_set_on_n_docs(user_id, min_docs=3)
-    if chat_batch_size > best_batch_size:
-        best_batch_size = chat_batch_size
-        best_batch_all_ok = True  # Activity event is only written on success
+    # Chat-driven path: one extraction run over 3+ documents counts as a batch.
+    # A failed run counts at the size it was started on: one that raised is
+    # finished before documents_touched is written, but its document titles
+    # were recorded at the start. A completed run is credited in full; the
+    # activity record does not say which documents yielded values.
+    events = await ActivityEvent.find(
+        ActivityEvent.user_id == user_id,
+        ActivityEvent.type == ActivityType.SEARCH_SET_RUN.value,
+        {"status": {"$in": [
+            ActivityStatus.COMPLETED.value,
+            ActivityStatus.FAILED.value,
+            ActivityStatus.CANCELED.value,
+        ]}},
+    ).to_list()
+    for e in events:
+        size = max(e.documents_touched or 0, len(getattr(e, "document_titles", None) or []))
+        succeeded = getattr(e, "status", ActivityStatus.COMPLETED.value) == ActivityStatus.COMPLETED.value
+        runs.append((_as_utc(getattr(e, "started_at", None)), size, size if succeeded else 0))
+
+    batch_runs = [run for run in runs if run[1] >= 3]
+    largest = max((size for _, size, _ in runs), default=0)
+    latest = max(batch_runs, key=lambda run: run[0]) if batch_runs else None
+    latest_ok = latest is not None and latest[2] == latest[1]
+    best_successful = max((size for _, size, done in batch_runs if done == size), default=0)
 
     checks.append({
         "name": "Batch execution",
-        "passed": best_batch_size >= 3,
-        "detail": f"Largest batch has {best_batch_size} documents (need 3+)",
+        "passed": latest is not None,
+        "detail": f"Largest batch has {largest} documents (need 3+)",
     })
-    checks.append({
-        "name": "All succeeded",
-        "passed": best_batch_all_ok and best_batch_size >= 3,
-        "detail": "All documents in the batch must complete successfully",
-    })
+    if latest is None and in_progress:
+        detail = "Your batch is still running; check again when it finishes"
+    elif latest is None:
+        detail = "All documents in the batch must complete successfully"
+    elif latest_ok:
+        detail = f"Your most recent batch of 3+ documents: all {latest[1]} completed"
+    else:
+        detail = (
+            f"Your most recent batch of 3+ documents: {latest[2]} of {latest[1]} completed. "
+            "Fix the problem and run the batch again; a retry that completes fully replaces this result"
+        )
+    checks.append({"name": "All succeeded", "passed": latest_ok, "detail": detail})
 
     passed = all(c["passed"] for c in checks)
     stars = 1 if passed else 0
-    if passed and best_batch_size >= 5:
+    if passed and best_successful >= 5:
         stars = 2
-    if passed and best_batch_size >= 10:
+    if passed and best_successful >= 10:
         stars = 3
 
     return {"passed": passed, "stars": stars, "checks": checks}

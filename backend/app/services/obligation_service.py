@@ -5,7 +5,8 @@ its quote must be on the cited page, a deadline's date must be in its quote
 or calculated from a verified relative rule and period dates,
 and a limit's figures must be in their quotes. A proposal that fails is
 returned with the reason, never saved, so the inbox cannot hold a deadline
-the documents don't state.
+the documents don't state. The exception is ``add_by_hand``: a deadline a
+person enters in the inbox, saved as unchecked and labeled that way.
 """
 
 import datetime
@@ -393,11 +394,58 @@ def _document_span(text: str, quote: str, role: str) -> Optional[str]:
     norm_quote, _ = normalize_with_map(_blank_markup(quote))
     i = norm_doc.find(norm_quote) if norm_quote else -1
     if i == -1:
-        return None
+        return _row_holding(text, quote) if role in _PERIOD_ROLES else None
     start, end = index_map[i], index_map[i + len(norm_quote) - 1] + 1
     if role in _PERIOD_ROLES:
         start, end = _whole_rows(text, start, end)
     return text[start:end].strip()
+
+
+_MAX_HOLDING_ROWS = 4
+
+
+def _row_holding(text: str, quote: str) -> Optional[str]:
+    """The one run of table rows whose cells hold a period quote's words, in order.
+
+    Support ticket: a NIFA subaward's stored text ran two rows together,
+    "End Date|Federal Funds Obligated|August 31, 2027 (18 months) $95,550".
+    A model quoting "End Date August 31, 2027" skips the other label, so the
+    quote wasn't found and both final reports were refused. A quote may also
+    run on from the Start Date row above ("Start Date March 1, 2026 End Date
+    August 31, 2027"), which a Start Date rule needs.
+
+    Only table rows count (lines of pipe- or tab-separated cells), up to
+    four consecutive ones, holding every word of the quote in order; the
+    shortest such run must be the only one in the document. The document's
+    rows are what get stored and read for dates, never the model's wording.
+    """
+    words = re.findall(r"[a-z0-9]+", plain_quote(quote).lower())
+    if len(words) < 3:
+        return None
+    lines = text.splitlines()
+
+    def is_row(line: str) -> bool:
+        return "|" in line or "\t" in line
+
+    def holds(first: int, last: int) -> bool:
+        joined = " ".join(lines[first:last + 1]).replace("|", " ")
+        cells = iter(re.findall(r"[a-z0-9]+", plain_quote(joined).lower()))
+        return all(word in cells for word in words)
+
+    runs = set()
+    for first, line in enumerate(lines):
+        if not is_row(line):
+            continue
+        for last in range(first, min(first + _MAX_HOLDING_ROWS, len(lines))):
+            if not is_row(lines[last]):
+                break
+            if holds(first, last):
+                # Shortest run only: the rows after its first must not hold
+                # the quote on their own.
+                if last == first or not holds(first + 1, last):
+                    runs.add("\n".join(ln.strip() for ln in lines[first:last + 1]))
+                break
+    return runs.pop() if len(runs) == 1 else None
 
 
 def _whole_rows(text: str, start: int, end: int) -> tuple[int, int]:
@@ -558,13 +606,100 @@ def _title_words(title: str) -> set[str]:
     return {w for w in re.findall(r"[a-z0-9]+", (title or "").lower()) if w not in _TITLE_FILLER}
 
 
+#: Words chat adds around a deliverable's name that don't name a different
+#: deliverable: the timing it restates and labels like "(deliverable)".
+_TITLE_NOISE = frozenset({
+    "days", "day", "calendar", "business", "week", "weeks", "month", "months", "year", "years",
+    "after", "before", "within", "following", "prior", "each", "every", "end", "period", "expiration",
+    "termination", "completion", "submission", "submit", "submitted", "deliverable", "required",
+}) | frozenset(_MONTHS)
+#: Words that, inside brackets, only point at the rule or its anchor:
+#: "(see Section 5.2)", "(per the award terms)", "(from the budget period end)".
+_BRACKET_LABEL = frozenset({
+    "see", "per", "from", "in", "at", "as", "with", "under", "or", "is", "are", "section", "sec",
+    "article", "clause", "paragraph", "para", "page", "pp", "p", "attachment", "exhibit", "appendix",
+    "term", "terms", "condition", "conditions", "agreement", "award", "subaward", "budget", "project",
+    "performance", "start", "anchor", "rule",
+})
+#: Words that name a different deliverable when only one of two titles has
+#: them: "Final report" is not "Final financial report" or "Final patent report".
+_DISTINGUISHING = frozenset({
+    "financial", "technical", "scientific", "patent", "invention", "property", "inventory", "equipment",
+    "cost", "share", "sharing", "invoice", "audit", "federal", "sf", "rppr", "ffr", "fsr", "expenditure",
+    "progress", "performance", "final", "interim", "annual", "quarterly", "monthly", "closeout", "budget",
+    "subcontract", "subaward", "data", "publication", "disclosure", "certification",
+})
+_BRACKETED = re.compile(r"\(([^)]*)\)|\[([^\]]*)\]")
+_NUMERIC_DATE = re.compile(r"\b\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?\b")
+_TIMING_AFTER_NUMBER = frozenset({"day", "days", "calendar", "business", "week", "weeks", "month", "months", "year", "years"})
+
+
+def _singular(word: str) -> str:
+    return word[:-1] if len(word) > 3 and word.endswith("s") and not word.endswith("ss") else word
+
+
+def _content_words(text: str, labels: frozenset[str] = frozenset()) -> set[str]:
+    """Words naming the deliverable. Numbers that are timing ("60 days",
+    "March 1", "2027") are dropped; any other number ("Year 2", "SF-425")
+    tells deliverables apart and is kept."""
+    tokens = re.findall(r"[a-z0-9]+", _NUMERIC_DATE.sub(" ", (text or "").lower()))
+    words = set()
+    reference = False  # numbers after "Section", "Article": "(see Section 5.2)"
+    for i, w in enumerate(tokens):
+        number = re.fullmatch(r"(\d+)(?:st|nd|rd|th)?", w)
+        if not number:
+            reference = w in labels
+        if w in _TITLE_FILLER or w in _TITLE_NOISE or w in labels:
+            continue
+        if number:
+            after = tokens[i + 1] if i + 1 < len(tokens) else ""
+            before = tokens[i - 1] if i else ""
+            if reference or after in _TIMING_AFTER_NUMBER or before in _MONTHS or re.fullmatch(r"(19|20)\d\d", w):
+                continue
+            w = number.group(1)
+        words.add(_singular(w))
+    return words
+
+
+def _deliverable_words(title: str) -> tuple[set[str], set[str]]:
+    """(all words naming the deliverable, those from its brackets). A
+    bracket holding only timing or a label is dropped; one naming something
+    ("(financial)", "(SF-425)") counts like the rest of the title."""
+    bracketed: set[str] = set()
+    for m in _BRACKETED.finditer(title or ""):
+        bracketed |= _content_words(m.group(1) or m.group(2) or "", _BRACKET_LABEL)
+    return _content_words(_BRACKETED.sub(" ", title or "")) | bracketed, bracketed
+
+
+_DISTINGUISHING_WORDS = frozenset(_singular(w) for w in _DISTINGUISHING)
+
+
 def _similar_titles(a: str, b: str) -> bool:
     """"Semi-annual results due" and "Semi-annual results report": yes.
-    "Final invoice" and "Final report": no."""
-    wa, wb = _title_words(a), _title_words(b)
+    "Annual progress report for NIFA REEport (deliverable)" and "Annual
+    progress report for the NIFA REEport submission (60 days after March 1,
+    2027)": yes, they differ only in timing and labels.
+
+    When in doubt, no: merging two different deadlines hides one, a missed
+    duplicate is only one more item to reject. "Final invoice" and "Final
+    report", "Final report (financial)" and "Final report (technical)",
+    "Final report" and "Final Federal Financial Report (SF-425)", "Year 1
+    progress report" and "Year 2 progress report": no, one names a
+    deliverable or number the other doesn't."""
+    (wa, ba), (wb, bb) = _deliverable_words(a), _deliverable_words(b)
     if not wa or not wb:
         return False
-    return len(wa & wb) / len(wa | wb) > 0.5
+    if wa == wb:
+        return True
+    if ba and bb and ba != bb:
+        return False
+    extra = wa ^ wb
+    if any(w.isdigit() or w in _DISTINGUISHING_WORDS for w in extra):
+        return False
+    common = wa & wb
+    if len(min(wa, wb, key=len)) >= 3 and (wa <= wb or wb <= wa):
+        return True
+    return len(common) / len(wa | wb) > 0.5
 
 
 def _same_rule(a: str, b: str) -> bool:
@@ -580,6 +715,12 @@ def _same_deadline(ob: Obligation, clean: dict) -> bool:
     # once from a stated date and once from a timing rule.
     if _title_words(ob.title) and _title_words(ob.title) == _title_words(clean["title"]):
         return True
+    if getattr(ob, "entered_by_hand", False):
+        # Saved as type "other" with no rule behind it: only its title says
+        # which deadline it is. Matching on type would refuse every verified
+        # "other" deadline on that day ("Invention disclosure" after a
+        # hand-added "Final report").
+        return False
     old_calc, new_calc = ob.deadline_calculation, clean.get("deadline_calculation")
     if old_calc or new_calc:
         # Occurrences of a recurring rule. Support ticket: the 4 semi-annual
@@ -608,13 +749,7 @@ def _norm_title(title: str) -> str:
 _KNOWN_STATUSES = ("open", "done")
 
 
-async def find_existing(project_uuid: str, clean: dict) -> Optional[Obligation]:
-    """The inbox item a proposal repeats, open or already marked done.
-
-    Support ticket: only open items were compared, so a deadline marked Done
-    was proposed again on the next run and would have come back as open, with
-    its reminders starting over.
-    """
+async def _matching(project_uuid: str, clean: dict) -> list[Obligation]:
     existing = await Obligation.find(
         {"project_uuid": project_uuid, "kind": clean["kind"], "status": {"$in": list(_KNOWN_STATUSES)}}
     ).to_list()
@@ -628,7 +763,32 @@ async def find_existing(project_uuid: str, clean: dict) -> Optional[Obligation]:
         elif _norm_title(ob.title) == _norm_title(clean["title"]):
             matches.append(ob)
     # An open copy is the one the inbox is showing.
-    return next((ob for ob in matches if ob.status == "open"), matches[0] if matches else None)
+    return sorted(matches, key=lambda ob: ob.status != "open")
+
+
+async def find_existing(project_uuid: str, clean: dict) -> Optional[Obligation]:
+    """The inbox item a proposal repeats, open or already marked done.
+
+    Support ticket: only open items were compared, so a deadline marked Done
+    was proposed again on the next run and would have come back as open, with
+    its reminders starting over.
+
+    A deadline added by hand doesn't count: a proposal checked against a
+    document confirms it instead (``find_hand_entered``).
+    """
+    return next((ob for ob in await _matching(project_uuid, clean) if not getattr(ob, "entered_by_hand", False)), None)
+
+
+async def find_hand_entered(project_uuid: str, clean: dict) -> Optional[Obligation]:
+    """The hand-added deadline a checked proposal is the same as (same date, same title).
+
+    Saving the proposal turns that item into the checked one, in place, rather
+    than refusing it as "already in the inbox": the unchecked copy would
+    otherwise stay unchecked for good.
+    """
+    if clean.get("kind") != "deadline" or not clean.get("sources"):
+        return None
+    return next((ob for ob in await _matching(project_uuid, clean) if getattr(ob, "entered_by_hand", False)), None)
 
 
 async def is_duplicate(project_uuid: str, clean: dict) -> bool:
@@ -647,15 +807,31 @@ def _already_reason(ob: Obligation, user: User) -> str:
 
 async def save_checked(project: Project, user: User, clean: dict) -> Obligation:
     replaced = await find_replaced(project.uuid, clean)
-    ob = Obligation(
-        uuid=uuid_mod.uuid4().hex,
-        project_uuid=project.uuid,
-        team_id=project.team_id,
-        created_by=user.user_id,
-        supersedes=replaced.uuid if replaced else None,
-        **clean,
-    )
-    await ob.insert()
+    hand = await find_hand_entered(project.uuid, clean)
+    if hand is not None:
+        # The same deadline, now checked against a document: it takes the
+        # cited version's title, type, time and sources and stops being
+        # "added by hand". Done, dismissals and its uuid (calendar entries)
+        # carry over, so nobody sees it come back or twice.
+        for key, value in clean.items():
+            setattr(hand, key, value)
+        hand.entered_by_hand = False
+        hand.source_note = None
+        if replaced and not hand.supersedes:
+            hand.supersedes = replaced.uuid
+        hand.updated_at = _now()
+        await hand.save()
+        ob = hand
+    else:
+        ob = Obligation(
+            uuid=uuid_mod.uuid4().hex,
+            project_uuid=project.uuid,
+            team_id=project.team_id,
+            created_by=user.user_id,
+            supersedes=replaced.uuid if replaced else None,
+            **clean,
+        )
+        await ob.insert()
     if replaced:
         replaced.status = "superseded"
         replaced.superseded_by = ob.uuid
@@ -692,8 +868,70 @@ async def propose(project: Project, user: User, items: list[dict]) -> dict:
                 rejected.append({"title": row["title"], "reason": _already_reason(existing, user)})
                 continue
             replaced = await find_replaced(project.uuid, row)
-            accepted.append({"clean": row, "replaces": serialize(replaced, user) if replaced else None})
+            hand = await find_hand_entered(project.uuid, row)
+            accepted.append({
+                "clean": row, "replaces": serialize(replaced, user) if replaced else None,
+                **({"confirms_hand_entered": hand.uuid} if hand else {}),
+            })
     return {"accepted": accepted, "rejected": rejected}
+
+
+_MAX_NOTE = 300
+
+
+async def add_by_hand(
+    project: Project, user: User, *, title: str, due_date: str, source_note: Optional[str] = None,
+) -> tuple[Optional[Obligation], Optional[str]]:
+    """Save a deadline typed into the inbox. Returns ``(obligation, None)`` or ``(None, reason)``.
+
+    Support ticket: chat refuses a deadline it can't verify against the
+    document and says to add it in the inbox, which had no way to add one. The
+    item is saved as ``entered_by_hand``, with the person's own note on where it
+    comes from, and never replaces a document-backed deadline.
+    """
+    clean_title = " ".join((title or "").split())[:200]
+    if not clean_title:
+        return None, "Give the deadline a title."
+    if not isinstance(due_date, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", due_date.strip()):
+        return None, "Give the due date as YYYY-MM-DD."
+    try:
+        due = datetime.datetime.fromisoformat(due_date.strip())
+    except ValueError:
+        return None, "That due date is not a real date."
+    if not 1900 <= due.year <= 2999:
+        return None, "Give a due date between 1900 and 2999."
+    note = " ".join((source_note or "").split())[:_MAX_NOTE] or None
+    clean: dict[str, Any] = {
+        "kind": "deadline", "title": clean_title, "deadline_type": "other",
+        "due_at": due, "due_text": None, "sources": [],
+    }
+    # Same date and same title only. find_existing also treats any two
+    # "other" deadlines on one day as the same, which would refuse a second,
+    # different deadline someone types for that day.
+    candidates = await Obligation.find(
+        {"project_uuid": project.uuid, "kind": "deadline", "status": {"$in": list(_KNOWN_STATUSES)}},
+    ).to_list()
+    existing = next((
+        ob for ob in sorted(candidates, key=lambda o: o.status != "open")
+        if ob.due_at and ob.due_at.date() == due.date()
+        and (_title_words(ob.title) or {_norm_title(ob.title)}) == (_title_words(clean_title) or {_norm_title(clean_title)})
+    ), None)
+    if existing is not None:
+        where = ("marked done" if existing.status == "done"
+                 else "dismissed from your Home" if user.user_id in (existing.dismissed_by or [])
+                 else "open")
+        return None, f'"{existing.title}" on that date is already in this project\'s inbox ({where}).'
+    ob = Obligation(
+        uuid=uuid_mod.uuid4().hex,
+        project_uuid=project.uuid,
+        team_id=project.team_id,
+        created_by=user.user_id,
+        entered_by_hand=True,
+        source_note=note,
+        **clean,
+    )
+    await ob.insert()
+    return ob, None
 
 
 def _sort_key(ob: Obligation) -> tuple[int, datetime.datetime, datetime.datetime]:
@@ -766,6 +1004,8 @@ def serialize(
         "sources": [{**s.model_dump(), "deleted": s.document_uuid in deleted} for s in ob.sources],
         "source_deleted": source_deleted(ob, deleted),
         "kept_without_source": bool(getattr(ob, "kept_without_source", False)),
+        "entered_by_hand": bool(getattr(ob, "entered_by_hand", False)),
+        "source_note": getattr(ob, "source_note", None),
         "status": ob.status,
         "supersedes": ob.supersedes,
         "superseded_by": ob.superseded_by,

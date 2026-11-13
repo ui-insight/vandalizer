@@ -73,6 +73,11 @@ class User(Document):
     # person accepted it: an edit by anyone stops chat using the Skill until
     # they accept the new text (skill_service.core_skill_states).
     core_skills: list[dict] = []
+    # Shared Skills this person reviewed and accepted, as ``{"uuid", "version"}``.
+    # A Skill someone else wrote is used in their chats only at a version listed
+    # here (skill_service.require_reviewed). Several versions of one Skill can be
+    # listed: a conversation keeps the version it pinned.
+    accepted_skills: list[dict] = []
 
     # v5.0 launch — one-time announcement send tracking
     v5_announcement_sent_at: Optional[datetime.datetime] = None

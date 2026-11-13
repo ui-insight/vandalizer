@@ -96,12 +96,16 @@ class DefaultSkillRequest(BaseModel):
 
 @router.get("/{project_uuid}/default-skill", response_model=None)
 async def get_default_skill(project_uuid: str, user: User = Depends(get_current_user)) -> dict:
-    from app.services.skill_service import snapshot_skill
+    from app.services.skill_service import skill_for_review
     project = await project_service.get_authorized_project(project_uuid, user)
     if not project:
         raise HTTPException(404, "Project not found")
     uuid = getattr(project, "default_skill_uuid", None)
-    return {"active_skill": await snapshot_skill(uuid, user) if uuid else None}
+    if not uuid:
+        return {"active_skill": None, "needs_review": False}
+    # A default someone else set or wrote is shown for review first.
+    snapshot, review = await skill_for_review(uuid, user)
+    return {"active_skill": snapshot, "needs_review": review}
 
 
 @router.put("/{project_uuid}/default-skill", response_model=None)

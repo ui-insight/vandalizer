@@ -11,6 +11,7 @@ import { ChatScrollRegion } from './ChatScrollRegion'
 import { ChatInput } from './ChatInput'
 import { AttachmentList } from './AttachmentList'
 import { ChatSkillDialog } from './ChatSkillDialog'
+import { SkillReviewDialog } from './SkillReviewDialog'
 import { AssistantSettingsLink } from '../assistant/AssistantSettingsLink'
 import { CoreSkillsNotice } from '../assistant/CoreSkillsNotice'
 import { useCoreSkills } from '../../hooks/useCoreSkills'
@@ -116,6 +117,9 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     initializeProjectSkill,
     projectSkillBlocked,
     selectSkill,
+    skillReview,
+    acceptReviewedSkill,
+    cancelSkillReview,
     isSelectingSkill,
     setActivity,
   } = useChat({ onLiveToolResult: result => {
@@ -950,6 +954,13 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         disabled={isStreaming || isLoadingHistory || isSelectingSkill}
         onSelect={selectSkill}
         onClose={() => setSkillDialog(null)}
+      />}
+      {skillReview && <SkillReviewDialog
+        skill={skillReview.skill}
+        accepting={skillReview.accepting}
+        error={skillReview.error}
+        onAccept={() => void acceptReviewedSkill()}
+        onCancel={cancelSkillReview}
       />}
 
       {chatUploads.uploads.length > 0 && (
