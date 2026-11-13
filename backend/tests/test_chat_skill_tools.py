@@ -92,16 +92,18 @@ async def test_inspection_does_not_select_and_reports_inaccessible_skills():
 async def test_selection_requires_prior_turn_and_pins_exact_preview_despite_library_edits(accepted):
     conv = conversation()
     ctx = _make_context(conversation=conv, turn_marker=5)
-    with patch.object(skill_service, "snapshot_skill", AsyncMock(return_value=snapshot())) as read, \
+    with patch.object(skill_service, "skill_for_review", AsyncMock(return_value=(snapshot(), True))) as read, \
          patch.object(skill_service, "authorize_skill", AsyncMock()):
         preview = await tools.select_skill(ctx, "s1", confirmed=True)
         assert preview["needs_confirmation"] and preview["skill_instructions"] == "NEW_REVIEW_GUIDANCE"
+        # Approving accepts a Skill someone else wrote: the card shows its instructions open.
+        assert preview["needs_review"] is True
         assert preview["approval_label"] == "Use Skill"
         assert '"Use Skill" button' in preview["assistant_instruction"]
         assert (await tools.select_skill(ctx, "s1", confirmed=True))["needs_confirmation"]
         conv.set.assert_not_awaited()
         ctx.deps.turn_marker = 7
-        read.return_value = snapshot(version="v2", instructions="UNREVIEWED_EDIT")
+        read.return_value = (snapshot(version="v2", instructions="UNREVIEWED_EDIT"), True)
         selected = await tools.select_skill(ctx, "s1", confirmed=True)
     assert selected["active_skill"] == snapshot().model_dump()
     assert conv.active_skill == snapshot()
@@ -137,7 +139,7 @@ async def test_removal_preview_and_receipt_use_removal_wording_and_preserve_conf
 async def test_revocation_and_conversation_ownership_block_selection():
     conv = conversation()
     ctx = _make_context(conversation=conv)
-    with patch.object(skill_service, "snapshot_skill", AsyncMock(return_value=snapshot())):
+    with patch.object(skill_service, "skill_for_review", AsyncMock(return_value=(snapshot(), False))):
         await tools.select_skill(ctx, "s1")
     ctx.deps.turn_marker += 2
     with patch.object(skill_service, "authorize_skill", AsyncMock(side_effect=HTTPException(404, "Access revoked"))):
@@ -167,7 +169,7 @@ async def test_model_receives_replaced_instructions_immediately_and_on_followup(
 
     agent = Agent(FunctionModel(respond), tools=[tools.select_skill], history_processors=[_inject_queued_user_parts])
     instructions = tools.conversation_instructions("Application rules.")
-    with patch.object(skill_service, "snapshot_skill", AsyncMock(return_value=snapshot())), \
+    with patch.object(skill_service, "skill_for_review", AsyncMock(return_value=(snapshot(), False))), \
          patch.object(skill_service, "authorize_skill", AsyncMock()):
         await tools.select_skill(ctx, uuid)
         ctx.deps.turn_marker += 2

@@ -131,19 +131,20 @@ async def select_skill(
         return {"error": "Open your own conversation before selecting a Skill."}
     key = {"skill_uuid": skill_uuid}
     stash = _armed_stash(context, "select_skill", key) if confirmed else None
+    needs_review = False
     try:
         if skill_uuid:
             if stash and stash.get("skill"):
                 await skill_service.authorize_skill(skill_uuid, context.deps.user)
                 selected = SkillSnapshot.model_validate(stash["skill"])
             else:
-                selected = await skill_service.snapshot_skill(skill_uuid, context.deps.user)
+                selected, needs_review = await skill_service.skill_for_review(skill_uuid, context.deps.user)
         else:
             selected = None
     except HTTPException as exc:
         return {"error": str(exc.detail)}
     snapshot = selected.model_dump() if selected else None
-    preview = {
+    preview: dict[str, object] = {
         "title": selected.title if selected else "No active Skill",
         "skill_uuid": skill_uuid,
         "approval_label": "Use Skill" if selected else "Remove Skill",
@@ -154,6 +155,10 @@ async def select_skill(
     }
     if selected and selected.when_to_use:
         preview["when_to_use"] = selected.when_to_use
+    if needs_review:
+        # Approving accepts a Skill someone else wrote, so the card shows its
+        # instructions open rather than behind "Inspect".
+        preview["needs_review"] = True
     pending = await _confirm_gate(context, tool_name="select_skill", key=key, confirmed=confirmed,
                                   preview=preview, stash={"skill": snapshot})
     if pending is not None:

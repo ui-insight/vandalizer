@@ -1,4 +1,4 @@
-import { apiFetch, rawFetch } from './client'
+import { apiFetch, errorDetailMessage, rawFetch } from './client'
 import { MissingDocumentsError } from './chatErrors'
 import type { CardDecision, ChatMessage, UrlAttachment, FileAttachment, PlanTask, StreamChunk, SkillSnapshot } from '../types/chat'
 
@@ -80,7 +80,8 @@ export async function streamChat(
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ detail: 'Chat request failed' }))
-    const message = typeof body.detail === 'string' && body.detail ? body.detail : 'Chat request failed'
+    // Structured details ({code, message}), such as a shared Skill awaiting review, carry their text in `message`.
+    const message = errorDetailMessage(body?.detail, 'Chat request failed')
     if (res.headers.get('X-Chat-Error') === 'document_missing') {
       throw new MissingDocumentsError(
         message,
