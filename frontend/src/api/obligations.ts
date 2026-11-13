@@ -42,6 +42,10 @@ export interface Obligation {
   source_deleted?: boolean
   /** Someone chose to keep the item after its file was deleted; until then it sends no reminders. */
   kept_without_source?: boolean
+  /** Entered in the inbox by a person, not found in a document: never checked against a source. */
+  entered_by_hand?: boolean
+  /** That person's note on where it comes from, as typed. Not a verified citation. */
+  source_note?: string | null
 }
 
 /** Home's list across your projects, or one project's when *projectUuid* is given. */
@@ -66,6 +70,14 @@ export function setObligationDismissed(uuid: string, dismissed: boolean) {
 /** Keep an item whose source file was deleted, for everyone on the project. */
 export function setObligationKept(uuid: string, keep: boolean) {
   return apiFetch<Obligation>(`/api/obligations/${uuid}/keep`, { method: 'POST', body: JSON.stringify({ keep }) })
+}
+
+/** Add a deadline by hand to a project's inbox. It is saved as not checked against a document. */
+export function addDeadlineByHand(projectUuid: string, title: string, dueDate: string, sourceNote?: string) {
+  return apiFetch<Obligation>('/api/obligations/by-hand', {
+    method: 'POST',
+    body: JSON.stringify({ project_uuid: projectUuid, title, due_date: dueDate, source_note: sourceNote || null }),
+  })
 }
 
 export function setInboxHidden(inboxHidden: boolean) {

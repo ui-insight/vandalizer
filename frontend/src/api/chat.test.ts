@@ -1,7 +1,10 @@
 import { expect, it, vi } from 'vitest'
 import { streamChat, exportChat } from './chat'
 import { rawFetch } from './client'
-vi.mock('./client', () => ({ rawFetch: vi.fn(), apiFetch: vi.fn() }))
+vi.mock('./client', async importOriginal => ({
+  rawFetch: vi.fn(), apiFetch: vi.fn(),
+  errorDetailMessage: (await importOriginal<typeof import('./client')>()).errorDetailMessage,
+}))
 it('sends the current browser timezone on each turn without trusting a client date', async () => {
   vi.mocked(rawFetch).mockImplementation(async () => new Response(''))
   const original = Intl.DateTimeFormat().resolvedOptions()
@@ -128,4 +131,14 @@ it('names the approval card a click decided', async () => {
   body = JSON.parse(vi.mocked(rawFetch).mock.lastCall![1]!.body as string)
   expect(body.decline_for).toBe('call-save')
   expect(body).not.toHaveProperty('approval_for')
+})
+
+it('shows the message of a structured error detail, such as a Skill awaiting review', async () => {
+  vi.mocked(rawFetch).mockResolvedValueOnce(new Response(JSON.stringify({ detail: {
+    code: 'skill_review_required', skill_uuid: 's1',
+    message: 'Review and accept the instructions of "Team review" before using it.',
+  } }), { status: 409 }))
+  await expect(streamChat('Hello', [])).rejects.toThrow('Review and accept the instructions of "Team review" before using it.')
+  vi.mocked(rawFetch).mockResolvedValueOnce(new Response('not json', { status: 500 }))
+  await expect(streamChat('Hello', [])).rejects.toThrow('Chat request failed')
 })

@@ -508,6 +508,10 @@ def page_html(v: dict[str, Any]) -> str:
         for d in items:
             src = d["sources"][0] if d.get("sources") else None
             where = f" · {src['document_title']}{', p. ' + str(src['page']) if src and src.get('page') else ''}" if src else ""
+            if d.get("entered_by_hand"):
+                # No document behind it; the copy must not read as cited.
+                where = " · Added by hand · not checked against a document" + (
+                    f" · Source: {d['source_note']}" if d.get("source_note") else "")
             when = _date(d.get("due_at")) + (f", {d['due_text']}" if d.get("due_text") else "")
             out.append(f"<li><strong>{e(d['title'])}</strong> · {e(when)}{e(where)}</li>")
         return "".join(out)
