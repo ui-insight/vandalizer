@@ -147,6 +147,23 @@ class TestCreateWorkflow:
         assert args[1] == LibraryItemKind.WORKFLOW
         assert args[2] == "user1"
 
+    @patch("app.services.library_service.ensure_bookmark", new_callable=AsyncMock)
+    @patch("app.services.name_conflicts.ensure_workflow_name_available", new_callable=AsyncMock)
+    @patch("app.services.workflow_service.Workflow")
+    async def test_a_new_team_stamped_workflow_is_bookmarked_personally(
+        self, mock_wf_cls, mock_ensure, mock_bookmark,
+    ):
+        """A new workflow stays out of the team's library until its owner
+        shares it, as a new Skill does (support ticket)."""
+        from app.services.workflow_service import create_workflow
+
+        mock_wf_cls.return_value = MagicMock(insert=AsyncMock())
+
+        await create_workflow(name="My Workflow", user_id="user1", team_id="team1")
+
+        assert mock_wf_cls.call_args.kwargs["team_id"] == "team1"
+        assert mock_bookmark.await_args.kwargs.get("team_id") is None
+
 
 class TestDuplicateWorkflowBookmarks:
     async def test_copy_gets_a_library_bookmark(self):
@@ -180,6 +197,46 @@ class TestDuplicateWorkflowBookmarks:
         assert args[0] == new_wf.id
         assert args[1] == LibraryItemKind.WORKFLOW
         assert args[2] == "user1"
+
+    async def _duplicate_in_team(self, *, source_in_team_library: bool):
+        original = _make_workflow(name="Budget Analyzer", team_id="team1")
+        new_wf = _make_workflow(name="Budget Analyzer (Copy)", team_id="team1")
+        ensure = AsyncMock()
+        in_team = AsyncMock(return_value=source_in_team_library)
+
+        with (
+            patch("app.services.workflow_service.get_authorized_workflow", new_callable=AsyncMock, return_value=original),
+            patch("app.services.workflow_service.get_workflow", new_callable=AsyncMock, return_value={"name": "Budget Analyzer", "steps": [], "description": None}),
+            patch("app.services.workflow_service.Workflow") as mock_wf_cls,
+            patch("app.services.name_conflicts.next_available_name", new_callable=AsyncMock, return_value="Budget Analyzer (Copy)"),
+            patch("app.services.library_service.in_team_library", in_team),
+            patch("app.services.library_service.ensure_bookmark", ensure),
+        ):
+            mock_wf_cls.return_value = new_wf
+            mock_wf_cls.get = AsyncMock(return_value=original)
+
+            from app.services.workflow_service import duplicate_workflow
+
+            await duplicate_workflow(
+                str(original.id), MagicMock(), user_id="user1", team_id="team1",
+            )
+
+        from app.models.library import LibraryItemKind
+
+        in_team.assert_awaited_once_with(original.id, LibraryItemKind.WORKFLOW, "team1")
+        assert mock_wf_cls.call_args.kwargs["team_id"] == "team1"
+        return ensure
+
+    async def test_a_copy_of_an_unshared_workflow_is_bookmarked_personally(self):
+        """Support ticket: "Make a copy" of a workflow that sat only in Mine
+        filed the copy in the current team's library, so every teammate saw
+        it in Library → Team though nobody shared it."""
+        ensure = await self._duplicate_in_team(source_in_team_library=False)
+        assert ensure.await_args.kwargs.get("team_id") is None
+
+    async def test_a_copy_of_a_shared_workflow_stays_in_the_team_library(self):
+        ensure = await self._duplicate_in_team(source_in_team_library=True)
+        assert ensure.await_args.kwargs.get("team_id") == "team1"
 
 
 class TestListWorkflows:
