@@ -5574,6 +5574,8 @@ async def propose_obligations(
         if a["replaces"]:
             old = a["replaces"]
             line += f" — replaces {old['due_at'][:10]} ({old['sources'][0]['document_title']})"
+        if a.get("confirms_hand_entered"):
+            line += " — checks the deadline added by hand for that date, which keeps its done and dismissed state"
         descriptions.append(line)
     excluded = [
         {"title": r["title"] or "Item", "explanation": _obligation_review_reason(r["reason"])}
@@ -5597,18 +5599,19 @@ async def propose_obligations(
                 + " Tell the user this; do not propose these again or reopen items marked done."
             ),
         }
+    # Something was actually refused, not just already in the inbox.
+    refused = any("already in" not in (r.get("reason") or "") for r in rejected)
     if not accepted:
         context.deps.obligation_failures = failures + 1
         return {
             "error": "None of the proposed items could be checked against their documents.",
             "rejected": rejected,
             "hint": "Fix each item using its reason (usually the exact quote or its page) and propose again.",
-            "if_still_refused": _ADD_BY_HAND,
+            **({"if_still_refused": _ADD_BY_HAND} if refused else {}),
         }
 
     from fastapi.encoders import jsonable_encoder
 
-    refused = any("already in" not in (r.get("reason") or "") for r in rejected)
     # Approval covers the actual write, not rejected inputs or model formatting.
     # Rechecking still enforces access and source evidence. Changed accepted
     # dates, sources, or replacements require a fresh preview; dropping rejected

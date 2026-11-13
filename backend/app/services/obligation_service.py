@@ -581,6 +581,12 @@ def _same_deadline(ob: Obligation, clean: dict) -> bool:
     # once from a stated date and once from a timing rule.
     if _title_words(ob.title) and _title_words(ob.title) == _title_words(clean["title"]):
         return True
+    if getattr(ob, "entered_by_hand", False):
+        # Saved as type "other" with no rule behind it: only its title says
+        # which deadline it is. Matching on type would refuse every verified
+        # "other" deadline on that day ("Invention disclosure" after a
+        # hand-added "Final report").
+        return False
     old_calc, new_calc = ob.deadline_calculation, clean.get("deadline_calculation")
     if old_calc or new_calc:
         # Occurrences of a recurring rule. Support ticket: the 4 semi-annual
@@ -609,13 +615,7 @@ def _norm_title(title: str) -> str:
 _KNOWN_STATUSES = ("open", "done")
 
 
-async def find_existing(project_uuid: str, clean: dict) -> Optional[Obligation]:
-    """The inbox item a proposal repeats, open or already marked done.
-
-    Support ticket: only open items were compared, so a deadline marked Done
-    was proposed again on the next run and would have come back as open, with
-    its reminders starting over.
-    """
+async def _matching(project_uuid: str, clean: dict) -> list[Obligation]:
     existing = await Obligation.find(
         {"project_uuid": project_uuid, "kind": clean["kind"], "status": {"$in": list(_KNOWN_STATUSES)}}
     ).to_list()
@@ -629,7 +629,32 @@ async def find_existing(project_uuid: str, clean: dict) -> Optional[Obligation]:
         elif _norm_title(ob.title) == _norm_title(clean["title"]):
             matches.append(ob)
     # An open copy is the one the inbox is showing.
-    return next((ob for ob in matches if ob.status == "open"), matches[0] if matches else None)
+    return sorted(matches, key=lambda ob: ob.status != "open")
+
+
+async def find_existing(project_uuid: str, clean: dict) -> Optional[Obligation]:
+    """The inbox item a proposal repeats, open or already marked done.
+
+    Support ticket: only open items were compared, so a deadline marked Done
+    was proposed again on the next run and would have come back as open, with
+    its reminders starting over.
+
+    A deadline added by hand doesn't count: a proposal checked against a
+    document confirms it instead (``find_hand_entered``).
+    """
+    return next((ob for ob in await _matching(project_uuid, clean) if not getattr(ob, "entered_by_hand", False)), None)
+
+
+async def find_hand_entered(project_uuid: str, clean: dict) -> Optional[Obligation]:
+    """The hand-added deadline a checked proposal is the same as (same date, same title).
+
+    Saving the proposal turns that item into the checked one, in place, rather
+    than refusing it as "already in the inbox": the unchecked copy would
+    otherwise stay unchecked for good.
+    """
+    if clean.get("kind") != "deadline" or not clean.get("sources"):
+        return None
+    return next((ob for ob in await _matching(project_uuid, clean) if getattr(ob, "entered_by_hand", False)), None)
 
 
 async def is_duplicate(project_uuid: str, clean: dict) -> bool:
@@ -648,15 +673,31 @@ def _already_reason(ob: Obligation, user: User) -> str:
 
 async def save_checked(project: Project, user: User, clean: dict) -> Obligation:
     replaced = await find_replaced(project.uuid, clean)
-    ob = Obligation(
-        uuid=uuid_mod.uuid4().hex,
-        project_uuid=project.uuid,
-        team_id=project.team_id,
-        created_by=user.user_id,
-        supersedes=replaced.uuid if replaced else None,
-        **clean,
-    )
-    await ob.insert()
+    hand = await find_hand_entered(project.uuid, clean)
+    if hand is not None:
+        # The same deadline, now checked against a document: it takes the
+        # cited version's title, type, time and sources and stops being
+        # "added by hand". Done, dismissals and its uuid (calendar entries)
+        # carry over, so nobody sees it come back or twice.
+        for key, value in clean.items():
+            setattr(hand, key, value)
+        hand.entered_by_hand = False
+        hand.source_note = None
+        if replaced and not hand.supersedes:
+            hand.supersedes = replaced.uuid
+        hand.updated_at = _now()
+        await hand.save()
+        ob = hand
+    else:
+        ob = Obligation(
+            uuid=uuid_mod.uuid4().hex,
+            project_uuid=project.uuid,
+            team_id=project.team_id,
+            created_by=user.user_id,
+            supersedes=replaced.uuid if replaced else None,
+            **clean,
+        )
+        await ob.insert()
     if replaced:
         replaced.status = "superseded"
         replaced.superseded_by = ob.uuid
@@ -693,7 +734,11 @@ async def propose(project: Project, user: User, items: list[dict]) -> dict:
                 rejected.append({"title": row["title"], "reason": _already_reason(existing, user)})
                 continue
             replaced = await find_replaced(project.uuid, row)
-            accepted.append({"clean": row, "replaces": serialize(replaced, user) if replaced else None})
+            hand = await find_hand_entered(project.uuid, row)
+            accepted.append({
+                "clean": row, "replaces": serialize(replaced, user) if replaced else None,
+                **({"confirms_hand_entered": hand.uuid} if hand else {}),
+            })
     return {"accepted": accepted, "rejected": rejected}
 
 
@@ -719,6 +764,8 @@ async def add_by_hand(
         due = datetime.datetime.fromisoformat(due_date.strip())
     except ValueError:
         return None, "That due date is not a real date."
+    if not 1900 <= due.year <= 2999:
+        return None, "Give a due date between 1900 and 2999."
     note = " ".join((source_note or "").split())[:_MAX_NOTE] or None
     clean: dict[str, Any] = {
         "kind": "deadline", "title": clean_title, "deadline_type": "other",

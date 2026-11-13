@@ -70,6 +70,8 @@ async def test_a_deadline_added_by_hand_is_saved_as_unchecked_with_its_note(monk
     ("Report", "", "YYYY-MM-DD"),
     ("Report", "03/31/2027", "YYYY-MM-DD"),
     ("Report", "2027-02-30", "not a real date"),
+    ("Report", "0001-01-01", "between 1900 and 2999"),
+    ("Report", "3000-01-01", "between 1900 and 2999"),
 ])
 async def test_a_title_and_a_real_date_are_required(monkeypatch, title, due, reason):
     model, inserted = _obligation_model([])
@@ -158,3 +160,119 @@ async def test_chat_reads_hand_added_items_as_not_from_a_document(project_env): 
         result = await chat_tools.list_project_inbox(_ctx(user))
     assert result["items"][0]["added_by_hand"] is True
     assert result["items"][0]["source_note"] == "Sponsor email"
+
+
+# --- A hand-added deadline and the checked ones (review of #1145) ----------
+
+DAY = datetime.datetime(2027, 3, 31)
+CITED = ObligationSource(document_uuid="subaward", document_title="Subaward.pdf", page=5,
+                         quote="Final report and invention disclosure due March 31, 2027.")
+
+
+def _checked(title: str) -> dict:
+    return {"kind": "deadline", "title": title, "deadline_type": "other", "due_at": DAY,
+            "due_text": None, "sources": [CITED]}
+
+
+@pytest.fixture
+def hand_env(monkeypatch):
+    """An inbox holding one hand-added "Final report" (marked done, dismissed by
+    a teammate), and proposals that pass the document check."""
+    from tests.conftest import fake_model
+
+    hand = _existing(uuid="hand", title="Final report", deadline_type="other", due_at=DAY, status="done",
+                     dismissed_by=["teammate"], entered_by_hand=True, source_note="Sponsor email",
+                     supersedes=None, superseded_by=None)
+    inserted: list = []
+
+    async def insert(self):
+        inserted.append(self)
+
+    model = fake_model([hand])
+    model.__new__ = lambda cls, **values: Obligation.model_construct(**values)
+    monkeypatch.setattr(service, "Obligation", model)
+    monkeypatch.setattr(Obligation, "insert", insert)
+    monkeypatch.setattr(Obligation, "save", AsyncMock())
+    monkeypatch.setattr(service, "check_proposal",
+                        AsyncMock(side_effect=lambda item, user, project: (_checked(item["title"]), None)))
+    return hand, inserted
+
+
+@pytest.mark.asyncio
+async def test_a_hand_added_deadline_does_not_block_a_different_checked_one_that_day(hand_env):
+    """Both "other" on the same date; only the title says which deadline each is."""
+    hand, _ = hand_env
+    checked = await service.propose(PROJECT, USER, [{"title": "Invention disclosure"}])
+    assert checked["rejected"] == []
+    assert [a["clean"]["title"] for a in checked["accepted"]] == ["Invention disclosure"]
+    assert "confirms_hand_entered" not in checked["accepted"][0]
+
+
+@pytest.mark.asyncio
+async def test_the_checked_version_of_a_hand_added_deadline_replaces_it_in_place(hand_env):
+    hand, inserted = hand_env
+    checked = await service.propose(PROJECT, USER, [{"title": "Final report due"}])
+    assert checked["rejected"] == []
+    (row,) = checked["accepted"]
+    assert row["confirms_hand_entered"] == "hand"
+    saved = await service.save_checked(PROJECT, USER, row["clean"])
+    assert saved is hand and inserted == []
+    assert hand.entered_by_hand is False and hand.source_note is None
+    assert hand.sources == [CITED] and hand.title == "Final report due"
+    # Same item: done stays done, a teammate's dismissal stays.
+    assert hand.status == "done" and hand.dismissed_by == ["teammate"] and hand.uuid == "hand"
+    hand.save.assert_awaited()
+
+
+@pytest.mark.asyncio
+async def test_chat_adds_the_checked_deadlines_a_hand_added_one_would_have_hidden(project_env, hand_env):  # noqa: F811
+    # project_env first: hand_env's inbox replaces its empty one.
+    from unittest.mock import patch
+
+    hand, inserted = hand_env
+    project, user, _ = project_env
+    ctx = _ctx(user)
+    items = [{"title": "Final report"}, {"title": "Invention disclosure"}]
+    with patch.object(chat_tools, "_resolve_active_project", AsyncMock(return_value=project)), \
+         patch("app.services.project_service.can_manage_project", AsyncMock(return_value=True)):
+        preview = await chat_tools.propose_obligations(ctx, items, confirmed=True)
+        assert preview["needs_confirmation"] is True
+        assert preview["rejected"] == [] and "if_still_refused" not in preview
+        assert "Invention disclosure" in preview["preview"]
+        assert "checks the deadline added by hand" in preview["preview"]
+        ctx.deps.turn_marker += 2
+        result = await chat_tools.propose_obligations(ctx, items, confirmed=True)
+    assert [o["title"] for o in result["added"]] == ["Final report", "Invention disclosure"]
+    assert [o.title for o in inserted] == ["Invention disclosure"]
+    assert hand.entered_by_hand is False and hand.sources == [CITED]
+
+
+@pytest.mark.asyncio
+async def test_chat_offers_add_by_hand_only_when_something_was_refused(project_env):  # noqa: F811
+    from unittest.mock import patch
+
+    project, user, _ = project_env
+    with patch.object(chat_tools, "_resolve_active_project", AsyncMock(return_value=project)), \
+         patch("app.services.project_service.can_manage_project", AsyncMock(return_value=True)), \
+         patch.object(service, "propose", AsyncMock(return_value={"accepted": [], "rejected": []})):
+        result = await chat_tools.propose_obligations(_ctx(user), [{"kind": "deadline"}])
+    assert "if_still_refused" not in result
+
+
+def test_the_award_snapshot_labels_hand_added_deadlines():
+    from app.services.award_snapshot import page_html
+    from app.services.chat_snapshot_tools import _deadline
+
+    row = {"title": "Final report", "due_at": "2027-03-31T00:00:00", "due_text": None, "sources": [],
+           "entered_by_hand": True, "source_note": "Sponsor email"}
+    told = _deadline(row)
+    assert told["source"] == "Added by hand · not checked against a document"
+    assert told["added_by_hand"] is True and told["source_note"] == "Sponsor email"
+    cited = _deadline({**row, "entered_by_hand": False, "sources": [{"document_title": "Subaward.pdf", "page": 5}]})
+    assert cited["source"] == "Subaward.pdf, p. 5" and "added_by_hand" not in cited
+
+    view = {"project": {"uuid": "p", "title": "NIH", "state": "awarded"}, "facts": [], "budget_years": [],
+            "deadlines": {"overdue": [], "upcoming": [row], "done": [], "needed": []},
+            "last_run": None, "pages": [], "built_at": None, "generated_at": "2026-11-03T10:00:00+00:00"}
+    assert ("Final report</strong> · Mar 31, 2027 · Added by hand · not checked against a document"
+            " · Source: Sponsor email") in page_html(view)

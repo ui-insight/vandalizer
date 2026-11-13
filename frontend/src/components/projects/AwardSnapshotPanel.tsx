@@ -93,6 +93,9 @@ function DeadlineList({ label, items, empty, kind }: { label: string; items: Sna
           <strong>{d.title}</strong> · {day(d.due_at)}{d.due_text ? `, ${d.due_text}` : ''}{when && <em> · {when}</em>}
         </button>
         {source && <SourceButton item={{ ...source, page_approximate: false }} />}
+        {d.entered_by_hand && <span className="award-snapshot__unconfirmed">
+          <AlertTriangle size={11} aria-hidden /> Added by hand · not checked against a document{d.source_note ? ` · Source: ${d.source_note}` : ''}
+        </span>}
       </li>
     })}</ul>}
   </div>
