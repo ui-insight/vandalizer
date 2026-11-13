@@ -393,11 +393,58 @@ def _document_span(text: str, quote: str, role: str) -> Optional[str]:
     norm_quote, _ = normalize_with_map(_blank_markup(quote))
     i = norm_doc.find(norm_quote) if norm_quote else -1
     if i == -1:
-        return None
+        return _row_holding(text, quote) if role in _PERIOD_ROLES else None
     start, end = index_map[i], index_map[i + len(norm_quote) - 1] + 1
     if role in _PERIOD_ROLES:
         start, end = _whole_rows(text, start, end)
     return text[start:end].strip()
+
+
+_MAX_HOLDING_ROWS = 4
+
+
+def _row_holding(text: str, quote: str) -> Optional[str]:
+    """The one run of table rows whose cells hold a period quote's words, in order.
+
+    Support ticket: a NIFA subaward's stored text ran two rows together,
+    "End Date|Federal Funds Obligated|August 31, 2027 (18 months) $95,550".
+    A model quoting "End Date August 31, 2027" skips the other label, so the
+    quote wasn't found and both final reports were refused. A quote may also
+    run on from the Start Date row above ("Start Date March 1, 2026 End Date
+    August 31, 2027"), which a Start Date rule needs.
+
+    Only table rows count (lines of pipe- or tab-separated cells), up to
+    four consecutive ones, holding every word of the quote in order; the
+    shortest such run must be the only one in the document. The document's
+    rows are what get stored and read for dates, never the model's wording.
+    """
+    words = re.findall(r"[a-z0-9]+", plain_quote(quote).lower())
+    if len(words) < 3:
+        return None
+    lines = text.splitlines()
+
+    def is_row(line: str) -> bool:
+        return "|" in line or "\t" in line
+
+    def holds(first: int, last: int) -> bool:
+        joined = " ".join(lines[first:last + 1]).replace("|", " ")
+        cells = iter(re.findall(r"[a-z0-9]+", plain_quote(joined).lower()))
+        return all(word in cells for word in words)
+
+    runs = set()
+    for first, line in enumerate(lines):
+        if not is_row(line):
+            continue
+        for last in range(first, min(first + _MAX_HOLDING_ROWS, len(lines))):
+            if not is_row(lines[last]):
+                break
+            if holds(first, last):
+                # Shortest run only: the rows after its first must not hold
+                # the quote on their own.
+                if last == first or not holds(first + 1, last):
+                    runs.add("\n".join(ln.strip() for ln in lines[first:last + 1]))
+                break
+    return runs.pop() if len(runs) == 1 else None
 
 
 def _whole_rows(text: str, start: int, end: int) -> tuple[int, int]:

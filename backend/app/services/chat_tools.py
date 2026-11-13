@@ -5494,7 +5494,9 @@ async def propose_obligations(
             Relative deadlines instead add "relative_deadline": true and omit
             due_at/due_text. Sources use roles "timing", "period_of_performance",
             and "budget_period". Supported rules: N days before/after the end of
-            each budget period; N days after the end of the Period of Performance;
+            each budget period; N days after the end of the Period of Performance
+            (or the End Date); N days before/after the Start Date (or the
+            start/beginning of the Period of Performance; not the Effective Date);
             within N days of each June 30 and December 31 (or other annual dates).
             Cite one period per passage, with full dates and its period label.
             When the dates are in a table, quote the header row with the
