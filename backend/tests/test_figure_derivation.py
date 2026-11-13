@@ -157,3 +157,41 @@ def test_working_written_without_dollar_signs_counts_as_calculated():
 ])
 def test_bare_operands_do_not_excuse_unsupported_figures(answer, flagged):
     assert check_figures(answer, _as_sources(CATEGORY_SHEET))[0] == flagged
+
+
+@pytest.mark.parametrize("answer,flagged", [
+    # Review of #1152: bare numbers listed in a sentence are not operands.
+    # $0.9M is invented; 240,000 + 241,000 + 246,000 + 219,000 is near it only
+    # within "$0.9M"'s ±$50K rounding.
+    ("Yearly totals are 304,000, 240,000, 241,000, 246,000 and 219,000; equipment adds roughly $0.9M.", ["$0.9M"]),
+    # Years 1-3 are $785K; "$1M" is within ±$500K of 304,000 + 240,000.
+    ("Years 1-3 (304,000, 240,000 and 241,000) cost about $1M.", ["$1M"]),
+    # Written working must equal the figure, not just round to it.
+    ("Years 1-3: 304,000 + 240,000 = $1M.", ["$1M"]),
+    # A leading minus is kept: -265,000 + 625,000 is $360,000, not $890,000.
+    ("-265,000 + 625,000 = $890,000 net.", ["$890,000"]),
+    # Another currency is not dollars.
+    ("€625,000 − 265,000 = $360,000 more.", ["$360,000"]),
+    # A percentage needs working that divides.
+    ("625,000 + 265,000 = 50% of the budget.", ["50%"]),
+    # The 100× error: 625,000 ÷ 1,250,000 is 50%, not 0.5%.
+    ("625,000 ÷ 1,250,000 = 0.5% of the budget.", ["0.5%"]),
+])
+def test_bare_numbers_do_not_clear_invented_figures(answer, flagged):
+    sources = _as_sources(CATEGORY_SHEET)
+    assert check_figures(answer, sources)[0] == flagged
+    # The same derivation backs Page figure checks and citation verdicts.
+    assert _formulas(answer, sources) == {}
+
+
+@pytest.mark.parametrize("answer,figure,formula", [
+    ("-265,000 + 625,000 = $360,000 net.", "$360,000", "-265,000 + 625,000 = $360,000"),
+    ("625,000 minus 265,000 is $360,000.", "$360,000", "625,000 minus 265,000 = $360,000"),
+    ("Years 1-3: 304,000 + 240,000 + 241,000 = $785K.", "$785K", "304,000 + 240,000 + 241,000 = $785K"),
+    ("625,000 divided by 1,250,000 is 50%.", "50%", "625,000 divided by 1,250,000 = 50%"),
+])
+def test_written_working_is_evaluated_as_written(answer, figure, formula):
+    sources = _as_sources(CATEGORY_SHEET)
+    assert check_figures(answer, sources)[0] == []
+    assert _formulas(answer, sources) == {figure: formula}
+
