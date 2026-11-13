@@ -9,6 +9,7 @@ The model symbols are patched wholesale so the validators can run without an
 initialized Beanie connection (field-expression queries need one otherwise).
 """
 
+import datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -124,3 +125,62 @@ async def test_validate_batch_processing_fails_when_a_doc_did_not_complete():
     all_ok = next(c for c in result["checks"] if c["name"] == "All succeeded")
     assert all_ok["passed"] is False
     assert result["passed"] is False
+
+
+def _batch(batch_id: str, statuses: list[str], day: int) -> list[SimpleNamespace]:
+    started = datetime.datetime(2026, 11, day, 9, 0)
+    return [
+        SimpleNamespace(batch_id=batch_id, status=status, workflow="wf-1", start_time=started)
+        for status in statuses
+    ]
+
+
+async def _grade_batches(results):
+    with patch.object(cs, "Workflow", _model([SimpleNamespace(id="wf-1")])), \
+         patch.object(cs, "WorkflowResult", _model(results)):
+        return await cs._validate_batch_processing("user-1")
+
+
+async def test_batch_retry_of_the_same_size_clears_an_earlier_failure():
+    # Support ticket: a failed batch of three blocked the module for good,
+    # because only a *larger* batch could replace it.
+    failed = _batch("b1", ["completed", "error", "completed"], day=10)
+    retry = _batch("b2", ["completed", "completed", "completed"], day=11)
+    result = await _grade_batches(failed + retry)
+    assert result["passed"] is True
+    assert result["stars"] == 1
+    all_ok = next(c for c in result["checks"] if c["name"] == "All succeeded")
+    assert all_ok["detail"] == "Your most recent batch of 3+ documents: all 3 completed"
+
+
+async def test_batch_most_recent_failure_says_how_to_clear_it():
+    ok = _batch("b1", ["completed"] * 3, day=10)
+    failed = _batch("b2", ["completed", "error", "completed"], day=11)
+    result = await _grade_batches(ok + failed)
+    assert result["passed"] is False
+    all_ok = next(c for c in result["checks"] if c["name"] == "All succeeded")
+    assert "2 of 3 completed" in all_ok["detail"]
+    assert "run the batch again" in all_ok["detail"]
+
+
+async def test_batch_stars_come_from_the_largest_fully_successful_batch():
+    # A failed batch of ten earns nothing; the clean batch of five earns two stars.
+    big_failed = _batch("b1", ["completed"] * 9 + ["error"], day=9)
+    five = _batch("b2", ["completed"] * 5, day=10)
+    three = _batch("b3", ["completed"] * 3, day=11)
+    result = await _grade_batches(big_failed + five + three)
+    assert result["passed"] is True
+    assert result["stars"] == 2
+
+
+async def test_batch_still_running_is_not_judged_yet():
+    # Checking while a new batch runs must not say "fix the problem".
+    ok = _batch("b1", ["completed"] * 3, day=10)
+    running = _batch("b2", ["completed", "running", "queued"], day=11)
+    result = await _grade_batches(ok + running)
+    assert result["passed"] is True
+
+    result = await _grade_batches(running)
+    assert result["passed"] is False
+    all_ok = next(c for c in result["checks"] if c["name"] == "All succeeded")
+    assert all_ok["detail"] == "Your batch is still running; check again when it finishes"

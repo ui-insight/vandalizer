@@ -217,7 +217,8 @@
       "Select all three batch documents: **proposal-batch-1.pdf**, **proposal-batch-2.pdf**, **proposal-batch-3.pdf**.",
       "Run the workflow in **Batch** mode.",
       "Monitor the batch progress as each document is processed.",
-      "Verify all 3 documents completed successfully with correct PI names: Maria Lopez, Robert Kim, Amara Okafor."
+      "Verify all 3 documents completed successfully with correct PI names: Maria Lopez, Robert Kim, Amara Okafor.",
+      "If a document fails, fix the problem and run the batch again: the check reads your most recent batch of three or more documents, so a retry that completes fully clears the earlier failure. The three lab files earn one star. Two and three stars need a batch of 5+ or 10+ documents that all complete, so add proposals of your own; the lab provides only three."
     ],
     "expected_fields": ["PI Name", "Institution", "Total Budget", "Research Area", "Sponsoring Agency"],
     "expected_values": {
