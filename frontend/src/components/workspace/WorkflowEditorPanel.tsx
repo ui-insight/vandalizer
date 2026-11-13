@@ -658,7 +658,7 @@ export function WorkflowEditorPanel() {
     const startRun = (uuids: string[], batch: boolean) => runner.start(
       openWorkflowId, uuids, runModel, batch,
       useProjectContext && activeProjectUuid ? activeProjectUuid : undefined,
-      isNoInput ? [] : selectedFolderUuids,
+      runFolderUuids(workflow?.input_config?.trigger_type as string | undefined, selectedFolderUuids),
     )
     try {
       if (isNoInput) {
@@ -1250,10 +1250,13 @@ export function WorkflowEditorPanel() {
                 resize: 'vertical', boxSizing: 'border-box',
               }}
             />
-            {selectedDocUuids.length > 0 && (
+            {(selectedDocUuids.length > 0 || selectedFolderUuids.length > 0) && (
               <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#526071', marginTop: 'var(--workspace-space-6)', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)' }}>
                 <FileText style={{ width: 12, height: 12 }} />
-                + {selectedDocUuids.length} document{selectedDocUuids.length !== 1 ? 's' : ''} selected
+                {/* Ticked folders' documents are sent with the text too. */}
+                + {selectedFolderUuids.length > 0
+                  ? describeSelectionCount(selectedDocUuids.length, selectedFolderUuids.length)
+                  : `${selectedDocUuids.length} document${selectedDocUuids.length !== 1 ? 's' : ''} selected`}
               </div>
             )}
           </div>
@@ -2716,6 +2719,13 @@ export function describeRunInput(input: {
     }
   }
   return { missing: true, hint: 'Select a document to run this workflow' }
+}
+
+/** The folders ticked in Files that a run sends: every trigger that takes
+ * documents (a document run, or a text-input run, which takes documents
+ * alongside the text). A no-input run takes none. */
+export function runFolderUuids(triggerType: string | undefined, selectedFolderUuids: string[]): string[] {
+  return triggerType === 'no_input' ? [] : selectedFolderUuids
 }
 
 /** The Documents line's count: "2 selected", or "2 folders, 1 document selected". */
