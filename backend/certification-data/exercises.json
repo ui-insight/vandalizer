@@ -405,8 +405,9 @@
       "Run it on all three files. In chat, ask it to run on those three. In the workflow editor, select the three documents, choose **Run per document (3 runs)**, then **Run**.",
       "Check that each of the three documents finished.",
       "Check the PI names in the results: Maria Lopez, Robert Kim and Amara Okafor.",
-      "If a document failed, fix the problem and run that one again.",
-      "When all three have finished, check the module."
+      "If a document failed, fix the problem and run all three again.",
+      "When all three have finished, check the module.",
+      "For two or three stars, run a batch of 5 or more, or 10 or more, documents that all finish. Add proposals of your own; the course provides three."
     ],
     "chat_instructions": [
       "Ask chat to get the three files ready: **proposal-batch-1.pdf**, **proposal-batch-2.pdf** and **proposal-batch-3.pdf**.",
@@ -414,8 +415,9 @@
       "Ask chat to run the extraction on those three files, and approve it.",
       "Check that each of the three documents finished.",
       "Check the PI names in the results: Maria Lopez, Robert Kim and Amara Okafor.",
-      "If a document failed, fix the problem and run that one again.",
-      "When all three have finished, check the module."
+      "If a document failed, fix the problem and run all three again.",
+      "When all three have finished, check the module.",
+      "For two or three stars, run a batch of 5 or more, or 10 or more, documents that all finish. Add proposals of your own; the course provides three."
     ],
     "expected_fields": [
       "PI Name",

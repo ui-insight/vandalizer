@@ -247,11 +247,15 @@ def test_batch_processing_steps_are_plain_and_name_no_internal_checks():
     instead of what to do."""
     current = json.loads((corrections.SOURCE.parent / 'exercises.json').read_text())['batch_processing']
     text = ' '.join([current['overview'], *current['instructions'], *current['chat_instructions']]).lower()
-    for phrase in ('threshold', 'counter', 'stars', 'original', 'source identity', 'reconcile', 'aggregate terminal', 'teaching targets'):
+    for phrase in ('threshold', 'counter', 'size-based stars', 'original', 'source identity', 'reconcile', 'aggregate terminal', 'teaching targets'):
         assert phrase not in text, phrase
     for steps in (current['instructions'], current['chat_instructions']):
-        assert len(steps) == 7 and all(len(step) <= 200 for step in steps)
+        assert len(steps) == 8 and all(len(step) <= 200 for step in steps)
         assert 'Maria Lopez, Robert Kim and Amara Okafor' in steps[4]
+        # A retry must be a fresh batch of all three (PR #1154's grading reads
+        # the most recent batch of 3+), and the star batches are spelled out.
+        assert steps[5] == 'If a document failed, fix the problem and run all three again.'
+        assert '5 or more, or 10 or more' in steps[7]
     assert '**Run per document (3 runs)**' in current['instructions'][2]
 
     package = CourseCatalog().load(VERSION, preview=True)
