@@ -196,6 +196,22 @@ describe('LibraryTab Skills', () => {
     }))
   })
 
+  it('tells the editor of a team Skill that teammates review the new text, and says nothing in Mine', async () => {
+    const { unmount } = render(<LibraryTab />)
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
+    fireEvent.click(screen.getByText('Edit'))
+    await screen.findByText('Edit Skill')
+    expect(screen.queryByTestId('team-core-skill-note')).toBeNull()
+    unmount()
+
+    render(<LibraryTab />)
+    fireEvent.click(screen.getByRole('button', { name: 'Team' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'More actions' }))
+    fireEvent.click(screen.getByText('Edit'))
+    await screen.findByText('Edit Skill')
+    expect(screen.getByTestId('team-core-skill-note').textContent).toMatch(/Teammates who use this as a core Skill will need to review the new text/)
+  })
+
   // Support ticket: Edit → Update erased the line, pausing the Skill as a
   // core Skill. Update leaves it alone unless the user changed it.
   it('keeps the saved "When to use" line when only the instructions change', async () => {
