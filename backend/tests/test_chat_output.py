@@ -54,6 +54,30 @@ def test_user_facing_answers_are_unchanged(answer):
     assert public_chat_text(answer) == answer
 
 
+@pytest.mark.parametrize("blob", [
+    'Version:1.1:{"model":"openai/gpt-oss-120b","name":"VandalAI"}',
+    'Version:1.1:{“model”:”openai/gpt-oss-120b”,”name”:”VandalAI”}',  # as the ticket quoted it
+    "Version: 2.0: {\"model\": \"x\"}",
+    "Version:1.1:",
+])
+def test_leaked_model_metadata_is_removed(blob):
+    """Support ticket: "…let me retry with different evidence phrasing.Version:1.1:{…}"."""
+    answer = "The 3 reporting deadlines were added to the RA inbox."
+    assert public_chat_text(answer + blob) == answer
+    assert public_chat_text(answer + " " + blob + "\n\nNext steps follow.") == answer + "\n\nNext steps follow."
+    narrated = "The first proposal couldn't be verified, so let me retry with different evidence phrasing." + blob
+    assert public_chat_text(narrated + "\n\n" + answer) == answer
+    assert "gpt-oss" not in public_chat_text(narrated)
+
+
+@pytest.mark.parametrize("answer", [
+    "You can retry the upload once the file is under 50 MB.",
+    "The sponsor's template (Version 1.1: March 2026) is attached.",
+])
+def test_ordinary_mentions_of_retry_and_versions_are_kept(answer):
+    assert public_chat_text(answer) == answer
+
+
 @pytest.fixture
 def chat_harness(monkeypatch):
     """Real agent iteration and stream transport, with storage/config isolated."""

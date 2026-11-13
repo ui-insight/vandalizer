@@ -20,9 +20,17 @@ _INTERNAL_PROSE = re.compile(
     r"|\bconfirmed[\s`*\"']*[=:][\s`*\"']*(?:true|false)\b"
     r"|\b(?:needs_confirmation|awaiting_user_confirmation)\b"
     r"|\bI (?:should|must|need to) (?:now )?(?:call|invoke|execute)\b"
-    r"|\b(?:the )?user has approved\b",
+    r"|\b(?:the )?user has approved\b"
+    # Support ticket: "…let me retry with different evidence phrasing." is
+    # the model narrating its next tool attempt, not the answer.
+    r"|\blet me (?:retry|try again)\b",
     re.IGNORECASE,
 )
+# Support ticket: a reply ended "…phrasing.Version:1.1:{"model":"openai/gpt-oss-120b",
+# "name":"VandalAI"}". The model wrote a metadata header (naming a model other
+# than the selected one) into its text. Removed where it sits, so an answer
+# it is glued onto survives.
+_LEAKED_METADATA = re.compile(r"[ \t]*\bVersion:\s*\d+(?:\.\d+)*:[ \t]*(?:\{[^{}]*\})?", re.IGNORECASE)
 
 
 @lru_cache(maxsize=1)
@@ -45,7 +53,7 @@ def public_chat_text(output: str) -> str:
     supplements the channel boundary; it is not a general reasoning detector.
     User messages and structured tool results do not pass through this filter.
     """
-    text = _PRIVATE_BLOCK.sub("", output)
+    text = _LEAKED_METADATA.sub("", _PRIVATE_BLOCK.sub("", output))
     paragraphs = re.split(r"\n\s*\n", text)
     return "\n\n".join(
         paragraph.strip()
