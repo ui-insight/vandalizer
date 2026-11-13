@@ -66,6 +66,25 @@ def _figures(text: str) -> list[Figure]:
     return [f for _, f in sorted(out, key=lambda pair: pair[0])]
 
 
+# "625,000" in a reply's working: a comma-grouped amount written without "$".
+# Support ticket: "625,000 ÷ 1,250,000 = 50.0%" and "625,000 − 265,000 =
+# $360,000" were flagged although every input was in the spreadsheet, because
+# only "$" amounts were read as operands. Comma groups only, so a year
+# ("2026") or a count never becomes one.
+_BARE_GROUPED = re.compile(r"(?<![\d$.,])\d{1,3}(?:,\d{3})+(?:\.\d+)?(?![\d%]|,\d|\s?(?:%|per\s?cent\b))")
+
+
+def _bare_amounts(text: str) -> list[Figure]:
+    """Comma-grouped amounts written without "$", as money operands."""
+    out = []
+    for m in _BARE_GROUPED.finditer(text):
+        if text[max(0, m.start() - 2):m.start()].rstrip().endswith("$"):
+            continue
+        value = float(m.group(0).replace(",", ""))
+        out.append(Figure(m.group(0), round(value, 2), False, max(0.51, 0.5 * 10 ** -_decimals(m.group(0)))))
+    return out
+
+
 def _segments(text: str) -> list[tuple[str, str]]:
     """(scope, extra operand text): sentences, and table rows with their header.
 
@@ -161,7 +180,7 @@ def derive_figures(answer: str, source_money: set[float], source_pct: set[float]
                 if target.label in found or _known(target.value, target.percent, money, pct):
                     continue
                 operands = [
-                    f for f in (*figures, *extra)
+                    f for f in (*figures, *extra, *_bare_amounts(segment))
                     if f is not target and _known(f.value, f.percent, money, pct)
                 ]
                 formula = _match(target, _candidates(

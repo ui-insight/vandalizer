@@ -185,3 +185,19 @@ async def test_turns_without_documents_are_not_checked():
         deps.context_document_uuids = []
         assert await _run(_agent([TICKET_REPLY, "retried"]), deps) == TICKET_REPLY
     texts.assert_not_awaited()
+
+
+def test_a_share_the_tool_returned_as_a_fraction_matches_its_percentage():
+    """Support ticket: "625000 / 1250000 = 0.5", stated as "50.0%", was flagged."""
+    output = json.dumps(run([Calculation(label="Personnel share", expression="625000 / 1250000"),
+                             Calculation(label="Gap", expression="625000 - 265000")]))
+    assert calculation_formulas(["50.0%", "50%", "$360,000", "0.5%", "$0.50"], [output]) == {
+        "50.0%": "Personnel share: 625000 / 1250000 = 0.5",
+        "50%": "Personnel share: 625000 / 1250000 = 0.5",
+        "$360,000": "Gap: 625000 - 265000 = 360,000",
+        "0.5%": "Personnel share: 625000 / 1250000 = 0.5",
+        "$0.50": "Personnel share: 625000 / 1250000 = 0.5",
+    }
+    # A step that doesn't divide is not read as a share: 0.5 isn't 50%.
+    plain = json.dumps(run([Calculation(label="Half", expression="0.25 + 0.25")]))
+    assert calculation_formulas(["50%"], [plain]) == {}
