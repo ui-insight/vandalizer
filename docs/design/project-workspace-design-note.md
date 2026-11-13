@@ -133,6 +133,10 @@ button gated on edit permission when integrated.
   one failed); all six affected files passed on the base with two workers
   (100 passed). These results show concurrency-sensitive failures, not a
   green default frontend gate.
+- Complete frontend rerun with `npx vitest run --maxWorkers=2`: **3,046 passed
+  across all 395 files**, with unchanged timeouts and assertions. This is an
+  additional passing run; the default-concurrency failure above remains part
+  of the validation record.
 - Screenshots use the real app with synthetic project/inbox API responses,
   without a live database or LLM. Chromium review at 1440×1000 and 390×844;
   compact document scroll width equals viewport width (390px). The bounded
