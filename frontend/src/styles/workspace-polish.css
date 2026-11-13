@@ -127,9 +127,9 @@
 }
 @container files (max-width: 560px) {
   .file-table col:last-child { width: 42px !important; }
-  .file-table th:last-child { font-size: 0 !important; padding: 0 !important; }
-  .file-table th:last-child button { font-size: 0 !important; }
-  .file-table th:last-child button svg { width: 18px; height: 18px; }
+  .file-table thead th:last-child { font-size: 0 !important; padding: 0 !important; }
+  .file-table thead th:last-child button { font-size: 0 !important; }
+  .file-table thead th:last-child button svg { width: 18px; height: 18px; }
   .file-table td:last-child { padding: 0 !important; }
   .file-modified-label { display: none; }
   /* Take the Size column out of the table entirely (its col and every cell in it). A zero-width column in a

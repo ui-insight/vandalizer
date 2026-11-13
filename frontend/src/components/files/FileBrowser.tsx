@@ -348,6 +348,9 @@ export function FileBrowser({ listScrollRef, onListScroll, searchField, selected
   // A chip whose count reaches 0 (the last failing file was retried, or a
   // search left none of that type) falls back to All, never an empty list.
   const documentFilter: DocumentFilter = filterCounts[chosenFilter] > 0 ? chosenFilter : 'all'
+  // Forget the fallen-back choice too, so a later failure or a cleared search
+  // can't narrow the list again without the user asking.
+  if (documentFilter !== chosenFilter) setDocumentFilter('all')
   const shownDocuments = useMemo(
     () => documentFilter === 'all' ? sortedDocuments : sortedDocuments.filter(d => matchesDocumentFilter(d, documentFilter)),
     [sortedDocuments, documentFilter],
@@ -366,7 +369,11 @@ export function FileBrowser({ listScrollRef, onListScroll, searchField, selected
   )
   const hiddenSelection = useMemo(() => {
     const hidden = (items: { uuid: string }[]) => items.filter(item => selectedUuids.has(item.uuid) && !shownUuids.has(item.uuid)).length
-    return { folders: hidden(sortedFolders), documents: hidden(sortedDocuments) }
+    const folders = hidden(sortedFolders)
+    const documents = hidden(sortedDocuments)
+    // The rest of the hidden selection is what the search leaves out.
+    const search = [...selectedUuids].filter(uuid => !shownUuids.has(uuid)).length - folders - documents
+    return { folders, documents, search }
   }, [selectedUuids, sortedFolders, sortedDocuments, shownUuids])
 
   const handleToggleSelect = useCallback((uuid: string) => {
@@ -862,9 +869,10 @@ export function FileBrowser({ listScrollRef, onListScroll, searchField, selected
         >
           <span className="text-sm font-medium" style={{ color: '#374151' }}>
             {actionableUuids.size} selected
-            {hiddenSelection.folders + hiddenSelection.documents > 0 && (
+            {hiddenSelection.folders + hiddenSelection.documents + hiddenSelection.search > 0 && (
               <span className="font-normal text-gray-500">
                 {' · '}{[
+                  hiddenSelection.search > 0 && `${hiddenSelection.search} hidden by the search`,
                   hiddenSelection.documents > 0 && `${hiddenSelection.documents} hidden by the filter`,
                   hiddenSelection.folders > 0 && `${hiddenSelection.folders} in collapsed Folders`,
                 ].filter(Boolean).join(', ')} (not included)

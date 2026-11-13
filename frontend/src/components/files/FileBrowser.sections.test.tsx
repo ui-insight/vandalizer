@@ -30,7 +30,7 @@ vi.mock('../../api/files', async (original) => ({ ...(await original<typeof impo
 vi.mock('./UploadZone', () => ({ UploadZone: () => null }))
 vi.mock('./UploadProgress', () => ({ UploadProgress: () => null }))
 
-const renderBrowser = () => render(<QueryClientProvider client={new QueryClient()}><FileBrowser /></QueryClientProvider>)
+const renderBrowser = (props: { searchQuery?: string } = {}) => render(<QueryClientProvider client={new QueryClient()}><FileBrowser {...props} /></QueryClientProvider>)
 const chip = (name: RegExp) => within(screen.getByRole('group', { name: 'Show documents' })).getByRole('button', { name })
 const docRows = () => screen.queryAllByRole('row', { name: /^Document:/ }).map(row => row.getAttribute('aria-label'))
 
@@ -91,4 +91,26 @@ it('never bulk-deletes a selected file the filter is hiding', async () => {
   // The hidden spreadsheet was not part of the delete and is still selected.
   fireEvent.click(chip(/^All/))
   expect(screen.getByRole('checkbox', { name: 'Select budget.xlsx' })).toBeChecked()
+})
+
+it('forgets a chip that fell back to All, so the list never narrows again by itself', () => {
+  const view = renderBrowser()
+  fireEvent.click(chip(/^Spreadsheet/))
+  expect(docRows()).toEqual(['Document: budget.xlsx'])
+  // A search with no spreadsheets in it: the chip falls back to All...
+  view.rerender(<QueryClientProvider client={new QueryClient()}><FileBrowser searchQuery="pdf" /></QueryClientProvider>)
+  expect(chip(/^All/)).toHaveAttribute('aria-pressed', 'true')
+  // ...and clearing the search does not bring the Spreadsheet filter back.
+  view.rerender(<QueryClientProvider client={new QueryClient()}><FileBrowser searchQuery="" /></QueryClientProvider>)
+  expect(chip(/^All/)).toHaveAttribute('aria-pressed', 'true')
+  expect(docRows()).toHaveLength(4)
+})
+
+it('says when a selected file is hidden by the search', () => {
+  const view = renderBrowser()
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Select budget.xlsx' }))
+  view.rerender(<QueryClientProvider client={new QueryClient()}><FileBrowser searchQuery="memo" /></QueryClientProvider>)
+  const toolbar = screen.getByRole('group', { name: 'Selected files and bulk actions' })
+  expect(toolbar).toHaveTextContent('0 selected · 1 hidden by the search (not included)')
+  expect(within(toolbar).getByRole('button', { name: 'Delete' })).toBeDisabled()
 })

@@ -199,7 +199,7 @@ export function FileList({
       {folders.length > 0 && (
       <tbody aria-labelledby={`${sectionId}-folders`}>
         <tr className="file-section-row">
-          <th scope="colgroup" colSpan={4} id={`${sectionId}-folders`}>
+          <th scope="rowgroup" colSpan={4} id={`${sectionId}-folders`}>
             {onToggleFoldersCollapsed ? (
               <button
                 type="button"
@@ -237,7 +237,7 @@ export function FileList({
       {allDocuments.length > 0 && (
       <tbody aria-labelledby={`${sectionId}-documents`}>
         <tr className="file-section-row">
-          <th scope="colgroup" colSpan={4}>
+          <th scope="rowgroup" colSpan={4}>
             <div className="file-section-heading">
               <span className="file-section-title" id={`${sectionId}-documents`}>
                 Documents <span className="file-section-count">{allDocuments.length}</span>
