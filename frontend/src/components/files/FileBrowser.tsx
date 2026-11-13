@@ -21,7 +21,7 @@ import { MoveFileDialog } from './MoveFileDialog'
 import { ExistingFilesDialog } from './ExistingFilesDialog'
 import { useConfirm } from '../shared/useConfirm'
 import { useToast } from '../../contexts/ToastContext'
-import { deleteFile, renameFile, downloadFile, downloadFilesAsZip, moveFile, fetchDocumentUsage, uploadFileVersion, type DeleteFileResult, type DocumentUsage } from '../../api/files'
+import { deleteFile, renameFile, downloadFile, downloadFilesAsZip, moveFile, duplicateFile, fetchDocumentUsage, uploadFileVersion, type DeleteFileResult, type DocumentUsage } from '../../api/files'
 import { VersionHistoryDialog } from './VersionHistoryDialog'
 import { DocumentUsageDialog, UsageSummaryList, UsageCheckFailedNote, RemoveFromKnowledgeBasesOption, describeDeleteEffects, mergeUsage, summarizeUsage, type UsageGroups } from './DocumentUsageDialog'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
@@ -543,6 +543,15 @@ export function FileBrowser({ listScrollRef, onListScroll, searchField, selected
       toast(err instanceof Error ? err.message : 'Could not upload the new version', 'error')
     }
   }, [refresh, toast])
+  const handleDuplicate = useCallback(async (doc: Document) => {
+    try {
+      const copy = await duplicateFile(doc.uuid)
+      toast(`Created ${copy.title}.`, 'success')
+      refresh()
+    } catch (err: unknown) {
+      toast(err instanceof Error ? err.message : `Could not duplicate ${doc.title}`, 'error')
+    }
+  }, [refresh, toast])
   const { openWorkflow, openExtraction, activateKB } = useWorkspace()
   const [contextMenu, setContextMenu] = useState<{
     x: number
@@ -1013,6 +1022,11 @@ export function FileBrowser({ listScrollRef, onListScroll, searchField, selected
                     fromFolderId: doc.folder,
                   })
                 }
+          }
+          onDuplicate={
+            contextMenu.type === 'doc'
+              ? () => { void handleDuplicate(contextMenu.item as Document) }
+              : undefined
           }
           onExport={
             contextMenu.type === 'folder'
