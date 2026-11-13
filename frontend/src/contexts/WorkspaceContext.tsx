@@ -110,6 +110,10 @@ interface ChatStateContextValue {
   setCurrentConversationUuid: (uuid: string | null) => void
   newChatSignal: number
   triggerNewChat: () => void
+  /** Called by the chat after it loads a conversation's saved scope. An
+   *  unsent attachment restored on return to the workspace is newer than that
+   *  scope, so it is applied again over it (once, for that conversation). */
+  reapplyRestoredAttachments: (conversationUuid: string) => void
   // Bumped to ask the ChatPanel to reveal itself and focus the composer
   // (e.g. the file browser's "Ask about folder" action) without starting a
   // new conversation.
@@ -279,6 +283,43 @@ function setStoredRaw(key: string, value: string | null): void {
 
 const PROJECT_STORAGE_KEY = 'workspace:project'
 const KB_STORAGE_KEY = 'workspace:kb'
+// The files and folders attached to chat, for this browser tab. Leaving the
+// workspace (Assistant settings, Library, a full reload) unmounts the
+// provider; the draft survives in session storage, so the files it is about
+// must too. Only uuids are kept; titles are re-resolved, which also drops
+// anything deleted or no longer shared in the meantime.
+const ATTACHMENTS_STORAGE_KEY = 'vandalizer:chat-attachments'
+
+type StoredAttachments = { team: string | null; project: string | null; conversation: string | null; documents: string[]; folders: string[] }
+
+function readStoredAttachments(): StoredAttachments | null {
+  try {
+    const parsed = JSON.parse(sessionStorage.getItem(ATTACHMENTS_STORAGE_KEY) || 'null') as Partial<StoredAttachments> | null
+    if (!parsed || typeof parsed !== 'object') return null
+    const uuids = (value: unknown) => Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []
+    const documents = uuids(parsed.documents)
+    const folders = uuids(parsed.folders)
+    if (!documents.length && !folders.length) return null
+    return {
+      team: typeof parsed.team === 'string' ? parsed.team : null,
+      project: typeof parsed.project === 'string' ? parsed.project : null,
+      conversation: typeof parsed.conversation === 'string' ? parsed.conversation : null,
+      documents,
+      folders,
+    }
+  } catch {
+    return null
+  }
+}
+
+function writeStoredAttachments(value: StoredAttachments | null): void {
+  try {
+    if (value) sessionStorage.setItem(ATTACHMENTS_STORAGE_KEY, JSON.stringify(value))
+    else sessionStorage.removeItem(ATTACHMENTS_STORAGE_KEY)
+  } catch {
+    /* storage unavailable — the attachment just won't survive leaving the workspace */
+  }
+}
 
 export interface AttachedKB {
   uuid: string
@@ -430,6 +471,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   )
   const [activeKBs, setActiveKBs] = useState<AttachedKB[]>([])
   const kbsHydratedRef = useRef(false)
+  // Restoring chat attachments on return (see the restore effect below).
+  const attachmentEpoch = useRef(0)
+  const restoredAttachments = useRef<{ conversation: string; documents: { uuid: string; title: string }[]; folders: { uuid: string; title: string }[] } | null>(null)
+  // False while a stored project is being re-fetched on mount: until then the
+  // active project is unknown, and the attachment must not be read or written
+  // against the wrong scope.
+  const [projectSettled, setProjectSettled] = useState(() => {
+    try { return !localStorage.getItem(PROJECT_STORAGE_KEY) } catch { return true }
+  })
   const activeKBUuid = activeKBs[0]?.uuid ?? null
   const activeKBTitle = activeKBs[0]?.title ?? null
   // Invalidates asynchronous scope reads after another navigation or team change.
@@ -525,6 +575,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   // Every fresh-chat entry point must drop them explicitly, or a document
   // attached to the previous chat stays attached in the new one.
   const clearChatAttachments = useCallback(() => {
+    // An explicit clear (New chat, scope change) cancels a pending restore.
+    attachmentEpoch.current += 1
+    restoredAttachments.current = null
     setSelectedDocUuids([])
     setSelectedDocNames({})
     setSelectedFolderUuids([])
@@ -811,9 +864,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     // a reload then resurrected a KB the user had detached.
     kbsHydratedRef.current = storedKBUuids.length === 0
 
-    if (deepLink) return
+    if (deepLink) { setProjectSettled(true); return }
 
     const version = projectScopeVersion.current
+    if (!storedProject) setProjectSettled(true)
     if (storedProject) {
       import('../api/projects').then(({ getProject }) => {
         getProject(storedProject)
@@ -826,7 +880,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
             setActiveProjectRole(project.role)
           })
           .catch(() => { if (projectScopeVersion.current === version) setStoredRaw(PROJECT_STORAGE_KEY, null) })
-      }).catch(() => {})
+          .finally(() => setProjectSettled(true))
+      }).catch(() => setProjectSettled(true))
       return
     }
 
@@ -864,6 +919,65 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     if (!kbsHydratedRef.current) return
     setStoredRaw(KB_STORAGE_KEY, activeKBs.length ? storedKBValue(activeKBs) : null)
   }, [activeKBs])
+
+  // Restore the chat's attached files and folders when the workspace opens
+  // again, so returning from Assistant settings (or reloading) keeps what the
+  // unsent draft is about. It waits for the team and for a stored project to
+  // finish loading, and applies only to that same team and project, so a
+  // project that no longer opens never leaks its files into Home. A deep link
+  // that sets up its own scope or attachment owns the restore; New chat or a
+  // scope change made meanwhile cancels it.
+  const [mountScope] = useState(() => ({
+    deepLink: !!(search.project || search.kb || search.docs || search.folders),
+    stored: readStoredAttachments(),
+  }))
+  const [attachmentsHydrated, setAttachmentsHydrated] = useState(() => !mountScope.stored || mountScope.deepLink)
+  useEffect(() => {
+    if (attachmentsHydrated || teamsLoading || !projectSettled) return
+    const stored = mountScope.stored
+    if (!stored || stored.team !== (currentTeam?.uuid ?? null) || stored.project !== activeProjectUuid) {
+      setAttachmentsHydrated(true)
+      return
+    }
+    const epoch = attachmentEpoch.current
+    let cancelled = false
+    import('../api/documents')
+      .then(({ resolveTitles }) => resolveTitles(stored.documents, stored.folders))
+      .then(titles => {
+        if (cancelled || attachmentEpoch.current !== epoch) return
+        setSelectedDocUuids(titles.documents.map(d => d.uuid))
+        setSelectedDocNames(Object.fromEntries(titles.documents.map(d => [d.uuid, d.title])))
+        setSelectedFolderUuids(titles.folders.map(f => f.uuid))
+        setSelectedFolderNames(Object.fromEntries(titles.folders.map(f => [f.uuid, f.title])))
+        // The chat reopens the scope's conversation on return and applies its
+        // saved scope; if that lands after this, it re-applies the restore.
+        restoredAttachments.current = stored.conversation
+          ? { conversation: stored.conversation, documents: titles.documents, folders: titles.folders }
+          : null
+      })
+      .catch(() => { /* titles unavailable: start without the attachment rather than show unverified names */ })
+      .finally(() => { if (!cancelled) setAttachmentsHydrated(true) })
+    return () => { cancelled = true }
+  }, [attachmentsHydrated, teamsLoading, projectSettled, currentTeam?.uuid, activeProjectUuid, mountScope])
+
+  const reapplyRestoredAttachments = useCallback((conversationUuid: string) => {
+    const restored = restoredAttachments.current
+    restoredAttachments.current = null
+    if (!restored || restored.conversation !== conversationUuid) return
+    setSelectedDocUuids(restored.documents.map(d => d.uuid))
+    setSelectedDocNames(Object.fromEntries(restored.documents.map(d => [d.uuid, d.title])))
+    setSelectedFolderUuids(restored.folders.map(f => f.uuid))
+    setSelectedFolderNames(Object.fromEntries(restored.folders.map(f => [f.uuid, f.title])))
+  }, [])
+
+  // Persist once the restore has settled and the scope is known, so neither
+  // the empty initial state nor a not-yet-loaded project is written over it.
+  useEffect(() => {
+    if (!attachmentsHydrated || teamsLoading || !projectSettled) return
+    writeStoredAttachments(selectedDocUuids.length || selectedFolderUuids.length
+      ? { team: currentTeam?.uuid ?? null, project: activeProjectUuid, conversation: currentConversationUuid, documents: selectedDocUuids, folders: selectedFolderUuids }
+      : null)
+  }, [attachmentsHydrated, teamsLoading, projectSettled, currentTeam?.uuid, activeProjectUuid, currentConversationUuid, selectedDocUuids, selectedFolderUuids])
 
   // Projects and knowledge bases are team-scoped. Switching the current team
   // (which happens live, without a reload) must drop any active scope so we
@@ -986,7 +1100,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const chatValue = useMemo<ChatStateContextValue>(() => ({
     loadConversationId, setLoadConversationId,
     currentConversationUuid, setCurrentConversationUuid,
-    newChatSignal, triggerNewChat,
+    newChatSignal, triggerNewChat, reapplyRestoredAttachments,
     focusChatSignal, focusChat,
     pendingChatMessage, sendChatMessage, clearPendingChatMessage,
     activeKBs, activeKBUuid, activeKBTitle, activateKB, attachKBs, replaceKBs, detachKB, deactivateKB,
@@ -996,7 +1110,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     documentReadiness, updateDocumentReadiness,
   }), [
     loadConversationId, currentConversationUuid,
-    newChatSignal, triggerNewChat,
+    newChatSignal, triggerNewChat, reapplyRestoredAttachments,
     focusChatSignal, focusChat,
     pendingChatMessage, sendChatMessage, clearPendingChatMessage,
     activeKBs, activeKBUuid, activeKBTitle, activateKB, attachKBs, replaceKBs, detachKB, deactivateKB,

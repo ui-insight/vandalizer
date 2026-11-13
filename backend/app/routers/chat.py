@@ -43,7 +43,7 @@ from app.schemas.chat import (
 from app.services import access_control, organization_service
 from app.services import activity_service, audit_service
 from app.services.chat_service import chat_stream
-from app.schemas.skills import SelectSkillRequest, SkillSnapshot
+from app.schemas.skills import AcceptSkillRequest, SelectSkillRequest, SkillSnapshot
 from app.schemas.chat_export import ChatExportRequest
 from app.services.chat_export import MIME_TYPES, render_chat_export
 from app.services import skill_service
@@ -918,8 +918,20 @@ async def _restore_scope(
 
 
 @router.get("/skills/{skill_uuid}", response_model=None)
-async def preview_skill(skill_uuid: str, user: User = Depends(get_current_user)) -> SkillSnapshot:
-    return await skill_service.snapshot_skill(skill_uuid, user)
+async def preview_skill(skill_uuid: str, user: User = Depends(get_current_user)) -> dict:
+    """The Skill's current text; needs_review when it must be accepted before use."""
+    snapshot, review = await skill_service.skill_for_review(skill_uuid, user)
+    return {**snapshot.model_dump(), "needs_review": review}
+
+
+@router.post("/skills/{skill_uuid}/accept", response_model=None)
+async def accept_skill(skill_uuid: str, body: AcceptSkillRequest, user: User = Depends(get_current_user)) -> dict:
+    """Accept a shared Skill's instructions, at the version the person was shown."""
+    snapshot, _ = await skill_service.skill_for_review(skill_uuid, user)
+    if snapshot.version != body.version:
+        raise HTTPException(status_code=409, detail="This Skill changed while you were reviewing it. Review the updated instructions.")
+    await skill_service.accept_skill(user, snapshot)
+    return {**snapshot.model_dump(), "needs_review": False}
 
 
 @router.put("/history/{conversation_uuid}/skill", response_model=None)
@@ -939,7 +951,7 @@ async def select_conversation_skill(
     # They must still allow selecting a Skill before the first question.
     if running and isinstance(running.meta_summary, dict) and running.meta_summary.get("chat_turn_started"):
         raise HTTPException(status_code=409, detail="Wait for the current response before changing Skills.")
-    selected = await skill_service.snapshot_skill(body.skill_uuid, user) if body.skill_uuid else None
+    selected = await skill_service.usable_skill(body.skill_uuid, user) if body.skill_uuid else None
     # Update only these fields, without replacing a stale conversation object.
     await conversation.set({
         "active_skill": selected.model_dump() if selected else None,

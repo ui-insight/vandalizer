@@ -7,6 +7,7 @@ pointer to mutable library text. Authorization is checked again on every use.
 
 import hashlib
 import json
+import logging
 from dataclasses import dataclass
 from typing import Any
 
@@ -16,6 +17,8 @@ from app.models.search_set import SearchSet, SearchSetItem
 from app.models.user import User
 from app.schemas.skills import SkillSnapshot, clean_when_to_use
 from app.services import access_control
+
+logger = logging.getLogger(__name__)
 
 
 async def authorize_skill(skill_uuid: str, user: User) -> SearchSet:
@@ -61,14 +64,95 @@ async def snapshot_skill(skill_uuid: str, user: User) -> SkillSnapshot:
     return _snapshot(skill, await skill.get_items())
 
 
+# ── Reviewing shared Skills ─────────────────────────────────────────────────
+# Suggestion ticket: a Skill shared with the team started in a teammate's
+# chat without them ever seeing its instructions, and chat followed them as
+# written. A Skill someone else wrote is now used in a person's chats only at
+# a version they read and accepted; an edit asks them again. Their own Skills
+# need no review. (Core Skills keep their own accepted version on the core
+# list; chat's select_skill card shows the instructions, so approving it is
+# accepting them.)
+
+MAX_ACCEPTED_SKILLS = 500
+
+REVIEW_REQUIRED = "skill_review_required"
+
+
+def _is_own(skill: SearchSet, user: User) -> bool:
+    return bool(skill.user_id) and skill.user_id == user.user_id
+
+
+def _accepted(user: User, snapshot: SkillSnapshot) -> bool:
+    entries = getattr(user, "accepted_skills", None)
+    if not isinstance(entries, list):
+        return False
+    return any(
+        isinstance(entry, dict) and entry.get("uuid") == snapshot.uuid and entry.get("version") == snapshot.version
+        for entry in entries
+    )
+
+
+def needs_review(skill: SearchSet, user: User, snapshot: SkillSnapshot) -> bool:
+    """Whether *user* must read and accept this text before chat uses it."""
+    return not _is_own(skill, user) and not _accepted(user, snapshot)
+
+
+def review_required_error(snapshot: SkillSnapshot, *, pinned: bool = False) -> HTTPException:
+    then = (" Remove it from this chat and select it again to review its instructions." if pinned else "")
+    return HTTPException(status_code=409, detail={
+        "code": REVIEW_REQUIRED,
+        "message": f'Review and accept the instructions of "{snapshot.title}" before using it. '
+                   "It was shared with you, or edited since you accepted it." + then,
+        "skill_uuid": snapshot.uuid,
+    })
+
+
+async def skill_for_review(skill_uuid: str, user: User) -> tuple[SkillSnapshot, bool]:
+    """The Skill's current text, and whether the person must accept it first."""
+    skill = await authorize_skill(skill_uuid, user)
+    snapshot = _snapshot(skill, await skill.get_items())
+    return snapshot, needs_review(skill, user, snapshot)
+
+
+async def usable_skill(skill_uuid: str, user: User) -> SkillSnapshot:
+    """The Skill's current text, refused until the person has accepted it."""
+    snapshot, review = await skill_for_review(skill_uuid, user)
+    if review:
+        raise review_required_error(snapshot)
+    return snapshot
+
+
+async def require_reviewed(snapshot: SkillSnapshot, user: User) -> None:
+    """A pinned version is used only if it is the person's own Skill or they accepted it."""
+    skill = await authorize_skill(snapshot.uuid, user)
+    if needs_review(skill, user, snapshot):
+        raise review_required_error(snapshot, pinned=True)
+
+
+async def accept_skill(user: User, snapshot: SkillSnapshot) -> None:
+    """Record that the person read and accepted this exact text."""
+    if _accepted(user, snapshot):
+        return
+    entry = {"uuid": snapshot.uuid, "version": snapshot.version}
+    await _users().update_one(
+        {"_id": user.id},
+        {"$push": {"accepted_skills": {"$each": [entry], "$slice": -MAX_ACCEPTED_SKILLS}}},
+    )
+    accepted = getattr(user, "accepted_skills", None)
+    user.accepted_skills = [*(accepted if isinstance(accepted, list) else []), entry][-MAX_ACCEPTED_SKILLS:]
+
+
 async def resolve_active_skill(user: User, current: SkillSnapshot | None, requested_uuid: str | None = None, *, explicit: bool = False) -> SkillSnapshot | None:
-    """Omitted selection retains the pin; explicit null removes it."""
+    """Omitted selection retains the pin; explicit null removes it.
+
+    Either way the Skill must be the person's own or a version they accepted.
+    """
     if explicit and requested_uuid is None:
         return None
     if explicit and requested_uuid is not None and (current is None or current.uuid != requested_uuid):
-        return await snapshot_skill(requested_uuid, user)
+        return await usable_skill(requested_uuid, user)
     if current is not None:
-        await authorize_skill(current.uuid, user)
+        await require_reviewed(current, user)
     return current
 
 
@@ -197,6 +281,74 @@ async def accept_core_skill(user: User, skill: SkillSnapshot) -> bool:
         {"$set": {"core_skills.$.version": skill.version}},
     )
     return bool(result.matched_count)
+
+
+async def _current_snapshot(skill_uuid: str) -> SkillSnapshot | None:
+    """The Skill as stored now, or None when it isn't a usable Skill.
+    Callers have already authorized the edit."""
+    doc = await SearchSet.find_one({"uuid": skill_uuid})
+    if doc is None or doc.set_type != "prompt":
+        return None
+    try:
+        return _snapshot(doc, await doc.get_items())
+    except HTTPException:
+        return None
+
+
+SKILL_PARTS = frozenset({"title", "when_to_use", "instructions"})
+
+
+async def core_version_before_edit(user: User, skill_uuid: str) -> SkillSnapshot | None:
+    """Before the person saves an edit: the Skill as they had accepted it, if
+    it is one of their core Skills and they were up to date with it."""
+    accepted = next((e["version"] for e in core_skill_entries(user) if e["uuid"] == skill_uuid), None)
+    if not accepted:
+        return None
+    current = await _current_snapshot(skill_uuid)
+    return current if current is not None and current.version == accepted else None
+
+
+async def keep_own_edit_accepted(
+    user: User, skill_uuid: str, before: SkillSnapshot | None, edited: frozenset[str] = SKILL_PARTS,
+) -> None:
+    """After the person's own edit: carry their acceptance to the new text.
+
+    The pause on an edited core Skill guards against someone else's change
+    reaching chat unreviewed. The person who just wrote the text has reviewed
+    it, so pausing it for them only sent them to Assistant settings to approve
+    their own words (support ticket). Only an acceptance that was current
+    before the edit moves: if a teammate's change was already waiting for
+    review, it stays waiting. Teammates who use the Skill as a core Skill
+    still review the new text.
+
+    ``edited`` names the parts this request could change. If any other part
+    differs from ``before``, a teammate saved concurrently, and nothing is
+    carried over so their change waits for review.
+
+    Best-effort: the edit has already been saved, so a failure here is logged
+    and leaves the old behaviour (the Skill pauses until reviewed).
+    """
+    if before is None:
+        return
+    try:
+        await _keep_own_edit_accepted(user, skill_uuid, before, edited)
+    except Exception:
+        logger.warning("Could not keep core Skill %s accepted after its editor's save", skill_uuid, exc_info=True)
+
+
+async def _keep_own_edit_accepted(
+    user: User, skill_uuid: str, before: SkillSnapshot, edited: frozenset[str],
+) -> None:
+    after = await _current_snapshot(skill_uuid)
+    if after is None or after.version == before.version:
+        return
+    if any(getattr(after, part) != getattr(before, part) for part in SKILL_PARTS - edited):
+        return
+    await _users().update_one(
+        {"_id": user.id, "core_skills": {"$elemMatch": {"uuid": skill_uuid, "version": before.version}}},
+        {"$set": {"core_skills.$.version": after.version}},
+    )
+    await reload_core_skills(user)
 
 
 async def reload_core_skills(user: User) -> None:

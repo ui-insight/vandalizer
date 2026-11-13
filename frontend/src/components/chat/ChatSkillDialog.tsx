@@ -9,7 +9,8 @@ interface Props {
   mode: 'change' | 'inspect'
   skill: SkillSnapshot
   disabled: boolean
-  onSelect: (uuid: string) => Promise<boolean>
+  /** null: the user cancelled reviewing a shared Skill; the dialog stays open, without an error. */
+  onSelect: (uuid: string) => Promise<boolean | null>
   onClose: () => void
 }
 
@@ -35,8 +36,9 @@ export function ChatSkillDialog({ mode, skill, disabled, onSelect, onClose }: Pr
     setSaving(true)
     setError('')
     try {
-      if (await onSelect(uuid)) onClose()
-      else setError('Could not change Skill. Your current Skill is still selected. Try again.')
+      const selected = await onSelect(uuid)
+      if (selected) onClose()
+      else if (selected === false) setError('Could not change Skill. Your current Skill is still selected. Try again.')
     } catch {
       setError('Could not change Skill. Your current Skill is still selected. Try again.')
     } finally {

@@ -2,7 +2,8 @@ import { hasPendingPageApproval, pageDecision } from '../lib/pageApprovals'
 import { isPagePreparation } from '../lib/chatProgress'
 import { getProjectDefaultSkill } from '../api/projects'
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { streamChat, getHistory, previewSkill, selectConversationSkill, stopChatTurn, type ChatHistory } from '../api/chat'
+import { streamChat, getHistory, acceptSkill, previewSkill, selectConversationSkill, stopChatTurn, type ChatHistory, type SkillPreview } from '../api/chat'
+import { ApiError } from '../api/client'
 import { MissingDocumentsError } from '../api/chatErrors'
 import type { CardDecision, ChatActivity, SkillSnapshot } from '../types/chat'
 import { expandSnippetRefs, markUsed } from '../utils/snippetRefs'
@@ -51,6 +52,11 @@ function toFriendlyError(e: unknown): string {
     return m || 'Chat failed'
   }
   return 'Chat failed'
+}
+
+/** The Skill as chat pins it, without the review flag. */
+function snapshotOf({ uuid, title, version, instructions, when_to_use }: SkillPreview): SkillSnapshot {
+  return when_to_use === undefined ? { uuid, title, version, instructions } : { uuid, title, version, instructions, when_to_use }
 }
 
 type SendArgs = [
@@ -126,6 +132,58 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
   const projectDefaultScope = useRef<string | null | undefined>(undefined)
   const [projectSkillBlocked, setProjectSkillBlocked] = useState(false)
 
+  // A Skill someone else wrote is read and accepted before chat uses it, and
+  // again after an edit (suggestion ticket). The dialog resolves one decision.
+  const [skillReview, setSkillReview] = useState<{ skill: SkillPreview; accepting: boolean; error: string | null } | null>(null)
+  const reviewRef = useRef<SkillPreview | null>(null)
+  // Resolves with the version the user accepted (newer than the one first shown
+  // when it was edited during review), or null when they cancelled.
+  const reviewDecision = useRef<((accepted: SkillSnapshot | null) => void) | null>(null)
+  const askToAccept = useCallback((skill: SkillPreview) => new Promise<SkillSnapshot | null>(resolve => {
+    reviewDecision.current?.(null)
+    reviewDecision.current = resolve
+    reviewRef.current = skill
+    setSkillReview({ skill, accepting: false, error: null })
+  }), [])
+  const finishReview = useCallback((accepted: boolean) => {
+    const decide = reviewDecision.current
+    const shown = reviewRef.current
+    reviewDecision.current = null
+    reviewRef.current = null
+    setSkillReview(null)
+    decide?.(accepted && shown ? snapshotOf(shown) : null)
+  }, [])
+  const cancelSkillReview = useCallback(() => finishReview(false), [finishReview])
+  const acceptReviewedSkill = useCallback(async () => {
+    const skill = reviewRef.current
+    if (!skill) return
+    setSkillReview({ skill, accepting: true, error: null })
+    try {
+      await acceptSkill(skill.uuid, skill.version)
+      // Closed (reset, another chat) while accepting: don't decide a newer review.
+      if (reviewRef.current === skill) finishReview(true)
+    } catch (e) {
+      if (reviewRef.current !== skill) return
+      if (e instanceof ApiError && e.status === 409) {
+        // Edited while the dialog was open: show the new text to review.
+        try {
+          const latest = await previewSkill(skill.uuid)
+          if (reviewRef.current !== skill) return
+          reviewRef.current = latest
+          setSkillReview({ skill: latest, accepting: false, error: 'This Skill changed while you were reviewing it. Review the updated instructions.' })
+          return
+        } catch { /* fall through to the original error */ }
+      }
+      setSkillReview({ skill, accepting: false, error: toFriendlyError(e) })
+    }
+  }, [finishReview])
+  /** The Skill once it may be used (the user's own, already accepted, or
+   * accepted now), or null when the user cancelled its review. */
+  const ensureReviewed = useCallback(async (uuid: string): Promise<SkillSnapshot | null> => {
+    const preview = await previewSkill(uuid)
+    return preview.needs_review ? askToAccept(snapshotOf(preview)) : snapshotOf(preview)
+  }, [askToAccept])
+
   const initializeProjectSkill = useCallback(async (projectUuid: string | null, retry = false) => {
     if (conversationUuid || messages.length || isLoadingHistory || manualSkillSelection.current) return
     if (!retry && projectDefaultScope.current === projectUuid) return
@@ -136,8 +194,11 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
     if (!projectUuid) return
     setError(null)
     try {
-      const { active_skill } = await getProjectDefaultSkill(projectUuid)
-      if (version === skillSelectionVersion.current) setActiveSkill(active_skill)
+      const { active_skill, needs_review } = await getProjectDefaultSkill(projectUuid)
+      if (version !== skillSelectionVersion.current) return
+      // A default someone else wrote is reviewed first; cancelling continues without it.
+      const accepted = active_skill && needs_review ? await askToAccept(active_skill) : active_skill
+      if (version === skillSelectionVersion.current) setActiveSkill(accepted)
     } catch {
       if (version === skillSelectionVersion.current) {
         setProjectSkillBlocked(true)
@@ -146,18 +207,22 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
     } finally {
       if (version === skillSelectionVersion.current) setIsSelectingSkill(false)
     }
-  }, [conversationUuid, messages.length, isLoadingHistory])
+  }, [conversationUuid, messages.length, isLoadingHistory, askToAccept])
 
-  const selectSkill = useCallback(async (uuid: string | null) => {
+  /** True when selected, false on failure, null when the user cancelled its review. */
+  const selectSkill = useCallback(async (uuid: string | null): Promise<boolean | null> => {
     if (isStreaming || isLoadingHistory || isSelectingSkill) return false
     manualSkillSelection.current = true
     const version = ++skillSelectionVersion.current
     setIsSelectingSkill(true)
     setError(null)
     try {
+      const reviewed = uuid ? await ensureReviewed(uuid) : null
+      if (uuid && !reviewed) return null
+      if (version !== skillSelectionVersion.current) return false
       const skill = conversationUuid
         ? (await selectConversationSkill(conversationUuid, uuid)).active_skill
-        : uuid ? await previewSkill(uuid) : null
+        : reviewed
       if (version !== skillSelectionVersion.current) return false
       setActiveSkill(skill)
       setProjectSkillBlocked(false)
@@ -168,7 +233,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
     } finally {
       if (version === skillSelectionVersion.current) setIsSelectingSkill(false)
     }
-  }, [conversationUuid, isStreaming, isLoadingHistory, isSelectingSkill])
+  }, [conversationUuid, isStreaming, isLoadingHistory, isSelectingSkill, ensureReviewed])
 
   const streamingRef = useRef('')
   const thinkingRef = useRef('')
@@ -241,9 +306,12 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
         setIsSelectingSkill(true)
         setError(null)
         try {
+          // Cancelling the review sends nothing.
+          const reviewed = await ensureReviewed(skillUuid)
+          if (!reviewed || version !== skillSelectionVersion.current) return
           turnSkill = conversationUuid
             ? (await selectConversationSkill(conversationUuid, skillUuid)).active_skill
-            : await previewSkill(skillUuid)
+            : reviewed
           if (version !== skillSelectionVersion.current) return
           if (!turnSkill) throw new Error('Could not load Skill')
           setActiveSkill(turnSkill)
@@ -565,7 +633,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
         if (ownsView()) clearLiveTurn()
       }
     },
-    [activityId, conversationUuid, isLoadingHistory, isSelectingSkill, projectSkillBlocked, activeSkill, clearLiveTurn, queueMessage, awaitingPageApproval],
+    [activityId, conversationUuid, isLoadingHistory, isSelectingSkill, projectSkillBlocked, activeSkill, clearLiveTurn, queueMessage, awaitingPageApproval, ensureReviewed],
   )
 
   useEffect(() => {
@@ -617,6 +685,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
     manualSkillSelection.current = true
     setProjectSkillBlocked(false)
     skillSelectionVersion.current += 1
+    finishReview(false) // A review opened for the previous chat no longer applies.
     setIsSelectingSkill(false)
     setActiveSkill(null)
     detachLiveTurn()
@@ -646,7 +715,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
     } finally {
       if (version === historyLoadVersion.current) setIsLoadingHistory(false)
     }
-  }, [detachLiveTurn])
+  }, [detachLiveTurn, finishReview])
 
   const reset = useCallback(() => {
     manualSkillSelection.current = false
@@ -654,6 +723,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
     setProjectSkillBlocked(false)
     historyLoadVersion.current += 1
     skillSelectionVersion.current += 1
+    finishReview(false)
     setIsSelectingSkill(false)
     setActiveSkill(null)
     detachLiveTurn()
@@ -673,7 +743,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
     setCompactionStatus(null)
     setPlanTasks(null)
     setPlanWaiting(0)
-  }, [detachLiveTurn])
+  }, [detachLiveTurn, finishReview])
 
   const clearError = useCallback(() => {
     setError(null)
@@ -721,6 +791,9 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
     initializeProjectSkill,
     projectSkillBlocked,
     selectSkill,
+    skillReview,
+    acceptReviewedSkill,
+    cancelSkillReview,
     isSelectingSkill,
     messages,
     setMessages,

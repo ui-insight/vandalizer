@@ -200,6 +200,62 @@ describe('LibraryTab Skills', () => {
     }))
   })
 
+  it('tells the editor of a team Skill that teammates review the new text, and says nothing in Mine', async () => {
+    const { unmount } = render(<LibraryTab />)
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
+    fireEvent.click(screen.getByText('Edit'))
+    await screen.findByText('Edit Skill')
+    expect(screen.queryByTestId('team-core-skill-note')).toBeNull()
+    unmount()
+
+    render(<LibraryTab />)
+    fireEvent.click(screen.getByRole('button', { name: 'Team' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'More actions' }))
+    fireEvent.click(screen.getByText('Edit'))
+    await screen.findByText('Edit Skill')
+    expect(screen.getByTestId('team-core-skill-note').textContent).toMatch(/Teammates who use this as a core Skill will need to review the new text/)
+  })
+
+  // Support ticket: Edit → Update erased the line, pausing the Skill as a
+  // core Skill. Update leaves it alone unless the user changed it.
+  it('keeps the saved "When to use" line when only the instructions change', async () => {
+    mockItems.current = [makePrompt({ when_to_use: 'Reviewing a new award notice' })]
+    vi.mocked(updateSearchSet).mockResolvedValue({} as Awaited<ReturnType<typeof updateSearchSet>>)
+    render(<LibraryTab />)
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
+    fireEvent.click(screen.getByText('Edit'))
+    const instructions = screen.getByPlaceholderText('Write your Skill instructions here')
+    await waitFor(() => expect(instructions).toHaveValue('Summarize the key terms of this award.'))
+    fireEvent.change(instructions, { target: { value: 'Summarize the key terms of this subaward.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Update' }))
+    await waitFor(() => expect(updateSearchSet).toHaveBeenCalledWith('ss-uuid-1', { title: 'Summarize Award' }))
+  })
+
+  it('a line the Library list did not include is never saved over as empty', async () => {
+    mockItems.current = [makePrompt({ when_to_use: undefined })]
+    vi.mocked(updateSearchSet).mockResolvedValue({} as Awaited<ReturnType<typeof updateSearchSet>>)
+    render(<LibraryTab />)
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
+    fireEvent.click(screen.getByText('Edit'))
+    await waitFor(() => expect(screen.getByPlaceholderText('Write your Skill instructions here')).toHaveValue('Summarize the key terms of this award.'))
+    fireEvent.click(screen.getByRole('button', { name: 'Update' }))
+    await waitFor(() => expect(updateSearchSet).toHaveBeenCalled())
+    expect(vi.mocked(updateSearchSet).mock.calls[0][1]).not.toHaveProperty('when_to_use')
+  })
+
+  it('clearing the "When to use" line saves it empty', async () => {
+    mockItems.current = [makePrompt({ when_to_use: 'Reviewing a new award notice' })]
+    vi.mocked(updateSearchSet).mockResolvedValue({} as Awaited<ReturnType<typeof updateSearchSet>>)
+    render(<LibraryTab />)
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
+    fireEvent.click(screen.getByText('Edit'))
+    const line = await screen.findByLabelText('When to use (optional)')
+    await waitFor(() => expect(screen.getByPlaceholderText('Write your Skill instructions here')).toHaveValue('Summarize the key terms of this award.'))
+    fireEvent.change(line, { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Update' }))
+    await waitFor(() => expect(updateSearchSet).toHaveBeenCalledWith('ss-uuid-1', { title: 'Summarize Award', when_to_use: '' }))
+  })
+
   it('still opens the workflow editor directly for workflow items', async () => {
     mockItems.current = [makePrompt({ id: 'li-2', item_id: 'wf-1', item_uuid: 'wf-uuid-1', kind: 'workflow', set_type: null, name: 'Budget Workflow' })]
     render(<LibraryTab />)

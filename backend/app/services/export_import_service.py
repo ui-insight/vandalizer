@@ -496,7 +496,6 @@ async def _bookmark(
     item_id: PydanticObjectId,
     kind: LibraryItemKind,
     user_id: str,
-    team_id: str | None = None,
 ) -> None:
     """Give an imported object a library bookmark so the importer can find it.
 
@@ -505,10 +504,14 @@ async def _bookmark(
     only the first one ever added the bookmark client-side. Objects from the
     others were invisible in every listing while still holding their name, so
     bookmarking moved server-side where all three paths meet.
+
+    The bookmark is personal even though the object carries the importer's
+    current team: like a newly created item, an import reaches the team's
+    library only when its owner shares it.
     """
     from app.services import library_service
 
-    await library_service.ensure_bookmark(item_id, kind, user_id, team_id=team_id)
+    await library_service.ensure_bookmark(item_id, kind, user_id)
 
 
 async def import_workflow(
@@ -567,7 +570,7 @@ async def import_workflow(
         validation_inputs=item.get("validation_inputs", []),
     )
     await new_wf.insert()
-    await _bookmark(_persisted_id(new_wf), LibraryItemKind.WORKFLOW, user_id, team_id)
+    await _bookmark(_persisted_id(new_wf), LibraryItemKind.WORKFLOW, user_id)
 
     imported = await workflow_service.get_workflow(str(_persisted_id(new_wf)))
     if imported is None:
@@ -792,7 +795,7 @@ async def import_search_set(
     # manage but do not own — filing it into their personal library on an
     # import of fields is not something they asked for.
     if target is None:
-        await _bookmark(_persisted_id(result), LibraryItemKind.SEARCH_SET, user_id, team_id)
+        await _bookmark(_persisted_id(result), LibraryItemKind.SEARCH_SET, user_id)
     return result
 
 

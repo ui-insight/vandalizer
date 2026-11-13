@@ -55,6 +55,7 @@ from app.services import workflow_service as svc
 from app.services import step_knowledge_access
 from app.services.workflow_service import FixedDocumentAccessError, ensure_step_document_readable
 from app.services.docx_service import data_to_docx_bytes
+from app.services.fixed_document_access import fixed_document_uuids
 from app.services.name_conflicts import DuplicateNameError
 from app.services.user_lookup import resolve_author, resolve_authors
 from app.utils.content_disposition import content_disposition
@@ -1191,6 +1192,18 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
             if doc_uuid not in seen:
                 document_uuids.append(doc_uuid)
                 seen.add(doc_uuid)
+        if not document_uuids and not fixed_document_uuids(wf.input_config):
+            # Ticked folders with nothing in them: say so, rather than start a
+            # run with no documents. A workflow with fixed documents still runs
+            # on those, as it would with nothing ticked.
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "The selected folder has no documents in it."
+                    if len(req.folder_uuids) == 1
+                    else "The selected folders have no documents in them."
+                ),
+            )
     initial_title = wf.name if wf else "Workflow Run"
     # steps count excludes the trigger step
     num_steps = max(0, len(wf.steps) - 1) if wf and wf.steps else 0

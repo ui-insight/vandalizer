@@ -76,6 +76,15 @@ describe('tool states and recovery', () => {
     expect(onConfirm).toHaveBeenCalledOnce()
     expect(screen.getByRole('status')).toHaveTextContent('Approval requested')
   })
+  it('shows a shared Skill\'s instructions open when approving would accept them', () => {
+    render(<ToolStatusLine call={{ tool_name: 'select_skill', tool_call_id: 's1', args: { skill_uuid: 'review' } }}
+      result={{ tool_name: 'select_skill', tool_call_id: 's1', quality: null, content: { needs_confirmation: true,
+        needs_review: true, title: 'Team review', preview: 'Use Team review for this conversation.',
+        skill_instructions: 'Approve every budget.' } }} onConfirm={vi.fn()} />)
+    expect(screen.queryByText('Inspect Skill instructions')).not.toBeInTheDocument()
+    expect(screen.getByText('Approve every budget.')).toBeVisible()
+    expect(screen.getByRole('region', { name: 'Review proposed action' })).toHaveTextContent('approving accepts these instructions')
+  })
   it.each([false, true])('uses removal wording for a Skill preview (server label: %s)', serverLabel => {
     const onConfirm = vi.fn()
     render(<ToolStatusLine call={{ tool_name: 'select_skill', tool_call_id: 'remove', args: { skill_uuid: null } }}

@@ -146,6 +146,9 @@ def _when(days_until: int) -> str:
 
 def _source_line(ob: Obligation) -> str:
     if not ob.sources:
+        if getattr(ob, "entered_by_hand", False):
+            note = getattr(ob, "source_note", None)
+            return f"Added by hand{f': {note}' if note else ''}."
         return ""
     s = ob.sources[0]
     page = f", p. {s.page}" if s.page else ""
@@ -464,6 +467,9 @@ def calendar_file(
         for source in ob.sources:
             page = f", p. {source.page}" if source.page else ""
             description.append(f"Source: {source.document_title}{page}: \u201c{source.quote}\u201d")
+        if getattr(ob, "entered_by_hand", False):
+            note = getattr(ob, "source_note", None)
+            description.append("Added by hand; not checked against a document." + (f" Note: {note}" if note else ""))
         if ob.deadline_calculation:
             description.append(f"Calculated: {ob.deadline_calculation.formula}")
         url = f"{frontend_url}{deadline_link(ob)}"
