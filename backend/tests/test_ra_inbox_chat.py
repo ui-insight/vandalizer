@@ -241,14 +241,53 @@ async def test_a_rule_deadline_retitled_with_its_timing_is_already_in_the_inbox(
     assert chat_tools._obligation_review_reason(again["rejected"][0]["reason"]).startswith("Already included in this inbox")
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("first,second", [
+    ("Final report (financial)", "Final report (technical)"),
+    ("Final report (SF-425)", "Final report (RPPR)"),
+    ("Final report", "Final Federal Financial Report (SF-425)"),
+    ("Progress report", "Progress report on cost share commitments"),
+    ("Year 1 progress report", "Year 2 progress report"),
+])
+async def test_a_different_deliverable_from_the_same_rule_is_not_already_in_the_inbox(project_env, monkeypatch, first, second):
+    """One rule can name two deliverables due the same day ("Final technical
+    and financial reports are due 120 days after the End Date"). Hiding one
+    as "already in the inbox" is worse than proposing a duplicate."""
+    project, user, _ = project_env
+    row = (await service.propose(project, user, [proposal(title=first)]))["accepted"][0]["clean"]
+    old = Obligation.model_construct(uuid="old", project_uuid=project.uuid, created_by=user.user_id, status="open", **row)
+    monkeypatch.setattr(service, "Obligation", fake_model([old]))
+    again = await service.propose(project, user, [proposal(title=second)])
+    assert again["rejected"] == []
+    assert [r["clean"]["title"] for r in again["accepted"]] == [second]
+
+
 @pytest.mark.parametrize("a,b,same", [
+    # The support ticket's retitled deadline, and other rewordings of one deliverable.
     ("Annual progress report for NIFA REEport (deliverable)",
      "Annual progress report for the NIFA REEport submission (60 days after March 1, 2027)", True),
     ("Final report", "Final report due 60 days after December 31", True),
+    ("Final report", "Final report (due 12/31/2027)", True),
+    ("Final report", "Final reports", True),
     ("Semi-annual results due", "Semi-annual results report", True),
+    ("Semi-annual results", "Semi-annual results report", True),
+    ("Annual progress report (see Section 5.2)", "Annual progress report", True),
+    ("Year 1 progress report", "Year 1 progress report (90 days after budget period end)", True),
+    # Different deliverables, even when the same rule and date produce them.
     ("Final invoice", "Final report", False),
     ("Final financial report", "Final technical report", False),
     ("Final report (60 days)", "Final invoice (60 days)", False),
+    ("Final report (financial)", "Final report (technical)", False),
+    ("Final report (SF-425)", "Final report (RPPR)", False),
+    ("Final report", "Final report (SF-425)", False),
+    ("Final report", "Final Federal Financial Report (SF-425)", False),
+    ("Final report", "Final patent/invention report", False),
+    ("Final report", "Final property inventory report", False),
+    ("Final report", "Final financial report", False),
+    ("Progress report", "Progress report on cost share commitments", False),
+    ("Year 1 progress report", "Year 2 progress report", False),
+    ("Progress report", "Year 2 progress report", False),
+    ("Progress report (Year 1)", "Progress report (Year 2)", False),
 ])
 def test_similar_titles(a, b, same):
     assert service._similar_titles(a, b) is same
