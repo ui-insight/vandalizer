@@ -95,6 +95,24 @@ class TestCreateSearchSet:
         assert args[1] == LibraryItemKind.SEARCH_SET
         assert args[2] == "user1"
 
+    async def test_a_new_team_stamped_set_is_bookmarked_personally(self):
+        """Support ticket: a new Skill, created while a team was current,
+        appeared in every teammate's Team tab without being shared. It belongs
+        in the creator's personal library until they share it."""
+        with (
+            patch("app.services.search_set_service.SearchSet") as MockSS,
+            patch("app.services.name_conflicts.ensure_search_set_title_available", new_callable=AsyncMock),
+            patch("app.services.library_service.ensure_bookmark", new_callable=AsyncMock) as mock_bookmark,
+        ):
+            MockSS.return_value = _make_search_set()
+
+            from app.services.search_set_service import create_search_set
+
+            await create_search_set("Visibility test", "user1", "prompt", team_id="team1")
+
+        assert MockSS.call_args.kwargs["team_id"] == "team1"
+        assert mock_bookmark.await_args.kwargs.get("team_id") is None
+
 
 # ---------------------------------------------------------------------------
 # list_search_sets

@@ -147,6 +147,23 @@ class TestCreateWorkflow:
         assert args[1] == LibraryItemKind.WORKFLOW
         assert args[2] == "user1"
 
+    @patch("app.services.library_service.ensure_bookmark", new_callable=AsyncMock)
+    @patch("app.services.name_conflicts.ensure_workflow_name_available", new_callable=AsyncMock)
+    @patch("app.services.workflow_service.Workflow")
+    async def test_a_new_team_stamped_workflow_is_bookmarked_personally(
+        self, mock_wf_cls, mock_ensure, mock_bookmark,
+    ):
+        """A new workflow stays out of the team's library until its owner
+        shares it, as a new Skill does (support ticket)."""
+        from app.services.workflow_service import create_workflow
+
+        mock_wf_cls.return_value = MagicMock(insert=AsyncMock())
+
+        await create_workflow(name="My Workflow", user_id="user1", team_id="team1")
+
+        assert mock_wf_cls.call_args.kwargs["team_id"] == "team1"
+        assert mock_bookmark.await_args.kwargs.get("team_id") is None
+
 
 class TestDuplicateWorkflowBookmarks:
     async def test_copy_gets_a_library_bookmark(self):
