@@ -412,7 +412,7 @@
     "chat_instructions": [
       "Ask chat to get the three files ready: **proposal-batch-1.pdf**, **proposal-batch-2.pdf** and **proposal-batch-3.pdf**.",
       "Choose a saved extraction and look at its fields.",
-      "Ask chat to run the extraction on those three files, and approve it.",
+      "Ask chat to run the extraction on those three files.",
       "Check that each of the three documents finished.",
       "Check the PI names in the results: Maria Lopez, Robert Kim and Amara Okafor.",
       "If a document failed, fix the problem and run all three again.",
