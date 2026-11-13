@@ -390,10 +390,19 @@ async def duplicate_workflow(
     # Bookmark the copy here rather than leaving it to the caller: "Make a copy"
     # in the workflow editor never made that follow-up call, so every copy it
     # produced was invisible in the library while still holding its name.
+    #
+    # The copy joins the team library only when the original is already there
+    # (a copy of a shared workflow). Every workflow carries its creator's
+    # current team, so the team stamp alone would put a copy of an unshared
+    # workflow in every teammate's Team tab.
     from app.services import library_service
 
+    shared = await library_service.in_team_library(
+        PydanticObjectId(workflow_id), LibraryItemKind.WORKFLOW, team_id,
+    )
     await library_service.ensure_bookmark(
-        new_wf.id, LibraryItemKind.WORKFLOW, user_id, team_id=team_id,
+        new_wf.id, LibraryItemKind.WORKFLOW, user_id,
+        team_id=team_id if shared else None,
     )
 
     return await get_workflow(str(new_wf.id))

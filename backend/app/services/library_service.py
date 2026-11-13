@@ -338,6 +338,34 @@ async def has_bookmark(item_id: PydanticObjectId, kind: LibraryItemKind) -> bool
     return await Library.find_one({"items": {"$in": [r.id for r in rows]}}) is not None
 
 
+async def in_team_library(
+    item_id: PydanticObjectId, kind: LibraryItemKind, team_id: str | None,
+) -> bool:
+    """True when the team's library holds a bookmark pointing at this object.
+
+    The team stamp on an object (``team_id``) does not say this: every item is
+    stamped with its creator's current team, shared or not. Only a bookmark in
+    the team library means the item was shared there. A team that cannot be
+    resolved has no library, so nothing is in it.
+    """
+    if not team_id:
+        return False
+    try:
+        team_oid = await _resolve_team_oid(team_id)
+    except ValueError:
+        return False
+    rows = await LibraryItem.find(
+        LibraryItem.item_id == item_id, LibraryItem.kind == kind
+    ).to_list()
+    if not rows:
+        return False
+    return await Library.find_one(
+        Library.scope == LibraryScope.TEAM,
+        Library.team == team_oid,
+        In(Library.items, [r.id for r in rows]),
+    ) is not None
+
+
 async def ensure_bookmark(
     item_id: PydanticObjectId,
     kind: LibraryItemKind,
@@ -356,11 +384,16 @@ async def ensure_bookmark(
     (duplicate, import, catalog import) call this instead, so a dropped or
     failed second request can no longer strand the object.
 
-    The bookmark follows where the object lives: a team-scoped object
-    (``team_id`` set) lands in the team library so teammates who can access it
-    see it, not in the creator's personal library where they cannot. A team_id
-    that cannot be resolved falls back to the personal library — an object
-    bookmarked in the wrong place is recoverable, an unbookmarked one is not.
+    The bookmark goes in the creator's personal library unless the caller
+    passes ``team_id``, which files it in that team's library instead, where
+    every teammate sees it in Library → Team. Pass it only when the item is
+    meant to be shared, e.g. a copy of an item that is already in that team's
+    library (see :func:`in_team_library`), never merely because the object is
+    stamped with a team: every new item carries its creator's current team,
+    and a new item reaches the team library only when its owner shares it. A
+    team_id that cannot be resolved falls back to the personal library — an
+    object bookmarked in the wrong place is recoverable, an unbookmarked one
+    is not.
 
     Idempotent: returns ``None`` when the object is already bookmarked.
     """

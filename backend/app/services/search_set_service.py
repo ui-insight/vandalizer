@@ -204,14 +204,19 @@ async def clone_search_set(search_set_uuid: str, user_id: str) -> SearchSet | No
         )
         await new_item.insert()
 
-    # Bookmark the clone where it lives: the clone keeps the original's
-    # team_id, so a copy of a team extraction set belongs in the team library,
-    # not the copier's personal one (#673).
+    # A clone of a set that is in its team's library belongs there too, not in
+    # the copier's personal library (#673). The clone keeps the original's
+    # team stamp either way, but that stamp is on every set, shared or not, so
+    # a clone of an unshared set goes to the copier's personal library.
     from app.models.library import LibraryItemKind
     from app.services import library_service
 
+    shared = await library_service.in_team_library(
+        original.id, LibraryItemKind.SEARCH_SET, original.team_id,
+    )
     await library_service.ensure_bookmark(
-        clone.id, LibraryItemKind.SEARCH_SET, user_id, team_id=original.team_id,
+        clone.id, LibraryItemKind.SEARCH_SET, user_id,
+        team_id=original.team_id if shared else None,
     )
 
     return clone
