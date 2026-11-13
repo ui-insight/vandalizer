@@ -393,29 +393,29 @@
     }
   },
   "batch_processing": {
-    "overview": "Process the three assigned proposals and reconcile each distinct input with its actual source-checked result.\n\nThe original check uses recorded batch rows or successful extraction activity and size thresholds of three, five and ten. These counters do not establish distinct assigned sources, correct values or complete source coverage. Reconcile each actual input and result independently.",
+    "overview": "Run one saved extraction on three proposals at once, then check that each proposal finished and that its results are right.",
     "documents": [
       "proposal-batch-1.pdf",
       "proposal-batch-2.pdf",
       "proposal-batch-3.pdf"
     ],
     "instructions": [
-      "Prepare the three assigned files: **proposal-batch-1.pdf**, **proposal-batch-2.pdf** and **proposal-batch-3.pdf**. Verify each distinct source identity.",
-      "Select a suitable saved extraction and inspect its fields and configured input scope. Test representative behavior before processing the set.",
-      "In chat, authorize the extraction on exactly those three documents. In the workflow editor route, select the three documents and choose **Run per document (3 runs)** before **Run**.",
-      "Inspect actual per-document status and retain the intended input list and run identities. Streaming activity or a combined table alone does not prove all inputs completed.",
-      "Compare the returned PI names with each assigned source: Maria Lopez, Robert Kim and Amara Okafor are teaching targets, not a substitute for actual evidence.",
-      "Preserve successful results, inspect failures and verify repairs before a targeted retry. An aggregate terminal batch can contain failures.",
-      "Reconcile all assigned inputs and unresolved results before checking course completion. Original size-based stars remain separate from the new course’s assessed coverage outcomes."
+      "Get the three files ready: **proposal-batch-1.pdf**, **proposal-batch-2.pdf** and **proposal-batch-3.pdf**.",
+      "Choose a saved extraction and look at its fields.",
+      "Run it on all three files. In chat, ask it to run on those three. In the workflow editor, select the three documents, choose **Run per document (3 runs)**, then **Run**.",
+      "Check that each of the three documents finished.",
+      "Check the PI names in the results: Maria Lopez, Robert Kim and Amara Okafor.",
+      "If a document failed, fix the problem and run that one again.",
+      "When all three have finished, check the module."
     ],
     "chat_instructions": [
-      "Ask chat for this module’s saved original requirements. Ask chat to prepare the three assigned files: **proposal-batch-1.pdf**, **proposal-batch-2.pdf** and **proposal-batch-3.pdf**. Verify each distinct source identity.",
-      "Select a suitable saved extraction and inspect its fields and configured input scope. Test representative behavior before processing the set.",
-      "In chat, authorize the extraction on exactly those three documents. In the workflow editor route, select the three documents and choose **Run per document (3 runs)** before **Run**.",
-      "Inspect actual per-document status and retain the intended input list and run identities. Streaming activity or a combined table alone does not prove all inputs completed.",
-      "Compare the returned PI names with each assigned source: Maria Lopez, Robert Kim and Amara Okafor are teaching targets, not a substitute for actual evidence.",
-      "Preserve successful results, inspect failures and verify repairs before a targeted retry. An aggregate terminal batch can contain failures.",
-      "Reconcile all assigned inputs and unresolved results before checking course completion. Original size-based stars remain separate from the new course’s assessed coverage outcomes."
+      "Ask chat to get the three files ready: **proposal-batch-1.pdf**, **proposal-batch-2.pdf** and **proposal-batch-3.pdf**.",
+      "Choose a saved extraction and look at its fields.",
+      "Ask chat to run the extraction on those three files, and approve it.",
+      "Check that each of the three documents finished.",
+      "Check the PI names in the results: Maria Lopez, Robert Kim and Amara Okafor.",
+      "If a document failed, fix the problem and run that one again.",
+      "When all three have finished, check the module."
     ],
     "expected_fields": [
       "PI Name",
