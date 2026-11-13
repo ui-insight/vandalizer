@@ -1191,6 +1191,17 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
             if doc_uuid not in seen:
                 document_uuids.append(doc_uuid)
                 seen.add(doc_uuid)
+        if not document_uuids:
+            # Ticked folders with nothing in them: say so, rather than start a
+            # run with no documents.
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "The selected folder has no documents in it."
+                    if len(req.folder_uuids) == 1
+                    else "The selected folders have no documents in them."
+                ),
+            )
     initial_title = wf.name if wf else "Workflow Run"
     # steps count excludes the trigger step
     num_steps = max(0, len(wf.steps) - 1) if wf and wf.steps else 0
