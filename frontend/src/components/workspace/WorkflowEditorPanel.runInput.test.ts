@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { describeRunInput, describeSelectionCount } from './WorkflowEditorPanel'
+import { describeRunInput, describeSelectionCount, runFolderUuids } from './WorkflowEditorPanel'
 
 const base = { triggerType: 'manual', selectedCount: 0, fixedCount: 0, hasProject: false, textInput: '' }
 
@@ -43,5 +43,15 @@ describe('describeSelectionCount', () => {
     expect(describeSelectionCount(0, 2)).toBe('2 folders selected')
     expect(describeSelectionCount(1, 1)).toBe('1 folder, 1 document selected')
     expect(describeSelectionCount(2, 3)).toBe('3 folders, 2 documents selected')
+  })
+})
+
+describe('runFolderUuids', () => {
+  it('sends ticked folders for runs that take documents, and none for a no-input run', () => {
+    const folders = ['F1', 'F2']
+    expect(runFolderUuids(undefined, folders)).toEqual(folders)
+    expect(runFolderUuids('manual', folders)).toEqual(folders)
+    expect(runFolderUuids('text_input', folders)).toEqual(folders)
+    expect(runFolderUuids('no_input', folders)).toEqual([])
   })
 })

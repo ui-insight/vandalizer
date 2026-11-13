@@ -1060,6 +1060,17 @@ async def delete_task(task_id: str, user: User = Depends(get_current_user)):
 # Execution
 # ---------------------------------------------------------------------------
 
+def _has_fixed_documents(input_config: object) -> bool:
+    """Whether a run loads fixed documents (Input tab). The run loader merges
+    them in for every trigger except ``no_input``."""
+    if not isinstance(input_config, dict) or input_config.get("trigger_type") == "no_input":
+        return False
+    return any(
+        (fd.get("uuid") if isinstance(fd, dict) else fd)
+        for fd in input_config.get("fixed_documents") or []
+    )
+
+
 @router.post("/{workflow_id}/run")
 @limiter.limit("20/minute")
 async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowRequest, user: User = Depends(get_current_user)):
@@ -1095,9 +1106,10 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
             if doc_uuid not in seen:
                 document_uuids.append(doc_uuid)
                 seen.add(doc_uuid)
-        if not document_uuids:
+        if not document_uuids and not _has_fixed_documents(wf.input_config):
             # Ticked folders with nothing in them: say so, rather than start a
-            # run with no documents.
+            # run with no documents. A workflow with fixed documents still runs
+            # on those, as it would with nothing ticked.
             raise HTTPException(
                 status_code=400,
                 detail=(
