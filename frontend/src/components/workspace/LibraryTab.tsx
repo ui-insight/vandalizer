@@ -489,6 +489,10 @@ export function LibraryTab() {
   const [editTitle, setEditTitle] = useState('')
   const [editContent, setEditContent] = useState('')
   const [editWhen, setEditWhen] = useState('')
+  // The line the window opened with. Update sends when_to_use only when the
+  // field changed, so a line the list didn't deliver is never saved over as
+  // empty (support ticket: every Edit → Update erased it).
+  const editWhenLoaded = useRef('')
   const [editItemId, setEditItemId] = useState<string | null>(null) // SearchSetItem ID
   const [editLoading, setEditLoading] = useState(false)
   const [editSaving, setEditSaving] = useState(false)
@@ -507,6 +511,7 @@ export function LibraryTab() {
     // authoritative searchphrase loads.
     setEditContent(item.description || '')
     setEditWhen(item.when_to_use || '')
+    editWhenLoaded.current = (item.when_to_use || '').trim()
     setEditError(null)
     setEditLoadError(null)
     setEditItemId(null)
@@ -576,7 +581,8 @@ export function LibraryTab() {
     setEditSaving(true)
     setEditError(null)
     try {
-      await updateSearchSet(editingItem.item_uuid, editKind === 'prompt' ? { title: cleanTitle, when_to_use: editWhen.trim() } : { title: cleanTitle })
+      const whenChanged = editKind === 'prompt' && editWhen.trim() !== editWhenLoaded.current
+      await updateSearchSet(editingItem.item_uuid, whenChanged ? { title: cleanTitle, when_to_use: editWhen.trim() } : { title: cleanTitle })
       if (editItemId) {
         await updateSearchSetItem(editItemId, { searchphrase: editContent, title: cleanTitle })
       } else {
