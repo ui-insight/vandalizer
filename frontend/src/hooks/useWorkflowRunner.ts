@@ -53,7 +53,7 @@ export function useWorkflowRunner() {
     }
   }, [stopPolling, shareToken])
 
-  const start = useCallback(async (workflowId: string, documentUuids: string[], model?: string, batchMode?: boolean) => {
+  const start = useCallback(async (workflowId: string, documentUuids: string[], model?: string, batchMode?: boolean, folderUuids?: string[]) => {
     setRunning(true)
     setStatus(null)
     setBatchStatus(null)
@@ -66,6 +66,7 @@ export function useWorkflowRunner() {
         document_uuids: documentUuids,
         model,
         batch_mode: batchMode,
+        ...(folderUuids?.length ? { folder_uuids: folderUuids } : {}),
       }, shareToken)
     } catch (err) {
       setRunning(false)
