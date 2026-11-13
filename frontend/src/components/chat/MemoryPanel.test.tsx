@@ -22,6 +22,12 @@ describe('MemoryPanel on/off state (#1014 item 48)', () => {
     expect(screen.getByText('Off')).toBeInTheDocument()
   })
 
+  it('labels the button "Memory" in words, not only an icon', async () => {
+    mocks.getUserMemory.mockResolvedValue(memory(false))
+    render(<MemoryPanel />)
+    expect(await screen.findByRole('button', { name: 'Assistant memory: on' })).toHaveTextContent(/^Memory$/)
+  })
+
   it('turns memory off from the switch and updates the button', async () => {
     mocks.getUserMemory.mockResolvedValue(memory(false))
     mocks.setUserMemoryPaused.mockResolvedValue({ paused: true })

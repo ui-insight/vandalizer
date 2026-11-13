@@ -146,3 +146,34 @@ it('shows the hand cursor on New chat (v5 retest ticket)', () => {
   render(<ChatInput onSend={vi.fn()} onNewChat={vi.fn()} hasMessages />)
   expect(screen.getByRole('button', { name: 'New chat' })).toHaveClass('cursor-pointer')
 })
+
+// The composer toolbar was regrouped (d9368664) without tests; these pin the
+// grouping it settled on (ported from the superseded PR #1118).
+describe('composer toolbar grouping', () => {
+  const bar = (hasMessages: boolean) => render(
+    <ChatInput
+      onSend={vi.fn()} onModelChange={vi.fn()} onNewChat={vi.fn()} hasMessages={hasMessages}
+      memoryControl={<button type="button">Memory</button>}
+      activityControl={<button type="button">Activity</button>}
+      exportActions={<><button type="button">Copy chat</button><button type="button">Download chat</button></>}
+    />,
+  )
+
+  it('groups Activity and Memory as assistant tools, and New chat and exports as conversation tools, with Send outside both', () => {
+    bar(true)
+    const assistant = screen.getByRole('group', { name: 'Assistant tools' })
+    const conversation = screen.getByRole('group', { name: 'Conversation tools' })
+    for (const name of ['Activity', 'Memory']) expect(assistant).toContainElement(screen.getByRole('button', { name }))
+    for (const name of ['New chat', 'Copy chat', 'Download chat']) expect(conversation).toContainElement(screen.getByRole('button', { name }))
+    const send = screen.getByRole('button', { name: 'Send message' })
+    expect(assistant).not.toContainElement(send)
+    expect(conversation).not.toContainElement(send)
+  })
+
+  it('keeps Memory but leaves out Activity and the conversation tools before the first message', () => {
+    bar(false)
+    expect(screen.getByRole('group', { name: 'Assistant tools' })).toContainElement(screen.getByRole('button', { name: 'Memory' }))
+    expect(screen.queryByRole('button', { name: 'Activity' })).toBeNull()
+    expect(screen.queryByRole('group', { name: 'Conversation tools' })).toBeNull()
+  })
+})
