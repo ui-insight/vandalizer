@@ -65,12 +65,13 @@ CAPABILITIES: tuple[Capability, ...] = (
     ),
     Capability(
         "web_pages", "Read a web page",
-        "Opens a public link you paste and reads the page.",
+        "Opens a public link you paste and reads the page. Chat also needs it to add a link to a knowledge base.",
         ("fetch_url",),
     ),
     Capability(
         "knowledge_bases", "Knowledge bases",
-        "Searches your knowledge bases for answers with citations, and can create one or add sources to it.",
+        "Searches your knowledge bases for answers with citations, and can create one or add your files to it. "
+        "Adding a link also needs “Read a web page” on.",
         ("search_knowledge_base", "list_knowledge_bases", "create_knowledge_base", "add_documents_to_kb", "add_url_to_kb"),
     ),
     Capability(
@@ -135,6 +136,14 @@ ALSO_REQUIRES: dict[str, tuple[str, ...]] = {
     "add_url_to_kb": ("web_pages",),
 }
 
+# What each ALSO_REQUIRES tool does, as chat should name it when the other
+# switch withholds it. Support ticket: with Read a web page off and Knowledge
+# bases on, chat said the switch didn't matter, promised twice to add a link,
+# created the knowledge base empty, then said it had no tool for links.
+_ALSO_REQUIRES_WORK = {
+    "add_url_to_kb": "add a link (URL) to a knowledge base",
+}
+
 
 def admin_off(system_config_doc: dict | None) -> frozenset[str]:
     """Capabilities an administrator switched off for the whole deployment."""
@@ -189,6 +198,7 @@ def instructions(own: frozenset[str], admin: frozenset[str] = frozenset()) -> st
     personal = [c.label for c in CAPABILITIES if c.id in own and c.id not in admin]
     if not locked and not personal:
         return ""
+    off = own | admin
     parts = ["\n\nSome capabilities are turned off, so their tools are not available to you."]
     if personal:
         parts.append(
@@ -205,6 +215,23 @@ def instructions(own: frozenset[str], admin: frozenset[str] = frozenset()) -> st
         "Do not attempt the task another way, claim you did it, or answer from memory in its place. "
         "Other requests are unaffected."
     )
+    for tool, needed in ALSO_REQUIRES.items():
+        own_capability = _CAPABILITY_OF[tool]
+        blocking = [_BY_ID[c] for c in needed if c in off]
+        if own_capability in off or not blocking:
+            continue
+        names = " and ".join(f"“{c.label}”" for c in blocking)
+        who = (
+            "only an administrator can turn it on" if all(c.id in admin for c in blocking)
+            else "they can turn it on at [Assistant settings](/assistant)"
+        )
+        parts.append(
+            f" Because {names} is off, you cannot {_ALSO_REQUIRES_WORK[tool]}, even though "
+            f"“{_BY_ID[own_capability].label}” is on: that needs both. When asked to, say so in your first "
+            f"reply, before creating or changing anything, naming {names} as the reason ({who}). "
+            "Do not promise to do it later or say the switch doesn't apply. Other work in "
+            f"“{_BY_ID[own_capability].label}” is unaffected."
+        )
     return "".join(parts)
 
 
