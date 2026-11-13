@@ -756,7 +756,18 @@ async def _validate_validation_qa(user_id: str) -> dict:
     return {"passed": passed, "stars": stars, "checks": checks}
 
 
+def _as_utc(moment: datetime.datetime | None) -> datetime.datetime:
+    """Mongo returns naive UTC datetimes; tests and new rows may be aware."""
+    if moment is None:
+        return datetime.datetime.min.replace(tzinfo=datetime.timezone.utc)
+    return moment if moment.tzinfo else moment.replace(tzinfo=datetime.timezone.utc)
+
+
 async def _validate_batch_processing(user_id: str) -> dict:
+    """The learner's most recent batch of 3+ documents decides "All succeeded",
+    so fixing a failure and running the batch again clears it. Stars come from
+    the largest batch that fully succeeded.
+    """
     checks = []
     # WorkflowResult has no user_id field, so scope by the user's workflows
     # (the same way every other validator scopes its data). Querying a
@@ -770,27 +781,41 @@ async def _validate_batch_processing(user_id: str) -> dict:
         else []
     )
 
-    batch_ids: dict[str, list] = {}
+    by_batch: dict[str, list] = {}
     for r in results:
         if r.batch_id:
-            batch_ids.setdefault(r.batch_id, []).append(r)
+            by_batch.setdefault(r.batch_id, []).append(r)
 
-    best_batch_size = 0
-    best_batch_all_ok = False
-    for bid, batch_results in batch_ids.items():
-        count = len(batch_results)
-        if count > best_batch_size:
-            best_batch_size = count
-            best_batch_all_ok = all(r.status == "completed" for r in batch_results)
+    # (started, size, completed documents) for each batch.
+    runs: list[tuple[datetime.datetime, int, int]] = []
+    for batch_results in by_batch.values():
+        started = min(_as_utc(getattr(r, "start_time", None)) for r in batch_results)
+        done = sum(1 for r in batch_results if r.status == "completed")
+        runs.append((started, len(batch_results), done))
 
-    checks.append({"name": "Batch execution", "passed": best_batch_size >= 3, "detail": f"Largest batch has {best_batch_size} documents (need 3+)"})
-    checks.append({"name": "All succeeded", "passed": best_batch_all_ok and best_batch_size >= 3, "detail": "All documents in batch must complete successfully"})
+    batch_runs = [run for run in runs if run[1] >= 3]
+    largest = max((size for _, size, _ in runs), default=0)
+    latest = max(batch_runs, key=lambda run: run[0]) if batch_runs else None
+    latest_ok = latest is not None and latest[2] == latest[1]
+    best_successful = max((size for _, size, done in batch_runs if done == size), default=0)
+
+    checks.append({"name": "Batch execution", "passed": latest is not None, "detail": f"Largest batch has {largest} documents (need 3+)"})
+    if latest is None:
+        detail = "All documents in batch must complete successfully"
+    elif latest_ok:
+        detail = f"Your most recent batch of 3+ documents: all {latest[1]} completed"
+    else:
+        detail = (
+            f"Your most recent batch of 3+ documents: {latest[2]} of {latest[1]} completed. "
+            "Fix the problem and run the batch again; a retry that completes fully replaces this result"
+        )
+    checks.append({"name": "All succeeded", "passed": latest_ok, "detail": detail})
 
     passed = all(c["passed"] for c in checks)
     stars = 1 if passed else 0
-    if passed and best_batch_size >= 5:
+    if passed and best_successful >= 5:
         stars = 2
-    if passed and best_batch_size >= 10:
+    if passed and best_successful >= 10:
         stars = 3
 
     return {"passed": passed, "stars": stars, "checks": checks}
