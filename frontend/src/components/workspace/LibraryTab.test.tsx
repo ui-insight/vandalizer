@@ -196,6 +196,22 @@ describe('LibraryTab Skills', () => {
     }))
   })
 
+  it('tells the editor of a team Skill that teammates review the new text, and says nothing in Mine', async () => {
+    const { unmount } = render(<LibraryTab />)
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
+    fireEvent.click(screen.getByText('Edit'))
+    await screen.findByText('Edit Skill')
+    expect(screen.queryByTestId('team-core-skill-note')).toBeNull()
+    unmount()
+
+    render(<LibraryTab />)
+    fireEvent.click(screen.getByRole('button', { name: 'Team' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'More actions' }))
+    fireEvent.click(screen.getByText('Edit'))
+    await screen.findByText('Edit Skill')
+    expect(screen.getByTestId('team-core-skill-note').textContent).toMatch(/Teammates who use this as a core Skill will need to review the new text/)
+  })
+
   it('still opens the workflow editor directly for workflow items', async () => {
     mockItems.current = [makePrompt({ id: 'li-2', item_id: 'wf-1', item_uuid: 'wf-uuid-1', kind: 'workflow', set_type: null, name: 'Budget Workflow' })]
     render(<LibraryTab />)

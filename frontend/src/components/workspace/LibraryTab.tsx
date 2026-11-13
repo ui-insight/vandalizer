@@ -1913,6 +1913,13 @@ export function LibraryTab() {
               <div id="library-edit-when-help" style={{ marginTop: 'var(--workspace-space-4)', fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>
                 Describe the task this Skill is for. Chat uses this description to find a matching Skill. Required to add the Skill to Core Skills in Assistant settings; optional when choosing it for one conversation.
               </div>
+              {scope === 'team' && (
+                // Your own edit stays in use as your core Skill; a teammate's
+                // core copy pauses until they review it (support ticket).
+                <div data-testid="team-core-skill-note" style={{ marginTop: 'var(--workspace-space-8)', fontSize: 'var(--workspace-font-meta)', color: '#526071' }}>
+                  Teammates who use this as a core Skill will need to review the new text in Assistant settings before their chat uses it again.
+                </div>
+              )}
               </div>
             )}
             <div style={{ marginBottom: 'var(--workspace-space-20)' }}>

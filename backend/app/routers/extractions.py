@@ -51,6 +51,7 @@ from app.schemas.extractions import (
 )
 from app.services import extraction_validation_service as val_svc
 from app.services import search_set_service as svc
+from app.services import skill_service
 from app.services.name_conflicts import DuplicateNameError
 from app.utils.content_disposition import content_disposition
 
@@ -211,6 +212,7 @@ async def get_search_set(uuid: str, user: User = Depends(get_current_user)) -> S
 @router.patch("/search-sets/{uuid}", response_model=SearchSetResponse)
 async def update_search_set(uuid: str, req: UpdateSearchSetRequest, user: User = Depends(get_current_user)) -> SearchSetResponse:
     await _get_search_set_or_404(uuid, user, manage=True)
+    core_before = await skill_service.core_version_before_edit(user, uuid)
     try:
         ss = await svc.update_search_set(
             uuid, title=req.title, extraction_config=req.extraction_config, when_to_use=req.when_to_use,
@@ -219,6 +221,7 @@ async def update_search_set(uuid: str, req: UpdateSearchSetRequest, user: User =
         raise HTTPException(status_code=409, detail=str(e))
     if not ss:
         raise HTTPException(status_code=404, detail="SearchSet not found")
+    await skill_service.keep_own_edit_accepted(user, uuid, core_before)
     # Flag stale verification if this search set was verified
     from app.services.verification_service import check_and_flag_stale_verification
     await check_and_flag_stale_verification("search_set", str(ss.id))
@@ -892,11 +895,13 @@ async def export_pdf(
 @router.post("/search-sets/{uuid}/items", response_model=SearchSetItemResponse)
 async def add_item(uuid: str, req: SearchSetItemRequest, user: User = Depends(get_current_user)) -> SearchSetItemResponse:
     await _get_search_set_or_404(uuid, user, manage=True)
+    core_before = await skill_service.core_version_before_edit(user, uuid)
     item = await svc.add_item(
         uuid, req.searchphrase, req.searchtype, req.title, user.user_id,
         is_optional=req.is_optional, enum_values=req.enum_values or [],
         description=req.description,
     )
+    await skill_service.keep_own_edit_accepted(user, uuid, core_before)
     return SearchSetItemResponse(
         id=str(item.id), searchphrase=item.searchphrase, searchset=item.searchset,
         searchtype=item.searchtype, title=item.title,
@@ -922,7 +927,8 @@ async def list_items(uuid: str, user: User = Depends(get_current_user)) -> list[
 
 @router.patch("/items/{item_id}", response_model=SearchSetItemResponse)
 async def update_item(item_id: str, req: UpdateSearchSetItemRequest, user: User = Depends(get_current_user)) -> SearchSetItemResponse:
-    await _get_search_set_item_or_404(item_id, user)
+    existing = await _get_search_set_item_or_404(item_id, user)
+    core_before = await skill_service.core_version_before_edit(user, existing.searchset)
     item = await svc.update_item(
         item_id, searchphrase=req.searchphrase, title=req.title,
         is_optional=req.is_optional, enum_values=req.enum_values,
@@ -930,6 +936,7 @@ async def update_item(item_id: str, req: UpdateSearchSetItemRequest, user: User 
     )
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
+    await skill_service.keep_own_edit_accepted(user, existing.searchset, core_before)
     # Flag stale verification on parent search set
     if item.searchset:
         from app.models.search_set import SearchSet
