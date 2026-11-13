@@ -66,6 +66,110 @@ def _figures(text: str) -> list[Figure]:
     return [f for _, f in sorted(out, key=lambda pair: pair[0])]
 
 
+# "625,000 ÷ 1,250,000 = 50.0%": working written without "$". Support
+# ticket: "625,000 ÷ 1,250,000 = 50.0%" and "625,000 − 265,000 = $360,000"
+# were flagged although every input was in the spreadsheet, because only "$"
+# amounts were read as operands.
+#
+# Bare numbers are read only as the operands of working the reply writes out
+# right before the figure ("a op b = figure"), and that working is evaluated
+# exactly as written. A bare number anywhere else in the sentence is never an
+# operand: with subset sums and a rounded figure's tolerance ("$1M" is ±$500K),
+# a list of yearly totals would "derive" almost any invented round figure.
+# A number must be comma-grouped (so a year such as "2026" is never one) and
+# must not carry another currency or a unit word, which breaks the working.
+_NUM = r"\$?\s?\d{1,3}(?:,\d{3})+(?:\.\d+)?|\$\s?\d+(?:\.\d+)?"
+_OP = r"\s*(?:[-−–+×x*÷/]|plus|minus|times|divided\s+by)\s*"
+_WORKING = re.compile(
+    rf"(?<![\w€£¥.,$%])((?:[-−](?=[\d$]))?(?:{_NUM})(?:{_OP}(?:{_NUM}))+)"
+    r"\s*(?:=|equals\b|is\b|comes\s+to\b|gives\b)\s*[*_]*\s*$",
+    re.IGNORECASE,
+)
+_TOKEN = re.compile(rf"({_NUM})|(divided\s+by|plus|minus|times|[-−–+×x*÷/])", re.IGNORECASE)
+_OPS = {"+": "+", "plus": "+", "-": "-", "−": "-", "–": "-", "minus": "-",
+        "×": "*", "x": "*", "*": "*", "times": "*", "÷": "/", "/": "/"}
+
+
+def _evaluate(tokens: list[tuple[float, str]]) -> float | None:
+    """Evaluate "a op b op c" with the usual precedence (no parentheses)."""
+    terms: list[float] = [tokens[0][0]]
+    ops: list[str] = []
+    for value, op in tokens[1:]:
+        if op in "*/":
+            if op == "/" and value == 0:
+                return None
+            terms[-1] = terms[-1] * value if op == "*" else terms[-1] / value
+        else:
+            terms.append(value)
+            ops.append(op)
+    total = terms[0]
+    for op, term in zip(ops, terms[1:]):
+        total = total + term if op == "+" else total - term
+    return total
+
+
+def _written_working(
+    segment: str, target: Figure, money: set[float],
+) -> str | None:
+    """The formula when *segment* writes "a op b = target" over known amounts.
+
+    Every operand must be stated in the sources (or calculated earlier), the
+    working must evaluate to the target within the precision of its operands
+    (a rounded target such as "$1M" does not widen it), and a percentage
+    target must come from working that divides.
+    """
+    m = None
+    at = segment.find(target.label)
+    while at != -1 and m is None:
+        m = _WORKING.search(segment[:at])
+        # Only the whole working: "52% × 253,000 + 10,000" is not "253,000 + 10,000".
+        before = segment[:m.start()].rstrip() if m else ""
+        if m and not re.fullmatch(r"\s*[-*+•]", before) and re.search(
+            r"(?:[-−–+×x*÷/%\d€£¥]|plus|minus|times|by)$", before, re.IGNORECASE,
+        ):
+            m = None
+        at = segment.find(target.label, at + 1)
+    if m is None:
+        return None
+    expr = m.group(1).strip()
+    tokens: list[tuple[float, str]] = []
+    pending = "+"
+    sign = 1.0
+    if expr[0] in "-−":
+        sign, expr_body = -1.0, expr[1:]
+    else:
+        expr_body = expr
+    for tok in _TOKEN.finditer(expr_body):
+        if tok.group(1):
+            value = float(re.sub(r"[$,\s]", "", tok.group(1)))
+            if round(value, 2) not in money:
+                return None
+            tokens.append((sign * value if not tokens else value, pending))
+            pending = ""
+        else:
+            if pending:
+                return None
+            word = tok.group(2).lower()
+            pending = "/" if word.startswith("divided") else _OPS[word]
+    if pending or len(tokens) < 2:
+        return None
+    result = _evaluate(tokens)
+    if result is None:
+        return None
+    divides = any(op == "/" for _, op in tokens)
+    if target.percent:
+        if not divides:
+            return None
+        value, tolerance = result * 100, target.tolerance  # "625,000 ÷ 1,250,000 = 50.0%"
+    else:
+        # Close to the exact arithmetic, whatever precision the target was
+        # written to: "304,000 + 240,000 = $1M" is not a rounding of $544,000.
+        value, tolerance = result, min(target.tolerance, max(0.51, 0.005 * abs(result)))
+    if abs(value - target.value) <= tolerance:
+        return f"{m.group(1).strip()} = {target.label}"
+    return None
+
+
 def _segments(text: str) -> list[tuple[str, str]]:
     """(scope, extra operand text): sentences, and table rows with their header.
 
@@ -166,7 +270,7 @@ def derive_figures(answer: str, source_money: set[float], source_pct: set[float]
                 ]
                 formula = _match(target, _candidates(
                     target, [f for f in operands if not f.percent], [f for f in operands if f.percent],
-                ))
+                )) or _written_working(segment, target, money)
                 if formula:
                     found[target.label] = Derivation(target.label, target.value, target.percent, formula)
                     (pct if target.percent else money).add(target.value if target.percent else round(target.value, 2))

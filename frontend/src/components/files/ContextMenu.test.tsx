@@ -41,6 +41,20 @@ describe('ContextMenu', () => {
     expect(layout()).toEqual(['Rename', '—', 'Copy UUID', '—', 'Delete'])
   })
 
+  it('offers Duplicate with the other organize actions for a file', () => {
+    const fn = vi.fn()
+    render(
+      <ContextMenu
+        x={0} y={0} onClose={fn}
+        onRename={fn} onMove={fn} onDuplicate={fn}
+        onDownload={fn} onDelete={fn}
+      />,
+    )
+    expect(layout()).toEqual(['Rename', 'Move to…', 'Duplicate', '—', 'Download', '—', 'Delete'])
+    screen.getByRole('menuitem', { name: 'Duplicate' }).click()
+    expect(fn).toHaveBeenCalledTimes(2) // the action, then onClose
+  })
+
   it('draws no divider when there is a single group', () => {
     render(<ContextMenu x={0} y={0} onClose={vi.fn()} onRename={vi.fn()} onMove={vi.fn()} />)
     expect(layout()).toEqual(['Rename', 'Move to…'])

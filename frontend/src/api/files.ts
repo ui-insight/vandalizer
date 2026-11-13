@@ -42,6 +42,14 @@ export function uploadFileVersion(docUuid: string, data: { contentAsBase64String
   )
 }
 
+/** Copy a document into its own folder as "<name> (Copy)". */
+export function duplicateFile(docUuid: string) {
+  return apiFetch<{ uuid: string; title: string }>(
+    `/api/files/${encodeURIComponent(docUuid)}/duplicate`,
+    { method: 'POST' },
+  )
+}
+
 export function listFileVersions(docUuid: string) {
   return apiFetch<{ versions: FileVersion[] }>(`/api/files/${encodeURIComponent(docUuid)}/versions`)
 }

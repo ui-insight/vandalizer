@@ -7,6 +7,7 @@ pointer to mutable library text. Authorization is checked again on every use.
 
 import hashlib
 import json
+import logging
 from dataclasses import dataclass
 from typing import Any
 
@@ -16,6 +17,8 @@ from app.models.search_set import SearchSet, SearchSetItem
 from app.models.user import User
 from app.schemas.skills import SkillSnapshot, clean_when_to_use
 from app.services import access_control
+
+logger = logging.getLogger(__name__)
 
 
 async def authorize_skill(skill_uuid: str, user: User) -> SearchSet:
@@ -197,6 +200,74 @@ async def accept_core_skill(user: User, skill: SkillSnapshot) -> bool:
         {"$set": {"core_skills.$.version": skill.version}},
     )
     return bool(result.matched_count)
+
+
+async def _current_snapshot(skill_uuid: str) -> SkillSnapshot | None:
+    """The Skill as stored now, or None when it isn't a usable Skill.
+    Callers have already authorized the edit."""
+    doc = await SearchSet.find_one({"uuid": skill_uuid})
+    if doc is None or doc.set_type != "prompt":
+        return None
+    try:
+        return _snapshot(doc, await doc.get_items())
+    except HTTPException:
+        return None
+
+
+SKILL_PARTS = frozenset({"title", "when_to_use", "instructions"})
+
+
+async def core_version_before_edit(user: User, skill_uuid: str) -> SkillSnapshot | None:
+    """Before the person saves an edit: the Skill as they had accepted it, if
+    it is one of their core Skills and they were up to date with it."""
+    accepted = next((e["version"] for e in core_skill_entries(user) if e["uuid"] == skill_uuid), None)
+    if not accepted:
+        return None
+    current = await _current_snapshot(skill_uuid)
+    return current if current is not None and current.version == accepted else None
+
+
+async def keep_own_edit_accepted(
+    user: User, skill_uuid: str, before: SkillSnapshot | None, edited: frozenset[str] = SKILL_PARTS,
+) -> None:
+    """After the person's own edit: carry their acceptance to the new text.
+
+    The pause on an edited core Skill guards against someone else's change
+    reaching chat unreviewed. The person who just wrote the text has reviewed
+    it, so pausing it for them only sent them to Assistant settings to approve
+    their own words (support ticket). Only an acceptance that was current
+    before the edit moves: if a teammate's change was already waiting for
+    review, it stays waiting. Teammates who use the Skill as a core Skill
+    still review the new text.
+
+    ``edited`` names the parts this request could change. If any other part
+    differs from ``before``, a teammate saved concurrently, and nothing is
+    carried over so their change waits for review.
+
+    Best-effort: the edit has already been saved, so a failure here is logged
+    and leaves the old behaviour (the Skill pauses until reviewed).
+    """
+    if before is None:
+        return
+    try:
+        await _keep_own_edit_accepted(user, skill_uuid, before, edited)
+    except Exception:
+        logger.warning("Could not keep core Skill %s accepted after its editor's save", skill_uuid, exc_info=True)
+
+
+async def _keep_own_edit_accepted(
+    user: User, skill_uuid: str, before: SkillSnapshot, edited: frozenset[str],
+) -> None:
+    after = await _current_snapshot(skill_uuid)
+    if after is None or after.version == before.version:
+        return
+    if any(getattr(after, part) != getattr(before, part) for part in SKILL_PARTS - edited):
+        return
+    await _users().update_one(
+        {"_id": user.id, "core_skills": {"$elemMatch": {"uuid": skill_uuid, "version": before.version}}},
+        {"$set": {"core_skills.$.version": after.version}},
+    )
+    await reload_core_skills(user)
 
 
 async def reload_core_skills(user: User) -> None:

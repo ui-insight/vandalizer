@@ -422,6 +422,97 @@ class TestAddItemIdempotency:
 # ---------------------------------------------------------------------------
 
 
+class TestInTeamLibrary:
+    """A copy joins the team library only when its source is already there.
+    The team stamp can't decide that: every item carries its creator's
+    current team, shared or not (support ticket: a copy of an unshared Skill
+    appeared in every teammate's Team tab)."""
+
+    @pytest.mark.asyncio
+    async def test_no_team_means_not_in_a_team_library(self):
+        from app.models.library import LibraryItemKind
+
+        with patch("app.services.library_service.LibraryItem") as MockItem:
+            from app.services.library_service import in_team_library
+
+            assert await in_team_library(PydanticObjectId(), LibraryItemKind.WORKFLOW, None) is False
+            MockItem.find.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_an_unresolvable_team_has_no_library(self):
+        from app.models.library import LibraryItemKind
+
+        with (
+            patch(
+                "app.services.library_service._resolve_team_oid",
+                new_callable=AsyncMock,
+                side_effect=ValueError("Team not found: gone"),
+            ),
+            patch("app.services.library_service.LibraryItem") as MockItem,
+        ):
+            from app.services.library_service import in_team_library
+
+            assert await in_team_library(PydanticObjectId(), LibraryItemKind.WORKFLOW, "gone") is False
+            MockItem.find.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_an_item_bookmarked_only_personally_is_not_in_the_team_library(self):
+        from app.models.library import LibraryItemKind
+
+        with (
+            patch("app.services.library_service._resolve_team_oid", new_callable=AsyncMock, return_value=PydanticObjectId()),
+            patch("app.services.library_service.Library") as MockLib,
+            patch("app.services.library_service.LibraryItem") as MockItem,
+        ):
+            mock_find = MagicMock()
+            mock_find.to_list = AsyncMock(return_value=[_make_library_item()])
+            MockItem.find = MagicMock(return_value=mock_find)
+            # No *team* library references the row (the personal one does).
+            MockLib.find_one = AsyncMock(return_value=None)
+
+            from app.services.library_service import in_team_library
+
+            assert await in_team_library(PydanticObjectId(), LibraryItemKind.SEARCH_SET, "team-1") is False
+            MockLib.find_one.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_an_item_bookmarked_in_the_team_library_is_in_it(self):
+        from app.models.library import LibraryItemKind
+
+        with (
+            patch("app.services.library_service._resolve_team_oid", new_callable=AsyncMock, return_value=PydanticObjectId()),
+            patch("app.services.library_service.Library") as MockLib,
+            patch("app.services.library_service.LibraryItem") as MockItem,
+        ):
+            mock_find = MagicMock()
+            mock_find.to_list = AsyncMock(return_value=[_make_library_item()])
+            MockItem.find = MagicMock(return_value=mock_find)
+            MockLib.find_one = AsyncMock(return_value=_make_library(scope="team"))
+
+            from app.services.library_service import in_team_library
+
+            assert await in_team_library(PydanticObjectId(), LibraryItemKind.SEARCH_SET, "team-1") is True
+
+    @pytest.mark.asyncio
+    async def test_an_unbookmarked_item_is_not_in_the_team_library(self):
+        from app.models.library import LibraryItemKind
+
+        with (
+            patch("app.services.library_service._resolve_team_oid", new_callable=AsyncMock, return_value=PydanticObjectId()),
+            patch("app.services.library_service.Library") as MockLib,
+            patch("app.services.library_service.LibraryItem") as MockItem,
+        ):
+            mock_find = MagicMock()
+            mock_find.to_list = AsyncMock(return_value=[])
+            MockItem.find = MagicMock(return_value=mock_find)
+            MockLib.find_one = AsyncMock()
+
+            from app.services.library_service import in_team_library
+
+            assert await in_team_library(PydanticObjectId(), LibraryItemKind.WORKFLOW, "team-1") is False
+            MockLib.find_one.assert_not_called()
+
+
 class TestEnsureBookmark:
     @pytest.mark.asyncio
     async def test_creates_bookmark_when_object_is_orphaned(self):
@@ -451,9 +542,9 @@ class TestEnsureBookmark:
             lib.save.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_team_scoped_object_lands_in_the_team_library(self):
-        # A team workflow bookmarked into the duplicator's personal library is
-        # invisible to the teammates who can actually access it (#673).
+    async def test_a_team_id_files_the_bookmark_in_the_team_library(self):
+        # Callers pass team_id only for an item meant for the team library,
+        # e.g. a copy of a shared team workflow (#673).
         from app.models.library import LibraryItemKind
 
         team_lib = _make_library()
