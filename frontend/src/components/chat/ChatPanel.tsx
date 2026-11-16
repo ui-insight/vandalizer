@@ -13,6 +13,7 @@ import { AttachmentList } from './AttachmentList'
 import { ChatSkillDialog } from './ChatSkillDialog'
 import { SkillReviewDialog } from './SkillReviewDialog'
 import { AssistantSettingsAnchor, AssistantSettingsLink } from '../assistant/AssistantSettingsLink'
+import { BrowserDiscovery } from '../assistant/BrowserDiscovery'
 import { CoreSkillsNotice } from '../assistant/CoreSkillsNotice'
 import { useCoreSkills } from '../../hooks/useCoreSkills'
 import { coreSkillsNeedingAttention } from '../../api/assistant'
@@ -1038,7 +1039,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           hasMessages={messages.length > 0}
           hasDocuments={fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0 || selectedFolderUuids.length > 0}
           memoryControl={<>
-            {messages.length === 0 && <AssistantSettingsAnchor browser className="chat-composer-tool" label="Set up browser and try a demo">Read websites · Set up browser</AssistantSettingsAnchor>}
+            {!showHome && messages.length === 0 && <AssistantSettingsAnchor browser className="chat-composer-tool" label="Set up your browser">Use your browser</AssistantSettingsAnchor>}
             <MemoryPanel />
             <AssistantSettingsLink pausedCount={coreSkillsNeedingAttention(coreSkills.page).length} unavailable={!!coreSkills.error} />
           </>}
@@ -1057,6 +1058,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
             ) : null
           }
         />
+        {showHome && <BrowserDiscovery />}
       </div>
 
       {/* Messages area */}

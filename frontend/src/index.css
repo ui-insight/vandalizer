@@ -226,8 +226,7 @@ html {
 
 /* Chat markdown styles */
 .chat-markdown { min-width: 0; overflow-wrap: anywhere; }
-.chat-table-scroll { max-width: 100%; overflow-x: auto; }
-.chat-table-scroll table { min-width: 420px; }
+.chat-table-scroll { max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
 .chat-markdown p { margin: 0 0 0.5em; }
 .chat-markdown p:last-child { margin-bottom: 0; }
 .chat-markdown h1, .chat-markdown h2, .chat-markdown h3,
@@ -275,6 +274,13 @@ html {
 .chat-markdown .chat-doc-link:hover { color: #1d4ed8; }
 .chat-markdown table { border-collapse: collapse; margin: 0.5em 0; width: 100%; }
 .chat-markdown th, .chat-markdown td {
+  /* Keep figures and source labels readable when a neighboring cell is long.
+     Wider tables scroll inside the existing keyboard-accessible region. */
+  min-width: 7rem;
+  max-width: 20rem;
+  vertical-align: top;
+  white-space: normal;
+  overflow-wrap: break-word;
   border: 1px solid #e5e7eb;
   padding: 6px 10px;
   text-align: left;

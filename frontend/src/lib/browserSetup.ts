@@ -3,7 +3,9 @@ import { detectBrowserExtension, isBrowserExtensionReady, runBrowserTool } from 
 export const EXTENSION_ID = 'goafgpnhcmnoklmmjoolggbhehomjomm'
 export type BrowserConnection = 'checking' | 'not-installed' | 'installed' | 'connected'
 export async function browserConnection(): Promise<BrowserConnection> {
-  if (await detectBrowserExtension(500)) return 'connected'
+  // Waking a suspended MV3 worker can take longer than a page-load frame.
+  // Keep setup from briefly claiming a working connection is disconnected.
+  if (await detectBrowserExtension(2000)) return 'connected'
   type Runtime = { sendMessage: (id: string, message: object, callback: (result?: { installed?: boolean }) => void) => void; lastError?: unknown }
   const runtime = (window as Window & { chrome?: { runtime?: Runtime } }).chrome?.runtime
   if (!runtime) return 'not-installed'
