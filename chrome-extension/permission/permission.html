@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Allow Vandalizer to read this site?</title>
+  <link rel="stylesheet" href="../popup/popup.css">
+</head>
+<body>
+  <main style="width:auto">
+    <h1>Allow chat to read <span id="host"></span>?</h1>
+    <p>Vandalizer chat wants to open <strong id="host2"></strong> in a tab, signed in as you, and read figures from it.</p>
+    <p>It only reads: it will not submit, save or approve anything. You can remove the site from the extension's menu at any time.</p>
+    <div class="row">
+      <button id="allow" class="primary" type="button">Allow</button>
+      <button id="deny" type="button">Don't allow</button>
+    </div>
+  </main>
+  <script src="permission.js" type="module"></script>
+</body>
+</html>

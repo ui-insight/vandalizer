@@ -32,6 +32,13 @@ class ChatRequest(BaseModel):
     include_onboarding_context: bool = False
     is_first_session: bool = False
     run_demo: bool = False
+    # The chat page found the Vandalizer browser extension (chat_browser_tools).
+    browser_available: bool = False
+
+
+class BrowserResultRequest(BaseModel):
+    tool_call_id: str = Field(pattern=r"^[A-Za-z0-9_\-:.]{1,128}$")
+    result: dict
 
 
 class AddLinkRequest(BaseModel):

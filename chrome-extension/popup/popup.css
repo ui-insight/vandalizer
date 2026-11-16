@@ -1,151 +1,18 @@
-body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-    width: 300px;
-    margin: 0;
-    padding: 0;
-    background-color: #f8f9fa;
-    color: #333;
-}
-
-.popup-container {
-    padding: 16px;
-}
-
-header {
-    margin-bottom: 20px;
-    text-align: center;
-}
-
-h1 {
-    margin: 0;
-    font-size: 20px;
-    color: #3b82f6;
-}
-
-.subtitle {
-    margin: 4px 0 0;
-    font-size: 12px;
-    color: #6c757d;
-}
-
-.status-section {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 20px;
-    padding: 8px;
-    background: white;
-    border-radius: 6px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.status-indicator {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    margin-right: 8px;
-    background-color: #dc3545;
-}
-
-.status-indicator.connected {
-    background-color: #28a745;
-}
-
-.status-indicator.disconnected {
-    background-color: #dc3545;
-}
-
-#status-text {
-    font-size: 14px;
-    font-weight: 500;
-}
-
-h3 {
-    font-size: 14px;
-    margin: 0 0 12px;
-    color: #495057;
-}
-
-form {
-    display: flex;
-    flex-direction: column;
-}
-
-label {
-    font-size: 12px;
-    margin-bottom: 4px;
-    color: #6c757d;
-}
-
-input {
-    padding: 8px;
-    margin-bottom: 12px;
-    border: 1px solid #ced4da;
-    border-radius: 4px;
-    font-size: 14px;
-}
-
-button {
-    padding: 8px 16px;
-    background-color: #3b82f6;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
-    transition: background-color 0.2s;
-}
-
-button:hover {
-    background-color: #2563eb;
-}
-
-button.secondary {
-    background-color: #6c757d;
-    width: 100%;
-    margin-top: 12px;
-}
-
-button.secondary:hover {
-    background-color: #5a6268;
-}
-
-.session-item {
-    background: white;
-    padding: 10px;
-    border-radius: 4px;
-    margin-bottom: 8px;
-    border-left: 3px solid #3b82f6;
-    font-size: 13px;
-    display: flex;
-    justify-content: space-between;
-}
-
-.session-state {
-    font-size: 11px;
-    background: #e9ecef;
-    padding: 2px 6px;
-    border-radius: 10px;
-}
-
-.no-sessions {
-    text-align: center;
-    color: #adb5bd;
-    font-size: 13px;
-    font-style: italic;
-    margin: 20px 0;
-}
-
-footer {
-    margin-top: 20px;
-    text-align: center;
-    border-top: 1px solid #e9ecef;
-    padding-top: 10px;
-}
-
-.version {
-    font-size: 10px;
-    color: #adb5bd;
-    margin: 0;
-}
+:root { color-scheme: light dark; --fg: #1f2933; --muted: #616e7c; --bg: #ffffff; --line: #d9e2ec; --accent: #1d4ed8; --bad: #b42318; }
+@media (prefers-color-scheme: dark) { :root { --fg: #e4e7eb; --muted: #9aa5b1; --bg: #1f2328; --line: #3e4c59; --accent: #7aa2ff; --bad: #ff8a80; } }
+body { font: 13px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--fg); background: var(--bg); margin: 0; }
+main { padding: 16px; width: 320px; box-sizing: border-box; }
+h1 { font-size: 15px; margin: 0 0 4px; }
+h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 18px 0 6px; }
+p { margin: 0 0 8px; color: var(--muted); }
+label { display: block; font-weight: 600; margin-bottom: 4px; }
+input { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--fg); font: inherit; }
+button { font: inherit; border-radius: 6px; padding: 6px 12px; border: 1px solid var(--line); background: transparent; color: var(--fg); cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.status { font-size: 12px; margin-top: 8px; }
+.status.bad { color: var(--bad); }
+ul { list-style: none; margin: 0; padding: 0; }
+li { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--line); }
+li button { padding: 2px 8px; font-size: 12px; }
+.empty { color: var(--muted); font-style: italic; }

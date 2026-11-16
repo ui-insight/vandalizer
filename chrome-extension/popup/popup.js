@@ -1,110 +1,84 @@
-document.addEventListener('DOMContentLoaded', async () => {
-    const statusDot = document.getElementById('status-dot');
-    const statusText = document.getElementById('status-text');
-    const setupSection = document.getElementById('setup-section');
-    const activeSection = document.getElementById('active-section');
-    const setupForm = document.getElementById('setup-form');
-    const disconnectBtn = document.getElementById('disconnect-btn');
-    const backendUrlInput = document.getElementById('backend-url');
-    const userTokenInput = document.getElementById('user-token');
+const BRIDGE_ID = 'vandalizer-bridge'
+const form = document.getElementById('connect')
+const input = document.getElementById('origin')
+const status = document.getElementById('status')
+const sites = document.getElementById('sites')
 
-    // Load saved config
-    const config = await chrome.storage.local.get(['backendUrl', 'userToken', 'connected']);
+function show(text, bad = false) {
+  status.textContent = text
+  status.className = bad ? 'status bad' : 'status'
+}
 
-    if (config.backendUrl) {
-        backendUrlInput.value = config.backendUrl;
+async function load() {
+  const { vandalizerOrigin } = await chrome.storage.local.get('vandalizerOrigin')
+  if (vandalizerOrigin) {
+    input.value = vandalizerOrigin
+    show(`Connected to ${vandalizerOrigin}. Reload any open Vandalizer tab after changing this.`)
+  }
+  await listSites(vandalizerOrigin)
+}
+
+async function listSites(vandalizerOrigin) {
+  const { origins = [] } = await chrome.permissions.getAll()
+  const allowed = origins.filter((o) => !vandalizerOrigin || o !== `${vandalizerOrigin}/*`)
+  sites.replaceChildren()
+  if (!allowed.length) {
+    const li = document.createElement('li')
+    li.className = 'empty'
+    li.textContent = 'None yet. Chat asks the first time it opens a site.'
+    sites.append(li)
+    return
+  }
+  for (const origin of allowed) {
+    const li = document.createElement('li')
+    const name = document.createElement('span')
+    name.textContent = origin.replace(/^https?:\/\//, '').replace(/\/\*$/, '')
+    const remove = document.createElement('button')
+    remove.type = 'button'
+    remove.textContent = 'Remove'
+    remove.addEventListener('click', async () => {
+      await chrome.permissions.remove({ origins: [origin] })
+      await listSites(vandalizerOrigin)
+    })
+    li.append(name, remove)
+    sites.append(li)
+  }
+}
+
+form.addEventListener('submit', async (event) => {
+  event.preventDefault()
+  let origin
+  try {
+    const url = new URL(input.value.trim())
+    if (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname))) {
+      show('Use an https address (http only for localhost).', true)
+      return
     }
+    origin = url.origin
+  } catch {
+    show('That is not a web address.', true)
+    return
+  }
+  // Must run straight from the click: Chrome only grants a site from a gesture.
+  const granted = await chrome.permissions.request({ origins: [`${origin}/*`] })
+  if (!granted) {
+    show('Chrome did not allow the extension on that address.', true)
+    return
+  }
+  const { vandalizerOrigin: previous } = await chrome.storage.local.get('vandalizerOrigin')
+  const registered = await chrome.scripting.getRegisteredContentScripts({ ids: [BRIDGE_ID] })
+  if (registered.length) await chrome.scripting.unregisterContentScripts({ ids: [BRIDGE_ID] })
+  await chrome.scripting.registerContentScripts([{
+    id: BRIDGE_ID,
+    matches: [`${origin}/*`],
+    js: ['content/bridge.js'],
+    runAt: 'document_start',
+    persistAcrossSessions: true,
+  }])
+  if (previous && previous !== origin) await chrome.permissions.remove({ origins: [`${previous}/*`] }).catch(() => {})
+  await chrome.storage.local.set({ vandalizerOrigin: origin })
+  show(`Connected to ${origin}. Reload your Vandalizer tab.`)
+  await listSites(origin)
+})
 
-    if (config.userToken) {
-        userTokenInput.value = config.userToken;
-    }
-
-    // Check connection status
-    checkConnectionStatus();
-
-    // Setup form submission
-    setupForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const backendUrl = backendUrlInput.value;
-        const userToken = userTokenInput.value;
-
-        // Save config
-        await chrome.storage.local.set({
-            backendUrl,
-            userToken,
-            connected: true
-        });
-
-        // Trigger connection in background script
-        chrome.runtime.sendMessage({ action: 'connect_to_backend' });
-
-        setTimeout(checkConnectionStatus, 1000);
-    });
-
-    // Disconnect button
-    disconnectBtn.addEventListener('click', async () => {
-        await chrome.storage.local.set({ connected: false });
-        chrome.runtime.sendMessage({ action: 'disconnect_from_backend' });
-
-        setupSection.style.display = 'block';
-        activeSection.style.display = 'none';
-        updateStatus('disconnected');
-    });
-
-    async function checkConnectionStatus() {
-        // Ask background script for status
-        chrome.runtime.sendMessage({ action: 'get_connection_status' }, (response) => {
-            if (response && response.connected) {
-                updateStatus('connected');
-                setupSection.style.display = 'none';
-                activeSection.style.display = 'block';
-                loadActiveSessions();
-            } else {
-                updateStatus('disconnected');
-                setupSection.style.display = 'block';
-                activeSection.style.display = 'none';
-            }
-        });
-    }
-
-    function updateStatus(status) {
-        if (status === 'connected') {
-            statusDot.className = 'status-indicator connected';
-            statusText.textContent = 'Connected';
-        } else {
-            statusDot.className = 'status-indicator disconnected';
-            statusText.textContent = 'Disconnected';
-        }
-    }
-
-    async function loadActiveSessions() {
-        // Ask background for active sessions
-        chrome.runtime.sendMessage({ action: 'get_active_sessions' }, (response) => {
-            const sessionsList = document.getElementById('sessions-list');
-
-            if (response && response.sessions && response.sessions.length > 0) {
-                sessionsList.innerHTML = '';
-
-                for (const session of response.sessions) {
-                    const sessionEl = document.createElement('div');
-                    sessionEl.className = 'session-item';
-                    sessionEl.innerHTML = `
-                        <strong>Session ${session.id.substring(0, 8)}</strong>
-                        <span class="session-state">${session.state}</span>
-                    `;
-                    sessionsList.appendChild(sessionEl);
-                }
-            } else {
-                sessionsList.innerHTML = '<p class="no-sessions">No active sessions</p>';
-            }
-        });
-    }
-
-    // Auto-refresh sessions every 3 seconds
-    setInterval(() => {
-        if (activeSection.style.display !== 'none') {
-            loadActiveSessions();
-        }
-    }, 3000);
-});
+load()

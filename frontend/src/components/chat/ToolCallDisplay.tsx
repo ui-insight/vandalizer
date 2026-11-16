@@ -175,6 +175,10 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
 
   const listError = listErrorEntry(content)
   if (listError) return { text: String(listError.error), qualityHint: '' }
+  // Browser tools explain themselves (a sign-in is needed, a site was not allowed).
+  if ((toolName.startsWith('browser_') || toolName === 'record_value') && (obj.error || obj.login_required) && obj.message) {
+    return { text: String(obj.message), qualityHint: '' }
+  }
   if (obj.error) return { text: String(obj.error), qualityHint: '' }
   if (obj.needs_confirmation) return { text: obj.preview ? String(obj.preview) : 'Awaiting confirmation', qualityHint: '' }
 
@@ -344,6 +348,26 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
       if (obj.matched === false) return { text: 'No matching help topic', qualityHint: '' }
       const topic = (obj.topic as Record<string, unknown> | undefined)?.title
       return { text: topic ? `Help: ${String(topic)}` : 'Help topic found', qualityHint: '' }
+    }
+
+    case 'browser_open':
+    case 'browser_read':
+    case 'browser_click':
+    case 'browser_select': {
+      const page = obj.page as Record<string, unknown> | undefined
+      if (!page) return { text: obj.ok ? 'Done' : '', qualityHint: '' }
+      let host = ''
+      try { host = new URL(String(page.url)).hostname } catch { /* not a URL */ }
+      const title = page.title ? `"${String(page.title).slice(0, 50)}"` : 'page'
+      return { text: [`Read ${title}`, host, page.truncated === true ? 'Partly read' : ''].filter(Boolean).join(' - '), qualityHint: '' }
+    }
+
+    case 'browser_type':
+      return { text: obj.ok ? 'Typed' : '', qualityHint: '' }
+
+    case 'record_value': {
+      if (obj.recorded !== true) return { text: 'Not found on the page', qualityHint: '' }
+      return { text: `${String(obj.label)}: ${String(obj.value)}`, qualityHint: '' }
     }
 
     case 'fetch_url': {

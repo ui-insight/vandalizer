@@ -2,7 +2,8 @@ import { hasPendingPageApproval, pageDecision } from '../lib/pageApprovals'
 import { isPagePreparation } from '../lib/chatProgress'
 import { getProjectDefaultSkill } from '../api/projects'
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { streamChat, getHistory, acceptSkill, previewSkill, selectConversationSkill, stopChatTurn, type ChatHistory, type SkillPreview } from '../api/chat'
+import { streamChat, getHistory, acceptSkill, previewSkill, selectConversationSkill, stopChatTurn, postBrowserResult, type ChatHistory, type SkillPreview } from '../api/chat'
+import { BROWSER_TOOL_NAMES, detectBrowserExtension, isBrowserExtensionReady, runBrowserTool } from '../lib/browserExtension'
 import { ApiError } from '../api/client'
 import { MissingDocumentsError } from '../api/chatErrors'
 import type { CardDecision, ChatActivity, SkillSnapshot } from '../types/chat'
@@ -427,12 +428,25 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
       // conversation. Nothing a detached stream does may touch the open chat.
       const ownsView = () => abortRef.current === controller
 
+      // Browser tool calls run in the extension one at a time, in the order
+      // the agent made them; the server waits for each result.
+      // Read, never awaited: detection runs once when chat mounts.
+      const browserAvailable = isBrowserExtensionReady()
+      let browserQueue: Promise<unknown> = Promise.resolve()
       try {
         const result = await streamChat(
           message,
           documentUuids,
           activityId,
           (chunk: StreamChunk) => {
+            // Before the view check: a detached turn still needs its results.
+            if (chunk.kind === 'tool_call' && chunk.tool_name && chunk.tool_call_id && BROWSER_TOOL_NAMES.has(chunk.tool_name)) {
+              const { tool_name: tool, tool_call_id: callId, args } = chunk
+              browserQueue = browserQueue
+                .then(() => runBrowserTool(tool, args ?? {}))
+                .then(outcome => postBrowserResult(callId, outcome))
+                .catch(() => { /* the server reports a timeout to the agent */ })
+            }
             if (!ownsView()) return
             if (chunk.kind === 'activity') {
               if (chunk.activity) setActivityProgress(chunk.activity)
@@ -597,6 +611,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
           retry && lastSendAcceptedRef.current && !!activityId,
           pageApproval,
           cardDecision,
+          browserAvailable,
         )
         if (!ownsView()) return
 
@@ -635,6 +650,10 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
     },
     [activityId, conversationUuid, isLoadingHistory, isSelectingSkill, projectSkillBlocked, activeSkill, clearLiveTurn, queueMessage, awaitingPageApproval, ensureReviewed],
   )
+
+  // The extension's bridge announces itself as the page loads, possibly before
+  // this listener exists, so ask once; sends then read the answer instantly.
+  useEffect(() => { void detectBrowserExtension(1000) }, [])
 
   useEffect(() => {
     if (isStreaming || abortRef.current || isLoadingHistory || isSelectingSkill || projectSkillBlocked || error || queuePaused || awaitingPageApproval) return

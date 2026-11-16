@@ -1669,6 +1669,7 @@ async def chat_stream(
     client_timezone: str | None = None,
     approval_for: str | None = None,
     decline_for: str | None = None,
+    browser_available: bool = False,
 ) -> AsyncGenerator[str, None]:
     """Async generator yielding newline-delimited JSON chunks for streaming chat."""
 
@@ -2709,6 +2710,7 @@ async def chat_stream(
             active_kb_uuid=active_kbs[0][0] if active_kbs else None,
             active_project_uuid=project_uuid,
             capabilities_off=capabilities_off,
+            browser_available=browser_available,
             conversation=conversation,
             # Monotonic per-turn marker: the current user message is already
             # persisted (router add_message) before chat_stream runs, so this

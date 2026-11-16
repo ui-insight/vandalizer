@@ -264,6 +264,8 @@ async def test_the_real_chat_agent_withholds_every_tool_of_an_off_capability(mon
         llm_service._agentic_chat_agent_cache.clear()
     every = {fn.__name__ for fn in TOOLS}
     withheld = set(caps._BY_ID["workflows"].tools) | set(caps._BY_ID["web_search"].tools)
+    # No browser extension on this chat page, so the browser tools are held back too.
+    withheld |= set(caps._BY_ID["browser"].tools)
     assert offered[0] == every - withheld
 
 
