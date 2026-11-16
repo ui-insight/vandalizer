@@ -1,4 +1,5 @@
 import './tool-calls.css'
+import { BrowserActivity } from './BrowserActivity'
 import { getToolMeta as getMeta, TOOL_META, toolTarget, activeToolLabel } from './toolActivity'
 import { qualityPresentation } from '../../lib/qualityLabels'
 import { completedSkillSelection } from '../../lib/skillSelection'
@@ -1537,6 +1538,8 @@ export function ToolStatusLine({
         </div>
       </div>
       {!(needsConfirmation && name === 'propose_obligations') && (!isActive || activeHint) && (summaryText || unconfirmed) && <p className="agent-tool-summary">{unconfirmed ? 'No result was received for this call.' : summaryText}</p>}
+      {name.startsWith('browser_') && <BrowserActivity result={obj} />}
+      {name === 'record_value' && obj?.recorded === true && typeof obj.url === 'string' && /^https?:\/\//i.test(obj.url) && <p className="px-3 pb-3 text-sm text-gray-700">Source: <a href={obj.url} target="_blank" rel="noreferrer" className="underline">{typeof obj.page_title === 'string' && obj.page_title ? obj.page_title : obj.url}</a>{typeof obj.captured_at === 'string' && <> · Captured {obj.captured_at}</>}</p>}
       {result && name === 'use_core_skill' && !isError && <CoreSkillDetails value={obj?.skill} />}
       {result && !isActive && !isError && !needsConfirmation && !canceled && result.quality && (
         <div className="agent-tool-evaluation"><QualityBadge quality={result.quality} showGrade /></div>

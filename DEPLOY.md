@@ -592,3 +592,7 @@ No backup needed. Redis is used as a transient Celery broker and result backend.
 3. Restore ChromaDB (or re-ingest documents to rebuild vector store)
 4. Start Redis (no restore needed)
 5. Start application services
+
+## Browser extension installation
+
+Assistant settings includes extension installation, connection instructions and an example Skill you can save to your Library. The demo is an ordinary Skill that reads real public websites in your own browser; no extra service or demo hosting is needed. See [the presenter guide](docs/browser-demo-presenter.md). `VITE_BROWSER_STORE_URL` can replace the unpacked download when a store listing is available.

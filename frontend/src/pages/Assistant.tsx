@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { BrowserSetup } from '../components/assistant/BrowserSetup'
 import { Check, LockKeyhole } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
 import { CoreSkillsSection } from '../components/assistant/CoreSkillsSection'
@@ -170,6 +171,7 @@ export default function Assistant() {
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-semibold text-gray-900">{c.label}</div>
                 <p id={`assistant-description-${c.id}`} className="mt-1 text-sm text-gray-600">{c.description}</p>
+                {c.id === 'browser' && <a className="mt-2 inline-block text-sm underline" href="#browser-setup">Install, connect and try the demo</a>}
                 {note && <p id={`assistant-note-${c.id}`} className="mt-2 text-sm text-amber-800"><LockKeyhole className="mr-1 inline h-3.5 w-3.5" aria-hidden="true" />{note}</p>}
               </div>
               <div className="shrink-0 text-right">
@@ -182,6 +184,8 @@ export default function Assistant() {
           })}
         </ul>}
       </section>
+
+      <BrowserSetup />
 
       {page?.can_set_limits && <details className="mb-6 rounded-lg border border-gray-300 bg-white p-4">
         <summary className="cursor-pointer font-semibold text-gray-900">Settings for all users — administrators</summary>

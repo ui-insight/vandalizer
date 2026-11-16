@@ -1,0 +1,23 @@
+.browser-panel {
+  --browser-surface: var(--workspace-surface, #fff);
+  --browser-text: var(--workspace-text, #263445);
+  --browser-muted: var(--workspace-text-muted, #526071);
+  --browser-line: var(--workspace-border, #d9e2ec);
+  color: var(--browser-text); background: var(--browser-surface); border-color: var(--browser-line);
+  line-height: 1.6;
+}
+.browser-panel h2, .browser-panel h3 { color: var(--browser-text); }
+.browser-setup-header { display: flex; align-items: flex-start; gap: 12px; }
+.browser-setup-icon { flex: none; padding: 8px; border: 1px solid var(--browser-line); border-radius: 8px; }
+.browser-connection { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--browser-line); border-radius: 6px; overflow-wrap: anywhere; }
+.browser-connection[data-connected=true] { color: #166534; background: #f0fdf4; border-color: #bbdfc7; }
+.browser-setup-actions { display: flex; gap: 10px; flex-wrap: wrap; margin: 12px 0; align-items: center; }
+.browser-setup-actions a { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 8px 12px; border: 1px solid var(--browser-line); border-radius: 6px; font-weight: 600; text-decoration: none; }
+.browser-setup-actions .browser-primary { background: var(--highlight-color, #eab308); color: var(--highlight-text-color, #111); border-color: transparent; }
+.browser-demo-guide { border-top: 1px solid var(--browser-line); margin-top: 20px; padding-top: 16px; }
+.browser-panel a:focus-visible, .browser-panel button:focus-visible, .browser-panel summary:focus-visible { outline: 3px solid var(--highlight-color, #b77900); outline-offset: 3px; }
+.browser-panel button:disabled { cursor: default; }
+@media (prefers-color-scheme: dark) {
+  .browser-panel { --browser-surface: #1f2933; --browser-text: #e5eaf0; --browser-muted: #c1cad6; --browser-line: #465366; }
+  .browser-connection[data-connected=true] { color: #b9f6ca; background: #153422; border-color: #38784a; }
+}

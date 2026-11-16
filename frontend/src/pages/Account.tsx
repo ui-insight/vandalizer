@@ -14,6 +14,7 @@ import {
 } from '../api/auth'
 import { getUserMemory, clearUserMemory, type UserMemoryResponse } from '../api/chat'
 import { HomeInboxSetting } from '../components/account/HomeInboxSetting'
+import { AssistantSettingsAnchor } from '../components/assistant/AssistantSettingsLink'
 import { DeadlineReminderSettings } from '../components/account/DeadlineReminderSettings'
 
 export default function Account() {
@@ -409,6 +410,7 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
 
         <HomeInboxSetting />
 
+        <p className="mb-4 text-sm"><AssistantSettingsAnchor browser className="underline">Set up Vandalizer Browser to read websites in chat</AssistantSettingsAnchor></p>
         <DeadlineReminderSettings />
 
         {/* Email Preferences */}

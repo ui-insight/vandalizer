@@ -11,10 +11,11 @@
     <p>Lets Vandalizer chat read the sites you allow, signed in as you. It never submits, saves or approves anything.</p>
 
     <form id="connect">
-      <label for="origin">Vandalizer address</label>
-      <input id="origin" type="url" placeholder="https://vandalizer.example.edu" required>
+      <label for="origin">Connect the site in your active tab</label>
+      <input id="origin" type="url" readonly required aria-describedby="connect-help">
+      <p id="connect-help">Open your Vandalizer tab before opening this popup. Connect only a Vandalizer site you trust: it can ask chat to read your allowed sites.</p>
       <div class="row">
-        <button class="primary" type="submit">Connect</button>
+        <button class="primary" type="submit">Connect this site</button>
       </div>
       <div id="status" class="status" role="status"></div>
     </form>

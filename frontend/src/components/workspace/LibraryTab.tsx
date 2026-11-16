@@ -1,3 +1,6 @@
+import { useRouter } from '@tanstack/react-router'
+import { BrowserSkillHelp } from '../assistant/BrowserSkillHelp'
+import { browserSkillTemplate } from '../../lib/browserSkillTemplates'
 import { TaskHelpLink } from '../shared/TaskHelpLink'
 import { WorkspaceSectionHeader } from '../shared/WorkspaceSectionHeader'
 import { WorkspaceSearchBar } from '../shared/WorkspaceSearchBar'
@@ -461,10 +464,22 @@ export function LibraryTab() {
 
   // Creation modal state
   type ModalType = 'workflow' | 'extraction' | 'prompt' | 'formatter' | null
-  const [createModalType, setCreateModalType] = useState<ModalType>(null)
-  const [createName, setCreateName] = useState('')
-  const [createDesc, setCreateDesc] = useState('')
-  const [createWhen, setCreateWhen] = useState('')
+  const router = useRouter({ warn: false })
+  const [starter] = useState(() => {
+    const kind = new URLSearchParams(location.search).get('browserSkill')
+    return kind === 'demo' || kind === 'starter' ? browserSkillTemplate(kind === 'demo') : null
+  })
+  useEffect(() => {
+    if (!starter) return
+    const url = new URL(window.location.href)
+    url.searchParams.delete('browserSkill')
+    if (router) router.history.replace(`${url.pathname}${url.search}${url.hash}`)
+    else window.history.replaceState(window.history.state, '', url)
+  }, [router, starter])
+  const [createModalType, setCreateModalType] = useState<ModalType>(starter ? 'prompt' : null)
+  const [createName, setCreateName] = useState(starter?.title ?? '')
+  const [createDesc, setCreateDesc] = useState(starter?.instructions ?? '')
+  const [createWhen, setCreateWhen] = useState(starter?.when ?? '')
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
 
@@ -1663,6 +1678,7 @@ export function LibraryTab() {
                 {createName.length}/{MAX_NAME_LENGTH}
               </div>
             </div>
+            {createModalType === 'prompt' && <BrowserSkillHelp onStart={!createDesc.trim() ? instructions => setCreateDesc(instructions) : undefined} />}
             {createModalType === 'prompt' && (
               <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
               <label className="library-field-label" htmlFor="library-create-when">When to use (optional)</label>
@@ -1950,6 +1966,7 @@ export function LibraryTab() {
                 }}
               />
             </div>
+            {editingItem.set_type === 'prompt' && <BrowserSkillHelp />}
             {editingItem.set_type === 'prompt' && (
               <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
               <label className="library-field-label" htmlFor="library-edit-when">When to use (optional)</label>

@@ -45,8 +45,8 @@ MAX_PAGES_PER_TURN = 30
 _NOT_CONNECTED = {
     "error": "browser_not_connected",
     "message": (
-        "The Vandalizer browser extension is not connected in this chat. Tell the person to install it, "
-        "set its Vandalizer address, and reload this page."
+        "The Vandalizer browser extension is not connected in this chat. Tell the person to open "
+        "Assistant settings → Set up Vandalizer Browser and follow the installation and connection steps."
     ),
 }
 
@@ -134,7 +134,7 @@ async def browser_open(context: RunContext[AgenticChatDeps], url: str) -> dict:
 
 
 async def browser_read(context: RunContext[AgenticChatDeps], query: str = "") -> dict:
-    """Read the current page in the Vandalizer tab again.
+    """Read the current page in the working browser tab again.
 
     Pass ``query`` (a few words, such as "remaining balance") to get only the
     parts of a long page around those words. Re-read after the page changes

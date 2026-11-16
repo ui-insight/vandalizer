@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Connect Vandalizer Browser</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main>
+    <h1>Vandalizer Browser</h1>
+    <p>Lets Vandalizer chat read the sites you allow, signed in as you. It never submits, saves or approves anything.</p>
+
+    <form id="connect">
+      <label for="origin">Connect the site in your active tab</label>
+      <input id="origin" type="url" readonly required aria-describedby="connect-help">
+      <p id="connect-help">Open your Vandalizer tab before opening this popup. Connect only a Vandalizer site you trust: it can ask chat to read your allowed sites.</p>
+      <div class="row">
+        <button class="primary" type="submit">Connect this site</button>
+      </div>
+      <div id="status" class="status" role="status"></div>
+    </form>
+
+    <h2>Sites chat may read</h2>
+    <ul id="sites"></ul>
+  </main>
+  <script src="popup.js" type="module"></script>
+</body>
+</html>

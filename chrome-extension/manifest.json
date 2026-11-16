@@ -29,5 +29,13 @@
     "16": "assets/icons/icon-16.png",
     "48": "assets/icons/icon-48.png",
     "128": "assets/icons/icon-128.png"
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAieelaEX0r7mGVJPZ7uCQPPpthXJnpATnMtnbiVl8QYaBPD7F/I6DoP195ocD6vcL8BO3unGPZ0Kv+bmRAEmFS4gp4Cy6a0fDtzH8XHl7XMZ5DG4czhofF0+YeF7xiUv5s9mPvwf7i4lYH5PWtkG4TxQy9fyNwzX/Rs26fUwpwWcs62htg9vzBwjLNUmOKCX1qjGdteJLVVVl4tS3biHzGqPt+L3QoFCMRGY8qKVuaVfoLcxrTm6uUwm+0fDeR0hedg/l5xtG/QIe7sLMopidrDuZwrU0ZocsffeLyfEKYBlwKVfZItQ2lcoUZTDoqD+oJMEWBv9jd10ymMBjoeGrUwIDAQAB",
+  "externally_connectable": {
+    "matches": [
+      "https://*/*",
+      "http://localhost/*",
+      "http://127.0.0.1/*"
+    ]
   }
 }

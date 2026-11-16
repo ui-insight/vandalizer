@@ -24,8 +24,8 @@ Chat page (Vandalizer tab)                 Vandalizer backend
 ## Install (development)
 
 1. `chrome://extensions` → turn on **Developer mode** → **Load unpacked** → choose this `chrome-extension/` folder.
-2. Click the extension icon, enter your Vandalizer address (for example `http://localhost:5173` or `https://vandalizer.example.edu`), and click **Connect**.
-3. Reload the Vandalizer tab. Chat offers the browser tools while the extension is connected. They appear under **Use your browser** on the Assistant page, where people or admins can switch them off.
+2. Open your Vandalizer tab, then the extension popup. It shows the active tab’s address. Click **Connect this site**, then **Allow connection** on the extension connection page and allow access.
+3. Return to Vandalizer; the bridge attaches immediately. Reload once only if the status does not update. Chat offers the browser tools while the extension is connected. They appear under **Use your browser** on the Assistant page, where people or admins can switch them off.
 
 Edge accepts the same unpacked folder (`edge://extensions`).
 

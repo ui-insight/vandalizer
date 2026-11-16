@@ -16,3 +16,8 @@ ul { list-style: none; margin: 0; padding: 0; }
 li { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--line); }
 li button { padding: 2px 8px; font-size: 12px; }
 .empty { color: var(--muted); font-style: italic; }
+
+body:has(h1) { min-height: 200px; }
+@media (min-width: 500px) { main { width: min(100%, 540px); margin: 40px auto; padding: 24px; } }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+button:disabled { opacity: .6; cursor: not-allowed; }
