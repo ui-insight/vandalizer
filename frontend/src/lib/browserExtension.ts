@@ -11,9 +11,15 @@ export const BROWSER_TOOL_NAMES: ReadonlySet<string> = new Set([
   'browser_open', 'browser_read', 'browser_click', 'browser_type', 'browser_select',
 ])
 
-// Longer than the server's wait for a site permission (150s), so the server
-// decides when a call has taken too long.
-const COMMAND_TIMEOUT_MS = 170_000
+// Five seconds shorter than the server's wait for each tool
+// (chat_browser_tools.py: 180s to open, 60s otherwise), so a command the
+// extension never answers is reported as a timeout while the server still
+// listens, and stops holding up the calls queued behind it.
+const OPEN_TIMEOUT_MS = 175_000
+const ACTION_TIMEOUT_MS = 55_000
+export function browserCommandTimeoutMs(tool: string): number {
+  return tool === 'browser_open' ? OPEN_TIMEOUT_MS : ACTION_TIMEOUT_MS
+}
 
 type ExtensionMessage = { source?: string; type?: string; id?: string; result?: unknown }
 
@@ -72,7 +78,7 @@ export async function runBrowserTool(tool: string, args: Record<string, unknown>
     const timer = setTimeout(() => {
       pending.delete(id)
       resolve({ error: 'browser_timeout', message: 'The browser extension did not answer.' })
-    }, COMMAND_TIMEOUT_MS)
+    }, browserCommandTimeoutMs(tool))
     pending.set(id, (result) => { clearTimeout(timer); resolve(result) })
     window.postMessage({ source: PAGE, type: 'command', id, tool, args }, window.location.origin)
   })

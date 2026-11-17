@@ -243,6 +243,8 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
   const toolResultsRef = useRef<ToolResultInfo[]>([])
   const segmentsRef = useRef<StreamSegment[]>([])
   const abortRef = useRef<AbortController | null>(null)
+  // Turns the person pressed Stop on; their queued browser calls are dropped.
+  const stoppedTurnsRef = useRef(new WeakSet<AbortController>())
   const citationsRef = useRef<Citation[]>([])
   const lastSendArgsRef = useRef<SendArgs | null>(null)
   const lastSendAcceptedRef = useRef(false)
@@ -440,11 +442,17 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
           activityId,
           (chunk: StreamChunk) => {
             // Before the view check: a detached turn still needs its results.
-            if (chunk.kind === 'tool_call' && chunk.tool_name && chunk.tool_call_id && BROWSER_TOOL_NAMES.has(chunk.tool_name)) {
+            // Only calls the server marked: it waits for those, and a withheld
+            // tool or bad arguments must never reach the person's browser.
+            if (chunk.kind === 'tool_call' && chunk.relay === true && chunk.tool_name && chunk.tool_call_id && BROWSER_TOOL_NAMES.has(chunk.tool_name)) {
               const { tool_name: tool, tool_call_id: callId, args } = chunk
               browserQueue = browserQueue
-                .then(() => runBrowserTool(tool, args ?? {}))
-                .then(outcome => postBrowserResult(callId, outcome))
+                .then(async () => {
+                  // After Stop, calls still queued must not open or click anything.
+                  if (stoppedTurnsRef.current.has(controller) || controller.signal.aborted) return
+                  const outcome = await runBrowserTool(tool, args ?? {})
+                  await postBrowserResult(callId, outcome)
+                })
                 .catch(() => { /* the server reports a timeout to the agent */ })
             }
             if (!ownsView()) return
@@ -685,6 +693,8 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
     setQueuePaused(true)
     const controller = abortRef.current
     if (!controller) return
+    // Before the server is told: browser calls still queued stop now.
+    stoppedTurnsRef.current.add(controller)
     // Tell the server first, so the turn is saved as stopped rather than as a
     // lost connection. Don't let a slow or failed request hold up the abort.
     const told = conversationUuid

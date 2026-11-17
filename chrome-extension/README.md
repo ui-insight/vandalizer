@@ -2,7 +2,14 @@
 
 Lets Vandalizer chat read sites in the person's own Chrome, signed in as them, so a Skill can collect figures from portals that have no API: financial systems, sponsor portals, payment systems.
 
-It only reads. It refuses to click anything labelled like a change (submit, save, approve, send, delete, pay, log out and similar), never types into password fields, and can open only the sites the person allowed.
+It only reads. `browser_click` judges what a control is, not just its label:
+
+- Links to other pages, tabs, and search forms that send GET are clicked, unless the label or address says delete, approve, pay, sign out and the like.
+- A form that posts is sent only by a button that clearly reads (Search, Next, View, Refresh…).
+- Checkboxes, radios and switches are changed only inside a search or filter panel.
+- A button with no readable label (an icon alone) is refused, since what it does is unknown. Other buttons are refused when any of their names reads like a change (save, submit, approve, add, apply…). The exception is a filter panel's Apply or Clear.
+
+It never types into password fields, and it can open only the sites the person allowed.
 
 ## How it works
 

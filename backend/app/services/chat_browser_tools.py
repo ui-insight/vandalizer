@@ -35,7 +35,9 @@ RELAYED_TOOL_NAMES: frozenset[str] = BROWSER_TOOL_NAMES - {"record_value"}
 
 # Opening a site the person has not allowed yet waits on their click in the
 # extension's permission window, so it gets longer than the other actions.
-OPEN_TIMEOUT_SECONDS = 150
+# The chat page gives up 5 seconds sooner (frontend/src/lib/browserExtension.ts)
+# and posts a timeout, so a stuck command never holds up the next one.
+OPEN_TIMEOUT_SECONDS = 180
 ACTION_TIMEOUT_SECONDS = 60
 # A result nobody collects (the turn was stopped) disappears on its own.
 RESULT_TTL_SECONDS = 300
@@ -53,6 +55,25 @@ _NOT_CONNECTED = {
 
 def result_key(user_id: str, tool_call_id: str) -> str:
     return f"chat_browser_result:{user_id}:{tool_call_id}"
+
+
+def should_relay(tool_name: str, args_valid: bool | None, deps: AgenticChatDeps | None) -> bool:
+    """Whether the chat page may run this streamed tool call in the extension.
+
+    pydantic-ai streams a call event before it knows the call will run: for a
+    tool the capability gate withheld (it is then unknown) and for arguments
+    that failed validation. Only a call that will reach the tool here, and so
+    wait for an answer, goes to the person's browser.
+    """
+    from app.services.assistant_capabilities import tool_is_off
+
+    return (
+        deps is not None
+        and tool_name in RELAYED_TOOL_NAMES
+        and args_valid is True
+        and deps.browser_available
+        and not tool_is_off(tool_name, deps.capabilities_off)
+    )
 
 
 def _redis() -> Any:
@@ -167,19 +188,43 @@ async def browser_select(context: RunContext[AgenticChatDeps], ref: int, option:
     return await _await_result(context, ACTION_TIMEOUT_SECONDS)
 
 
-_FIGURE_NOISE = re.compile(r"[\s$€£,]")
+_CURRENCY = re.compile(r"[$€£]")
+_THOUSANDS = re.compile(r"(?<=\d),(?=\d)")
+_SPACE = re.compile(r"\s+")
 
 
 def _normalize(value: str) -> str:
-    return _FIGURE_NOISE.sub("", value).casefold()
+    """Drop currency signs and thousands commas; collapse spacing."""
+    text = _THOUSANDS.sub("", _CURRENCY.sub("", value))
+    return _SPACE.sub(" ", text).strip().casefold()
+
+
+def _as_shown(wanted: str) -> re.Pattern[str]:
+    """Match ``wanted`` as a whole value, not as part of a longer one.
+
+    ``100`` is not on a page that shows ``1000000``, ``-500`` or ``0.5`` does
+    not contain ``500`` or ``5``, and ``1234567`` is not ``1234567.89``; but
+    ``15000`` is ``15000.00``.
+    """
+    pattern = re.escape(wanted)
+    if wanted[0].isalnum():
+        pattern = r"(?<!\w)" + pattern
+    if wanted[0].isdigit():
+        pattern = r"(?<!\d\.)(?<![-−])" + pattern
+    if wanted[-1].isalnum():
+        pattern += r"(?!\w)"
+    if wanted[-1].isdigit():
+        pattern += r"(?!\.\d*[1-9])"
+    return re.compile(pattern)
 
 
 def _found_on(value: str, pages: list[dict]) -> dict | None:
     wanted = _normalize(value)
     if not wanted:
         return None
+    shown = _as_shown(wanted)
     for page in reversed(pages):
-        if wanted in _normalize(page["text"]):
+        if shown.search(_normalize(page["text"])):
             return page
     return None
 
@@ -189,7 +234,8 @@ async def record_value(context: RunContext[AgenticChatDeps], label: str, value: 
 
     Call this for every number or status you will report from a website,
     before you write the answer. ``value`` must be copied from a page read
-    this turn (currency signs, commas and spacing may differ); anything else
+    this turn, as a whole value (currency signs, thousands commas and spacing
+    may differ, not digits); anything else
     is refused. Report only recorded values, and give the page each came
     from. Use the calculate tool for totals or differences.
     """
