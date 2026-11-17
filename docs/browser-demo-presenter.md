@@ -2,7 +2,7 @@
 
 The demo is a normal Skill you add to your account. It reads real public university pages; it has no separate website, service, scripted chat mode or seeded account.
 
-1. Start on the chat home screen. In **Read from your websites**, choose **Set up browser**. Follow the four steps: Download, Install, Connect, and Try a Skill. The app detects connection automatically. The same guide is near the top of Assistant settings.
+1. Start on the chat home screen. In **Read from your websites**, choose **Learn more** (or **Connect this site** if the extension is already installed). Follow the four steps: Download, Install, Connect, and Try a Skill. The app detects connection automatically and retires the suggestion. You can also dismiss it. The guide stays available through the composer's **Settings**, near the top of Assistant settings.
 2. Once connected, click **Add Skill to Library**, review its instructions in the existing Library editor, and click **Create Skill**. Alternatively download [browser-demo.json](../frontend/public/skills/browser-demo.json), open **Library → New → Skill**, and choose **Upload file**. This is a regular Library Skill: choose it for one chat, or add it to Core Skills in Assistant settings. Keep “Use your browser” on and allowed by your administrator; setup explains if it is off.
 3. Open **University research snapshot** in Library and choose **Run Skill**. In Vandalizer chat, send **Run the research snapshot**.
 4. Allow `www.uidaho.edu` when the extension asks. Chat opens the real page in its working tab, reads the figures and calls `record_value` once per figure. Point to the read-only site indicator and recorded source links.

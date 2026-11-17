@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+- Made the browser suggestion optional and dismissible. It stays hidden after connection or dismissal, and an installed extension is offered connection instead of installation.
 - Added in-app Vandalizer Browser installation and connection guidance, automatic site setup, browser activity and sign-in actions, browser Skill starters, and an importable example Skill that reads real public university pages.
 - Replaced the browser setup checklist with a guided flow that remembers your step, detects installation and connection, and offers a regular Library Skill when ready. Added a visible entry on the chat home screen and clearer Library/Core Skills wording.
 - Kept chat table columns readable when a cell contains a long explanation; wide tables scroll without squeezing figures or source links into broken words.
