@@ -9,16 +9,38 @@ import { clickRef, readPage, selectRef, typeRef } from './page-tools.js'
 
 const MAX_PAGE_CHARS = 20000
 const LOAD_TIMEOUT_MS = 30000
+// Chat's page waits 175s for browser_open (the server 180s): permission
+// (120s) plus loading (up to 31s) plus reading fits inside that.
 const PERMISSION_TIMEOUT_MS = 120000
+const KEEPALIVE_MS = 20000
 
 const pendingPermissions = new Map()
 
+// Chrome stops a service worker after 30 seconds without extension API
+// calls, even while a command is waiting on the person's click in the
+// permission window. That would drop the pending answer, so keep it awake
+// while any command is in flight; each API call resets Chrome's clock.
+let inFlight = 0
+let keepalive = null
+function hold() {
+  if (inFlight++ === 0) keepalive = setInterval(() => { chrome.runtime.getPlatformInfo().catch(() => {}) }, KEEPALIVE_MS)
+}
+function release() {
+  if (--inFlight === 0) {
+    clearInterval(keepalive)
+    keepalive = null
+  }
+}
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === 'vz-command') {
-    handleCommand(msg, sender).then(sendResponse, (err) => sendResponse({
-      error: 'extension_error',
-      message: String(err?.message || err),
-    }))
+    hold()
+    handleCommand(msg, sender)
+      .then(sendResponse, (err) => sendResponse({
+        error: 'extension_error',
+        message: String(err?.message || err),
+      }))
+      .finally(release)
     return true
   }
   if (msg?.type === 'vz-permission-decision' && sender.id === chrome.runtime.id && !sender.tab) {

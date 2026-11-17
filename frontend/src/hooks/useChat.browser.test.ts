@@ -1,17 +1,23 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { expect, it, vi } from 'vitest'
+import { beforeEach, expect, it, vi } from 'vitest'
 import { postBrowserResult, streamChat } from '../api/chat'
 import { isBrowserExtensionReady, runBrowserTool } from '../lib/browserExtension'
 import type { StreamChunk } from '../types/chat'
 import { useChat } from './useChat'
 
-vi.mock('../api/chat', () => ({ streamChat: vi.fn(), postBrowserResult: vi.fn(() => Promise.resolve({ status: 'ok' })) }))
+vi.mock('../api/chat', () => ({
+  streamChat: vi.fn(),
+  postBrowserResult: vi.fn(() => Promise.resolve({ status: 'ok' })),
+  stopChatTurn: vi.fn(() => Promise.resolve()),
+}))
 vi.mock('../lib/browserExtension', () => ({
-  BROWSER_TOOL_NAMES: new Set(['browser_open', 'browser_read']),
+  BROWSER_TOOL_NAMES: new Set(['browser_open', 'browser_read', 'browser_click']),
   detectBrowserExtension: vi.fn(() => Promise.resolve(true)),
   isBrowserExtensionReady: vi.fn(() => true),
   runBrowserTool: vi.fn(),
 }))
+
+beforeEach(() => { vi.clearAllMocks() })
 
 it('runs browser calls in the extension in order, posts each result, and tells the server the extension is there', async () => {
   let emit!: (chunk: StreamChunk) => void
@@ -34,8 +40,10 @@ it('runs browser calls in the extension in order, posts each result, and tells t
   expect(vi.mocked(streamChat).mock.calls[0].at(-1)).toBe(true)
   expect(isBrowserExtensionReady).toHaveBeenCalled()
 
-  act(() => emit({ kind: 'tool_call', content: '', tool_name: 'browser_open', tool_call_id: 'open-1', args: { url: 'https://fin.example.edu' } }))
-  act(() => emit({ kind: 'tool_call', content: '', tool_name: 'browser_read', tool_call_id: 'read-1', args: { query: 'balance' } }))
+  act(() => emit({ kind: 'tool_call', content: '', tool_name: 'browser_open', tool_call_id: 'open-1', args: { url: 'https://fin.example.edu' }, relay: true }))
+  act(() => emit({ kind: 'tool_call', content: '', tool_name: 'browser_read', tool_call_id: 'read-1', args: { query: 'balance' }, relay: true }))
+  // Not marked by the server (withheld tool or bad arguments): never runs.
+  act(() => emit({ kind: 'tool_call', content: '', tool_name: 'browser_read', tool_call_id: 'read-unrelayed', args: {} }))
   act(() => emit({ kind: 'tool_call', content: '', tool_name: 'web_search', tool_call_id: 'web-1', args: {} }))
   await waitFor(() => expect(order).toEqual(['start browser_open']))
   await act(async () => { releaseOpen() })
@@ -48,4 +56,29 @@ it('runs browser calls in the extension in order, posts each result, and tells t
   ])
   expect(runBrowserTool).toHaveBeenCalledWith('browser_open', { url: 'https://fin.example.edu' })
   await act(async () => { finish(); await sending })
+})
+
+it('drops browser calls still queued when the person presses Stop', async () => {
+  let emit!: (chunk: StreamChunk) => void
+  vi.mocked(streamChat).mockImplementation((_m, _d, _a, onChunk, ...rest) => new Promise((_resolve, reject) => {
+    emit = onChunk!
+    const signal = rest.find((arg): arg is AbortSignal => arg instanceof AbortSignal)
+    signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')))
+  }))
+  let releaseOpen!: () => void
+  vi.mocked(runBrowserTool).mockImplementation((tool) => tool === 'browser_open'
+    ? new Promise(resolve => { releaseOpen = () => resolve({ page: { text: 'opened' } }) })
+    : Promise.resolve({ ok: true }))
+
+  const { result } = renderHook(() => useChat())
+  act(() => { void result.current.send('Check the balance') })
+  act(() => emit({ kind: 'tool_call', content: '', tool_name: 'browser_open', tool_call_id: 'open-1', args: { url: 'https://fin.example.edu' }, relay: true }))
+  act(() => emit({ kind: 'tool_call', content: '', tool_name: 'browser_click', tool_call_id: 'click-1', args: { ref: 3 }, relay: true }))
+  await waitFor(() => expect(runBrowserTool).toHaveBeenCalledTimes(1))
+
+  act(() => { result.current.stop() })
+  await act(async () => { releaseOpen() })
+  await new Promise(resolve => setTimeout(resolve, 20))
+  expect(runBrowserTool).toHaveBeenCalledTimes(1)
+  expect(runBrowserTool).not.toHaveBeenCalledWith('browser_click', expect.anything())
 })
