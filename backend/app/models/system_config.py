@@ -265,6 +265,11 @@ class SystemConfig(Document):
     # OUTBOUND_URL_ALLOWED_HOSTS env list; see app.utils.url_validation.
     outbound_url_allowed_hosts: list[str] = []
 
+    # Sites chat's browser tools may use (domains; subdomains included).
+    # Empty means any site the person allows in the extension. Enforced by
+    # app.services.browser_policy and again in the extension.
+    browser_allowed_domains: list[str] = []
+
     # Chat capabilities an admin switched off for the whole deployment (ids
     # from app.services.assistant_capabilities). A person can switch more off
     # for themselves on the Assistant page, never back on past this.

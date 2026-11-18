@@ -70,7 +70,12 @@ export function detectBrowserExtension(timeoutMs = 300): Promise<boolean> {
 }
 
 /** Run one browser tool call in the extension. Never rejects. */
-export async function runBrowserTool(tool: string, args: Record<string, unknown>): Promise<Record<string, unknown>> {
+export async function runBrowserTool(
+  tool: string,
+  args: Record<string, unknown>,
+  /** The administrator's site list for this call, which the extension enforces on redirects and links. */
+  allowedHosts?: string[],
+): Promise<Record<string, unknown>> {
   listen()
   if (!(await detectBrowserExtension(500))) return Promise.resolve({ error: 'browser_not_connected', message: 'The Vandalizer browser extension is not connected on this page.' })
   const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
@@ -80,7 +85,7 @@ export async function runBrowserTool(tool: string, args: Record<string, unknown>
       resolve({ error: 'browser_timeout', message: 'The browser extension did not answer.' })
     }, browserCommandTimeoutMs(tool))
     pending.set(id, (result) => { clearTimeout(timer); resolve(result) })
-    window.postMessage({ source: PAGE, type: 'command', id, tool, args }, window.location.origin)
+    window.postMessage({ source: PAGE, type: 'command', id, tool, args, ...(allowedHosts?.length ? { allowedHosts } : {}) }, window.location.origin)
   })
 }
 

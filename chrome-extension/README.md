@@ -11,6 +11,11 @@ It only reads. `browser_click` judges what a control is, not just its label:
 
 It never types into password fields, and it can open only the sites the person allowed.
 
+Two more checks run on the Vandalizer server before a call reaches this extension (`backend/app/services/browser_policy.py`):
+
+- **Allowed sites.** An administrator can list the domains the browser may use (Admin → System Config → Browser allowed sites). The list travels with each command, and the extension refuses to open, read or act on a page outside it, including after a redirect. The server applies the same rule to every page it receives. With no list, any site the person allows can be used.
+- **Request review.** A short model call reads the person's request, the Skill in use and the site, then allows it, blocks it (requests to change something, handle credentials, use personal accounts, or collect people's personal data), or asks the person with an approval card (pages likely to show sensitive records, a site nobody named, an unclear purpose). An approved site stays approved for that conversation.
+
 ## How it works
 
 ```

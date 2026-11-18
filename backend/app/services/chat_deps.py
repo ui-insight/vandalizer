@@ -1,7 +1,7 @@
 """Dependency dataclass for agentic chat tools."""
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from app.models.user import User
 from app.services.access_control import TeamAccessContext
@@ -46,6 +46,15 @@ class AgenticChatDeps:
     # accepted from them; record_value only accepts what a page shows.
     browser_pages: list[dict] = field(default_factory=list)
     browser_values: list[dict] = field(default_factory=list)
+    # browser_policy: this turn's request reviews (one per site) and the
+    # decision for each browser tool call, so the stream and the tool agree.
+    browser_reviews: dict = field(default_factory=dict)
+    browser_decisions: dict = field(default_factory=dict)
+    # Set by the first review that blocks; every later browser call this
+    # turn is then blocked too (a browser_policy.Verdict).
+    browser_blocked: Any = None
+    # The selected Skill's instructions, which the request review reads.
+    browser_skill_text: str = ""
 
     # Sidecar for quality metadata — tools write here keyed by tool_call_id,
     # and the streaming layer pops entries when emitting tool_result events.

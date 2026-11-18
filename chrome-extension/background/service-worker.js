@@ -83,6 +83,11 @@ async function handleCommand(msg, sender) {
     return { error: 'browser_not_connected', message: 'Reconnect this Vandalizer site in the extension popup.' }
   }
   const args = msg.args || {}
+  // The sites the Vandalizer administrator allows, sent with each chat
+  // command; empty means no limit beyond what the person allowed.
+  const hosts = Array.isArray(msg.allowedHosts)
+    ? msg.allowedHosts.filter((h) => typeof h === 'string' && h).map((h) => h.toLowerCase())
+    : []
   switch (msg.tool) {
     case 'browser_status': return { ok: true, version: chrome.runtime.getManifest().version }
     case 'browser_focus': return withTab(async (tab) => {
@@ -90,29 +95,29 @@ async function handleCommand(msg, sender) {
       await chrome.tabs.update(tab.id, { active: true })
       return { ok: true }
     })
-    case 'browser_open': return openUrl(String(args.url || ''), sender.tab, vandalizerOrigin)
-    case 'browser_read': return withTab((tab) => readTab(tab, String(args.query || '')))
+    case 'browser_open': return openUrl(String(args.url || ''), sender.tab, vandalizerOrigin, hosts)
+    case 'browser_read': return withTab((tab) => readTab(tab, String(args.query || ''), hosts))
     case 'browser_click': return withTab(async (tab) => {
-      const blocked = await guardSite(tab)
+      const blocked = await guardSite(tab, hosts)
       if (blocked) return blocked
       const outcome = await runInTab(tab.id, clickRef, [Number(args.ref)])
       if (!outcome?.ok) return outcome
       await settle(tab.id)
-      return { ...outcome, ...(await readTab(await chrome.tabs.get(tab.id), '')) }
+      return { ...outcome, ...(await readTab(await chrome.tabs.get(tab.id), '', hosts)) }
     })
     case 'browser_type': return withTab(async (tab) => {
-      const blocked = await guardSite(tab)
+      const blocked = await guardSite(tab, hosts)
       if (blocked) return blocked
       return runInTab(tab.id, typeRef, [Number(args.ref), String(args.text ?? '')])
     })
     case 'browser_select': return withTab(async (tab) => {
-      const blocked = await guardSite(tab)
+      const blocked = await guardSite(tab, hosts)
       if (blocked) return blocked
       const outcome = await runInTab(tab.id, selectRef, [Number(args.ref), String(args.option ?? '')])
       if (!outcome?.ok) return outcome
       // Many older portals reload the page when a drop-down changes.
       await settle(tab.id)
-      return { ...outcome, ...(await readTab(await chrome.tabs.get(tab.id), '')) }
+      return { ...outcome, ...(await readTab(await chrome.tabs.get(tab.id), '', hosts)) }
     })
     default:
       return { error: 'unknown_tool', message: `Unknown browser tool ${msg.tool}` }
@@ -133,11 +138,13 @@ async function withTab(fn) {
   return fn(tab)
 }
 
-async function openUrl(raw, chatTab, vandalizerOrigin) {
+async function openUrl(raw, chatTab, vandalizerOrigin, hosts = []) {
   let url
   try { url = new URL(raw) } catch { return { error: 'bad_url', message: `Not a web address: ${raw}` } }
   if (url.protocol !== 'https:' && url.protocol !== 'http:') return { error: 'bad_url', message: 'Only http and https addresses can be opened.' }
   if (url.origin === vandalizerOrigin) return { error: 'bad_url', message: 'Use Vandalizer tools for Vandalizer itself.' }
+
+  if (!adminAllows(url.hostname, hosts)) return notOnAdminList(url.hostname)
 
   const pattern = sitePattern(url)
   if (!(await chrome.permissions.contains({ origins: [pattern] }))) {
@@ -155,7 +162,22 @@ async function openUrl(raw, chatTab, vandalizerOrigin) {
     await chrome.storage.session.set({ workingTabId: tab.id })
   }
   await settle(tab.id)
-  return readTab(await chrome.tabs.get(tab.id), '')
+  return readTab(await chrome.tabs.get(tab.id), '', hosts)
+}
+
+// A listed domain covers its subdomains. The server applies the same rule
+// (backend/app/services/browser_policy.py) to every page it is sent.
+function adminAllows(hostname, hosts) {
+  const host = String(hostname || '').toLowerCase()
+  return !hosts.length || hosts.some((domain) => host === domain || host.endsWith(`.${domain}`))
+}
+
+function notOnAdminList(hostname) {
+  return {
+    error: 'site_not_allowed_by_admin',
+    site: hostname,
+    message: `${hostname} is not on the list of sites your Vandalizer administrator allows the browser to use. Nothing was opened or read there.`,
+  }
 }
 
 function sitePattern(url) {
@@ -164,9 +186,15 @@ function sitePattern(url) {
 
 // A redirect can land the tab on a site that was never allowed, such as a
 // single sign-on page. Never read or act there.
-async function guardSite(tab) {
+async function guardSite(tab, hosts = []) {
   let url
   try { url = new URL(tab.url || '') } catch { url = null }
+  if (url && !adminAllows(url.hostname, hosts)) {
+    return {
+      ...notOnAdminList(url.hostname),
+      message: `The working tab is now on ${url.hostname}, which is not on the list of sites your Vandalizer administrator allows, so it was not read. If it is a sign-in page, ask the person to sign in in that tab and tell you when they are done. Do not ask for their password.`,
+    }
+  }
   if (url && (url.protocol === 'https:' || url.protocol === 'http:')
       && await chrome.permissions.contains({ origins: [sitePattern(url)] })) return null
   return {
@@ -176,8 +204,8 @@ async function guardSite(tab) {
   }
 }
 
-async function readTab(tab, query) {
-  const blocked = await guardSite(tab)
+async function readTab(tab, query, hosts = []) {
+  const blocked = await guardSite(tab, hosts)
   if (blocked) return blocked
   const page = await runInTab(tab.id, readPage, [query, MAX_PAGE_CHARS])
   if (!page || page.error) return page || { error: 'read_failed' }

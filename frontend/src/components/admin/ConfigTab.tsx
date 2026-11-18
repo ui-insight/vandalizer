@@ -189,6 +189,7 @@ function ConfigEditor() {
   // read-only beside it so the admin sees the whole effective policy.
   const [allowedHosts, setAllowedHosts] = useState('')
   const [envAllowedHosts, setEnvAllowedHosts] = useState<string[]>([])
+  const [browserDomains, setBrowserDomains] = useState('')
   const [ocrApiKey, setOcrApiKey] = useState('')
   // Tracks whether the user actually edited the key field (vs. it merely
   // holding the load's initial value). Only a dirty key is sent on save —
@@ -299,7 +300,7 @@ function ConfigEditor() {
     onePassStructured, onePassModel, twoPassP1Thinking, twoPassP1Structured, twoPassP1Model,
     twoPassP2Thinking, twoPassP2Structured, twoPassP2Model, useImages, requireValidation,
     minAccuracy, minConsistency, minWorkflowGrade, excellentThreshold, goodThreshold,
-    fairThreshold, ocrEndpoint, allowedHosts, ocrApiKey, webSearchProvider,
+    fairThreshold, ocrEndpoint, allowedHosts, browserDomains, ocrApiKey, webSearchProvider,
     webSearchEndpoint, webSearchApiKey, ocrProvider, ocrOptionsText, ocrAsync, ocrTimeout,
   }, !!cfg)
   const complianceDraft = useConfigDraft('Compliance', {
@@ -324,6 +325,7 @@ function ConfigEditor() {
       setOcrEndpoint(c.ocr_endpoint || '')
       setAllowedHosts((c.outbound_url_allowed_hosts || []).join('\n'))
       setEnvAllowedHosts(c.outbound_url_env_allowed_hosts || [])
+      setBrowserDomains((c.browser_allowed_domains || []).join('\n'))
       setOcrApiKey(c.ocr_api_key || '')
       setOcrApiKeyDirty(false)
       setWebSearchProvider(c.web_search_provider || '')
@@ -514,6 +516,7 @@ function ConfigEditor() {
         },
         ocr_endpoint: ocrEndpoint,
         outbound_url_allowed_hosts: allowedHosts.split(/[\n,]/).map(h => h.trim()).filter(Boolean),
+        browser_allowed_domains: browserDomains.split(/[\n,]/).map(h => h.trim()).filter(Boolean),
         ocr_provider: ocrProvider,
         ocr_options: parsedOcrOptions,
         ocr_async: ocrAsync,
@@ -1024,6 +1027,23 @@ ${playgroundResult.request.user_prompt}`}
                 Also allowed by the server operator (<code>OUTBOUND_URL_ALLOWED_HOSTS</code>): {envAllowedHosts.join(', ')}
               </div>
             )}
+          </div>
+          <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f3f4f6' }}>
+            <label style={labelStyle} htmlFor="browser-allowed-sites">Browser allowed sites</label>
+            <textarea
+              id="browser-allowed-sites" rows={3} spellCheck={false}
+              value={browserDomains}
+              onChange={e => setBrowserDomains(e.target.value)}
+              placeholder={'example.edu\ngrants.gov'}
+              style={{ ...inputStyle, maxWidth: 500, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12, lineHeight: 1.5 }}
+            />
+            <div style={hintStyle}>
+              Optional. Limits which sites chat can open and read in a person’s own browser through the Vandalizer
+              extension. List one domain per line; each covers its subdomains (<code>example.edu</code> covers{' '}
+              <code>finance.example.edu</code>). Leave empty to let people use any site they allow in the extension.
+              Include your sign-in provider’s domain only if chat should read those pages; people can still sign in
+              there themselves. No wildcards, ports or paths. Changes are audit-logged and take effect on the next message.
+            </div>
           </div>
 
           {/* Web Search — powers the agentic chat web_search tool */}

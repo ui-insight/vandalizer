@@ -44,6 +44,18 @@ describe('browser extension bridge', () => {
     expect(read).toEqual({ tool: 'browser_read', args: { query: 'balance' } })
   })
 
+  it("sends the administrator's site list with a command, and nothing when there is none", async () => {
+    remove = installBridge(() => ({ ok: true }))
+    const sent: Record<string, unknown>[] = []
+    const spy = (event: MessageEvent) => { if (event.data?.type === 'command') sent.push(event.data) }
+    window.addEventListener('message', spy)
+    await runBrowserTool('browser_open', { url: 'https://fin.example.edu' }, ['example.edu'])
+    await runBrowserTool('browser_read', {})
+    window.removeEventListener('message', spy)
+    expect(sent[0].allowedHosts).toEqual(['example.edu'])
+    expect('allowedHosts' in sent[1]).toBe(false)
+  })
+
   it('ignores an extension announcement from another origin', async () => {
     const handler = (event: MessageEvent) => {
       if (event.data?.type === 'ping') setTimeout(() => fromThisPage({ source: 'vandalizer-extension', type: 'ready' }, 'https://evil.example'))

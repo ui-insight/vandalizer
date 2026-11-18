@@ -288,6 +288,9 @@ export interface StreamChunk {
    *  the page runs it in the extension. Absent for withheld tools and calls
    *  whose arguments failed validation — those never run. */
   relay?: boolean
+  /** tool_call only, with relay: the sites the administrator allows the
+   *  browser to use (domains; subdomains included). Absent means no limit. */
+  browser_allowed_hosts?: string[]
   quality?: QualityMeta | null
   request_tokens?: number
   response_tokens?: number

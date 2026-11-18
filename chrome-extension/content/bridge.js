@@ -24,7 +24,7 @@
     if (msg.type !== 'command' || typeof msg.id !== 'string') return
     const reply = (result) => window.postMessage({ source: EXT, type: 'result', id: msg.id, result }, location.origin)
     try {
-      chrome.runtime.sendMessage({ type: 'vz-command', tool: msg.tool, args: msg.args || {} })
+      chrome.runtime.sendMessage({ type: 'vz-command', tool: msg.tool, args: msg.args || {}, allowedHosts: msg.allowedHosts })
         .then(reply, (err) => reply({ error: 'extension_unavailable', message: String(err?.message || err) }))
     } catch (err) {
       // The extension was reloaded or removed after this page loaded.

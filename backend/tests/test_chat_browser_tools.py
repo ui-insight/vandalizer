@@ -41,6 +41,17 @@ def fake_redis(monkeypatch):
     monkeypatch.setattr(browser, "_redis", FakeRedis)
 
 
+@pytest.fixture(autouse=True)
+def review_allows(monkeypatch):
+    """These tests are about the relay; tests/test_browser_policy.py covers the review."""
+    from app.services import browser_policy
+
+    async def allow(deps, prompt):
+        return '{"decision": "allow", "reason": "Ordinary reading for work."}'
+
+    monkeypatch.setattr(browser_policy, "_ask_model", allow)
+
+
 def _context(*, available=True, user_id="ra", call_id="call-1"):
     deps = AgenticChatDeps(
         user=SimpleNamespace(), user_id=user_id, team_id=None, team_access=None,

@@ -41,7 +41,7 @@ it('runs browser calls in the extension in order, posts each result, and tells t
   expect(isBrowserExtensionReady).toHaveBeenCalled()
 
   act(() => emit({ kind: 'tool_call', content: '', tool_name: 'browser_open', tool_call_id: 'open-1', args: { url: 'https://fin.example.edu' }, relay: true }))
-  act(() => emit({ kind: 'tool_call', content: '', tool_name: 'browser_read', tool_call_id: 'read-1', args: { query: 'balance' }, relay: true }))
+  act(() => emit({ kind: 'tool_call', content: '', tool_name: 'browser_read', tool_call_id: 'read-1', args: { query: 'balance' }, relay: true, browser_allowed_hosts: ['example.edu'] }))
   // Not marked by the server (withheld tool or bad arguments): never runs.
   act(() => emit({ kind: 'tool_call', content: '', tool_name: 'browser_read', tool_call_id: 'read-unrelayed', args: {} }))
   act(() => emit({ kind: 'tool_call', content: '', tool_name: 'web_search', tool_call_id: 'web-1', args: {} }))
@@ -54,7 +54,9 @@ it('runs browser calls in the extension in order, posts each result, and tells t
     ['open-1', { page: { text: 'opened' } }],
     ['read-1', { page: { text: 'read' } }],
   ])
-  expect(runBrowserTool).toHaveBeenCalledWith('browser_open', { url: 'https://fin.example.edu' })
+  expect(runBrowserTool).toHaveBeenCalledWith('browser_open', { url: 'https://fin.example.edu' }, undefined)
+  // The administrator's site list travels with the call for the extension to enforce.
+  expect(runBrowserTool).toHaveBeenCalledWith('browser_read', { query: 'balance' }, ['example.edu'])
   await act(async () => { finish(); await sending })
 })
 
