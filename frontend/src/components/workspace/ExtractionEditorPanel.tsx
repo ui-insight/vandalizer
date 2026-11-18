@@ -62,6 +62,7 @@ import { relativeTime } from '../../utils/time'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { assertedTierNote } from '../../lib/qualityLabels'
+import { saveGeneratedFile, unappliedUploadMessage } from '../../lib/duplicateUpload'
 
 marked.setOptions({ breaks: true, gfm: true })
 
@@ -545,8 +546,22 @@ export function ExtractionEditorPanel() {
         reader.onerror = reject
         reader.readAsDataURL(new Blob([buildResultsCSV()], { type: 'text/csv' }))
       })
-      const fileName = `${searchSet?.title || 'extraction'}-results-${new Date().toISOString().slice(0, 10)}.csv`
-      await uploadFile({ contentAsBase64String: base64, fileName, extension: 'csv', folder: activeProjectRootFolder })
+      const stem = `${searchSet?.title || 'extraction'}-results-${new Date().toISOString().slice(0, 10)}`
+      // A second save on the same day carried new results and said "Saved"
+      // while the project kept the morning's CSV (the server keeps an
+      // existing file of the same name and stores nothing).
+      const saved = await saveGeneratedFile(
+        fileName => uploadFile({ contentAsBase64String: base64, fileName, extension: 'csv', folder: activeProjectRootFolder }),
+        stem, 'csv',
+      )
+      if (saved.outcome === 'refused') {
+        toast(unappliedUploadMessage(saved.fileName, saved.result), 'error')
+        return
+      }
+      if (saved.outcome === 'identical') {
+        toast('These results are already saved in the project. Nothing was changed.', 'info')
+        return
+      }
       toast('Saved to project. Indexing for chat…', 'success')
       bumpActivitySignal()
     } catch (e) {

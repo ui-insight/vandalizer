@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { isUnappliedUpload, unappliedUploadMessage } from './duplicateUpload'
+import { describe, expect, it, vi } from 'vitest'
+import { isUnappliedUpload, saveGeneratedFile, unappliedUploadMessage } from './duplicateUpload'
 
 describe('isUnappliedUpload', () => {
   it('is false for a new file and for an identical one', () => {
@@ -33,5 +33,36 @@ describe('unappliedUploadMessage', () => {
     const text = unappliedUploadMessage('budget.xlsx', { exists: true, changed: null }, 'your files')
     expect(text).not.toContain('different')
     expect(text).toContain('already in your files and was not updated')
+  })
+})
+
+// "Save to project" writes "<set>-results-<date>.csv". A second save the same
+// day met the first one's name: the server kept the old CSV and the page said
+// "Saved to project".
+describe('saveGeneratedFile', () => {
+  const at = new Date(2026, 10, 18, 14, 5, 9)
+  it('saves under the plain name when it is free', async () => {
+    const save = vi.fn().mockResolvedValue({ uuid: 'd1' })
+    const out = await saveGeneratedFile(save, 'Awards-results-2026-11-18', 'csv', at)
+    expect(out.outcome).toBe('saved')
+    expect(save.mock.calls).toEqual([['Awards-results-2026-11-18.csv']])
+  })
+  it('saves newer results under the time when the name holds different content', async () => {
+    const save = vi.fn().mockResolvedValueOnce({ exists: true, changed: true }).mockResolvedValueOnce({ uuid: 'd2' })
+    const out = await saveGeneratedFile(save, 'Awards-results-2026-11-18', 'csv', at)
+    expect(out).toMatchObject({ outcome: 'saved', fileName: 'Awards-results-2026-11-18-140509.csv' })
+    expect(save).toHaveBeenLastCalledWith('Awards-results-2026-11-18-140509.csv')
+  })
+  it('does not save a second copy of identical results', async () => {
+    const save = vi.fn().mockResolvedValue({ exists: true, changed: false })
+    const out = await saveGeneratedFile(save, 'Awards-results-2026-11-18', 'csv', at)
+    expect(out.outcome).toBe('identical')
+    expect(save).toHaveBeenCalledTimes(1)
+  })
+  it('reports a refusal when the timed name is taken too, or the content could not be compared', async () => {
+    const save = vi.fn().mockResolvedValue({ exists: true, changed: null })
+    const out = await saveGeneratedFile(save, 'Awards-results-2026-11-18', 'csv', at)
+    expect(out).toMatchObject({ outcome: 'refused', fileName: 'Awards-results-2026-11-18-140509.csv' })
+    expect(save).toHaveBeenCalledTimes(2)
   })
 })
