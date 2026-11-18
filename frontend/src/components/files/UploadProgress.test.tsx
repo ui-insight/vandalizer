@@ -32,3 +32,15 @@ describe('UploadProgress', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 })
+
+describe('UploadProgress — a file that was already here', () => {
+  it('shows the note under a finished upload that changed nothing', () => {
+    render(
+      <UploadProgress
+        uploads={[{ id: 1, fileName: 'budget.pdf', progress: 100, done: true, note: 'Already here with the same content. Nothing was changed.' }]}
+        onDismiss={() => {}}
+      />,
+    )
+    expect(screen.getByText('Already here with the same content. Nothing was changed.')).toBeInTheDocument()
+  })
+})

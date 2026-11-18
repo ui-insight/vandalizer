@@ -7,6 +7,7 @@ import { useToast } from '../../contexts/ToastContext'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { DeletedDocumentBadge, stripFixedDocumentFlags, type FixedDocument } from './FixedDocumentsZone'
 import { toggleSource, type StepInputValue, type TaskInputSource } from './stepInputConfig'
+import { isUnappliedUpload, unappliedUploadMessage } from '../../lib/duplicateUpload'
 
 /**
  * The data-source picker for one step.
@@ -131,11 +132,17 @@ export function StepInputSources({
         reader.readAsDataURL(file)
       })
       const ext = file.name.split('.').pop() || ''
-      const { uuid } = await uploadFile({
+      const result = await uploadFile({
         contentAsBase64String: base64,
         fileName: file.name,
         extension: ext,
       })
+      if (isUnappliedUpload(result)) {
+        // Adding the existing file would run the step on the old content.
+        toast(`${unappliedUploadMessage(file.name, result, 'your files')} Nothing was added to this step.`, 'error')
+        return
+      }
+      const { uuid } = result
       if (uuid) addFixedDoc({ uuid, title: file.name })
     } catch { /* ignore upload errors */ }
     finally { setUploading(false) }
