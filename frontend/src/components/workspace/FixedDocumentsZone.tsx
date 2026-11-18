@@ -5,6 +5,7 @@ import { useToast } from '../../contexts/ToastContext'
 import { uploadFile } from '../../api/files'
 import { searchDocuments } from '../../api/documents'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
+import { isUnappliedUpload, unappliedUploadMessage } from '../../lib/duplicateUpload'
 
 /**
  * A fixed document on the Input tab. `missing` is set by the server on read
@@ -85,6 +86,11 @@ export function FixedDocumentsZone({
       const res = await uploadFile({ contentAsBase64String: base64, fileName: file.name, extension: ext })
       if (!res.uuid) {
         toast(`Could not upload ${file.name}`, 'error')
+        return
+      }
+      if (isUnappliedUpload(res)) {
+        // Pinning the existing file would run the workflow on the old content.
+        toast(`${unappliedUploadMessage(file.name, res, 'your files')} Nothing was pinned.`, 'error')
         return
       }
       await onAddDocs([{ uuid: res.uuid, title: file.name }])

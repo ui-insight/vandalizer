@@ -38,6 +38,31 @@ def _safe_resolve(settings: Settings, relative_path: str) -> Path | None:
     return target
 
 
+async def _differs_from_stored(
+    existing: SmartDocument, blob: str, settings: Settings
+) -> bool | None:
+    """Whether an upload's bytes differ from the stored file of the same name.
+
+    None when the stored file can't be read, so the caller reports "not
+    updated" without claiming either way.
+    """
+    try:
+        uploaded = base64.b64decode(blob, validate=True)
+    except (ValueError, TypeError):
+        raise ValueError("Invalid base64 string.")
+    stored_path = existing.path or existing.downloadpath
+    if not stored_path:
+        return None
+    from app.services.storage import get_storage
+
+    try:
+        stored = await get_storage(settings).read(str(stored_path))
+    except Exception:
+        logger.warning("Could not read stored file for %s to compare an upload", existing.uuid)
+        return None
+    return stored != uploaded
+
+
 async def upload_document(
     blob: str,
     filename: str,
@@ -130,7 +155,16 @@ async def upload_document(
             SmartDocument.superseded_by == None,  # noqa: E711 — older versions are hidden
         )
     if existing:
-        return {"complete": True, "exists": True, "uuid": existing.uuid}
+        # Nothing is stored or replaced. ``changed`` lets the page tell the
+        # person whether what they just chose differs from what is here:
+        # treating a revised file as "already uploaded" opened the old copy as
+        # if the upload had worked (support ticket).
+        return {
+            "complete": True,
+            "exists": True,
+            "uuid": existing.uuid,
+            "changed": await _differs_from_stored(existing, blob, settings),
+        }
 
     uid = uuid.uuid4().hex.upper()
 
@@ -222,7 +256,8 @@ async def upload_document(
             await storage.delete(relative_path_str)
         except Exception:
             logger.exception('Could not remove losing course sample upload %s', relative_path_str)
-        return {"complete": True, "exists": True, "uuid": existing.uuid}
+        # Two requests provisioned the same course sample; the content is the same.
+        return {"complete": True, "exists": True, "uuid": existing.uuid, "changed": False}
 
     # Only the inserted candidate needs a local task path and dispatch. An
     # interrupted/unknown dispatch still requires its own recovery protocol.
