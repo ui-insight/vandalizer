@@ -13,6 +13,7 @@ import { AttachmentList } from './AttachmentList'
 import { ChatSkillDialog } from './ChatSkillDialog'
 import { SkillReviewDialog } from './SkillReviewDialog'
 import { AssistantSettingsLink } from '../assistant/AssistantSettingsLink'
+import { BrowserDiscovery } from '../assistant/BrowserDiscovery'
 import { CoreSkillsNotice } from '../assistant/CoreSkillsNotice'
 import { useCoreSkills } from '../../hooks/useCoreSkills'
 import { coreSkillsNeedingAttention } from '../../api/assistant'
@@ -1056,6 +1057,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
             ) : null
           }
         />
+        {showHome && <BrowserDiscovery />}
       </div>
 
       {/* Messages area */}

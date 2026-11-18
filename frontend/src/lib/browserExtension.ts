@@ -44,6 +44,7 @@ function listen() {
       if (!resolve) return
       pending.delete(msg.id)
       const result = msg.result
+      if (result && typeof result === 'object' && 'error' in result && result.error === 'extension_unavailable') ready = false
       resolve(result && typeof result === 'object' && !Array.isArray(result)
         ? result as Record<string, unknown>
         : { error: 'browser_bad_result' })
@@ -60,19 +61,18 @@ export function isBrowserExtensionReady(): boolean {
 /** Ask whether the extension's bridge is on this page; resolves within timeoutMs. */
 export function detectBrowserExtension(timeoutMs = 300): Promise<boolean> {
   listen()
-  if (ready) return Promise.resolve(true)
   return new Promise((resolve) => {
     const done = () => { clearTimeout(timer); readyWaiters.delete(done); resolve(true) }
-    const timer = setTimeout(() => { readyWaiters.delete(done); resolve(ready) }, timeoutMs)
+    const timer = setTimeout(() => { readyWaiters.delete(done); ready = false; resolve(false) }, timeoutMs)
     readyWaiters.add(done)
     window.postMessage({ source: PAGE, type: 'ping' }, window.location.origin)
   })
 }
 
 /** Run one browser tool call in the extension. Never rejects. */
-export function runBrowserTool(tool: string, args: Record<string, unknown>): Promise<Record<string, unknown>> {
+export async function runBrowserTool(tool: string, args: Record<string, unknown>): Promise<Record<string, unknown>> {
   listen()
-  if (!ready) return Promise.resolve({ error: 'browser_not_connected', message: 'The Vandalizer browser extension is not connected on this page.' })
+  if (!(await detectBrowserExtension(500))) return Promise.resolve({ error: 'browser_not_connected', message: 'The Vandalizer browser extension is not connected on this page.' })
   const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
   return new Promise((resolve) => {
     const timer = setTimeout(() => {

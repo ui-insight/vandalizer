@@ -100,3 +100,9 @@ it('shows the built-in figure check on the preview card, whatever the reply says
   expect(note).toHaveTextContent(summary)
   expect(note).toHaveClass('page-figure-check--review')
 })
+
+it('distinguishes a missing source file from browser evidence without claiming verification', () => {
+  render(<ToolStatusLine call={call} result={{ ...result, content: { ...result.content, figure_check: 'Figures not checked: this Page has no recorded source file.' } }} onConfirm={vi.fn()} />)
+  expect(screen.getByText(/No source file was attached/)).toHaveTextContent('Review the figures against their source links')
+  expect(screen.queryByText('Figure check:')).not.toBeInTheDocument()
+})

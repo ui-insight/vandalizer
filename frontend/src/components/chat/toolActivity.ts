@@ -89,6 +89,9 @@ export function getToolMeta(name: string) {
 /** Only show short, user-facing targets. Never display generated HTML or tool instructions. */
 export function toolTarget(call: ToolCallInfo, names: Record<string, string>): string {
   const args = call.args
+  if (call.tool_name.startsWith('browser_') && typeof args.url === 'string') {
+    try { return `Read-only · ${new URL(args.url).host}` } catch { return 'Read-only browser' }
+  }
   const parts: string[] = []
   for (const key of ['kb_uuid', 'knowledge_base_uuid', 'workflow_id', 'extraction_set_uuid', 'project_uuid', 'folder_uuid', 'document_uuid']) {
     const id = args[key]

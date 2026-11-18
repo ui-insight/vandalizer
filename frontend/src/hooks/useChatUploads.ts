@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { uploadFile } from '../api/files'
 import { readUploadPolicy, uploadFileError } from '../utils/uploadPolicy'
+import { isUnappliedUpload, unappliedUploadMessage } from '../lib/duplicateUpload'
 
 export interface ChatUpload {
   id: string
@@ -46,6 +47,9 @@ export function useChatUploads(onUploaded: (uuid: string, file: File) => void) {
       const content = await readFile(entry.file, controller.signal)
       const result = await uploadFile({ contentAsBase64String: content, fileName: entry.file.name, extension: entry.file.name.split('.').pop() || '' }, controller.signal)
       if (controller.signal.aborted) return
+      // The server kept an existing file of the same name. Attaching it would
+      // put the old content in the chat under the name of the file just chosen.
+      if (isUnappliedUpload(result)) throw new Error(`${unappliedUploadMessage(entry.file.name, result, 'your files')} It was not attached to this chat.`)
       if (!result.uuid) throw new Error('The server did not return a document. Try uploading again.')
       callback.current(result.uuid, entry.file)
       setUploads(prev => prev.filter(item => item.id !== entry.id))

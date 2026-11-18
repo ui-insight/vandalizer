@@ -2,25 +2,37 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Vandalizer Browser</title>
   <link rel="stylesheet" href="popup.css">
 </head>
-<body>
+<body data-page="popup">
   <main>
-    <h1>Vandalizer Browser</h1>
-    <p>Lets Vandalizer chat read the sites you allow, signed in as you. It never submits, saves or approves anything.</p>
-
+    <header class="brand"><img src="../assets/icons/icon-48.png" alt="">Vandalizer Browser</header>
+<section id="connection" class="connection" aria-label="Connection">
+      <div id="connection-label" class="connection-label">Checking connection…</div>
+      <strong id="connection-site" class="connection-site"></strong>
+      <p id="connection-description"></p>
+    </section>
+<div id="connected-actions" hidden>
+      <button id="open-vandalizer" class="primary wide" type="button">Open Vandalizer</button>
+      <button id="open-working" class="wide" type="button" hidden>Open working tab</button>
+    </div>
+    <details id="change-connection"><summary id="connection-toggle">Connect Vandalizer</summary>
     <form id="connect">
       <label for="origin">Vandalizer address</label>
-      <input id="origin" type="url" placeholder="https://vandalizer.example.edu" required>
-      <div class="row">
-        <button class="primary" type="submit">Connect</button>
-      </div>
-      <div id="status" class="status" role="status"></div>
+      <input id="origin" type="url" readonly required aria-describedby="connect-help">
+      <p id="connect-help">Open your Vandalizer tab, then reopen this menu. Connect only a Vandalizer site you trust.</p>
+      <button class="primary wide" type="submit">Connect this site</button>
     </form>
-
-    <h2>Sites chat may read</h2>
-    <ul id="sites"></ul>
+    </details>
+    <div id="status" class="status" role="status"></div>
+    <section class="sites-section" aria-labelledby="sites-heading">
+      <h2 id="sites-heading">Sites chat may read</h2>
+      <p>You choose each site when chat first opens it.</p>
+      <ul id="sites"></ul>
+    </section>
+    <p class="safety"><strong>Read-only, signed in as you.</strong>Chat won’t enter passwords or submit, save, pay or change anything.</p>
   </main>
   <script src="popup.js" type="module"></script>
 </body>

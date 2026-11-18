@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, Copy, Download } from 'lucide-react'
+import { Check, Copy, Download, Mail } from 'lucide-react'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import type { ChatMessage } from '../../types/chat'
@@ -9,6 +9,7 @@ import { saveChatArtifact } from '../../api/artifacts'
 import { conversationToCsv, conversationToText, copyMessages, exportMessages } from './conversationExport'
 import { openPrintPage } from '../../lib/printPage'
 import { announceWorkspaceWrite } from '../../lib/chatWrites'
+import { emailDraftFromReply, mailtoUrl, MAILTO_SAFE_LENGTH, openMailto } from '../../lib/emailChatReply'
 
 function download(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)
@@ -36,6 +37,7 @@ export function ChatExportActions({ messages, scope = 'message', names = {}, dis
   const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState('')
+  const [emailNote, setEmailNote] = useState('')
   const [savedArtifact, setSavedArtifact] = useState<string | null>(null)
   const [reusedArtifact, setReusedArtifact] = useState(false)
   const artifactRequest = useRef<{ content: string; id: string } | null>(null)
@@ -104,8 +106,23 @@ export function ChatExportActions({ messages, scope = 'message', names = {}, dis
         setTimeout(() => setCopied(false), 2000)
       } catch { setError('Could not copy. Select the text to copy it, or try again.') }
     }}>{copied ? <Check size={16} /> : <Copy size={16} />}</button>
+    {canExport && scope === 'message' && <button type="button" className={actionClass} aria-label="Email message" title="Email message" disabled={disabled || busy} onClick={async () => {
+      // Opens the person's own email app with the reply as a draft. Nothing is sent from here.
+      setError('')
+      setEmailNote('')
+      const { subject, body } = emailDraftFromReply(exportMessages(messages, names).map(m => m.content).filter(Boolean).join('\n\n'))
+      const url = mailtoUrl(subject, body)
+      if (url.length <= MAILTO_SAFE_LENGTH) { openMailto(url); return }
+      // Too long for a mailto: link, which email apps cut short. Copy it instead.
+      try {
+        await navigator.clipboard.writeText(body)
+        setEmailNote('This reply is too long to pass to your email app, so it was copied. Paste it into the email.')
+        openMailto(mailtoUrl(subject))
+      } catch { setError('This reply is too long to pass to your email app. Use Copy, then paste it into an email.') }
+    }}><Mail size={16} /></button>}
     {canExport && <button ref={button} type="button" className={actionClass} aria-label={`Export ${scope}`} title={`Export ${scope}`} aria-haspopup="menu" aria-expanded={open} disabled={disabled || busy} onClick={() => setOpen(!open)}><Download size={16} /></button>}
     {busy && <span role="status" className="text-xs">Preparing export…</span>}
+    {emailNote && <p role="status" className="w-full text-xs">{emailNote}</p>}
     {canExport && open && createPortal(<div ref={menu} role="menu" style={position} className="fixed z-[1000] w-[236px] max-h-[90vh] overflow-auto rounded-lg border bg-white p-1.5 text-gray-800 shadow-lg" aria-label={`Export ${scope} format`} onBlur={e => {
       // A pointer click in Safari can blur without focusing the selected
       // button. Keep it mounted until click; outside pointers dismiss above.

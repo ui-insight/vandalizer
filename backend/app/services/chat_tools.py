@@ -45,6 +45,7 @@ from app.services.certification_versions.tool_results import (
     CheckResult, CompletionResult, LessonResult, ModuleResult, ProgressResult,
     ProvisionResult, ReflectionResult, certification_result,
 )
+from app.services.kb_section_context import SECTION_NOTE, SectionIndex
 from app.services.page_locator import annotate_chunk_pages, cited_pages, format_page_range
 
 logger = logging.getLogger(__name__)
@@ -856,10 +857,15 @@ async def search_knowledge_base(
 
     openable = await resolve_openable_documents(source_ids, user_id=user_id)
 
+    # Where each passage sits in its source, read from the source's stored
+    # text: a passage is a slice with no heading of its own.
+    section_indexes: dict[str, SectionIndex] = {}
+
     enriched: list[dict] = []
     citations: list[dict] = []
     any_approximate = False
     any_spanning = False
+    any_section = False
     for r in results:
         meta = r.get("metadata", {})
         sid = meta.get("source_id", "")
@@ -915,12 +921,32 @@ async def search_knowledge_base(
                 entry["url"] = src.url
             if src.source_reference:
                 entry["source_reference"] = src.source_reference
+            if isinstance(src.content, str) and src.content:
+                index = section_indexes.get(sid)
+                if index is None:
+                    index = section_indexes[sid] = SectionIndex(src.content)
+                section = index.section_for(content)
+                if section:
+                    entry["section"] = section
+                    any_section = True
         enriched.append(entry)
+
+        # Several searches in one turn return some of the same chunks. Each
+        # is one source however often it came back (support ticket: 40 source
+        # references under an answer whose search card said 8 passages).
+        chunk_id = r.get("chunk_id")
+        if isinstance(chunk_id, str) and chunk_id in context.deps.kb_chunk_refs:
+            continue
 
         # Numbered after every snippet already shown this turn, so the
         # finished answer can mark which passages it cited (#993). The model
         # cites these by name; the number stays out of its context.
         context.deps.kb_snippet_ref += 1
+        if isinstance(chunk_id, str):
+            context.deps.kb_chunk_refs[chunk_id] = context.deps.kb_snippet_ref
+        context.deps.kb_snippet_texts[context.deps.kb_snippet_ref] = (
+            f"{entry.get('section') or ''}\n{content}"
+        )
         source_name = meta.get("source_name", "Unknown")
         locator = (
             format_page_range(page, page_end, approximate) if isinstance(page, int)
@@ -974,6 +1000,8 @@ async def search_knowledge_base(
             "page begins. Cite the page the passage you are using falls under, "
             "not the page the passage starts on."
         )
+    if any_section:
+        notes.append(SECTION_NOTE)
     if notes:
         # On every entry rather than as a leading pseudo-passage. The array is
         # rendered by the UI as passages — a note dict prepended to it inflates

@@ -54,6 +54,7 @@ function FigureCheck({ value }: { value: unknown }) {
     : value && typeof value === 'object' && typeof (value as { summary?: unknown }).summary === 'string' ? (value as { summary: string }).summary
     : null
   if (!summary) return null
+  if (summary === 'Figures not checked: this Page has no recorded source file.') return <p className="page-figure-check page-figure-check--neutral" role="note"><strong>Source review:</strong> No source file was attached for this Page’s automatic figure check. Review the figures against their source links before saving.</p>
   const needsReview = /manual edit|not found|not checked/.test(summary)
   return <p className={`page-figure-check${needsReview ? ' page-figure-check--review' : ''}`} role="note">
     <strong>Figure check:</strong> {summary}

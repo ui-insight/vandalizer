@@ -14,7 +14,29 @@ const LOAD_TIMEOUT_MS = 30000
 const PERMISSION_TIMEOUT_MS = 120000
 const KEEPALIVE_MS = 20000
 
+// Public discovery only. External pages cannot run commands or grant access.
+chrome.runtime.onMessageExternal.addListener((msg, _sender, respond) => {
+  if (msg?.type === 'vz-installed') respond({ installed: true, version: chrome.runtime.getManifest().version })
+})
+
 const pendingPermissions = new Map()
+
+// Chrome clears dynamic registrations on an unpacked-extension reload.
+// Restore the saved, already granted connection and repair open app tabs.
+async function restoreBridge() {
+  const { vandalizerOrigin } = await chrome.storage.local.get('vandalizerOrigin')
+  if (!vandalizerOrigin || !(await chrome.permissions.contains({ origins: [`${vandalizerOrigin}/*`] }))) return
+  const scripts = await chrome.scripting.getRegisteredContentScripts({ ids: ['vandalizer-bridge'] })
+  if (!scripts.length) await chrome.scripting.registerContentScripts([{
+    id: 'vandalizer-bridge', matches: [`${vandalizerOrigin}/*`], js: ['content/bridge.js'],
+    runAt: 'document_start', persistAcrossSessions: true,
+  }])
+  for (const tab of await chrome.tabs.query({ url: `${vandalizerOrigin}/*` })) {
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content/bridge.js'] }).catch(() => {})
+  }
+}
+chrome.runtime.onInstalled.addListener(() => { restoreBridge().catch(console.error) })
+chrome.runtime.onStartup.addListener(() => { restoreBridge().catch(console.error) })
 
 // Chrome stops a service worker after 30 seconds without extension API
 // calls, even while a command is waiting on the person's click in the
@@ -43,7 +65,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       .finally(release)
     return true
   }
-  if (msg?.type === 'vz-permission-decision' && sender.id === chrome.runtime.id && !sender.tab) {
+  if (msg?.type === 'vz-permission-decision' && sender.id === chrome.runtime.id
+      && sender.url?.startsWith(chrome.runtime.getURL('permission/permission.html?'))) {
     pendingPermissions.get(msg.id)?.(Boolean(msg.granted))
     sendResponse({ ok: true })
     return false
@@ -56,8 +79,17 @@ async function handleCommand(msg, sender) {
   if (!vandalizerOrigin || sender.id !== chrome.runtime.id || sender.origin !== vandalizerOrigin || !sender.tab) {
     return { error: 'not_allowed', message: 'This page is not the Vandalizer address set in the extension.' }
   }
+  if (!(await chrome.permissions.contains({ origins: [`${vandalizerOrigin}/*`] }))) {
+    return { error: 'browser_not_connected', message: 'Reconnect this Vandalizer site in the extension popup.' }
+  }
   const args = msg.args || {}
   switch (msg.tool) {
+    case 'browser_status': return { ok: true, version: chrome.runtime.getManifest().version }
+    case 'browser_focus': return withTab(async (tab) => {
+      await chrome.windows.update(tab.windowId, { focused: true })
+      await chrome.tabs.update(tab.id, { active: true })
+      return { ok: true }
+    })
     case 'browser_open': return openUrl(String(args.url || ''), sender.tab, vandalizerOrigin)
     case 'browser_read': return withTab((tab) => readTab(tab, String(args.query || '')))
     case 'browser_click': return withTab(async (tab) => {
@@ -153,7 +185,7 @@ async function readTab(tab, query) {
     page,
     ...(page.login_required ? {
       login_required: true,
-      message: 'This page has a password field. If it is a sign-in page, ask the person to sign in in the Vandalizer tab and tell you when they are done; otherwise carry on. Never type a password.',
+      message: 'This page has a password field. If it is a sign-in page, ask the person to sign in in the working browser tab and tell you when they are done; otherwise carry on. Never type a password.',
     } : {}),
   }
 }
@@ -193,7 +225,7 @@ async function askForSite(host, pattern) {
   const params = new URLSearchParams({ id, host, pattern })
   const win = await chrome.windows.create({
     url: chrome.runtime.getURL(`permission/permission.html?${params}`),
-    type: 'popup', width: 460, height: 320, focused: true,
+    type: 'popup', width: 460, height: 480, focused: true,
   })
   return new Promise((resolve) => {
     let done = false

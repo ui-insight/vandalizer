@@ -22,6 +22,8 @@ WORKDIR /app
 # time, so we accept these as build args and re-export them as ENV before
 # `npm run build`. `.env` files are excluded from the build context via
 # `.dockerignore`, so this is the only way the bundle picks them up.
+ARG VITE_BROWSER_STORE_URL
+ENV VITE_BROWSER_STORE_URL=${VITE_BROWSER_STORE_URL}
 ARG VITE_SENTRY_DSN
 ARG VITE_SENTRY_ENVIRONMENT
 ARG VITE_SENTRY_RELEASE

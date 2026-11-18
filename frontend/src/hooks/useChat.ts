@@ -432,7 +432,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
 
       // Browser tool calls run in the extension one at a time, in the order
       // the agent made them; the server waits for each result.
-      // Read, never awaited: detection runs once when chat mounts.
+      // A newly injected bridge announces itself without a page reload.
       const browserAvailable = isBrowserExtensionReady()
       let browserQueue: Promise<unknown> = Promise.resolve()
       try {
