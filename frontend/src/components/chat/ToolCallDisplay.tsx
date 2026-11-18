@@ -1,4 +1,6 @@
 import './tool-calls.css'
+import { BrowserRun } from './BrowserRun'
+import { groupBrowserSegments, isBrowserTool } from './browserToolGroups'
 import { getToolMeta as getMeta, TOOL_META, toolTarget, activeToolLabel } from './toolActivity'
 import { qualityPresentation } from '../../lib/qualityLabels'
 import { completedSkillSelection } from '../../lib/skillSelection'
@@ -175,6 +177,10 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
 
   const listError = listErrorEntry(content)
   if (listError) return { text: String(listError.error), qualityHint: '' }
+  // Browser tools explain themselves (a sign-in is needed, a site was not allowed).
+  if ((toolName.startsWith('browser_') || toolName === 'record_value') && (obj.error || obj.login_required) && obj.message) {
+    return { text: String(obj.message), qualityHint: '' }
+  }
   if (obj.error) return { text: String(obj.error), qualityHint: '' }
   if (obj.needs_confirmation) return { text: obj.preview ? String(obj.preview) : 'Awaiting confirmation', qualityHint: '' }
 
@@ -344,6 +350,26 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
       if (obj.matched === false) return { text: 'No matching help topic', qualityHint: '' }
       const topic = (obj.topic as Record<string, unknown> | undefined)?.title
       return { text: topic ? `Help: ${String(topic)}` : 'Help topic found', qualityHint: '' }
+    }
+
+    case 'browser_open':
+    case 'browser_read':
+    case 'browser_click':
+    case 'browser_select': {
+      const page = obj.page as Record<string, unknown> | undefined
+      if (!page) return { text: obj.ok ? 'Done' : '', qualityHint: '' }
+      let host = ''
+      try { host = new URL(String(page.url)).hostname } catch { /* not a URL */ }
+      const title = page.title ? `"${String(page.title).slice(0, 50)}"` : 'page'
+      return { text: [`Read ${title}`, host, page.truncated === true ? 'Partly read' : ''].filter(Boolean).join(' - '), qualityHint: '' }
+    }
+
+    case 'browser_type':
+      return { text: obj.ok ? 'Typed' : '', qualityHint: '' }
+
+    case 'record_value': {
+      if (obj.recorded !== true) return { text: 'Not found on the page', qualityHint: '' }
+      return { text: `${String(obj.label)}: ${String(obj.value)}`, qualityHint: '' }
     }
 
     case 'fetch_url': {
@@ -1499,6 +1525,8 @@ export function ToolStatusLine({
       onDecide={onConfirm && !upNext ? decide : undefined} upNext={upNext} stepHeading={step?.heading} revising={name === 'revise_html_artifact'} />
   }
 
+  if (isBrowserTool(name)) return <BrowserRun calls={[call ?? { tool_name: name, tool_call_id: result?.tool_call_id ?? name, args: {} }]} results={new Map(result ? [[result.tool_call_id, result]] : [])} running={isActive} />
+
   return (
     <div className="agent-tool-result agent-tool-card" data-tool-state={executionLabel} data-tool-category={meta.category} data-tool-error={isError || undefined}>
       <div className="agent-tool-header">
@@ -1643,7 +1671,10 @@ export function ToolCallDisplay({ names = {}, toolCalls, toolResults, isStreamin
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-2)', margin: "var(--workspace-space-6) 0" }}>
-      {[...allCallIds].map((callId) => {
+      {groupBrowserSegments([...allCallIds].map(id => ({ kind: 'tool_call', call: toolCalls.find(call => call.tool_call_id === id) ?? { tool_call_id: id, tool_name: resultMap.get(id)?.tool_name ?? 'unknown', args: {} } }))).map(segment => {
+        if (segment.kind === 'browser_group') return <BrowserRun key={segment.calls[0].tool_call_id} calls={segment.calls} results={resultMap} running={isStreaming} />
+        if (segment.kind !== 'tool_call') return null
+        const callId = segment.call.tool_call_id
         const result = resultMap.get(callId)
         const call = toolCalls.find((c) => c.tool_call_id === callId)
         const name = result?.tool_name || call?.tool_name || 'unknown'

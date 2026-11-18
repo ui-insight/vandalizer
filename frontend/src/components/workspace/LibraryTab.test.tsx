@@ -102,7 +102,7 @@ vi.mock('../../api/extractions', () => ({
   addItem: vi.fn(),
 }))
 
-import { listItems as listSearchSetItems, updateSearchSet } from '../../api/extractions'
+import { createSearchSet, listItems as listSearchSetItems, updateSearchSet } from '../../api/extractions'
 import { touchItem } from '../../api/library'
 
 function makePrompt(overrides: Partial<LibraryItem> = {}): LibraryItem {
@@ -525,4 +525,19 @@ describe('LibraryTab sidebar', () => {
       setItem.mockRestore()
     }
   })
+})
+
+
+it('opens the demo starter in the existing editor and saves it through the usual Library API', async () => {
+  history.replaceState({}, '', '/?tab=library&browserSkill=demo')
+  const rectangles = vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{ width: 1, height: 1 }] as unknown as DOMRectList)
+  try {
+    vi.mocked(createSearchSet).mockResolvedValue({ id: 'demo', uuid: 'demo-uuid' } as Awaited<ReturnType<typeof createSearchSet>>)
+    render(<LibraryTab />)
+    expect(screen.getByDisplayValue('University research snapshot')).toBeVisible()
+    expect((screen.getByDisplayValue(/Sites and figures/) as HTMLTextAreaElement).value).toContain('record_value')
+    fireEvent.click(screen.getByRole('button', { name: 'Create Skill' }))
+    await waitFor(() => expect(createSearchSet).toHaveBeenCalledWith(expect.objectContaining({ set_type: 'prompt', extraction_config: { content: expect.stringContaining('rankings-facts') } })))
+    expect(sendChatMessage).not.toHaveBeenCalled()
+  } finally { rectangles.mockRestore(); history.replaceState({}, '', '/') }
 })

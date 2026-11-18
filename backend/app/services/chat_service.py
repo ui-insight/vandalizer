@@ -20,7 +20,7 @@ import json
 import logging
 import re
 import time
-from typing import AsyncGenerator, Optional
+from typing import Any, AsyncGenerator, Optional
 
 import anyio
 
@@ -72,6 +72,7 @@ from app.services.hidden_drafts import had_hidden_retry, without_draft_correctio
 from app.services.chat_budget_tables import reconcile_budget_tables
 from app.services.chat_source_claims import attachment_sources, ground_source_checks
 from app.services.chat_spreadsheet_figures import spreadsheet_figures_note
+from app.services.chat_browser_tools import should_relay as should_relay_browser_call
 from app.services.compliance_claims import relabel_presence_checks, superseded_threshold_note
 from app.services.inbox_provenance import REPLY_NOTE as INBOX_REPLY_NOTE, credits_inbox
 from app.services.web_answer_grounding import (
@@ -1669,6 +1670,7 @@ async def chat_stream(
     client_timezone: str | None = None,
     approval_for: str | None = None,
     decline_for: str | None = None,
+    browser_available: bool = False,
 ) -> AsyncGenerator[str, None]:
     """Async generator yielding newline-delimited JSON chunks for streaming chat."""
 
@@ -2709,6 +2711,7 @@ async def chat_stream(
             active_kb_uuid=active_kbs[0][0] if active_kbs else None,
             active_project_uuid=project_uuid,
             capabilities_off=capabilities_off,
+            browser_available=browser_available,
             conversation=conversation,
             # Monotonic per-turn marker: the current user message is already
             # persisted (router add_message) before chat_stream runs, so this
@@ -2902,11 +2905,16 @@ async def chat_stream(
                                     args = tool_event.part.args_as_dict()
                                 except Exception:
                                     args = {}
-                                call_data = {
+                                call_data: dict[str, Any] = {
                                     "tool_name": tool_event.part.tool_name,
                                     "tool_call_id": tool_event.part.tool_call_id,
                                     "args": args,
                                 }
+                                # The chat page runs browser calls in the extension
+                                # only when marked: a withheld tool or bad arguments
+                                # still stream a call event but never run here.
+                                if should_relay_browser_call(tool_event.part.tool_name, tool_event.args_valid, deps):
+                                    call_data["relay"] = True
                                 streamed_tool_calls.append(call_data)
                                 streamed_segments.append({"kind": "tool_call", "call": call_data})
                                 yield json.dumps({"kind": "tool_call", **call_data}) + "\n"

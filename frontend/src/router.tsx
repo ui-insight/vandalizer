@@ -198,6 +198,7 @@ const indexRoute = createRoute({
     tab: (['assistant', 'library'].includes(search.tab as string)
       ? (search.tab as 'assistant' | 'library')
       : undefined),
+    ...(['demo', 'starter'].includes(String(search.browserSkill)) ? { browserSkill: search.browserSkill as 'demo' | 'starter' } : {}),
     // Open editor IDs — support legacy param names for backwards compat
     workflow: ((search.workflow as string) || (search.openWorkflow as string) || undefined),
     extraction: ((search.extraction as string) || (search.openExtraction as string) || undefined),

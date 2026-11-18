@@ -49,6 +49,7 @@ export async function streamChat(
   retry = false,
   pageApproval?: string,
   cardDecision?: CardDecision,
+  browserAvailable = false,
 ): Promise<{ conversationUuid: string; activityId: string }> {
   const res = await rawFetch('/api/chat', {
     method: 'POST',
@@ -75,6 +76,7 @@ export async function streamChat(
       ...(isFirstSession ? { is_first_session: true } : {}),
       ...(runDemo ? { run_demo: true } : {}),
       ...(projectUuid ? { project_uuid: projectUuid } : {}),
+      ...(browserAvailable ? { browser_available: true } : {}),
     }),
   })
 
@@ -324,6 +326,14 @@ export function queueChatMessage(conversationUuid: string, message: string) {
   return apiFetch<{ success: boolean }>('/api/chat/queue', {
     method: 'POST',
     body: JSON.stringify({ conversation_uuid: conversationUuid, message }),
+  })
+}
+
+/** Hand the browser extension's answer to the chat tool waiting for it. */
+export function postBrowserResult(toolCallId: string, result: Record<string, unknown>) {
+  return apiFetch<{ status: string }>('/api/chat/browser-results', {
+    method: 'POST',
+    body: JSON.stringify({ tool_call_id: toolCallId, result }),
   })
 }
 

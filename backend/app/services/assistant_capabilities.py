@@ -114,6 +114,12 @@ CAPABILITIES: tuple[Capability, ...] = (
          "run_pin_on_project", "pin_to_project", "unpin_from_project", "set_project_status", "get_award_snapshot"),
     ),
     Capability(
+        "browser", "Use your browser",
+        "With the Vandalizer browser extension, opens the sites you allow in your own Chrome, signed in as you, "
+        "and reads figures from them. It only reads: it will not submit, save or approve anything.",
+        ("browser_open", "browser_read", "browser_click", "browser_type", "browser_select", "record_value"),
+    ),
+    Capability(
         "ra_inbox", "RA inbox",
         "Reads a project's deadlines and required material, and proposes new items it finds in your documents.",
         ("list_project_inbox", "propose_obligations"),
@@ -170,6 +176,9 @@ def tool_is_off(tool_name: str, off: frozenset[str] | None) -> bool:
 async def gate(context: RunContext[Any], tool_def: ToolDefinition) -> ToolDefinition | None:
     """Withhold a tool whose capability is off for this request."""
     if tool_is_off(tool_def.name, getattr(context.deps, "capabilities_off", None)):
+        return None
+    # The browser tools need the extension on the chat page this turn.
+    if _CAPABILITY_OF.get(tool_def.name) == "browser" and not getattr(context.deps, "browser_available", False):
         return None
     return tool_def
 

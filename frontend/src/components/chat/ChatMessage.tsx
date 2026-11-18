@@ -11,6 +11,8 @@ import { useCertificationPanel } from '../../contexts/CertificationPanelContext'
 import { certificationChatEntry } from '../../lib/certificationChat'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { ToolCallDisplay, ToolStatusLine, recoveredCallIds, supersededCallIds } from './ToolCallDisplay'
+import { BrowserRun } from './BrowserRun'
+import { groupBrowserSegments } from './browserToolGroups'
 import { renderMarkdown, THINK_BLOCK_RE, THINK_TRAILING_RE } from './markdown'
 import { routeActionClick } from './actionRoute'
 import type { CardDecision, ChatActivity, ChatMessage as ChatMessageType, Citation, StreamSegment, ToolCallInfo, ToolResultInfo } from '../../types/chat'
@@ -341,7 +343,8 @@ export function ChatMessage({
           {/* Interleaved segment rendering (streaming + persisted) */}
           {segments && segments.length > 0 ? (
             <div ref={contentRef} onClick={handleActionClick}>
-              {segments.map((seg, i) => {
+              {groupBrowserSegments(segments).map((seg, i) => {
+                if (seg.kind === 'browser_group') return <BrowserRun key={seg.calls[0].tool_call_id} calls={seg.calls} results={resultMap} running={isStreamingProp || seg.calls.some(call => activeCallIds.has(call.tool_call_id))} />
                 if (seg.kind === 'text') {
                   const cleaned = seg.content.replace(THINK_BLOCK_RE, '').replace(THINK_TRAILING_RE, '')
                   if (!cleaned.trim()) return null

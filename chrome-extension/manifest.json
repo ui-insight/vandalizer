@@ -1,45 +1,22 @@
 {
   "manifest_version": 3,
-  "name": "Vandalizer Browser Automation",
-  "version": "1.0.0",
-  "description": "Browser automation extension for Vandalizer workflows",
+  "name": "Vandalizer Browser",
+  "version": "2.0.0",
+  "description": "Lets Vandalizer chat read the sites you allow, in your own browser and signed in as you. Read-only.",
+  "minimum_chrome_version": "116",
   "permissions": [
-    "tabs",
-    "activeTab",
-    "scripting",
     "storage",
-    "webNavigation",
-    "downloads"
+    "scripting",
+    "tabs"
   ],
-  "host_permissions": [
-    "<all_urls>"
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://*/*"
   ],
   "background": {
-    "service_worker": "background/service-worker-socketio.js"
+    "service_worker": "background/service-worker.js",
+    "type": "module"
   },
-  "content_scripts": [
-    {
-      "matches": [
-        "<all_urls>"
-      ],
-      "css": [
-        "content/target-picker.css"
-      ],
-      "js": [
-        "content/locator-stack.js",
-        "content/target-picker.js",
-        "content/repair-ui.js",
-        "content/session-detector.js",
-        "content/recorder.js",
-        "content/dom-actions.js",
-        "content/extractor.js",
-        "content/overlay.js",
-        "content/content-script.js"
-      ],
-      "run_at": "document_idle",
-      "all_frames": true
-    }
-  ],
   "action": {
     "default_popup": "popup/popup.html",
     "default_icon": {
@@ -48,14 +25,17 @@
       "128": "assets/icons/icon-128.png"
     }
   },
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "assets/*"
-      ],
-      "matches": [
-        "<all_urls>"
-      ]
-    }
-  ]
+  "icons": {
+    "16": "assets/icons/icon-16.png",
+    "48": "assets/icons/icon-48.png",
+    "128": "assets/icons/icon-128.png"
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAieelaEX0r7mGVJPZ7uCQPPpthXJnpATnMtnbiVl8QYaBPD7F/I6DoP195ocD6vcL8BO3unGPZ0Kv+bmRAEmFS4gp4Cy6a0fDtzH8XHl7XMZ5DG4czhofF0+YeF7xiUv5s9mPvwf7i4lYH5PWtkG4TxQy9fyNwzX/Rs26fUwpwWcs62htg9vzBwjLNUmOKCX1qjGdteJLVVVl4tS3biHzGqPt+L3QoFCMRGY8qKVuaVfoLcxrTm6uUwm+0fDeR0hedg/l5xtG/QIe7sLMopidrDuZwrU0ZocsffeLyfEKYBlwKVfZItQ2lcoUZTDoqD+oJMEWBv9jd10ymMBjoeGrUwIDAQAB",
+  "externally_connectable": {
+    "matches": [
+      "https://*/*",
+      "http://localhost/*",
+      "http://127.0.0.1/*"
+    ]
+  }
 }

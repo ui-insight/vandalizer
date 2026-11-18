@@ -1,52 +1,39 @@
-<!DOCTYPE html>
-<html>
-
+<!doctype html>
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Vandalizer Browser Automation</title>
-    <link rel="stylesheet" href="popup.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vandalizer Browser</title>
+  <link rel="stylesheet" href="popup.css">
 </head>
-
-<body>
-    <div class="popup-container">
-        <header>
-            <h1>Vandalizer</h1>
-            <p class="subtitle">Browser Automation</p>
-        </header>
-
-        <div id="connection-status" class="status-section">
-            <div class="status-indicator" id="status-dot"></div>
-            <span id="status-text">Disconnected</span>
-        </div>
-
-        <div id="setup-section">
-            <h3>Setup</h3>
-            <form id="setup-form">
-                <label for="backend-url">Backend URL:</label>
-                <input type="text" id="backend-url" placeholder="http://localhost:5000" />
-
-                <label for="user-token">User Token:</label>
-                <input type="text" id="user-token" placeholder="Your auth token" />
-
-                <button type="submit">Connect</button>
-            </form>
-        </div>
-
-        <div id="active-section" style="display: none;">
-            <h3>Active Sessions</h3>
-            <div id="sessions-list">
-                <p class="no-sessions">No active sessions</p>
-            </div>
-
-            <button id="disconnect-btn" class="secondary">Disconnect</button>
-        </div>
-
-        <footer>
-            <p class="version">v1.0.0</p>
-        </footer>
+<body data-page="popup">
+  <main>
+    <header class="brand"><img src="../assets/icons/icon-48.png" alt="">Vandalizer Browser</header>
+<section id="connection" class="connection" aria-label="Connection">
+      <div id="connection-label" class="connection-label">Checking connection…</div>
+      <strong id="connection-site" class="connection-site"></strong>
+      <p id="connection-description"></p>
+    </section>
+<div id="connected-actions" hidden>
+      <button id="open-vandalizer" class="primary wide" type="button">Open Vandalizer</button>
+      <button id="open-working" class="wide" type="button" hidden>Open working tab</button>
     </div>
-
-    <script src="popup.js"></script>
+    <details id="change-connection"><summary id="connection-toggle">Connect Vandalizer</summary>
+    <form id="connect">
+      <label for="origin">Vandalizer address</label>
+      <input id="origin" type="url" readonly required aria-describedby="connect-help">
+      <p id="connect-help">Open your Vandalizer tab, then reopen this menu. Connect only a Vandalizer site you trust.</p>
+      <button class="primary wide" type="submit">Connect this site</button>
+    </form>
+    </details>
+    <div id="status" class="status" role="status"></div>
+    <section class="sites-section" aria-labelledby="sites-heading">
+      <h2 id="sites-heading">Sites chat may read</h2>
+      <p>You choose each site when chat first opens it.</p>
+      <ul id="sites"></ul>
+    </section>
+    <p class="safety"><strong>Read-only, signed in as you.</strong>Chat won’t enter passwords or submit, save, pay or change anything.</p>
+  </main>
+  <script src="popup.js" type="module"></script>
 </body>
-
 </html>
