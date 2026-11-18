@@ -209,6 +209,17 @@ def test_the_reminder_with_a_document_asks_for_the_full_list_marked_against_the_
     assert "Nothing was attached" in builtin_kbs.consulted_reminder([builtin_kbs.describe(PAPPG)])
 
 
+def test_the_reminder_with_a_document_fits_a_question_that_is_not_a_list():
+    # "Is this cost allowable under 2 CFR 200?" routes too; it must not be
+    # told to answer with a marked-up list and a Save button.
+    text = builtin_kbs.consulted_reminder([builtin_kbs.describe(PAPPG)], with_documents=True)
+    assert "Answer from these snippets and cite each one you use." in text
+    assert "When the person asks for a list" in text
+    assert "End a list with this button" in text
+    # The snippets are one search's worth; the rest of a long list is a search away.
+    assert f"search_knowledge_base for the rest before answering ({PAPPG.title} (kb_uuid {PAPPG.uuid}))" in text
+
+
 NIH = _kb("kb-nih-gps", "NIH Grants Policy Statement (FY2026)")
 
 

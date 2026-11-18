@@ -168,18 +168,22 @@ def consulted_reminder(kbs: list[dict], *, with_documents: bool = False) -> str:
         for kb in kbs
     )
     if with_documents:
+        searchable = "; ".join(f"{kb['title']} (kb_uuid {kb['uuid']})" for kb in kbs)
         return (
             "The attached document(s) are still loaded. This question also names a sponsor's "
             "rulebook, so Vandalizer searched its built-in knowledge base(s) for it:\n" + lines + "\n"
             "The person wants what the rulebook requires, not only what the attached document "
-            "happens to mention. Give the complete list the snippets support, one item per line, "
-            "and cite each item's snippet so every item carries its source. This answer may run "
-            "longer than usual. If a document is attached that states some of these items, mark "
-            "those items \"In this award\" and leave the others unmarked; never drop an item "
-            "because the document is silent on it. Say which knowledge base and edition the list "
-            "reflects. If the snippets do not cover the whole topic, say the list may be "
-            "incomplete rather than filling it from memory. End with this button on its own "
-            "line, written exactly:\n[ACTION:ask]Save as document[/ACTION]"
+            "happens to mention. Answer from these snippets and cite each one you use. Say which "
+            "knowledge base and edition the answer reflects.\n"
+            "When the person asks for a list (prior approvals, requirements): give the complete "
+            "list the snippets support, one item per line, and cite each item's snippet so every "
+            "item carries its source. This answer may run longer than usual. Mark the items the "
+            "attached document also states \"In this award\" and leave the others unmarked; never "
+            "drop an item because the document is silent on it. The snippets are one search's "
+            "worth: if they hold only part of the list, call search_knowledge_base for the rest "
+            "before answering (" + searchable + "). If the list may still be incomplete, say so "
+            "rather than filling it from memory. End a list with this button on its own line, "
+            "written exactly:\n[ACTION:ask]Save as document[/ACTION]"
         )
     return (
         "Nothing was attached, but this question is about a regulation or sponsor policy, so "

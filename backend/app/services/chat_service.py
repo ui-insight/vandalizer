@@ -95,6 +95,7 @@ from app.services.model_routing import (
     suggest_document_model,
 )
 from app.services.native_token_count import count_natively, native_count_for
+from app.services.kb_section_context import SectionIndex
 from app.services.page_locator import (
     annotate_chunk_pages,
     chunk_page_segments,
@@ -4370,6 +4371,8 @@ async def _render_kb_segment(
     any_approximate = False
     any_spanning = False
     any_amendment = False
+    any_section = False
+    section_indexes = await _kb_section_indexes(kb_results)
     page_segments: dict[int, list[tuple[int, str]]] = {}
     for ref, r in enumerate(kb_results, start=1):
         meta = r.get("metadata") or {}
@@ -4396,7 +4399,14 @@ async def _render_kb_segment(
         any_spanning = any_spanning or annotated != content
         # Numbered so the answer can say which snippets it used: a filename
         # can't, when one document contributes several.
-        snippet_blocks.append(f"\n**[S{ref}] Source: {label}**\n{annotated}\n")
+        # Where the snippet sits in its source: a snippet cut from the middle
+        # of a section or table carries no heading of its own (support ticket:
+        # a Standard Term of Award credited to the prior-approval exhibit).
+        index = section_indexes.get(meta.get("source_id") or "")
+        section = index.section_for(content) if index else None
+        any_section = any_section or bool(section)
+        section_line = f"_Section: {section}_\n" if section else ""
+        snippet_blocks.append(f"\n**[S{ref}] Source: {label}**\n{section_line}{annotated}\n")
         kb_sources.append({
             "ref": ref,
             # What [S{ref}] reads as in the answer the user sees and the one
@@ -4427,6 +4437,15 @@ async def _render_kb_segment(
         "`[S3]`, or `[S1, S3]` for several. Cite only snippets you actually "
         "used. If none answers the question, say so and cite none._\n"
     )
+    if any_section:
+        kb_text += (
+            "\n_A snippet's `Section:` line is where the snippet BEGINS in its "
+            "source (parent section > section > exhibit or table). A snippet "
+            "with no heading of its own belongs to that section or table, and "
+            "may continue a table that began in another snippet. Credit each "
+            "statement to the section or table it sits in, not to one named in "
+            "a neighbouring snippet._\n"
+        )
     if any_approximate:
         # A tilde the model has not had explained to it does not survive: it
         # gets normalised away and the estimate is restated as fact. Measured
@@ -4474,6 +4493,31 @@ async def _render_kb_segment(
     # honest outcome — an answer wearing citation chips for evidence the model
     # never saw is not.
     return DocumentSegment(label="kb", text=kb_text, required=True, page_segments=page_segments), kb_sources
+
+
+async def _kb_section_indexes(kb_results: list[dict]) -> dict[str, "SectionIndex"]:
+    """Heading indexes for the sources behind *kb_results*, by source id.
+
+    Read from each source's stored text. Best-effort: a snippet without one
+    is simply shown without a section.
+    """
+    from app.models.knowledge import KnowledgeBaseSource
+
+    ids = sorted({
+        sid for r in kb_results
+        if isinstance(sid := (r.get("metadata") or {}).get("source_id"), str) and sid
+    })
+    if not ids:
+        return {}
+    try:
+        sources = await KnowledgeBaseSource.find({"uuid": {"$in": ids}}).to_list()
+    except Exception as e:
+        logger.warning("Could not load knowledge base sources for section labels: %s", e)
+        return {}
+    return {
+        s.uuid: SectionIndex(s.content)
+        for s in sources if isinstance(s.content, str) and s.content
+    }
 
 
 # The optional "[S3] " prefix is the snippet number a numbered rendering puts
