@@ -60,6 +60,11 @@ def _context(*, available=True, user_id="ra", call_id="call-1"):
     return SimpleNamespace(deps=deps, tool_call_id=call_id)
 
 
+def _page_only(result: dict) -> dict:
+    """A read's result without the note that marks page text as data."""
+    return {k: v for k, v in result.items() if k != "untrusted_content_note"}
+
+
 PAGE = {"page": {"url": "https://fin.example.edu/award/123", "title": "Award 123",
                  "text": "# Award 123\nExpenditures to date | $1,234,567.89\nRemaining balance | 15,000.00"}}
 
@@ -72,7 +77,7 @@ async def test_a_tool_returns_what_the_page_posts_for_its_own_call():
     # Another person's answer for the same call id never reaches this turn.
     await browser.deliver_result("someone-else", "call-1", {"page": {"text": "wrong"}})
     await browser.deliver_result("ra", "call-1", PAGE)
-    assert await waiting == PAGE
+    assert _page_only(await waiting) == PAGE
     assert context.deps.browser_pages[-1]["url"] == "https://fin.example.edu/award/123"
 
 
@@ -235,7 +240,7 @@ async def test_the_page_sees_each_browser_call_before_the_tool_waits_for_it(chat
     assert calls["browser_read"]["relay"] is True
     assert "relay" not in calls["record_value"]
     results = {c["tool_name"]: c["content"] for c in chunks if c["kind"] == "tool_result"}
-    assert results["browser_read"] == PAGE
+    assert _page_only(results["browser_read"]) == PAGE
     assert results["record_value"]["recorded"] is True
     assert results["record_value"]["url"] == "https://fin.example.edu/award/123"
 

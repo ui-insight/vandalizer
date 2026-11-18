@@ -40,6 +40,22 @@ it('grants only the confirmed site, registers future loads and injects into exis
   expect(chrome.storage.local.set).toHaveBeenCalledWith({ vandalizerOrigin: 'https://vandalizer.example.edu' })
   expect(chrome.scripting.executeScript).toHaveBeenCalledWith({ target: { tabId: 42 }, files: ['content/bridge.js'] })
 })
+it('drops the sites allowed for a previous Vandalizer address when a different one is connected', async () => {
+  // Kept, they would let the newly connected address read every portal the
+  // person allowed for the old one, with no further prompt.
+  const { chrome, submit } = await popup('?origin=https%3A%2F%2Fother.example.org', true, 'https://vandalizer.example.edu')
+  chrome.permissions.getAll.mockResolvedValue({ origins: ['https://vandalizer.example.edu/*', 'https://fin.example.edu/*', 'https://other.example.org/*'] })
+  submit()
+  await waitFor(() => expect(chrome.storage.local.set).toHaveBeenCalledWith({ vandalizerOrigin: 'https://other.example.org' }))
+  expect(chrome.permissions.remove).toHaveBeenCalledWith({ origins: ['https://vandalizer.example.edu/*', 'https://fin.example.edu/*'] })
+})
+it('keeps allowed sites when the same Vandalizer address is connected again', async () => {
+  const { chrome, submit } = await popup('?origin=https%3A%2F%2Fvandalizer.example.edu', true, 'https://vandalizer.example.edu')
+  chrome.permissions.getAll.mockResolvedValue({ origins: ['https://vandalizer.example.edu/*', 'https://fin.example.edu/*'] })
+  submit()
+  await waitFor(() => expect(chrome.storage.local.set).toHaveBeenCalled())
+  expect(chrome.permissions.remove).not.toHaveBeenCalled()
+})
 it('explains a denied grant and leaves the connection unchanged', async () => {
   const { chrome, submit } = await popup('?origin=https%3A%2F%2Fvandalizer.example.edu', false)
   submit()

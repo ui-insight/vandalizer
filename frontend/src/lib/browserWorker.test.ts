@@ -45,6 +45,17 @@ it('does not inject a reader after a redirect to a site without permission', asy
   expect(await state.readTab({ id: 2, url: 'https://unapproved.example/login' }, '')).toMatchObject({ error: 'unapproved_site' })
   expect(chrome.scripting.executeScript).not.toHaveBeenCalled()
 })
+it('does not read or act on Vandalizer itself, though that address holds a site permission', async () => {
+  const { state, chrome } = worker()
+  chrome.permissions.contains.mockResolvedValue(true)
+  // A link or redirect landed the working tab on the app, admin pages included.
+  const landed = { id: 2, url: 'https://vandalizer.example.edu/admin/config' }
+  expect(await state.guardSite(landed)).toMatchObject({ error: 'unapproved_site', site: 'vandalizer.example.edu' })
+  expect(await state.readTab(landed, '')).toMatchObject({ error: 'unapproved_site' })
+  expect(chrome.scripting.executeScript).not.toHaveBeenCalled()
+  // Another site the person allowed is still read.
+  expect(await state.guardSite({ id: 2, url: 'https://fin.example.edu/award' })).toBeNull()
+})
 it("refuses a page outside the administrator's site list, even one the person allowed", async () => {
   const { state, chrome } = worker()
   chrome.permissions.contains.mockResolvedValue(true)

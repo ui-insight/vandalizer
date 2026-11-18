@@ -69,6 +69,8 @@ export function detectBrowserExtension(timeoutMs = 300): Promise<boolean> {
   })
 }
 
+export const RELAY_PING_TIMEOUT_MS = 2000
+
 /** Run one browser tool call in the extension. Never rejects. */
 export async function runBrowserTool(
   tool: string,
@@ -77,7 +79,10 @@ export async function runBrowserTool(
   allowedHosts?: string[],
 ): Promise<Record<string, unknown>> {
   listen()
-  if (!(await detectBrowserExtension(500))) return Promise.resolve({ error: 'browser_not_connected', message: 'The Vandalizer browser extension is not connected on this page.' })
+  // The reply needs the extension's background worker, which Chrome suspends
+  // after about 30 seconds idle; waking it can take over a second. At 500 ms
+  // a connected browser was reported as not connected mid-task.
+  if (!(await detectBrowserExtension(RELAY_PING_TIMEOUT_MS))) return Promise.resolve({ error: 'browser_not_connected', message: 'The Vandalizer browser extension is not connected on this page.' })
   const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
   return new Promise((resolve) => {
     const timer = setTimeout(() => {

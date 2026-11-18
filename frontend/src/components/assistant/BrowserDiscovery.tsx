@@ -2,6 +2,7 @@ import './browser-setup.css'
 import { useCallback, useEffect, useState } from 'react'
 import { ArrowRight, Globe2, X } from 'lucide-react'
 import { browserConnection, type BrowserConnection } from '../../lib/browserSetup'
+import { getAssistantCapabilities } from '../../api/assistant'
 import { AssistantSettingsAnchor } from './AssistantSettingsLink'
 
 // Like the other Home preferences, this choice belongs to this browser/site.
@@ -15,13 +16,28 @@ function isHidden() {
 export function BrowserDiscovery() {
   const [hidden, setHidden] = useState(isHidden)
   const [connection, setConnection] = useState<BrowserConnection>('checking')
+  // Whether chat can use the browser here at all. With "Use your browser"
+  // switched off by an administrator (or by the person), suggesting the
+  // extension advertises something they cannot use. Unknown counts as off.
+  const [offered, setOffered] = useState(false)
+  useEffect(() => {
+    if (hidden) return
+    let active = true
+    getAssistantCapabilities()
+      .then((page) => {
+        const browser = page.capabilities.find(capability => capability.id === 'browser')
+        if (active) setOffered(Boolean(browser && browser.allowed && browser.available && browser.enabled))
+      })
+      .catch(() => { /* Not knowing is no reason to suggest it. */ })
+    return () => { active = false }
+  }, [hidden])
   const dismiss = useCallback(() => {
     setHidden(true)
     try { localStorage.setItem(hiddenKey, '1') } catch { /* Still hide it for this visit. */ }
   }, [])
 
   useEffect(() => {
-    if (hidden) return
+    if (hidden || !offered) return
     let active = true
     let pending = false
     const check = async () => {
@@ -51,9 +67,9 @@ export function BrowserDiscovery() {
       window.removeEventListener('storage', syncDismissal)
       document.removeEventListener('visibilitychange', refresh)
     }
-  }, [hidden, dismiss])
+  }, [hidden, offered, dismiss])
 
-  if (hidden || connection === 'checking') return null
+  if (hidden || !offered || connection === 'checking') return null
 
   return <aside className="browser-panel browser-discovery" aria-label="Optional browser feature">
     <Globe2 className="browser-discovery-icon" size={20} aria-hidden="true" />

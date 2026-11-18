@@ -273,14 +273,21 @@ export function clickRef(ref) {
     // "Apply" or "Clear" in a filter panel narrows the list.
     if (inFilterPanel() && !DESTRUCTIVE.test(words)) return allowed
     if (WRITE.test(words)) return blocked('blocked_write_action', 'looks like it would change something')
-    // A plain button runs whatever script the page gave it, so a list of
-    // forbidden words is never complete: "Mark as complete", "Publish",
-    // "Yes" and "Terminate award" all got through one. It is clicked only
-    // when its label says it shows something (search, view, next, expand…)
-    // or it opens a menu or panel.
+    // A plain button runs whatever script the page gave it. "Mark as
+    // complete", "Publish", "Yes" and "Terminate award" all got through the
+    // word list above before it grew, and no list is complete, so where a
+    // click is most likely to act (a dialog, a form, a bare confirmation)
+    // the label must say that it shows something.
     const discloses = el.hasAttribute('aria-expanded') || el.hasAttribute('aria-haspopup') || el.hasAttribute('aria-controls')
     if (READS.test(words) || discloses) return allowed
-    return blocked('blocked_write_action', 'does not say that it only shows something')
+    // Answering a prompt ("Yes", "OK", "Continue") carries out whatever the
+    // prompt asked, and a button in a dialog or a form acts on it.
+    const CONFIRMS = /^(yes|ok|okay|continue|proceed|done|got it|i agree|i understand|next step)\b/i
+    const inPrompt = el.closest('[role="dialog"], [role="alertdialog"], dialog, form')
+    if (inPrompt || CONFIRMS.test(label)) return blocked('blocked_write_action', 'does not say that it only shows something')
+    // Elsewhere a button with nothing but a name ("Purchase Orders",
+    // "Transactions") is how many portals switch views.
+    return allowed
   }
 
   // Same places readPage numbers: the page, same-origin frames at any depth,
@@ -344,8 +351,23 @@ export function typeRef(ref, text) {
     const doc = node.ownerDocument
     const names = [node.innerText ?? node.textContent, node.value, node.name, node.id, node.title,
       node.getAttribute('aria-label'), node.getAttribute('placeholder'), node.getAttribute('alt')]
-    if (node.id) names.push(doc.querySelector(`label[for="${CSS.escape(node.id)}"]`)?.innerText)
-    names.push(node.closest('label')?.innerText)
+    const textOf = (label) => (label ? label.innerText ?? label.textContent : '')
+    if (node.id) names.push(textOf(doc.querySelector(`label[for="${CSS.escape(node.id)}"]`)))
+    names.push(textOf(node.closest('label')))
+    return clean(names.filter(Boolean).join(' '))
+  }
+  // What a field is called, without what it currently holds.
+  const fieldNames = (node) => {
+    const doc = node.ownerDocument
+    const textOf = (label) => (label ? label.innerText ?? label.textContent : '')
+    const names = [node.name, node.id, node.title, node.getAttribute('aria-label'), node.getAttribute('placeholder')]
+    if (node.id) names.push(textOf(doc.querySelector(`label[for="${CSS.escape(node.id)}"]`)))
+    const wrap = node.closest('label')
+    if (wrap) {
+      const copy = wrap.cloneNode(true)
+      copy.querySelectorAll('select, option, input, textarea').forEach((inner) => inner.remove())
+      names.push(copy.textContent)
+    }
     return clean(names.filter(Boolean).join(' '))
   }
   const FINDS = /search|filter|find|look ?up|lookup|query|keyword|criteria|facet/i
@@ -357,7 +379,7 @@ export function typeRef(ref, text) {
     const form = field.form || field.closest('form')
     const method = (form?.getAttribute('method') || 'get').toLowerCase()
     if (form && method === 'get') return true
-    if (FINDS.test(`${field.name} ${field.id} ${field.getAttribute('aria-label') || ''} ${field.getAttribute('placeholder') || ''} ${field.title || ''}`)) return true
+    if (FINDS.test(fieldNames(field))) return true
     let node = field.parentElement
     for (let i = 0; node && i < 6; i++, node = node.parentElement) {
       const name = `${node.id} ${typeof node.className === 'string' ? node.className : ''} ${node.getAttribute('aria-label') || ''}`
@@ -415,8 +437,23 @@ export function selectRef(ref, option) {
     const doc = node.ownerDocument
     const names = [node.innerText ?? node.textContent, node.value, node.name, node.id, node.title,
       node.getAttribute('aria-label'), node.getAttribute('placeholder'), node.getAttribute('alt')]
-    if (node.id) names.push(doc.querySelector(`label[for="${CSS.escape(node.id)}"]`)?.innerText)
-    names.push(node.closest('label')?.innerText)
+    const textOf = (label) => (label ? label.innerText ?? label.textContent : '')
+    if (node.id) names.push(textOf(doc.querySelector(`label[for="${CSS.escape(node.id)}"]`)))
+    names.push(textOf(node.closest('label')))
+    return clean(names.filter(Boolean).join(' '))
+  }
+  // What a field is called, without what it currently holds.
+  const fieldNames = (node) => {
+    const doc = node.ownerDocument
+    const textOf = (label) => (label ? label.innerText ?? label.textContent : '')
+    const names = [node.name, node.id, node.title, node.getAttribute('aria-label'), node.getAttribute('placeholder')]
+    if (node.id) names.push(textOf(doc.querySelector(`label[for="${CSS.escape(node.id)}"]`)))
+    const wrap = node.closest('label')
+    if (wrap) {
+      const copy = wrap.cloneNode(true)
+      copy.querySelectorAll('select, option, input, textarea').forEach((inner) => inner.remove())
+      names.push(copy.textContent)
+    }
     return clean(names.filter(Boolean).join(' '))
   }
   const FINDS = /search|filter|find|look ?up|lookup|query|keyword|criteria|facet/i
@@ -428,7 +465,7 @@ export function selectRef(ref, option) {
     const form = field.form || field.closest('form')
     const method = (form?.getAttribute('method') || 'get').toLowerCase()
     if (form && method === 'get') return true
-    if (FINDS.test(`${field.name} ${field.id} ${field.getAttribute('aria-label') || ''} ${field.getAttribute('placeholder') || ''} ${field.title || ''}`)) return true
+    if (FINDS.test(fieldNames(field))) return true
     let node = field.parentElement
     for (let i = 0; node && i < 6; i++, node = node.parentElement) {
       const name = `${node.id} ${typeof node.className === 'string' ? node.className : ''} ${node.getAttribute('aria-label') || ''}`
@@ -443,7 +480,7 @@ export function selectRef(ref, option) {
     }
     return false
   }
-  if (!findsThings(el) && !VIEWS.test(controlNames(el).replace(el.innerText ?? '', ' '))) {
+  if (!findsThings(el) && !VIEWS.test(fieldNames(el))) {
     return {
       error: 'blocked_write_action',
       message: `[${ref}] is not a search, filter or view drop-down, so Vandalizer will not change it. Ask the person to choose it themselves if it is needed.`,

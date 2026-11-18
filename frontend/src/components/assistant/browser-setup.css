@@ -117,12 +117,6 @@
   .browser-discovery-action { grid-column: 2; justify-self: start; }
   .browser-discovery-dismiss { grid-column: 3; grid-row: 1 / 3; }
 }
-@media (prefers-color-scheme: dark) {
-  .browser-panel { --browser-surface: #1f2933; --browser-text: #edf0f4; --browser-muted: #bcc7d3; --browser-line: #465366; --browser-soft: #263340; --browser-accent: #e9c95b; }
-  .browser-status[data-connected=true], .browser-skill-card li svg { color: #a1e8b6; }
-  .browser-steps [data-complete=true]:not([data-current=true]) .browser-step-number { color: #a1e8b6; border-color: #38784a; background: #153422; }
-}
-
 .browser-run { border: 1px solid var(--browser-line); border-radius: 12px; margin: 12px 0; overflow: hidden; font-size: 13px; }
 .browser-activity { padding: 14px 16px; }
 .browser-activity-heading { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }

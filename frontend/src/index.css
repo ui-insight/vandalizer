@@ -276,7 +276,7 @@ html {
 .chat-markdown th, .chat-markdown td {
   /* Keep figures and source labels readable when a neighboring cell is long.
      Wider tables scroll inside the existing keyboard-accessible region. */
-  min-width: 7rem;
+  min-width: 5rem;
   max-width: 20rem;
   vertical-align: top;
   white-space: normal;
