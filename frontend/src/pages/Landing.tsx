@@ -26,6 +26,7 @@ import {
   Users,
   X,
 } from 'lucide-react'
+import { rememberPendingNext, safeNextPath } from '../lib/pendingNext'
 
 // ---------------------------------------------------------------------------
 // Authentication
@@ -243,7 +244,7 @@ function AuthBlock({ config, mode, setMode }: { config: AuthConfig | null; mode:
 
       {oauthEnabled && azureProvider && (
         <div className="mb-4">
-          <a href="/api/auth/oauth/azure" className="launch-light-button w-full justify-center">
+          <a href="/api/auth/oauth/azure" onClick={() => rememberPendingNext(search?.next)} className="launch-light-button w-full justify-center">
             {azureProvider.display_name}
           </a>
         </div>
@@ -251,7 +252,7 @@ function AuthBlock({ config, mode, setMode }: { config: AuthConfig | null; mode:
 
       {samlProvider && (
         <div className="mb-4">
-          <a href="/api/auth/saml/login" className="launch-brand-button w-full justify-center">
+          <a href="/api/auth/saml/login" onClick={() => rememberPendingNext(search?.next)} className="launch-brand-button w-full justify-center">
             {samlProvider.display_name || 'Sign in with University SSO'}
           </a>
         </div>
@@ -611,12 +612,6 @@ function ConfirmationVisual() {
       </div>
     </div>
   )
-}
-
-function safeNextPath(raw: string | undefined): string | null {
-  if (!raw) return null
-  if (!raw.startsWith('/') || raw.startsWith('//')) return null
-  return raw
 }
 
 export default function Landing() {
