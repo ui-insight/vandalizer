@@ -18,6 +18,7 @@ export function BrowserSetup({ capability, onEnable, saving = false }: {
   saving?: boolean
 }) {
   const [state, setState] = useState<BrowserConnection>('checking')
+  const [expanded, setExpanded] = useState(() => location.hash === '#browser-setup')
   const [step, setStep] = useState(savedStep)
   const [downloaded, setDownloaded] = useState(false)
   const [edge, setEdge] = useState(() => navigator.userAgent.includes('Edg/'))
@@ -44,6 +45,8 @@ export function BrowserSetup({ capability, onEnable, saving = false }: {
       if (next !== previous.current) {
         if (next === 'connected') setStep(3)
         else if (next === 'installed' || previous.current === 'connected') setStep(2)
+        // Returning users need a connection summary, not the installation flow.
+        if (next === 'connected' && previous.current === 'checking') setExpanded(false)
         previous.current = next
       }
       if (manual && next !== 'connected') {
@@ -69,23 +72,40 @@ export function BrowserSetup({ capability, onEnable, saving = false }: {
   useEffect(() => {
     try { sessionStorage.setItem(progressKey, String(step)) } catch { /* Private browsing may block storage. */ }
     if (focusStep.current) { heading.current?.focus(); focusStep.current = false }
-  }, [step])
+  }, [step, expanded])
 
-  const go = (next: number) => { focusStep.current = true; setCopyNotice(''); setCheckNotice(''); setStep(next) }
+  useEffect(() => {
+    const open = () => { if (location.hash === '#browser-setup') setExpanded(true) }
+    window.addEventListener('hashchange', open)
+    return () => window.removeEventListener('hashchange', open)
+  }, [])
+
+  const go = (next: number) => { focusStep.current = true; setExpanded(true); setCopyNotice(''); setCheckNotice(''); setStep(next) }
   const status = state === 'checking' ? 'Checking your browser…' : state === 'connected' ? 'Browser connected' : state === 'installed' ? 'Extension installed · ready to connect' : 'Browser not connected'
   const title = step === 0 ? 'Get Vandalizer Browser' : step === 1 ? 'Add it to ' + browserName : step === 2 ? 'Connect this Vandalizer site' : 'Your browser is ready'
 
-  return <section id="browser-setup" tabIndex={-1} aria-labelledby="browser-setup-title" className="browser-panel browser-wizard">
+  return <section id="browser-setup" tabIndex={-1} aria-labelledby="browser-setup-title" className="browser-panel browser-wizard" data-compact={!expanded}>
     <header className="browser-wizard-header">
+      <div className="browser-header-copy">
       <div className="browser-eyebrow"><Globe2 size={17} aria-hidden="true" /> Vandalizer Browser</div>
-      <h2 id="browser-setup-title">Bring your websites into chat</h2>
-      <p>Collect figures from the sites you use. Get a table with a source for every value.</p>
+      <h2 id="browser-setup-title">{!expanded && state === 'connected' ? 'Your browser is ready' : 'Bring your websites into chat'}</h2>
+      <p>{!expanded && state === 'connected' ? <>Connected to <strong>{location.origin}</strong>. Use a browser Skill from your Library.</> : 'Collect figures from the sites you use, with a source for every value.'}</p>
       <div className="browser-status" role="status" data-connected={state === 'connected'}>
         {state === 'connected' ? <CheckCircle2 size={16} aria-hidden="true" /> : state === 'checking' ? <Loader2 size={16} aria-hidden="true" className="animate-spin" /> : <span className="browser-status-dot" aria-hidden="true" />}
         {status}
       </div>
+      </div>
+      <div className="browser-header-actions">
+        {expanded ? <button type="button" className="browser-text-button" aria-expanded="true" aria-controls="browser-setup-content" onClick={() => { setExpanded(false); document.getElementById('browser-setup')?.focus() }}>Close guide</button> : state !== 'checking' && <>
+          <button type="button" className="browser-secondary" aria-expanded="false" aria-controls="browser-setup-content" onClick={() => go(state === 'connected' ? 3 : step)}>{state === 'connected' ? 'Try a Skill' : state === 'installed' ? 'Connect this site' : 'Set up browser'}</button>
+          {state === 'connected' && <button type="button" className="browser-text-button" onClick={() => go(2)}>Connection help</button>}
+        </>}
+      </div>
     </header>
 
+    {blocked && <div className="browser-blocked" role="status"><strong>{!capability.allowed ? 'Your administrator has turned off browser access.' : !capability.available ? 'Browser access is unavailable on this Vandalizer site.' : 'Turn on “Use your browser” to use browser Skills.'}</strong><p>{!capability.allowed || !capability.available ? 'Ask your administrator to enable it before setting up your browser.' : 'You can turn it on when you need it. You still approve each website separately.'}</p>{capability.allowed && capability.available && onEnable && <button className="browser-secondary" type="button" disabled={saving} onClick={onEnable}>{saving ? 'Saving…' : 'Turn on Use your browser'}</button>}</div>}
+
+    {expanded && <div id="browser-setup-content">
     <ol className="browser-steps" aria-label="Browser setup progress">
       {steps.map((label, index) => <li key={label} data-current={step === index} data-complete={state === 'connected' || (state === 'installed' && index < 2)}>
         <button type="button" aria-current={step === index ? 'step' : undefined} disabled={index > step && !(state === 'connected' || state === 'installed' && index <= 2)} onClick={() => go(index)}>
@@ -139,14 +159,14 @@ export function BrowserSetup({ capability, onEnable, saving = false }: {
           <li><span>2</span><div>Click <strong>Connect this site</strong>.<small>On the page that opens, click <strong>Allow connection</strong> and approve {browserName}’s request.</small></div></li>
           <li><span>3</span><div>Come back here.<small>We’ll detect the connection and take you to the next step.</small></div></li>
         </ol>
-        <div className="browser-waiting"><span className="browser-status-dot" aria-hidden="true" />Waiting for your connection<button type="button" onClick={() => void check(true)} disabled={checking} className="browser-text-button">{checking ? 'Checking…' : 'Check again'}</button></div>
+        <div className="browser-waiting"><span className="browser-status-dot" aria-hidden="true" />{state === 'connected' ? 'This site is already connected' : 'Waiting for your connection'}<button type="button" onClick={() => void check(true)} disabled={checking} className="browser-text-button">{checking ? 'Checking…' : 'Check again'}</button></div>
+        {state === 'connected' && <button type="button" className="browser-secondary" onClick={() => go(3)}>Try a Skill <ArrowRight size={16} aria-hidden="true" /></button>}
         {checkNotice && <p role="status" className="browser-hint">{checkNotice}</p>}
         <details className="browser-help"><summary>Need help connecting?</summary><p>Open the extension from this Vandalizer tab so it picks up the right address. If you’ve already allowed the connection, reload this tab once.</p><button type="button" className="browser-text-button" onClick={() => go(0)}>Show installation steps</button></details>
       </>}
 
       {step === 3 && <>
         <p className="browser-stage-intro">Connected to <strong>{location.origin}</strong>. Try it with a Skill from your Library.</p>
-        {blocked && <div className="browser-blocked" role="status"><strong>{!capability.allowed ? 'Your administrator has turned off browser access.' : !capability.available ? 'Browser access is unavailable on this Vandalizer site.' : 'Turn on “Use your browser” to run this Skill.'}</strong><p>{!capability.allowed || !capability.available ? 'Ask your administrator to enable it. Your extension is connected.' : 'This is your Assistant setting. You still approve each website separately.'}</p>{capability.allowed && capability.available && onEnable && <button className="browser-secondary" type="button" disabled={saving} onClick={onEnable}>{saving ? 'Saving…' : 'Turn on Use your browser'}</button>}</div>}
         <div className="browser-skill-card"><div className="browser-eyebrow">Try with public university pages</div><h4>University research snapshot</h4><p>Collect enrollment, research spending, and economic impact from the University of Idaho’s website.</p><ul><li><Check size={16} aria-hidden="true" />No university login needed</li><li><Check size={16} aria-hidden="true" />A table with page links</li></ul><a className="browser-primary" href="/?tab=library&browserSkill=demo">Add Skill to Library <ArrowRight size={16} aria-hidden="true" /></a><p className="browser-hint">Review and save it, then choose <strong>Run Skill</strong> in your Library.</p></div>
         <p className="browser-library-note">This is a regular Library Skill. Use it in one chat, or add it to Core Skills in Assistant settings.</p>
         <details className="browser-help"><summary>Use your own instructions</summary><p>Start with a template in the same Library editor, or download the example to import into another account.</p><div className="browser-extra-links"><a href="/?tab=library&browserSkill=starter">Write a Skill</a><a href="/skills/browser-demo.json" download>Download example Skill</a></div></details>
@@ -155,5 +175,6 @@ export function BrowserSetup({ capability, onEnable, saving = false }: {
       {step > 0 && step < 3 && <button type="button" className="browser-back browser-text-button" onClick={() => go(step - 1)}><ArrowLeft size={15} aria-hidden="true" />Back</button>}
     </div>
     <footer className="browser-safety"><ShieldCheck size={18} aria-hidden="true" /><div><strong>Read-only. You choose the sites.</strong><span>Chat won’t enter passwords or click buttons that submit, pay, save, or change anything. If sign-in is needed, you take over.</span></div></footer>
+    </div>}
   </section>
 }

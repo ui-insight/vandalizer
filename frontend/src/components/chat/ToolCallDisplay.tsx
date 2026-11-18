@@ -1,5 +1,6 @@
 import './tool-calls.css'
-import { BrowserActivity } from './BrowserActivity'
+import { BrowserRun } from './BrowserRun'
+import { groupBrowserSegments, isBrowserTool } from './browserToolGroups'
 import { getToolMeta as getMeta, TOOL_META, toolTarget, activeToolLabel } from './toolActivity'
 import { qualityPresentation } from '../../lib/qualityLabels'
 import { completedSkillSelection } from '../../lib/skillSelection'
@@ -1524,6 +1525,8 @@ export function ToolStatusLine({
       onDecide={onConfirm && !upNext ? decide : undefined} upNext={upNext} stepHeading={step?.heading} revising={name === 'revise_html_artifact'} />
   }
 
+  if (isBrowserTool(name)) return <BrowserRun calls={[call ?? { tool_name: name, tool_call_id: result?.tool_call_id ?? name, args: {} }]} results={new Map(result ? [[result.tool_call_id, result]] : [])} running={isActive} />
+
   return (
     <div className="agent-tool-result agent-tool-card" data-tool-state={executionLabel} data-tool-category={meta.category} data-tool-error={isError || undefined}>
       <div className="agent-tool-header">
@@ -1538,8 +1541,6 @@ export function ToolStatusLine({
         </div>
       </div>
       {!(needsConfirmation && name === 'propose_obligations') && (!isActive || activeHint) && (summaryText || unconfirmed) && <p className="agent-tool-summary">{unconfirmed ? 'No result was received for this call.' : summaryText}</p>}
-      {name.startsWith('browser_') && <BrowserActivity result={obj} />}
-      {name === 'record_value' && obj?.recorded === true && typeof obj.url === 'string' && /^https?:\/\//i.test(obj.url) && <p className="px-3 pb-3 text-sm text-gray-700">Source: <a href={obj.url} target="_blank" rel="noreferrer" className="underline">{typeof obj.page_title === 'string' && obj.page_title ? obj.page_title : obj.url}</a>{typeof obj.captured_at === 'string' && <> · Captured {obj.captured_at}</>}</p>}
       {result && name === 'use_core_skill' && !isError && <CoreSkillDetails value={obj?.skill} />}
       {result && !isActive && !isError && !needsConfirmation && !canceled && result.quality && (
         <div className="agent-tool-evaluation"><QualityBadge quality={result.quality} showGrade /></div>
@@ -1670,7 +1671,10 @@ export function ToolCallDisplay({ names = {}, toolCalls, toolResults, isStreamin
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-2)', margin: "var(--workspace-space-6) 0" }}>
-      {[...allCallIds].map((callId) => {
+      {groupBrowserSegments([...allCallIds].map(id => ({ kind: 'tool_call', call: toolCalls.find(call => call.tool_call_id === id) ?? { tool_call_id: id, tool_name: resultMap.get(id)?.tool_name ?? 'unknown', args: {} } }))).map(segment => {
+        if (segment.kind === 'browser_group') return <BrowserRun key={segment.calls[0].tool_call_id} calls={segment.calls} results={resultMap} running={isStreaming} />
+        if (segment.kind !== 'tool_call') return null
+        const callId = segment.call.tool_call_id
         const result = resultMap.get(callId)
         const call = toolCalls.find((c) => c.tool_call_id === callId)
         const name = result?.tool_name || call?.tool_name || 'unknown'
