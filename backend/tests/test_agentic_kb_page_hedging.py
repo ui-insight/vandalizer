@@ -11,6 +11,7 @@ to prevent: an estimated page stated as exact, and a chunk cited by the page it
 starts on rather than the page the answer is on.
 """
 
+import itertools
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -25,10 +26,18 @@ def _kb() -> MagicMock:
     return kb
 
 
-def _result(content: str, **meta) -> dict:
+_chunk_ids = itertools.count(1)
+
+
+def _result(content: str, chunk_id: str | None = None, **meta) -> dict:
     base = {"source_id": "src-1", "source_name": "Award Terms.pdf"}
     base.update(meta)
-    return {"content": content, "metadata": base, "chunk_id": "c-1", "score": 0.9}
+    # Every indexed chunk has its own id; a search that returns the same id
+    # again is returning the same chunk.
+    return {
+        "content": content, "metadata": base,
+        "chunk_id": chunk_id or f"c-{next(_chunk_ids)}", "score": 0.9,
+    }
 
 
 async def _search(

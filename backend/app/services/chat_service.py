@@ -3066,7 +3066,10 @@ async def chat_stream(
                 # because they mean nothing outside this turn. That holds for
                 # the passages the agent's own KB searches returned as much as
                 # for the pre-fetched ones; those are only ever cited by name.
-                used_refs = _mark_used_citations(assistant_message, streamed_citations)
+                used_refs = _mark_used_citations(
+                    assistant_message, streamed_citations,
+                    deps.kb_snippet_texts if deps is not None else None,
+                )
                 if used_refs is not None:
                     if kb_sources:
                         assistant_message = expand_snippet_refs(assistant_message, kb_sources, kb_page_segments)
@@ -4545,17 +4548,21 @@ def _completed_tool_work(
     }
 
 
-def _mark_used_citations(answer: str, citations: list[dict]) -> Optional[list[int]]:
+def _mark_used_citations(
+    answer: str, citations: list[dict], texts: dict[int, str] | None = None,
+) -> Optional[list[int]]:
     """Mark each numbered citation ``used`` if *answer* cites it.
 
     Covers the pre-fetched KB snippets and the passages the agent's own KB
     searches returned alike. Returns the used numbers, or None when no
     citation is numbered (web pages, attached documents, older turns).
+    *texts* is the searched passages' text by number, which narrows a
+    citation by source name to the passages its claim draws on.
     """
     numbered = [c for c in citations if isinstance(c.get("ref"), int)]
     if not numbered:
         return None
-    used_refs = used_snippet_refs(answer, numbered)
+    used_refs = used_snippet_refs(answer, numbered, texts)
     for c in numbered:
         c["used"] = c["ref"] in used_refs
     return used_refs
