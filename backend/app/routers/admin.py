@@ -326,6 +326,7 @@ class ConfigUpdateRequest(BaseModel):
     default_team_id: Optional[str] = None
     support_contacts: Optional[list[dict]] = None
     outbound_url_allowed_hosts: Optional[list[str]] = None
+    browser_allowed_domains: Optional[list[str]] = None
 
     _validate_compliance = field_validator("compliance_config")(validate_compliance_patch)
     _validate_retention = field_validator("retention_config")(validate_retention_config)
@@ -1641,6 +1642,7 @@ async def get_config(
         # Read-only: what the operator allowed via env, shown beside the
         # editable list so an admin can see the whole effective policy.
         "outbound_url_env_allowed_hosts": sorted(url_validation.env_allowed_hosts()),
+        "browser_allowed_domains": list(getattr(cfg, "browser_allowed_domains", None) or []),
     }
 
 
@@ -1729,6 +1731,19 @@ async def update_config(
         if hosts != list(cfg.outbound_url_allowed_hosts or []):
             hosts_audit = {"before": list(cfg.outbound_url_allowed_hosts or []), "after": hosts}
         cfg.outbound_url_allowed_hosts = hosts
+    browser_audit: dict | None = None
+    if body.browser_allowed_domains is not None:
+        from app.services import browser_policy
+
+        # A line that is not a bare domain would never match, leaving the
+        # admin with a list that blocks the site they meant to allow.
+        try:
+            domains = browser_policy.normalize_domains(body.browser_allowed_domains)
+        except url_validation.InvalidAllowedHost as e:
+            raise HTTPException(status_code=400, detail=f"Browser allowed sites: {e}")
+        if domains != list(getattr(cfg, "browser_allowed_domains", None) or []):
+            browser_audit = {"before": list(getattr(cfg, "browser_allowed_domains", None) or []), "after": domains}
+        cfg.browser_allowed_domains = domains
 
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
     cfg.updated_by = user.user_id
@@ -1744,6 +1759,13 @@ async def update_config(
             "Changed the private-address hosts outbound requests may reach: "
             f"{', '.join(hosts_audit['after']) or '(none)'}",
             hosts_audit,
+        )
+    if browser_audit is not None:
+        await _audit(
+            user, "update_browser_allowed_domains",
+            "Changed the sites chat's browser tools may use: "
+            f"{', '.join(browser_audit['after']) or '(any site the person allows)'}",
+            browser_audit,
         )
 
     return {"status": "ok"}

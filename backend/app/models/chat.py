@@ -366,6 +366,10 @@ class ChatConversation(Document):
     # a real user message must intervene. See chat_tools._confirm_gate.
     pending_confirmations: list[dict] = []
 
+    # Sites the person approved for the browser tools after the request
+    # review asked (browser_policy). Approved once per conversation.
+    browser_approved_sites: list[str] = []
+
     class Settings:
         name = "chat_conversation"
         indexes = [

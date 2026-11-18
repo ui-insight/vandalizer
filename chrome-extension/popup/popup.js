@@ -147,7 +147,17 @@ form.addEventListener('submit', async (event) => {
       runAt: 'document_start',
       persistAcrossSessions: true,
     }])
-    if (previous && previous !== origin) await chrome.permissions.remove({ origins: [`${previous}/*`] }).catch(() => {})
+    if (previous && previous !== origin) {
+      // A different Vandalizer address starts with no sites allowed. Kept,
+      // the old grants would let whatever is connected now read every portal
+      // the person allowed for the previous one, with no further prompt.
+      const granted = (await chrome.permissions.getAll()).origins || []
+      const stale = granted.filter((pattern) => pattern !== `${origin}/*`)
+      if (stale.length) {
+        try { await chrome.permissions.remove({ origins: stale }) } catch { /* Chrome keeps a grant it will not remove. */ }
+      }
+      try { await chrome.storage.session.remove('workingTabId') } catch { /* no working tab to forget */ }
+    }
     await chrome.storage.local.set({ vandalizerOrigin: origin })
     // Register for future loads, then attach to already open tabs immediately.
     const tabs = await chrome.tabs.query({ url: `${origin}/*` })

@@ -7,10 +7,12 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import toolsScript from '../../../chrome-extension/background/page-tools.js?raw'
 
 type Outcome = Record<string, unknown>
-const { clickRef, readPage } = new Function(
-  `${toolsScript.replaceAll('export function', 'function')}\nreturn { clickRef, readPage };`,
+const { clickRef, readPage, selectRef, typeRef } = new Function(
+  `${toolsScript.replaceAll('export function', 'function')}\nreturn { clickRef, readPage, selectRef, typeRef };`,
 )() as {
   clickRef: (ref: number) => Outcome
+  typeRef: (ref: number, text: string) => Outcome
+  selectRef: (ref: number, option: string) => Outcome
   readPage: (query: string, maxChars: number) => { text: string } & Outcome
 }
 
@@ -71,6 +73,102 @@ describe('browser_click allows ordinary navigation and filters', () => {
     ['a checkbox in a search form', '<form action="/search"><label><input type="checkbox"> Active only</label></form>'],
   ])('%s', (_name, html) => {
     expect(click(html).ok).toBe(true)
+  })
+})
+
+// Independent review of the first version: each of these was clicked, typed
+// or chosen, while the permission window promised "Read-only".
+describe('browser_click refuses what the first word list missed', () => {
+  it.each([
+    ['Mark as complete', '<button type="button">Mark as complete</button>'],
+    ['Publish', '<button type="button">Publish</button>'],
+    ['Yes', '<button type="button">Yes</button>'],
+    ['OK', '<button type="button">OK</button>'],
+    ['Continue', '<button type="button">Continue</button>'],
+    ['Buy now', '<button type="button">Buy now</button>'],
+    ['Unsubscribe', '<button type="button">Unsubscribe</button>'],
+    ['Revoke access', '<button type="button">Revoke access</button>'],
+    ['Disable account', '<button type="button">Disable account</button>'],
+    ['Reset password', '<button type="button">Reset password</button>'],
+    ['Share', '<button type="button">Share</button>'],
+    ['Enroll', '<button type="button">Enroll</button>'],
+    ['a role=button "Terminate award"', '<div role="button">Terminate award</div>'],
+    ['a link to an archive address', '<a href="/awards/12/archive">Old awards</a>'],
+    ['a link to a disable address', '<a href="/users/5/disable">User 5</a>'],
+    ['a link with action=mark_paid', '<a href="/invoices/7?action=mark_paid">Invoice 7</a>'],
+    ['"View and finish" in a posting form', '<form method="post"><button>View and finish</button></form>'],
+    ['a named button inside a dialog', '<div role="dialog"><button type="button">Transactions</button></div>'],
+    ['a named button inside a posting form', '<form method="post"><button type="button">Transactions</button></form>'],
+  ])('%s', (_name, html) => {
+    expect(click(html).error).toBe('blocked_write_action')
+  })
+
+  it.each([
+    ['a menu button', '<button type="button" aria-haspopup="menu">Account</button>'],
+    ['an expander', '<button type="button" aria-expanded="false">Budget lines</button>'],
+    ['"Close" on a dialog', '<div role="dialog"><button type="button">Close</button></div>'],
+    ['"View details" in a dialog', '<div role="dialog"><button type="button">View details</button></div>'],
+    ['a named view button', '<button type="button">Transactions</button>'],
+  ])('still clicks %s', (_name, html) => {
+    expect(click(html).ok).toBe(true)
+  })
+})
+
+/** Put html on the page and number its [data-test] control (or first field) as 1. */
+function field(html: string): HTMLElement {
+  document.body.innerHTML = html
+  const target = (document.querySelector('[data-test]') ?? document.querySelector('input, textarea, select')) as HTMLElement
+  target.setAttribute('data-vz-ref', '1')
+  return target
+}
+
+describe('browser_type and browser_select only work in search and filter fields', () => {
+  it.each([
+    ['a comment box', '<form method="post"><textarea name="comment"></textarea><button>Save</button></form>'],
+    ['a text field in a form that saves', '<form method="post"><input name="title"><button>Update</button></form>'],
+    ['a field outside any form or filter', '<input name="amount">'],
+  ])('does not type in %s', (_name, html) => {
+    const el = field(html) as HTMLInputElement
+    const changed = vi.fn()
+    el.addEventListener('change', changed)
+    expect(typeRef(1, 'x')).toMatchObject({ error: 'blocked_write_action' })
+    expect(el.value).toBe('')
+    expect(changed).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['a search box', '<input type="search" name="q">'],
+    ['a field in a GET form', '<form action="/search"><input name="term"></form>'],
+    ['a field named for a filter', '<input name="awardFilter">'],
+    ['a field in a filter panel', '<div class="search-criteria"><input name="fund"></div>'],
+    ['a field in a posting form that only searches', '<form method="post"><input name="fund"><input type="submit" value="Search"></form>'],
+  ])('types in %s', (_name, html) => {
+    const el = field(html) as HTMLInputElement
+    expect(typeRef(1, '123456')).toMatchObject({ ok: true })
+    expect(el.value).toBe('123456')
+  })
+
+  it.each([
+    ['a status drop-down in a form that saves', '<form method="post"><label>Status <select name="status"><option>Open</option><option>Closed</option></select></label><button>Save</button></form>'],
+    ['a status drop-down that saves on change', '<label>Status <select name="status"><option>Open</option><option>Closed</option></select></label>'],
+  ])('does not choose in %s', (_name, html) => {
+    const el = field(html) as HTMLSelectElement
+    const changed = vi.fn()
+    el.addEventListener('change', changed)
+    expect(selectRef(1, 'Closed')).toMatchObject({ error: 'blocked_write_action' })
+    expect(el.value).toBe('Open')
+    expect(changed).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['a fiscal year drop-down', '<label>Fiscal year <select name="fy"><option>2025</option><option>2026</option></select></label>', '2026'],
+    ['a rows-per-page drop-down', '<select aria-label="Rows per page"><option>10</option><option>50</option></select>', '50'],
+    ['a drop-down in a search form', '<form action="/search"><select name="type"><option>All</option><option>Grants</option></select></form>', 'Grants'],
+    ['a drop-down in a filter panel', '<div id="filters"><select name="status"><option>Open</option><option>Closed</option></select></div>', 'Closed'],
+  ])('chooses in %s', (_name, html, option) => {
+    const el = field(html) as HTMLSelectElement
+    expect(selectRef(1, option)).toMatchObject({ ok: true, selected: option })
+    expect(el.value).toBe(option)
   })
 })
 

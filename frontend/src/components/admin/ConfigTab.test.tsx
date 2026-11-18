@@ -419,6 +419,31 @@ describe('ConfigTab — allowed private hosts', () => {
   })
 })
 
+describe('ConfigTab — browser allowed sites', () => {
+  it('shows the saved domains one per line and saves an edited list', async () => {
+    mockGetSystemConfig.mockResolvedValue(makeConfig({ browser_allowed_domains: ['example.edu', 'grants.gov'] }))
+    await renderConfigTab()
+
+    const field = screen.getByLabelText('Browser allowed sites') as HTMLTextAreaElement
+    expect(field.value).toBe('example.edu\ngrants.gov')
+    fireEvent.change(field, { target: { value: ' example.edu \n\nnsf.gov, grants.gov\n' } })
+    fireEvent.click(screen.getAllByRole('button', { name: /Save Processing Settings/i })[0])
+
+    await waitFor(() => expect(mockUpdateSystemConfig).toHaveBeenCalledTimes(1))
+    const payload = mockUpdateSystemConfig.mock.calls[0][0] as Record<string, unknown>
+    expect(payload.browser_allowed_domains).toEqual(['example.edu', 'nsf.gov', 'grants.gov'])
+  })
+
+  it('saves an empty list when the field is cleared, which removes the limit', async () => {
+    mockGetSystemConfig.mockResolvedValue(makeConfig({ browser_allowed_domains: ['example.edu'] }))
+    await renderConfigTab()
+    fireEvent.change(screen.getByLabelText('Browser allowed sites'), { target: { value: '' } })
+    fireEvent.click(screen.getAllByRole('button', { name: /Save Processing Settings/i })[0])
+    await waitFor(() => expect(mockUpdateSystemConfig).toHaveBeenCalledTimes(1))
+    expect((mockUpdateSystemConfig.mock.calls[0][0] as Record<string, unknown>).browser_allowed_domains).toEqual([])
+  })
+})
+
 // ---------------------------------------------------------------------------
 // 2. Load-failure guard (plan 003)
 // ---------------------------------------------------------------------------

@@ -204,9 +204,9 @@ export function clickRef(ref) {
     // Filter controls change the view, not the record.
     const FILTER_WORDS = /\b(add|apply|clear|reset|remove|update|change)\s+(a\s+|the\s+)?(filters?|criteria|columns?|sort(ing)?|search|view|date range)\b/gi
     const words = label.replace(NOUNS, ' ').replace(FILTER_WORDS, ' ')
-    const DESTRUCTIVE = /\b(approve|certify|sign|e-?sign|delete|remove|pay|payment|transfer|withdraw|cancel|confirm|reject|deny|decline|accept|agree|void|reverse|finali[sz]e|draw ?down|close ?out|log ?out|sign ?out|log ?off|sign ?off|purchase|send)\b/i
-    const WRITE = /\b(submit|save|update|approve|certify|sign|e-?sign|send|delete|remove|pay|payment|transfer|confirm|apply|post|upload|cancel|withdraw|reject|deny|decline|accept|agree|purchase|order|create|add|change|request|finali[sz]e|draw ?down|close ?out|log ?out|sign ?out|log ?off|sign ?off|void|reverse|archive|release|route|discard|deactivate|unlock)\b/i
-    const READS = /\b(search|find|filter|view|show|display|refresh|look ?up|run report|next|previous|prev|first|last|page|sort|expand|collapse|details|more|export|print)\b/i
+    const DESTRUCTIVE = /\b(approve|certify|sign|e-?sign|delete|remove|pay|payment|transfer|withdraw|cancel|confirm|reject|deny|decline|accept|agree|void|reverse|finali[sz]e|draw ?down|close ?out|log ?out|sign ?out|log ?off|sign ?off|purchase|send|archive|disable|deactivate|enable|activate|revoke|terminate|suspend|unsubscribe|subscribe|enroll|unenroll|publish|unpublish|share|buy|check ?out|reset password|mark|complete|finish|release|discard|lock|unlock|close (the |this )?(account|award|project|record|case|ticket|request))\b/i
+    const WRITE = /\b(submit|save|update|approve|certify|sign|e-?sign|send|delete|remove|pay|payment|transfer|confirm|apply|post|upload|cancel|withdraw|reject|deny|decline|accept|agree|purchase|order|create|add|change|request|finali[sz]e|draw ?down|close ?out|log ?out|sign ?out|log ?off|sign ?off|void|reverse|archive|release|route|discard|deactivate|unlock|disable|enable|activate|revoke|terminate|suspend|unsubscribe|subscribe|enroll|unenroll|publish|unpublish|share|buy|check ?out|reset password|mark|complete|finish|lock|close (the |this )?(account|award|project|record|case|ticket|request))\b/i
+    const READS = /\b(search|find|filter|view|show|display|refresh|look ?up|run report|next|previous|prev|first|last|page|sort|expand|collapse|details|more|export|print|open|close|back|load|see|menu|hide|go to|select all|help)\b/i
 
     const form = el.form || el.closest('form')
     const method = (el.getAttribute('formmethod') || form?.getAttribute('method') || 'get').toLowerCase()
@@ -257,7 +257,7 @@ export function clickRef(ref) {
       try { target = new URL(el.href, doc.baseURI) } catch { target = null }
       let path = target ? `${target.pathname}${target.search}` : rawHref
       try { path = decodeURIComponent(path) } catch { /* keep it encoded */ }
-      if (/(^|[/_\-.=?&])(delete|del|remove|destroy|logout|log-?out|log_?off|logoff|signout|sign-?out|signoff|approve|reject|certify|submit|withdraw|cancel|pay|transfer|void)([/_\-.=?&]|$)/i.test(path)) {
+      if (/(^|[/_\-.=?&])(delete|del|remove|destroy|logout|log-?out|log_?off|logoff|signout|sign-?out|signoff|approve|reject|certify|submit|withdraw|cancel|pay|transfer|void|archive|disable|deactivate|enable|activate|revoke|terminate|suspend|unsubscribe|subscribe|enroll|unenroll|publish|unpublish|mark|complete|finali[sz]e|purchase|checkout|send|save|update|create|reset)([/_\-.=?&]|$)/i.test(path)) {
         return blocked('blocked_write_action', 'links to an address that looks like it would change something')
       }
       return DESTRUCTIVE.test(words) ? blocked('blocked_write_action', 'looks like it would change something') : allowed
@@ -270,10 +270,24 @@ export function clickRef(ref) {
 
     // Any other button: it must say what it does.
     if (!/[a-z]{2}/i.test(label)) return blocked('unlabeled_control', 'has no readable label, so what it does is unknown')
-    if (!WRITE.test(words)) return allowed
     // "Apply" or "Clear" in a filter panel narrows the list.
     if (inFilterPanel() && !DESTRUCTIVE.test(words)) return allowed
-    return blocked('blocked_write_action', 'looks like it would change something')
+    if (WRITE.test(words)) return blocked('blocked_write_action', 'looks like it would change something')
+    // A plain button runs whatever script the page gave it. "Mark as
+    // complete", "Publish", "Yes" and "Terminate award" all got through the
+    // word list above before it grew, and no list is complete, so where a
+    // click is most likely to act (a dialog, a form, a bare confirmation)
+    // the label must say that it shows something.
+    const discloses = el.hasAttribute('aria-expanded') || el.hasAttribute('aria-haspopup') || el.hasAttribute('aria-controls')
+    if (READS.test(words) || discloses) return allowed
+    // Answering a prompt ("Yes", "OK", "Continue") carries out whatever the
+    // prompt asked, and a button in a dialog or a form acts on it.
+    const CONFIRMS = /^(yes|ok|okay|continue|proceed|done|got it|i agree|i understand|next step)\b/i
+    const inPrompt = el.closest('[role="dialog"], [role="alertdialog"], dialog, form')
+    if (inPrompt || CONFIRMS.test(label)) return blocked('blocked_write_action', 'does not say that it only shows something')
+    // Elsewhere a button with nothing but a name ("Purchase Orders",
+    // "Transactions") is how many portals switch views.
+    return allowed
   }
 
   // Same places readPage numbers: the page, same-origin frames at any depth,
@@ -328,6 +342,64 @@ export function typeRef(ref, text) {
   const type = (el.type || '').toLowerCase()
   const typable = el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && ['', 'text', 'search', 'number', 'date', 'email', 'tel', 'url', 'month', 'week'].includes(type))
   if (!typable) return { error: 'not_a_text_field', message: `[${ref}] is not a text field.` }
+
+  // Read-only: typing or choosing is for finding things. A field that is not
+  // part of a search or filter may save as soon as it changes (a status
+  // drop-down, a comment box), so it is left to the person.
+  const clean = (s) => String(s || '').replace(/\s+/g, ' ').trim()
+  const controlNames = (node) => {
+    const doc = node.ownerDocument
+    const names = [node.innerText ?? node.textContent, node.value, node.name, node.id, node.title,
+      node.getAttribute('aria-label'), node.getAttribute('placeholder'), node.getAttribute('alt')]
+    const textOf = (label) => (label ? label.innerText ?? label.textContent : '')
+    if (node.id) names.push(textOf(doc.querySelector(`label[for="${CSS.escape(node.id)}"]`)))
+    names.push(textOf(node.closest('label')))
+    return clean(names.filter(Boolean).join(' '))
+  }
+  // What a field is called, without what it currently holds.
+  const fieldNames = (node) => {
+    const doc = node.ownerDocument
+    const textOf = (label) => (label ? label.innerText ?? label.textContent : '')
+    const names = [node.name, node.id, node.title, node.getAttribute('aria-label'), node.getAttribute('placeholder')]
+    if (node.id) names.push(textOf(doc.querySelector(`label[for="${CSS.escape(node.id)}"]`)))
+    const wrap = node.closest('label')
+    if (wrap) {
+      const copy = wrap.cloneNode(true)
+      copy.querySelectorAll('select, option, input, textarea').forEach((inner) => inner.remove())
+      names.push(copy.textContent)
+    }
+    return clean(names.filter(Boolean).join(' '))
+  }
+  const FINDS = /search|filter|find|look ?up|lookup|query|keyword|criteria|facet/i
+  const VIEWS = /\b(sort|order by|per page|rows|page size|show|display|view|fiscal|year|period|month|quarter|date|from|through|range)\b/i
+  const SAVES = /\b(save|submit|update|approve|certify|send|create|add|delete|remove|post|upload|confirm|pay|sign|apply changes)\b/i
+  const findsThings = (field) => {
+    const type = (field.type || '').toLowerCase()
+    if (type === 'search' || field.getAttribute('role') === 'searchbox' || field.closest('[role="search"]')) return true
+    const form = field.form || field.closest('form')
+    const method = (form?.getAttribute('method') || 'get').toLowerCase()
+    if (form && method === 'get') return true
+    if (FINDS.test(fieldNames(field))) return true
+    let node = field.parentElement
+    for (let i = 0; node && i < 6; i++, node = node.parentElement) {
+      const name = `${node.id} ${typeof node.className === 'string' ? node.className : ''} ${node.getAttribute('aria-label') || ''}`
+      if (/filter|search|criteria|facet|query|lookup/i.test(name)) return true
+    }
+    // Older portals post every search. Such a form has a Search or Find
+    // button and nothing that saves.
+    if (form) {
+      const buttons = [...form.querySelectorAll('button, input[type="submit"], input[type="button"], input[type="image"], [role="button"]')]
+        .map(controlNames).filter(Boolean)
+      if (buttons.length && buttons.some((b) => FINDS.test(b) || /\b(go|run report|retrieve|refresh)\b/i.test(b)) && !buttons.some((b) => SAVES.test(b))) return true
+    }
+    return false
+  }
+  if (!findsThings(el)) {
+    return {
+      error: 'blocked_write_action',
+      message: `[${ref}] is not a search or filter field, so Vandalizer will not type in it. Ask the person to fill it in themselves if it is needed.`,
+    }
+  }
   const proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype
   el.focus()
   Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, String(text))
@@ -356,6 +428,64 @@ export function selectRef(ref, option) {
   const el = findRef(document)
   if (!el) return { error: 'stale_ref', message: `No element [${ref}] on the page now. Read the page again.` }
   if (el.tagName !== 'SELECT') return { error: 'not_a_dropdown', message: `[${ref}] is not a drop-down.` }
+
+  // Read-only: typing or choosing is for finding things. A field that is not
+  // part of a search or filter may save as soon as it changes (a status
+  // drop-down, a comment box), so it is left to the person.
+  const clean = (s) => String(s || '').replace(/\s+/g, ' ').trim()
+  const controlNames = (node) => {
+    const doc = node.ownerDocument
+    const names = [node.innerText ?? node.textContent, node.value, node.name, node.id, node.title,
+      node.getAttribute('aria-label'), node.getAttribute('placeholder'), node.getAttribute('alt')]
+    const textOf = (label) => (label ? label.innerText ?? label.textContent : '')
+    if (node.id) names.push(textOf(doc.querySelector(`label[for="${CSS.escape(node.id)}"]`)))
+    names.push(textOf(node.closest('label')))
+    return clean(names.filter(Boolean).join(' '))
+  }
+  // What a field is called, without what it currently holds.
+  const fieldNames = (node) => {
+    const doc = node.ownerDocument
+    const textOf = (label) => (label ? label.innerText ?? label.textContent : '')
+    const names = [node.name, node.id, node.title, node.getAttribute('aria-label'), node.getAttribute('placeholder')]
+    if (node.id) names.push(textOf(doc.querySelector(`label[for="${CSS.escape(node.id)}"]`)))
+    const wrap = node.closest('label')
+    if (wrap) {
+      const copy = wrap.cloneNode(true)
+      copy.querySelectorAll('select, option, input, textarea').forEach((inner) => inner.remove())
+      names.push(copy.textContent)
+    }
+    return clean(names.filter(Boolean).join(' '))
+  }
+  const FINDS = /search|filter|find|look ?up|lookup|query|keyword|criteria|facet/i
+  const VIEWS = /\b(sort|order by|per page|rows|page size|show|display|view|fiscal|year|period|month|quarter|date|from|through|range)\b/i
+  const SAVES = /\b(save|submit|update|approve|certify|send|create|add|delete|remove|post|upload|confirm|pay|sign|apply changes)\b/i
+  const findsThings = (field) => {
+    const type = (field.type || '').toLowerCase()
+    if (type === 'search' || field.getAttribute('role') === 'searchbox' || field.closest('[role="search"]')) return true
+    const form = field.form || field.closest('form')
+    const method = (form?.getAttribute('method') || 'get').toLowerCase()
+    if (form && method === 'get') return true
+    if (FINDS.test(fieldNames(field))) return true
+    let node = field.parentElement
+    for (let i = 0; node && i < 6; i++, node = node.parentElement) {
+      const name = `${node.id} ${typeof node.className === 'string' ? node.className : ''} ${node.getAttribute('aria-label') || ''}`
+      if (/filter|search|criteria|facet|query|lookup/i.test(name)) return true
+    }
+    // Older portals post every search. Such a form has a Search or Find
+    // button and nothing that saves.
+    if (form) {
+      const buttons = [...form.querySelectorAll('button, input[type="submit"], input[type="button"], input[type="image"], [role="button"]')]
+        .map(controlNames).filter(Boolean)
+      if (buttons.length && buttons.some((b) => FINDS.test(b) || /\b(go|run report|retrieve|refresh)\b/i.test(b)) && !buttons.some((b) => SAVES.test(b))) return true
+    }
+    return false
+  }
+  if (!findsThings(el) && !VIEWS.test(fieldNames(el))) {
+    return {
+      error: 'blocked_write_action',
+      message: `[${ref}] is not a search, filter or view drop-down, so Vandalizer will not change it. Ask the person to choose it themselves if it is needed.`,
+    }
+  }
   const wanted = String(option).replace(/\s+/g, ' ').trim().toLowerCase()
   const options = [...el.options]
   const match = options.find((o) => o.text.replace(/\s+/g, ' ').trim().toLowerCase() === wanted)

@@ -2,13 +2,41 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { BrowserDiscovery } from './BrowserDiscovery'
 import { browserConnection, type BrowserConnection } from '../../lib/browserSetup'
+import { getAssistantCapabilities, type AssistantCapability, type AssistantPage } from '../../api/assistant'
 
 vi.mock('../../lib/browserSetup', () => ({ browserConnection: vi.fn() }))
+vi.mock('../../api/assistant', async (original) => ({ ...(await original<typeof import('../../api/assistant')>()), getAssistantCapabilities: vi.fn() }))
+
+const capabilities = (browser: Partial<AssistantCapability> = {}): AssistantPage => ({
+  capabilities: [{ id: 'browser', label: 'Use your browser', description: '', enabled: true, allowed: true, available: true, active: true, ...browser }],
+  always_on: [], can_set_limits: false,
+})
 
 beforeEach(() => {
   localStorage.clear()
   vi.clearAllMocks()
   vi.mocked(browserConnection).mockResolvedValue('not-installed')
+  vi.mocked(getAssistantCapabilities).mockResolvedValue(capabilities())
+})
+
+it.each([
+  ['an administrator switched browser use off', { allowed: false, active: false }],
+  ['the person switched browser use off', { enabled: false, active: false }],
+])('is not suggested when %s', async (_name, browser) => {
+  vi.mocked(getAssistantCapabilities).mockResolvedValue(capabilities(browser))
+  render(<BrowserDiscovery />)
+  await waitFor(() => expect(getAssistantCapabilities).toHaveBeenCalled())
+  await act(async () => { await Promise.resolve() })
+  expect(screen.queryByRole('complementary')).not.toBeInTheDocument()
+  // And it does not keep checking for the extension.
+  expect(browserConnection).not.toHaveBeenCalled()
+})
+
+it('is not suggested when the setting could not be read', async () => {
+  vi.mocked(getAssistantCapabilities).mockRejectedValue(new Error('offline'))
+  render(<BrowserDiscovery />)
+  await act(async () => { await Promise.resolve() })
+  expect(screen.queryByRole('complementary')).not.toBeInTheDocument()
 })
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers() })
 

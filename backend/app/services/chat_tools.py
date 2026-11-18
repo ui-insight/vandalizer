@@ -375,6 +375,7 @@ _APPROVE_BUTTON_LABELS = {
     "run_pin_on_project": "Run on project files",
     "set_project_status": "Update status",
     "save_to_folder": "Save to folder",
+    "browser_open": "Open site",
 }
 
 

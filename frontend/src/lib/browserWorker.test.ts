@@ -10,7 +10,7 @@ function worker() {
     scripting: { executeScript: vi.fn(async () => []), getRegisteredContentScripts: vi.fn(async () => []), registerContentScripts: vi.fn() },
   }
   const script = workerScript.replace(/^import .* from .*\n/m, '')
-  const state = new Function('chrome', `${script}\nreturn { pendingPermissions, readTab, handleCommand };`)(chrome)
+  const state = new Function('chrome', `${script}\nreturn { pendingPermissions, readTab, handleCommand, guardSite };`)(chrome)
   return { chrome, state, receive: chrome.runtime.onMessage.addListener.mock.calls[0][0], external: chrome.runtime.onMessageExternal.addListener.mock.calls[0][0] }
 }
 it('accepts permission decisions from its exact extension page even when it has a tab', () => {
@@ -44,6 +44,29 @@ it('does not inject a reader after a redirect to a site without permission', asy
   const { state, chrome } = worker()
   expect(await state.readTab({ id: 2, url: 'https://unapproved.example/login' }, '')).toMatchObject({ error: 'unapproved_site' })
   expect(chrome.scripting.executeScript).not.toHaveBeenCalled()
+})
+it('does not read or act on Vandalizer itself, though that address holds a site permission', async () => {
+  const { state, chrome } = worker()
+  chrome.permissions.contains.mockResolvedValue(true)
+  // A link or redirect landed the working tab on the app, admin pages included.
+  const landed = { id: 2, url: 'https://vandalizer.example.edu/admin/config' }
+  expect(await state.guardSite(landed)).toMatchObject({ error: 'unapproved_site', site: 'vandalizer.example.edu' })
+  expect(await state.readTab(landed, '')).toMatchObject({ error: 'unapproved_site' })
+  expect(chrome.scripting.executeScript).not.toHaveBeenCalled()
+  // Another site the person allowed is still read.
+  expect(await state.guardSite({ id: 2, url: 'https://fin.example.edu/award' })).toBeNull()
+})
+it("refuses a page outside the administrator's site list, even one the person allowed", async () => {
+  const { state, chrome } = worker()
+  chrome.permissions.contains.mockResolvedValue(true)
+  const sender = { id: 'ours', origin: 'https://vandalizer.example.edu', tab: { id: 1, windowId: 1, index: 0 } }
+  const opened = await state.handleCommand({ tool: 'browser_open', args: { url: 'https://bank.example.com/' }, allowedHosts: ['Example.edu'] }, sender)
+  expect(opened).toMatchObject({ error: 'site_not_allowed_by_admin', site: 'bank.example.com' })
+  // A redirect that leaves the list is not read; a subdomain of a listed domain is.
+  expect(await state.readTab({ id: 2, url: 'https://sso.other.org/login' }, '', ['example.edu'])).toMatchObject({ error: 'site_not_allowed_by_admin' })
+  expect(chrome.scripting.executeScript).not.toHaveBeenCalled()
+  expect(await state.guardSite({ id: 2, url: 'https://fin.example.edu/award' }, ['example.edu'])).toBeNull()
+  expect(await state.guardSite({ id: 2, url: 'https://notexample.edu/' }, ['example.edu'])).toMatchObject({ error: 'site_not_allowed_by_admin' })
 })
 
 it('restores only a saved, granted connection after browser startup', async () => {

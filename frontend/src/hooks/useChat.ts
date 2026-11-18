@@ -445,12 +445,12 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
             // Only calls the server marked: it waits for those, and a withheld
             // tool or bad arguments must never reach the person's browser.
             if (chunk.kind === 'tool_call' && chunk.relay === true && chunk.tool_name && chunk.tool_call_id && BROWSER_TOOL_NAMES.has(chunk.tool_name)) {
-              const { tool_name: tool, tool_call_id: callId, args } = chunk
+              const { tool_name: tool, tool_call_id: callId, args, browser_allowed_hosts: allowedHosts } = chunk
               browserQueue = browserQueue
                 .then(async () => {
                   // After Stop, calls still queued must not open or click anything.
                   if (stoppedTurnsRef.current.has(controller) || controller.signal.aborted) return
-                  const outcome = await runBrowserTool(tool, args ?? {})
+                  const outcome = await runBrowserTool(tool, args ?? {}, allowedHosts)
                   await postBrowserResult(callId, outcome)
                 })
                 .catch(() => { /* the server reports a timeout to the agent */ })
