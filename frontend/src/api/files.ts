@@ -17,7 +17,7 @@ export function uploadFile(data: {
   extension: string
   folder?: string
 }, signal?: AbortSignal) {
-  return apiFetch<{ complete: boolean; uuid?: string; exists?: boolean }>(
+  return apiFetch<{ complete: boolean; uuid?: string; exists?: boolean; changed?: boolean | null }>(
     '/api/files/upload',
     { method: 'POST', body: JSON.stringify(data), signal },
   )

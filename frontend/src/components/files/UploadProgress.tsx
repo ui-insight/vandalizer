@@ -6,6 +6,7 @@ interface UploadItem {
   progress: number
   done: boolean
   error?: string
+  note?: string
 }
 
 interface UploadProgressProps {
@@ -63,6 +64,7 @@ export function UploadProgress({ uploads, onDismiss }: UploadProgressProps) {
               </div>
             )}
             {u.error && <p className="mt-1 text-xs text-red-600">{u.error}</p>}
+            {!u.error && u.note && <p className="mt-1 text-xs text-gray-500">{u.note}</p>}
           </div>
         </div>
       ))}

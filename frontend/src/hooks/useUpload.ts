@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 import { uploadFile } from '../api/files'
+import { IDENTICAL_UPLOAD_NOTE, isUnappliedUpload, unappliedUploadMessage } from '../lib/duplicateUpload'
 import { readUploadPolicy, uploadFileError } from '../utils/uploadPolicy'
 
 export interface UploadProgress {
@@ -8,6 +9,8 @@ export interface UploadProgress {
   progress: number // 0–100
   done: boolean
   error?: string
+  /** Shown under a finished upload that changed nothing. */
+  note?: string
   uuid?: string
 }
 
@@ -64,10 +67,18 @@ export function useUpload(folderId: string | null, onComplete: () => void) {
             folder: folderId ?? undefined,
           })
 
+          // A same-name file was already here and the server kept it. Unless
+          // the two are known to be identical, that is not a successful
+          // upload: say so, and don't open the old file as if it were new.
+          if (isUnappliedUpload(result)) {
+            updateItem(item.id, { done: true, error: unappliedUploadMessage(file.name, result) })
+            continue
+          }
+
           const uuid = result.uuid
           if (uuid && !firstUuid) firstUuid = uuid
 
-          updateItem(item.id, { progress: 100, done: true, uuid })
+          updateItem(item.id, { progress: 100, done: true, uuid, note: result.exists ? IDENTICAL_UPLOAD_NOTE : undefined })
         } catch (err) {
           updateItem(item.id, {
             done: true,
