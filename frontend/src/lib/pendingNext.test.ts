@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { consumePendingNext, PENDING_NEXT_KEY, rememberPendingNext, safeNextPath } from './pendingNext'
+import { clearPendingNext, consumePendingNext, PENDING_NEXT_KEY, rememberPendingNext, safeNextPath } from './pendingNext'
 
 beforeEach(() => sessionStorage.clear())
 afterEach(() => vi.useRealTimers())
@@ -32,6 +32,12 @@ describe('the link parked across single sign-on', () => {
   it('comes back once, then is gone', () => {
     rememberPendingNext('/?kb=abc')
     expect(consumePendingNext()).toBe('/?kb=abc')
+    expect(consumePendingNext()).toBeNull()
+  })
+
+  it('is forgotten when sign-in follows another link directly', () => {
+    rememberPendingNext('/?kb=abandoned')
+    clearPendingNext()
     expect(consumePendingNext()).toBeNull()
   })
 

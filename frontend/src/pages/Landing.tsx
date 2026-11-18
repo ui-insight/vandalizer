@@ -26,7 +26,7 @@ import {
   Users,
   X,
 } from 'lucide-react'
-import { rememberPendingNext, safeNextPath } from '../lib/pendingNext'
+import { clearPendingNext, rememberPendingNext, safeNextPath } from '../lib/pendingNext'
 
 // ---------------------------------------------------------------------------
 // Authentication
@@ -644,7 +644,11 @@ export default function Landing() {
   }, [])
 
   useEffect(() => {
-    if (user && !demoExpired && !inviteToken && nextPath) window.location.replace(nextPath)
+    if (user && !demoExpired && !inviteToken && nextPath) {
+      // This link wins over one parked by an earlier, abandoned single sign-on.
+      clearPendingNext()
+      window.location.replace(nextPath)
+    }
   }, [user, demoExpired, inviteToken, nextPath])
 
   if (loading) return null

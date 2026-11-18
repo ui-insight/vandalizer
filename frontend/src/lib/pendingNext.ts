@@ -54,6 +54,18 @@ export function rememberPendingNext(raw: string | undefined | null): void {
   }
 }
 
+/** Forget the parked link. Called when sign-in follows a link directly
+ * (password sign-in, or an already signed-in visit): a link parked by an
+ * earlier, abandoned single sign-on must not pull the person away from the
+ * one they just opened. */
+export function clearPendingNext(): void {
+  try {
+    sessionStorage.removeItem(PENDING_NEXT_KEY)
+  } catch {
+    // Nothing was parked if storage is unavailable.
+  }
+}
+
 /** The parked link, removed as it is read. Null when there is none, it has
  * expired, or it isn't a safe path. */
 export function consumePendingNext(): string | null {
