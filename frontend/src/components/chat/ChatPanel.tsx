@@ -18,6 +18,7 @@ import { useCoreSkills } from '../../hooks/useCoreSkills'
 import { coreSkillsNeedingAttention } from '../../api/assistant'
 import { ExistingFilesDialog } from '../files/ExistingFilesDialog'
 import { FileProcessingCell, type ProcessingCellDoc } from './FileProcessingCell'
+import { LIST_PRIOR_APPROVALS, looksLikeAward } from './awardSuggestions'
 import { ChatExportActions } from './ChatExportActions'
 import { TrialTopUpDialog } from '../trial/TrialTopUpDialog'
 import { UnverifiedEmailAction } from '../trial/UnverifiedEmailAction'
@@ -1278,6 +1279,9 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                 'What are the most important facts and figures?',
                 'List every topic covered',
               ] : hasDocContext ? [
+                // An award's prior approvals are what people ask for first and
+                // didn't know they could (support ticket).
+                ...(selectedDocUuids.some(uuid => looksLikeAward(selectedDocNames[uuid])) ? [LIST_PRIOR_APPROVALS] : []),
                 'Summarize this in 5 bullet points',
                 ...(onboardingStatus?.top_extraction_set_name
                   ? [`Run ${onboardingStatus.top_extraction_set_name} on selected documents`]

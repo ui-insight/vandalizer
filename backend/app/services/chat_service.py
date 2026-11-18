@@ -2010,13 +2010,17 @@ async def chat_stream(
     # and figure checks as an attached one, instead of memory or web blogs.
     from app.services import builtin_kbs
     auto_kbs: list[dict] = []
+    # With a document attached, only a question that names a rulebook and asks
+    # what it requires consults one (support ticket: "list NIH prior approvals"
+    # with an award letter selected returned only what the letter mentions).
+    routed_with_documents = bool(document_uuids or attachment_segments)
     if (
-        not kbs and not kb_uuid and not document_uuids and not attachment_segments
+        not kbs and not kb_uuid
         and not include_onboarding_context and not is_first_session and not run_demo
         and "knowledge_bases" not in capabilities_off
     ):
         try:
-            routed = await builtin_kbs.route(message)
+            routed = await builtin_kbs.route(message, with_documents=routed_with_documents)
         except Exception as e:
             logger.warning("Built-in knowledge base routing failed: %s", e)
             routed = []
@@ -2172,7 +2176,7 @@ async def chat_stream(
         # project" on follow-ups too.
         reminder_blocks.append(KB_CHAT_RULES + _build_manifest_block(kb_manifest))
         if auto_kbs:
-            reminder_blocks.append(builtin_kbs.consulted_reminder(auto_kbs))
+            reminder_blocks.append(builtin_kbs.consulted_reminder(auto_kbs, with_documents=routed_with_documents))
         if kbs_not_searched:
             reminder_blocks.append(_kbs_not_searched_reminder(kbs_not_searched))
     elif have_context:

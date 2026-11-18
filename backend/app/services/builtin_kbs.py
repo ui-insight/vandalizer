@@ -59,6 +59,26 @@ _TOPICS: list[tuple[str, re.Pattern[str]]] = [
 
 MAX_ROUTED = 2
 
+# With a document attached, the topic words above are usually about the
+# document ("is this cost allowable?", "who is the subrecipient?"), so they
+# don't route. What routes is the question naming the rulebook or its sponsor
+# AND asking what that rulebook requires (support ticket: "list NIH prior
+# approvals" with an award letter selected listed only the ones the letter
+# mentions, and the full list was a typed follow-up away).
+_NAMES: list[tuple[str, re.Pattern[str]]] = [
+    ("kb-nih-gps", re.compile(r"\bnih\b|\bnational institutes of health\b|\bgrants policy statement\b", re.IGNORECASE)),
+    ("kb-nsf-pappg", re.compile(r"\bnsf\b|\bnational science foundation\b|\bpappg\b", re.IGNORECASE)),
+    ("kb-2cfr200", re.compile(r"\b2\s*c\.?\s*f\.?\s*r\.?\b|\buniform guidance\b|\bomb (?:circular|guidance)\b", re.IGNORECASE)),
+    ("kb-dod-research", re.compile(r"\bdfars\b|\bdod\b|\bdepartment of defense\b", re.IGNORECASE)),
+    ("kb-doe-fa", re.compile(r"\bdoe\b|\bdepartment of energy\b", re.IGNORECASE)),
+    ("kb-far", re.compile(r"\bfederal acquisition regulation\b|\bfar\s+(?:part|clause|subpart)\b", re.IGNORECASE)),
+]
+_RULEBOOK_ASK = re.compile(
+    r"\bprior approvals?\b|\bpolic(?:y|ies)\b|\b(?:full|complete|entire|whole)\s+(?:\w+\s+){0,3}list\b"
+    r"|\bgrants policy statement\b|\bpappg\b|\buniform guidance\b|\b2\s*c\.?\s*f\.?\s*r\.?\b",
+    re.IGNORECASE,
+)
+
 # A request to do something ("run the NSF budget workflow", "create a KB from
 # the PAPPG") is a task for tools, not a policy question: answering it in
 # knowledge-base mode would get in the way.
@@ -69,7 +89,7 @@ _ACTION = re.compile(
 )
 _QUESTION = re.compile(
     r"\?|^\s*(?:what|when|which|who|whom|where|why|how|is|are|was|were|does|do|did|can|could|may|must|should"
-    r"|shall|will|would|has|have|explain|describe|define|list|cite|summari[sz]e|tell me|what's)\b",
+    r"|shall|will|would|has|have|explain|describe|define|list|cite|summari[sz]e|tell me|what's|show|give me)\b",
     re.IGNORECASE,
 )
 
@@ -89,11 +109,19 @@ def is_policy_question(message: str) -> bool:
     return bool(_QUESTION.search(text)) and not _ACTION.search(text) and not _APP_OBJECT.search(text)
 
 
-def matching_seed_ids(message: str) -> list[str]:
-    """Built-in KB seed ids a question is about, most specific first."""
+def matching_seed_ids(message: str, *, with_documents: bool = False) -> list[str]:
+    """Built-in KB seed ids a question is about, most specific first.
+
+    ``with_documents``: something is attached, so only a question that names a
+    rulebook and asks what it requires matches (see ``_NAMES``).
+    """
     text = message or ""
     if not is_policy_question(text):
         return []
+    if with_documents:
+        if not _RULEBOOK_ASK.search(text):
+            return []
+        return [seed for seed, pattern in _NAMES if pattern.search(text)][:MAX_ROUTED]
     return [seed for seed, pattern in _TOPICS if pattern.search(text)][:MAX_ROUTED]
 
 
@@ -120,9 +148,9 @@ async def builtin_kbs() -> list[Any]:
     return [kb for kb in found if _searchable(kb)]
 
 
-async def route(message: str) -> list[Any]:
+async def route(message: str, *, with_documents: bool = False) -> list[Any]:
     """The built-in knowledge bases this question should consult, in topic order."""
-    seeds = matching_seed_ids(message)
+    seeds = matching_seed_ids(message, with_documents=with_documents)
     if not seeds:
         return []
     # The catalog's own copy (owned by "system") wins over any other verified
@@ -132,13 +160,27 @@ async def route(message: str) -> list[Any]:
     return [by_seed[seed] for seed in seeds if seed in by_seed]
 
 
-def consulted_reminder(kbs: list[dict]) -> str:
+def consulted_reminder(kbs: list[dict], *, with_documents: bool = False) -> str:
     """Told to the model on a turn that consulted built-in KBs it wasn't given."""
     lines = "\n".join(
         f"- {kb['title']}" + (f": {kb['description']}" if kb["description"] else "")
         + (f" (last updated {kb['updated']})" if kb["updated"] else "")
         for kb in kbs
     )
+    if with_documents:
+        return (
+            "The attached document(s) are still loaded. This question also names a sponsor's "
+            "rulebook, so Vandalizer searched its built-in knowledge base(s) for it:\n" + lines + "\n"
+            "The person wants what the rulebook requires, not only what the attached document "
+            "happens to mention. Give the complete list the snippets support, one item per line, "
+            "and cite each item's snippet so every item carries its source. This answer may run "
+            "longer than usual. If a document is attached that states some of these items, mark "
+            "those items \"In this award\" and leave the others unmarked; never drop an item "
+            "because the document is silent on it. Say which knowledge base and edition the list "
+            "reflects. If the snippets do not cover the whole topic, say the list may be "
+            "incomplete rather than filling it from memory. End with this button on its own "
+            "line, written exactly:\n[ACTION:ask]Save as document[/ACTION]"
+        )
     return (
         "Nothing was attached, but this question is about a regulation or sponsor policy, so "
         "Vandalizer searched its built-in knowledge base(s) for it:\n" + lines + "\n"
