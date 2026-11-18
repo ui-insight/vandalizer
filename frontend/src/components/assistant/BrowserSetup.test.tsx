@@ -5,7 +5,7 @@ import { browserConnection } from '../../lib/browserSetup'
 import type { AssistantCapability } from '../../api/assistant'
 
 vi.mock('../../lib/browserSetup', () => ({ browserConnection: vi.fn(), browserStoreUrl: '' }))
-beforeEach(() => { sessionStorage.clear(); vi.mocked(browserConnection).mockResolvedValue('not-installed') })
+beforeEach(() => { sessionStorage.clear(); history.replaceState(null, '', '#browser-setup'); vi.mocked(browserConnection).mockResolvedValue('not-installed') })
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
 it('starts with one download action and keeps later instructions out of the way', async () => {
@@ -87,6 +87,7 @@ it('returns to connection help if the extension disconnects', async () => {
   await screen.findByRole('heading', { name: 'Your browser is ready' })
   vi.mocked(browserConnection).mockResolvedValue('not-installed')
   fireEvent.focus(window)
+  fireEvent.click(await screen.findByRole('button', { name: 'Set up browser' }))
   await waitFor(() => expect(screen.queryByRole('link', { name: 'Add Skill to Library' })).not.toBeInTheDocument())
   expect(screen.getByRole('heading', { name: 'Connect this Vandalizer site' })).toBeVisible()
 })
@@ -99,7 +100,7 @@ it('routes an off capability through the existing enable action', async () => {
   render(<BrowserSetup capability={capability} onEnable={onEnable} />)
   fireEvent.click(await screen.findByRole('button', { name: 'Turn on Use your browser' }))
   expect(onEnable).toHaveBeenCalledOnce()
-  expect(screen.getByText('Turn on “Use your browser” to run this Skill.')).toBeVisible()
+  expect(screen.getByText('Turn on “Use your browser” to use browser Skills.')).toBeVisible()
 })
 
 it('explains an administrator block without offering to bypass it', async () => {
@@ -107,4 +108,26 @@ it('explains an administrator block without offering to bypass it', async () => 
   render(<BrowserSetup capability={{ ...capability, allowed: false }} onEnable={vi.fn()} />)
   expect(await screen.findByText('Your administrator has turned off browser access.')).toBeVisible()
   expect(screen.queryByRole('button', { name: 'Turn on Use your browser' })).not.toBeInTheDocument()
+})
+
+it('keeps returning connected users out of the wizard until they choose a Skill', async () => {
+  vi.mocked(browserConnection).mockResolvedValue('connected')
+  render(<BrowserSetup />)
+  await screen.findByText('Browser connected')
+  expect(screen.queryByRole('list', { name: 'Browser setup progress' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('link', { name: 'Add Skill to Library' })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Try a Skill' }))
+  expect(screen.getByRole('link', { name: 'Add Skill to Library' })).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: 'Close guide' }))
+  expect(screen.getByRole('region', { name: 'Your browser is ready' })).toHaveFocus()
+})
+it('keeps setup optional on the general Assistant settings page', async () => {
+  history.replaceState(null, '', '/assistant')
+  render(<BrowserSetup />)
+  expect(await screen.findByRole('button', { name: 'Set up browser' })).toBeVisible()
+  expect(screen.queryByRole('link', { name: 'Download extension' })).not.toBeInTheDocument()
+})
+it('shows administrator restrictions before installation', async () => {
+  render(<BrowserSetup capability={{ ...capability, allowed: false }} />)
+  expect(await screen.findByText('Your administrator has turned off browser access.')).toBeVisible()
 })

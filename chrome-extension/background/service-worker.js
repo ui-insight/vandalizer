@@ -253,7 +253,7 @@ async function askForSite(host, pattern) {
   const params = new URLSearchParams({ id, host, pattern })
   const win = await chrome.windows.create({
     url: chrome.runtime.getURL(`permission/permission.html?${params}`),
-    type: 'popup', width: 460, height: 320, focused: true,
+    type: 'popup', width: 460, height: 480, focused: true,
   })
   return new Promise((resolve) => {
     let done = false

@@ -2,18 +2,23 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Allow Vandalizer to read this site?</title>
   <link rel="stylesheet" href="../popup/popup.css">
 </head>
-<body>
-  <main style="width:auto">
-    <h1>Allow chat to read <span id="host"></span>?</h1>
-    <p>Vandalizer chat wants to open <strong id="host2"></strong> in a tab, signed in as you, and read figures from it.</p>
-    <p>It only reads: it will not submit, save or approve anything. You can remove the site from the extension's menu at any time.</p>
+<body data-page="permission">
+  <main>
+    <header class="brand"><img src="../assets/icons/icon-48.png" alt="">Vandalizer Browser</header>
+    <h1>Allow chat to read this site?</h1>
+    <strong id="host" class="site-address"></strong>
+    <p>Chat can open this site and read figures using your signed-in session.</p>
+    <p class="hint">Stays allowed until you remove it in the extension menu.</p>
     <div class="row">
-      <button id="allow" class="primary" type="button">Allow</button>
-      <button id="deny" type="button">Don't allow</button>
+      <button id="deny" type="button">Not now</button>
+      <button id="allow" class="primary" type="button">Allow this site</button>
     </div>
+    <div id="status" class="status bad" role="status"></div>
+    <p class="safety"><strong>Read-only. You sign in yourself.</strong>Chat won’t enter passwords or submit, save, pay or change anything.</p>
   </main>
   <script src="permission.js" type="module"></script>
 </body>

@@ -7,6 +7,7 @@ import { listAllFolders, type FolderSummary } from '../../api/folders'
 import { uploadFile } from '../../api/files'
 import { useUploadPolicy } from '../../hooks/useUploadPolicy'
 import { readUploadPolicy, uploadFileError } from '../../utils/uploadPolicy'
+import { isUnappliedUpload, unappliedUploadMessage } from '../../lib/duplicateUpload'
 
 interface DocumentPickerModalProps {
   onSubmit: (docUuids: string[]) => void | Promise<void>
@@ -198,7 +199,11 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
           extension: p.ext,
           folder: targetFolder,
         })
-        if (result.uuid) {
+        if (isUnappliedUpload(result)) {
+          // Selecting the existing file here would add the old content under
+          // the name of the file just chosen.
+          patchUpload(p.item.id, { status: 'error', error: unappliedUploadMessage(p.file.name, result, targetFolder ? 'this folder' : 'your files') })
+        } else if (result.uuid) {
           newUuids.push(result.uuid)
           patchUpload(p.item.id, { status: 'done', uuid: result.uuid })
         } else {

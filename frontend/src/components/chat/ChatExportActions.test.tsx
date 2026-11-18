@@ -137,3 +137,33 @@ it('keeps copy on user messages without offering individual downloads', async ()
   fireEvent.click(screen.getByRole('button', { name: 'Copy message' }))
   await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith('Review the grant packet.'))
 })
+
+// Support ticket #1200: chat wrote an email summary of an award, and the only
+// way to send it on was copy and paste.
+describe('email a chat reply', () => {
+  const reply = (content: string): ChatMessage[] => [{ role: 'assistant', content }]
+  const opened = () => vi.mocked(HTMLAnchorElement.prototype.click).mock.contexts.map(a => decodeURIComponent((a as HTMLAnchorElement).href))
+
+  it('opens the reply as a draft in the person\u2019s own email app', () => {
+    render(<ChatExportActions messages={reply('**Subject:** Award highlights\n\nHello,\n\nThe award is **$148,500**.')} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Email message' }))
+    expect(opened()).toEqual(['mailto:?subject=Award highlights&body=Hello,\r\n\r\nThe award is $148,500.'])
+  })
+
+  it('copies a reply too long for an email link and says so', async () => {
+    const long = 'The award terms. '.repeat(200)
+    render(<ChatExportActions messages={reply(long)} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Email message' }))
+    expect(await screen.findByRole('status')).toHaveTextContent('too long to pass to your email app, so it was copied')
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(long.trim())
+    expect(opened()).toEqual(['mailto:'])
+  })
+
+  it('is offered on a reply, not on a user message or the whole conversation', () => {
+    const { unmount } = render(<ChatExportActions messages={[{ role: 'user', content: 'Review the award' }]} />)
+    expect(screen.queryByRole('button', { name: 'Email message' })).toBeNull()
+    unmount()
+    render(<ChatExportActions messages={messages} scope="conversation" />)
+    expect(screen.queryByRole('button', { name: 'Email message' })).toBeNull()
+  })
+})

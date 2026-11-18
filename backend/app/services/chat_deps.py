@@ -71,6 +71,13 @@ class AgenticChatDeps:
     # returns takes the next one, after the pre-fetched snippets' [S1]..[Sn],
     # so the finished answer can mark which of them it used (#993).
     kb_snippet_ref: int = 0
+    # The number each searched chunk was given this turn. A chunk a later
+    # search returns again keeps its number, so the source list holds it once.
+    kb_chunk_refs: dict[str, int] = field(default_factory=dict)
+    # Each numbered passage's text (with its section), by number. The finished
+    # answer cites these passages by source name, and a name alone can't say
+    # which of a chapter's passages a row drew on; the text can.
+    kb_snippet_texts: dict[int, str] = field(default_factory=dict)
 
     # The live conversation for this turn + a monotonic turn marker
     # (len(messages) captured at turn start). Write tools read/write

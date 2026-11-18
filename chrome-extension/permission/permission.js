@@ -3,7 +3,6 @@ const id = params.get('id')
 const host = params.get('host') || ''
 const pattern = params.get('pattern') || ''
 document.getElementById('host').textContent = host
-document.getElementById('host2').textContent = host
 
 async function decide(granted) {
   await chrome.runtime.sendMessage({ type: 'vz-permission-decision', id, granted }).catch(() => {})
@@ -13,6 +12,7 @@ async function decide(granted) {
 document.getElementById('allow').addEventListener('click', async () => {
   // Chrome shows its own confirmation for the site as well.
   const granted = await chrome.permissions.request({ origins: [pattern] }).catch(() => false)
-  await decide(granted)
+  if (granted) await decide(true)
+  else document.getElementById('status').textContent = 'Your browser did not allow access. Try again, or choose Not now to return to chat.'
 })
 document.getElementById('deny').addEventListener('click', () => decide(false))

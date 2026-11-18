@@ -8,6 +8,7 @@ import type { VerificationSession } from '../api/verificationSessions'
 import { useTeams } from '../hooks/useTeams'
 import { useToast } from './ToastContext'
 import { parseIdList } from '../lib/shareLink'
+import { describeLinkFailure, describePartialLink, isAccessRefusal } from '../lib/chatLinkAccess'
 import type { CrossFieldRunReport, ExtractionSourceMap, DocumentWarning } from '../api/extractions'
 
 type RightTab = 'assistant' | 'library'
@@ -744,20 +745,29 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       replace: true,
     })
     Promise.all([import('../api/knowledge'), import('../api/documents')]).then(async ([{ getKnowledgeBase }, { resolveTitles }]) => {
+      // A refusal (the item isn't shared with this person) and a failure to
+      // ask at all (offline, server error) need different messages: telling
+      // someone to request access they already have sends them in a circle.
+      let loadFailed = false
       const [kbResults, titles] = await Promise.all([
         Promise.allSettled(kbUuids.map(uuid => getKnowledgeBase(uuid))),
         docUuids.length || folderUuids.length
-          ? resolveTitles(docUuids, folderUuids).catch(() => ({ documents: [], folders: [] }))
+          ? resolveTitles(docUuids, folderUuids).catch(() => { loadFailed = true; return { documents: [], folders: [] } })
           : Promise.resolve({ documents: [], folders: [] }),
       ])
       const kbs: AttachedKB[] = []
       kbResults.forEach((res, i) => {
         if (res.status === 'fulfilled') kbs.push({ uuid: kbUuids[i], title: res.value.title })
+        else if (!isAccessRefusal(res.reason)) loadFailed = true
       })
       const attached = kbs.length + titles.documents.length + titles.folders.length
       const requested = kbUuids.length + docUuids.length + folderUuids.length
       if (attached === 0) {
-        if (requested > 1) toast('None of the items in this chat link are shared with you. Ask the person who sent it to share them.', 'error')
+        // Always said, and as an error so it stays until dismissed: opening a
+        // link and landing in an ordinary chat with no word looked like the
+        // knowledge base was attached, and the answers that followed quietly
+        // didn't use it.
+        toast(describeLinkFailure({ kbs: kbUuids.length, docs: docUuids.length, folders: folderUuids.length, loadFailed }), 'error')
         clearParams(false)
         return
       }
@@ -770,11 +780,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setSelectedFolderNames(Object.fromEntries(titles.folders.map(f => [f.uuid, f.title])))
       setStoredRaw('workspace:mode', 'chat')
       if (attached < requested) {
-        const missing = requested - attached
-        toast(
-          `${attached} of ${requested} items from this link are attached. ${missing === 1 ? 'The other one isn\u2019t' : `The other ${missing} aren\u2019t`} shared with you. Ask the person who sent it to share ${missing === 1 ? 'it' : 'them'}.`,
-          'info',
-        )
+        toast(describePartialLink({ attached, requested, loadFailed }), 'info')
       }
       clearParams(true)
     }).catch(() => {
@@ -894,11 +900,24 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           .then(results => {
             if (projectScopeVersion.current !== version) return
             const restored: AttachedKB[] = []
+            let lostAccess = 0
             results.forEach((res, i) => {
               if (res.status === 'fulfilled') {
                 restored.push({ uuid: storedKBUuids[i], title: res.value.title })
+              } else if (isAccessRefusal(res.reason)) {
+                lostAccess++
               }
             })
+            // The chip would otherwise just vanish, and the next answers
+            // would quietly stop using the knowledge base.
+            if (lostAccess) {
+              toast(
+                lostAccess === 1
+                  ? 'A knowledge base that was attached to your chat is no longer available to you, so it was removed. Answers won\u2019t use it.'
+                  : `${lostAccess} knowledge bases that were attached to your chat are no longer available to you, so they were removed. Answers won\u2019t use them.`,
+                'error',
+              )
+            }
             setActiveKBs(restored)
             setStoredRaw(KB_STORAGE_KEY, restored.length ? storedKBValue(restored) : null)
           })

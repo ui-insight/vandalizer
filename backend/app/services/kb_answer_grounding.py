@@ -472,26 +472,95 @@ def _covers_page(source: dict, pages: set[int]) -> bool:
     return any(start <= p <= end for p in pages)
 
 
-def used_snippet_refs(answer: str, sources: list[dict]) -> list[int]:
+# "8.1.2.5", "200.308": a section number the answer names beside a claim.
+_SECTION_NUMBER_RE = re.compile(r"(?<![\d.$])\d+(?:\.\d+){2,}(?![\d])|§\s*\d+\.\d+")
+# A passage counts for a claim when it holds at least this share of the
+# claim words the best-matching passage holds.
+_NEAR_BEST = 0.6
+# Sentence ends and line breaks (a table row is a line).
+_CLAIM_PART_RE = re.compile(r"(?<=[.!?])\s+|\n+")
+# Fewer words than this say too little to pick a passage by.
+_MIN_PART_WORDS = 3
+
+
+def _passages_behind_claim(claim: str, cited: str, texts: dict[int, str]) -> set[int]:
+    """Which of several same-source passages a filename citation draws on.
+
+    A chapter served as one web source has no pages, so a citation of its
+    name matched every passage retrieved from it: an answer citing one
+    chapter listed all 40 passages its searches returned, stipends and
+    relocation costs included (support ticket). The claim the citation
+    closes says which were meant: the passages holding a section number it
+    names, and those sharing most of its words. When neither tells them
+    apart, all stay sources, as before.
+    """
+    numbers = {
+        "".join(n.split()).lstrip("§")
+        for n in _SECTION_NUMBER_RE.findall(f"{claim} {cited}")
+    }
+    named = {
+        ref for ref, text in texts.items()
+        if any(re.search(rf"(?<![\d.]){re.escape(n)}(?![\d]|\.\d)", text) for n in numbers)
+    }
+    vocab = {ref: _content_words(text) for ref, text in texts.items()}
+    # Judged a sentence (or table row) at a time. A paragraph restating one
+    # passage, followed by a single fact from another, scored the second
+    # passage far below the first and dropped a source the answer used.
+    parts = [
+        words for part in _CLAIM_PART_RE.split(claim)
+        if len(words := _content_words(part)) >= _MIN_PART_WORDS
+    ] or [_content_words(claim)]
+    close: set[int] = set()
+    for words in parts:
+        scores = {ref: len(words & v) for ref, v in vocab.items()}
+        best = max(scores.values(), default=0)
+        if best:
+            close |= {ref for ref, score in scores.items() if score >= _NEAR_BEST * best}
+    return (named | close) or set(texts)
+
+
+def used_snippet_refs(
+    answer: str,
+    sources: list[dict],
+    texts: dict[int, str] | None = None,
+) -> list[int]:
     """The numbers of the snippets ``answer`` cites, in order.
 
     A number no snippet carries is ignored. A citation by filename counts for
-    that file's snippets on the page it names, or all of them when it names
-    none: less precise than a number, but it is still the model saying it
-    used the file. An answer that cites nothing used nothing — which is what
-    "the sources don't cover this" should look like.
+    that file's snippets on the page it names. When it names no page, and
+    *texts* holds the passages' text by number, it counts for the passages
+    the claim it closes draws on (see ``_passages_behind_claim``); without
+    their text, for all of them: less precise than a number, but it is still
+    the model saying it used the file. An answer that cites nothing used
+    nothing — which is what "the sources don't cover this" should look like.
     """
     by_ref = _by_ref(sources)
+    texts = texts or {}
     used: set[int] = set()
     for m in _SNIPPET_REF_RE.finditer(answer):
         used.update(n for n in map(int, _DIGITS_RE.findall(m.group(0))) if n in by_ref)
+    # A claim runs from the citation before it, numbered ones included.
+    ends = sorted(
+        m.end() for regex in (_SNIPPET_REF_RE, _FILENAME_CITATION_RE) for m in regex.finditer(answer)
+    )
+    claim = ""
     for m in _FILENAME_CITATION_RE.finditer(answer):
+        claim_start = max((e for e in ends if e <= m.start()), default=0)
         cited = m.group(1).lower()
         pages = {int(p) for p in _CITED_PAGE_RE.findall(cited)}
-        for ref, s in by_ref.items():
-            title = (s.get("document_title") or "").lower()
-            if title and title in cited and (not pages or _covers_page(s, pages)):
-                used.add(ref)
+        matched = {
+            ref for ref, s in by_ref.items()
+            if (title := (s.get("document_title") or "").lower()) and title in cited
+            and (not pages or _covers_page(s, pages))
+        }
+        known = {ref: texts[ref] for ref in matched if texts.get(ref)}
+        # Citations in a row share the claim before the first of them.
+        between = answer[claim_start:m.start()]
+        if _content_words(between):
+            claim = between
+        if len(known) > 1:
+            matched = (matched - set(known)) | _passages_behind_claim(claim, cited, known)
+        used |= matched
     return sorted(used)
 
 

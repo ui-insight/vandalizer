@@ -2,26 +2,31 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Connect Vandalizer Browser</title>
   <link rel="stylesheet" href="popup.css">
 </head>
-<body>
+<body data-page="connect">
   <main>
-    <h1>Vandalizer Browser</h1>
-    <p>Lets Vandalizer chat read the sites you allow, signed in as you. It never submits, saves or approves anything.</p>
-
+    <header class="brand"><img src="../assets/icons/icon-48.png" alt="">Vandalizer Browser</header>
+<h1 id="page-title">Connect your browser</h1>
+    <p id="page-description">Allow this Vandalizer site to work with your browser. You’ll choose which websites chat may read separately.</p>
+<section id="connection" class="connection" aria-label="Connection">
+      <div id="connection-label" class="connection-label">Checking connection…</div>
+      <strong id="connection-site" class="connection-site"></strong>
+      <p id="connection-description"></p>
+    </section>
+<div id="connected-actions" hidden>
+      <button id="open-vandalizer" class="primary wide" type="button">Return to Vandalizer</button>
+    </div>
     <form id="connect">
-      <label for="origin">Connect the site in your active tab</label>
+      <label for="origin">Vandalizer address</label>
       <input id="origin" type="url" readonly required aria-describedby="connect-help">
-      <p id="connect-help">Open your Vandalizer tab before opening this popup. Connect only a Vandalizer site you trust: it can ask chat to read your allowed sites.</p>
-      <div class="row">
-        <button class="primary" type="submit">Connect this site</button>
-      </div>
-      <div id="status" class="status" role="status"></div>
+      <p id="connect-help">Check that this is your Vandalizer address. Your browser will ask you to confirm access.</p>
+      <button class="primary wide" type="submit">Allow connection</button>
     </form>
-
-    <h2>Sites chat may read</h2>
-    <ul id="sites"></ul>
+    <div id="status" class="status" role="status"></div>
+    <p class="safety"><strong>Read-only, signed in as you.</strong>Chat won’t enter passwords or submit, save, pay or change anything.</p>
   </main>
   <script src="popup.js" type="module"></script>
 </body>
