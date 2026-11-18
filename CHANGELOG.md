@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 - **Uploading a revised file under a name that's already there says it was not replaced.** Uploading a file whose name matched one in the same folder opened the existing file, old content and all, with no warning: the new file was ignored. The server now compares the two. If they differ, the upload is shown as not uploaded ("A different file named … is already in this folder. It was not replaced…") and stays until dismissed, and the old file is no longer opened as though it were the new one. If they are identical, the existing file opens with "Already here with the same content". The same applies when attaching a file in chat, adding one to a knowledge base, or pinning one to a workflow: the old file is no longer attached under the new file's name.
+  - **Save to project** (extraction results) had the same gap: a second save on the same day met the first one's file name, the project kept the earlier CSV, and the page said "Saved to project". Different results are now saved with the time added to the name, and identical ones say nothing was changed.
 
 ## [v4.16.0] - 2026-11-16
 
