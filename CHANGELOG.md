@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **A knowledge base link says so when the knowledge base isn't shared with you.** Opening a link to one knowledge base, document or folder you can't see opened an ordinary chat with no message, so it looked attached and the answers that followed quietly didn't use it. The chat now says "The knowledge base in this link isn't shared with you, so this chat won't use it", and the message stays until dismissed. A link that couldn't be checked (offline, server error) says that instead of blaming sharing. A knowledge base that was attached and is no longer available on your next visit is also reported rather than silently removed.
+- **A link opened before signing in survives university single sign-on.** A signed-out visitor who opened a link, such as a knowledge base link from another site, and signed in with SSO or Microsoft landed on the home page without it; only password sign-in followed the link. The link is now kept for that tab for ten minutes and opened after sign-in.
+
 ## [v4.16.0] - 2026-11-16
 
 ### Added
