@@ -36,6 +36,8 @@ MAX_REQUEST_CHARS = 4000
 MAX_SKILL_CHARS = 6000
 MAX_APPROVED_SITES = 50
 MAX_URL_CHARS = 2000
+# Tools that act on the page the tab is showing, not just read it.
+ACTING_TOOLS = frozenset({"browser_click", "browser_type", "browser_select"})
 
 
 # ── The admin's site list ──────────────────────────────────────────────────
@@ -55,6 +57,9 @@ def normalize_domains(entries: list[str] | None) -> list[str]:
         if "." not in domain:
             # "edu" or "com" would allow every site under it.
             raise InvalidAllowedHost(f"{entry.strip()!r} is not a full domain -- enter one such as example.edu")
+        if re.fullmatch(r"[\d.]+", domain):
+            # "10.0" or "169.254.169.254": an address, not a site's name.
+            raise InvalidAllowedHost(f"{entry.strip()!r} is a network address -- enter a site's domain such as example.edu")
         if domain not in out:
             out.append(domain)
     return out
@@ -330,6 +335,21 @@ async def decide(deps: AgenticChatDeps, call_id: str, tool: str, args: dict[str,
 async def _decide(deps: AgenticChatDeps, call_id: str, tool: str, args: dict[str, Any]) -> dict | None:
     if deps.browser_blocked is not None:
         return _blocked(deps.browser_blocked)
+    if tool in ACTING_TOOLS:
+        # These act on whatever the tab shows. The page must have been read
+        # and cleared this turn: the last page that passed says nothing about
+        # one that was refused since, or about where an earlier turn left
+        # the tab.
+        if deps.browser_tab_refusal is not None:
+            return dict(deps.browser_tab_refusal)
+        if not deps.browser_pages:
+            return {
+                "error": "read_the_page_first",
+                "message": (
+                    "No page has been read in this reply yet. Call browser_read (or browser_open) first; "
+                    "element numbers come from that read."
+                ),
+            }
     if tool != "browser_open":
         verdict = await review(deps, None)
         if verdict.decision == "allow":
@@ -370,7 +390,20 @@ async def landed(deps: AgenticChatDeps, page_url: object) -> dict | None:
     """
     site = host_of(page_url)
     if site is None:
-        return None
+        # An address this server cannot read is an unchecked one. host_of
+        # refuses anything over MAX_URL_CHARS (long single sign-on and search
+        # addresses are routine) and hosts it can't be sure Chrome reads the
+        # same way; returning the page here skipped the admin's list and the
+        # request review for all of them.
+        return {
+            "error": "page_address_not_checked",
+            "message": (
+                "The working tab is on a page whose address Vandalizer could not check against its browser "
+                "rules, so the page was not read. If it is a sign-in page, ask the person to sign in in that "
+                "tab and tell you when they are done; otherwise open the page you need by its address with "
+                "browser_open."
+            ),
+        }
     allowed = allowed_domains(deps.system_config_doc)
     if not domain_allowed(site, allowed):
         return site_refusal(site, allowed, landed=True)

@@ -53,6 +53,11 @@ class AgenticChatDeps:
     # Set by the first review that blocks; every later browser call this
     # turn is then blocked too (a browser_policy.Verdict).
     browser_blocked: Any = None
+    # Why the working tab's current page was not read (it left the admin's
+    # list, needs approval, or has an address the server can't check), or
+    # None once a page there passes. Click, type and select are refused while
+    # it is set: they would act on a site nothing has cleared.
+    browser_tab_refusal: Any = None
     # The selected Skill's instructions, which the request review reads.
     browser_skill_text: str = ""
 

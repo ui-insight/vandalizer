@@ -189,6 +189,17 @@ function sitePattern(url) {
 async function guardSite(tab, hosts = []) {
   let url
   try { url = new URL(tab.url || '') } catch { url = null }
+  // Vandalizer's own address holds a site permission (the bridge runs
+  // there), so a link or redirect that lands the tab on it would otherwise
+  // pass: chat could then read and click inside Vandalizer as the person.
+  const { vandalizerOrigin } = await chrome.storage.local.get('vandalizerOrigin')
+  if (url && vandalizerOrigin && url.origin === vandalizerOrigin) {
+    return {
+      error: 'unapproved_site',
+      site: url.hostname,
+      message: 'The working tab is now on Vandalizer itself, which the browser tools do not read or act on. Use Vandalizer tools for Vandalizer.',
+    }
+  }
   if (url && !adminAllows(url.hostname, hosts)) {
     return {
       ...notOnAdminList(url.hostname),
