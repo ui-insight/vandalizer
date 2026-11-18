@@ -83,7 +83,7 @@ class TestSectionOfAPassage:
         "7. Fixed Rates for the Life of the Sponsored Agreement.",
     ])
     def test_a_wrapped_sentence_is_not_a_heading(self, line):
-        text = f"1.1 Real Heading\nBody text of the real section goes on for a while here.\n{line}\nMore body text that the passage is made of, long enough to find."
+        text = f"1.0 Opening Part\n1.2 Other Heading\nx\n1.1 Real Heading\nBody text of the real section goes on for a while here.\n{line}\nMore body text that the passage is made of, long enough to find."
         assert SectionIndex(text).section_for("More body text that the passage is made of") == "1.1 Real Heading"
 
     def test_ecfr_section_signs_are_headings(self):
@@ -95,6 +95,47 @@ class TestSectionOfAPassage:
         assert SectionIndex(text).section_for("(a) The approved budget for the Federal award") == (
             "§ 200.308 Revision of budget and program plans."
         )
+
+    @pytest.mark.parametrize("line", [
+        "1.5 FTE Research Assistant", "10.5 Million Dollars Awarded", "192.168.1.1 Server Address",
+    ])
+    def test_a_lone_numbered_line_in_a_document_without_numbered_sections_is_not_a_heading(self, line):
+        text = f"Budget notes.\n{line}\nBody text of the budget that is long enough to be found in the source."
+        assert SectionIndex(text).section_for("Body text of the budget that is long enough") is None
+
+    def test_a_passage_found_under_two_sections_gets_no_label(self):
+        boilerplate = "Requests must be made in writing to the grants management officer before the change."
+        text = (f"1.1 Equipment Purchases\n{boilerplate}\n1.2 Travel Changes\n{boilerplate}\n"
+                "1.3 Other Changes\nNothing else needs approval under this policy at all.\n")
+        index = SectionIndex(text)
+        assert index.section_for(boilerplate) is None
+        assert index.section_for("Nothing else needs approval under this policy at all.") == "1.3 Other Changes"
+
+    def test_ecfr_supplements_and_reserved_sections_end_the_section_before_them(self):
+        text = ("§ 774.1 Introduction.\nThe Commerce Control List is in Supplement No. 1 to this part.\n"
+                "§ 774.2 [Reserved]\n"
+                "Supplement No. 1 to Part 774—The Commerce Control List\n"
+                "1E001 Technology according to the General Technology Note for the development of items.\n")
+        assert SectionIndex(text).section_for("1E001 Technology according to the General Technology Note") == (
+            "Supplement No. 1 to Part 774—The Commerce Control List"
+        )
+
+    def test_a_passage_far_past_the_last_heading_found_gets_no_label(self):
+        filler = "An entry in a long list that has headings in a style not recognised here.\n" * 800
+        text = f"§ 744.22 Restrictions on certain end uses.\nRule text.\n{filler}Zurmat Group of Companies, House No. 319, Kabul, listed here.\n"
+        index = SectionIndex(text)
+        assert index.section_for("Rule text.\nAn entry in a long list") == "§ 744.22 Restrictions on certain end uses."
+        assert index.section_for("Zurmat Group of Companies, House No. 319, Kabul, listed here.") is None
+
+    def test_no_bundled_ecfr_passage_is_labelled_with_a_section_a_supplement_closed(self):
+        content = Path(__file__).resolve().parents[1] / "seeds/knowledge_bases/content"
+        for name in ("ecfr-title15-part774.txt", "ecfr-title15-part744.txt"):
+            text = (content / name).read_text()
+            index = SectionIndex(text)
+            first_supplement = text.index("\nSupplement No. 1 to Part")
+            for chunk, offset in _split_text_with_offsets(text, CHUNK_SIZE, CHUNK_OVERLAP):
+                if offset > first_supplement + 5:
+                    assert not (index.section_for(chunk) or "").startswith("§"), (name, offset)
 
     def test_a_source_without_headings_or_a_passage_not_in_it_has_no_section(self, index):
         assert SectionIndex("Plain prose with no headings at all.").section_for("Plain prose") is None
@@ -224,6 +265,24 @@ class TestWhichPassagesAnAnswerUsed:
             f"Sources:\n- [Source: {NAME}]\n- [Source: {NAME}]\n"
         )
         assert used_snippet_refs(answer, citations, texts) == [3]
+
+    def test_a_short_fact_after_a_long_paragraph_keeps_its_passage(self, index):
+        carryover = _chunk("8.1.2.4 Carryover of Unobligated Balances")
+        equipment = _chunk("Purchase of a unit of equipment exceeding $25,000")
+        citations, texts = _retrieved(
+            [equipment, carryover, _chunk("Exhibit 10. Summary of Audit Requirements"),
+             _chunk("Exhibit 8. Extramural Invention Reporting")], index=index,
+        )
+        paragraph = " ".join(carryover.split()[20:110]).rstrip(".,;: ")
+        answer = (f"{paragraph}. Separately, buying one item of equipment above $25,000 "
+                  f"is a change in scope. [Source: {NAME}]")
+        assert used_snippet_refs(answer, citations, texts) == [1, 2]
+
+    def test_a_numbered_citation_ends_the_claim_before_it(self, retrieved):
+        citations, texts = retrieved
+        answer = (f"Audits are required of recipients that expend federal awards [S5]. "
+                  f"Capital expenditures for land or buildings need approval [Source: {NAME}].")
+        assert used_snippet_refs(answer, citations, texts) == [3, 5]
 
     def test_a_dollar_amount_is_not_read_as_a_section_number(self, retrieved):
         citations, texts = retrieved

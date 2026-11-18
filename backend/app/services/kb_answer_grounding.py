@@ -477,6 +477,10 @@ _SECTION_NUMBER_RE = re.compile(r"(?<![\d.$])\d+(?:\.\d+){2,}(?![\d])|§\s*\d+\.
 # A passage counts for a claim when it holds at least this share of the
 # claim words the best-matching passage holds.
 _NEAR_BEST = 0.6
+# Sentence ends and line breaks (a table row is a line).
+_CLAIM_PART_RE = re.compile(r"(?<=[.!?])\s+|\n+")
+# Fewer words than this say too little to pick a passage by.
+_MIN_PART_WORDS = 3
 
 
 def _passages_behind_claim(claim: str, cited: str, texts: dict[int, str]) -> set[int]:
@@ -498,10 +502,20 @@ def _passages_behind_claim(claim: str, cited: str, texts: dict[int, str]) -> set
         ref for ref, text in texts.items()
         if any(re.search(rf"(?<![\d.]){re.escape(n)}(?![\d]|\.\d)", text) for n in numbers)
     }
-    words = _content_words(claim)
-    scores = {ref: len(words & _content_words(text)) for ref, text in texts.items()} if words else {}
-    best = max(scores.values(), default=0)
-    close = {ref for ref, score in scores.items() if score >= _NEAR_BEST * best} if best else set()
+    vocab = {ref: _content_words(text) for ref, text in texts.items()}
+    # Judged a sentence (or table row) at a time. A paragraph restating one
+    # passage, followed by a single fact from another, scored the second
+    # passage far below the first and dropped a source the answer used.
+    parts = [
+        words for part in _CLAIM_PART_RE.split(claim)
+        if len(words := _content_words(part)) >= _MIN_PART_WORDS
+    ] or [_content_words(claim)]
+    close: set[int] = set()
+    for words in parts:
+        scores = {ref: len(words & v) for ref, v in vocab.items()}
+        best = max(scores.values(), default=0)
+        if best:
+            close |= {ref for ref, score in scores.items() if score >= _NEAR_BEST * best}
     return (named | close) or set(texts)
 
 
@@ -525,9 +539,13 @@ def used_snippet_refs(
     used: set[int] = set()
     for m in _SNIPPET_REF_RE.finditer(answer):
         used.update(n for n in map(int, _DIGITS_RE.findall(m.group(0))) if n in by_ref)
-    claim_start = 0
+    # A claim runs from the citation before it, numbered ones included.
+    ends = sorted(
+        m.end() for regex in (_SNIPPET_REF_RE, _FILENAME_CITATION_RE) for m in regex.finditer(answer)
+    )
     claim = ""
     for m in _FILENAME_CITATION_RE.finditer(answer):
+        claim_start = max((e for e in ends if e <= m.start()), default=0)
         cited = m.group(1).lower()
         pages = {int(p) for p in _CITED_PAGE_RE.findall(cited)}
         matched = {
@@ -537,13 +555,12 @@ def used_snippet_refs(
         }
         known = {ref: texts[ref] for ref in matched if texts.get(ref)}
         # Citations in a row share the claim before the first of them.
-        between = _SNIPPET_REF_RE.sub(" ", answer[claim_start:m.start()])
+        between = answer[claim_start:m.start()]
         if _content_words(between):
             claim = between
         if len(known) > 1:
             matched = (matched - set(known)) | _passages_behind_claim(claim, cited, known)
         used |= matched
-        claim_start = m.end()
     return sorted(used)
 
 

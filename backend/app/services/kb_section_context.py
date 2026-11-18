@@ -25,11 +25,28 @@ from typing import Optional
 # and program plans.", "Exhibit 7. Summary of Actions Requiring …". A lone
 # number ("7. Fixed Rates …") is as likely a list item, so it is not one.
 _NUMBERED_RE = re.compile(r"(?P<num>\d+(?:\.\d+)+)\.?\s+(?P<title>[A-Z][^\n]*)")
-_SECTION_SIGN_RE = re.compile(r"§\s*(?P<num>\d+(?:\.\d+)+)\s+(?P<title>[A-Z][^\n]*)")
+# eCFR: "§ 742.10 [Reserved]", and titles that run past 160 characters.
+_SECTION_SIGN_RE = re.compile(r"§\s*(?P<num>\d+(?:\.\d+)+)\s+(?P<title>\S[^\n]*)")
+# "Supplement No. 4 to Part 744—Entity List", "Appendix I to Part 200—…".
+# These close the last § before them: missed, the whole Commerce Control
+# List was labelled "§ 774.1 Introduction."
+_ATTACHMENT_RE = re.compile(
+    r"(?:Supplement|Appendix)\s+(?:No\.\s*)?[A-Z0-9]+\s+to\s+(?:Part|Subpart|§)\s*[\w.]+\b[^\n]*"
+)
 _CAPTION_RE = re.compile(
     r"(?P<kind>Exhibit|Table|Appendix)\s+(?P<num>[A-Z0-9]+(?:[.-]\d+)*)\s*[.:]\s+(?P<title>[A-Z][^\n]*)"
 )
 _MAX_HEADING_CHARS = 160
+_MAX_ECFR_HEADING_CHARS = 600
+# A bare "1.5 FTE Research Assistant" on a line of a budget reads like a
+# numbered heading. A document that numbers its sections has several under
+# the same leading number; one that doesn't is left unlabelled.
+_MIN_NUMBERED_SIBLINGS = 3
+# A wrong label is worse than none: the model is told to cite by it. Past
+# this distance from the last heading found, a heading in a style not
+# recognised here has probably gone by (the longest section in the bundled
+# NIH chapters is well under it), so the passage gets no label.
+_MAX_CHARS_FROM_HEADING = 40_000
 # A passage is looked up by its opening text. Long enough to be unique in a
 # chapter, short enough to survive a table header the splitter prepended.
 _PROBE_CHARS = 160
@@ -63,44 +80,74 @@ def _reads_as_title(title: str) -> bool:
 
 def _headings(text: str) -> list[_Heading]:
     out: list[_Heading] = []
+    numbered: list[_Heading] = []
     pos = 0
     for line in text.split("\n"):
         stripped = line.strip()
-        if stripped and len(stripped) <= _MAX_HEADING_CHARS:
-            m = _SECTION_SIGN_RE.fullmatch(stripped)
-            if m is None:
+        if stripped and len(stripped) <= _MAX_ECFR_HEADING_CHARS:
+            ecfr = _SECTION_SIGN_RE.fullmatch(stripped)
+            if ecfr:
+                out.append(_Heading(pos, _clean(stripped), ecfr.group("num"), False))
+            elif _ATTACHMENT_RE.fullmatch(stripped):
+                out.append(_Heading(pos, _clean(stripped), None, False))
+            elif len(stripped) <= _MAX_HEADING_CHARS:
                 m = _NUMBERED_RE.fullmatch(stripped)
-                if m and not _reads_as_title(m.group("title")):
-                    m = None
-            if m and stripped.count(")") <= stripped.count("("):
                 # "8.1.2.5 Change in Scope) for details" is a wrapped
                 # cross-reference, not a heading.
-                out.append(_Heading(pos, _clean(stripped), m.group("num"), False))
-            else:
-                c = _CAPTION_RE.fullmatch(stripped)
-                if c:
+                if m and _reads_as_title(m.group("title")) and stripped.count(")") <= stripped.count("("):
+                    heading = _Heading(pos, _clean(stripped), m.group("num"), False)
+                    out.append(heading)
+                    numbered.append(heading)
+                elif _CAPTION_RE.fullmatch(stripped):
                     out.append(_Heading(pos, _clean(stripped), None, True))
         pos += len(line) + 1
-    return out
+    families: dict[str, int] = {}
+    for h in numbered:
+        lead = (h.number or "").split(".", 1)[0]
+        families[lead] = families.get(lead, 0) + 1
+    lone = {
+        id(h) for h in numbered
+        if families[(h.number or "").split(".", 1)[0]] < _MIN_NUMBERED_SIBLINGS
+    }
+    return [h for h in out if id(h) not in lone]
 
 
-def _locate(text: str, passage: str) -> int:
-    """Offset of *passage* in *text*, or -1."""
+_MAX_OCCURRENCES = 20
+
+
+def _occurrences(text: str, probe: str) -> list[int]:
+    found: list[int] = []
+    at = text.find(probe)
+    while at != -1 and len(found) < _MAX_OCCURRENCES:
+        found.append(at)
+        at = text.find(probe, at + 1)
+    return found
+
+
+def _locate(text: str, passage: str) -> list[int]:
+    """Every offset *passage* is found at in *text*.
+
+    Boilerplate repeated under two sections, or two tables with the same
+    rows, put the same passage in more than one place; the caller labels it
+    only when every place is in the same section.
+    """
     passage = passage.strip()
     if not passage:
-        return -1
-    at = text.find(passage)
-    if at != -1:
-        return at
+        return []
+    found = _occurrences(text, passage)
+    if found:
+        return found
     # A chunk that starts inside a pipe table carries that table's header in
     # front of its own text, so the whole chunk is not a substring. Its later
     # lines still are.
     for line in passage.split("\n")[1:4]:
         probe = line.strip()[:_PROBE_CHARS]
-        if len(probe) >= 40 and text.count(probe) == 1:
-            return text.find(probe)
+        if len(probe) >= 40:
+            found = _occurrences(text, probe)
+            if len(found) == 1:
+                return found
     probe = passage[:_PROBE_CHARS]
-    return text.find(probe) if len(probe) >= 40 else -1
+    return _occurrences(text, probe) if len(probe) >= 40 else []
 
 
 class SectionIndex:
@@ -117,17 +164,21 @@ class SectionIndex:
         Salaries of Administrative and Clerical Staff"``. A passage that
         starts inside an exhibit or table names it after the section holding
         it. None when the source has no recognisable headings before the
-        passage, or the passage can't be found in it.
+        passage, the passage can't be found in it, it is found under more
+        than one section, or it lies too far past the last heading found.
         """
         if not self._headings:
             return None
-        at = _locate(self._text, passage)
-        if at == -1:
-            return None
+        labels = {self._section_at(at) for at in _locate(self._text, passage)}
+        return labels.pop() if len(labels) == 1 else None
+
+    def _section_at(self, at: int) -> Optional[str]:
         before = [h for h in self._headings if h.offset <= at]
         if not before:
             return None
         current = before[-1]
+        if at - current.offset > _MAX_CHARS_FROM_HEADING:
+            return None
         parts: list[str] = []
         section = current
         if current.caption:
