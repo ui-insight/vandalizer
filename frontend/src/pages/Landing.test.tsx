@@ -79,3 +79,19 @@ describe('Landing — trial signup form', () => {
     expect(document.querySelector('#landing-register-email')).toBeNull()
   })
 })
+
+describe('Landing — the link opened before signing in', () => {
+  it('is parked when leaving for single sign-on, which returns to "/" without it', async () => {
+    sessionStorage.clear()
+    mockSearch = { next: '/?kb=kb-1' }
+    mockGetAuthConfig.mockResolvedValue({
+      auth_methods: ['oauth'],
+      oauth_providers: [{ provider: 'saml', display_name: 'University SSO', configured: true }],
+    } as AuthConfig)
+    render(<Landing />)
+    const sso = await screen.findByRole('link', { name: 'University SSO' })
+    sso.addEventListener('click', (event) => event.preventDefault())
+    sso.click()
+    expect(JSON.parse(sessionStorage.getItem('vandalizer:pendingNext')!).path).toBe('/?kb=kb-1')
+  })
+})

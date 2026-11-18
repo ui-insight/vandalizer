@@ -27,6 +27,7 @@ import {
   Mail,
   ExternalLink,
 } from 'lucide-react'
+import { rememberPendingNext, safeNextPath } from '../lib/pendingNext'
 
 // ---------------------------------------------------------------------------
 // Inline dark-themed auth forms
@@ -241,7 +242,7 @@ function AuthBlock({ config }: { config: AuthConfig | null }) {
       {oauthEnabled && azureProvider && (
         <div className="mb-6">
           <a
-            href="/api/auth/oauth/azure"
+            href="/api/auth/oauth/azure" onClick={() => rememberPendingNext(search?.next)}
             className="flex w-full items-center justify-center gap-2 rounded-lg bg-white px-4 py-3 font-bold text-black transition-all hover:bg-gray-200"
           >
             {azureProvider.display_name}
@@ -252,7 +253,7 @@ function AuthBlock({ config }: { config: AuthConfig | null }) {
       {samlProvider && (
         <div className="mb-6">
           <a
-            href="/api/auth/saml/login"
+            href="/api/auth/saml/login" onClick={() => rememberPendingNext(search?.next)}
             className="flex w-full items-center justify-center gap-2 rounded-lg bg-highlight px-4 py-3 font-bold text-highlight-text transition-all hover:bg-highlight-hover"
           >
             {samlProvider.display_name || 'Sign in with University SSO'}
@@ -308,14 +309,6 @@ function AuthBlock({ config }: { config: AuthConfig | null }) {
 // ---------------------------------------------------------------------------
 // Landing page
 // ---------------------------------------------------------------------------
-
-function safeNextPath(raw: string | undefined): string | null {
-  if (!raw) return null
-  // Must be a same-origin relative path. Reject protocol-relative (//host)
-  // and absolute URLs to prevent open-redirect.
-  if (!raw.startsWith('/') || raw.startsWith('//')) return null
-  return raw
-}
 
 export default function Landing() {
   const { user, loading, demoExpired, demoFeedbackToken } = useAuth()
