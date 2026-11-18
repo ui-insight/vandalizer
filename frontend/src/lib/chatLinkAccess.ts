@@ -8,7 +8,11 @@ import { ApiError } from '../api/client'
 /** True when the server answered "you can't see this" (or it no longer
  * exists), as opposed to the request failing to get an answer. */
 export function isAccessRefusal(reason: unknown): boolean {
-  return reason instanceof ApiError && (reason.status === 403 || reason.status === 404)
+  if (!(reason instanceof ApiError)) return false
+  if (reason.status === 404) return true
+  // The client also raises 403 for an expired trial and for a CSRF token it
+  // is about to refresh by reloading. Neither says the item isn't shared.
+  return reason.status === 403 && reason.message !== 'DEMO_EXPIRED' && !reason.message.startsWith('CSRF validation failed')
 }
 
 /** What to say when a link attached some of its items and not others. */

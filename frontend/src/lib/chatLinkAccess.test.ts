@@ -7,6 +7,10 @@ describe('isAccessRefusal', () => {
     expect(isAccessRefusal(new ApiError(404, 'Knowledge base not found'))).toBe(true)
     expect(isAccessRefusal(new ApiError(403, 'Forbidden'))).toBe(true)
   })
+  it('is false for a 403 that is about the session, not the item', () => {
+    expect(isAccessRefusal(new ApiError(403, 'DEMO_EXPIRED'))).toBe(false)
+    expect(isAccessRefusal(new ApiError(403, 'CSRF validation failed (reloading)'))).toBe(false)
+  })
   it('is false when no answer came back', () => {
     expect(isAccessRefusal(new ApiError(0, 'Network error'))).toBe(false)
     expect(isAccessRefusal(new ApiError(500, 'Server error'))).toBe(false)

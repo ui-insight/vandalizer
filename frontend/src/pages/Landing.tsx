@@ -27,7 +27,7 @@ import {
   Mail,
   ExternalLink,
 } from 'lucide-react'
-import { rememberPendingNext, safeNextPath } from '../lib/pendingNext'
+import { clearPendingNext, rememberPendingNext, safeNextPath } from '../lib/pendingNext'
 
 // ---------------------------------------------------------------------------
 // Inline dark-themed auth forms
@@ -331,6 +331,8 @@ export default function Landing() {
 
   useEffect(() => {
     if (user && !demoExpired && !inviteToken && nextPath) {
+      // This link wins over one parked by an earlier, abandoned single sign-on.
+      clearPendingNext()
       window.location.replace(nextPath)
     }
   }, [user, demoExpired, inviteToken, nextPath])
