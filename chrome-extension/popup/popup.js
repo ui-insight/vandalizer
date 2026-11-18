@@ -153,7 +153,9 @@ form.addEventListener('submit', async (event) => {
       // the person allowed for the previous one, with no further prompt.
       const granted = (await chrome.permissions.getAll()).origins || []
       const stale = granted.filter((pattern) => pattern !== `${origin}/*`)
-      if (stale.length) await chrome.permissions.remove({ origins: stale }).catch(() => {})
+      if (stale.length) {
+        try { await chrome.permissions.remove({ origins: stale }) } catch { /* Chrome keeps a grant it will not remove. */ }
+      }
       try { await chrome.storage.session.remove('workingTabId') } catch { /* no working tab to forget */ }
     }
     await chrome.storage.local.set({ vandalizerOrigin: origin })

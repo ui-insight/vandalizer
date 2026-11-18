@@ -44,14 +44,14 @@ it('drops the sites allowed for a previous Vandalizer address when a different o
   // Kept, they would let the newly connected address read every portal the
   // person allowed for the old one, with no further prompt.
   const { chrome, submit } = await popup('?origin=https%3A%2F%2Fother.example.org', true, 'https://vandalizer.example.edu')
-  chrome.permissions.getAll.mockResolvedValue({ origins: ['https://vandalizer.example.edu/*', 'https://fin.example.edu/*', 'https://other.example.org/*'] })
+  chrome.permissions.getAll.mockResolvedValue({ origins: ['https://vandalizer.example.edu/*', 'https://fin.example.edu/*', 'https://other.example.org/*'] as never[] })
   submit()
   await waitFor(() => expect(chrome.storage.local.set).toHaveBeenCalledWith({ vandalizerOrigin: 'https://other.example.org' }))
   expect(chrome.permissions.remove).toHaveBeenCalledWith({ origins: ['https://vandalizer.example.edu/*', 'https://fin.example.edu/*'] })
 })
 it('keeps allowed sites when the same Vandalizer address is connected again', async () => {
   const { chrome, submit } = await popup('?origin=https%3A%2F%2Fvandalizer.example.edu', true, 'https://vandalizer.example.edu')
-  chrome.permissions.getAll.mockResolvedValue({ origins: ['https://vandalizer.example.edu/*', 'https://fin.example.edu/*'] })
+  chrome.permissions.getAll.mockResolvedValue({ origins: ['https://vandalizer.example.edu/*', 'https://fin.example.edu/*'] as never[] })
   submit()
   await waitFor(() => expect(chrome.storage.local.set).toHaveBeenCalled())
   expect(chrome.permissions.remove).not.toHaveBeenCalled()
