@@ -28,3 +28,24 @@ export function unappliedUploadMessage(
     ? `A different file named \u201c${fileName}\u201d is already in ${place}. It was not replaced, and the file you chose was not uploaded. ${ADVICE}`
     : `A file named \u201c${fileName}\u201d is already in ${place} and was not updated. If yours is a newer version: ${ADVICE.charAt(0).toLowerCase()}${ADVICE.slice(1)}`
 }
+
+/** Save a file the app generated (not one the person picked) under a name
+ * built from *stem*. When a different file already has that name, the save
+ * is repeated with the time added, so newer results are stored rather than
+ * silently dropped. `identical`: the same content is already there. */
+export async function saveGeneratedFile<R extends DuplicateUploadResult>(
+  save: (fileName: string) => Promise<R>,
+  stem: string,
+  extension: string,
+  now: Date = new Date(),
+): Promise<{ outcome: 'saved' | 'identical' | 'refused'; fileName: string; result: R }> {
+  const settle = (fileName: string, result: R) => ({
+    outcome: isUnappliedUpload(result) ? 'refused' as const : result.exists ? 'identical' as const : 'saved' as const,
+    fileName, result,
+  })
+  const first = settle(`${stem}.${extension}`, await save(`${stem}.${extension}`))
+  if (first.outcome !== 'refused') return first
+  const two = (n: number) => String(n).padStart(2, '0')
+  const timed = `${stem}-${two(now.getHours())}${two(now.getMinutes())}${two(now.getSeconds())}.${extension}`
+  return settle(timed, await save(timed))
+}
