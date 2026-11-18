@@ -3,7 +3,7 @@ import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useTeams } from '../hooks/useTeams'
 import { useToast } from './ToastContext'
 import { parseIdList } from '../lib/shareLink'
-import { describeLinkFailure, isAccessRefusal } from '../lib/chatLinkAccess'
+import { describeLinkFailure, describePartialLink, isAccessRefusal } from '../lib/chatLinkAccess'
 import type { CrossFieldRunReport, ExtractionSourceMap, DocumentWarning } from '../api/extractions'
 
 type RightTab = 'assistant' | 'library'
@@ -629,11 +629,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setSelectedFolderNames(Object.fromEntries(titles.folders.map(f => [f.uuid, f.title])))
       localStorage.setItem('workspace:mode', 'chat')
       if (attached < requested) {
-        const missing = requested - attached
-        toast(
-          `${attached} of ${requested} items from this link are attached. ${missing === 1 ? 'The other one isn\u2019t' : `The other ${missing} aren\u2019t`} shared with you. Ask the person who sent it to share ${missing === 1 ? 'it' : 'them'}.`,
-          'info',
-        )
+        toast(describePartialLink({ attached, requested, loadFailed }), 'info')
       }
       clearParams(true)
     }).catch(() => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '../api/client'
-import { describeLinkFailure, isAccessRefusal } from './chatLinkAccess'
+import { describeLinkFailure, describePartialLink, isAccessRefusal } from './chatLinkAccess'
 
 describe('isAccessRefusal', () => {
   it('is true for the server saying no', () => {
@@ -30,6 +30,21 @@ describe('describeLinkFailure', () => {
   })
   it('does not blame sharing when the request itself failed', () => {
     const text = describeLinkFailure({ ...none, kbs: 1, loadFailed: true })
+    expect(text).not.toContain('shared')
+    expect(text).toContain('open the link again')
+  })
+})
+
+describe('describePartialLink', () => {
+  it('says the rest are not shared when the server refused them', () => {
+    expect(describePartialLink({ attached: 1, requested: 2, loadFailed: false }))
+      .toBe('1 of 2 items from this link are attached. The other one isn’t shared with you. Ask the person who sent it to share it.')
+    expect(describePartialLink({ attached: 1, requested: 3, loadFailed: false }))
+      .toContain('The other 2 aren’t shared with you. Ask the person who sent it to share them.')
+  })
+  it('does not blame sharing when a request failed', () => {
+    const text = describePartialLink({ attached: 1, requested: 2, loadFailed: true })
+    expect(text).toContain('1 of 2 items from this link are attached.')
     expect(text).not.toContain('shared')
     expect(text).toContain('open the link again')
   })
