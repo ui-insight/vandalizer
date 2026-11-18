@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useLayoutEffect } from 'react'
-import { Download, Edit2, Trash2, Copy, Users, FolderInput, FolderDown, MessageSquareText, Play, Library, Link2, Upload, History, CopyPlus } from 'lucide-react'
+import { Download, Edit2, Trash2, Copy, Users, FolderInput, FolderDown, MessageSquareText, Play, Library, Link2, Upload, History, CopyPlus, Mail } from 'lucide-react'
 
 interface ContextMenuProps {
   x: number
@@ -19,6 +19,7 @@ interface ContextMenuProps {
   onShowUsage?: () => void
   onUploadVersion?: () => void
   onShowVersions?: () => void
+  onEmailHighlights?: () => void
 }
 
 export function ContextMenu({
@@ -39,6 +40,7 @@ export function ContextMenu({
   onShowUsage,
   onUploadVersion,
   onShowVersions,
+  onEmailHighlights,
 }: ContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState({ top: y, left: x })
@@ -73,6 +75,7 @@ export function ContextMenu({
       onAskFolder && { label: 'Ask about folder', icon: MessageSquareText, action: onAskFolder },
       onRunWorkflow && { label: 'Run workflow on folder', icon: Play, action: onRunWorkflow },
       onAddToKB && { label: 'Add to knowledge base', icon: Library, action: onAddToKB },
+      onEmailHighlights && { label: 'Email highlights to PI', icon: Mail, action: onEmailHighlights },
     ),
     // Organize
     group(

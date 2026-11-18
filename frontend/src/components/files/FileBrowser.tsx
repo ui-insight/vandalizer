@@ -22,6 +22,7 @@ import { ExistingFilesDialog } from './ExistingFilesDialog'
 import { useConfirm } from '../shared/useConfirm'
 import { useToast } from '../../contexts/ToastContext'
 import { deleteFile, renameFile, downloadFile, downloadFilesAsZip, moveFile, duplicateFile, fetchDocumentUsage, uploadFileVersion, type DeleteFileResult, type DocumentUsage } from '../../api/files'
+import { AwardHighlightsDialog } from './AwardHighlightsDialog'
 import { VersionHistoryDialog } from './VersionHistoryDialog'
 import { DocumentUsageDialog, UsageSummaryList, UsageCheckFailedNote, RemoveFromKnowledgeBasesOption, describeDeleteEffects, mergeUsage, summarizeUsage, type UsageGroups } from './DocumentUsageDialog'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
@@ -525,6 +526,7 @@ export function FileBrowser({ listScrollRef, onListScroll, searchField, selected
   // Context menu state
   const [usageTarget, setUsageTarget] = useState<{ uuid: string; title: string } | null>(null)
   const [versionsTarget, setVersionsTarget] = useState<{ uuid: string; title: string } | null>(null)
+  const [highlightsTarget, setHighlightsTarget] = useState<{ uuid: string; title: string } | null>(null)
   const versionInput = useRef<HTMLInputElement>(null)
   const versionTarget = useRef<Document | null>(null)
   const uploadVersion = useCallback(async (file: File) => {
@@ -970,6 +972,9 @@ export function FileBrowser({ listScrollRef, onListScroll, searchField, selected
       {versionsTarget && (
         <VersionHistoryDialog docUuid={versionsTarget.uuid} docTitle={versionsTarget.title} onClose={() => setVersionsTarget(null)} />
       )}
+      {highlightsTarget && (
+        <AwardHighlightsDialog docUuid={highlightsTarget.uuid} docTitle={highlightsTarget.title} onClose={() => setHighlightsTarget(null)} />
+      )}
       {usageTarget && (
         <DocumentUsageDialog
           docUuid={usageTarget.uuid}
@@ -1067,6 +1072,11 @@ export function FileBrowser({ listScrollRef, onListScroll, searchField, selected
           onShowVersions={
             contextMenu.type === 'doc'
               ? () => setVersionsTarget({ uuid: contextMenu.item.uuid, title: contextMenu.item.title })
+              : undefined
+          }
+          onEmailHighlights={
+            contextMenu.type === 'doc'
+              ? () => setHighlightsTarget({ uuid: contextMenu.item.uuid, title: contextMenu.item.title })
               : undefined
           }
           onConvertToTeam={

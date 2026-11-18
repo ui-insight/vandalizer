@@ -18,6 +18,7 @@ from app.schemas.documents import (
     UploadRequest,
     UploadVersionRequest,
 )
+from app.services import award_highlights as award_highlights_service
 from app.services import document_usage as document_usage_service
 from app.services import file_service
 from app.services import access_control, knowledge_service
@@ -284,6 +285,23 @@ async def versions(doc_uuid: str, user: User = Depends(get_current_user)) -> dic
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
     return {"versions": await file_service.list_versions(document, user)}
+
+
+@router.post("/{doc_uuid}/award-highlights", response_model=None)
+@limiter.limit("10/minute")
+async def award_highlights(request: Request, doc_uuid: str, user: User = Depends(get_current_user)) -> dict:
+    """A fixed set of award facts, each with its page, for an email to the PI.
+
+    Reads the document with a model call. Nothing is sent or stored: the page
+    writes the draft and the person sends it from their own mail program.
+    """
+    document = await access_control.get_authorized_document(doc_uuid, user)
+    if not document or document.soft_deleted:
+        raise HTTPException(status_code=404, detail="Document not found")
+    try:
+        return await award_highlights_service.build(document, user)
+    except award_highlights_service.HighlightsError as e:
+        raise HTTPException(status_code=e.status, detail=e.message)
 
 
 @router.get("/{doc_uuid}/usage", response_model=None)

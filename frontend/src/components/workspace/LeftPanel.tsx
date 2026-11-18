@@ -3,12 +3,13 @@ import { useNavigate, useSearch } from '@tanstack/react-router'
 import { PanelsTopLeft } from 'lucide-react'
 import { PagesBrowser } from '../artifacts/PagesBrowser'
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
-import { ArrowLeft, FileText, Link2 } from 'lucide-react'
+import { ArrowLeft, FileText, Link2, Mail } from 'lucide-react'
 import { WorkspaceSearchBar } from '../shared/WorkspaceSearchBar'
 import { FileBrowser } from '../files/FileBrowser'
 import type { ContentMatch } from '../files/FileBrowser'
 import { DocumentViewer } from '../files/DocumentViewer'
 import { DocumentUsageDialog } from '../files/DocumentUsageDialog'
+import { AwardHighlightsDialog } from '../files/AwardHighlightsDialog'
 import { RawTextModal } from '../files/RawTextModal'
 import { VerificationNavBar } from '../files/VerificationNavBar'
 import { ItemPickerModal } from './ItemPickerModal'
@@ -51,6 +52,7 @@ export function LeftPanel() {
   const setFilesView = useCallback((view: 'documents' | 'pages' | 'templates') => { void navigateFiles({ to: '/', search: prev => ({ ...prev, files: view === 'documents' ? undefined : view }) }) }, [navigateFiles])
   const [showRawText, setShowRawText] = useState(false)
   const [showUsage, setShowUsage] = useState(false)
+  const [showHighlights, setShowHighlights] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [contentSearchState, setContentSearchState] = useState<'loading' | 'error' | null>(null)
   const [searchAttempt, setSearchAttempt] = useState(0)
@@ -71,6 +73,7 @@ export function LeftPanel() {
     setViewingDoc(null)
     setShowRawText(false)
     setShowUsage(false)
+    setShowHighlights(false)
     setSearchQuery('')
     setContentMatches([])
     setWorkflowPickerFolder(null)
@@ -308,6 +311,7 @@ export function LeftPanel() {
         </button>
         <h2>{viewingDoc.title}</h2>
         <div className="workspace-section-actions">
+          <button type="button" onClick={() => setShowHighlights(true)} className="workspace-header-icon" title="Email highlights to PI" aria-label="Email highlights to PI"><Mail size={20} /></button>
           <button type="button" onClick={() => setShowUsage(true)} className="workspace-header-icon" title="Where is this used?" aria-label="Where is this used?"><Link2 size={20} /></button>
           <button type="button" onClick={() => setShowRawText(true)} className="workspace-header-icon" title="View extracted text" aria-label="View extracted text"><FileText size={20} /></button>
         </div>
@@ -424,6 +428,9 @@ export function LeftPanel() {
           />
         </div>
 
+      {showHighlights && viewingDoc && (
+        <AwardHighlightsDialog docUuid={viewingDoc.uuid} docTitle={viewingDoc.title} onClose={() => setShowHighlights(false)} />
+      )}
       {showUsage && viewingDoc && (
         <DocumentUsageDialog
           docUuid={viewingDoc.uuid}

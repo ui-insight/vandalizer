@@ -145,3 +145,42 @@ export interface DocumentUsage {
 export function fetchDocumentUsage(docUuid: string) {
   return apiFetch<DocumentUsage>(`/api/files/${docUuid}/usage`)
 }
+
+/** One award fact. `value` is null when it was not found in the document. */
+export interface AwardHighlightFact {
+  key: string
+  label: string
+  value: string | null
+  page: number | null
+  page_approximate: boolean
+  quote: string | null
+  /** 'supported' | 'unassessed' | 'quote_unsupported'; null when not found. */
+  support: string | null
+}
+
+export interface AwardHighlightPI {
+  role: 'pass_through' | 'recipient'
+  role_label: string
+  institution: AwardHighlightFact
+  name: AwardHighlightFact
+  /** Only an address written in the document; never a guess. */
+  email: string | null
+  email_source: AwardHighlightFact
+}
+
+export interface AwardHighlights {
+  document: { uuid: string; title: string }
+  facts: AwardHighlightFact[]
+  contacts: AwardHighlightFact[]
+  pis: AwardHighlightPI[]
+  /** Index into `pis`, or null when the reader has to choose. */
+  suggested_pi: number | null
+  suggestion_reason: 'only_one' | 'your_institution' | null
+  sender_name: string | null
+}
+
+/** Reads the document for a fixed set of award facts, each with its page.
+ * Nothing is sent: the draft is written and sent by the person. */
+export function fetchAwardHighlights(docUuid: string) {
+  return apiFetch<AwardHighlights>(`/api/files/${encodeURIComponent(docUuid)}/award-highlights`, { method: 'POST' })
+}
