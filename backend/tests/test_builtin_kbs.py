@@ -168,3 +168,81 @@ async def test_web_results_put_official_sources_first():
 def test_official_url(url, official):
     from app.services.chat_tools import _is_official_url
     assert _is_official_url(url) is official
+
+
+# --- With a document attached ------------------------------------------------
+# Support ticket: "list NIH prior approvals" with an award letter selected
+# listed only the approvals the letter mentions. The sponsor's rulebook was a
+# typed follow-up away, behind a one-sentence offer.
+
+@pytest.mark.parametrize("question, seeds", [
+    ("List NIH prior approvals", ["kb-nih-gps"]),
+    ("Show full NIH prior approvals list", ["kb-nih-gps"]),          # the answer button's message
+    ("What does the NSF PAPPG say about no-cost extensions?", ["kb-nsf-pappg"]),
+    ("Is this cost allowable under 2 CFR 200?", ["kb-2cfr200"]),
+    ("Give me the complete list of NSF requirements", ["kb-nsf-pappg"]),
+])
+def test_a_question_naming_a_rulebook_routes_with_a_document_attached(question, seeds):
+    assert builtin_kbs.matching_seed_ids(question, with_documents=True) == seeds
+
+
+@pytest.mark.parametrize("message", [
+    "List prior approvals",                 # no sponsor named: answered from the award, with buttons
+    "Summarize this NIH award",             # about the document
+    "Who is the subrecipient?",             # a topic word, about the document
+    "Is this cost allowable?",
+    "What is the indirect cost rate in this agreement?",
+    "Save the NIH prior approvals as a document",   # a task
+])
+def test_questions_about_the_document_itself_do_not_route(message):
+    assert builtin_kbs.matching_seed_ids(message, with_documents=True) == []
+
+
+def test_the_reminder_with_a_document_asks_for_the_full_list_marked_against_the_award():
+    text = builtin_kbs.consulted_reminder([builtin_kbs.describe(PAPPG)], with_documents=True)
+    assert "attached document(s) are still loaded" in text
+    assert "complete list" in text and "cite each item" in text
+    assert "In this award" in text
+    assert "never drop an item" in text
+    assert "[ACTION:ask]Save as document[/ACTION]" in text
+    assert "Nothing was attached" not in text
+    assert "Nothing was attached" in builtin_kbs.consulted_reminder([builtin_kbs.describe(PAPPG)])
+
+
+def test_the_reminder_with_a_document_fits_a_question_that_is_not_a_list():
+    # "Is this cost allowable under 2 CFR 200?" routes too; it must not be
+    # told to answer with a marked-up list and a Save button.
+    text = builtin_kbs.consulted_reminder([builtin_kbs.describe(PAPPG)], with_documents=True)
+    assert "Answer from these snippets and cite each one you use." in text
+    assert "When the person asks for a list" in text
+    assert "End a list with this button" in text
+    # The snippets are one search's worth; the rest of a long list is a search away.
+    assert f"search_knowledge_base for the rest before answering ({PAPPG.title} (kb_uuid {PAPPG.uuid}))" in text
+
+
+NIH = _kb("kb-nih-gps", "NIH Grants Policy Statement (FY2026)")
+
+
+@pytest.mark.asyncio
+async def test_an_award_attached_still_gets_the_sponsors_full_list(chat_harness, kb_env, monkeypatch):  # noqa: F811
+    monkeypatch.setattr(builtin_kbs, "builtin_kbs", AsyncMock(return_value=[PAPPG, UG, NIH]))
+    award = SimpleNamespace(filename="NIH_Notice_of_Award.pdf", content="Carryover requires prior approval.")
+    chat_harness.conversation.get_file_attachments = AsyncMock(return_value=[award])
+    seen: list[str] = []
+    chunks = await chat_harness.run(_agent(seen, "Carryover (In this award) [S1]."), message="List NIH prior approvals")
+    assert not [c for c in chunks if c["kind"] == "error"], chunks
+    assert kb_env == [[("uuid-kb-nih-gps", "NIH Grants Policy Statement (FY2026)")]]
+    assert "NIH_Notice_of_Award.pdf" in seen[0]          # the award is still in front of the model
+    assert "In this award" in seen[0] and "complete list" in seen[0]
+
+
+@pytest.mark.asyncio
+async def test_an_award_attached_and_a_question_about_it_is_left_alone(chat_harness, kb_env):  # noqa: F811
+    award = SimpleNamespace(filename="NIH_Notice_of_Award.pdf", content="Carryover requires prior approval.")
+    chat_harness.conversation.get_file_attachments = AsyncMock(return_value=[award])
+    seen: list[str] = []
+    await chat_harness.run(_agent(seen, "Carryover."), message="List prior approvals")
+    assert kb_env == []
+    # The model is told to end with the buttons in place of a sentence.
+    assert "[ACTION:ask]Show full NIH prior approvals list[/ACTION]" in seen[0]
+    assert "[ACTION:ask]Save as document[/ACTION]" in seen[0]
