@@ -7,15 +7,15 @@ import { SlidersHorizontal } from 'lucide-react'
  * through the router, so a reply that is still streaming and an unsent draft
  * survive; the href is the fallback where no router is mounted.
  */
-export function AssistantSettingsAnchor({ children, coreSkills = false, className, label, title }: { children: ReactNode; coreSkills?: boolean; className?: string; label?: string; title?: string }) {
+export function AssistantSettingsAnchor({ children, coreSkills = false, browser = false, className, label, title }: { children: ReactNode; coreSkills?: boolean; browser?: boolean; className?: string; label?: string; title?: string }) {
   const router = useRouter({ warn: false })
   const open = (event: MouseEvent<HTMLAnchorElement>) => {
     if (!router || event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
     event.preventDefault()
-    void router.navigate({ to: '/assistant', hash: coreSkills ? 'assistant-core-skills' : undefined })
+    void router.navigate({ to: '/assistant', hash: browser ? 'browser-setup' : coreSkills ? 'assistant-core-skills' : undefined })
   }
   return (
-    <a href={coreSkills ? '/assistant#assistant-core-skills' : '/assistant'} onClick={open} title={title} aria-label={label} className={className}>{children}</a>
+    <a href={browser ? '/assistant#browser-setup' : coreSkills ? '/assistant#assistant-core-skills' : '/assistant'} onClick={open} title={title} aria-label={label} className={className}>{children}</a>
   )
 }
 

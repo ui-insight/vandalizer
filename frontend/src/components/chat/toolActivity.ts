@@ -22,6 +22,12 @@ export const TOOL_META: Record<string, { label: string; category: ToolCategory }
   calculate:             { label: 'Calculating',              category: 'read' },
   get_app_help:          { label: 'Looking up help',          category: 'read' },
   fetch_url:             { label: 'Reading web page',         category: 'read' },
+  browser_open:          { label: 'Opening site in your browser', category: 'read' },
+  browser_read:          { label: 'Reading the page in your browser', category: 'read' },
+  browser_click:         { label: 'Clicking in your browser', category: 'read' },
+  browser_type:          { label: 'Typing a search in your browser', category: 'read' },
+  browser_select:        { label: 'Choosing an option in your browser', category: 'read' },
+  record_value:          { label: 'Recording a figure from the page', category: 'read' },
   web_search:            { label: 'Searching the web',        category: 'read' },
   run_extraction:        { label: 'Running extraction',       category: 'extract' },
   check_compliance:      { label: 'Checking compliance rules', category: 'workflow' },
@@ -83,6 +89,9 @@ export function getToolMeta(name: string) {
 /** Only show short, user-facing targets. Never display generated HTML or tool instructions. */
 export function toolTarget(call: ToolCallInfo, names: Record<string, string>): string {
   const args = call.args
+  if (call.tool_name.startsWith('browser_') && typeof args.url === 'string') {
+    try { return `Read-only · ${new URL(args.url).host}` } catch { return 'Read-only browser' }
+  }
   const parts: string[] = []
   for (const key of ['kb_uuid', 'knowledge_base_uuid', 'workflow_id', 'extraction_set_uuid', 'project_uuid', 'folder_uuid', 'document_uuid']) {
     const id = args[key]

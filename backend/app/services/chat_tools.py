@@ -7424,6 +7424,7 @@ async def submit_certification_assessment(
 
 from app.services.chat_workflow_tools import get_workflow_definition, update_workflow  # noqa: E402
 from app.services.chat_snapshot_tools import get_award_snapshot  # noqa: E402
+from app.services.chat_browser_tools import TOOLS as BROWSER_TOOLS  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Tool registry — imported by llm_service.create_agentic_chat_agent()
@@ -7511,6 +7512,9 @@ TOOLS: list[ToolFuncContext[AgenticChatDeps, ...]] = [
     check_certification_module,
     complete_certification_module,
     submit_certification_assessment,
+    # Phase 12 — The person's own browser, through the Vandalizer extension.
+    # Sequential (not in PARALLEL_SAFE_TOOLS): they drive one tab in order.
+    *BROWSER_TOOLS,
 ]
 
 

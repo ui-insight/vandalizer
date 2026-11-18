@@ -284,6 +284,10 @@ export interface StreamChunk {
   tool_name?: string
   tool_call_id?: string
   args?: Record<string, unknown>
+  /** tool_call only: the server will wait for this browser call's result, so
+   *  the page runs it in the extension. Absent for withheld tools and calls
+   *  whose arguments failed validation — those never run. */
+  relay?: boolean
   quality?: QualityMeta | null
   request_tokens?: number
   response_tokens?: number

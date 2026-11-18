@@ -179,6 +179,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
+        VITE_BROWSER_STORE_URL: ${VITE_BROWSER_STORE_URL:-}
         VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
         VITE_SENTRY_ENVIRONMENT: ${VITE_SENTRY_ENVIRONMENT:-}
         VITE_SENTRY_RELEASE: ${VITE_SENTRY_RELEASE:-}

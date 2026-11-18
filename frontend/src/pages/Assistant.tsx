@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { BrowserSetup } from '../components/assistant/BrowserSetup'
 import { Check, LockKeyhole } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
 import { CoreSkillsSection } from '../components/assistant/CoreSkillsSection'
@@ -148,6 +149,11 @@ export default function Assistant() {
         <p className="mt-2 max-w-[680px] text-sm text-gray-600">Choose your usual instructions and what chat can use. Changes apply from your next message. Chat still asks before it creates, changes or shares anything.</p>
       </header>
 
+      <BrowserSetup capability={verified ? page?.capabilities.find(c => c.id === 'browser') : undefined} saving={busy} onEnable={() => {
+        const browser = page?.capabilities.find(c => c.id === 'browser')
+        if (browser) void change(browser, true, false)
+      }} />
+
       <CoreSkillsSection />
 
       <section aria-labelledby="assistant-capabilities" className="mb-6">
@@ -170,6 +176,7 @@ export default function Assistant() {
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-semibold text-gray-900">{c.label}</div>
                 <p id={`assistant-description-${c.id}`} className="mt-1 text-sm text-gray-600">{c.description}</p>
+                {c.id === 'browser' && <a className="mt-2 inline-block text-sm underline" href="#browser-setup">Set up your browser</a>}
                 {note && <p id={`assistant-note-${c.id}`} className="mt-2 text-sm text-amber-800"><LockKeyhole className="mr-1 inline h-3.5 w-3.5" aria-hidden="true" />{note}</p>}
               </div>
               <div className="shrink-0 text-right">

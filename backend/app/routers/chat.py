@@ -2,6 +2,7 @@
 from collections.abc import AsyncGenerator
 
 import io
+import json
 import logging
 import os
 import re
@@ -31,6 +32,7 @@ from app.models.chat import (
 from app.models.user import User
 from app.schemas.chat import (
     AddLinkRequest,
+    BrowserResultRequest,
     ChatDownloadRequest,
     ChatRequest,
     ClearContextRequest,
@@ -415,6 +417,7 @@ async def chat(
                 client_timezone=body.client_timezone,
                 approval_for=body.approval_for,
                 decline_for=body.decline_for,
+                browser_available=body.browser_available,
             ):
                 yield chunk
         finally:
@@ -1133,6 +1136,30 @@ async def download_chat(
 # ---------------------------------------------------------------------------
 # Context management
 # ---------------------------------------------------------------------------
+
+
+# One extension answer: a page outline is capped near 20k characters, so this
+# leaves room without letting a page post megabytes into Redis.
+_MAX_BROWSER_RESULT_BYTES = 256_000
+
+
+@router.post("/browser-results", response_model=None)
+async def post_browser_result(
+    body: BrowserResultRequest,
+    user: User = Depends(get_current_user),
+) -> dict[str, object]:
+    """Hand the Vandalizer extension's answer to the browser tool waiting for it.
+
+    The chat page receives a browser tool call in the stream, runs it in the
+    extension, and posts the result here. The key includes the person, so a
+    result can only reach their own turn.
+    """
+    from app.services.chat_browser_tools import deliver_result
+
+    if len(json.dumps(body.result)) > _MAX_BROWSER_RESULT_BYTES:
+        raise HTTPException(status_code=413, detail="Browser result is too large")
+    await deliver_result(user.user_id, body.tool_call_id, body.result)
+    return {"status": "ok"}
 
 
 @router.post("/queue", response_model=None)

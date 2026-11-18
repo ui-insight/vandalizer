@@ -39,6 +39,13 @@ class AgenticChatDeps:
     # Capabilities switched off for this person (their own choice plus the
     # admin's limit); each tool's prepare hook withholds its tools.
     capabilities_off: frozenset[str] = frozenset()
+    # The chat page found the Vandalizer browser extension, so the browser
+    # tools (chat_browser_tools) can reach the person's Chrome this turn.
+    browser_available: bool = False
+    # Pages the browser tools read this turn, and the values record_value
+    # accepted from them; record_value only accepts what a page shows.
+    browser_pages: list[dict] = field(default_factory=list)
+    browser_values: list[dict] = field(default_factory=list)
 
     # Sidecar for quality metadata — tools write here keyed by tool_call_id,
     # and the streaming layer pops entries when emitting tool_result events.
