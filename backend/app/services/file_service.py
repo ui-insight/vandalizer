@@ -33,6 +33,31 @@ def _safe_resolve(settings: Settings, relative_path: str) -> Path | None:
     return target
 
 
+async def _differs_from_stored(
+    existing: SmartDocument, blob: str, settings: Settings
+) -> bool | None:
+    """Whether an upload's bytes differ from the stored file of the same name.
+
+    None when the stored file can't be read, so the caller reports "not
+    updated" without claiming either way.
+    """
+    try:
+        uploaded = base64.b64decode(blob, validate=True)
+    except (ValueError, TypeError):
+        raise ValueError("Invalid base64 string.")
+    stored_path = existing.path or existing.downloadpath
+    if not stored_path:
+        return None
+    from app.services.storage import get_storage
+
+    try:
+        stored = await get_storage(settings).read(str(stored_path))
+    except Exception:
+        logger.warning("Could not read stored file for %s to compare an upload", existing.uuid)
+        return None
+    return stored != uploaded
+
+
 async def upload_document(
     blob: str,
     filename: str,
@@ -98,7 +123,16 @@ async def upload_document(
             SmartDocument.soft_deleted != True,  # noqa: E712
         )
     if existing:
-        return {"complete": True, "exists": True, "uuid": existing.uuid}
+        # Nothing is stored or replaced. ``changed`` lets the page tell the
+        # person whether what they just chose differs from what is here:
+        # treating a revised file as "already uploaded" opened the old copy as
+        # if the upload had worked (support ticket).
+        return {
+            "complete": True,
+            "exists": True,
+            "uuid": existing.uuid,
+            "changed": await _differs_from_stored(existing, blob, settings),
+        }
 
     uid = uuid.uuid4().hex.upper()
 

@@ -21,6 +21,7 @@ import { getUserConfig, updateUserConfig, markFirstSessionComplete } from '../..
 import type { FileAttachment, UrlAttachment } from '../../types/chat'
 import type { ModelInfo } from '../../types/workflow'
 import { stageCopy } from '../../utils/processingStatus'
+import { isUnappliedUpload, unappliedUploadMessage } from '../../lib/duplicateUpload'
 
 const LOADING_WORDS = [
   'Thinking', 'Vandalizing', 'Pondering', 'Analyzing',
@@ -391,6 +392,12 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         const ext = file.name.split('.').pop() || ''
         const base64 = await fileToBase64(file)
         const result = await uploadFile({ contentAsBase64String: base64, fileName: file.name, extension: ext })
+        if (isUnappliedUpload(result)) {
+          // The server kept the existing file. Attaching it would put the old
+          // content in the chat under the name of the file just chosen.
+          toast(`${unappliedUploadMessage(file.name, result, 'your files')} It was not attached to this chat.`, 'error')
+          continue
+        }
         if (result.uuid) {
           newUuids.push(result.uuid)
           newNames[result.uuid] = file.name
