@@ -326,3 +326,37 @@ def test_the_prompt_asks_for_sections_exact_figures_and_one_row_per_item():
     assert "A result's `section` says where the passage sits" in prompt
     assert "give each item one row" in prompt
     assert "copy amounts, percentages and time limits exactly" in prompt
+
+
+class TestPrefetchedSnippets:
+    """A question that names a sponsor's rulebook is answered from snippets
+    fetched before the model runs; they need their section as much as the
+    passages the search tool returns."""
+
+    @pytest.mark.asyncio
+    async def test_a_prefetched_snippet_carries_its_section(self, index):
+        from app.services import chat_service
+
+        passage = _chunk("Purchase of a unit of equipment exceeding $25,000")
+        results = [{"content": passage, "metadata": {"source_id": "src-1", "source_name": NAME},
+                    "chunk_id": "src-1_chunk_40", "score": 0.9}]
+        with patch.object(chat_service, "_kb_section_indexes", AsyncMock(return_value={"src-1": index})), \
+             patch("app.services.knowledge_service.resolve_openable_documents", new=AsyncMock(return_value={})):
+            segment, sources = await chat_service._render_kb_segment(results, "List NIH prior approvals")
+        assert f"**[S1] Source: {NAME}**\n_Section: 8.1.2 Prior Approval Requirements > 8.1.2.5 Change in Scope_\n" in segment.text
+        assert "is where the snippet BEGINS" in segment.text
+        # The citation check still finds the snippet under its source name.
+        assert "exceeding $25,000" in chat_service._cited_source_texts([segment])[NAME]
+        assert [s["ref"] for s in sources] == [1]
+
+    @pytest.mark.asyncio
+    async def test_no_section_line_when_the_source_text_is_not_available(self):
+        from app.services import chat_service
+
+        results = [{"content": "Travel is reimbursed at cost.", "metadata": {"source_id": "src-9", "source_name": "Travel.pdf"},
+                    "chunk_id": "c9", "score": 0.9}]
+        # No database here: loading the sources fails and is not fatal.
+        with patch("app.services.knowledge_service.resolve_openable_documents", new=AsyncMock(return_value={})):
+            segment, _ = await chat_service._render_kb_segment(results, "q")
+        assert "_Section:" not in segment.text
+        assert "BEGINS" not in segment.text

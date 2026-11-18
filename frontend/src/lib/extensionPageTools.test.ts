@@ -1,7 +1,20 @@
 // The extension's page tools (chrome-extension/background/page-tools.js),
 // run under jsdom: what browser_click refuses, and where numbers are found.
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { clickRef, readPage, selectRef, typeRef } from '../../../chrome-extension/background/page-tools.js'
+// Loaded as text and evaluated, like the other extension tests. A typed
+// import of a file outside frontend/ fails `tsc -b` in the Docker build,
+// whose context is frontend/ alone, so the image could not be built.
+import toolsScript from '../../../chrome-extension/background/page-tools.js?raw'
+
+type Outcome = Record<string, unknown>
+const { clickRef, readPage, selectRef, typeRef } = new Function(
+  `${toolsScript.replaceAll('export function', 'function')}\nreturn { clickRef, readPage, selectRef, typeRef };`,
+)() as {
+  clickRef: (ref: number) => Outcome
+  typeRef: (ref: number, text: string) => Outcome
+  selectRef: (ref: number, option: string) => Outcome
+  readPage: (query: string, maxChars: number) => { text: string } & Outcome
+}
 
 beforeAll(() => {
   // jsdom lays nothing out; treat every element as drawn except
