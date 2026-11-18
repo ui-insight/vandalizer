@@ -13,11 +13,33 @@ export const PENDING_NEXT_KEY = 'vandalizer:pendingNext'
 // sign-in doesn't redirect a later visit in the same tab.
 const MAX_AGE_MS = 10 * 60 * 1000
 
+// Only used to resolve a path; nothing is ever sent to it.
+const RESOLVE_BASE = 'https://same-origin.invalid'
+
+function hasControlCharacter(text: string): boolean {
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i)
+    if (code <= 0x20 || code === 0x7f) return true
+  }
+  return false
+}
+
 /** A same-origin relative path, or null. Rejects protocol-relative (//host)
- * and absolute URLs so `next` can't be used as an open redirect. */
+ * and absolute URLs so `next` can't be used as an open redirect.
+ *
+ * A browser drops tabs and newlines when it parses a URL, so "/\t/evil.example"
+ * is "//evil.example" by the time it is followed. A path never holds a raw
+ * space or control character (they arrive percent-encoded), so one is
+ * refused, and the path must still resolve to the origin it was given. */
 export function safeNextPath(raw: string | undefined | null): string | null {
   if (!raw) return null
   if (!raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/\\')) return null
+  if (hasControlCharacter(raw)) return null
+  try {
+    if (new URL(raw, RESOLVE_BASE).origin !== RESOLVE_BASE) return null
+  } catch {
+    return null
+  }
   return raw
 }
 
