@@ -2418,6 +2418,10 @@ async def chat_stream(
         assistant_capabilities.own_off(user) if user and team_access else frozenset(),
         assistant_capabilities.admin_off(sys_config_doc) if user and team_access else frozenset(),
     )
+    # Without the extension on the chat page the browser tools are withheld;
+    # say why, or "use my browser" is quietly answered with the web reader.
+    if user and team_access:
+        capability_note += assistant_capabilities.browser_not_connected_note(capabilities_off, browser_available)
     instructions_text += capability_note
     from app.services.skill_service import core_skill_instructions, core_skills, skill_instructions
 
