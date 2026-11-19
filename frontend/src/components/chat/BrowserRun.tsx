@@ -14,6 +14,12 @@ export function capturedTime(value: unknown) {
   return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(value))
 }
 
+const text = (value: unknown) => typeof value === 'string' ? value.trim().toLowerCase() : ''
+function host(value: unknown) {
+  if (typeof value !== 'string') return ''
+  try { return new URL(value).host.toLowerCase() } catch { return '' }
+}
+
 /** Same text whatever the quote style, case or spacing the model used on a second try. */
 const fold = (value: unknown) => typeof value === 'string' ? value.replace(/[‘’`]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, ' ').trim().toLowerCase() : ''
 
@@ -34,7 +40,17 @@ export function BrowserRun({ calls, results, running = false }: { calls: ToolCal
       return later.some(next => next.call.tool_name === 'record_value' && next.value.recorded === true
         && ((wanted && fold(next.value.value) === wanted) || (label && fold(next.value.label) === label)))
     }
-    return later.some(next => next.call.tool_name.startsWith('browser_') && next.result && !next.value.error)
+    // "Went through" is a page that was read or a control that was used: not
+    // merely the absence of an error. A site waiting on its approval card has
+    // no error and opened nothing. And a step that names a site is made good
+    // only by a page on that site: reading B says nothing about A timing out.
+    const site = text(entry.value.site) || host(entry.call.args?.url)
+    return later.some(next => {
+      if (!next.call.tool_name.startsWith('browser_') || next.value.error) return false
+      const reached = host(record(next.value.page).url)
+      if (!reached) return !site && next.value.ok === true
+      return !site || reached === site || reached.replace(/:\d+$/, '') === site
+    })
   }
   const seen = new Set<string>()
   const errors = entries
@@ -58,7 +74,7 @@ export function BrowserRun({ calls, results, running = false }: { calls: ToolCal
     {errors.map(({ call, refused, message }) => <p key={call.tool_call_id} className="browser-run-notice"><strong>{refused ? 'Action blocked.' : 'Step needs attention.'}</strong> {message}</p>)}
     {browser.length > 0 && <details className="browser-run-log"><summary>Activity · {browser.length} {browser.length === 1 ? 'step' : 'steps'}</summary><ol>{browser.map(({ call, result, value }) => {
       const page = record(value.page)
-      return <li key={call.tool_call_id}>{!result ? running ? 'Working…' : 'No result received' : value.error ? browserMessage(value, call.args) : page.title ? <>Read {String(page.title)}{page.truncated === true && ' (part of page)'}</> : 'Browser step completed'}</li>
+      return <li key={call.tool_call_id}>{!result ? running ? 'Working…' : 'No result received' : value.error ? browserMessage(value, call.args) : value.needs_confirmation === true || value.still_waiting === true ? 'Waiting for your approval' : page.title ? <>Read {String(page.title)}{page.truncated === true && ' (part of page)'}</> : 'Browser step completed'}</li>
     })}</ol></details>}
   </section>
 }

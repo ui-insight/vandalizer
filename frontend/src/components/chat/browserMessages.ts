@@ -22,7 +22,11 @@ const UNREAD = 'Chat could not read the page. Check the working tab before conti
 export function browserMessage(result: Result, args: Result = {}): string {
   const error = text(result.error)
   const site = text(result.site)
-  if (error.startsWith('blocked_')) return 'This control could change something on the site. Chat stopped without using it.'
+  if (error.startsWith('blocked_')) {
+    // Name the control when the result does: two blocked controls are two notices.
+    const label = text(result.label).slice(0, 80)
+    return `${label ? `“${label}”` : 'This control'} could change something on the site. Chat stopped without using it.`
+  }
   switch (error) {
     case 'browser_request_blocked': {
       const reason = text(result.reason)
@@ -39,7 +43,7 @@ export function browserMessage(result: Result, args: Result = {}): string {
     case 'page_address_not_checked':
       return 'The working tab moved to a page Vandalizer could not check, so chat did not read it. If it is a sign-in page, sign in there yourself, then continue.'
     case 'browser_needs_approval':
-      return `Chat needs your approval before it uses the browser${site ? ` on ${site}` : ''}. Ask it to open the site and you’ll get an approval card.`
+      return `Chat needs your approval before it uses the browser${site ? ` on ${site}` : ''}. Use the approval card if one follows; otherwise ask chat to open the site.`
     case 'browser_not_connected':
     case 'extension_unavailable':
     case 'browser_unavailable':

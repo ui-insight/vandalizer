@@ -3,10 +3,12 @@ import exampleSkillJson from '../data/browser-demo-skill.json?raw'
 const example = JSON.parse(exampleSkillJson).items[0] as { title: string; extraction_config: { content: string } }
 export function browserSkillTemplate(demo = false) {
   return demo ? {
+    example: true,
     title: example.title,
     when: 'Collect a sourced research snapshot from the University of Idaho public website.',
     instructions: example.extraction_config.content,
   } : {
+    example: false,
     title: 'Collect figures from websites',
     when: 'Collect figures from the websites and award numbers I specify.',
     instructions: `Sites to visit

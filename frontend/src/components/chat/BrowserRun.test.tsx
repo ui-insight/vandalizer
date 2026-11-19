@@ -96,6 +96,39 @@ it('keeps a warning when no later browser step went through', () => {
   expect(screen.getAllByText(/The browser did not answer in time\. Check that the working tab is still open/)[0]).toBeVisible()
   expect(screen.getAllByText('The working tab was closed. Ask chat to open the site again.')[0]).toBeVisible()
 })
+it('keeps a warning when the only later step is a site waiting for approval, which opened nothing', () => {
+  run([
+    step('read', 'browser_read', {}, { error: 'browser_timeout' }),
+    step('ask', 'browser_open', { url: 'https://portal.example.edu' }, { needs_confirmation: true, status: 'awaiting_user_confirmation', site: 'portal.example.edu' }),
+    step('again', 'browser_open', { url: 'https://portal.example.edu' }, { still_waiting: true, status: 'awaiting_user_confirmation' }),
+  ])
+  expect(screen.getByText('Step needs attention.')).toBeVisible()
+  expect(screen.getAllByText(/The browser did not answer in time/)[0]).toBeVisible()
+})
+it('keeps a warning about one site when a different site is read afterwards', () => {
+  run([
+    step('a', 'browser_open', { url: 'https://finance.example.edu/awards' }, { error: 'browser_timeout' }),
+    step('b', 'browser_open', { url: 'https://www.uidaho.edu/search' }, PAGE),
+  ])
+  expect(screen.getByText('Step needs attention.')).toBeVisible()
+})
+it('drops a warning about a site once a page on that site is read', () => {
+  run([
+    step('a', 'browser_open', { url: 'https://www.uidaho.edu/about' }, { error: 'browser_timeout' }),
+    step('b', 'browser_open', { url: 'https://www.uidaho.edu/search' }, PAGE),
+  ])
+  expect(screen.queryByText('Step needs attention.')).not.toBeInTheDocument()
+})
+it('names each blocked control, so two of them are two notices', () => {
+  run([
+    step('a', 'browser_click', { ref: 3 }, { error: 'blocked_write_action', label: 'Submit Invoice', message: 'Submit Invoice would change something.' }),
+    step('b', 'browser_click', { ref: 4 }, { error: 'blocked_write_action', label: 'Delete award', message: 'Delete award would change something.' }),
+    step('c', 'browser_read', {}, PAGE),
+  ])
+  expect(screen.getAllByText('Action blocked.')).toHaveLength(2)
+  expect(screen.getAllByText(/“Submit Invoice” could change something on the site/)[0]).toBeVisible()
+  expect(screen.getAllByText(/“Delete award” could change something on the site/)[0]).toBeVisible()
+})
 it('says a repeated problem once', () => {
   run([
     step('a', 'browser_click', { ref: 3 }, { error: 'stale_ref', message: 'No element [3] on the page now. Read the page again.' }),
@@ -129,6 +162,24 @@ it('groups browser work without moving narrative or other tools', () => {
   expect(groups.map(group => group.kind)).toEqual(['browser_group', 'text', 'tool_call', 'browser_group'])
   expect(groups[0]).toEqual({ kind: 'browser_group', calls })
   expect(groups[1]).toBe(text)
+})
+it('leaves a browser call that is waiting for approval out of the group, so it gets an approval card', () => {
+  const waiting = { tool_call_id: 'ask', tool_name: 'browser_open', args: { url: 'https://portal.example.edu' } }
+  const map = new Map(results)
+  map.set('ask', { ...waiting, content: { needs_confirmation: true, approval_label: 'Open site' }, quality: null })
+  const groups = groupBrowserSegments([
+    { kind: 'tool_call', call: calls[0] },
+    { kind: 'tool_call', call: waiting },
+    { kind: 'tool_result', result: map.get('ask')! },
+    { kind: 'tool_call', call: calls[1] },
+  ], map)
+  expect(groups).toEqual([{ kind: 'browser_group', calls: [calls[0]] }, { kind: 'tool_call', call: waiting }, { kind: 'browser_group', calls: [calls[1]] }])
+})
+it('never logs a step that is waiting for approval as completed', () => {
+  const waiting = { tool_call_id: 'ask', tool_name: 'browser_open', args: {} }
+  render(<BrowserRun calls={[waiting]} results={new Map([['ask', { ...waiting, content: { needs_confirmation: true }, quality: null }]])} />)
+  expect(screen.getByText('Waiting for your approval')).toBeInTheDocument()
+  expect(screen.queryByText('Browser step completed')).not.toBeInTheDocument()
 })
 it('omits malformed capture dates', () => { expect(capturedTime('not a date')).toBe('') })
 it('words a refusal to open Vandalizer itself for the person, and keeps it', () => {
