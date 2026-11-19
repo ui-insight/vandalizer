@@ -23,6 +23,7 @@ export function BrowserSetup({ capability, onEnable, saving = false }: {
   const [downloaded, setDownloaded] = useState(false)
   const [edge, setEdge] = useState(() => navigator.userAgent.includes('Edg/'))
   const [copyNotice, setCopyNotice] = useState('')
+  const [copied, setCopied] = useState(false)
   const [checking, setChecking] = useState(false)
   const [checkNotice, setCheckNotice] = useState('')
   const previous = useRef<BrowserConnection>('checking')
@@ -30,6 +31,7 @@ export function BrowserSetup({ capability, onEnable, saving = false }: {
   const mounted = useRef(false)
   const heading = useRef<HTMLHeadingElement>(null)
   const focusStep = useRef(false)
+  const copiedTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const browserName = edge ? 'Edge' : 'Chrome'
   const extensionsAddress = edge ? 'edge://extensions' : 'chrome://extensions'
   const blocked = capability && (!capability.allowed || !capability.available || !capability.enabled)
@@ -66,7 +68,7 @@ export function BrowserSetup({ capability, onEnable, saving = false }: {
     const refresh = () => { if (!document.hidden) void check() }
     const timer = setInterval(refresh, 2500)
     window.addEventListener('focus', refresh)
-    return () => { mounted.current = false; clearInterval(timer); window.removeEventListener('focus', refresh) }
+    return () => { mounted.current = false; clearInterval(timer); clearTimeout(copiedTimer.current); window.removeEventListener('focus', refresh) }
   }, [check])
 
   useEffect(() => {
@@ -80,7 +82,13 @@ export function BrowserSetup({ capability, onEnable, saving = false }: {
     return () => window.removeEventListener('hashchange', open)
   }, [])
 
-  const go = (next: number) => { focusStep.current = true; setExpanded(true); setCopyNotice(''); setCheckNotice(''); setStep(next) }
+  // The button itself confirms a copy for a few seconds; the line under the box is easy to miss.
+  const showCopied = (on: boolean) => {
+    clearTimeout(copiedTimer.current)
+    setCopied(on)
+    if (on) copiedTimer.current = setTimeout(() => { if (mounted.current) setCopied(false) }, 3000)
+  }
+  const go = (next: number) => { focusStep.current = true; setExpanded(true); setCopyNotice(''); showCopied(false); setCheckNotice(''); setStep(next) }
   const status = state === 'checking' ? 'Checking your browser…' : state === 'connected' ? 'Browser connected' : state === 'installed' ? 'Extension installed · ready to connect' : 'Browser not connected'
   const title = step === 0 ? 'Get Vandalizer Browser' : step === 1 ? 'Add it to ' + browserName : step === 2 ? 'Connect this Vandalizer site' : 'Your browser is ready'
 
@@ -116,7 +124,7 @@ export function BrowserSetup({ capability, onEnable, saving = false }: {
     </ol>
 
     <div className="browser-stage">
-      <div className="browser-stage-heading"><span className="browser-step-label">Step {step + 1} of 4</span>{step < 2 && <fieldset className="browser-choice"><legend className="sr-only">Your browser</legend>{['Chrome', 'Edge'].map(name => <label key={name}><input type="radio" name="setup-browser" checked={edge === (name === 'Edge')} onChange={() => { setEdge(name === 'Edge'); setCopyNotice('') }} /><span>{name}</span></label>)}</fieldset>}</div>
+      <div className="browser-stage-heading"><span className="browser-step-label">Step {step + 1} of 4</span>{step < 2 && <fieldset className="browser-choice"><legend className="sr-only">Your browser</legend>{['Chrome', 'Edge'].map(name => <label key={name}><input type="radio" name="setup-browser" checked={edge === (name === 'Edge')} onChange={() => { setEdge(name === 'Edge'); setCopyNotice(''); showCopied(false) }} /><span>{name}</span></label>)}</fieldset>}</div>
       <h3 ref={heading} tabIndex={-1}>{title}</h3>
 
       {step === 0 && <>
@@ -137,10 +145,10 @@ export function BrowserSetup({ capability, onEnable, saving = false }: {
 
       {step === 1 && <>
         <p className="browser-stage-intro">Open {browserName}’s extensions page in a new tab. Keep this tab open to follow along.</p>
-        <div className="browser-address"><code>{extensionsAddress}</code><button type="button" className="browser-secondary" aria-label="Copy extensions address" onClick={async () => {
-          try { await navigator.clipboard.writeText(extensionsAddress); setCopyNotice('Copied. Paste it into a new tab’s address bar.') }
-          catch { setCopyNotice('Select the address above and copy it manually.') }
-        }}><Copy size={16} aria-hidden="true" />Copy address</button></div>
+        <div className="browser-address"><code>{extensionsAddress}</code><button type="button" className="browser-secondary" data-copied={copied || undefined} aria-label="Copy extensions address" onClick={async () => {
+          try { await navigator.clipboard.writeText(extensionsAddress); setCopyNotice('Copied. Paste it into a new tab’s address bar.'); showCopied(true) }
+          catch { setCopyNotice('Select the address above and copy it manually.'); showCopied(false) }
+        }}>{copied ? <><Check size={16} aria-hidden="true" />Copied</> : <><Copy size={16} aria-hidden="true" />Copy address</>}</button></div>
         <p className="browser-hint" role="status">{copyNotice || 'Paste this into the address bar, not a search box.'}</p>
         <ol className="browser-instructions">
           <li><span>1</span><div>Turn on <strong>Developer mode</strong>.<small>{edge ? 'Look in the left sidebar.' : 'Look in the top-right corner.'}</small></div></li>
