@@ -15,7 +15,7 @@ it('offers working tab and continue for a sign-in pause', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Open working tab' }))
   expect(focusBrowserTab).toHaveBeenCalledOnce()
   fireEvent.click(screen.getByRole('button', { name: 'Continue after sign-in' }))
-  expect(send).toHaveBeenCalledWith(expect.stringContaining('read the current page first'))
+  expect(send).toHaveBeenCalledWith('I have finished signing in in the working tab. Continue what you were doing; read the current page first.')
 })
 it('explains focus failure and shows no continue action on an ordinary page', async () => {
   vi.mocked(focusBrowserTab).mockResolvedValue({ error: 'no_open_page' })
@@ -45,3 +45,16 @@ it('does not offer a retry that would bypass a refused write', () => {
   expect(screen.getByText('Action blocked · read-only')).toBeVisible()
   expect(screen.queryByRole('button', { name: /Continue|Retry|Ask for/ })).not.toBeInTheDocument()
 })
+it.each([
+  ['Continue after sign-in', { login_required: true }],
+  ['Check page and continue', { error: 'unapproved_site' }],
+  ['Ask for site access', { error: 'site_not_allowed' }],
+  ['Continue browser task', { error: 'no_open_page' }],
+  ['Continue browser task', { error: 'browser_not_connected' }],
+])('"%s" never mentions a Skill, since the chat may have none selected', (label, result) => {
+  render(<BrowserActivity result={result} />)
+  fireEvent.click(screen.getByRole('button', { name: label }))
+  expect(send).toHaveBeenCalledOnce()
+  expect(send.mock.calls[0][0]).not.toMatch(/skill/i)
+})
+
