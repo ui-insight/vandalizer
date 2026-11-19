@@ -1525,7 +1525,8 @@ export function ToolStatusLine({
       onDecide={onConfirm && !upNext ? decide : undefined} upNext={upNext} stepHeading={step?.heading} revising={name === 'revise_html_artifact'} />
   }
 
-  if (isBrowserTool(name)) return <BrowserRun calls={[call ?? { tool_name: name, tool_call_id: result?.tool_call_id ?? name, args: {} }]} results={new Map(result ? [[result.tool_call_id, result]] : [])} running={isActive} />
+  // A site waiting for approval falls through to the approval card below.
+  if (isBrowserTool(name) && !needsConfirmation) return <BrowserRun calls={[call ?? { tool_name: name, tool_call_id: result?.tool_call_id ?? name, args: {} }]} results={new Map(result ? [[result.tool_call_id, result]] : [])} running={isActive} />
 
   return (
     <div className="agent-tool-result agent-tool-card" data-tool-state={executionLabel} data-tool-category={meta.category} data-tool-error={isError || undefined}>
@@ -1533,7 +1534,7 @@ export function ToolStatusLine({
         <span className="agent-tool-icon" aria-hidden="true"><ToolIcon size={18} /></span>
         <div className="agent-tool-identity">
           <div className="agent-tool-heading" role="status" aria-atomic="true">
-            <span className="agent-tool-name">{isActive && call ? activeToolLabel(call) : meta.label}</span>
+            <span className="agent-tool-name">{isActive && call ? activeToolLabel(call) : needsConfirmation && name === 'browser_open' ? 'Open site in your browser' : meta.label}</span>
             <span className="sr-only"> · </span>
             <span className="agent-tool-status">{isActive && <Loader2 size={11} className="agent-tool-spin" aria-hidden="true" />}{executionLabel}</span>
           </div>
@@ -1671,7 +1672,7 @@ export function ToolCallDisplay({ names = {}, toolCalls, toolResults, isStreamin
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-2)', margin: "var(--workspace-space-6) 0" }}>
-      {groupBrowserSegments([...allCallIds].map(id => ({ kind: 'tool_call', call: toolCalls.find(call => call.tool_call_id === id) ?? { tool_call_id: id, tool_name: resultMap.get(id)?.tool_name ?? 'unknown', args: {} } }))).map(segment => {
+      {groupBrowserSegments([...allCallIds].map(id => ({ kind: 'tool_call', call: toolCalls.find(call => call.tool_call_id === id) ?? { tool_call_id: id, tool_name: resultMap.get(id)?.tool_name ?? 'unknown', args: {} } })), resultMap).map(segment => {
         if (segment.kind === 'browser_group') return <BrowserRun key={segment.calls[0].tool_call_id} calls={segment.calls} results={resultMap} running={isStreaming} />
         if (segment.kind !== 'tool_call') return null
         const callId = segment.call.tool_call_id
