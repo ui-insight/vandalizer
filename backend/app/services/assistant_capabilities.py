@@ -255,6 +255,11 @@ def browser_not_connected_note(off: frozenset[str], browser_available: bool) -> 
     """
     if browser_available or "browser" in off:
         return ""
+    # Offer the web reader only if chat has it ("Read a web page" can be off too).
+    offer = (
+        "" if "web_pages" in off
+        else " You may offer to read a public page with the web reader instead, and do so if they accept."
+    )
     return (
         "\n\nThis person's own browser is not connected to this chat (the Vandalizer Browser extension is "
         "not installed, is switched off, or is not connected to this site), so the browser tools are not "
@@ -262,8 +267,8 @@ def browser_not_connected_note(off: frozenset[str], browser_available: bool) -> 
         "isn't connected, and that they can reconnect it at "
         "[Assistant settings → Set up Vandalizer Browser](/assistant#browser-setup), then ask again. "
         "Do not read the page with fetch_url or a web search in that reply as if it were their browser, and "
-        "never say or imply their browser was used. You may offer to read a public page with the web reader "
-        "instead, and do so if they accept. Requests that don't ask for their browser are unaffected."
+        f"never say or imply their browser was used.{offer} Requests that don't ask for their browser are "
+        "unaffected."
     )
 
 

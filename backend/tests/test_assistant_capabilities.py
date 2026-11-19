@@ -64,7 +64,11 @@ def test_chat_is_told_the_browser_is_not_connected_and_how_to_reconnect_it():
     # Connected: the tools are there. Switched off: the switched-off note covers it.
     assert caps.browser_not_connected_note(frozenset(), True) == ""
     assert caps.browser_not_connected_note(frozenset({"browser"}), False) == ""
-    assert caps.browser_not_connected_note(frozenset({"web_pages"}), False) == note
+    # With "Read a web page" off too, there is no web reader to offer.
+    assert "You may offer to read a public page with the web reader" in note
+    without_reader = caps.browser_not_connected_note(frozenset({"web_pages"}), False)
+    assert "web reader" not in without_reader and "browser isn't connected" in without_reader
+    assert caps.browser_not_connected_note(frozenset({"pages"}), False) == note
 
 
 def test_chat_is_told_a_link_cannot_go_into_a_knowledge_base_while_reading_pages_is_off():
