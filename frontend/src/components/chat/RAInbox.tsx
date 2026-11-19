@@ -164,7 +164,13 @@ function InboxRow({ item, focused, onChanged, onError }: {
   if (mode === 'edit') return (
     <li ref={rowRef} style={{ listStyle: 'none', paddingBottom: 'var(--workspace-space-8)' }}>
       <AddDeadlineForm projectUuid={item.project_uuid} item={item}
-        onAdded={edited => { onChanged(item.uuid, { edited }); backTo(editButton) }}
+        onAdded={edited => {
+          onChanged(item.uuid, { edited })
+          setMode('view')
+          // A new date can move the row to another group, which remounts it:
+          // find its Edit button again instead of trusting this row's ref.
+          window.setTimeout(() => document.querySelector<HTMLElement>(`[data-edit-deadline="${item.uuid}"]`)?.focus(), 0)
+        }}
         onCancel={() => backTo(editButton)} />
     </li>
   )
@@ -248,7 +254,7 @@ function InboxRow({ item, focused, onChanged, onError }: {
             onClick={() => { downloadDeadlineCalendar({ obligation: item.uuid }).catch((e: unknown) => onError(e instanceof Error ? e.message : 'The calendar file could not be downloaded.')) }}>
             <CalendarPlus size={12} aria-hidden /> Add to calendar
           </button>}
-          {item.editable && <button ref={editButton} type="button" style={QUIET} disabled={busy}
+          {item.editable && <button ref={editButton} type="button" style={QUIET} disabled={busy} data-edit-deadline={item.uuid}
             aria-label={`Edit "${item.title}"`} onClick={() => setMode('edit')}>
             <Pencil size={12} aria-hidden /> Edit
           </button>}
@@ -267,7 +273,8 @@ function InboxRow({ item, focused, onChanged, onError }: {
             <EyeOff size={12} aria-hidden /> Dismiss
           </button>
         </div>
-        {mode === 'delete' && <div role="group" aria-label={`Delete "${item.title}"`} style={{
+        {mode === 'delete' && <div role="group" aria-label={`Delete "${item.title}"`}
+          onKeyDown={e => { if (e.key === 'Escape') backTo(deleteButton) }} style={{
           display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-6)', marginTop: 'var(--workspace-space-4)',
           padding: 'var(--workspace-space-4) var(--workspace-space-8)', borderRadius: 'var(--workspace-radius-small)',
           backgroundColor: '#fef2f2', border: '1px solid #fecaca', fontSize: 'var(--workspace-font-meta)', color: '#7f1d1d',
@@ -459,7 +466,11 @@ export function RAInbox({ projectUuid }: { projectUuid?: string | null } = {}) {
 
   // Done leaves the inbox for everyone; Dismiss only hides it here, so it
   // stays countable under "Show dismissed".
-  const changed = (uuid: string, change: RowChange) => setItems(current =>
+  const changed = (uuid: string, change: RowChange) => {
+    setError(null)
+    applyChange(uuid, change)
+  }
+  const applyChange = (uuid: string, change: RowChange) => setItems(current =>
     change === 'done' || change === 'deleted'
       ? (current ?? []).filter(i => i.uuid !== uuid)
       : (current ?? []).map(i => (i.uuid !== uuid ? i
@@ -526,7 +537,7 @@ export function RAInbox({ projectUuid }: { projectUuid?: string | null } = {}) {
         Nothing due or missing in this project. Only deadlines and materials saved to it appear here.
       </p>}
       {focusMissing && <p role="status" style={{ margin: 'var(--workspace-space-4) var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: '#4b5563' }}>
-        The deadline from that reminder is no longer open here: it was marked done, replaced by an amendment, or dismissed.
+        The deadline from that reminder is no longer open here: it was marked done, replaced by an amendment, dismissed, or deleted.
       </p>}
       {GROUPS.map(group => {
         const rows = open.filter(i => upcomingGroup(i) === group.key)

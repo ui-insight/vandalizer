@@ -978,14 +978,14 @@ async def edit_by_hand(
     reason = await _hand_duplicate(ob.project_uuid, user, fields["title"], fields["due_at"], skip_uuid=ob.uuid)
     if reason:
         return None, reason
-    date_changed = not ob.due_at or ob.due_at.date() != fields["due_at"].date()
+    changed = (ob.title, ob.due_at) != (fields["title"], fields["due_at"])
     for key, value in fields.items():
         setattr(ob, key, value)
     ob.edited_by = user.user_id
     ob.updated_at = _now()
     await ob.save()
-    if date_changed:
-        # A bell item for the old date ("due in 3 days") is no longer true.
+    if changed:
+        # A bell item carrying the old title or date is no longer true.
         await _clear_notifications(ob.uuid)
     return ob, None
 

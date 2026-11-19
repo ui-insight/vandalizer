@@ -323,11 +323,14 @@ async def test_a_hand_added_deadline_can_be_corrected_in_place(edit_env):
 
 
 @pytest.mark.asyncio
-async def test_correcting_only_the_title_keeps_reminders_already_in_the_bell(edit_env):
+async def test_correcting_only_the_note_keeps_reminders_already_in_the_bell(edit_env):
     ob = _hand()
-    await service.edit_by_hand(ob, USER, title="Final financial report", due_date="2027-03-13", source_note="Sponsor email")
-    assert ob.title == "Final financial report"
+    await service.edit_by_hand(ob, USER, title="Final finacial report", due_date="2027-03-13", source_note="Award letter")
+    assert ob.source_note == "Award letter"
     edit_env.cleared.assert_not_awaited()
+    # A corrected title: the bell item spelling it the old way is cleared.
+    await service.edit_by_hand(ob, USER, title="Final financial report", due_date="2027-03-13", source_note="Award letter")
+    edit_env.cleared.assert_awaited_once_with("hand")
 
 
 @pytest.mark.asyncio

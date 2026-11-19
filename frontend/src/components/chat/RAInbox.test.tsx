@@ -426,6 +426,28 @@ describe('Edit or delete a deadline added by hand (#1165)', () => {
     expect(api.addDeadlineByHand).not.toHaveBeenCalled()
   })
 
+  it('keeps focus on the row when the new date moves it to another group, and clears an earlier error', async () => {
+    const soon = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10)
+    const THIS_WEEK = { ...HAND, due_at: `${soon}T00:00:00` }
+    api.getInbox.mockResolvedValue({ items: [THIS_WEEK], inbox_hidden: false, project_count: 1 })
+    api.deleteDeadlineByHand.mockRejectedValue(new Error('Could not delete.'))
+    api.editDeadlineByHand.mockResolvedValue({ ...HAND, due_at: '2099-03-31T00:00:00' })
+    render(<RAInbox projectUuid="proj-1" />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete "Final finacial report"' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete deadline' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not delete.')
+    fireEvent.keyDown(screen.getByRole('group', { name: 'Delete "Final finacial report"' }), { key: 'Escape' })
+    expect(screen.queryByRole('group', { name: 'Delete "Final finacial report"' })).not.toBeInTheDocument()
+
+    expect(screen.getByRole('group', { name: 'Due this week' })).toHaveTextContent('Final finacial report')
+    fireEvent.click(screen.getByRole('button', { name: 'Edit "Final finacial report"' }))
+    fireEvent.change(screen.getByLabelText('Due date'), { target: { value: '2099-03-31' } })
+    fireEvent.submit(screen.getByRole('form', { name: 'Edit "Final finacial report"' }))
+    await waitFor(() => expect(screen.getByRole('group', { name: 'Later' })).toHaveTextContent('Final finacial report'))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit "Final finacial report"' })).toHaveFocus())
+  })
+
   it("keeps the form and shows the server's reason when the change can't be saved, and Cancel leaves the row as it was", async () => {
     api.getInbox.mockResolvedValue({ items: [HAND], inbox_hidden: false, project_count: 1 })
     api.editDeadlineByHand.mockRejectedValue(new Error("Only the project's owner and editors can change its inbox."))
