@@ -13,7 +13,7 @@ const text = (value: unknown) => typeof value === 'string' ? value.trim() : ''
 
 /** Refusals: a rule stopped chat. Later steps succeeding doesn't undo that, so the notice stays. */
 export function isBrowserRefusal(error: string) {
-  return error.startsWith('blocked_') || ['browser_request_blocked', 'site_not_allowed', 'site_not_allowed_by_admin'].includes(error)
+  return error.startsWith('blocked_') || ['browser_request_blocked', 'site_not_allowed', 'site_not_allowed_by_admin', 'vandalizer_itself'].includes(error)
 }
 
 const CONTROL = 'Chat could not use a control on the page. The page may have changed since chat read it.'
@@ -28,6 +28,8 @@ export function browserMessage(result: Result, args: Result = {}): string {
       const reason = text(result.reason)
       return `Vandalizer did not use the browser for this request${reason ? `: ${reason}` : '.'}`
     }
+    case 'vandalizer_itself':
+      return 'Chat’s browser can’t be used on Vandalizer itself, so chat did not open or read it.'
     case 'site_not_allowed_by_admin':
       return `${site || 'This site'} is not on the list of sites your Vandalizer administrator allows, so chat did not read it.`
     case 'site_not_allowed':

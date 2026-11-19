@@ -131,3 +131,12 @@ it('groups browser work without moving narrative or other tools', () => {
   expect(groups[1]).toBe(text)
 })
 it('omits malformed capture dates', () => { expect(capturedTime('not a date')).toBe('') })
+it('words a refusal to open Vandalizer itself for the person, and keeps it', () => {
+  const { container } = run([
+    step('own', 'browser_open', {}, { error: 'vandalizer_itself', site: 'vandalizer.example.edu', message: 'x', hint: 'Tell the person plainly. Do not ask for approval.' }),
+    step('open', 'browser_open', {}, PAGE),
+  ])
+  expect(screen.getByText('Action blocked.')).toBeVisible()
+  expect(screen.getAllByText(/Chat’s browser can’t be used on Vandalizer itself/)[0]).toBeVisible()
+  expect(container.textContent).not.toMatch(/Do not ask for approval/)
+})
