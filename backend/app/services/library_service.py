@@ -1146,6 +1146,7 @@ async def _dereference_item(
     item_uuid = None
     creator_user_id: str | None = None
     can_delete_underlying = False
+    can_edit_underlying = False
 
     # Prefetch entries are keyed by item kind as well as database identity.
     if item.kind == LibraryItemKind.WORKFLOW:
@@ -1172,6 +1173,8 @@ async def _dereference_item(
             can_delete_underlying = access_control.can_manage_search_set(
                 ss, user, team_access=team_access,
             )
+            # The edit routes also let a site admin through.
+            can_edit_underlying = can_delete_underlying or bool(user.is_admin)
 
     return {
         "id": str(item.id),
@@ -1193,6 +1196,7 @@ async def _dereference_item(
         "last_used_at": _iso_utc(item.last_used_at),
         "creator_user_id": creator_user_id,
         "can_delete_underlying": can_delete_underlying,
+        "can_edit_underlying": can_edit_underlying,
     }
 
 
