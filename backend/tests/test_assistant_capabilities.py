@@ -57,6 +57,16 @@ def test_chat_is_told_what_is_off_and_who_can_turn_it_back_on():
     assert "Turned off by this person" not in only_locked and "(/assistant)" not in only_locked
 
 
+def test_chat_is_told_the_browser_is_not_connected_and_how_to_reconnect_it():
+    note = caps.browser_not_connected_note(frozenset(), False)
+    assert "browser isn't connected" in note and "(/assistant#browser-setup)" in note
+    assert "Do not read the page with fetch_url" in note
+    # Connected: the tools are there. Switched off: the switched-off note covers it.
+    assert caps.browser_not_connected_note(frozenset(), True) == ""
+    assert caps.browser_not_connected_note(frozenset({"browser"}), False) == ""
+    assert caps.browser_not_connected_note(frozenset({"web_pages"}), False) == note
+
+
 def test_chat_is_told_a_link_cannot_go_into_a_knowledge_base_while_reading_pages_is_off():
     """Support ticket: with Read a web page off, chat promised twice to add a
     link to a knowledge base, created it empty, then said it had no tool."""
@@ -548,6 +558,26 @@ async def test_a_chat_turn_withholds_off_tools_and_tells_the_model_who_switched_
     await _turn(monkeypatch, _recording_agent(seen))
     assert seen["tools"] == ["fetch_url", "run_workflow", "web_search"]
     assert "Some capabilities are turned off" not in seen["instructions"]
+
+
+async def test_a_chat_turn_without_the_extension_tells_the_model_the_browser_is_not_connected(chat_harness, monkeypatch):  # noqa: F811
+    marker = "browser is not connected to this chat"
+    seen: dict = {}
+    chunks = await _turn(monkeypatch, _recording_agent(seen), message="Use my browser to open https://www.uidaho.edu/about/rankings-facts")
+    assert not [c for c in chunks if c["kind"] == "error"], chunks
+    assert marker in seen["instructions"] and "(/assistant#browser-setup)" in seen["instructions"]
+
+    # Connected: nothing to explain.
+    seen.clear()
+    await _turn(monkeypatch, _recording_agent(seen), browser_available=True)
+    assert marker not in seen["instructions"]
+
+    # Switched off: only the switched-off note, which names the switch.
+    for kwargs in ({"user_off": ["browser"]}, {"admin_off": ["browser"]}):
+        seen.clear()
+        await _turn(monkeypatch, _recording_agent(seen), **kwargs)
+        assert marker not in seen["instructions"]
+        assert "Use your browser" in seen["instructions"]
 
 
 async def test_knowledge_bases_off_stops_retrieval_before_the_model_runs(chat_harness, monkeypatch):  # noqa: F811
