@@ -535,9 +535,50 @@ it('opens the demo starter in the existing editor and saves it through the usual
     vi.mocked(createSearchSet).mockResolvedValue({ id: 'demo', uuid: 'demo-uuid' } as Awaited<ReturnType<typeof createSearchSet>>)
     render(<LibraryTab />)
     expect(screen.getByDisplayValue('University research snapshot')).toBeVisible()
+    expect(screen.getByRole('dialog', { name: 'Skill creation' })).toHaveAccessibleDescription('This is an example Skill from Vandalizer. It reads two public University of Idaho pages. You can edit it before saving.')
     expect((screen.getByDisplayValue(/Sites and figures/) as HTMLTextAreaElement).value).toContain('record_value')
     fireEvent.click(screen.getByRole('button', { name: 'Create Skill' }))
     await waitFor(() => expect(createSearchSet).toHaveBeenCalledWith(expect.objectContaining({ set_type: 'prompt', extraction_config: { content: expect.stringContaining('rankings-facts') } })))
     expect(sendChatMessage).not.toHaveBeenCalled()
+  } finally { rectangles.mockRestore(); history.replaceState({}, '', '/') }
+})
+
+it('shows the example note only for the setup guide example, not for the blank starter or a new Skill', async () => {
+  const note = /example Skill from Vandalizer/
+  history.replaceState({}, '', '/?tab=library&browserSkill=starter')
+  const rectangles = vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{ width: 1, height: 1 }] as unknown as DOMRectList)
+  try {
+    const { unmount } = render(<LibraryTab />)
+    expect(screen.getByDisplayValue('Collect figures from websites')).toBeVisible()
+    expect(screen.queryByText(note)).not.toBeInTheDocument()
+    unmount()
+    history.replaceState({}, '', '/?tab=library&browserSkill=demo')
+    render(<LibraryTab />)
+    expect(screen.getByText(note)).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    // A new Skill started afterwards is not the example.
+    fireEvent.click(await screen.findByRole('button', { name: 'New' }))
+    fireEvent.click(screen.getByText('New Skill'))
+    expect(screen.getByRole('dialog', { name: 'Skill creation' })).not.toHaveAccessibleDescription()
+    expect(screen.queryByText(note)).not.toBeInTheDocument()
+  } finally { rectangles.mockRestore(); history.replaceState({}, '', '/') }
+})
+
+it('drops the example note once the example instructions are cleared or replaced with the starter', () => {
+  const note = /example Skill from Vandalizer/
+  history.replaceState({}, '', '/?tab=library&browserSkill=demo')
+  const rectangles = vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{ width: 1, height: 1 }] as unknown as DOMRectList)
+  try {
+    render(<LibraryTab />)
+    const instructions = screen.getByDisplayValue(/Sites and figures/)
+    fireEvent.change(instructions, { target: { value: 'Use your browser to read one page only.' } })
+    expect(screen.getByText(note)).toBeVisible()
+    fireEvent.change(instructions, { target: { value: '' } })
+    expect(screen.queryByText(note)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText('Use “Collect figures from websites” starter'))
+    expect((instructions as HTMLTextAreaElement).value).toContain('Sites to visit')
+    expect(screen.queryByText(note)).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Skill creation' })).not.toHaveAccessibleDescription()
   } finally { rectangles.mockRestore(); history.replaceState({}, '', '/') }
 })
