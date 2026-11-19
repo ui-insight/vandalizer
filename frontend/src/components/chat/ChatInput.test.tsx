@@ -39,7 +39,8 @@ describe('ChatInput', () => {
     const input = screen.getByRole('textbox', { name: 'Message input' })
     expect(input).toHaveAttribute('wrap', 'soft')
     expect(input).toHaveClass('overflow-x-hidden', 'overflow-y-auto')
-    expect(input).toHaveStyle({ minHeight: '24px', lineHeight: '1.5' })
+    expect(input.style.minHeight).toBe('24px')
+    expect(input.style.lineHeight).toBe('1.5')
 
     fireEvent.change(input, { target: { value: 'Check the budget total.' } })
     expect(input).toHaveStyle({ height: '24px' })
