@@ -3,6 +3,7 @@ import { ExternalLink, ShieldCheck } from 'lucide-react'
 import { useState } from 'react'
 import { focusBrowserTab } from '../../lib/browserSetup'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
+import { browserMessage } from './browserMessages'
 
 export function browserSite(result?: Record<string, unknown> | null) {
   const page = result?.page as Record<string, unknown> | undefined
@@ -34,7 +35,7 @@ export function BrowserActivity({ result, active = false }: { result?: Record<st
     {signIn && <p>Sign in yourself in the working tab, then return here. Keep your password out of chat.</p>}
     {disconnected && <p>Open browser settings to reconnect this Vandalizer site, then continue your task.</p>}
     {refused && <p>This control could change something on the site. Chat stopped without using it.</p>}
-    {error && !permission && !disconnected && !refused && <p>{typeof result?.message === 'string' ? result.message : 'Chat could not read the page. Check the working tab before continuing.'}</p>}
+    {error && !permission && !disconnected && !refused && <p>{browserMessage(result ?? {})}</p>}
     {!active && <div className="browser-activity-actions">
       {disconnected ? <a className="browser-secondary" href="/assistant#browser-setup">Open browser settings</a> : error !== 'site_not_allowed' && <button type="button" className="browser-text-button" onClick={async () => {
         const outcome = await focusBrowserTab()
