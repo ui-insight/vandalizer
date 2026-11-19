@@ -301,7 +301,7 @@ async def add_item(
     })
     if existing:
         return await _attach_author(
-            await _single_with_run_based_last_used(await _dereference_item(existing), user)
+            await _single_with_run_based_last_used(await _dereference_for(existing, user), user)
         )
 
     now = datetime.datetime.now(datetime.timezone.utc)
@@ -323,7 +323,7 @@ async def add_item(
     await lib.save()
 
     return await _attach_author(
-        await _single_with_run_based_last_used(await _dereference_item(li), user)
+        await _single_with_run_based_last_used(await _dereference_for(li, user), user)
     )
 
 
@@ -562,7 +562,7 @@ async def update_item(
     if updates:
         await item.set(updates)
     return await _attach_author(
-        await _single_with_run_based_last_used(await _dereference_item(item), user)
+        await _single_with_run_based_last_used(await _dereference_for(item, user), user)
     )
 
 
@@ -1120,6 +1120,16 @@ async def _prefetch_targets(items: list[LibraryItem]) -> dict:
         for item_id in ids:
             out[(kind, item_id)] = found.get(item_id)
     return out
+
+
+async def _dereference_for(item: LibraryItem, user: User | None) -> dict | None:
+    """``_dereference_item`` with *user*'s edit/delete rights filled in.
+
+    A row returned from add, pin, favorite or tag replaces the listed one in
+    the UI; without the rights it would lose Edit on the creator's own item.
+    """
+    team_access = await access_control.get_team_access_context(user) if user is not None else None
+    return await _dereference_item(item, user, team_access)
 
 
 async def _dereference_item(

@@ -457,6 +457,11 @@ async def has_library_backed_object_access(
     for item in library_items:
         parent_libraries = await Library.find({"items": item.id}).to_list()
         for library in parent_libraries:
+            # A bookmark in your own library is not ownership: anyone who can
+            # see an item can bookmark it, which used to let them edit or
+            # delete it (#1164). Its creator passes the direct check instead.
+            if manage and library.scope == LibraryScope.PERSONAL:
+                continue
             allowed = (
                 can_manage_library(library, user, team_access, allow_admin=allow_admin)
                 if manage
