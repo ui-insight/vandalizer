@@ -3,10 +3,13 @@ import type { StreamSegment, ToolCallInfo, ToolResultInfo } from '../../types/ch
 export const isBrowserTool = (name: string) => name.startsWith('browser_') || name === 'record_value'
 export type BrowserGroup = { kind: 'browser_group'; calls: ToolCallInfo[] }
 
-/** A browser call that did nothing yet: it is waiting for the person to approve the site. */
+/** A browser call that did nothing yet: it is waiting for the person to approve the site.
+ * ``still_waiting`` is the same site asked for again while its card waits. */
 export function browserAwaitingApproval(result?: ToolResultInfo): boolean {
   const content = result?.content
-  return !!content && typeof content === 'object' && (content as Record<string, unknown>).needs_confirmation === true
+  if (!content || typeof content !== 'object') return false
+  const value = content as Record<string, unknown>
+  return value.needs_confirmation === true || value.still_waiting === true
 }
 
 /** Keep narrated text and other tools in order while combining adjacent browser work.

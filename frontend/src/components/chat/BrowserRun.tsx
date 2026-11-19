@@ -37,7 +37,7 @@ export function BrowserRun({ calls, results, running = false }: { calls: ToolCal
     {errors.map(({ call, value }) => <p key={call.tool_call_id} className="browser-run-notice"><strong>{String(value.error).startsWith('blocked_') ? 'Action blocked.' : 'Step needs attention.'}</strong> {String(value.message || value.error)}</p>)}
     {browser.length > 0 && <details className="browser-run-log"><summary>Activity · {browser.length} {browser.length === 1 ? 'step' : 'steps'}</summary><ol>{browser.map(({ call, result, value }) => {
       const page = record(value.page)
-      return <li key={call.tool_call_id}>{!result ? running ? 'Working…' : 'No result received' : value.error ? String(value.message || value.error) : value.needs_confirmation === true ? 'Waiting for your approval' : page.title ? <>Read {String(page.title)}{page.truncated === true && ' (part of page)'}</> : 'Browser step completed'}</li>
+      return <li key={call.tool_call_id}>{!result ? running ? 'Working…' : 'No result received' : value.error ? String(value.message || value.error) : value.needs_confirmation === true || value.still_waiting === true ? 'Waiting for your approval' : page.title ? <>Read {String(page.title)}{page.truncated === true && ' (part of page)'}</> : 'Browser step completed'}</li>
     })}</ol></details>}
   </section>
 }
