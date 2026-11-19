@@ -202,6 +202,55 @@ async def add_by_hand(body: AddByHandRequest, user: User = Depends(get_current_u
     return obligation_service.serialize(ob, user, project.title)
 
 
+class InboxSettingsRequest(BaseModel):
+    inbox_hidden: bool
+
+
+@router.put("/home-settings", response_model=None)
+async def update_home_settings(body: InboxSettingsRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
+    """Turn the whole RA inbox on Home off or back on, for this account."""
+    user.home_inbox_hidden = body.inbox_hidden
+    await user.save()
+    return {"inbox_hidden": user.home_inbox_hidden}
+
+
+class EditByHandRequest(BaseModel):
+    title: str
+    due_date: str
+    source_note: Optional[str] = None
+
+
+async def _hand_entered_for(obligation_uuid: str, user: User) -> tuple[Obligation, Project]:
+    ob, project = await _obligation_for(obligation_uuid, user, manage=True)
+    if not obligation_service.hand_editable(ob):
+        raise HTTPException(
+            status_code=409,
+            detail="An amendment replaced this deadline; it can no longer be changed." if getattr(ob, "entered_by_hand", False)
+            else "This item comes from a document, so it can't be edited or deleted here. Mark it done or dismiss it instead.",
+        )
+    return ob, project
+
+
+@router.put("/{obligation_uuid}", response_model=None)
+async def edit_by_hand(obligation_uuid: str, body: EditByHandRequest, user: User = Depends(get_current_user)) -> dict:
+    """Correct a deadline that was added by hand, for everyone on the project (#1165)."""
+    ob, project = await _hand_entered_for(obligation_uuid, user)
+    edited, reason = await obligation_service.edit_by_hand(
+        ob, user, title=body.title, due_date=body.due_date, source_note=body.source_note,
+    )
+    if edited is None:
+        raise HTTPException(status_code=422, detail=reason)
+    return obligation_service.serialize(edited, user, project.title)
+
+
+@router.delete("/{obligation_uuid}", response_model=None)
+async def delete_by_hand(obligation_uuid: str, user: User = Depends(get_current_user)) -> dict[str, bool]:
+    """Delete a deadline that was added by hand, for everyone on the project (#1165)."""
+    ob, _project = await _hand_entered_for(obligation_uuid, user)
+    await obligation_service.delete_by_hand(ob, user)
+    return {"deleted": True}
+
+
 class DoneRequest(BaseModel):
     done: bool
 
@@ -238,15 +287,3 @@ async def dismiss(obligation_uuid: str, body: DismissRequest, user: User = Depen
     ob, project = await _obligation_for(obligation_uuid, user, manage=False)
     ob = await obligation_service.set_dismissed(ob, user, body.dismissed)
     return await obligation_service.serialize_checked(ob, user, project.title)
-
-
-class InboxSettingsRequest(BaseModel):
-    inbox_hidden: bool
-
-
-@router.put("/home-settings", response_model=None)
-async def update_home_settings(body: InboxSettingsRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
-    """Turn the whole RA inbox on Home off or back on, for this account."""
-    user.home_inbox_hidden = body.inbox_hidden
-    await user.save()
-    return {"inbox_hidden": user.home_inbox_hidden}

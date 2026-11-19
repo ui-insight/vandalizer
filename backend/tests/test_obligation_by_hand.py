@@ -276,3 +276,159 @@ def test_the_award_snapshot_labels_hand_added_deadlines():
             "last_run": None, "pages": [], "built_at": None, "generated_at": "2026-11-03T10:00:00+00:00"}
     assert ("Final report</strong> · Mar 31, 2027 · Added by hand · not checked against a document"
             " · Source: Sponsor email") in page_html(view)
+
+
+# --- Editing and deleting a hand-entered deadline (#1165) -------------------
+
+
+def _hand(**kw):
+    """A saved hand-entered deadline that records its own save and delete."""
+    base = dict(
+        uuid="hand", project_uuid="proj-1", kind="deadline", title="Final finacial report",
+        deadline_type="other", due_at=datetime.datetime(2027, 3, 13), due_text=None, sources=[],
+        status="open", dismissed_by=["pi"], created_by="ra", entered_by_hand=True,
+        source_note="Sponsor email", edited_by=None, completed_by=None,
+    )
+    ob = SimpleNamespace(**{**base, **kw})
+    ob.save = AsyncMock()
+    ob.delete = AsyncMock()
+    return ob
+
+
+@pytest.fixture
+def edit_env(monkeypatch):
+    others: list = []
+    model, _ = _obligation_model(others)
+    monkeypatch.setattr(service, "Obligation", model)
+    cleared = AsyncMock()
+    monkeypatch.setattr(service, "_clear_notifications", cleared)
+    return SimpleNamespace(others=others, cleared=cleared)
+
+
+@pytest.mark.asyncio
+async def test_a_hand_added_deadline_can_be_corrected_in_place(edit_env):
+    ob = _hand(status="done", completed_by="ra")
+    edit_env.others.append(ob)  # its own old title and date never count as a duplicate
+    edited, reason = await service.edit_by_hand(
+        ob, SimpleNamespace(user_id="editor"), title=" Final  financial report ", due_date="2027-03-31", source_note=" ",
+    )
+    assert reason is None and edited is ob
+    assert (ob.title, ob.due_at, ob.source_note) == ("Final financial report", datetime.datetime(2027, 3, 31), None)
+    # Same item for everyone: uuid, done state and dismissals carry over.
+    assert (ob.uuid, ob.status, ob.dismissed_by, ob.entered_by_hand) == ("hand", "done", ["pi"], True)
+    assert ob.edited_by == "editor"
+    ob.save.assert_awaited_once()
+    # The bell's "due in N days" for the old date is no longer true.
+    edit_env.cleared.assert_awaited_once_with("hand")
+
+
+@pytest.mark.asyncio
+async def test_correcting_only_the_title_keeps_reminders_already_in_the_bell(edit_env):
+    ob = _hand()
+    await service.edit_by_hand(ob, USER, title="Final financial report", due_date="2027-03-13", source_note="Sponsor email")
+    assert ob.title == "Final financial report"
+    edit_env.cleared.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("title,due,reason", [
+    ("  ", "2027-03-31", "Give the deadline a title."),
+    ("Report", "31/03/2027", "Give the due date as YYYY-MM-DD."),
+    ("Report", "2027-02-30", "That due date is not a real date."),
+])
+async def test_an_edit_that_cannot_be_saved_changes_nothing(edit_env, title, due, reason):
+    ob = _hand()
+    edited, why = await service.edit_by_hand(ob, USER, title=title, due_date=due)
+    assert edited is None and why == reason
+    assert ob.title == "Final finacial report" and ob.due_at == datetime.datetime(2027, 3, 13)
+    ob.save.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_an_edit_cannot_turn_it_into_a_copy_of_another_deadline(edit_env):
+    edit_env.others.append(_existing(title="Final financial report", due_at=datetime.datetime(2027, 3, 31)))
+    ob = _hand()
+    edited, why = await service.edit_by_hand(ob, USER, title="Final financial report", due_date="2027-03-31")
+    assert edited is None and "already in this project's inbox (open)" in why
+    ob.save.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_deleting_removes_the_deadline_its_reminders_and_its_bell_items(monkeypatch, edit_env):
+    reminders = MagicMock()
+    reminders.find.return_value.delete = AsyncMock()
+    monkeypatch.setattr(service, "ObligationReminder", reminders)
+    ob = _hand()
+    await service.delete_by_hand(ob, USER)
+    ob.delete.assert_awaited_once()
+    reminders.find.assert_called_once_with({"obligation_uuid": "hand"})
+    reminders.find.return_value.delete.assert_awaited_once()
+    edit_env.cleared.assert_awaited_once_with("hand")
+
+
+def test_only_a_hand_added_deadline_that_is_still_current_is_editable():
+    assert service.serialize(_existing(entered_by_hand=True), USER)["editable"] is True
+    assert service.serialize(_existing(entered_by_hand=True, status="done"), USER)["editable"] is True
+    # Found in a document, confirmed by one later, or replaced by an amendment.
+    assert service.serialize(_existing(), USER)["editable"] is False
+    assert service.serialize(_existing(entered_by_hand=True, status="superseded"), USER)["editable"] is False
+
+
+@pytest.mark.asyncio
+async def test_edit_and_delete_need_edit_access_to_the_project(monkeypatch):
+    monkeypatch.setattr(routes, "_obligation_for", AsyncMock(side_effect=HTTPException(status_code=403)))
+    body = routes.EditByHandRequest(title="Report", due_date="2027-03-31")
+    for call in (routes.edit_by_hand("hand", body, user=USER), routes.delete_by_hand("hand", user=USER)):
+        with pytest.raises(HTTPException) as denied:
+            await call
+        assert denied.value.status_code == 403
+    assert all(c.kwargs == {"manage": True} for c in routes._obligation_for.await_args_list)
+
+
+@pytest.mark.asyncio
+async def test_a_document_backed_item_is_refused_and_left_alone(monkeypatch):
+    found = _hand(entered_by_hand=False, sources=[ObligationSource(document_uuid="d", quote="q")])
+    monkeypatch.setattr(routes, "_obligation_for", AsyncMock(return_value=(found, PROJECT)))
+    edit, delete = AsyncMock(), AsyncMock()
+    monkeypatch.setattr(service, "edit_by_hand", edit)
+    monkeypatch.setattr(service, "delete_by_hand", delete)
+    body = routes.EditByHandRequest(title="Report", due_date="2027-03-31")
+    for call in (routes.edit_by_hand("hand", body, user=USER), routes.delete_by_hand("hand", user=USER)):
+        with pytest.raises(HTTPException) as refused:
+            await call
+        assert refused.value.status_code == 409 and "comes from a document" in refused.value.detail
+    edit.assert_not_awaited()
+    delete.assert_not_awaited()
+
+    replaced = _hand(status="superseded")
+    monkeypatch.setattr(routes, "_obligation_for", AsyncMock(return_value=(replaced, PROJECT)))
+    with pytest.raises(HTTPException) as gone:
+        await routes.delete_by_hand("hand", user=USER)
+    assert gone.value.status_code == 409 and "amendment replaced" in gone.value.detail
+
+
+@pytest.mark.asyncio
+async def test_the_edit_endpoint_returns_the_corrected_row_or_the_reason(monkeypatch):
+    ob = _existing(uuid="hand", entered_by_hand=True)
+    monkeypatch.setattr(routes, "_obligation_for", AsyncMock(return_value=(ob, PROJECT)))
+    body = routes.EditByHandRequest(title="Report", due_date="2027-03-31", source_note="Email")
+    monkeypatch.setattr(service, "edit_by_hand", AsyncMock(return_value=(ob, None)))
+    row = await routes.edit_by_hand("hand", body, user=USER)
+    assert row["uuid"] == "hand" and row["editable"] is True and row["project_title"] == "NIH Subaward"
+    assert service.edit_by_hand.await_args.kwargs == {"title": "Report", "due_date": "2027-03-31", "source_note": "Email"}
+
+    monkeypatch.setattr(service, "edit_by_hand", AsyncMock(return_value=(None, "Give the deadline a title.")))
+    with pytest.raises(HTTPException) as bad:
+        await routes.edit_by_hand("hand", body, user=USER)
+    assert bad.value.status_code == 422 and bad.value.detail == "Give the deadline a title."
+
+    monkeypatch.setattr(service, "delete_by_hand", AsyncMock())
+    assert await routes.delete_by_hand("hand", user=USER) == {"deleted": True}
+    service.delete_by_hand.assert_awaited_once_with(ob, USER)
+
+
+def test_home_settings_is_not_shadowed_by_the_edit_route():
+    """``PUT /home-settings`` must be registered before ``PUT /{obligation_uuid}``."""
+    puts = [r.path for r in routes.router.routes if "PUT" in getattr(r, "methods", ())]
+    assert puts.index("/home-settings") < puts.index("/{obligation_uuid}")
+    assert puts.index("/reminder-settings") < puts.index("/{obligation_uuid}")

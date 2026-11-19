@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { AlertTriangle, CalendarClock, CalendarPlus, Check, ChevronDown, ChevronRight, EyeOff, FileText, Inbox, Plus } from 'lucide-react'
-import { addDeadlineByHand, downloadDeadlineCalendar, getInbox, plainQuote, quoteSearchTerms, setObligationDismissed, setObligationDone, setObligationKept } from '../../api/obligations'
+import { AlertTriangle, CalendarClock, CalendarPlus, Check, ChevronDown, ChevronRight, EyeOff, FileText, Inbox, Pencil, Plus, Trash2 } from 'lucide-react'
+import { addDeadlineByHand, deleteDeadlineByHand, downloadDeadlineCalendar, editDeadlineByHand, getInbox, plainQuote, quoteSearchTerms, setObligationDismissed, setObligationDone, setObligationKept } from '../../api/obligations'
 import type { Obligation } from '../../api/obligations'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 
@@ -18,7 +18,9 @@ import { useWorkspace } from '../../contexts/WorkspaceContext'
 // Inside a project, Add deadline records a deadline by hand (support ticket:
 // chat refuses a deadline it can't verify in the document and pointed people
 // here, where nothing could be added). Such a row says it was added by hand
-// and shows the person's note instead of a cited page.
+// and shows the person's note instead of a cited page. It is the one kind of
+// row with Edit and Delete (#1165): a typo in a title or date had no fix, and
+// Dismiss or Done left it reminding everyone else or listed as done.
 
 const COLLAPSED_KEY = 'home:ra-inbox-collapsed'
 
@@ -118,15 +120,24 @@ export function upcomingGroup(item: Obligation): GroupKey {
   return 'later'
 }
 
+type RowChange = 'done' | 'dismissed' | 'kept' | 'deleted' | { edited: Obligation }
+
 function InboxRow({ item, focused, onChanged, onError }: {
   item: Obligation
   focused: boolean
-  onChanged: (uuid: string, change: 'done' | 'dismissed' | 'kept') => void
+  onChanged: (uuid: string, change: RowChange) => void
   onError: (message: string) => void
 }) {
   const navigate = useNavigate()
   const { viewDocument } = useWorkspace()
   const [busy, setBusy] = useState(false)
+  const [mode, setMode] = useState<'view' | 'edit' | 'delete'>('view')
+  const editButton = useRef<HTMLButtonElement>(null)
+  const deleteButton = useRef<HTMLButtonElement>(null)
+  const backTo = (button: typeof editButton) => {
+    setMode('view')
+    window.setTimeout(() => button.current?.focus(), 0)
+  }
   const rowRef = useRef<HTMLLIElement>(null)
   // A reminder's link lands here: bring the item into view.
   useEffect(() => { if (focused) rowRef.current?.scrollIntoView?.({ block: 'nearest' }) }, [focused])
@@ -137,7 +148,7 @@ function InboxRow({ item, focused, onChanged, onError }: {
   // A cited file was deleted and nobody has decided what to do with the item.
   const undecided = !!item.source_deleted && !item.kept_without_source
 
-  const act = async (change: 'done' | 'dismissed' | 'kept', fn: () => Promise<unknown>) => {
+  const act = async (change: 'done' | 'dismissed' | 'kept' | 'deleted', fn: () => Promise<unknown>) => {
     if (busy) return
     setBusy(true)
     try {
@@ -149,6 +160,14 @@ function InboxRow({ item, focused, onChanged, onError }: {
       setBusy(false)
     }
   }
+
+  if (mode === 'edit') return (
+    <li ref={rowRef} style={{ listStyle: 'none', paddingBottom: 'var(--workspace-space-8)' }}>
+      <AddDeadlineForm projectUuid={item.project_uuid} item={item}
+        onAdded={edited => { onChanged(item.uuid, { edited }); backTo(editButton) }}
+        onCancel={() => backTo(editButton)} />
+    </li>
+  )
 
   return (
     <li ref={rowRef} aria-current={focused ? 'true' : undefined} style={{
@@ -229,6 +248,14 @@ function InboxRow({ item, focused, onChanged, onError }: {
             onClick={() => { downloadDeadlineCalendar({ obligation: item.uuid }).catch((e: unknown) => onError(e instanceof Error ? e.message : 'The calendar file could not be downloaded.')) }}>
             <CalendarPlus size={12} aria-hidden /> Add to calendar
           </button>}
+          {item.editable && <button ref={editButton} type="button" style={QUIET} disabled={busy}
+            aria-label={`Edit "${item.title}"`} onClick={() => setMode('edit')}>
+            <Pencil size={12} aria-hidden /> Edit
+          </button>}
+          {item.editable && <button ref={deleteButton} type="button" style={QUIET} disabled={busy} aria-expanded={mode === 'delete'}
+            aria-label={`Delete "${item.title}"`} onClick={() => setMode('delete')}>
+            <Trash2 size={12} aria-hidden /> Delete
+          </button>}
           <button type="button" style={QUIET} disabled={busy}
             aria-label={`Mark "${item.title}" done for everyone on the project`}
             onClick={() => act('done', () => setObligationDone(item.uuid, true))}>
@@ -240,6 +267,20 @@ function InboxRow({ item, focused, onChanged, onError }: {
             <EyeOff size={12} aria-hidden /> Dismiss
           </button>
         </div>
+        {mode === 'delete' && <div role="group" aria-label={`Delete "${item.title}"`} style={{
+          display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-6)', marginTop: 'var(--workspace-space-4)',
+          padding: 'var(--workspace-space-4) var(--workspace-space-8)', borderRadius: 'var(--workspace-radius-small)',
+          backgroundColor: '#fef2f2', border: '1px solid #fecaca', fontSize: 'var(--workspace-font-meta)', color: '#7f1d1d',
+        }}>
+          <span style={{ flex: 1, minWidth: '12rem' }}>
+            Delete this deadline for everyone on the project? Its reminders stop. This can't be undone.
+          </span>
+          <button type="button" style={BUTTON} disabled={busy} autoFocus onClick={() => backTo(deleteButton)}>Cancel</button>
+          <button type="button" style={{ ...BUTTON, backgroundColor: '#b91c1c', color: '#fff', borderColor: '#b91c1c' }} disabled={busy}
+            onClick={() => act('deleted', () => deleteDeadlineByHand(item.uuid))}>
+            {busy ? 'Deleting…' : 'Delete deadline'}
+          </button>
+        </div>}
       </div>
     </li>
   )
@@ -250,15 +291,17 @@ const FIELD = {
   fontFamily: 'inherit', borderRadius: 'var(--workspace-radius-small)', border: '1px solid var(--workspace-border)',
 } as const
 
-/** Add a deadline the documents don't let chat verify: title, date, optional note on where it comes from. */
-export function AddDeadlineForm({ projectUuid, onAdded, onCancel }: {
+/** Add a deadline the documents don't let chat verify: title, date, optional note on where it comes from.
+ * With *item*, the same form corrects that hand-entered deadline instead. */
+export function AddDeadlineForm({ projectUuid, item, onAdded, onCancel }: {
   projectUuid: string
+  item?: Obligation
   onAdded: (item: Obligation) => void
   onCancel: () => void
 }) {
-  const [title, setTitle] = useState('')
-  const [dueDate, setDueDate] = useState('')
-  const [note, setNote] = useState('')
+  const [title, setTitle] = useState(item?.title ?? '')
+  const [dueDate, setDueDate] = useState(item?.due_at?.slice(0, 10) ?? '')
+  const [note, setNote] = useState(item?.source_note ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const titleRef = useRef<HTMLInputElement>(null)
@@ -272,15 +315,17 @@ export function AddDeadlineForm({ projectUuid, onAdded, onCancel }: {
     setSaving(true)
     setError(null)
     try {
-      onAdded(await addDeadlineByHand(projectUuid, title.trim(), dueDate, note.trim() || undefined))
+      onAdded(item
+        ? await editDeadlineByHand(item.uuid, title.trim(), dueDate, note.trim() || undefined)
+        : await addDeadlineByHand(projectUuid, title.trim(), dueDate, note.trim() || undefined))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'The deadline could not be added.')
+      setError(err instanceof Error ? err.message : item ? 'The deadline could not be saved.' : 'The deadline could not be added.')
       setSaving(false)
     }
   }
 
   return (
-    <form aria-label="Add deadline" onSubmit={submit} onKeyDown={e => { if (e.key === 'Escape') onCancel() }} style={{
+    <form aria-label={item ? `Edit "${item.title}"` : 'Add deadline'} onSubmit={submit} onKeyDown={e => { if (e.key === 'Escape') onCancel() }} style={{
       display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-6)', margin: 'var(--workspace-space-8) var(--workspace-space-12) 0',
       padding: 'var(--workspace-space-8) var(--workspace-space-12)', borderRadius: 'var(--workspace-radius-medium)',
       border: '1px solid var(--workspace-border)', backgroundColor: '#f9fafb', fontSize: 'var(--workspace-font-meta)', color: '#374151',
@@ -307,7 +352,7 @@ export function AddDeadlineForm({ projectUuid, onAdded, onCancel }: {
       <div style={{ display: 'flex', gap: 'var(--workspace-space-6)', justifyContent: 'flex-end' }}>
         <button type="button" style={BUTTON} onClick={onCancel} disabled={saving}>Cancel</button>
         <button type="submit" style={{ ...BUTTON, backgroundColor: '#111827', color: '#fff', borderColor: '#111827' }} disabled={saving}>
-          {saving ? 'Adding…' : 'Add deadline'}
+          {item ? (saving ? 'Saving…' : 'Save changes') : (saving ? 'Adding…' : 'Add deadline')}
         </button>
       </div>
     </form>
@@ -414,10 +459,12 @@ export function RAInbox({ projectUuid }: { projectUuid?: string | null } = {}) {
 
   // Done leaves the inbox for everyone; Dismiss only hides it here, so it
   // stays countable under "Show dismissed".
-  const changed = (uuid: string, change: 'done' | 'dismissed' | 'kept') => setItems(current =>
-    change === 'done'
+  const changed = (uuid: string, change: RowChange) => setItems(current =>
+    change === 'done' || change === 'deleted'
       ? (current ?? []).filter(i => i.uuid !== uuid)
-      : (current ?? []).map(i => (i.uuid === uuid ? { ...i, ...(change === 'kept' ? { kept_without_source: true } : { dismissed: true }) } : i)))
+      : (current ?? []).map(i => (i.uuid !== uuid ? i
+        : typeof change === 'object' ? { ...change.edited, dismissed: i.dismissed }
+          : { ...i, ...(change === 'kept' ? { kept_without_source: true } : { dismissed: true }) })))
   const closeAdd = () => {
     setAdding(false)
     window.setTimeout(() => addButton.current?.focus(), 0)
