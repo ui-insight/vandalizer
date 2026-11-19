@@ -418,6 +418,8 @@ async def chat(
                 approval_for=body.approval_for,
                 decline_for=body.decline_for,
                 browser_available=body.browser_available,
+                # The chat page's own address: the browser tools refuse it.
+                site_origin=request.headers.get("origin"),
             ):
                 yield chunk
         finally:

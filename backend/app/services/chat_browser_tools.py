@@ -257,6 +257,10 @@ async def browser_open(context: RunContext[AgenticChatDeps], url: str, confirmed
     call this again with the same address and ``confirmed=true``. If the
     result says ``browser_request_blocked`` or ``site_not_allowed_by_admin``,
     tell the person and stop; do not try another way.
+
+    Vandalizer's own pages (this site, its admin pages included) cannot be
+    opened: the result says ``vandalizer_itself``. Say so; there is no
+    approval that changes it.
     """
     return await _run(context, "browser_open", {"url": url, "confirmed": confirmed}, OPEN_TIMEOUT_SECONDS)
 

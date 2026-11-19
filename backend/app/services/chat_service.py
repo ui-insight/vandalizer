@@ -1647,6 +1647,18 @@ def _retry_as_error(part: RetryPromptPart) -> dict:
     return {"error": reason or "The call failed and was sent back to the assistant to correct."}
 
 
+def _browser_own_sites(settings: Settings | None, site_origin: str | None) -> frozenset[str]:
+    """Vandalizer's own address for the browser tools to refuse.
+
+    The configured site URL, and the origin the chat page sent this request
+    from (the address the extension is connected to, even where the
+    configured URL is stale or still the localhost default).
+    """
+    from app.services import browser_policy
+
+    return browser_policy.own_sites(getattr(settings, "frontend_url", None), site_origin)
+
+
 async def chat_stream(
     message: str,
     document_uuids: list[str],
@@ -1672,6 +1684,7 @@ async def chat_stream(
     approval_for: str | None = None,
     decline_for: str | None = None,
     browser_available: bool = False,
+    site_origin: str | None = None,
 ) -> AsyncGenerator[str, None]:
     """Async generator yielding newline-delimited JSON chunks for streaming chat."""
 
@@ -2721,6 +2734,7 @@ async def chat_stream(
             active_project_uuid=project_uuid,
             capabilities_off=capabilities_off,
             browser_available=browser_available,
+            browser_own_sites=_browser_own_sites(settings, site_origin),
             browser_skill_text=skill_instructions(active_skill),
             conversation=conversation,
             # Monotonic per-turn marker: the current user message is already
