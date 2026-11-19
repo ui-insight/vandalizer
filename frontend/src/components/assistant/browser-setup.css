@@ -61,6 +61,9 @@
 .browser-hint { font-size: 12px; color: var(--browser-muted); margin: 10px 0; }
 .browser-address, .browser-site { display: flex; align-items: center; gap: 12px; background: var(--browser-soft); border: 1px solid var(--browser-line); border-radius: 9px; padding: 10px 12px; }
 .browser-address code { flex: 1; font-size: 14px; overflow-wrap: anywhere; user-select: all; }
+/* Same width for "Copy address" and "Copied", so the box doesn't shift when the label changes. */
+.browser-address button { min-width: 142px; justify-content: center; }
+.browser-address button[data-copied] { color: #18743a; border-color: #b6d4c0; background: #f0f8f2; }
 .browser-site { padding: 14px 16px; margin-bottom: 20px; }
 .browser-site strong { overflow-wrap: anywhere; min-width: 0; font-size: 14px; }
 .browser-site svg { flex: none; color: var(--browser-muted); }

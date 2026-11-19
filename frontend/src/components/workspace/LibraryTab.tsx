@@ -480,6 +480,8 @@ export function LibraryTab() {
   const [createName, setCreateName] = useState(starter?.title ?? '')
   const [createDesc, setCreateDesc] = useState(starter?.instructions ?? '')
   const [createWhen, setCreateWhen] = useState(starter?.when ?? '')
+  // The setup guide's example Skill arrives pre-filled; say where the text came from.
+  const [createFromExample, setCreateFromExample] = useState(starter?.example ?? false)
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
 
@@ -488,6 +490,7 @@ export function LibraryTab() {
     setCreateName('')
     setCreateDesc('')
     setCreateWhen('')
+    setCreateFromExample(false)
     setCreateError(null)
   }
 
@@ -496,6 +499,7 @@ export function LibraryTab() {
     setCreateName('')
     setCreateDesc('')
     setCreateWhen('')
+    setCreateFromExample(false)
     setCreateError(null)
   }
 
@@ -1639,6 +1643,7 @@ export function LibraryTab() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="library-create-title"
+            aria-describedby={createFromExample ? 'library-create-example-note' : undefined}
             onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); if (!creating && !uploading) closeCreateModal() } }}
             onClick={(e) => e.stopPropagation()}
             style={{
@@ -1653,6 +1658,11 @@ export function LibraryTab() {
             <h2 id="library-create-title" style={{ margin: "0 0 var(--workspace-space-20)", fontSize: 'var(--workspace-font-page-title)', fontWeight: 600, color: '#202124', textAlign: 'left' }}>
               {modalConfig[createModalType].title}
             </h2>
+            {createFromExample && (
+              <p id="library-create-example-note" style={{ margin: "0 0 var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', lineHeight: 1.45, color: '#526071', textAlign: 'left' }}>
+                This is an example Skill from Vandalizer. It reads two public University of Idaho pages. You can edit it before saving.
+              </p>
+            )}
             <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
               <input
                 type="text"
@@ -1678,7 +1688,7 @@ export function LibraryTab() {
                 {createName.length}/{MAX_NAME_LENGTH}
               </div>
             </div>
-            {createModalType === 'prompt' && <BrowserSkillHelp onStart={!createDesc.trim() ? instructions => setCreateDesc(instructions) : undefined} />}
+            {createModalType === 'prompt' && <BrowserSkillHelp onStart={!createDesc.trim() ? instructions => { setCreateDesc(instructions); setCreateFromExample(false) } : undefined} />}
             {createModalType === 'prompt' && (
               <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
               <label className="library-field-label" htmlFor="library-create-when">When to use (optional)</label>
@@ -1710,7 +1720,8 @@ export function LibraryTab() {
                 <textarea
                   aria-label={modalConfig[createModalType].descPlaceholder}
                   value={createDesc}
-                  onChange={(e) => setCreateDesc(e.target.value)}
+                  // Once the example's instructions are cleared, what follows is the person's own text.
+                  onChange={(e) => { setCreateDesc(e.target.value); if (!e.target.value.trim()) setCreateFromExample(false) }}
                   placeholder={modalConfig[createModalType].descPlaceholder}
                   rows={createModalType === 'workflow' ? 5 : 10}
                   style={{

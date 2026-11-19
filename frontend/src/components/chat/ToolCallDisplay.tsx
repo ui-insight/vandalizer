@@ -1,5 +1,6 @@
 import './tool-calls.css'
 import { BrowserRun } from './BrowserRun'
+import { browserSite } from './BrowserActivity'
 import { groupBrowserSegments, isBrowserTool } from './browserToolGroups'
 import { getToolMeta as getMeta, TOOL_META, toolTarget, activeToolLabel } from './toolActivity'
 import { qualityPresentation } from '../../lib/qualityLabels'
@@ -1349,15 +1350,21 @@ export function recoveredCallIds(order: string[], results: Map<string, ToolResul
  * retried "Add to inbox" left the first card (1 item) live above the second
  * (6 items), both awaiting approval, and nothing said which one counted. A
  * later call only replaces a card once it returns something that is not a
- * failure: a new preview or the saved result. */
+ * failure: a new preview or the saved result.
+ *
+ * Opening a site is one action per site: a card for nih.gov is not replaced
+ * by a later browser_open of nsf.gov, which would leave it reading "approve
+ * the one below" with no button anywhere. */
 export function supersededCallIds(order: string[], results: Map<string, ToolResultInfo>): Set<string> {
   const superseded = new Set<string>()
   order.forEach((id, i) => {
     const r = results.get(id)
-    if (!r || (r.content as Record<string, unknown> | null)?.needs_confirmation !== true) return
+    const waiting = r?.content as Record<string, unknown> | null | undefined
+    if (!r || waiting?.needs_confirmation !== true) return
     if (order.slice(i + 1).some(later => {
       const next = results.get(later)
-      return next?.tool_name === r.tool_name && !toolResultFailed(next.tool_name, next.content)
+      if (next?.tool_name !== r.tool_name || toolResultFailed(next.tool_name, next.content)) return false
+      return r.tool_name !== 'browser_open' || browserSite(next.content as Record<string, unknown> | null) === browserSite(waiting)
     })) superseded.add(id)
   })
   return superseded
@@ -1525,7 +1532,8 @@ export function ToolStatusLine({
       onDecide={onConfirm && !upNext ? decide : undefined} upNext={upNext} stepHeading={step?.heading} revising={name === 'revise_html_artifact'} />
   }
 
-  if (isBrowserTool(name)) return <BrowserRun calls={[call ?? { tool_name: name, tool_call_id: result?.tool_call_id ?? name, args: {} }]} results={new Map(result ? [[result.tool_call_id, result]] : [])} running={isActive} />
+  // A site waiting for approval falls through to the approval card below.
+  if (isBrowserTool(name) && !needsConfirmation && obj?.still_waiting !== true) return <BrowserRun calls={[call ?? { tool_name: name, tool_call_id: result?.tool_call_id ?? name, args: {} }]} results={new Map(result ? [[result.tool_call_id, result]] : [])} running={isActive} />
 
   return (
     <div className="agent-tool-result agent-tool-card" data-tool-state={executionLabel} data-tool-category={meta.category} data-tool-error={isError || undefined}>
@@ -1533,7 +1541,7 @@ export function ToolStatusLine({
         <span className="agent-tool-icon" aria-hidden="true"><ToolIcon size={18} /></span>
         <div className="agent-tool-identity">
           <div className="agent-tool-heading" role="status" aria-atomic="true">
-            <span className="agent-tool-name">{isActive && call ? activeToolLabel(call) : meta.label}</span>
+            <span className="agent-tool-name">{isActive && call ? activeToolLabel(call) : (needsConfirmation || obj?.still_waiting === true) && name === 'browser_open' ? 'Open site in your browser' : meta.label}</span>
             <span className="sr-only"> · </span>
             <span className="agent-tool-status">{isActive && <Loader2 size={11} className="agent-tool-spin" aria-hidden="true" />}{executionLabel}</span>
           </div>
@@ -1671,7 +1679,7 @@ export function ToolCallDisplay({ names = {}, toolCalls, toolResults, isStreamin
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-2)', margin: "var(--workspace-space-6) 0" }}>
-      {groupBrowserSegments([...allCallIds].map(id => ({ kind: 'tool_call', call: toolCalls.find(call => call.tool_call_id === id) ?? { tool_call_id: id, tool_name: resultMap.get(id)?.tool_name ?? 'unknown', args: {} } }))).map(segment => {
+      {groupBrowserSegments([...allCallIds].map(id => ({ kind: 'tool_call', call: toolCalls.find(call => call.tool_call_id === id) ?? { tool_call_id: id, tool_name: resultMap.get(id)?.tool_name ?? 'unknown', args: {} } })), resultMap).map(segment => {
         if (segment.kind === 'browser_group') return <BrowserRun key={segment.calls[0].tool_call_id} calls={segment.calls} results={resultMap} running={isStreaming} />
         if (segment.kind !== 'tool_call') return null
         const callId = segment.call.tool_call_id

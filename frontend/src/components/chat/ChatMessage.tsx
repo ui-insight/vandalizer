@@ -343,7 +343,7 @@ export function ChatMessage({
           {/* Interleaved segment rendering (streaming + persisted) */}
           {segments && segments.length > 0 ? (
             <div ref={contentRef} onClick={handleActionClick}>
-              {groupBrowserSegments(segments).map((seg, i) => {
+              {groupBrowserSegments(segments, resultMap).map((seg, i) => {
                 if (seg.kind === 'browser_group') return <BrowserRun key={seg.calls[0].tool_call_id} calls={seg.calls} results={resultMap} running={isStreamingProp || seg.calls.some(call => activeCallIds.has(call.tool_call_id))} />
                 if (seg.kind === 'text') {
                   const cleaned = seg.content.replace(THINK_BLOCK_RE, '').replace(THINK_TRAILING_RE, '')

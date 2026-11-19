@@ -330,3 +330,55 @@ describe('lesson position on a course without server-side places', () => {
     expect(screen.queryByRole('button', { name: 'Review recovery options' })).toBeNull()
   })
 })
+
+describe('a site waiting for approval in the browser', () => {
+  const open = { tool_name: 'browser_open', tool_call_id: 'open-1', args: { url: 'https://public.era.nih.gov/commons/' } }
+  const waiting = { tool_name: 'browser_open', tool_call_id: 'open-1', quality: null, content: {
+    needs_confirmation: true, status: 'awaiting_user_confirmation', approval_label: 'Open site', site: 'public.era.nih.gov',
+    preview: 'Open public.era.nih.gov in your browser and read it. This site may show sensitive information.',
+  } }
+
+  it('shows the Open site button the Assistant points to, and does not call the step completed', () => {
+    const confirm = vi.fn()
+    const { container } = render(<ToolCallDisplay toolCalls={[open]} toolResults={[waiting]} onConfirm={confirm} />)
+    expect(screen.getByRole('region', { name: 'Review proposed action' })).toHaveTextContent('Open public.era.nih.gov in your browser and read it.')
+    expect(container.querySelector('[data-tool-state="Awaiting approval"]')).not.toBeNull()
+    expect(container).not.toHaveTextContent('Browser step completed')
+    expect(screen.queryByRole('button', { name: /Open working tab/ })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Open site' }))
+    expect(confirm).toHaveBeenCalledWith('Yes, go ahead', undefined, { approve: 'open-1' })
+  })
+
+  it('lets the person cancel instead', () => {
+    const confirm = vi.fn()
+    render(<ToolStatusLine call={open} result={waiting} onConfirm={confirm} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel action' }))
+    expect(confirm).toHaveBeenCalledWith('No, cancel that', undefined, { decline: 'open-1' })
+  })
+
+  it('keeps a card for one site live when a different site is opened or asked for later in the reply', () => {
+    const card = (id: string, site: string) => ({ tool_name: 'browser_open', tool_call_id: id, quality: null, content: { needs_confirmation: true, site, approval_key: site } })
+    const opened = (id: string, url: string) => ({ tool_name: 'browser_open', tool_call_id: id, quality: null, content: { page: { url, title: 'Page' } } })
+    const results = (...list: ReturnType<typeof card | typeof opened>[]) => new Map(list.map(r => [r.tool_call_id, r]))
+    expect(supersededCallIds(['a', 'b'], results(card('a', 'nih.gov'), card('b', 'nsf.gov')))).toEqual(new Set())
+    expect(supersededCallIds(['a', 'b'], results(card('a', 'nih.gov'), opened('b', 'https://www.uidaho.edu/about')))).toEqual(new Set())
+    // The same site again does replace it.
+    expect(supersededCallIds(['a', 'b'], results(card('a', 'nih.gov'), card('b', 'nih.gov')))).toEqual(new Set(['a']))
+    expect(supersededCallIds(['a', 'b'], results(card('a', 'nih.gov'), opened('b', 'https://nih.gov/grants')))).toEqual(new Set(['a']))
+  })
+
+  it('says a site asked for again is still waiting, not that the step completed', () => {
+    const again = { ...waiting, tool_call_id: 'open-2', content: { status: 'awaiting_user_confirmation', still_waiting: true, site: 'public.era.nih.gov' } }
+    const { container } = render(<ToolCallDisplay toolCalls={[{ ...open, tool_call_id: 'open-2' }]} toolResults={[again]} onConfirm={vi.fn()} />)
+    expect(container.querySelector('[data-tool-state="Waiting for its own approval"]')).not.toBeNull()
+    expect(container).not.toHaveTextContent('Browser step completed')
+    expect(screen.queryByRole('button', { name: 'Open site' })).not.toBeInTheDocument()
+  })
+
+  it('still shows the browser card once the site is open', () => {
+    render(<ToolStatusLine call={open} result={{ ...waiting, content: { page: { url: 'https://public.era.nih.gov/commons/', title: 'eRA Commons' } } }} onConfirm={vi.fn()} />)
+    expect(screen.getByRole('region', { name: 'Browser activity' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Open site' })).not.toBeInTheDocument()
+  })
+})
+

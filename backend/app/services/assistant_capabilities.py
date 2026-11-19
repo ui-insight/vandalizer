@@ -244,6 +244,34 @@ def instructions(own: frozenset[str], admin: frozenset[str] = frozenset()) -> st
     return "".join(parts)
 
 
+def browser_not_connected_note(off: frozenset[str], browser_available: bool) -> str:
+    """Tell chat the person's browser isn't connected, so it says so.
+
+    The browser tools are withheld without the extension on the chat page
+    (see ``gate``). Unlike a switched-off capability, nothing told the model
+    why: asked to "use my browser", it read the page with the web reader and
+    never mentioned the browser (support ticket). When the switch is off,
+    ``instructions`` already covers it.
+    """
+    if browser_available or "browser" in off:
+        return ""
+    # Offer the web reader only if chat has it ("Read a web page" can be off too).
+    offer = (
+        "" if "web_pages" in off
+        else " You may offer to read a public page with the web reader instead, and do so if they accept."
+    )
+    return (
+        "\n\nThis person's own browser is not connected to this chat (the Vandalizer Browser extension is "
+        "not installed, is switched off, or is not connected to this site), so the browser tools are not "
+        "available to you. If they ask you to use their browser, begin your reply by saying their browser "
+        "isn't connected, and that they can reconnect it at "
+        "[Assistant settings → Set up Vandalizer Browser](/assistant#browser-setup), then ask again. "
+        "Do not read the page with fetch_url or a web search in that reply as if it were their browser, and "
+        f"never say or imply their browser was used.{offer} Requests that don't ask for their browser are "
+        "unaffected."
+    )
+
+
 def describe(user: Any, system_config_doc: dict | None) -> dict:
     """The Assistant page: every capability, who switched it off, and what is always on."""
     config = system_config_doc or {}
