@@ -535,9 +535,28 @@ it('opens the demo starter in the existing editor and saves it through the usual
     vi.mocked(createSearchSet).mockResolvedValue({ id: 'demo', uuid: 'demo-uuid' } as Awaited<ReturnType<typeof createSearchSet>>)
     render(<LibraryTab />)
     expect(screen.getByDisplayValue('University research snapshot')).toBeVisible()
+    expect(screen.getByRole('dialog', { name: 'Skill creation' })).toHaveAccessibleDescription('This is an example Skill from Vandalizer. It reads two public University of Idaho pages. You can edit it before saving.')
     expect((screen.getByDisplayValue(/Sites and figures/) as HTMLTextAreaElement).value).toContain('record_value')
     fireEvent.click(screen.getByRole('button', { name: 'Create Skill' }))
     await waitFor(() => expect(createSearchSet).toHaveBeenCalledWith(expect.objectContaining({ set_type: 'prompt', extraction_config: { content: expect.stringContaining('rankings-facts') } })))
     expect(sendChatMessage).not.toHaveBeenCalled()
+  } finally { rectangles.mockRestore(); history.replaceState({}, '', '/') }
+})
+
+it('shows the example note only for the setup guide example, not for the blank starter or a new Skill', async () => {
+  const note = /example Skill from Vandalizer/
+  history.replaceState({}, '', '/?tab=library&browserSkill=starter')
+  const rectangles = vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{ width: 1, height: 1 }] as unknown as DOMRectList)
+  try {
+    const { unmount } = render(<LibraryTab />)
+    expect(screen.getByDisplayValue('Collect figures from websites')).toBeVisible()
+    expect(screen.queryByText(note)).not.toBeInTheDocument()
+    unmount()
+    history.replaceState({}, '', '/?tab=library&browserSkill=demo')
+    render(<LibraryTab />)
+    expect(screen.getByText(note)).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.queryByText(note)).not.toBeInTheDocument()
   } finally { rectangles.mockRestore(); history.replaceState({}, '', '/') }
 })
