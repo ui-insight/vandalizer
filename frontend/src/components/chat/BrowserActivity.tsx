@@ -21,7 +21,9 @@ export function BrowserActivity({ result, active = false }: { result?: Record<st
   const disconnected = ['browser_not_connected', 'extension_unavailable', 'browser_unavailable'].includes(error)
   const signIn = !permission && Boolean(result?.login_required)
   const refused = error.startsWith('blocked_')
-  const title = active ? 'Reading in your browser…' : permission ? 'Site permission needed' : signIn ? 'Sign in to continue' : disconnected ? 'Reconnect your browser' : refused ? 'Action blocked · read-only' : error ? 'Browser needs attention' : 'Read-only browser'
+  // The server refuses Vandalizer's own pages outright; its message is written for the person.
+  const ownSite = error === 'vandalizer_itself'
+  const title = active ? 'Reading in your browser…' : permission ? 'Site permission needed' : signIn ? 'Sign in to continue' : disconnected ? 'Reconnect your browser' : refused ? 'Action blocked · read-only' : ownSite ? 'Not available on Vandalizer itself' : error ? 'Browser needs attention' : 'Read-only browser'
   const continueLabel = redirected ? 'Check page and continue' : permission ? 'Ask for site access' : signIn ? 'Continue after sign-in' : 'Continue browser task'
   const continueMessage = redirected
     ? 'Continue the selected browser Skill; read the current working tab again. If it still needs site permission, ask me before opening it with browser_open. Never bypass site permissions.'
@@ -36,7 +38,7 @@ export function BrowserActivity({ result, active = false }: { result?: Record<st
     {refused && <p>This control could change something on the site. Chat stopped without using it.</p>}
     {error && !permission && !disconnected && !refused && <p>{typeof result?.message === 'string' ? result.message : 'Chat could not read the page. Check the working tab before continuing.'}</p>}
     {!active && <div className="browser-activity-actions">
-      {disconnected ? <a className="browser-secondary" href="/assistant#browser-setup">Open browser settings</a> : error !== 'site_not_allowed' && <button type="button" className="browser-text-button" onClick={async () => {
+      {disconnected ? <a className="browser-secondary" href="/assistant#browser-setup">Open browser settings</a> : error !== 'site_not_allowed' && !ownSite && <button type="button" className="browser-text-button" onClick={async () => {
         const outcome = await focusBrowserTab()
         setNotice(outcome.ok ? '' : outcome.error === 'no_open_page' ? 'The working tab has closed. Ask chat to open the site again.' : 'Could not open the tab. Check your connection in Assistant settings, or select the tab in your browser.')
       }}>Open working tab <ExternalLink size={14} aria-hidden="true" /></button>}

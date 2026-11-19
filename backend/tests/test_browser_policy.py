@@ -483,3 +483,118 @@ async def test_an_ordinary_page_is_still_marked_as_data(model):
 def test_the_admin_list_takes_site_names_not_network_addresses(entry):
     with pytest.raises(InvalidAllowedHost):
         policy.normalize_domains([entry])
+
+
+# ── Vandalizer itself ──────────────────────────────────────────────────────
+
+
+def _own(context, *addresses):
+    context.deps.browser_own_sites = policy.own_sites(*addresses)
+    return context
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url", [
+    "https://vandalizer.example.edu/admin",
+    "https://vandalizer.example.edu",
+    "HTTPS://Vandalizer.Example.EDU/admin?tab=users",
+    "http://vandalizer.example.edu/admin",      # the http form redirects to the same site
+    "https://vandalizer.example.edu:443/admin",
+])
+async def test_vandalizers_own_address_is_refused_without_a_review_or_an_approval_card(model, url):
+    # "ask" is what the review said about the admin page in the ticket.
+    model.answer = '{"decision": "ask", "reason": "An admin page could hold confidential records."}'
+    conversation = _conversation()
+    context = _own(_context(conversation=conversation), "https://vandalizer.example.edu")
+    result = await browser.browser_open(context, url)
+    assert result["error"] == "vandalizer_itself" and result["site"] == "vandalizer.example.edu"
+    assert "needs_confirmation" not in result and conversation.pending_confirmations == []
+    assert "Do not ask for approval" in result["hint"]
+    # The line the card shows is for the person: no tool names.
+    assert "browser_" not in result["message"] and "the person" not in result["message"]
+    assert await browser.relay_fields("browser_open", True, context.deps, "call-1", {"url": url}) == {}
+    assert model.prompts == [] and FakeRedis.lists == {}
+
+
+@pytest.mark.asyncio
+async def test_approving_does_not_open_vandalizer_itself(model):
+    context = _own(_context(conversation=_conversation(), approved=None), "https://vandalizer.example.edu")
+    result = await browser.browser_open(context, "https://vandalizer.example.edu/admin", confirmed=True)
+    assert result["error"] == "vandalizer_itself" and FakeRedis.lists == {}
+
+
+@pytest.mark.asyncio
+async def test_vandalizer_is_refused_even_when_the_admin_list_names_its_domain(model):
+    context = _own(_context(domains=["example.edu"]), "https://vandalizer.example.edu")
+    assert (await browser.browser_open(context, "https://vandalizer.example.edu/admin"))["error"] == "vandalizer_itself"
+
+
+@pytest.mark.asyncio
+async def test_other_sites_and_other_ports_are_not_mistaken_for_vandalizer(model):
+    context = _own(_context(), "http://localhost:5173", "https://vandalizer.example.edu")
+    for call_id, url in (("a", "https://fin.example.edu/award/123"), ("b", "https://notvandalizer.example.edu/"),
+                         ("c", "http://localhost:8080/report")):
+        context.tool_call_id = call_id
+        assert _page_only(await _answered(browser.browser_open(context, url), call_id=call_id)) == PAGE
+    context.tool_call_id = "d"
+    assert (await browser.browser_open(context, "http://localhost:5173/admin"))["error"] == "vandalizer_itself"
+
+
+@pytest.mark.asyncio
+async def test_a_tab_that_lands_on_vandalizer_is_not_read_or_acted_on(model):
+    context = _own(_context(), "https://vandalizer.example.edu")
+    result = await _answered(browser.browser_open(context, "https://fin.example.edu/award/123"),
+                             result=_landing("https://vandalizer.example.edu/admin"))
+    assert result["error"] == "vandalizer_itself" and "SECRET" not in str(result)
+    assert context.deps.browser_pages == []
+    context.tool_call_id = "click"
+    assert (await browser.browser_click(context, 1))["error"] == "vandalizer_itself"
+
+
+def test_own_sites_come_from_the_configured_url_and_the_chat_pages_origin():
+    from app.services.chat_service import _browser_own_sites
+
+    settings = SimpleNamespace(frontend_url="http://localhost:5173")
+    assert _browser_own_sites(settings, "https://vandalizer-dev.example.edu") == {"localhost:5173", "vandalizer-dev.example.edu"}
+    # A missing or unreadable origin adds nothing and breaks nothing.
+    assert _browser_own_sites(settings, None) == {"localhost:5173"}
+    assert _browser_own_sites(None, "null") == frozenset()
+
+
+@pytest.mark.asyncio
+async def test_in_chat_the_request_origin_marks_vandalizer_as_off_limits(chat_harness, monkeypatch, model):  # noqa: F811
+    import json
+
+    from pydantic_ai import Agent
+    from pydantic_ai.messages import ToolReturnPart
+    from pydantic_ai.models.function import DeltaToolCall, FunctionModel
+
+    from app.services import assistant_capabilities as caps
+    from app.services import chat_service as chat
+
+    model.answer = '{"decision": "ask", "reason": "An admin page could hold confidential records."}'
+
+    async def agent_model(messages, info):
+        if not [p for m in messages for p in getattr(m, "parts", []) if isinstance(p, ToolReturnPart)]:
+            yield {0: DeltaToolCall(name="browser_open", json_args='{"url":"https://vandalizer-dev.example.edu/admin"}', tool_call_id="open-1")}
+        else:
+            yield "Chat's browser can't be used on Vandalizer itself."
+
+    agent = Agent(FunctionModel(stream_function=agent_model), deps_type=AgenticChatDeps)
+    agent.tool(prepare=caps.gate)(browser.browser_open)
+    monkeypatch.setattr(chat, "create_agentic_chat_agent", lambda *a, **k: agent)
+
+    chunks = []
+    async for raw in chat.chat_stream(
+        "Use my browser to open https://vandalizer-dev.example.edu/admin and tell me what is on the page.",
+        [], "conversation", "user",
+        user=SimpleNamespace(current_team=None, organization_id=None), team_access=SimpleNamespace(),
+        browser_available=True, site_origin="https://vandalizer-dev.example.edu",
+    ):
+        chunks.append(json.loads(raw))
+
+    call = next(c for c in chunks if c["kind"] == "tool_call" and c["tool_name"] == "browser_open")
+    assert "relay" not in call
+    result = next(c for c in chunks if c["kind"] == "tool_result" and c["tool_name"] == "browser_open")
+    assert result["content"]["error"] == "vandalizer_itself"
+    assert not result["content"].get("needs_confirmation") and model.prompts == []

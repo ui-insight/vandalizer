@@ -81,6 +81,7 @@ def allowed_domains(system_config_doc: dict | None) -> tuple[str, ...]:
 _LABEL = r"[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?"
 _AUTHORITY = re.compile(rf"({_LABEL}(\.{_LABEL})*)\.?(:\d{{1,5}})?", re.IGNORECASE)
 _HTTP_URL = re.compile(r"(https?)://([^/?#]*)(.*)", re.IGNORECASE | re.DOTALL)
+_PORT = re.compile(r":(\d{1,5})$")
 
 
 def host_of(url: object) -> str | None:
@@ -100,6 +101,52 @@ def host_of(url: object) -> str | None:
     if not authority:
         return None
     return authority.group(1).lower()
+
+
+def _site_key(url: object) -> str | None:
+    """``host`` or ``host:port`` of an http(s) address; None when host_of refuses it.
+
+    Ports 80 and 443 count as no port, so the http and https forms of one
+    address are the same site.
+    """
+    host = host_of(url)
+    if host is None:
+        return None
+    match = _HTTP_URL.fullmatch(str(url).strip())
+    stated = _PORT.search(match.group(2)) if match else None
+    port = stated.group(1).lstrip("0") if stated else ""
+    return host if port in ("", "80", "443") else f"{host}:{port}"
+
+
+def own_sites(*addresses: object) -> frozenset[str]:
+    """Vandalizer's own address(es): the configured site URL and the origin the chat page was served from."""
+    return frozenset(key for key in map(_site_key, addresses) if key)
+
+
+def is_own_site(deps: AgenticChatDeps, url: object) -> bool:
+    return _site_key(url) in deps.browser_own_sites
+
+
+def own_site_refusal(host: str, *, landed: bool = False) -> dict:
+    """Chat's browser is never used on Vandalizer itself, admin pages included.
+
+    Said before the request review, so the person is not shown an approval
+    card for a page the extension would then refuse to open.
+    """
+    return {
+        "error": "vandalizer_itself",
+        "site": host,
+        "message": (
+            "The working tab is now on Vandalizer itself, which chat's browser can't be used on, so it was not read."
+            if landed else "Chat's browser can't be used on Vandalizer itself, so nothing was opened."
+        ),
+        "hint": (
+            "Tell the person plainly that the browser tools do not open, read or act on Vandalizer's own pages, "
+            "admin pages included. Do not ask for approval, do not offer to read the page, and do not try again. "
+            "If one of your other Vandalizer tools covers what they asked for, use it; otherwise say what you "
+            "cannot do."
+        ),
+    }
 
 
 def domain_allowed(host: str, allowed: tuple[str, ...]) -> bool:
@@ -365,6 +412,8 @@ async def _decide(deps: AgenticChatDeps, call_id: str, tool: str, args: dict[str
             "error": "bad_url",
             "message": "That is not a plain web address. Use the form https://site.example.edu/page.",
         }
+    if is_own_site(deps, url):
+        return own_site_refusal(site)
     allowed = allowed_domains(deps.system_config_doc)
     if not domain_allowed(site, allowed):
         return site_refusal(site, allowed)
@@ -404,6 +453,8 @@ async def landed(deps: AgenticChatDeps, page_url: object) -> dict | None:
                 "browser_open."
             ),
         }
+    if is_own_site(deps, page_url):
+        return own_site_refusal(site, landed=True)
     allowed = allowed_domains(deps.system_config_doc)
     if not domain_allowed(site, allowed):
         return site_refusal(site, allowed, landed=True)

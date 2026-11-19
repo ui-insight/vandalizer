@@ -45,3 +45,10 @@ it('does not offer a retry that would bypass a refused write', () => {
   expect(screen.getByText('Action blocked · read-only')).toBeVisible()
   expect(screen.queryByRole('button', { name: /Continue|Retry|Ask for/ })).not.toBeInTheDocument()
 })
+it('says the browser is not used on Vandalizer itself, with nothing to approve or retry', () => {
+  render(<BrowserActivity result={{ error: 'vandalizer_itself', site: 'vandalizer.example.edu', message: 'Chat’s browser can’t be used on Vandalizer itself, so nothing was opened.', hint: 'Tell the person plainly. Do not ask for approval.' }} />)
+  expect(screen.getByText('Not available on Vandalizer itself')).toBeVisible()
+  expect(screen.getByText('Chat’s browser can’t be used on Vandalizer itself, so nothing was opened.')).toBeVisible()
+  expect(screen.queryByText(/Do not ask for approval/)).not.toBeInTheDocument()
+  expect(screen.queryByRole('button')).not.toBeInTheDocument()
+})

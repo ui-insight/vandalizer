@@ -42,6 +42,9 @@ class AgenticChatDeps:
     # The chat page found the Vandalizer browser extension, so the browser
     # tools (chat_browser_tools) can reach the person's Chrome this turn.
     browser_available: bool = False
+    # Vandalizer's own address(es), as browser_policy.own_sites reads them.
+    # The browser tools never open, read or act on Vandalizer itself.
+    browser_own_sites: frozenset[str] = frozenset()
     # Pages the browser tools read this turn, and the values record_value
     # accepted from them; record_value only accepts what a page shows.
     browser_pages: list[dict] = field(default_factory=list)
