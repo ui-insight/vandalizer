@@ -92,7 +92,20 @@ async def test_a_browser_that_never_answers_is_reported_not_waited_on_forever(mo
 async def test_without_the_extension_the_tool_says_so_instead_of_waiting():
     result = await browser.browser_click(_context(available=False), 3)
     assert result["error"] == "browser_not_connected"
+    assert "(/assistant#browser-setup)" in result["hint"] and "fetch_url" in result["hint"]
     assert FakeRedis.lists == {}
+
+
+@pytest.mark.asyncio
+async def test_an_extension_that_went_away_mid_chat_is_not_quietly_replaced_by_the_web_reader():
+    # The turn was sent as connected; the chat page then found the extension gone.
+    context = _context()
+    waiting = asyncio.create_task(browser.browser_open(context, "https://fin.example.edu/award/123"))
+    await asyncio.sleep(0.05)
+    await browser.deliver_result("ra", "call-1", {"error": "browser_not_connected", "message": "Not connected on this page."})
+    result = await waiting
+    assert result["error"] == "browser_not_connected"
+    assert "isn't connected" in result["hint"] and "Do not read the page with fetch_url" in result["hint"]
 
 
 @pytest.mark.asyncio
