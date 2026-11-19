@@ -1688,7 +1688,7 @@ export function LibraryTab() {
                 {createName.length}/{MAX_NAME_LENGTH}
               </div>
             </div>
-            {createModalType === 'prompt' && <BrowserSkillHelp onStart={!createDesc.trim() ? instructions => setCreateDesc(instructions) : undefined} />}
+            {createModalType === 'prompt' && <BrowserSkillHelp onStart={!createDesc.trim() ? instructions => { setCreateDesc(instructions); setCreateFromExample(false) } : undefined} />}
             {createModalType === 'prompt' && (
               <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
               <label className="library-field-label" htmlFor="library-create-when">When to use (optional)</label>
@@ -1720,7 +1720,8 @@ export function LibraryTab() {
                 <textarea
                   aria-label={modalConfig[createModalType].descPlaceholder}
                   value={createDesc}
-                  onChange={(e) => setCreateDesc(e.target.value)}
+                  // Once the example's instructions are cleared, what follows is the person's own text.
+                  onChange={(e) => { setCreateDesc(e.target.value); if (!e.target.value.trim()) setCreateFromExample(false) }}
                   placeholder={modalConfig[createModalType].descPlaceholder}
                   rows={createModalType === 'workflow' ? 5 : 10}
                   style={{
