@@ -52,4 +52,22 @@ it('groups browser work without moving narrative or other tools', () => {
   expect(groups[0]).toEqual({ kind: 'browser_group', calls })
   expect(groups[1]).toBe(text)
 })
+it('leaves a browser call that is waiting for approval out of the group, so it gets an approval card', () => {
+  const waiting = { tool_call_id: 'ask', tool_name: 'browser_open', args: { url: 'https://portal.example.edu' } }
+  const map = new Map(results)
+  map.set('ask', { ...waiting, content: { needs_confirmation: true, approval_label: 'Open site' }, quality: null })
+  const groups = groupBrowserSegments([
+    { kind: 'tool_call', call: calls[0] },
+    { kind: 'tool_call', call: waiting },
+    { kind: 'tool_result', result: map.get('ask')! },
+    { kind: 'tool_call', call: calls[1] },
+  ], map)
+  expect(groups).toEqual([{ kind: 'browser_group', calls: [calls[0]] }, { kind: 'tool_call', call: waiting }, { kind: 'browser_group', calls: [calls[1]] }])
+})
+it('never logs a step that is waiting for approval as completed', () => {
+  const waiting = { tool_call_id: 'ask', tool_name: 'browser_open', args: {} }
+  render(<BrowserRun calls={[waiting]} results={new Map([['ask', { ...waiting, content: { needs_confirmation: true }, quality: null }]])} />)
+  expect(screen.getByText('Waiting for your approval')).toBeInTheDocument()
+  expect(screen.queryByText('Browser step completed')).not.toBeInTheDocument()
+})
 it('omits malformed capture dates', () => { expect(capturedTime('not a date')).toBe('') })
