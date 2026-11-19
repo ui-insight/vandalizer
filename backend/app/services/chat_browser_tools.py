@@ -46,12 +46,21 @@ RESULT_TTL_SECONDS = 300
 # Pages kept per turn for record_value's check.
 MAX_PAGES_PER_TURN = 30
 
+# The extension can also go away mid-chat, after the turn was sent as
+# connected: the call then comes back with one of these from the chat page.
+_DISCONNECTED_ERRORS = frozenset({"browser_not_connected", "extension_unavailable", "browser_unavailable"})
+_DISCONNECTED_HINT = (
+    "Tell the person their browser isn't connected and that they can reconnect it at "
+    "[Assistant settings → Set up Vandalizer Browser](/assistant#browser-setup). Do not read the page "
+    "with fetch_url or a web search in this reply as if it were their browser."
+)
 _NOT_CONNECTED = {
     "error": "browser_not_connected",
     "message": (
         "The Vandalizer browser extension is not connected in this chat. Tell the person to open "
         "Assistant settings → Set up Vandalizer Browser and follow the installation and connection steps."
     ),
+    "hint": _DISCONNECTED_HINT,
 }
 
 
@@ -132,6 +141,8 @@ async def _run(context: RunContext[AgenticChatDeps], tool: str, args: dict, time
     if refusal is not None:
         return refusal
     result = await _await_result(deps, context.tool_call_id, timeout)
+    if result.get("error") in _DISCONNECTED_ERRORS:
+        result.setdefault("hint", _DISCONNECTED_HINT)
     # Where the tab ended up gets the same checks as a site opened directly
     # (a redirect or a clicked link can leave the admin's list, or reach a
     # site that needs approval), before its text is kept or returned.
