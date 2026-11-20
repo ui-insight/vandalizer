@@ -1,0 +1,33 @@
+{
+  "overview": "Review the assigned synthetic budget as an internal exception memo. Select supported methods, preserve exact arithmetic checks and demonstrate safe ordering of independent source work and dependent synthesis using actual saved execution evidence.",
+  "documents": [
+    "budget-justification.pdf"
+  ],
+  "instructions": [
+    "Use only the assigned synthetic budget justification. Keep its original amounts and wording visible, including disagreements; do not silently repair the source or treat it as current institutional policy.",
+    "Separate source reading, interpretation and arithmetic. This bounded runner supports one or two source-review Prompt tasks followed by one internal memo Prompt or Formatter task. It does not execute Deep Analysis, API, crawler or Code tasks. Use an available model; do not enable restricted nodes, supply external credentials or request staff access. Explicit learner arithmetic with a reproducible record is supported.",
+    "Record three checks in USD: add the three Equipment amounts; add the seven Budget Summary categories from Senior Personnel through Subaward; then add those seven categories and the separately listed estimated indirect cost. Name every source row, page and amount, show the operation and preserve the result. These sums check printed figures, not their common time period or policy eligibility.",
+    "Compare the checks with the printed Equipment total, Budget Summary TOTAL and the direct-cost/indirect-cost narrative. Preserve disagreements and missing assumptions. Do not transform a matching addition into a claim that the rates, periods, institution policy or entire budget are approved.",
+    "Inspect the saved two-step workflow and exact task inputs. Source-review Prompt tasks must use Workflow documents. The later memo task must use both the preceding step’s results and Workflow documents, including the saved calculation evidence supplied by the challenge. Two independent review prompts may cover source purposes and inconsistencies; one combined review prompt is the supported alternative when parallel work is unavailable. The memo waits for every actual preceding review result.",
+    "Approve the exact bounded revision and assigned source before running it. Preserve the owned execution, actual task inputs/results, calculation record and final internal memo. Reject missing branch evidence rather than claiming a complete analysis from the remaining outputs.",
+    "If a capability is unavailable, select a supported alternative and preserve why. If execution is incomplete or its outcome is unknown, inspect saved results before any new action. Do not fabricate receipts, repeat external actions or treat an authored example as your execution.",
+    "Submit your method decision, actual calculation evidence and explanation of the observed dependencies. End at an internal exception memo. No email, external update, sharing, live policy lookup, budget approval or staff review is part of this exercise."
+  ],
+  "chat_instructions": [
+    "Assist with the design and evidence; never supply the learner’s approval, fabricate a calculation/run receipt or claim credit.",
+    "Use only the assigned synthetic budget justification. Keep its original amounts and wording visible, including disagreements; do not silently repair the source or treat it as current institutional policy.",
+    "Separate source reading, interpretation and arithmetic. Choose available permitted operations for the internal analysis. Deep Analysis is optional, never proof of exact arithmetic. Do not enable the restricted Code Node or request staff access; explicit learner arithmetic with a reproducible record is supported.",
+    "Record three checks in USD: add the three Equipment amounts; add the seven Budget Summary categories from Senior Personnel through Subaward; then add those seven categories and the separately listed estimated indirect cost. Name every source row, page and amount, show the operation and preserve the result. These sums check printed figures, not their common time period or policy eligibility.",
+    "Compare the checks with the printed Equipment total, Budget Summary TOTAL and the direct-cost/indirect-cost narrative. Preserve disagreements and missing assumptions. Do not transform a matching addition into a claim that the rates, periods, institution policy or entire budget are approved.",
+    "Inspect a saved workflow design and the exact source/task settings. Two tasks may draft a source-based cost-purpose summary and a list of source inconsistencies independently. A memo that claims a calculation was checked depends on the actual calculation record and required branch results; it must wait for and receive that evidence. A sequential alternative is acceptable when parallel execution is unavailable.",
+    "Approve the exact bounded revision and assigned source before running it. Preserve the owned execution, actual task inputs/results, calculation record and final internal memo. Reject missing branch evidence rather than claiming a complete analysis from the remaining outputs.",
+    "If a capability is unavailable, select a supported alternative and preserve why. If execution is incomplete or its outcome is unknown, inspect saved results before any new action. Do not fabricate receipts, repeat external actions or treat an authored example as your execution.",
+    "Submit your method decision, actual calculation evidence and explanation of the observed dependencies. End at an internal exception memo. No email, external update, sharing, live policy lookup, budget approval or staff review is part of this exercise."
+  ],
+  "expected_fields": [],
+  "expected_values": {},
+  "star_criteria": {},
+  "assessment_case_id": "budget-method-arithmetic-and-dependencies",
+  "advanced_case_sha256": "ded5c09b4454bfb74760a83aeff8930bfc19d4fce475257955def7f81b105b9a",
+  "assessment_method": "authenticated_method_calculation_dependency_review"
+}

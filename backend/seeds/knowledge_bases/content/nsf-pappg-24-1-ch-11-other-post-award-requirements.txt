@@ -1,0 +1,757 @@
+NSF PAPPG (NSF 24-1) — Chapter XI: Other Post-Award Requirements and Considerations
+Source: https://www.nsf.gov/policies/pappg/24-1/ch-11-other-post-award-requirements
+
+### A. Non-Discrimination Statutes and Regulations
+
+#### 1. General
+
+-
+A number of statutes prohibit NSF recipients from discriminating against individuals who participate in any of their programs, services, and activities. These statutes include:
+
+- Title VI of the Civil Rights Act of 1964 (prohibits discrimination on the basis of race, color, or national origin); Section 504 of the Rehabilitation Act of 1973 (prohibits discrimination on the basis of disability);
+- Title IX of the Educational Amendments of 1972 (prohibits discrimination on the basis of sex in Federally assisted education programs or activities); and
+- the Age Discrimination Act of 1975 (prohibits discrimination on the basis of age).
+
+In addition to statutory prohibitions, there are several civil rights and equal opportunity-related Presidential Executive Orders that also require compliance by NSF recipients:
+
+- Executive Order (E.O.) 11246 bars various types of discriminatory employment practices under awards for construction;
+- E.O. 13166 "Improving Access to Services for Persons with Limited English Proficiency (LEP)" requires government agencies to take steps to provide meaningful access to its programs and activities to members of the public who are limited in their English proficiency, including recipients' programs and activities; and
+- E. O.14096 "Revitalizing Our Nation's Commitment to Environmental Justice for All" (April 21, 2023) which directs Federal agencies to make achieving environmental justice part of the agency mission.
+
+The following sections discuss the application of each of these Statutes and E.O. 11246, E.O. 13166, and E.O. 14096 to NSF recipients:
+
+-
+When NSF receives a complaint alleging discrimination under any of these statutes, NSF may refer the complaint to the recipient or another entity with authority or jurisdiction to investigate the complaint when the complaint does not meet NSF requirements of acceptance for investigation. In this instance, when the complaint is referred to the recipient by NSF, the recipient shall acknowledge receipt to NSF of the referred complaint and inform NSF of the final disposition of the complaint.
+
+Information on the complaint process can be found on the OECR website. The complainant may also use the recipient's internal discrimination complaint process. Such processes are required for NSF recipients to implement under Title IX for sex discrimination complaints, including sexual harassment and under Section 504 for disability discrimination complaints. Recipients are prohibited by these regulations from engaging in acts of intimidation, coercion or retaliation against: a) any person who attempts to assert a right protected by these statutes and their implementing regulations; or b) cooperates in any part of NSF's review, investigation and compliance resolution or enforcement process.
+
+- NSF proposers and recipients are required under these regulations to keep records deemed pertinent to ascertain a recipient's compliance with these regulations. It also requires the recipient to submit to NSF timely, complete and accurate reports, and in such form and containing such information, as NSF may determine to be necessary to ascertain whether the recipient has complied or is complying with these regulations.
+
+- NSF proposers and recipients are advised that NSF may conduct pre-award and post-award compliance reviews to ensure that the recipient is complying with NSF's civil rights regulations. Recipients are required to provide NSF with access to information, records, recipient officials, recipient program participants, and facilities deemed pertinent by NSF to ascertain a recipient's compliance with these regulations.
+
+- NSF proposers and recipients are required under these regulations to make available to its participants, beneficiaries, and other interested persons, information regarding these regulations and their applicability to the program(s) under which the recipient receives Federal financial assistance from NSF. Proposers and recipients are also required to make such information available to these parties in such a manner as NSF finds necessary to apprise such persons of the protections against discrimination assured them by these regulations.
+
+- NSF proposers and recipients may contact the Office of Equity and Civil Rights (OECR), Awardee Compliance Branch (ACB), at the link in (b) above, by email at programcomplaints@nsf.gov, or by phone at 1-703-292-7020 with any questions regarding these non-discrimination statutes and their implementing NSF regulations and their applicability to their institutions’ programs, services, and activities.
+-
+NSF Policy on Sexual Harassment, Other Forms of Harassment, or Sexual Assault
+
+As the primary funding agency of fundamental science and engineering research in the U.S., NSF is committed to promoting safe, productive research and education environments for current and future scientists and engineers. The Foundation considers the PI and any co-PIs identified on an NSF award to be in positions of trust. The PI and co-PI(s) and all award personnel must comport themselves in a responsible and accountable manner during the performance of award activities whether at the recipient organization, on-line, or conducted outside the organization, such as at field sites, facilities, or during conferences and workshops.
+
+The 3,000 recipient organizations that receive NSF funding are responsible for fully investigating complaints and for compliance with federal non-discrimination laws, regulations, and executive orders.
+
+In support of this position, the AOR at the recipient organization is required to notify NSF of:
+
+(1) any finding/determination regarding the PI or any co-PI that demonstrates a violation of recipient policies or codes of conduct, statutes, regulations, or executive orders relating to sexual harassment, other forms of harassment, or sexual assault; and/or
+
+(2) if the PI or any co-PI is placed on administrative leave or if any administrative action has been imposed on the PI or any co-PI by the recipient relating to any finding/determination or an investigation of an alleged violation of recipient policies or codes of conduct, statutes, regulations, or executive orders relating to sexual harassment, other forms of harassment, or sexual assault.
+
+Such notifications must be submitted by the AOR to NSF's Office of Equity and Civil Rights at www.nsf.gov/harassment within ten business days from the date of the finding/determination, or the date of the placement of a PI or co-PI by the recipient on administrative leave or the imposition of an administrative action, whichever is sooner.
+
+Each notification must include the following information:
+
+- NSF Award Number;
+- Name of PI or co-PI being reported;
+- Type of Notification: Select one of the following:
+
+- Finding/Determination that the reported individual has been found to have violated recipient policies or codes of conduct, statutes, regulations, or executive orders relating to sexual harassment, other forms of harassment, or sexual assault; or
+- Placement by the recipient of the reported individual on administrative leave or the imposition of any administrative action on the PI or any co-PI by the recipient relating to any finding/determination or an investigation of an alleged violation of recipient policies or codes of conduct, statutes, regulations, or executive orders relating to sexual harassment, other forms of harassment, or sexual assault.
+
+- Description of the finding/determination and action(s) taken, if any; and
+- Reason(s) for, and conditions of, placement of the PI or any co-PI on administrative leave or imposition of administrative action.
+
+NSF expects all recipients to establish and maintain clear and unambiguous standards of behavior to ensure harassment-free workplaces wherever science is conducted. NSF has developed a sexual harassment prevention website that includes promising practices on policies, effective codes of conduct, and standards of behavior, as well as Frequently Asked Questions that respond to inquiries received on this complex topic.
+
+A community effort is essential to eliminate sexual and other forms of harassment in science and to build scientific workspaces where people can learn, grow, and thrive.
+
+-
+Award Condition
+
+Each NSF research award includes as part of the award general terms and conditions an article that implements the notification requirements and harassment policy specified above. The recipient is reminded of its responsibility to obtain prior written approval from NSF in the event the investigator will be disengaged from the project for a period greater than three months. See Chapter VII.B.2.a. for additional information.
+
+#### 2. Title VI of the Civil Rights Act of 1964
+
+#### a. Background
+
+Section 602 of the Civil Rights Act of 1964 (42 U.S.C. § 2000d, et seq.) provides that no person in the U.S. shall, on the grounds of race, color, or national origin, be excluded from participation in, be denied the benefits of, or be otherwise subjected to discrimination under any program or activity receiving Federal financial assistance. Section 602 requires that each Government agency which is empowered to extend such financial assistance issue rules or regulations implementing Title VI with respect to such programs or activities administered by the agency.
+
+#### b. NSF Regulations
+
+NSF regulations implementing Title VI are found at 45 CFR § 611. These regulations apply to recipients, subrecipients and successors in interest. These regulations do not apply to contracts for commercially available materials and supplies, equipment, or general support services.
+
+#### c. Key Procedural and Programmatic Requirements
+
+The procedures for ensuring NSF recipients' compliance with Title VI are found at 45 CFR §§ 611.6-11. These regulations provide for the compliance and investigative actions that NSF may initiate in order to ascertain recipients' compliance with Title VI. These regulations also provide for the enforcement procedures to compel recipient compliance with Title VI if a recipient refuses to take corrective action for violations found during an NSF complaint investigation or compliance review. NSF's Section 504, Title IX and Age Discrimination Act regulations incorporate by reference the Title VI compliance, investigative and enforcement procedures.
+
+#### 3. Section 504 of the Rehabilitation Act of 1973
+
+#### a. Background
+
+Section 504 of the Rehabilitation Act of 1973, as amended (29 U.S.C. § 794) provides that "no otherwise qualified individual with a disability in the United States...shall, solely by reason of her or his disability, be excluded from the participation in, be denied the benefits of, or be subjected to discrimination under any program or activity receiving Federal financial assistance...."
+
+#### b. NSF Regulations
+
+NSF regulations implementing Section 504 are found at 45 CFR § 605. With a few changes, these regulations mirror the regulations issued by the Department of Health and Human Services (DHHS) at 45 CFR § 84. These regulations also apply to subrecipients and successors in interest. These regulations do not apply to contracts for commercially available materials and supplies, equipment, or general support services.
+
+#### c. Key Procedural and Programmatic Requirements
+
+NSF's Section 504 regulations, in addition to prohibiting discrimination on the basis of disability, requires NSF recipients to designate a Section 504 coordinator, publish and adopt procedures to investigate and adjudicate complaints of internally-filed disability discrimination complaints, and notify the public of its obligation to comply with Section 504. NSF's Section 504 regulation also requires NSF recipients to conduct a self-evaluation to determine the accessibility of its programs, services, activities and facilities, and implement modifications, implement corrective actions identified from the self-evaluation and conduct a transition plan to identify those physical elements of the NSF recipient's facilities that are inaccessible to individuals with disabilities and require retrofit. NSF's Section 504 regulations also require that all new construction and alterations to existing facilities are accessible to individuals with disabilities and meet current accessibility standards. See 45 CFR § 605 for all of the regulatory requirements for NSF recipients.
+
+#### 4. Title IX of the Education Amendments of 1972
+
+#### a. Background
+
+Subject to exceptions regarding admission policies at certain religious and military organizations, Title IX of the Education Amendments of 1972 (20 U.S.C. §§ 1681-1686) prohibits discrimination on the basis of sex in any education program or activity receiving Federal financial assistance.
+
+On August 14, 2020, the U.S. Department of Education's (DoED) revised regulations implementing Title IX went into effect (34 CFR § 106). Recipients are advised that this action did not change NSF's Title IX regulations. NSF recipients also may be recipients of DoED funding and will have the responsibility to comply with both DoED's and NSF's Title IX regulations. In Title IX compliance activities involving recipients that fall under the jurisdiction of both NSF and DoED, NSF will determine whether the recipient is in compliance with NSF's Title IX regulations only. Recipients are advised that a determination by NSF that the recipient is in compliance or non-compliance with NSF Title IX regulations does not mean that the recipient is in compliance with DoED's Title IX regulations. Recipients with Title IX compliance obligations to DoED are encouraged to contact DoED's Office for Civil Rights if there are questions or concerns regarding compliance with DoED's revised Title IX regulations.
+
+#### b. NSF Regulations
+
+NSF regulations implementing Title IX are found at 45 CFR § 618. All NSF recipients who provide or operate educational programs as defined in 45 CFR § 618.105 must comply with Title IX. These regulations also apply to subrecipients and successors in interest who operate such educational programs. These regulations do not apply to contracts for commercially available materials and supplies, equipment, or general support services.
+
+#### c. Key Procedural and Programmatic Requirements
+
+NSF's Title IX regulations, in addition to prohibiting discrimination on the basis of sex in education programs, requires NSF recipients to designate a Title IX coordinator, publish and adopt procedures to investigate and adjudicate complaints of internally-filed sex discrimination complaints, notify the public of its obligation to comply with Title IX, conduct a self-evaluation to determine whether its programs, services, activities and facilities comply with Title IX and implement corrective actions identified from the self-evaluation. See 45 CFR § 618 for all of the regulatory requirements for NSF recipients under Title IX.
+
+#### 5. Age Discrimination Act of 1975
+
+#### a. Background
+
+The Age Discrimination Act of 1975, as amended (42 U.S.C. § 6101 et seq.), provides that pursuant to regulations issued by DHHS "no person in the United States shall, on the basis of age, be excluded from participation in, be denied the benefits of, or be subjected to discrimination under, any program or activity receiving Federal financial assistance."
+
+#### b. NSF Regulations
+
+NSF regulations implementing the Age Discrimination Act are found at 45 CFR § 617. These regulations also apply to subrecipients and successors in interest. These regulations do not apply to contracts for commercially available materials and supplies, equipment, or general support services.
+
+#### c. Key Procedural and Programmatic Requirements
+
+NSF's Age Discrimination Act regulations, in addition to prohibiting discrimination on the basis of age in education programs, requires NSF recipients conduct a self-evaluation to determine each recipient shall identify all age distinctions it uses and justify each age distinction it imposes on the program or activity receiving Federal financial assistance from NSF. See 45 CFR § 617 for all of the regulatory requirements under the Age Discrimination Act for NSF recipients.
+
+#### 6. Equal Employment Opportunity under E.O. 11246
+
+#### a. Background
+
+E.O. 11246, as amended, requires contractors and subcontractors performing Federally assisted construction projects to provide equal opportunity, without regard to race, color, religion, sex, or national origin, to persons employed or seeking employment with them. This E.O. may apply to some NSF awards for construction. E.O. 11246 is enforced by the U.S. Department of Labor's Office of Federal Contract Compliance Programs.
+
+#### b. Award Condition
+
+In instances when E.O. 11246 is applicable, the award will include an equal opportunity article in conformance with regulations issued by the Secretary of Labor at 41 CFR § 60.
+
+#### 7. Limited English Proficiency under E.O. 13166
+
+#### a. Background
+
+E.O. 13166 requires Federal agencies and NSF recipients to take steps to provide meaningful access to its programs and activities to program participants who are limited English proficient (LEP). The failure to ensure that LEP persons can effectively participate in or benefit from Federally-assisted programs and activities may violate the prohibition under Title VI of the Civil Rights Act of 1964 and NSF’s Title VI implementing regulations against national origin discrimination. The U.S. Department of Justice has published guidance to assist NSF recipients in their efforts to comply with Title VI when providing LEP individuals with access to recipient programs, services and activities. NSF recipients also should refer to NSF's Language Access Information Page for additional guidance on providing LEP individuals with access to programs, services, and activities.
+
+#### b. Award Condition
+
+In instances when E.O. 13166 is applicable, NSF recipients should contact NSF’s LEP Coordinator within the OECR, ACB for guidance, by contacting ACB at email to programcomplaints@nsf.gov, by phone at 703-292-7020, or in writing to 2415 Eisenhower Avenue, Alexandria, VA 22314.
+
+#### 8. Environmental Justice under E.O. 14096
+
+#### a. Background
+
+E.O. 14096 adopts a government-wide approach to Environmental Justice and directs Federal agencies to, in accordance with Title VI, ensure that all programs or activities receiving Federal financial assistance that potentially affects human health or the environment do not directly, or through contractual or other arrangements, use criteria, policies, practices, or methods of administration that discriminate on the basis of race, color, or national origin. This order also supplements and builds upon the foundational efforts of E.O. 12898 . "Federal Actions To Address Environmental Justice in Minority Populations and Low-Income Populations" (February 11, 1994) which directs Federal agencies to make achieving environmental justice part of agency missions by identifying and addressing, as appropriate, disproportionately high and adverse human health or environmental effects of its programs, policies, and activities on minority populations and low-income populations in the U.S. and its territories and possessions.
+
+#### b. Award Condition
+
+In instances when E.O. 14096 is applicable, NSF recipients should contact the OECR, ACB for guidance at email programcomplaints@nsf.gov, by phone at 703-292-7020, or in writing to 2415 Eisenhower Avenue, Alexandria, VA 22314.
+
+For more information on the Federal Government's Environmental Justice efforts please visit https://www.whitehouse.gov/environmentaljustice/. NSF encourages recipients to visit the Environmental Justice Scorecard for updates or changes to NSF regulations, policies, procedures and practices related to NSF's implementation of E.O. 14096.
+
+### B. Protection of Living Organisms
+
+#### 1. Human Subjects
+
+#### a. Background
+
+The recipient is responsible for the protection of the rights and welfare of human subjects involved in activities supported by NSF. All research involving human subjects supported or otherwise subject to regulation by any Federal agency is covered by a policy set forth in the Common Rule, "Protection of Human Subjects". For projects lacking definite plans for the use of human subjects pursuant to 45 CFR § 690.118, NSF can accept a determination from an IRB that stipulates that no work with human subjects, including recruitment, may be conducted until full IRB approval is obtained. Complete instructions on preparation and submission of proposals that involve use of human subjects are available in Chapter II.D.5.
+
+#### b. NSF Regulation
+
+(i) NSF's Common Rule on Protection of Human Subjects is available on the NSF website.
+
+(ii) During the life of the award, additional IRB approval must be obtained if the protocols for the use of human subject have been changed substantively from those originally proposed and approved. When an additional IRB approval is required, the organization must provide to the cognizant NSF Program Officer a new IRB approval letter indicating approval of the covered activities, for example by explicitly referencing the title and/or award number of the award. In the event the recipient's FWA is canceled or lapses, the recipient must immediately notify the cognizant NSF Grants and Agreements Officer identified in the award.
+
+(iii) Supplements to existing awards do not require a separate IRB approval letter. If the scope of the project has been substantively changed from the award, however, a new signed IRB approval letter is required, indicating approval of the covered activities, and explicitly referencing the title of the award.
+
+#### c. Award Condition
+
+Each NSF award contains as part of the award general terms and conditions, an article implementing NSF regulations on projects involving research with human subjects. In addition, each award notice contains the following language relating to a recipient's responsibilities regarding the use of human subjects during the life of the award:
+
+- "It is the recipient's responsibility to ensure that any human subjects work conducted under this award has an Institutional Review Board (IRB) approval, where required, and that such approval remains valid at all times that human subjects work is conducted under the award. Failure to comply with this condition will result in suspension and/or termination of the award."
+
+#### 2. Research Involving Recombinant or Synthetic Nucleic Acid Molecules
+
+#### a. Applicability
+
+This section applies to all research, for which NSF award funds are used, that falls within the scope of the Guidelines for Research Involving Recombinant DNA or Synthetic Nucleic Acid Molecules (NIH Guidelines), as amended in April 2019, hereafter referred to as the "Guidelines".
+
+#### b. Policy
+
+NSF recipients performing research within the U.S. that falls within the scope of the Guidelines shall comply with the Guidelines, including the procedural requirements and any subsequent revisions as they are published in the Federal Register. Recipient responsibilities include:
+
+-
+(i) Each organization involved in the conduct of NSF-supported recombinant or synthetic nucleic acid research subject to the Guidelines must have a standing Institutional Biosafety Committee (IBC) as specified in Section IV of the Guidelines.
+
+(ii) Recombinant or synthetic nucleic acid research subject to the Guidelines must be registered with the IBC indicating compliance with the containment requirements specified in Part III of the Guidelines. IBCs are required to keep records of recombinant or synthetic nucleic acid research conducted at their organization in a form that is available to NSF upon request.
+
+#### c. Research Requiring Prior Approval
+
+In certain instances, research should not be initiated or registered with IBCs prior to approval and determination of containment level by the Director, NIH. Normally such experiments are reviewed by the Recombinant DNA Advisory Committee before a decision is made by the Director, NIH. Such instances are:
+
+-
+(i) research for which containment levels are not explicitly specified by the Guidelines;
+
+(ii) research involving experiments prohibited by the Guidelines, i.e., requests for exceptions to the Guidelines; and
+
+(iii) requests to perform experiments without regard to the containment specified in the Guidelines, i.e., exemptions from the Guidelines.
+
+#### 3. Live Vertebrate Animals
+
+#### a. Background
+
+The recipient is responsible for the humane care and treatment of any live vertebrate animal used or intended for use in such activities as field or laboratory research, development, training, experiments, biological testing, or for related purposes supported by NSF awards.
+
+#### b. Federal Regulations
+
+(i) Any recipient performing research on live vertebrate animals[79] shall comply with the Animal Welfare Act [7 U.S.C. § 2131 et seq.] and the regulations promulgated thereunder by the Secretary of Agriculture [9 CFR 1.1-4.11] pertaining to the humane care, handling, and treatment of live vertebrate animals held or used for research, teaching, or other activities supported by Federal awards. The recipient is expected to ensure that the guidelines described in the National Academies of Science, Engineering and Medicine (NASEM) Publication, "Guide for the Care and Use of Laboratory Animals" are followed and to comply with the Public Health Service Policy and Government Principles Regarding the Care and Use of Animals (included as Appendix D to the NASEM Guide). Taxon-specific guidelines may be used as supplemental references.[80] Departures from the Guide must be approved by the Institutional Animal Care and Use Committee (IACUC) and based on scientific, veterinary, medical, or animal welfare issues (for more information, see OLAW- Departures from the Guide).
+
+(ii) During the life of the award, additional IACUC approval must be obtained if the protocols for the care or the use of live vertebrate animals have been changed substantively from those originally proposed and approved. When an additional IACUC approval is required, the organization must provide to the cognizant NSF Program Officer a signed copy of a new IACUC approval letter indicating approval of the covered activities and explicitly referencing the title of the award. In the event the recipient's PHS-approved Animal Welfare Assurance is canceled or lapses, the recipient must immediately notify the cognizant NSF Grants and Agreements Officer identified in the award.
+
+(iii) Supplements to existing awards do not require a separate IACUC approval letter. If the scope of the project has been substantively changed from the parent award, however, a new signed IACUC approval letter is required.
+
+(iv) Awards to U.S. recipients for projects involving the care or use of live vertebrate animals at a foreign institution or foreign field site also require approval of research protocols by the U.S. recipient's IACUC. If the project is to be funded through an award to a foreign organization or through an individual fellowship award that will support activities at a foreign organization, NSF will require a statement from the international organization explicitly listing the proposer's name and referencing the title of the award to confirm that activities will be conducted in accordance with all applicable laws in the foreign country and that the International Guiding Principles for Biomedical Research Involving Animals will be followed.
+
+#### c. Award Condition
+
+Each NSF award contains as part of the award general terms and conditions, an article implementing NSF regulations on projects involving research with live vertebrate animals. In addition, each award notice contains the following language relating to a recipient's responsibilities regarding the care or use of live vertebrate animals during the life of the award:
+
+- "It is the recipient's responsibility to ensure that any live vertebrate animal work conducted under this award has Institutional Animal Care and Use Committee (IACUC) approval, where required, that the approval be from an organization that has a current Public Health Service-approved Animal Welfare Assurance, and that such approval remains valid at all times that live vertebrate animal work is conducted under the award. See NSF PAPPG Chapter II.D.4, for additional information. This condition extends to live vertebrate animal work funded via use of a subaward. Failure to comply with this article will result in suspension and/or termination of the award."
+
+#### 4. Government Permits and Activities Abroad
+
+- For awards that include activities requiring permits from appropriate Federal, State, or local government authorities, the recipient should obtain any required permits prior to undertaking the proposed activities.
+- The recipient should ensure that activities carried on outside the U.S. are coordinated as necessary with appropriate U.S. and foreign government authorities and that necessary licenses, permits or approvals are obtained prior to undertaking proposed activities. NSF does not assume responsibility for recipient compliance with the laws and regulations of the country in which the work is to be conducted.
+
+#### 5. Potential Life Sciences Dual Use Research of Concern (DURC)
+
+#### a. Applicability
+
+This section applies to all research, for which NSF award funds may be used, that potentially falls within the scope of the U.S. Government Policy for Institutional Oversight of Life Sciences Dual Use Research of Concern as published in September 2014, and/or would fall under the Department of Health and Human Services Framework for Guiding Decisions about Proposed Research Involving Enhanced Potential Pandemic Pathogens, as published in January 2017, hereafter referred to as the "Policy".
+
+#### b. NSF Implementation of the Policy
+
+NSF is committed to preserving the benefits of life sciences research while minimizing the risk of misuse of the knowledge, information, products, or technologies provided by such research. The purpose of NSF's implementation of this Policy is to clarify recipient expectations about NSF-funded research with certain high-consequence pathogens and toxins with potential to be considered dual use research of concern.
+
+Recipients are responsible for monitoring the research progress and for implementation of all appropriate biosafety and biosecurity risk mitigation measures including compliance with all applicable laws and regulations related to that implementation, including the Policy specified above. While the White House Office of Science and Technology Policy has lifted the research funding pause on gain of function research as of January 2017, NSF will not consider funding research that would lead to a gain of function for agents associated with the U.S. Government Policy on Dual Use Research of Concern. NSF will not fund research that involves the creation, transfer or use of enhanced potential pandemic pathogens except under special circumstances where the potential benefits to society far outweigh the risks and all other conditions of the Policy are met.
+
+-
+(i) Each organization involved in the conduct of NSF-supported research that utilizes select agents or other enhanced potential pandemic pathogens, as defined by the Policy, must have a standing Institutional Biosafety Committee (IBC) or other Institutional Review Entity (IRE) whose role is the review of research involving agents covered by the Policy.
+
+(ii) Use of the select agents or other potential pandemic pathogens as defined by the Policy must be registered with the CDC or USDA as directed under the Select Agent Regulations. Documentation demonstrating appropriate registration of the agent must be submitted to NSF prior to issuance of the award.
+
+(iii) In the rare cases where NSF funds research that involves the creation, transfer, or use of enhanced potential pandemic pathogens, then special award conditions will be applied to ensure adequate oversite by the cognizant NSF program officer or other NSF official. Award terms and conditions also will specify the establishment of a risk mitigation plan for the research that must be reviewed and approved by the IRE and NSF, as well as the requirement of maintenance of records of institutional review of the research and risk mitigation activities for three years after completion of the project.
+
+### C. Construction, Rearrangements and Reconversions
+
+#### 1. Davis-Bacon Act
+
+The Davis-Bacon Act (40 U.S.C. §§ 276a et seq.) establishes minimum wages to be paid to laborers and mechanics on construction contracts to which the U.S. is a party involving public buildings or public works within the U.S. A number of other statutes have extended this provision to specific Federal award programs involving construction. However, unless specifically stated in the award, the Davis-Bacon Act does not normally apply to NSF awards since recipients normally retain title to property acquired under the award and the construction, if any, is normally on non-Government land.
+
+#### 2. Bonding and Insurance
+
+The NSF Act (42 U.S.C. § 1870c) provides NSF with authority to enter into grants, contracts or other agreements without performance or other bonds. Therefore, unless the award specifically provides otherwise, NSF does not require performance or other bonds or insurance.
+
+#### 3. Seismic Safety of Buildings
+
+E.O. 12699 Seismic Safety of Federal and Federally-assisted or Regulated New Building Construction dated January 5, 1990, requires that consideration be given to seismic hazards in the design of buildings. Very seldom are NSF recipients involved with Federally-assisted construction and rarely are new buildings involved. NSF ensures compliance with the Order through its recipients by inclusion of a specific award condition in any appropriate award.
+
+### D. Intellectual Property
+
+#### 1. Patents and Inventions
+
+#### a. Background
+
+(i) The disposition of rights to inventions made by small business firms, large business firms, and non-profit organizations, including universities and other institutions of higher education, during NSF-assisted research is governed by 35 U.S.C. § 18, commonly called the Bayh-Dole Act, and EO 12591, as amended by E.O. 12618. In accordance with a Presidential Memorandum entitled, Government Patent Policy issued on February 18, 1983, and under the authority of Section 12 of the National Science Foundation Act of 1950, as amended (42 U.S.C. § 1871), NSF applies the policies of the Bayh-Dole Act to all its recipients. The Department of Commerce (DOC) is the lead agency for implementing the Bayh-Dole Act and has published guidance to Federal agencies in 37 CFR § 401. This policy serves as NSF's implementation of 37 CFR § 401 and updates to incorporate changes effective May 14, 2018.
+
+(ii) NSF's standard Patent Rights terms and conditions are identical to that prescribed in the DOC guidance (37 CFR § 401.14) except for modifications and tailoring allowed pursuant to section 401.5 of the DOC guidance (37 CFR § 401.5):
+
+-
+(a) pursuant to section 401.5(c) of the DOC guidance (37 CFR §401.5(c)), NSF has tailored the article to apply to awards and to identify NSF;
+
+(b) as permitted by Section 401.5(d) of the DOC guidance (37 CFR § 401.5(d)), NSF has added to paragraph b. of the article a stipulation that NSF reserves the right to direct a recipient to transfer to a foreign government or research performer such rights to any subject invention as are required to comply with any international treaty or agreement identified when the award is made as being applicable to the assisted research;
+
+(c) as permitted by Section 401.5(f) of the DOC guidance (37 CFR § 401.5(f)), NSF has added a subparagraph to the end of paragraph f. of the article to require recipients or their representatives to send NSF confirmations of the Government licenses for subject inventions and the page of any U.S. patent application that contains the Federal support article;
+
+(d) since NSF normally uses the same article for all subrecipients, the first two subparagraphs of paragraph g. of the article specified in the DOC guidance have been reduced to one;
+
+(e) paragraph c.1 of the article has been changed to require that invention disclosures be submitted electronically via the iEdison system;
+
+(f) paragraph l. of the article has been changed to require that all communications required by the Patents Rights article be submitted electronically via the iEdison system unless prior permission is obtained from the NSF Patent Assistant; and
+
+(g) in accordance with paragraph 401.5(g) of the DOC guidance (37 CFR § 401.5(g)), paragraph k.3 of the article is substituted when the award is made to a non-profit organization for the operation of a government-owned, contractor-operated facility.
+
+#### b. National Science Foundation Patent Policy
+
+As authorized by the NSB, the Director of NSF has adopted the following NSF patent policy:
+
+In accordance with the Bayh-Dole Act and the Presidential Memorandum entitled Government Patent Policy issued February 18, 1983, NSF will use the Patent Rights article prescribed by DOC at 37 CFR § 401.14 in all of its awards for the performance of experimental, developmental or research work, including awards made to foreign entities, with such modifications and tailoring allowed pursuant to section 401.5 of the DOC guidance (37 CFR § 401.5), unless NSF determines, consistent with sections 401.3(a)(2) and (a)(6) of the DOC guidance (37 CFR §§ 401.3(a)(2) and (a)(6)), that some other provision would better serve the purposes of that Act or the interests of the US and the general public.
+
+#### c. Standard Patent Rights Article
+
+Each NSF award contains as part of the award general terms and conditions, an article implementing the standard patent rights article.
+
+#### d. Special patent provisions
+
+(i) At the request of the prospective recipient, or on recommendation from the cognizant NSF Program Officer, the cognizant NSF Grants and Agreements Officer may negotiate special patent provisions when it has been determined that exceptional circumstances require restriction or elimination of the right of a prospective recipient to retain title to any subject invention in order to better promote the policy and objectives of chapter 18 of title 35 of the U.S.C. or the National Science Foundation Act. The cognizant Grants and Agreements Officer will prepare the written determination required by 37 CFR § 401.3(e) and ensure that appropriate reports are made to the Secretary of Commerce and Chief Counsel for Advocacy of the Small Business Administration as required in 37 CFR § 401.3(f). Unless doing so would be inconsistent with an obligation imposed on the Foundation by statute, international agreement, or pact with other participants in or supporters of the research, every special patent provision will allow the recipient, after an invention has been made, to request that it be allowed to retain principal rights to that invention in accordance procedures at D.1.j.(v) below.
+
+(ii) If the award is made to a non-profit organization and is for the operation of a government-owned, contractor-operated facility, the following will be substituted for the text of paragraph (k)(3) of the Patent Rights article at 37 CFR § 401.14:
+
+- After payment of patenting costs, licensing costs, payments to inventors, and other expenses incidental to the administration of subject inventions, the balance of any royalties or income earned and retained by the contractor during any fiscal year on subject inventions under this or any successor contract containing the same requirement, up to any amount equal to five percent of the budget of the facility for that fiscal year, shall be used by the contractor for scientific research, development, and education consistent with the research and development mission and objectives of the facility, including activities that increase the licensing potential of other inventions of the facility. If the balance exceeds five percent, 15 percent of the excess above five percent shall be paid by the contractor to the Treasury of the United States and the remaining 85 percent shall be used by the contractor only for the same purposes as described in the preceding sentence. To the extent it provides the most effective technology transfer, the licensing of subject inventions shall be administered by contractor employees on location at the facility.
+
+#### e. Awards Not Primarily for Research
+
+(i) Awards not primarily intended to support scientific or engineering research are not required to contain a patent provision. Examples of such awards are travel and conference grants.
+
+(ii) NSF fellowships and traineeships are primarily intended to support education or training, not particular research. Therefore, in accordance with 35 U.S.C. § 212, the Foundation claims no rights to inventions made by fellows or trainees. The following provision will be included in each fellowship or traineeship program solicitation and made part of the award:
+
+- Intellectual Property Rights. The National Science Foundation claims no rights to any inventions or writings that might result from its fellowship or traineeship awards. However, fellows and trainees should be aware that NSF, another Federal agency, or some private party may acquire such rights through other support for particular research. Also, fellows and trainees should note their obligation to include an Acknowledgment and Disclaimer in any publication.
+
+#### f. Awards affected by International Agreements
+
+(i) Some NSF awards are made as part of international cooperative research programs. The agreements or treaties underlying many of these programs require an allocation of patent rights different from that provided by the Patent Rights article in 37 CFR § 401.14. Therefore, as permitted by 37 CFR § 401.5(d), paragraph b. of the standard Patent Rights article has been modified to provide that the Foundation may require the recipient to transfer to a foreign government or research performer such rights in any subject invention as are contemplated in the international agreement. The award must identify the applicable agreement or treaty.
+
+(ii) After an invention is disclosed to the NSF Patent Assistant, the recipient of an award subject to an international agreement will be informed as to what rights, if any, it must transfer to the foreign participants. Recipients also may request the cognizant NSF Program Officer to provide them with copies of the identified international agreements before or after accepting the award.
+
+#### g. Retention of Rights by the Inventor
+
+If a recipient elects not to retain rights to an invention, the inventor may request prior written approval from the NSF Patent Assistant to retain principal patent rights. Such requests should be made as soon as possible after the recipient notifies the NSF Patent Assistant that it does not intend to patent the invention. Such requests will normally be granted unless either the recipient or the employer of the inventor shows that it would be harmed by that action. As required by 37 CFR § 401.9, the inventor will be subject to the same terms and conditions that would have been applied to the recipient, except that the special restrictions imposed on nonprofit organizations will not apply to the inventor. For purposes of this part, the term "inventor" means the individual(s) identified by the recipient as inventors when submitting an invention report to NSF in accordance with 37 CFR § 401.14(c)(1).
+
+#### h. Unwanted Inventions
+
+(i) The Foundation will normally allow any patent rights not wanted by the recipient or inventor to be dedicated to the public through publication in scientific and engineering journals or, as a statutory invention registration under 35 U.S.C. § 157. Except as provided in paragraph (ii) of this section, the NSF Patent Assistant will acknowledge a negative election by encouraging the recipient and inventor to promptly make all research results available to the scientific and engineering community.
+
+(ii) If the NSF Patent Assistant believes that another Federal agency is interested in the relevant technology, the NSF Patent Assistant may, after receiving the recipient's election not to patent and ascertaining that the inventor also does not want to patent, send a copy of the invention disclosure to that agency to give it an opportunity to review and patent the invention. Unless the agency expresses an interest in the invention within thirty days, the NSF Patent Assistant will acknowledge the recipient's negative election by encouraging prompt publication of all research results. If the agency does express an interest in patenting the invention, the NSF Patent Assistant will transfer to it all rights to the invention.
+
+#### i. Inventions also supported by another Federal Agency
+
+37 CFR § 401.13(a) provides that in the event that an invention is made under awards made by more than one federal agency, the agencies involved will, at the request of the recipient or on their own initiative, designate one agency to be responsible for the administration of the invention. Whenever the NSF Patent Assistant finds that another agency also supported an NSF subject invention, the NSF Patent Assistant will consult with the recipient and appropriate personnel in the other agency to determine if a single agency should be designated to administer the Government's rights in the invention. The NSF Patent Assistant may transfer to, or accept from, any other Federal agency, responsibility for administering a jointly-supported invention.
+
+#### j. Waivers and Approvals
+
+(i) Requests for extension of time to disclose to the NSF Patent Assistant, make an election to retain title to, or file a patent on a subject invention will be granted by the NSF Patent Assistant unless it is determined that such an extension would either imperil the securing of valid patent protection or unacceptably restrict the publication of the results of the NSF-supported research.
+
+(ii) Approval of assignments by nonprofit organizations (required by subparagraph (k)(1) of the Patent Rights article in 37 CFR § 401.14) will be granted by the NSF Patent Assistant unless it is determined that the interests of the U.S. Government will be adversely affected by such assignment.
+
+(iii) Approval of long-term exclusive licensing of NSF-assisted inventions by nonprofit organizations will be granted by the NSF Patent Assistant unless it is determined that the interests of the U.S. Government will be adversely affected by such waiver.
+
+(iv) The preference for U.S. industry imposed by paragraph (i) of the Patent Rights article in 37 CFR § 401.14 may be waived by the NSF Patent Assistant as provided in that paragraph.
+
+(v) Special restrictions on or limitation of the right of a recipient to retain title to subject inventions imposed under paragraph d. of this policy may be waived by the cognizant Grants and Agreements Officer whenever it is determined, after consultation with the cognizant Program Officer, that the reasons for imposing the restrictions or limitations do not require their application to a particular invention.
+
+(vi) Requests under paragraph (i) of this section for extensions of time to disclose, elect, or file may be made through the iEdison Invention Information Management System. A written request for extension of time to disclose, elect, or file can be assumed to have been approved unless the NSF Patent Assistant replies negatively within ten business days of the date such request was made. Requests for approvals or waivers under paragraphs (ii), (iii), (iv), and (v) of this section must be in writing and should explain why an approval or waiver is justified under the stated criteria. The requester will be provided a written explanation of the reasons for denial of a request covered by this section.
+
+#### k. Small Business Preference
+
+Small business firms that believe a nonprofit organization is not meeting its obligations under paragraph (k)(4) of 37 CFR § 401.14 may report their concerns to the NSF Office of Small and Disadvantaged Business Utilization. Requests should be in writing and provide the reasons for such concerns.
+
+#### l. Exercise of march-in rights
+
+(i) The procedures established by this section supplement those prescribed by 37 CFR § 401.6 and apply to all march-in rights held by NSF including those resulting from funding agreements not covered by the Bayh-Dole Act.
+
+(ii) Petitions requesting that NSF exercise a march-in right should be addressed to the NSF Patent Assistant. Such petitions should:
+
+-
+(a) identify the patent or patent application involved and the relevant fields of use of the invention;
+
+(b) state the grounds for the proposed march-in;
+
+(c) supply evidence that one or more of the four conditions creating a march-in right (lack of practical application, unsatisfied health or safety needs, unmet requirements for public use, or failure to prefer U.S. industry) is present; and
+
+(d) explain what action by the Foundation is necessary to correct that condition.
+
+(iii) If evidence received from a petitioner or from the Foundation's administration of the Patent Rights article indicates that one or more of the four conditions creating a march-in right might exist, the NSF Patent Assistant will informally review the matter as provided in 37 CFR § 401.6(b) of the DOC implementing regulation. If that informal review indicates that one or more of the four conditions creating a march-in right probably exists, the NSF Patent Assistant will initiate a formal march-in proceeding by issuing a written notice to the patent holder. That notice will provide all the information required by 37 CFR § 401.6(c) of the DOC implementing regulation. The patent holder may submit information and argument in opposition to the proposed march-in in person, in writing, or through a representative.
+
+(iv) If the NSF Patent Assistant determines that a genuine dispute over material facts exists, the disputed facts will be identified, and the NSF General Counsel will be notified. The NSF General Counsel will create a cross-directorate fact-finding panel, which will establish its own fact-finding procedures within the requirements of 37 CFR §401.6(e) of the DOC implementing regulation based on the dimensions of the particular dispute. The NSF Patent Assistant will serve as secretary to the panel but will not take part in its deliberations. Written findings of facts will be submitted to the NSF General Counsel, sent by certified mail to the patent holder, and made available to all other interested parties.
+
+(v) The NSF General Counsel will determine whether and how the Foundation should exercise a march-in right as provided in 37 CFR § 401.6(g).
+
+#### m. Request for conveyance of title to NSF
+
+(i) The procedures established by this section apply to the exercise of the Foundation's right under paragraph (d) of the Patent Rights article in 37 CFR § 401.14 to request conveyance of title to a subject invention if certain conditions exist.
+
+(ii) The NSF Patent Assistant may request the recipient to convey to the Foundation or a designee title in one or more countries to any invention to which the recipient has elected not to retain title. The NSF Patent Assistant may request immediate conveyance of title to a subject invention if the recipient fails: (1) to submit a timely invention disclosure; (2) to make a timely election to retain patent rights; or (3) to file a timely patent application; but only if it is determined that such action is required to preserve patent rights.
+
+(iii) The NSF Patent Assistant will informally review any apparent failure by a recipient to comply with the requirements of paragraph (c) of the Patent Rights article in 37 CFR § 401.14. The interested organization, the inventor, the patent holder, and any other interested party will be given an opportunity to explain why a particular invention was not disclosed, why an election was not made, or why a patent application was not filed. If the NSF Patent Assistant determines that a genuine dispute over material facts exists, a cross-directorate fact-finding panel will be appointed by the NSF General Counsel. The panel will establish its own fact-finding procedures based on the dimensions of the particular dispute. Written findings of facts will be submitted to the NSF General Counsel, sent by certified mail to the patent holder, and made available to all other interested parties.
+
+(iv) The NSF General Counsel will determine whether the Foundation should request conveyance of title or if it should retain title obtained under section m. (ii) above.
+
+#### n. Appeals
+
+(i) All actions by the NSF Patent Assistant under section XI.D.1.g denying an inventor's request to retain rights to a subject invention, under XI.D.1.j denying a request for waiver, or under XI.D.1.m(iv) denying the existence of a material dispute may be appealed to the NSF General Counsel by an affected party within thirty days. A request under XI.D.1.m.(ii) to immediately convey title to the Foundation may be appealed to the Director, Division of Grants and Agreements (DGA) by the title holder within five days.
+
+(ii) All actions by a cognizant Grants and Agreements Officer refusing to eliminate restrictions on or limitation of the right of a recipient to retain title to subject inventions imposed under Chapter XI.D.1.d. of this policy may be appealed to the Director, Division of Acquisition and Cooperative Support (DACS) by an affected party within thirty days.
+
+(iii) A decision by the NSF General Counsel to exercise a march-in right or to request conveyance of title may be appealed by the patent holder or any affected licensee to the NSF Deputy Director within thirty days. When a march-in was initiated in response to a petition, the NSF General Counsel's decision not to exercise a march-in right or to exercise it in a manner different from that requested in the petition may be appealed by the petitioner to the NSF Deputy Director within thirty days.
+
+(iv) In reviewing the actions of the NSF Patent Assistant, a Grants and Agreements Officer, or the NSF General Counsel, the DACS Division Director or NSF Deputy Director will consider both the factual and legal basis for the action or determination and its consistency with the policies and objectives of the Foundation and, if applicable, the Bayh-Dole Act (35 U.S.C. §§ 200-212) and the DOC implementing regulation at 37 CFR § 401.
+
+#### o. Background rights
+
+The Foundation will acquire rights to a research performer's pre-existing technology only in exceptional circumstances where, due to the nature of the research being supported, the Foundation requires greater control over resulting inventions. The cognizant NSF Grants and Agreements Officer, with concurrence of the cognizant Program Officer, will negotiate a background rights provision. If the affected recipient is a small business firm or nonprofit organization, the provision will conform to the requirements of the Bayh-Dole Act (35 U.S.C. § 202(f)) as implemented by 37 CFR § 401.12).
+
+#### p. Subawards
+
+As provided in paragraph (g) of the Patent Rights article in 37 CFR § 401.14, recipients should normally use that article in all subawards. At the request of the recipient or subrecipient or on recommendation from NSF staff, the cognizant Grants and Agreements Officer may direct the recipient to insert into subawards relating to scientific research a special patent provision negotiated under section XI.D.1.d(i).
+
+#### q. Utilization reports
+
+Paragraph (h) of the standard Patent Rights article set forth in 37 CFR § 401.14 obliges recipients "to submit on request periodic reports no more frequently than annually on the utilization of a subject invention or on efforts at obtaining such utilization". At this time, the Foundation does not plan to request such reports of all recipients except in connection with march-in investigations conducted under XI.D.1.l. or other circumstances requiring such reports as determined by the NSF Patent Assistant. This section will be amended to describe periodic reporting requirements if such are ever established.
+
+#### r. Delegation of authority
+
+The NSF General Counsel is responsible for implementing the NSF Patent Policy and is authorized to make any exceptions to or extensions of the NSF Patent Policy as may be required by particular circumstances. The NSF General Counsel will designate the NSF Patent Assistant and that individual is authorized to carry out the functions assigned.
+
+#### s. Electronic Invention Handling
+
+Recipients are required to use the iEdison System to disclose NSF subject inventions. Detailed instructions for use of that system are provided on the iEdison website and should be followed for NSF subject inventions except that:
+
+-
+(i) All communications required must be provided electronically as a pdf or TIFF file through iEdison unless prior permission for another form of submission is obtained from the NSF Patent Assistant.
+
+(ii) NSF does not require either an Annual Utilization Report or a Final Invention Statement and Certification.
+
+Questions on use of iEdison and requests for permission to submit material in other forms may be sent to the NSF Patent Assistant at: patents@nsf.gov, or at the Office of the General Counsel, National Science Foundation, 2415 Eisenhower Avenue, Alexandria, Virginia 22314.
+
+#### 2. Copyright
+
+#### a. Rights to Copyrighted Material
+
+The following principles governing the treatment of copyrighted material produced under NSF awards were adopted by the NSB.
+
+(i) NSF normally will acquire only such rights to copyrighted material as are needed to achieve its purposes or to comply with the requirements of any applicable government-wide policy or international agreement.
+
+(ii) To preserve incentives for private dissemination and development, NSF normally will not restrict, or take any part of income earned from, copyrighted material except as necessary to comply with the requirements of any applicable government-wide policy or international agreement.
+
+(iii) In exceptional circumstances, NSF may restrict or eliminate a recipient's control of NSF-supported copyrighted material and of income earned from it, if NSF determines that this would best serve the purposes of a particular program or award.
+
+#### b. Standard Copyrighted Material Article
+
+Unless a special article has been negotiated, each NSF award that relates to scientific or engineering research contains as part of the award general terms and conditions, an article implementing the standard copyrighted material requirements.
+
+#### c. Public Access to Copyrighted Material
+
+NSF's policy on public access to copyrighted material (Public Access Policy) reflects the Foundation's commitment to making certain that, to the extent possible, the American public, industry and the scientific community have access to the results of Federally funded scientific research. Pursuant to this policy, recipients must ensure that articles in peer-reviewed scholarly journals and papers in juried conference proceedings:
+
+- are deposited in NSF's Public Access Repository);
+- are available for download, reading, and analysis within 12 months of publication;
+- possess a minimum set of machine-readable metadata elements as described in the Public Access Policy; and
+- are reported in annual and final reports with a persistent identifier.
+
+Either the final printed version or the final peer-reviewed manuscript is acceptable for deposit.
+
+Each NSF award contains as part of the award general terms and conditions, an article implementing the public access requirements.
+
+#### 3. Special Patent and Copyright Situations
+
+#### a. Special Award Provisions
+
+At the request of the prospective recipient or on recommendation from NSF staff, the cognizant NSF Grants and Agreements Officer, with the concurrence of the cognizant NSF Program Officer, may negotiate special patent or copyright provisions when the Grants and Agreements Officer determines that exceptional circumstances require restriction or elimination of the right of a prospective recipient to control principal rights to subject inventions or writings in order to better achieve the objectives of the program, the National Science Foundation Act, or (in the case of inventions) 35 U.S.C § 18. Every special copyright or patent provision will allow the recipient, after an invention has been made or copyrighted material created, to request that it be allowed to retain principal rights to that invention or material, unless doing so would be inconsistent with an obligation imposed on NSF by statute, international agreement, or pact with other participants in, or supporters of, the research.
+
+#### b. Awards Not Primarily for Research
+
+(i) Awards not primarily intended to support scientific or engineering research generally do not contain patent or copyrighted material provisions. Examples of such awards are travel, conference, and equipment grants.
+
+(ii) NSF Fellowships and Traineeships. In accordance with 35 U.S.C. § 212, NSF claims no rights to inventions made by fellows or trainees. The following provision will be included in each fellowship or traineeship program solicitation and made part of the award:
+
+-
+INTELLECTUAL PROPERTY RIGHTS
+
+The National Science Foundation claims no rights to any inventions or writings that might result from its fellowship or traineeship grants. However, fellows and trainees should be aware that the NSF, another Federal agency, or some private party may acquire such rights through other support for particular research. Also, fellows and trainees should note their obligation to include an Acknowledgment and Disclaimer in any publication.
+
+[END OF PROVISION]
+
+#### c. Awards Affected by International Agreements
+
+(i) Many of the bilateral and multilateral treaties and agreements underlying NSF's international cooperative research programs contain provisions on allocation of rights to inventions or writings. These sometimes require an allocation of rights different from that provided by the standard Copyrighted Material or Patent Rights articles. In those cases, the standard articles will be modified through the addition of the following to the award:
+
+- "This project is supported under the cooperative program listed below. Your rights in inventions, writings, and data may be affected."
+
+The applicable agreement or treaty will be identified immediately beneath that sentence.
+
+(ii) After an invention is disclosed to the NSF Patent Assistant, the recipient of a award subject to an international agreement will be informed as to what rights, if any, it must transfer to foreign participants. Recipients also may ask the NSF Program Officer for copies of the identified international agreement before or after accepting an award.
+
+#### 4. Dissemination and Sharing of Research Results
+
+- Investigators are expected to promptly prepare and submit for publication, with authorship that accurately reflects the contributions of those involved, all significant findings from work conducted under NSF awards. Recipients are expected to permit and encourage such publication by those actually performing that work, unless a recipient intends to publish or disseminate such findings itself.
+- Investigators are expected to share with other researchers, at no more than incremental cost and within a reasonable time, the primary data, samples, physical collections, and other supporting materials created or gathered in the course of work under NSF awards. Recipients are expected to encourage and facilitate such sharing. Privileged or confidential information should be released only in a form that protects the privacy of individuals and subjects involved. Exceptions to this sharing expectation may be provided by the recipient for a particular field or discipline to safeguard the rights of individuals and subjects, the validity of results, the integrity of collections, or to accommodate the legitimate interest of investigators. A recipient or investigator also may request a particular adjustment or exception from the cognizant NSF Program Officer.
+- Investigators and recipients are encouraged to share software and inventions created under the award or otherwise make them or their products widely available and usable.
+- NSF normally allows recipients to retain principal legal rights to intellectual property developed under NSF awards to provide incentives for development and dissemination of inventions, software and publications that can enhance their usefulness, accessibility, and upkeep. Such incentives do not, however, reduce the responsibility that investigators and organizations have as members of the scientific and engineering community, to make results, data, and collections available to other researchers.
+- NSF program management will implement these policies for dissemination and sharing of research results, in a way appropriate to field and circumstances, through the proposal review process; through award negotiations and award conditions; and through appropriate support and incentives for data cleanup, documentation, dissemination, storage and the like.
+- Each NSF award contains, as part of the award general terms and conditions, an article implementing dissemination and sharing of research results.
+
+#### 5. Tangible Property
+
+#### a. Background
+
+Some NSF awards support collection or creation of tangible property, such as insects, marine life, drilling core samples and genetically-altered microorganisms. As used in this section "tangible property" means any personal property other than equipment (see Chapter II.C.2.g.(iii)), and intellectual property.
+
+#### b. Legal Rights to Tangible Property
+
+Unless otherwise provided in the award, all legal rights to tangible property collected or created during NSF-assisted research remain with the recipient or investigators as determined by the policies of the organization. As members of the scientific and engineering community, both recipients and investigators are responsible for making such tangible property appropriately available to other researchers. See also, for example, 2 CFR §§ 200.313 and 200.314 regarding Equipment and Supplies.
+
+### E. Publication/Distribution of Award Materials
+
+#### 1. NSF Policy
+
+NSF advocates and encourages open scientific and engineering communication. NSF expects significant findings from research it supports to be promptly submitted for publication, with authorship that accurately reflects the contributions of those involved. Copyrighted material published in peer-reviewed scholarly journals and papers included in juried conference proceedings must comply with NSF's Public Access Policy as implemented in the award general terms and conditions.
+
+#### 2. Costs
+
+Cost of documenting, preparing, publishing, disseminating, and sharing research findings and supporting material are allowable charges against the award. (See Chapter X.A.2.c.)
+
+#### 3. Responsibilities
+
+Unless otherwise provided in the award, preparation, content, editing, identification of authorship and submission for publication of significant research findings are the responsibility of the investigators, consistent with such policies and procedures as the recipient may prescribe.
+
+#### 4. Recipient Obligations
+
+a. Acknowledgement of Support. Unless otherwise provided in the award, the recipient is responsible for assuring that an acknowledgment of NSF support is made:
+
+-
+(i) in any publication (including World Wide Web pages) of any material based on or developed under this project through use of the following language:
+
+"This material is based upon work supported by the National Science Foundation under Award No. (NSF award number)."
+
+(ii) NSF support also must be orally acknowledged during all news media interviews, including popular media such as radio, television, and news magazines.
+
+Each NSF award contains as part of the award general terms and conditions, an article implementing the recipient obligations regarding the acknowledgement of support.
+
+b. Disclaimer. The recipient is responsible for assuring that every publication of material (including World Wide Web pages) based on or developed under an NSF award, except scientific articles or papers appearing in scientific, technical, or professional journals, contains the following disclaimer:
+
+- "Any opinions, findings and conclusions or recommendations expressed in this material are those of the author(s) and do not necessarily reflect the views of the National Science Foundation."
+
+c. Copies for NSF. The recipient is responsible for assuring that the cognizant NSF Program Officer is provided access to, either electronically or in paper form, a copy of every publication of material based on or developed under this award, clearly labeled with the award number and other appropriate identifying information, promptly after publication.
+
+d. Compliance with NSF Public Access Policy. The recipient is responsible for ensuring that copyrighted material published in peer-reviewed scholarly journals, papers in juried conference proceedings, and datasets are accessible to the public in accordance with the award general terms and conditions.
+
+e. Recipients also should note their obligations in regard to copyrights (see Chapter XI.D.2) and their responsibilities as members of the scientific and engineering community to disseminate and share research results (see Chapter XI.D.4).
+
+f. Each NSF award contains as part of the award general terms and conditions, an article implementing the recipient obligations regarding the acknowledgement of support and disclaimer.
+
+### F. International Considerations
+
+#### 1. Travel to Foreign Countries
+
+#### a. Policy
+
+-
+(i) Expenses for transportation, lodging, subsistence and related items incurred by project personnel and by outside consultants employed on the project, (see Chapter II.C.2.g.(iv)) who are on travel status on business related to an NSF-supported project are allowable as prescribed in the governing OMB cost principles.
+
+(ii) Except as provided in the governing OMB cost principles, the difference between economy airfare and a higher-class airfare is unallowable. A train, bus or other surface carrier may be used in lieu of, or as a supplement to, air travel at the lowest first-class rate by the transportation facility used. If such travel, however, could have been performed by air, the allowance will not normally exceed that for jet economy airfare.
+
+(iii) Support for the foreign travel of an investigator's dependents is allowable only under the conditions identified in Chapter X.C.5.
+
+#### b. Use of U.S.-Flag Air Carriers
+
+-
+(i) In accordance with the Fly America Act (49 U.S.C. § 40118), any air transportation to, from, between, or within a country other than the U.S. of persons or property, the expense of which will be assisted by NSF funding, must be performed by or under a code-sharing arrangement with a U.S.-flag air carrier if service provided by such a carrier is available (see Comptroller General Decision B-240956, dated September 25, 1991). Tickets (or documentation for electronic tickets) must identify the U.S. flag air carrier’s designator code and flight number.
+
+(ii) For the purposes of this requirement, U.S.-flag air carrier service is considered available even though:
+
+-
+(a) comparable or a different kind of service can be provided at less cost by a foreign-flag air carrier;
+
+(b) foreign-flag air carrier service is preferred by, or is more convenient for, NSF or traveler; or
+
+(c) service by a foreign-flag air carrier can be paid for in excess foreign currency.
+
+(iii) The following rules apply unless their application would result in the first or last leg of travel from or to the U.S. being performed by a foreign-flag air carrier:
+
+-
+(a) a U.S.-flag air carrier shall be used to destination or, in the absence of direct or through service, to the farthest interchange point on a usually traveled route.
+
+(b) if a U.S.-flag air carrier does not serve an origin or interchange point, a foreign-flag air carrier shall be used only to the nearest interchange point on a usually traveled route to connect with a U.S. flag air carrier.
+
+#### c. Use of Foreign-Flag Air Carriers
+
+There are certain circumstances under which use of a foreign-flag air carrier is permissible. These circumstances are outlined below:
+
+(i) Airline "Open Skies" Agreement:
+
+-
+A foreign-flag air carrier may be used if the transportation is provided under an air transportation agreement between the U.S. and a foreign government, which the Department of Transportation has determined meets the requirements of the Fly America Act. Information on "Open Skies" agreements in which the U.S. has entered is available on the GSA website.
+
+Note on U.S./European Union Open Skies Agreement
+
+In 2007, the U.S. entered into an "Open Skies" Agreement with the European Union (EU). This agreement was modified in June 2010. The current Agreement gives European Community airlines (airlines of Member States) the right to transport passengers and cargo on flights funded by the U.S. government, when the transportation is between: (1) any two points outside the U.S.; or (2) a point in the U.S. and any point outside the U.S. that the EU airline is authorized to serve under the "Open Skies" Agreement.
+
+In 2011, two significant changes were made to the U.S./EU Open Skies Agreement. First, EU airlines are now granted the right to transport civilian agency-funded passengers who are NOT eligible to travel on GSA Airline City Pair Contract fares (e.g., recipients) between a point in the U.S. and a point outside the U.S. even if there is a GSA Airline City Pair Contract fare in effect between the origin and destination points. An individual, however, who is traveling on a route for which there is a City Pair Contract fare in effect, and who is eligible for such a fare (e.g., Federal employee), are required to fly on a U.S. carrier, absent another applicable exception.
+
+Second, under the amended Agreement, EU airlines are now authorized to transport passengers between points in the U.S. and points outside the EU if the EU airline is authorized to serve the route under the Agreement. This includes flights that originate, arrive, or stop in the EU. Prior to this change, EU airlines were limited to flying passengers between points in the U.S. and points in the EU.
+
+(ii) Involuntary Rerouting
+
+- Travel on a foreign-flag carrier is permitted if a U.S.-flag air carrier involuntarily reroutes the traveler via a foreign-flag air carrier, notwithstanding the availability of alternative U.S.-flag air carrier service.
+
+(iii) Travel To and From the U.S. on non-European Community Airlines
+
+- Use of a non-European Community foreign-flag air carrier is permissible if the airport abroad is:
+
+-
+(a) the traveler's origin or destination airport, and use of U.S.-flag air carrier service would extend the time in a travel status by at least 24 hours more than travel by a foreign-flag air carrier; or
+
+(b) an interchange point, and use of U.S.-flag air carrier service would increase the number of aircraft changes the traveler must make outside of the U.S. by two or more, would require the traveler to wait four hours or more to make connections at that point, or would extend the time in a travel status by at least six hours more than travel by a foreign-flag air carrier.
+
+(iv) Travel Between Points Outside the U.S.on non-European Community Airlines
+
+- Use of a non-European Community foreign-flag air carrier is permissible if:
+
+-
+(a) travel by a foreign-flag air carrier would eliminate two or more aircraft changes en route;
+
+(b) travel by a U.S.-flag air carrier would require a connecting time of four hours or more at an overseas interchange point; or
+
+(c) the travel is not part of the trip to or from the U.S. and use of a U.S.-flag air carrier would extend the time in a travel status by at least six hours more than travel by a foreign-flag air carrier.
+
+(v) Short Distance Travel
+
+- For all short distance travel, regardless of origin and destination, use of a foreign-flag air carrier is permissible if the elapsed travel time on a scheduled flight from origin to destination airport by a foreign-flag air carrier is three hours or less and service by a U.S.-flag air carrier would double the travel time.
+
+#### 2. Charter Flights
+
+Because of the risk of catastrophic loss, NSF does not encourage the use of charter flights as a means of mass transportation for groups of scientists and engineers nor does it make arrangements for purchase of charter flight airline tickets.
+
+#### 3. Projects in a Foreign Country
+
+a. For awards that include activities requiring permits from appropriate Federal, State, or local government authorities, the recipient should obtain any required permits prior to undertaking the proposed activities.
+
+b. The recipient must comply with the laws and regulations of any foreign country in which research is to be conducted. Areas of potential concern include: (1) requirements for advance approval to conduct research or surveys; (2) special arrangements for the participation of foreign scientists and engineers; and (3) special visas for persons engaged in research or studies. NSF does not assume responsibility for recipient compliance with the laws and regulations of the country in which the work is to be conducted.
+
+c. The recipient also should assure that activities carried on outside the U.S. are coordinated as necessary with appropriate U.S. and foreign government authorities and that necessary licenses, permits or approvals are obtained prior to undertaking the proposed activities.
+
+#### 4. Passports and Visas
+
+NSF assumes no responsibility for securing passports or visas required by any person because of participation in an NSF-supported project. For restrictions concerning directly charging visa costs to an NSF award, see 2 CFR § 200.463.
+
+It should be noted that some countries that normally do not require visas for tourists do require special visas for scientists and engineers engaged in research or studies.
+
+### G. Intergovernmental Review of Federal Programs
+
+The Foundation's regulation on Intergovernmental Review of National Science Foundation Programs and Activities is published in 45 CFR § 660.
+
+### H. Handling of Information
+
+#### 1. Questionnaires: Data Collection Under NSF Awards
+
+#### a. Paperwork Control
+
+Under the OMB regulation, Controlling Paperwork Burdens on the Public (5 CFR § 1320), if a recipient obtains information from ten or more persons by means of identical questions, it is considered to be "sponsored" by NSF only if:
+
+-
+(i) the recipient is collecting the information at the specific request of NSF; or
+
+(ii) the terms of the award require specific approval by NSF of the collection or its procedures.
+
+If either of these conditions is met, OMB approval of the data collection is generally required, and recipients should obtain the necessary control number from the cognizant NSF Program Officer.
+
+#### b. NSF Policy
+
+Data collection activities of NSF recipients are the responsibility of recipients, and NSF support of a project does not constitute NSF approval of the survey design, questionnaire content or data collection procedures. No representation may be made to respondents that such data are being collected for, or in association with, NSF or the government. However, this requirement is not intended to preclude mention of NSF support of the project in response to an inquiry or acknowledgment of such support in any publication of this data (see Chapter XI.E.4).
+
+#### 2. Release of Information by NSF
+
+#### a. Press Releases
+
+Awards for projects which appear to be of special interest to the general public may be made the subject of an NSF or joint NSF/recipient press release to the news media. (See Chapter X.C.2.)
+
+#### b. Open Government Legislation
+
+(i) Pursuant to the Freedom of Information Act (FOIA) (5 U.S.C. § 552), NSF will provide agency records, with certain exceptions, if the request is in writing, includes the requester's name and means of contact, such as an email address or mailing address is clearly identified as a FOIA request, and describes the records sought with sufficient specificity to permit identification. The requester also must agree to pay fees that are chargeable under the NSF regulations. Detailed procedures are contained in 45 CFR § 612. Further information is available on the NSF FOIA website.
+
+(ii) The Government in the Sunshine Act (5 U.S.C. § 552b) requires that all meetings of the NSB be open to public observation unless the subject falls within one of ten exemptions. NSF's Sunshine Act regulations are contained in 45 CFR § 614. The Sunshine Act and the FOIA cited above, may require NSF to release to the public information, correspondence and documents received by NSF from recipients, unless they fall within the Acts' limited exceptions.
+
+#### c. Release of Project Reports
+
+NSF expects significant findings from research it supports to be promptly submitted for publication. To the extent permitted by law, NSF will honor requests from recipients that release of Annual and Final Project Reports be delayed to permit orderly dissemination of significant findings through refereed channels. Unless such a request is received, or material is marked as proprietary, such reports may be made available to others without notice to the recipient. Information, the disclosure of which might invade personal privacy, will be redacted before release.
+
+### I. Tax Status
+
+Determination of the tax status of an organization or person receiving compensation in any form as a result of an NSF award is the responsibility of the IRS, State and local tax authorities and the courts.
+
+### J. Historic Properties
+
+NSF is required by the National Historic Preservation Act (54 U.S.C. § 306108, et seq.) (NHPA), to take into account the effect of funding activities on historic properties eligible for or listed in the National Register of Historic Places. Occasionally, an NSF award may involve activities that require mitigation or other actions under the NHPA and the implementing regulations of the Advisory Council on Historic Preservation (36 CFR § 800). In such cases, as deemed appropriate by NSF, conditions meeting the requirements of the NHPA may be included in the award and the recipients may be required to coordinate with State or local historical preservation officers in implementing any required avoidance, minimization, and mitigation measures and/or in meeting reporting requirements.
+
+Back to top
+
+### K. Environmental Considerations
+
+Prior to making an award, NSF considers the anticipated environmental impacts associated with the activities described in the proposal. The assessment of environmental impacts is based, in part, on information provided by the organization. If, while performing the work required by the award, the recipient learns of any potential or actual unanticipated environmental impacts, the recipient shall immediately notify NSF of such impacts. The recipient shall also cease all work anticipated to cause or that is causing such unanticipated environmental impacts until NSF has had a reasonable opportunity to assess the situation, carry out any required environmental compliance activities, and provide further direction to the recipient.Other post-award environmental obligations include meeting any requirements to implement mitigation measures and/or meet reporting requirements identified during the environmental review process. These requirements may be the responsibility of the recipient and/or NSF.
+
+### L. National Security
+
+NSF awards are intended for unclassified, publicly releasable research. The recipient will not be granted access to classified information. NSF does not expect that the results of the research project will involve classified information.
+
+If, however, in conducting the activities supported under an award, the PI is concerned that any of the research results involve potentially classifiable information that may warrant Government restrictions on the dissemination of the results, the PI should promptly notify the cognizant NSF Program Officer.
+
+### M. Scientific Integrity
+
+Scientific integrity is the adherence to professional practices, ethical behavior, and the principles of honesty and objectivity when conducting, managing, using the results of, and communicating about science and scientific activities. Inclusivity, transparency, and protection from inappropriate influence are hallmarks of scientific integrity.[81]
+
+Scientific integrity is essential to helping ensure informed government decision-making, accountability, and trust, while maintaining a vibrant scientific enterprise. Protecting scientific integrity results in better decisions, which translate into better policies that help people and communities of all backgrounds thrive.[82] The National Science Foundation maintains high standards for scientific integrity, as expressly described throughout this Guide, through transparency and accountability of NSF policies and procedures, and responsible and ethical conduct of research. Additional information about scientific integrity is available on the NSF website.
+
+All organizations and personnel supported by NSF are expected to uphold the highest standards for scientific integrity. Scientific integrity builds on key principles of honesty, objectivity, ethical behavior, transparency, and professionalism in the conduct of scientific activities in an inclusive environment that is conducive to excellence in research and education.
+
+Organizations and all individuals supported by NSF awards, are reminded that the principles, expectations, and requirements that support scientific integrity are integral to multiple topics specified in the PAPPG, including:
+
+- Conflicts of interest (PAPPG Chapter, IX.A);
+- Disclosure requirements (PAPPG Chapter II.B);
+
+- Biographical Sketch (PAPPG Chapter II.D.2.h(i));
+- Current and Pending Support (PAPPG Chapter II.D.2.h(ii);
+- Collaborators and Other Affiliations (PAPPG Chapter II.D.2.h(iii));
+
+- Human Subjects (PAPPG Chapters II.E.5 and XI.B);
+- Live Vertebrate Animals (PAPPG Chapters II.E.4 and XI.B.3);
+- Non-discrimination (PAPPG Chapter XI);
+- NSF proposal processing and merit review (PAPPG Chapters III and IV);
+- Safe and Inclusive Working Environments for Off-Campus or Off-Site Research (PAPPG Chapter II.E.9);
+- Potential Life Science Dual Use Research of Concern (PAPPG Chapters II.E.6. and XI.B.5);
+- Publication and Distribution of Grant Materials (PAPPG Chapter XI.E);
+- Responsible and ethical conduct of research (PAPPG Chapter IX.B); and
+- Research misconduct (PAPPG Chapter IX.C).
+
+Reports or allegations regarding failures to adhere to Scientific Integrity principles[83], such as discrimination, harassment, and research misconduct may be referred to the appropriate offices such as the Office of Equity and Civil Rights and Office of the Inspector General, as appropriate. Information about whistleblower protection is available at https://www.whistleblowers.gov. Reports of allegations regarding whistleblower reprisal by NSF staff and panelists may be made to Office of the Inspector General. Reports of allegations regarding whistleblower reprisal by NSF awardees and contractors also may be made to Office of the Inspector General.
+
+### N. Miscellaneous
+
+#### 1. Liabilities and Losses
+
+NSF cannot assume any liability for accidents, bodily injury, illness, breach of contract, any other damages or loss, or any claims arising out of any activities undertaken pursuant to the award, whether with respect to persons or property of the recipient or third parties. The recipient is advised to insure or otherwise protect itself or others, as it may deem desirable.
+
+#### 2. Pre-College Students and Experimental Curriculum Development Projects
+
+As required by 42 U.S.C. §§ 1869a and 1869b, recipients of awards that involve pre-college students in research or development, or pilot-testing, evaluation, or revision of, experimental or innovative curriculum development projects will:
+
+- provide to the school board, or comparable authority responsible for the schools considering participation in the project, information concerning the need for and purposes of, the particular education project, the proposed content of the material to be used, the expected benefits to be derived and other information to assist the jurisdiction in arriving at a decision on participation;
+- obtain written approval for participation in the project activities after the responsible authority has carried out its procedures;
+- provide information and materials to the responsible school authority to assist it in carrying out its own established procedures regarding the participation of students in project activities;
+- provide information to NSF describing compliance with the above provisions; and
+- provide in every publication, testing or distribution agreement involving instructional material developed under an award (including but not limited to teacher's manuals, textbooks, films, tapes or other supplementary material) that such material will be made available within the school district using such material, for inspection by parents or guardians of children engaged in educational programs or projects of that school district.
+
+#### 3. Use of Metric Measurements
+
+The Metric Conversion Act of 1975 (15 U.S.C. §§ 205a-k) and E.O. 12770 (3 CFR § 1991 comp.) encourage Federal agencies to use the Metric System in procurement, awards, and other business-related activities. Each NSF award will contain as part of the award general terms and conditions, an article encouraging PIs to submit project reports, final reports, other reports, and publications produced under awards that employ the metric system of measurements.
+
+#### Footnotes to Chapter XI
+
+[79] In addition to live vertebrate animals covered by the Animal Welfare Act, the requirements specified in this coverage also are extended to rats, birds, and mice.
+
+[80] Guidelines to the Use of Wild Birds in Research; Guidelines of the American Society of Mammalogists for the Use of Wild Mammals in Research; Guidelines for the Use of Fishes in Research; Guidelines for the Use of Live Amphibians and Reptiles in Field and Laboratory Research.
+
+[81] See https://www.whitehouse.gov/wp-content/uploads/2023/01/01-2023-Framework-for-Federal-Scientific-Integrity-Policy-and-Practice.pdf.
+
+[82] See the White House Office of Science and Technology Policy Scientific Integrity Task Force Report.
+
+[83] See the White House Office of Science and Technology Policy Scientific Integrity Task Force Report.

@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
-import { FocusTrap } from 'focus-trap-react'
+import { usePanelEffect } from '../shared/usePanelEffect'
+import { useEffect, useRef, useState } from 'react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { X } from 'lucide-react'
 
 export interface ShareTeamOption {
@@ -17,6 +18,7 @@ interface Props {
    */
   teams?: ShareTeamOption[]
   defaultTeamId?: string
+  createsIndependentCopy?: boolean
   busy?: boolean
   /** Opened from another step (the share wizard): show Back to return there. */
   onBack?: () => void
@@ -24,9 +26,12 @@ interface Props {
   onConfirm: (comment: string, teamId?: string) => void | Promise<void>
 }
 
-export function ShareWithTeamDialog({ itemName, teamName, teams, defaultTeamId, busy, onBack, onCancel, onConfirm }: Props) {
+export function ShareWithTeamDialog({ itemName, teamName, teams, defaultTeamId, createsIndependentCopy = false, busy, onBack, onCancel, onConfirm }: Props) {
+  const dialogRef = useRef<HTMLDivElement>(null)
   const [comment, setComment] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const inFlight = useRef(false)
+  const [error, setError] = useState<string | null>(null)
   const [teamId, setTeamId] = useState<string | undefined>(
     () => (teams?.some((t) => t.id === defaultTeamId) ? defaultTeamId : teams?.[0]?.id),
   )
@@ -34,34 +39,45 @@ export function ShareWithTeamDialog({ itemName, teamName, teams, defaultTeamId, 
   const canPick = (teams?.length ?? 0) > 1
 
   const handleSubmit = async () => {
+    if (inFlight.current || busy) return
+    inFlight.current = true
+    setError(null)
     setSubmitting(true)
     try {
       await onConfirm(comment.trim(), teamId)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Could not share. Your note has been kept; try again.')
     } finally {
+      inFlight.current = false
       setSubmitting(false)
     }
   }
 
+  const errorRef = useRef<HTMLParagraphElement>(null)
   const isBusy = busy || submitting
+  useEffect(() => { if (error && !isBusy) errorRef.current?.focus() }, [error, isBusy])
 
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel() }
+  usePanelEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape' && !isBusy && !inFlight.current) onCancel() }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [onCancel])
+  }, [onCancel, isBusy])
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/40" style={{ zIndex: 700 }}>
-      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, fallbackFocus: () => dialogRef.current!, tabbableOptions: { displayCheck: 'none' } }}>
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label="Share with team"
         className="bg-white rounded-lg shadow-xl w-full max-w-md p-6"
+        style={{ margin: 'var(--workspace-space-12)', maxHeight: 'calc(100dvh - 24px)', overflowY: 'auto', overflowWrap: 'anywhere' }}
       >
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Share with team</h3>
-          <button onClick={onCancel} className="p-1 text-gray-400 hover:text-gray-600 rounded" disabled={isBusy}>
+          <button aria-label="Close sharing dialog" onClick={onCancel} className="p-1 text-gray-400 hover:text-gray-600 rounded" disabled={isBusy}>
             <X size={18} />
           </button>
         </div>
@@ -99,11 +115,14 @@ export function ShareWithTeamDialog({ itemName, teamName, teams, defaultTeamId, 
           </p>
         )}
 
+        {createsIndependentCopy && <p className="mb-4 text-sm text-gray-600">This creates an independent team copy. Later edits to your original or this copy do not update the other.</p>}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="share-team-note" className="block text-sm font-medium text-gray-700 mb-1">
             Add a note (optional)
           </label>
           <textarea
+            id="share-team-note"
+            disabled={isBusy}
             value={comment}
             onChange={e => setComment(e.target.value)}
             rows={4}
@@ -115,7 +134,8 @@ export function ShareWithTeamDialog({ itemName, teamName, teams, defaultTeamId, 
           <div className="text-xs text-gray-500 text-right mt-1">{comment.length}/1000</div>
         </div>
 
-        <div className="flex justify-end gap-2 mt-4">
+        {error && <p ref={errorRef} tabIndex={-1} role="alert" className="text-sm text-red-800 mt-3">{error}</p>}
+        <div className="flex flex-wrap justify-end gap-2 mt-4">
           {onBack && (
             <button
               onClick={onBack}

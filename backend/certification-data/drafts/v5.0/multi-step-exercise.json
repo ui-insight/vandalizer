@@ -1,0 +1,30 @@
+{
+  "overview": "Repair and assess one connected subaward workflow using actual original and corrected runs. Task counts or unrelated histories cannot substitute for the evidence chain.",
+  "documents": [
+    "subaward-agreement.pdf"
+  ],
+  "instructions": [
+    "Use only the assigned synthetic subaward. Configure one bounded internal workflow with extraction, reasoning and formatting roles. Identify actual input and output settings; names and counts do not establish connections.",
+    "Inspect the authored fault, then retain an actual bounded original run and its saved revision on the assigned source for the repair comparison. In this exercise the Formatter uses Workflow Documents instead of the incoming reasoning result. Do not use a production workflow or introduce sends, shares, approvals, schedules or external data.",
+    "Before each execution, inspect the saved workflow, input source and destination, then explicitly approve that revision and the assigned subaward. A chat description or a saved design approval from another module cannot authorize this run.",
+    "Inspect the original intermediate and final outputs. Change the Formatter input from Workflow Documents to Step Input so it consumes the reasoning output immediately before it. Inspect any task-level input override as well. Preserve the original revision and results, save the correction as a new revision, explicitly approve it and execute it on the same assigned source.",
+    "Open the corrected extraction result, reasoning result and final internal summary. Verify the actual intermediate and final results, source references and reporting terms. Separate supported facts, calculations with assumptions and interpretation; do not invent a missing institutional rule.",
+    "Use the separately labeled controlled recovery rehearsal on your own captured internal workflow. Inspect and approve that exact training plan: it will preserve the actual extraction and deliberately stop before the Reasoning provider, leaving Formatter unstarted. Open the successful output and failed-stage input/result, identify the failure and choose the supported next action. Preserve the original run. The screen does not resume a stage in place; any subsequent internal computation needs a separate prepared and approved run. Never replay completed external writes or count the partial run as completed.",
+    "Submit the original and corrected run references and your observed comparison. Missing receipts or unresolved inputs cannot be replaced with prose or simulated history. Extra tasks and star counts do not earn credit. End at the internal draft; no real staff review or external release is part of this exercise."
+  ],
+  "chat_instructions": [
+    "Use only the assigned synthetic subaward. Configure one bounded internal workflow with extraction, reasoning and formatting roles. Identify actual input and output settings; names and counts do not establish connections.",
+    "Inspect the authored fault, then retain an actual bounded original run and its saved revision on the assigned source for the repair comparison. In this exercise the Formatter uses Workflow Documents instead of the incoming reasoning result. Do not use a production workflow or introduce sends, shares, approvals, schedules or external data.",
+    "Before each execution, inspect the saved workflow, input source and destination, then explicitly approve that revision and the assigned subaward. A chat description or a saved design approval from another module cannot authorize this run.",
+    "Inspect the original intermediate and final outputs. Change the Formatter input from Workflow Documents to Step Input so it consumes the reasoning output immediately before it. Inspect any task-level input override as well. Preserve the original revision and results, save the correction as a new revision, explicitly approve it and execute it on the same assigned source.",
+    "Open the corrected extraction result, reasoning result and final internal summary. Verify the actual intermediate and final results, source references and reporting terms. Separate supported facts, calculations with assumptions and interpretation; do not invent a missing institutional rule.",
+    "Use the separately labeled controlled recovery rehearsal on your own captured internal workflow. Inspect and approve that exact training plan: it will preserve the actual extraction and deliberately stop before the Reasoning provider, leaving Formatter unstarted. Open the successful output and failed-stage input/result, identify the failure and choose the supported next action. Preserve the original run. The screen does not resume a stage in place; any subsequent internal computation needs a separate prepared and approved run. Never replay completed external writes or count the partial run as completed.",
+    "Submit the original and corrected run references and your observed comparison. Missing receipts or unresolved inputs cannot be replaced with prose or simulated history. Extra tasks and star counts do not earn credit. End at the internal draft; no real staff review or external release is part of this exercise."
+  ],
+  "expected_fields": [],
+  "expected_values": {},
+  "star_criteria": {},
+  "assessment_case_id": "subaward-connected-run-repair",
+  "connected_case_sha256": "5c723136fef524753d106c9e9dc9a395cf6ce743168ca6ebd6ac8bb458aab16e",
+  "assessment_method": "authenticated_connected_workflow_run_review"
+}

@@ -55,6 +55,27 @@ class TestGenerateActivityDescription:
         assert any(s.get("meta_summary.description_generated") for s in set_ops)
 
 
+class TestRunsKeepTheirTemplateName:
+    """Activity-panel ticket: a generated title ("Workflow Processing Subaward
+    Agreement Document") replaced the workflow's name on every run."""
+
+    def test_a_run_is_marked_done_without_a_generated_title(self):
+        import app.tasks.activity_tasks as at
+
+        for activity_type in ("workflow_run", "search_set_run"):
+            db, activity_id = _db_with_activity()
+            with patch.object(at, "_get_db", return_value=db), \
+                 patch.object(at, "_pick_title_model") as pick:
+                at.generate_activity_description_task(
+                    activity_id=activity_id, activity_type=activity_type,
+                    document_uuids=["doc-1"],
+                )
+
+            pick.assert_not_called()
+            set_ops = [c[0][1]["$set"] for c in db.activity_event.update_one.call_args_list]
+            assert set_ops == [{"meta_summary.description_generated": True}]
+
+
 class TestReapStaleRunning:
     """A run parked on an approval gate is waiting on a person, not stalled.
 

@@ -96,13 +96,13 @@ async def evaluate_eligible_prompt(
 
         # Create ticket + record exposure on first eligibility so the admin
         # stats reflect what users actually saw (not just what they clicked).
-        shown = await show_prompt(user, prompt.slug)
+        exposure = await show_prompt(user, prompt.slug)
         return {
             "slug": prompt.slug,
             "question_text": prompt.question_text,
             "subject": prompt.subject,
             "stage": prompt.stage,
-            "ticket_uuid": shown["ticket_uuid"] if shown else None,
+            "ticket_uuid": exposure["ticket_uuid"] if exposure else None,
         }
 
     return None
@@ -418,7 +418,7 @@ async def _dedupe_prompts_by_slug() -> int:
     Protects against races in earlier seed runs across multiple workers.
     """
     coll = FeedbackPrompt.get_motor_collection()
-    pipeline = [
+    pipeline: list[dict] = [
         {"$sort": {"created_at": 1}},
         {"$group": {
             "_id": "$slug",

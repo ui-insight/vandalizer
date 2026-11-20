@@ -4,7 +4,6 @@ Verifies ownership checks, path traversal protection, and auth enforcement.
 """
 
 import secrets
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -72,7 +71,7 @@ class TestFileDownloadAuth:
             MockUser.find_one = AsyncMock(return_value=user)
             mock_svc.download_document = AsyncMock(return_value=None)
 
-            resp = await client.get(
+            await client.get(
                 "/api/files/download?docid=test-uuid",
                 cookies=cookies,
                 headers=headers,
@@ -152,6 +151,37 @@ class TestFileDownloadRangeAndInline:
 
         assert resp.status_code == 200
         assert resp.headers["content-disposition"].startswith("inline;")
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("range_header", [None, "bytes=0-9"])
+    async def test_download_title_with_a_long_dash_keeps_its_name(self, client, range_header):
+        """Support ticket: chat saved "Year-by-Year Budget — nih-r01-neuroscience.xlsx"
+        and its download failed. The "—" can't be encoded in a latin-1 header,
+        so the browser saved the error body as "download.json"."""
+        from urllib.parse import unquote
+
+        user = _make_user()
+        cookies, headers = _auth_cookies()
+        from app.services.file_service import DownloadResult
+
+        title = "Year-by-Year Budget — nih-r01-neuroscience.xlsx"
+        result = DownloadResult(data=b"PK" * 64, extension="xlsx", title=title)
+        with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.files.file_service") as mock_svc:
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.download_document = AsyncMock(return_value=result)
+
+            resp = await client.get(
+                "/api/files/download?docid=u",
+                cookies=cookies,
+                headers={**headers, **({"Range": range_header} if range_header else {})},
+            )
+
+        assert resp.status_code == (206 if range_header else 200)
+        disposition = resp.headers["content-disposition"]
+        assert disposition.startswith("attachment;")
+        assert unquote(disposition.split("filename*=UTF-8''", 1)[1]) == title
 
     @pytest.mark.asyncio
     async def test_download_range_request_returns_206(self, client):
@@ -251,7 +281,7 @@ class TestFileDeleteAuth:
             MockUser.find_one = AsyncMock(return_value=user)
             mock_svc.delete_document = AsyncMock(return_value=True)
 
-            resp = await client.delete(
+            await client.delete(
                 "/api/files/test-uuid",
                 cookies=cookies,
                 headers=headers,
@@ -281,7 +311,7 @@ class TestBulkDownloadAuth:
             MockUser.find_one = AsyncMock(return_value=user)
             mock_svc.download_document = AsyncMock(return_value=None)
 
-            resp = await client.post(
+            await client.post(
                 "/api/files/download-bulk",
                 json={"doc_ids": ["uuid-1", "uuid-2"]},
                 cookies=cookies,
@@ -395,3 +425,15 @@ class TestSheetJsonBinaryCsv:
 
         assert resp.status_code == 422
         assert "not a text CSV" in resp.json()["detail"]
+
+class TestUploadPolicy:
+    @pytest.mark.asyncio
+    async def test_policy_requires_authentication(self, client):
+        assert (await client.get('/api/files/upload-policy')).status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_policy_uses_the_deployments_enforced_limit(self):
+        from app.routers.files import upload_policy
+        from app.utils.file_validation import ALLOWED_EXTS
+        result = await upload_policy(_make_user(), Settings(max_upload_size_mb=17))
+        assert result == {'extensions': sorted(ALLOWED_EXTS), 'max_size_bytes': 17 * 1024 * 1024}

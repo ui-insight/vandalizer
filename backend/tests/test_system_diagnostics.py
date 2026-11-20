@@ -486,3 +486,38 @@ def test_ocr_probe_gives_up_on_a_service_that_never_finishes():
         result = asyncio.run(sd.diagnose_ocr(_ocr_cfg()))
     assert result["ok"] is False
     assert result["error"]["category"] == "timeout"
+
+
+# --- site address for links (support ticket: .ics links to localhost) ----
+
+
+SITE = "https://vandalizer-dev.insight.uidaho.edu"
+
+
+def _site_row(site_url, viewed_from=None):
+    report = build_readiness(_cfg(), site_url=site_url, viewed_from=viewed_from)
+    return next(i for i in report["items"] if i["key"] == "site_url")
+
+
+def test_site_address_at_localhost_is_flagged_with_the_line_to_set():
+    row = _site_row("http://localhost:5173", viewed_from=SITE)
+    assert row["status"] == "missing" and row["severity"] == "recommended"
+    assert "http://localhost:5173" in row["summary"]
+    assert f"FRONTEND_URL={SITE}" in row["summary"]
+    # Set in backend/.env: no config section to jump to.
+    assert row["action_label"] == ""
+
+
+def test_site_address_that_is_not_where_the_admin_is_needs_attention():
+    row = _site_row("https://vandalizer.uidaho.edu", viewed_from=SITE + ":443")
+    assert row["status"] == "incomplete"
+    assert "https://vandalizer.uidaho.edu" in row["summary"] and SITE in row["summary"]
+
+
+@pytest.mark.parametrize("viewed_from", [SITE, SITE + "/", None, "http://localhost:5173", "javascript:alert(1)"])
+def test_site_address_matching_the_page_or_unknown_page_is_done(viewed_from):
+    assert _site_row(SITE + "/", viewed_from)["status"] == "configured"
+
+
+def test_readiness_without_a_site_address_has_no_site_row():
+    assert "site_url" not in [i["key"] for i in build_readiness(_cfg())["items"]]

@@ -6,20 +6,20 @@ import type { CSSProperties } from 'react'
 // is inline-styled by design — do not convert these to Tailwind.
 
 export const sectionStyle: CSSProperties = {
-  background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden',
+  scrollMarginTop: 180, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden',
 }
 
 export const sectionHeaderStyle: CSSProperties = {
   padding: '14px 20px', borderBottom: '1px solid #e5e7eb', fontSize: 15, fontWeight: 600,
-  display: 'flex', alignItems: 'center', gap: 10,
+  display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10,
 }
 
-export const sectionBodyStyle: CSSProperties = { padding: 20 }
+export const sectionBodyStyle: CSSProperties = { padding: 20, minWidth: 0, overflowWrap: 'anywhere' }
 
 export const labelStyle: CSSProperties = { display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 6 }
 
 export const inputStyle: CSSProperties = {
-  width: '100%', padding: '8px 12px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db',
+  width: '100%', minWidth: 0, maxWidth: '100%', padding: '8px 12px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db',
   fontSize: 14, outline: 'none',
 }
 

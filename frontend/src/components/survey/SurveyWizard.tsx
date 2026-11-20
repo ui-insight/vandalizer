@@ -1,4 +1,4 @@
-import { useState, useRef, type ReactNode } from 'react'
+import { useState, useRef, useEffect, type ReactNode } from 'react'
 import { ChevronLeft, ChevronRight, Loader2, type LucideIcon } from 'lucide-react'
 import { cn } from '../../lib/cn'
 
@@ -28,22 +28,34 @@ export function SurveyWizard({
   const [direction, setDirection] = useState<'forward' | 'backward'>('forward')
   const [animating, setAnimating] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
+  const stepRef = useRef<HTMLHeadingElement>(null)
+  const previousStep = useRef(0)
+  const transitionTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => { if (transitionTimer.current) clearTimeout(transitionTimer.current) }, [])
+  useEffect(() => {
+    if (previousStep.current === currentStep) return
+    previousStep.current = currentStep
+    stepRef.current?.focus({ preventScroll: true })
+    formRef.current?.scrollIntoView?.({ block: 'start' })
+  }, [currentStep])
 
   const isFirst = currentStep === 0
   const isLast = currentStep === steps.length - 1
 
   function goTo(index: number) {
-    if (index === currentStep || animating) return
+    if (index === currentStep || animating || submitting || index < 0 || index >= steps.length) return
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { setCurrentStep(index); return }
     setDirection(index > currentStep ? 'forward' : 'backward')
     setAnimating(true)
-    setTimeout(() => {
+    transitionTimer.current = setTimeout(() => {
       setCurrentStep(index)
       setAnimating(false)
-      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 150)
   }
 
-  function handleNext() {
+  function handleNext(event: React.MouseEvent<HTMLButtonElement>) {
+    // The last Next can become Submit during this same click in reduced motion.
+    event.preventDefault()
     if (!formRef.current?.reportValidity()) return
     goTo(currentStep + 1)
   }
@@ -54,6 +66,7 @@ export function SurveyWizard({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (submitting) return
     if (!formRef.current?.reportValidity()) return
     onSubmit()
   }
@@ -66,7 +79,8 @@ export function SurveyWizard({
   }
 
   return (
-    <form ref={formRef} onSubmit={handleSubmit} className="space-y-6">
+    <form ref={formRef} onSubmit={handleSubmit} className="scroll-mt-24">
+      <fieldset disabled={submitting} className="space-y-6 min-w-0 border-0 p-0 m-0">
       {/* Progress bar */}
       <div>
         <div className="flex gap-1">
@@ -75,29 +89,30 @@ export function SurveyWizard({
               key={i}
               type="button"
               onClick={() => handleProgressClick(i)}
+              disabled={submitting || i >= currentStep}
+              aria-current={i === currentStep ? 'step' : undefined}
               aria-label={`Go to step ${i + 1} of ${steps.length}: ${steps[i].title}`}
               className={cn(
-                'h-1.5 flex-1 rounded-full transition-colors',
-                i <= currentStep ? 'bg-[#f1b300]' : 'bg-white/10',
+                'h-6 flex-1 flex items-center',
                 i < currentStep && 'cursor-pointer hover:bg-[#f1b300]/80',
                 i >= currentStep && 'cursor-default',
               )}
-            />
+            ><span className={cn('block h-1.5 w-full rounded-full', i <= currentStep ? 'bg-[#f1b300]' : 'bg-white/10')} /></button>
           ))}
         </div>
-        <div className="flex items-center justify-between mt-3">
+        <div className="flex flex-wrap gap-2 items-center justify-between mt-3">
           <span className="text-xs text-gray-400">
             Step {currentStep + 1} of {steps.length}
           </span>
-          <span className="text-xs font-bold text-[#f1b300] uppercase tracking-wide">
+          <h2 ref={stepRef} tabIndex={-1} className="text-xs font-bold text-[#f1b300] uppercase tracking-wide">
             {steps[currentStep].title}
-          </span>
+          </h2>
         </div>
       </div>
 
       {/* Error */}
       {error && (
-        <div className="rounded-md bg-red-500/20 border border-red-500/30 p-3 text-sm text-red-300">
+        <div role="alert" className="rounded-md bg-red-500/20 border border-red-500/30 p-3 text-sm text-red-300">
           {error}
         </div>
       )}
@@ -115,7 +130,7 @@ export function SurveyWizard({
       </div>
 
       {/* Navigation */}
-      <div className="flex items-center justify-between pt-2">
+      <div className="flex flex-wrap gap-3 items-center justify-between pt-2">
         {!isFirst ? (
           <button
             type="button"
@@ -131,6 +146,7 @@ export function SurveyWizard({
 
         {isLast ? (
           <button
+            key="submit"
             type="submit"
             disabled={submitting}
             className="inline-flex items-center gap-2 rounded-lg bg-[#f1b300] px-6 py-3 font-bold text-black transition-all hover:bg-[#d49e00] disabled:opacity-50"
@@ -147,6 +163,7 @@ export function SurveyWizard({
           </button>
         ) : (
           <button
+            key="next"
             type="button"
             onClick={handleNext}
             className="inline-flex items-center gap-2 rounded-lg bg-[#f1b300] px-6 py-3 font-bold text-black transition-all hover:bg-[#d49e00]"
@@ -156,6 +173,7 @@ export function SurveyWizard({
           </button>
         )}
       </div>
+      </fieldset>
     </form>
   )
 }

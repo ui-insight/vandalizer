@@ -2,7 +2,6 @@
 
 import base64
 import logging
-from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import Response
@@ -12,6 +11,7 @@ from app.dependencies import get_current_user
 from app.models.support import TicketClassification, TicketPriority
 from app.models.user import User
 from app.services import support_service
+from app.utils.content_disposition import content_disposition
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -155,7 +155,7 @@ async def _is_support_user(user: User) -> bool:
 # Endpoints
 # ---------------------------------------------------------------------------
 
-@router.post("/tickets")
+@router.post("/tickets", response_model=None)
 async def create_ticket(
     subject: str = Form(...),
     message: str = Form(...),
@@ -163,7 +163,7 @@ async def create_ticket(
     classification: str | None = Form(None),
     files: list[UploadFile] = File(default=[]),
     user: User = Depends(get_current_user),
-):
+) -> dict:
     # Normalize/validate the classification up-front so a bad value returns a
     # clean 400 rather than a 500 from the enum conversion in the service.
     classification = (classification or "").strip() or None
@@ -217,7 +217,7 @@ async def create_ticket(
     return _view(ticket, is_support)
 
 
-@router.get("/tickets")
+@router.get("/tickets", response_model=None)
 async def list_tickets(
     status: str | None = None,
     priority: str | None = None,
@@ -229,7 +229,7 @@ async def list_tickets(
     offset: int = 0,
     scope: str | None = None,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """List tickets.
 
     - Default: support users see all tickets, regular users see their own.
@@ -266,11 +266,11 @@ async def list_tickets(
     return {"tickets": tickets, "total": total, "limit": limit, "offset": offset}
 
 
-@router.get("/tickets/{ticket_uuid}")
+@router.get("/tickets/{ticket_uuid}", response_model=None)
 async def get_ticket(
     ticket_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     ticket = await support_service.get_ticket(ticket_uuid)
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
@@ -283,11 +283,11 @@ async def get_ticket(
     return _view(ticket, is_support)
 
 
-@router.post("/tickets/{ticket_uuid}/read")
+@router.post("/tickets/{ticket_uuid}/read", response_model=None)
 async def mark_ticket_read(
     ticket_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Mark a ticket as read by the current user."""
     ok = await support_service.mark_ticket_read(ticket_uuid, user.user_id)
     if not ok:
@@ -295,12 +295,12 @@ async def mark_ticket_read(
     return {"ok": True}
 
 
-@router.post("/tickets/{ticket_uuid}/messages")
+@router.post("/tickets/{ticket_uuid}/messages", response_model=None)
 async def add_message(
     ticket_uuid: str,
     body: AddMessageRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     # Check access — owner, support, or watcher may reply.
     ticket_data = await support_service.get_ticket(ticket_uuid)
     if not ticket_data:
@@ -328,13 +328,13 @@ async def add_message(
     return _view(result, is_support)
 
 
-@router.patch("/tickets/{ticket_uuid}/messages/{message_uuid}")
+@router.patch("/tickets/{ticket_uuid}/messages/{message_uuid}", response_model=None)
 async def edit_message(
     ticket_uuid: str,
     message_uuid: str,
     body: EditMessageRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     """Edit your own message on a ticket. Authorship is required — even
     support agents can't rewrite someone else's words."""
     ticket_data = await support_service.get_ticket(ticket_uuid)
@@ -359,12 +359,12 @@ async def edit_message(
     return _view(result, is_support)
 
 
-@router.delete("/tickets/{ticket_uuid}/messages/{message_uuid}")
+@router.delete("/tickets/{ticket_uuid}/messages/{message_uuid}", response_model=None)
 async def delete_message(
     ticket_uuid: str,
     message_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     """Delete a message. Authors can delete their own; admins can delete
     any. Attachments uploaded with the message are removed too. Returns
     the updated ticket payload."""
@@ -401,12 +401,12 @@ async def delete_message(
     return _view(result, is_support)
 
 
-@router.post("/tickets/{ticket_uuid}/attachments")
+@router.post("/tickets/{ticket_uuid}/attachments", response_model=None)
 async def add_attachment(
     ticket_uuid: str,
     files: list[UploadFile] = File(...),
     user: User = Depends(get_current_user),
-):
+) -> dict:
     """Upload one or more attachments to an existing ticket.
 
     Accepts the ``files`` form field repeated per file (matches the
@@ -449,12 +449,12 @@ async def add_attachment(
     return _view(result, is_support)
 
 
-@router.delete("/tickets/{ticket_uuid}/attachments/{attachment_uuid}")
+@router.delete("/tickets/{ticket_uuid}/attachments/{attachment_uuid}", response_model=None)
 async def delete_attachment(
     ticket_uuid: str,
     attachment_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     """Remove an attachment. Uploader can delete their own; support agents
     can delete any. Returns the updated ticket payload."""
     ticket_data = await support_service.get_ticket(ticket_uuid)
@@ -490,12 +490,12 @@ async def delete_attachment(
     return _view(result, is_support)
 
 
-@router.get("/tickets/{ticket_uuid}/attachments/{attachment_uuid}")
+@router.get("/tickets/{ticket_uuid}/attachments/{attachment_uuid}", response_model=None)
 async def download_attachment(
     ticket_uuid: str,
     attachment_uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> Response:
     ticket_data = await support_service.get_ticket(ticket_uuid)
     if not ticket_data:
         raise HTTPException(status_code=404, detail="Ticket not found")
@@ -516,29 +516,19 @@ async def download_attachment(
     inline_types = ("image/", "application/pdf")
     disposition = "inline" if any(content_type.startswith(t) for t in inline_types) else "attachment"
 
-    # Filenames may contain non-latin-1 characters (e.g.   narrow no-break
-    # space from copy-pasted Word titles). Encode per RFC 5987 with an ASCII
-    # fallback so the latin-1 header encoding doesn't blow up.
-    ascii_fallback = filename.encode("ascii", "replace").decode("ascii").replace('"', "")
-    encoded = quote(filename, safe="")
     return Response(
         content=file_bytes,
         media_type=content_type,
-        headers={
-            "Content-Disposition": (
-                f'{disposition}; filename="{ascii_fallback}"; '
-                f"filename*=UTF-8''{encoded}"
-            ),
-        },
+        headers={"Content-Disposition": content_disposition(filename, disposition)},
     )
 
 
-@router.patch("/tickets/{ticket_uuid}")
+@router.patch("/tickets/{ticket_uuid}", response_model=None)
 async def update_ticket(
     ticket_uuid: str,
     body: UpdateTicketRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     """Update a ticket.
 
     Status, priority, classification, assignment, and tags are support-staff
@@ -605,12 +595,12 @@ async def update_ticket(
     return _view(result, is_support)
 
 
-@router.post("/tickets/{ticket_uuid}/watchers")
+@router.post("/tickets/{ticket_uuid}/watchers", response_model=None)
 async def add_watcher(
     ticket_uuid: str,
     body: AddWatcherRequest,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     """Tag a user (by email) to follow this ticket.
 
     Owner, support agents, and existing watchers may all add new watchers —
@@ -635,12 +625,12 @@ async def add_watcher(
     return _view(result, is_support)
 
 
-@router.delete("/tickets/{ticket_uuid}/watchers/{watcher_user_id}")
+@router.delete("/tickets/{ticket_uuid}/watchers/{watcher_user_id}", response_model=None)
 async def remove_watcher(
     ticket_uuid: str,
     watcher_user_id: str,
     user: User = Depends(get_current_user),
-):
+) -> dict:
     """Untag a watcher. Owner, support, or the watcher themselves may remove."""
     ticket_data = await support_service.get_ticket(ticket_uuid)
     if not ticket_data:
@@ -660,8 +650,8 @@ async def remove_watcher(
     return _view(result, is_support)
 
 
-@router.get("/stats")
-async def get_ticket_stats(user: User = Depends(get_current_user)):
+@router.get("/stats", response_model=None)
+async def get_ticket_stats(user: User = Depends(get_current_user)) -> dict:
     """Aggregate ticket counts by status. Support users / admins only."""
     is_support = await _is_support_user(user)
     if not is_support:
@@ -669,8 +659,8 @@ async def get_ticket_stats(user: User = Depends(get_current_user)):
     return await support_service.get_ticket_stats()
 
 
-@router.get("/tags")
-async def list_tags(user: User = Depends(get_current_user)):
+@router.get("/tags", response_model=None)
+async def list_tags(user: User = Depends(get_current_user)) -> dict[str, object]:
     """Return distinct tags currently in use across tickets. Support users only."""
     is_support = await _is_support_user(user)
     if not is_support:
@@ -678,8 +668,8 @@ async def list_tags(user: User = Depends(get_current_user)):
     return {"tags": await support_service.list_all_tags()}
 
 
-@router.get("/contacts")
-async def get_support_contacts(user: User = Depends(get_current_user)):
+@router.get("/contacts", response_model=None)
+async def get_support_contacts(user: User = Depends(get_current_user)) -> dict[str, object]:
     """Get list of support contacts (for admin config UI)."""
     is_support = await _is_support_user(user)
     if not is_support:

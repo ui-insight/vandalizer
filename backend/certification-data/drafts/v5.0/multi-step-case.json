@@ -1,0 +1,162 @@
+{
+  "schema_version": 1,
+  "id": "subaward-connected-run-repair",
+  "revision": 3,
+  "module_id": "multi_step",
+  "provenance": "authored_connected_workflow_case_not_execution",
+  "source_filename": "subaward-agreement.pdf",
+  "source_sha256": "ed54f2ebaaf1e1e312a32b67f615e3fce47302f0c3ae9878fe97ed12a0be122c",
+  "notice": "This is a synthetic training assignment. The flawed example below is authored teaching material, not an executed workflow or learner result. Actual approved runs and saved evidence are required. No external release, compliance decision or staff review request is authorized.",
+  "task": "Execute and repair one bounded subaward review workflow. Trace extraction into reasoning and reasoning into a formatted internal summary. Preserve an actual original run, correct a downstream input that bypasses the reasoning result, then approve and run the revised configuration on the assigned source. Inspect both revised intermediate and final results and distinguish supported source terms from unsupported analytical claims.",
+  "intended_output": "An internal subaward summary that identifies its source, preserves distinct reporting and deliverable terms, labels interpretation and unresolved questions, and links the final text to the intermediate evidence from the same corrected execution.",
+  "exclusions": [
+    "No documents beyond the assigned synthetic subaward.",
+    "No external send, sharing, approval request, integration write or scheduling action.",
+    "No invented institutional policy or compliance conclusion.",
+    "No combining unrelated historical runs to fabricate one execution chain."
+  ],
+  "required_stages": [
+    "extract",
+    "reason",
+    "format"
+  ],
+  "required_links": [
+    "extract_to_reason",
+    "reason_to_format"
+  ],
+  "flawed_example": {
+    "provenance": "authored_flawed_example_not_execution",
+    "notice": "This example deliberately describes a routing and reasoning fault. It contains no real run IDs, outputs or learner evidence.",
+    "routing": "The extraction stage reads the assigned subaward and the reasoning stage consumes that extraction. The Formatter is incorrectly set to Workflow Documents, so it re-reads the original source and bypasses the incoming reasoning result and its unresolved-question list. Three configured stages alone do not prove the required chain.",
+    "analysis": "The authored reasoning example treats quarterly reporting as proof that every deliverable has the same deadline and claims the schedule is stricter than an annual institutional standard. The assigned source does not supply that institutional standard, and different deliverables have different terms.",
+    "final_summary": "The authored Formatter example produces a polished statement that every report is due within 30 days of quarter end and that the award satisfies institutional requirements. It omits the reasoning result and its unresolved questions. Appearance and confident wording do not establish source support."
+  },
+  "instructions": [
+    "Use only the assigned synthetic subaward. Configure one bounded internal workflow with extraction, reasoning and formatting roles. Identify actual input and output settings; names and counts do not establish connections.",
+    "Inspect the authored fault, then retain an actual bounded original run and its saved revision on the assigned source for the repair comparison. In this exercise the Formatter uses Workflow Documents instead of the incoming reasoning result. Do not use a production workflow or introduce sends, shares, approvals, schedules or external data.",
+    "Before each execution, inspect the saved workflow, input source and destination, then explicitly approve that revision and the assigned subaward. A chat description or a saved design approval from another module cannot authorize this run.",
+    "Inspect the original intermediate and final outputs. Change the Formatter input from Workflow Documents to Step Input so it consumes the reasoning output immediately before it. Inspect any task-level input override as well. Preserve the original revision and results, save the correction as a new revision, explicitly approve it and execute it on the same assigned source.",
+    "Open the corrected extraction result, reasoning result and final internal summary. Verify the actual intermediate and final results, source references and reporting terms. Separate supported facts, calculations with assumptions and interpretation; do not invent a missing institutional rule.",
+    "Use the separately labeled controlled recovery rehearsal on your own captured internal workflow. Inspect and approve that exact training plan: it will preserve the actual extraction and deliberately stop before the Reasoning provider, leaving Formatter unstarted. Open the successful output and failed-stage input/result, identify the failure and choose the supported next action. Preserve the original run. The screen does not resume a stage in place; any subsequent internal computation needs a separate prepared and approved run. Never replay completed external writes or count the partial run as completed.",
+    "Submit the original and corrected run references and your observed comparison. Missing receipts or unresolved inputs cannot be replaced with prose or simulated history. Extra tasks and star counts do not earn credit. End at the internal draft; no real staff review or external release is part of this exercise."
+  ],
+  "questions": [
+    {
+      "id": "scope_approval",
+      "outcome_id": "multi_step.connected_execution",
+      "response_kind": "approve_saved_revision_and_assigned_source",
+      "phase": "before_execution",
+      "prompt": "Inspect the saved revision and assigned source for this execution. Trace the actual intended inputs and destinations, explain the bounded internal purpose, and explicitly approve or decline this exact revision before running it. A different module approval is not execution permission."
+    },
+    {
+      "id": "connection_repair",
+      "outcome_id": "multi_step.intermediate_review",
+      "response_kind": "compare_connection_and_two_stage_results",
+      "phase": "after_execution",
+      "prompt": "Identify the original and corrected owned runs and revisions. Describe the incorrect Formatter input and saved connection change, then compare the actual corrected reasoning and final results. Cite the intermediate/final evidence you inspected; do not claim the authored example is an execution."
+    },
+    {
+      "id": "source_review",
+      "outcome_id": "multi_step.bounded_reasoning",
+      "response_kind": "separate_sourced_facts_and_interpretation",
+      "phase": "after_execution",
+      "prompt": "Check the corrected intermediate and final summary against the assigned subaward. Identify sourced facts, derived statements with assumptions and interpretation. Show how distinct reporting terms and unresolved questions were preserved, and identify any unsupported claim you removed or kept unresolved."
+    }
+  ],
+  "execution_rule": "one_owned_revision_assigned_source_connected_successful_run_not_aggregate_counts",
+  "repair_rule": "saved_connection_change_new_owned_execution_compare_intermediate_and_final_results",
+  "comparison_policy": "actual_original_and_corrected_owned_runs_not_authored_specimen",
+  "recovery_rule": "preserve_completed_steps_inspect_failed_stage_no_automatic_write_replay",
+  "scope_policy": "assigned_source_internal_draft_no_integrations_or_staff",
+  "assistance_policy": "agent_may_draft_learner_approves_revision_and_checks_actual_results",
+  "assessment_policy": "deterministic_execution_plus_structured_review_no_staff_queue_no_presence_credit",
+  "review_guidance": [
+    {
+      "outcome_id": "multi_step.connected_execution",
+      "passing_conditions": [
+        "The same workflow execution contains the required connected stages and terminal outputs."
+      ],
+      "critical_failures": [
+        "Use unrelated single-step runs to simulate a complete evidence chain."
+      ],
+      "case_application": "Use the corrected execution only for the connected-run check. Its owned immutable workflow revision, exact assigned source, approval and stage receipts must establish extract-to-reason and reason-to-format data flow with terminal results. Three unrelated runs, task counts, authored examples, agent assertions or a favorable model verdict cannot replace this deterministic evidence."
+    },
+    {
+      "outcome_id": "multi_step.intermediate_review",
+      "passing_conditions": [
+        "The learner identifies the wrong input, repairs the connection and verifies the rerun at both stages."
+      ],
+      "critical_failures": [
+        "Accept a plausible final answer without checking its required upstream evidence."
+      ],
+      "case_application": "Require actual original and corrected saved workflow revisions and owned runs on the assigned subaward. Compare the wrong Formatter input with the corrected connection to the reasoning result. The learner must inspect both corrected intermediate reasoning and final formatting and explain the observed change. The authored example is a teaching fault, never an original execution receipt. Missing original/revised evidence is unavailable evidence, not a model-guessed pass."
+    },
+    {
+      "outcome_id": "multi_step.bounded_reasoning",
+      "passing_conditions": [
+        "Required factual claims remain traceable; interpretation is labeled and unsupported claims are removed or escalated."
+      ],
+      "critical_failures": [
+        "Present an invented analytical claim as an extracted source fact."
+      ],
+      "case_application": "Check the actual corrected intermediate and final text against assigned-source clauses. Distinguish financial, technical, annual-progress, final-dataset and final-report obligations. Preserve deadlines as source terms; do not invent an institutional standard or merge distinct deliverables. Facts need source references, derived calculations need stated assumptions and interpretation needs explicit labeling. Unsupported claims must be removed or retained as unresolved questions in the internal draft; no staff task is required."
+    }
+  ],
+  "source_expectations": [
+    {
+      "id": "source_identity",
+      "meaning": "The assessed source is this subaward, not another award or unrelated saved output. Preserve its parties, identity and amount without inventing values.",
+      "anchors": [
+        {
+          "page": 1,
+          "quote": "Subaward Number: UI-BSU-2024-0847"
+        },
+        {
+          "page": 1,
+          "quote": "Subaward Amount: $185,000"
+        }
+      ]
+    },
+    {
+      "id": "distinct_deliverables",
+      "meaning": "The annual progress report and final dataset have their own stated terms. They cannot be replaced with a generic quarterly deadline or conflated with the final report.",
+      "anchors": [
+        {
+          "page": 1,
+          "quote": "D2. Annual progress report aligned with NSF reporting requirements (due November 30 each year)."
+        },
+        {
+          "page": 1,
+          "quote": "D3. Final dataset in NCBI Sequence Read Archive format (due within 60 days of project end)."
+        }
+      ]
+    },
+    {
+      "id": "reporting_terms",
+      "meaning": "Financial, technical and final reporting are distinct. Preserve their source terms; comparisons to an institutional standard are unresolved because no such standard is supplied by this assignment.",
+      "anchors": [
+        {
+          "page": 2,
+          "quote": "Financial reports: Quarterly, due within 30 days of quarter end."
+        },
+        {
+          "page": 2,
+          "quote": "Technical reports: Semi-annually, due January 31 and July 31."
+        },
+        {
+          "page": 2,
+          "quote": "Final report: Due within 90 days of subaward end date."
+        }
+      ]
+    }
+  ],
+  "controlled_failure_practice": {
+    "provenance": "authored_training_stop_configuration_not_execution",
+    "failure_stage": "reason",
+    "failure_boundary": "before_reasoning_provider_after_preserved_extraction",
+    "notice": "Controlled recovery rehearsal: this separately approved run executes and preserves your actual extraction, then deliberately rejects the Reasoning stage before its provider is called. Formatter will not start. This is an internal training stop, not a provider outage or a complete assessed chain. Inspect the preserved successful work and failed stage before choosing a separate, explicitly approved internal run. No sends, shares, approvals, schedules or completed external writes may be replayed.",
+    "question": "Inspect your stopped run and its saved stage inputs and results. Which stage is the first failure, what successful work must remain intact, and which recovery route is supported here? A started stage without a saved result would instead have an unknown outcome.",
+    "retry_policy": "new_separately_approved_internal_run_only",
+    "assessment_policy": "deterministic_stage_and_recovery_choice_no_prose_credit"
+  }
+}

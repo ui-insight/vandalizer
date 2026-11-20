@@ -24,7 +24,7 @@ class ExtractionTestCase(Document):
     class Settings:
         name = "extraction_test_cases"
 
-    def __init__(self, **data):
+    def __init__(self, **data: object) -> None:
         super().__init__(**data)
         if not self.uuid:
             self.uuid = uuid4().hex

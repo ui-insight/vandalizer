@@ -291,3 +291,9 @@ def test_a_response_stopped_by_the_token_limit_is_never_repaired(monkeypatch, en
     )
     with pytest.raises(ExtractionError, match="unparseable"):
         engine._extract_fallback_json("some document text", KEYS, "test-model")
+
+
+def test_bare_entity_list_without_quotes_keeps_values_with_source_capture(monkeypatch, engine):
+    result = _run(monkeypatch, engine, '[{"Award amount": "$500,000"}]',
+                  ['Award amount'], capture_sources=True)
+    assert result == [{'Award amount': '$500,000'}]

@@ -98,6 +98,7 @@ class TestUploadSizeLimits:
         with patch("app.services.file_service.is_allowed_file", return_value=True), \
              patch("app.services.file_service.is_valid_file_content", return_value=True), \
              patch("app.services.file_service.SmartDocument") as MockDoc, \
+             patch("app.services.file_service.record_extraction_dispatch", new_callable=AsyncMock) as record_dispatch, \
              patch("app.services.storage.get_storage", return_value=mock_storage), \
              patch("app.tasks.upload_tasks.dispatch_upload_tasks", return_value="task-123"):
             MockDoc.find_one = AsyncMock(return_value=None)  # no duplicate
@@ -115,6 +116,8 @@ class TestUploadSizeLimits:
 
         assert result["complete"] is True
         assert "uuid" in result
+        record_dispatch.assert_awaited_once_with(mock_doc, 'task-123')
+        mock_doc.save.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_disallowed_file_type_rejected(self):

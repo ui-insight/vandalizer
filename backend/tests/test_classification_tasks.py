@@ -33,6 +33,7 @@ class TestClassifyTask:
     async def test_classification_disabled_applies_default(self):
         doc = MagicMock()
         doc.classification = None
+        doc.soft_deleted = False
 
         mock_config = MagicMock()
         mock_config.get_classification_config.return_value = {
@@ -69,6 +70,7 @@ class TestClassifyTask:
     async def test_classification_enabled_classifies_and_applies(self):
         doc = MagicMock()
         doc.classification = None
+        doc.soft_deleted = False
 
         mock_config = MagicMock()
         mock_config.get_classification_config.return_value = {

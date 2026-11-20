@@ -158,20 +158,12 @@ async def test_refresh_rejects_document_sources():
 
 @pytest.mark.asyncio
 async def test_partition_new_urls_splits_present_from_new_and_normalizes():
-    present = {"https://www.uidaho.edu/policies/apm/45/13"}
+    present = "https://www.uidaho.edu/policies/apm/45/13"
 
-    async def find_one(*conds):
-        # Beanie comparison conditions are opaque here; recover the URL from
-        # the second condition's rendered form.
-        rendered = str(conds[1])
-        return object() if any(u in rendered for u in present) else None
-
+    query = MagicMock()
+    query.to_list = AsyncMock(return_value=[SimpleNamespace(url=present)])
     cls = MagicMock()
-    cls.find_one = AsyncMock(side_effect=find_one)
-    cls.knowledge_base_uuid = MagicMock()
-    cls.url = MagicMock()
-    # Make `KnowledgeBaseSource.url == url` render the url so find_one can see it.
-    cls.url.__eq__ = lambda self, other: f"url=={other}"
+    cls.find = MagicMock(return_value=query)
 
     with patch.object(knowledge_service, "KnowledgeBaseSource", cls):
         new, skipped = await knowledge_service.partition_new_urls(
@@ -185,7 +177,12 @@ async def test_partition_new_urls_splits_present_from_new_and_normalizes():
         )
 
     assert new == ["https://www.uidaho.edu/policies/apm/45/14"]
-    assert skipped == ["https://www.uidaho.edu/policies/apm/45/13"]
+    assert skipped == [present]
+    # One query for the whole list, with each URL once and normalized.
+    cls.find.assert_called_once_with({
+        "knowledge_base_uuid": "kb-1",
+        "url": {"$in": [present, "https://www.uidaho.edu/policies/apm/45/14"]},
+    })
 
 
 # ---------------------------------------------------------------------------

@@ -41,12 +41,21 @@ htmlcov/
 /.python-version
 /data/
 *.log
+npm-debug.log.*
 /logs/
 /pids/
 *.db
 backend/data/chromadb/
 frontend/.vite/
 node_modules/
+
+# Demo renders are reproducible from the checked-in recipes. Keep the source
+# assets and recipes under version control, but never commit rendered media or
+# run-specific timelines.
+frontend/public/videos/generated/
+frontend/public/videos/live-product-demo*.mp4
+frontend/public/videos/live-product-demo*.mp3
+frontend/public/videos/live-product-demo*-poster.jpg
 
 # Internal planning docs (not for public release)
 deploy_roadmap.md
@@ -86,3 +95,11 @@ scripts/ui_endpoint_map.*
 # Backups left by patch(1) and merge tools.
 *.orig
 *.rej
+
+# Screenshot reviews, QA run captures and other generated evidence stay local.
+/artifacts/
+
+# Local certification release authoring locks and atomic-write staging.
+backend/certification-data/courses/.authoring.lock
+backend/certification-data/courses/.registry-*/
+backend/certification-data/courses/.draft-*/

@@ -7,7 +7,6 @@
     "seed_id": "wf-financial-budget-reconciliation",
     "display_name": "Budget Reconciliation",
     "description": "Compares a financial report against the original budget, identifying variances and flagging categories that need sponsor approval for rebudgeting.",
-    "quality_tier": "excellent",
     "collections": [
       "financial"
     ]
@@ -43,6 +42,34 @@
               }
             }
           ]
+        }
+      ],
+      "validation_plan": [
+        {
+          "id": "a401ea69-2bb6-5f42-80e1-379920ed5f13",
+          "name": "Figures match the source",
+          "category": "accuracy",
+          "description": "Every budget amount, expenditure, balance and percentage in the output appears in the source document with the same value, unit and (for dates) year. A figure the output calculated says how it was calculated and the arithmetic is right. FAIL if any value differs from the source, or appears with no basis in it."
+        },
+        {
+          "id": "f0af760f-167a-55a7-881b-c7bb1258ab68",
+          "name": "Variance arithmetic is right",
+          "category": "accuracy",
+          "description": "For each category reported, the variance equals actual minus budget and the percentage equals that variance divided by the budget amount. FAIL for any variance or percentage that does not follow from the stated figures."
+        },
+        {
+          "id": "891a3bd7-e1ab-5683-aa24-7aae3076b3d2",
+          "name": "Rebudgeting thresholds have a source",
+          "category": "content",
+          "description": "A threshold used to flag rebudgeting (such as 25%) is either quoted from the award or sponsor terms in the document or labelled as a general practice to confirm with the sponsor. FAIL if a threshold is applied as the sponsor's rule when the document does not state it."
+        }
+      ],
+      "validation_inputs": [
+        {
+          "id": "64e19f2a-b402-5132-814a-5d151d3732d9",
+          "type": "text",
+          "label": "Fictional budget statement. Answer key, as variance = actual minus budget: Travel +$6,000 (+75.0%) and Supplies −$8,000 (−40.0%) exceed 25% and are flagged. Personnel −$10,000 (−8.3%), Fringe −$3,000 (−8.3%) and Other direct +$500 (+8.3%) are within 25%. Total $245,700 spent of $266,000 (92.4%) with 75% of the budget period elapsed; remaining balance $20,300. The award's own rebudgeting term is 10% of the period's total budget ($26,600), not 25%. No movement reaches it, so no prior approval is needed for these variances. Carryforward of unobligated balances requires prior approval under the award terms.",
+          "text": "FICTIONAL QA MATERIAL — NOT A REAL ACCOUNT\nBudget Statement — Example University Sponsored Programs\nAward number: EXA-2026-1142\nBudget period: July 1, 2026 through June 30, 2027\nStatement through: March 31, 2027\nIndirect costs: 40% of total direct costs\n\nCategory: Budget / Actual\nPersonnel: $120,000 / $110,000\nFringe benefits: $36,000 / $33,000\nTravel: $8,000 / $14,000\nSupplies: $20,000 / $12,000\nEquipment: $0 / $0\nOther direct costs: $6,000 / $6,500\nIndirect costs: $76,000 / $70,200\nTotal: $266,000 / $245,700\nRemaining balance: $20,300\n\nAward terms\n- Rebudgeting: prior approval is required for any cumulative transfer among direct cost categories that exceeds 10% of the total budget for the budget period.\n- Carryforward: unobligated balances may be carried forward to the next budget period only with the agency's prior approval."
         }
       ]
     }

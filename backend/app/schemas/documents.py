@@ -43,6 +43,12 @@ class UploadRequest(BaseModel):
     rootFolderName: Optional[str] = None
 
 
+class UploadVersionRequest(BaseModel):
+    contentAsBase64String: str
+    fileName: str
+    extension: str
+
+
 class PollStatusResponse(BaseModel):
     status: Optional[str] = None
     status_messages: list[str] = []

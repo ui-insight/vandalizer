@@ -1,6 +1,7 @@
+import { usePanelEffect } from '../shared/usePanelEffect'
 import { useEffect, useState } from 'react'
 import { describeSourceCurrency, formatCurrencyDateTime } from './sourceCurrency'
-import { FocusTrap } from 'focus-trap-react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { X, FileText, Globe, ExternalLink, Loader2, AlertCircle, Check } from 'lucide-react'
 import { getKBSource, setKBSourceAmends, setKBSourceReference } from '../../api/knowledge'
 import type { KnowledgeBaseSource, KnowledgeBaseSourceDetail } from '../../types/knowledge'
@@ -15,12 +16,15 @@ interface Props {
   otherSources?: KnowledgeBaseSource[]
   onClose: () => void
   onUpdated?: () => void  // called after the source's provenance is edited, so the list refreshes
+  canManage?: boolean
 }
 
-export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onClose, onUpdated }: Props) {
+export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onClose, onUpdated, canManage = false }: Props) {
   const [detail, setDetail] = useState<KnowledgeBaseSourceDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
   // Editable provenance ("Source: …"). For url sources the origin URL is the
   // default when nothing was entered yet; the user can override either type.
   const [sourceDraft, setSourceDraft] = useState('')
@@ -45,10 +49,10 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
       .catch(err => { if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load source') })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [kbUuid, source.uuid])
+  }, [kbUuid, source.uuid, attempt])
 
   // Close on Escape
-  useEffect(() => {
+  usePanelEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
     }
@@ -60,31 +64,33 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
   const sourceDirty = sourceDraft.trim() !== (savedSource || '').trim()
 
   const saveSource = async () => {
-    if (savingSource || !sourceDirty) return
+    if (!canManage || savingSource || !sourceDirty) return
     setSavingSource(true)
+    setActionError(null)
     try {
       const updated = await setKBSourceReference(kbUuid, source.uuid, sourceDraft.trim())
       setDetail(prev => (prev ? { ...prev, source_reference: updated.source_reference } : prev))
       onUpdated?.()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save source')
+      setActionError(err instanceof Error ? err.message : 'Failed to save source')
     } finally {
       setSavingSource(false)
     }
   }
 
   const saveAmends = async (next: string[]) => {
-    if (savingAmends) return
+    if (!canManage || savingAmends) return
     const previous = amends
     setAmends(next)
     setSavingAmends(true)
+    setActionError(null)
     try {
       const updated = await setKBSourceAmends(kbUuid, source.uuid, next)
       setAmends(updated.amends_source_uuids ?? next)
       onUpdated?.()
     } catch (err) {
       setAmends(previous)
-      setError(err instanceof Error ? err.message : 'Failed to save what this source amends')
+      setActionError(err instanceof Error ? err.message : 'Failed to save what this source amends')
     } finally {
       setSavingAmends(false)
     }
@@ -133,7 +139,7 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
       style={{
         position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        zIndex: 1100, padding: 24,
+        zIndex: 1100, padding: 'var(--workspace-space-12)',
       }}
     >
       <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
@@ -143,48 +149,48 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
         aria-label={`Source: ${displayTitle}`}
         onClick={e => e.stopPropagation()}
         style={{
-          width: '90vw', maxWidth: 960, height: '85vh',
+          width: '100%', maxWidth: 960, height: '90dvh',
           display: 'flex', flexDirection: 'column',
-          backgroundColor: '#1f1f1f',
-          border: '1px solid #2e2e2e', borderRadius: 10,
-          overflow: 'hidden',
+          backgroundColor: 'var(--workspace-surface)',
+          border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-large)',
+          overflowY: 'auto', overflowX: 'hidden',
         }}
       >
         {/* Header */}
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 10,
-          padding: '14px 18px',
-          borderBottom: '1px solid #2e2e2e',
+          display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--workspace-space-12)',
+          padding: "var(--workspace-space-16) var(--workspace-space-20)",
+          borderBottom: '1px solid var(--workspace-border)',
           flexShrink: 0,
         }}>
           {isDoc
-            ? <FileText size={18} style={{ color: '#a78bfa', flexShrink: 0 }} aria-hidden="true" />
-            : <Globe size={18} style={{ color: '#60a5fa', flexShrink: 0 }} aria-hidden="true" />}
-          <div style={{ flex: 1, minWidth: 0 }}>
+            ? <FileText size={18} style={{ color: 'var(--workspace-info)', flexShrink: 0 }} aria-hidden="true" />
+            : <Globe size={18} style={{ color: 'var(--workspace-info)', flexShrink: 0 }} aria-hidden="true" />}
+          <div style={{ flex: '1 1 140px', minWidth: 0 }}>
             <div style={{
-              fontSize: 14, fontWeight: 600, color: '#fff',
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: 'var(--workspace-text)',
+              overflowWrap: 'anywhere',
             }}>
               {displayTitle}
             </div>
-            <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginTop: 'var(--workspace-space-2)' }}>
               {isDoc ? 'Document source' : 'URL source'}
               {source.chunk_count > 0 && <> · {source.chunk_count} chunks</>}
               {source.status !== 'ready' && <> · {source.status}</>}
               {docDeleted && (
-                <span style={{ color: '#d97706', fontStyle: 'italic' }}>
+                <span style={{ color: 'var(--workspace-warning)', fontStyle: 'italic' }}>
                   {' '}· source deleted — answers still come from the text below
                 </span>
               )}
               {fileUnavailableNote && (
-                <span style={{ color: '#d97706', fontStyle: 'italic' }}>
+                <span style={{ color: 'var(--workspace-warning)', fontStyle: 'italic' }}>
                   {' '}· {fileUnavailableNote}
                 </span>
               )}
             </div>
           </div>
           {isDoc && source.document_uuid && fileAvailable && (
-            <div style={{ display: 'inline-flex', border: '1px solid #2e2e2e', borderRadius: 5, overflow: 'hidden' }}>
+            <div style={{ display: 'inline-flex', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)', overflow: 'hidden' }}>
               {(['text', 'file'] as const).map(mode => (
                 <button
                   key={mode}
@@ -192,10 +198,10 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
                   aria-pressed={docView === mode}
                   onClick={() => setDocView(mode)}
                   style={{
-                    fontSize: 12, padding: '4px 10px', fontFamily: 'inherit', cursor: 'pointer',
+                    fontSize: 'var(--workspace-font-meta)', padding: "var(--workspace-space-4) var(--workspace-space-12)", fontFamily: 'inherit', cursor: 'pointer',
                     border: 'none',
-                    backgroundColor: docView === mode ? '#2e2e2e' : 'transparent',
-                    color: docView === mode ? '#fff' : '#9ca3af',
+                    backgroundColor: docView === mode ? 'var(--workspace-surface)' : 'transparent',
+                    color: docView === mode ? 'var(--workspace-text)' : 'var(--workspace-muted)',
                   }}
                 >
                   {mode === 'text' ? 'Text' : 'File'}
@@ -210,9 +216,9 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
               rel="noopener noreferrer"
               title="Open URL in new tab"
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-                fontSize: 12, color: '#60a5fa', textDecoration: 'none',
-                padding: '4px 8px', border: '1px solid #2e2e2e', borderRadius: 5,
+                display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+                fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-info)', textDecoration: 'none',
+                padding: "var(--workspace-space-4) var(--workspace-space-8)", border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)',
               }}
             >
               <ExternalLink size={12} />
@@ -223,7 +229,7 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
             type="button"
             aria-label="Close"
             onClick={onClose}
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, color: '#888' }}
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', color: 'var(--workspace-muted)' }}
           >
             <X size={18} aria-hidden="true" />
           </button>
@@ -232,25 +238,26 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
         {/* Verifiable provenance — editable, shown for both URL and document sources.
             Lets a user confirm/record where the content came from (origin URL or citation). */}
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          padding: '8px 18px', borderBottom: '1px solid #2e2e2e', flexShrink: 0,
+          display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--workspace-space-8)',
+          padding: "var(--workspace-space-8) var(--workspace-space-20)", borderBottom: '1px solid var(--workspace-border)', flexShrink: 0,
         }}>
-          <span id="kb-source-ref-label" style={{ fontSize: 11, color: '#888', flexShrink: 0 }}>Source</span>
+          <span id="kb-source-ref-label" style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', flexShrink: 0 }}>Source</span>
           <input
             aria-labelledby="kb-source-ref-label"
             value={sourceDraft}
             onChange={e => setSourceDraft(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); saveSource() } }}
-            placeholder={isDoc ? 'e.g. APM Ch.45 — uidaho.edu/apm/45' : 'Origin URL'}
+            placeholder={isDoc ? 'e.g. APM Ch.45, uidaho.edu/apm/45' : 'Origin URL'}
             maxLength={2000}
             disabled={savingSource}
+            readOnly={!canManage}
             style={{
-              flex: 1, fontSize: 12, color: '#e5e5e5',
-              backgroundColor: '#161616', border: '1px solid #2e2e2e',
-              borderRadius: 5, padding: '5px 8px', fontFamily: 'inherit',
+              flex: '1 1 160px', minWidth: 0, maxWidth: '100%', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)',
+              backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)',
+              borderRadius: 'var(--workspace-radius-small)', padding: "var(--workspace-space-6) var(--workspace-space-8)", fontFamily: 'inherit',
             }}
           />
-          {sourceDirty && (
+          {canManage && sourceDirty && (
             <button
               type="button"
               aria-label="Save source"
@@ -258,9 +265,9 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
               disabled={savingSource}
               title="Save source"
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-                fontSize: 12, color: '#fff', backgroundColor: '#2563eb',
-                border: 'none', borderRadius: 5, padding: '5px 10px',
+                display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+                fontSize: 'var(--workspace-font-meta)', color: 'var(--highlight-text-color, #000)', backgroundColor: 'var(--highlight-color, #eab308)',
+                border: 'none', borderRadius: 'var(--workspace-radius-small)', padding: "var(--workspace-space-6) var(--workspace-space-12)",
                 cursor: savingSource ? 'default' : 'pointer', flexShrink: 0,
               }}
             >
@@ -275,14 +282,14 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
         {/* Amends — which sources this one revises. Retrieval searches this
             source whenever one of those is retrieved, and tells the model
             this one governs where they conflict. */}
-        {amendable.length > 0 && (
+        {(amends.length > 0 || canManage && amendable.length > 0) && (
           <div style={{
-            display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6,
-            padding: '8px 18px', borderBottom: '1px solid #2e2e2e', flexShrink: 0,
+            display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--workspace-space-6)',
+            padding: "var(--workspace-space-8) var(--workspace-space-20)", borderBottom: '1px solid var(--workspace-border)', flexShrink: 0,
           }}>
             <span
               id="kb-source-amends-label"
-              style={{ fontSize: 11, color: '#888', flexShrink: 0 }}
+              style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', flexShrink: 0 }}
               title="Mark this source as a supplement, notice or revision of other sources. Questions that retrieve those sources will also search this one, and answers will treat it as the current rule."
             >
               Amends
@@ -291,33 +298,33 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
               <span
                 key={uuid}
                 style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                  fontSize: 12, color: '#e5e5e5', backgroundColor: '#2a2a2a',
-                  border: '1px solid #3a3a3a', borderRadius: 12, padding: '2px 4px 2px 8px',
+                  display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+                  fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)', backgroundColor: 'var(--workspace-surface)',
+                  border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-large)', padding: "var(--workspace-space-2) var(--workspace-space-4) var(--workspace-space-2) var(--workspace-space-8)",
                 }}
               >
                 {nameOf(uuid)}
-                <button
+                {canManage && <button
                   type="button"
                   aria-label={`Stop amending ${nameOf(uuid)}`}
                   onClick={() => saveAmends(amends.filter(u => u !== uuid))}
                   disabled={savingAmends}
-                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, color: '#888', display: 'inline-flex' }}
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--workspace-muted)', display: 'inline-flex' }}
                 >
                   <X size={12} aria-hidden="true" />
-                </button>
+                </button>}
               </span>
             ))}
-            {amendable.some(s => !amends.includes(s.uuid)) && (
+            {canManage && amendable.some(s => !amends.includes(s.uuid)) && (
               <select
                 aria-labelledby="kb-source-amends-label"
                 value=""
                 onChange={e => { if (e.target.value) saveAmends([...amends, e.target.value]) }}
                 disabled={savingAmends}
                 style={{
-                  fontSize: 12, color: '#e5e5e5', backgroundColor: '#161616',
-                  border: '1px solid #2e2e2e', borderRadius: 5, padding: '3px 6px', fontFamily: 'inherit',
-                  maxWidth: 320,
+                  fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)', backgroundColor: 'var(--workspace-canvas)',
+                  border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)', padding: "var(--workspace-space-4) var(--workspace-space-6)", fontFamily: 'inherit',
+                  maxWidth: '100%', minWidth: 0,
                 }}
               >
                 <option value="">{amends.length ? 'Add another…' : 'Nothing — pick a source this one revises…'}</option>
@@ -326,12 +333,14 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
                 ))}
               </select>
             )}
-            {savingAmends && <Loader2 size={12} style={{ animation: 'spin 1s linear infinite', color: '#888' }} aria-hidden="true" />}
+            {savingAmends && <Loader2 size={12} style={{ animation: 'spin 1s linear infinite', color: 'var(--workspace-muted)' }} aria-hidden="true" />}
           </div>
         )}
 
+        {actionError && <div role="alert" style={{ color: 'var(--workspace-danger)', padding: "var(--workspace-space-8) var(--workspace-space-20)", fontSize: 'var(--workspace-font-control)', lineHeight: 1.6, overflowWrap: 'anywhere' }}>{actionError} Your source text is preserved; retry the change.</div>}
+
         {/* Body */}
-        <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex' }}>
+        <div style={{ flex: 1, minHeight: 180, overflow: 'auto', display: 'flex' }}>
           {isDoc && docView === 'file' && fileAvailable ? (
             source.document_uuid ? (
               <div style={{ flex: 1, minWidth: 0, minHeight: 0 }}>
@@ -349,6 +358,7 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
               fallbackUrl={source.url}
               isDoc={isDoc}
               partialText={partialText}
+              onRetry={() => setAttempt(n => n + 1)}
             />
           )}
         </div>
@@ -362,7 +372,7 @@ function EmptyState({ message }: { message: string }) {
   return (
     <div style={{
       flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: 13, color: '#888',
+      fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)',
     }}>
       {message}
     </div>
@@ -370,11 +380,12 @@ function EmptyState({ message }: { message: string }) {
 }
 
 function SourceContentInspector({
-  kbUuid, loading, error, detail, fallbackUrl, isDoc = false, partialText = null,
+  kbUuid, loading, error, detail, fallbackUrl, isDoc = false, partialText = null, onRetry,
 }: {
   kbUuid: string
   loading: boolean
   error: string | null
+  onRetry?: () => void
   detail: KnowledgeBaseSourceDetail | null
   fallbackUrl?: string
   isDoc?: boolean
@@ -385,7 +396,7 @@ function SourceContentInspector({
     return (
       <div role="status" aria-live="polite" style={{
         flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: '#888',
+        color: 'var(--workspace-muted)',
       }}>
         <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
         <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Loading source…</span>
@@ -396,10 +407,11 @@ function SourceContentInspector({
     return (
       <div role="alert" style={{
         flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        gap: 8, color: '#ef4444', fontSize: 13,
+        gap: 'var(--workspace-space-8)', color: 'var(--workspace-danger)', fontSize: 'var(--workspace-font-control)', flexWrap: 'wrap', padding: 'var(--workspace-space-16)', overflowWrap: 'anywhere',
       }}>
         <AlertCircle size={16} aria-hidden="true" />
         {error}
+        {onRetry && <button type="button" onClick={onRetry} style={{ padding: "var(--workspace-space-8) var(--workspace-space-12)", color: 'var(--workspace-text)', background: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)' }}>Retry source</button>}
       </div>
     )
   }
@@ -409,66 +421,66 @@ function SourceContentInspector({
   const hasContent = !!(detail.content && detail.content.trim())
 
   return (
-    <div style={{
-      flex: 1, display: 'flex', flexDirection: 'column',
-      padding: '14px 18px', overflowY: 'auto',
+    <div role="region" aria-label="Indexed source details" tabIndex={0} style={{
+      flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column',
+      padding: "var(--workspace-space-16) var(--workspace-space-20)", overflowY: 'auto',
     }}>
       {/* Meta block */}
       <div style={{
-        display: 'grid', gridTemplateColumns: '120px 1fr', gap: '4px 12px',
-        fontSize: 12, color: '#cbd5e1', marginBottom: 16,
+        display: 'grid', gridTemplateColumns: '120px 1fr', gap: "var(--workspace-space-4) var(--workspace-space-12)",
+        fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginBottom: 'var(--workspace-space-16)',
       }}>
         {!isDoc && (
           <>
-            <div style={{ color: '#888' }}>URL</div>
+            <div style={{ color: 'var(--workspace-muted)' }}>URL</div>
             <div style={{ wordBreak: 'break-all' }}>
               {detail.url ? (
                 <a
                   href={detail.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ color: '#60a5fa', textDecoration: 'none' }}
+                  style={{ color: 'var(--workspace-info)', textDecoration: 'none' }}
                 >
                   {detail.url}
                 </a>
-              ) : (fallbackUrl || '—')}
+              ) : (fallbackUrl || '-')}
             </div>
           </>
         )}
         {detail.url_title && (
           <>
-            <div style={{ color: '#888' }}>Page title</div>
+            <div style={{ color: 'var(--workspace-muted)' }}>Page title</div>
             <div>{detail.url_title}</div>
           </>
         )}
-        <div style={{ color: '#888' }}>Status</div>
+        <div style={{ color: 'var(--workspace-muted)' }}>Status</div>
         <div>
           {detail.status}
           {detail.status === 'error' && (
-            <div style={{ color: '#f87171', marginTop: 2 }}>
+            <div style={{ color: 'var(--workspace-danger)', marginTop: 'var(--workspace-space-2)' }}>
               {detail.error_message
                 || 'No failure details were recorded for this source. Re-syncing it will capture the reason (e.g. the site blocking automated access).'}
             </div>
           )}
           {detail.status !== 'error' && detail.error_message ? ` — ${detail.error_message}` : ''}
         </div>
-        <div style={{ color: '#888' }}>Chunks</div>
+        <div style={{ color: 'var(--workspace-muted)' }}>Chunks</div>
         <div>{detail.chunk_count}</div>
         {detail.crawl_enabled && (
           <>
-            <div style={{ color: '#888' }}>Crawl</div>
+            <div style={{ color: 'var(--workspace-muted)' }}>Crawl</div>
             <div>up to {detail.max_crawl_pages} pages · {childCount} discovered</div>
           </>
         )}
         {detail.parent_source_uuid && (
           <>
-            <div style={{ color: '#888' }}>Crawled from</div>
-            <div style={{ fontFamily: 'monospace', fontSize: 11 }}>{detail.parent_source_uuid}</div>
+            <div style={{ color: 'var(--workspace-muted)' }}>Crawled from</div>
+            <div style={{ fontFamily: 'monospace', fontSize: 'var(--workspace-font-meta)' }}>{detail.parent_source_uuid}</div>
           </>
         )}
         {detail.processed_at && !detail.currency && (
           <>
-            <div style={{ color: '#888' }}>Processed</div>
+            <div style={{ color: 'var(--workspace-muted)' }}>Processed</div>
             <div>{new Date(detail.processed_at).toLocaleString()}</div>
           </>
         )}
@@ -479,11 +491,11 @@ function SourceContentInspector({
           const desc = describeSourceCurrency(c)
           const row = (label: string, value: string | null | undefined, opts?: { mono?: boolean; color?: string }) => value ? (
             <>
-              <div style={{ color: '#888' }}>{label}</div>
-              <div style={{ fontFamily: opts?.mono ? 'monospace' : undefined, fontSize: opts?.mono ? 11 : undefined, wordBreak: 'break-all', color: opts?.color }}>{value}</div>
+              <div style={{ color: 'var(--workspace-muted)' }}>{label}</div>
+              <div style={{ fontFamily: opts?.mono ? 'monospace' : undefined, fontSize: opts?.mono ? 'var(--workspace-font-meta)' : undefined, wordBreak: 'break-all', color: opts?.color }}>{value}</div>
             </>
           ) : null
-          const toneColor = desc?.tone === 'warn' ? '#fbbf24' : desc?.tone === 'error' ? '#f87171' : undefined
+          const toneColor = desc?.tone === 'warn' ? 'var(--workspace-warning)' : desc?.tone === 'error' ? 'var(--workspace-danger)' : undefined
           return (
             <>
               {row('Currency', desc ? `${desc.label} — ${desc.summary}` : null, { color: toneColor })}
@@ -491,7 +503,7 @@ function SourceContentInspector({
               {row('Last retrieved', formatCurrencyDateTime(c.last_retrieved_at))}
               {row('Last indexed', formatCurrencyDateTime(c.last_ingested_at))}
               {row('Serving text retrieved', formatCurrencyDateTime(c.content_retrieved_at))}
-              {row('Last refresh error', c.last_refresh_error, { color: '#f87171' })}
+              {row('Last refresh error', c.last_refresh_error, { color: 'var(--workspace-danger)' })}
               {row(
                 `Content hash (${c.content_hash_algorithm})`,
                 c.content_hash ? `${c.content_hash}${c.content_hash_recorded ? '' : ' (from stored snapshot)'}` : null,
@@ -504,14 +516,14 @@ function SourceContentInspector({
 
       {/* Crawled children list */}
       {childCount > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: '#ccc', marginBottom: 6 }}>
+        <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 'var(--workspace-space-6)' }}>
             Crawled pages ({childCount})
           </div>
           <div style={{
-            display: 'flex', flexDirection: 'column', gap: 4,
+            display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)',
             maxHeight: 160, overflowY: 'auto',
-            border: '1px solid #2a2a2a', borderRadius: 6, padding: 8,
+            border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)', padding: 'var(--workspace-space-8)',
           }}>
             {detail.child_sources.map(c => (
               <a
@@ -521,7 +533,7 @@ function SourceContentInspector({
                 rel="noopener noreferrer"
                 title={c.url}
                 style={{
-                  fontSize: 11, color: '#9ca3af', textDecoration: 'none',
+                  fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textDecoration: 'none',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}
               >
@@ -541,10 +553,10 @@ function SourceContentInspector({
           chunked into the KB. */}
       {detail.truncated && (
         <div style={{
-          marginBottom: 10, padding: '8px 10px',
-          fontSize: 12, lineHeight: 1.5, color: '#fbbf24',
+          marginBottom: 'var(--workspace-space-12)', padding: "var(--workspace-space-8) var(--workspace-space-12)",
+          fontSize: 'var(--workspace-font-meta)', lineHeight: 1.5, color: 'var(--workspace-warning)',
           backgroundColor: 'rgba(217, 119, 6, 0.12)',
-          border: '1px solid rgba(217, 119, 6, 0.4)', borderRadius: 6,
+          border: '1px solid rgba(217, 119, 6, 0.4)', borderRadius: 'var(--workspace-radius-small)',
         }}>
           This page was too long to ingest in full — the extracted text below was cut
           off at the size limit, and anything after the cut is not in this knowledge base.
@@ -557,10 +569,10 @@ function SourceContentInspector({
           nothing built on this source can answer about them. */}
       {partialText && (
         <div style={{
-          marginBottom: 10, padding: '8px 10px',
-          fontSize: 12, lineHeight: 1.5, color: '#fbbf24',
+          marginBottom: 'var(--workspace-space-12)', padding: "var(--workspace-space-8) var(--workspace-space-12)",
+          fontSize: 'var(--workspace-font-meta)', lineHeight: 1.5, color: 'var(--workspace-warning)',
           backgroundColor: 'rgba(217, 119, 6, 0.12)',
-          border: '1px solid rgba(217, 119, 6, 0.4)', borderRadius: 6,
+          border: '1px solid rgba(217, 119, 6, 0.4)', borderRadius: 'var(--workspace-radius-small)',
         }}>
           This document was only partly converted — {partialText}. Sections that did
           not convert are not in the text below and are not in this knowledge base, so
@@ -570,16 +582,16 @@ function SourceContentInspector({
       )}
 
       {/* Cached content */}
-      <div style={{ fontSize: 12, fontWeight: 600, color: '#ccc', marginBottom: 6 }}>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 'var(--workspace-space-6)' }}>
         Extracted text
       </div>
       {hasContent ? (
-        <pre style={{
-          margin: 0, padding: 12, flex: 1,
-          fontSize: 12, lineHeight: 1.55,
-          color: '#d1d5db',
-          backgroundColor: '#161616',
-          border: '1px solid #2a2a2a', borderRadius: 6,
+        <pre tabIndex={0} aria-label="Extracted text" style={{
+          margin: 0, padding: 'var(--workspace-space-12)', flex: 1,
+          fontSize: 'var(--workspace-font-meta)', lineHeight: 1.55,
+          color: 'var(--workspace-muted)',
+          backgroundColor: 'var(--workspace-canvas)',
+          border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)',
           whiteSpace: 'pre-wrap', wordBreak: 'break-word',
           overflowY: 'auto',
           fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
@@ -587,7 +599,7 @@ function SourceContentInspector({
           {detail.content}
         </pre>
       ) : (
-        <div style={{ fontSize: 12, color: '#888', fontStyle: 'italic' }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', fontStyle: 'italic' }}>
           No cached text available for this source.
         </div>
       )}

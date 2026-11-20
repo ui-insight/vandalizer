@@ -57,6 +57,11 @@ describe('isStale', () => {
     expect(isStale(run(), 30)).toBe(true)
   })
 
+  it('applies the same stale threshold to legacy UTC timestamps without an offset', () => {
+    const oldUtc = new Date(Date.now() - 2 * 3600 * 1000).toISOString().replace('Z', '')
+    expect(isStale(run({ last_updated_at: oldUtc }), 30)).toBe(true)
+  })
+
   it('exempts a run waiting on a reviewer', () => {
     // The run reports no progress by design. Calling that a timeout marked
     // every approval left overnight as a failure.

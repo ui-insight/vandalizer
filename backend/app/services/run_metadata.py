@@ -27,10 +27,15 @@ allow-list, and endpoints are reduced to their host.
 from __future__ import annotations
 
 import datetime
+from collections.abc import Mapping
+
 import hashlib
 import json
 import logging
-from typing import Any, Optional
+from typing import Optional, TypeVar, TypedDict, Unpack
+from pymongo.database import Database
+from pydantic_ai.models import Model, ModelRequestParameters
+from app.services.metering import MeterScope
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
@@ -94,12 +99,18 @@ def endpoint_host(url: Optional[str]) -> Optional[str]:
     return f"{parsed.scheme}://{host}" if parsed.scheme else host
 
 
-def _json_safe(value: Any) -> Any:
-    return json.loads(json.dumps(value, sort_keys=True, default=str))
+T = TypeVar("T")
+
+
+def _json_safe(value: dict) -> dict:
+    # A JSON object round trip preserves the root mapping; nested runtime
+    # values are encoded as strings when JSON has no representation for them.
+    decoded: dict = json.loads(json.dumps(value, sort_keys=True, default=str))
+    return decoded
 
 
 def request_fingerprint(
-    model, model_settings: Optional[dict], model_request_parameters=None,
+    model: Model, model_settings: Mapping[str, object] | None, model_request_parameters: ModelRequestParameters | None = None,
 ) -> dict:
     """The parts of one LLM request that determine its answer.
 
@@ -169,7 +180,7 @@ def _hash_text(text: str) -> str:
 def _definition_view(steps_data: list[dict]) -> list[dict]:
     """``steps_data`` minus the runtime attachments, bytes replaced by a hash."""
 
-    def clean(value):
+    def clean(value: object) -> object:
         if isinstance(value, (bytes, bytearray)):
             return {"sha256": hashlib.sha256(bytes(value)).hexdigest()}
         if isinstance(value, dict):
@@ -221,7 +232,7 @@ def _configured_steps(steps_data: list[dict]) -> list[dict]:
     return steps
 
 
-def _input_documents(db, workflow_doc: dict, trigger_step_data: dict) -> list[dict]:
+def _input_documents(db: Database[dict], workflow_doc: dict, trigger_step_data: dict) -> list[dict]:
     uuids = list((trigger_step_data or {}).get("doc_uuids") or [])
     input_cfg = workflow_doc.get("input_config") or {}
     if input_cfg.get("trigger_type") != "no_input":
@@ -249,7 +260,7 @@ def _input_documents(db, workflow_doc: dict, trigger_step_data: dict) -> list[di
 
 
 def build_run_config(
-    db,
+    db: Database[dict],
     *,
     workflow_doc: dict,
     steps_data: list[dict],
@@ -293,7 +304,16 @@ def build_run_config(
     })
 
 
-def snapshot_run_config(db, workflow_result_id, **kwargs) -> None:
+class RunConfigInput(TypedDict):
+    workflow_doc: dict
+    steps_data: list[dict]
+    trigger_step_data: dict
+    model: str | None
+    sys_config: dict | None
+    config_override: dict | None
+
+
+def snapshot_run_config(db: Database[dict], workflow_result_id: object, **kwargs: Unpack[RunConfigInput]) -> None:
     """Store :func:`build_run_config` on the run, once.
 
     The first pass wins: a retry or approval resume rebuilds the engine, and
@@ -315,7 +335,7 @@ def snapshot_run_config(db, workflow_result_id, **kwargs) -> None:
         )
 
 
-def record_pass_usage(db, workflow_result_id, scope, sys_config: Optional[dict]) -> None:
+def record_pass_usage(db: Database[dict], workflow_result_id: object, scope: MeterScope | None, sys_config: Optional[dict]) -> None:
     """Append one execution pass's per-step model usage to the run.
 
     Appended, not set: a retried or approval-resumed run executes in several
@@ -339,7 +359,7 @@ def record_pass_usage(db, workflow_result_id, scope, sys_config: Optional[dict])
         db.workflow_result.update_one(
             {"_id": ObjectId(str(workflow_result_id))},
             {"$push": {
-                "model_usage": {"$each": _json_safe(rows)},
+                "model_usage": {"$each": [_json_safe(row) for row in rows]},
                 "model_configs": {"$each": configs},
             }},
         )
@@ -374,7 +394,7 @@ def _merge_usage(rows: list[dict]) -> list[dict]:
     )
 
 
-def describe_run(result) -> Optional[dict]:
+def describe_run(result: object) -> Optional[dict]:
     """The ``run_metadata`` block of a run's status payload.
 
     ``None`` for a run with nothing recorded (it predates this, or never
@@ -382,7 +402,7 @@ def describe_run(result) -> Optional[dict]:
     """
     from app.services.metering import summarize_model_usage
 
-    def field(name, kind):
+    def field(name: str, kind: type[T]) -> T | None:
         value = getattr(result, name, None)
         return value if isinstance(value, kind) else None
 

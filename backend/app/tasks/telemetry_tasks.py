@@ -8,6 +8,12 @@ run time as a belt-and-suspenders guard.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from celery import Task
+
+
 import logging
 
 from app.celery_app import celery_app
@@ -25,7 +31,7 @@ logger = logging.getLogger(__name__)
     max_retries=2,
     default_retry_delay=300,
 )
-def send_heartbeat(self) -> dict:
+def send_heartbeat(self: Task) -> dict:
     """Send one anonymous deployment heartbeat (opt-in; no-op when disabled).
 
     The task is always scheduled; send_heartbeat resolves the effective decision

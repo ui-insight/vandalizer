@@ -7,15 +7,25 @@ immediately, then this task drives ``run_optimization`` in the background.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from celery import Task
+
+from collections.abc import Coroutine
+from typing import Any, TypeVar
+
 import logging
 
 from app.celery_app import celery_app
 from app.tasks import run_task_async
 
+T = TypeVar("T")
+
 logger = logging.getLogger(__name__)
 
 
-def _run_async(coro):
+def _run_async(coro: Coroutine[Any, Any, T]) -> T:
     """Run an async coroutine from sync Celery task context, releasing the
     loop's pooled LLM HTTP client on teardown (see ``run_task_async``)."""
     return run_task_async(coro)
@@ -31,7 +41,7 @@ def _run_async(coro):
     time_limit=5460,
 )
 def optimize_workflow_task(
-    self,
+    self: Task,
     workflow_id: str,
     user_id: str,
     run_uuid: str,
@@ -39,7 +49,7 @@ def optimize_workflow_task(
     apply_on_finish: bool = False,
     max_candidates: int = 10,
     include_judge: bool = True,
-):
+) -> dict[str, object]:
     """Drive a WorkflowOptimizationRun. The pre-allocated run document is
     passed in so the API route can return its UUID immediately."""
     return _run_async(_optimize_workflow_async(
@@ -56,7 +66,7 @@ async def _optimize_workflow_async(
     apply_on_finish: bool,
     max_candidates: int,
     include_judge: bool,
-):
+) -> dict[str, object]:
     from app.config import Settings
     from app.database import init_db
 

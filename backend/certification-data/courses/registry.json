@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "releases": {
+    "legacy-2026-10-02.1": {
+      "state": "draft",
+      "supported_for_existing": false,
+      "manifest_sha256": "54f74731d64f6c92b94252a3ff4e3cb60f5955c6a0029118842132a9cd7e0195"
+    }
+  }
+}

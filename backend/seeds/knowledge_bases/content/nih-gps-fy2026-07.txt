@@ -1,0 +1,1794 @@
+NIH Grants Policy Statement (FY 2026 revision) — Chapter 7: Cost Consideration
+Source: https://grants.nih.gov/policy-and-compliance/nihgps
+
+7 COST CONSIDERATION
+7.1 GENERAL
+Cost considerations are critical throughout the life cycle of a grant. An applicant’s budget request is
+reviewed for compliance with the governing cost principles and other requirements and policies applicable to the type of recipient and the type of award. Any resulting award will include a budget that is consistent with these requirements.
+NIH anticipates that, because of the nature of research, the recipient may need to modify its award
+budget during performance to accomplish the award’s programmatic objectives. Therefore, NIH provides
+some flexibility for recipients to deviate from the award budget, depending on the deviation’s significance to the project or activity. More significant post-award changes require NIH prior approval.
+Prior approval requirements and authorities are discussed in Administrative Requirements—Changes in
+Project and Budget.
+During post-award administration, the GMO, or a GMO designee, monitors expenditures for conformance with cost policies. The GMO’s monitoring includes, among other things, responding to prior
+approval requests and reviewing progress reports, audit reports, and other periodic reports. The GMO
+also may use audit findings as the basis for final cost adjustments (see Administrative Requirements—
+Closeout).
+This chapter addresses the general principles underlying the allowability of costs, differentiates direct
+costs from indirect costs, and highlights a number of specific costs and categories of cost for NIH applicants and recipients. It is not intended to be all-inclusive and should be used as a supplement to the applicable cost principles.
+7.2 THE COST PRINCIPLES
+In general, NIH grant awards provide for reimbursement of actual, allowable costs incurred and are subject to Federal cost principles. The cost principles establish standards for the allowability of costs,
+provide detailed guidance on the cost accounting treatment of costs as direct or indirect costs, and set
+forth allowability and allocability principles for selected items of cost. Applicability of a particular set of
+cost principles depends on the type of organization (regardless whether domestic or foreign) making the
+expenditure. For example, a for-profit organization collaborating with a university recipient would be
+subject to the cost principles for for-profit organizations, while the university would be subject to the
+cost principles for Institutions of Higher Educations (IHEs).
+The cost principles are set forth in HHS regulations at 2 CFR Part 200, Subpart E. For-profit organizations are subject to the cost principles located at 48 CFR Part 31.2 Federal Acquisition Regulation.
+The cost principles apply to all NIH award instruments, award mechanisms, and special programs and
+authorities, including modular awards and awards under SNAP with one exception: they do not apply to
+Kirschstein-NRSA individual fellowship awards. The allowable use of funds under those awards is
+included in Ruth L. Kirschstein National Research Service Awards in IIB.
+Recipients may use their own accounting systems, policies, and procedures to implement the cost principle requirements as long as they meet the standards prescribed in 2 CFR Part 200.302 for financial
+management systems.
+The cost principles address four tests to determine the allowability of costs. The tests are as follows:
+(GPS page IIA-68)
+
+l Reasonableness (Including Necessity). A cost may be considered reasonable if it does not
+exceed an amount that a prudent person would incur under the circumstances prevailing when
+the decision to incur the cost was made. The cost principles elaborate on this concept and
+address considerations such as whether the cost is  generally necessary for the organization’s operations or the grant’s performance, whether the recipient complied with its established organizational policies in incurring the cost or charge, and whether the individuals responsible for the
+expenditure acted with due prudence in carrying out their responsibilities to the Federal government and the public at large as well as to the organization.
+ l Allocability. A cost is allocable to a specific grant, function, department, or other component,
+known as a cost objective, if the cost is assignable to that cost objective in accordance with the
+relative benefits received or other equitable relationship. A cost is allocable to a grant if it is
+incurred solely in order to advance work under the grant; it benefits both the grant and other
+work of the institution, including other grant-supported projects; or it is necessary to the overall
+operation of the organization and is deemed to be assignable, at least in part, to the grant. A cost
+is allocable as a direct cost to a grant if it is incurred solely in order to advance work under the
+grant or meets the criteria for closely related projects determination (see Cost Considerations—
+Allocation of Costs and Closely Related Work).
+ l Consistency. Recipients must be consistent in assigning costs to cost objectives. Costs may be
+charged as either direct costs or indirect costs, depending on their identifiable benefit to a particular project or program, but all costs must be treated consistently for all work of the organization under similar circumstances, regardless of the source of funding.
+ l Conformance. This test of allowability—conformance with limitations and exclusions as contained in the terms and conditions of award, including those in the cost principles—varies by the
+type of activity, the type of recipient, and other characteristics of individual awards. Cost Considerations—Allowability of Costs/Activities provides information common to most NIH grants
+and, where appropriate, specifies some of the distinctions if there is a different treatment based
+on the type of grant or recipient. IIB contains additional information on allowability of costs for
+particular types of grants, recipients, and activities.
+These four tests apply regardless of whether the particular category of costs is one specified in the cost
+principles or one governed by other terms and conditions of an award. These tests also apply regardless
+of treatment as a direct cost or an indirect cost. The fact that a proposed cost is awarded as requested by
+an applicant does not indicate a determination of allowability.
+7.3 DIRECT COSTS AND INDIRECT COSTS
+Direct costs are any cost that can be identified specifically with a particular sponsored project, an instructional activity, or any other institutional activity, or that can be directly assigned (allocated) to such activities relatively easily with a high degree of accuracy. Direct costs may include, but are not limited to,
+salaries, travel, equipment, and supplies directly supporting or benefiting the grant-supported project or
+activity. If directly related to a specific award, certain costs that otherwise would be treated as indirect
+costs may also be considered direct costs.
+Most organizations also incur costs for common or joint objectives that cannot be readily identified with
+an individual project or program. These are referred to as indirect costs, also called Facilities and Administrative costs (F&A). Facilities operation and maintenance costs, depreciation, and administrative
+expenses are examples of costs that usually are treated as indirect costs. The organization is responsible
+for the management and accounting of costs consistently and must not include costs associated with its
+indirect costs rate as direct costs. Note, the term indirect costs and the term facilities and administrative
+costs  may be used interchangeably to determine applicable policies. For NIH purposes, including the
+(GPS page IIA-69)
+
+NIHGPS, these costs will be referred to as indirect costs; however, other documents or non-NIH entities
+may refer to them as facilities and administrative costs.
+Project costs consist of the allowable direct costs directly related to the performance of the grant plus the
+allocable portion of the allowable indirect costs of the organization, less applicable credits (as described
+below and in the cost principles).
+The amount NIH awards for each budget period will reflect the total approved budget for the grant,
+including direct costs and, if applicable, indirect costs. (SBIR and STTR awards also may include a fee
+as specified in Grants to For-Profit Organizations—Small Business Innovation Research and Small Business Technology Transfer Programs in IIB.) If a recipient waives reimbursement of full indirect costs,
+NIH will either not award indirect costs or will award only partial indirect costs, as appropriate. The NIH
+award amount shown in the NoA constitutes NIH’s maximum financial obligation to the recipient under
+that award.
+7.4 REIMBURSEMENT OF INDIRECT COSTS
+Under the Consolidated Appropriations Act for FY 2026, (P.L. 119-75, Division B, Title II, Sec. 224),
+the provisions relating to indirect costs in 45 CFR 75, including with respect to the approval of deviations from negotiated rates, apply to NIH awards. For grant programs that can provide indirect cost
+reimbursement, NIH will generally not provide indirect costs unless the recipient has established an indirect cost rate covering the applicable activities and period of time, except for awards under which indirect
+costs are reimbursed at a fixed rate.
+ In addition, NIH will not require a recipient to establish indirect cost rate if the organization’s total operations consist of a single grant-supported project or if the organization appropriately and consistently
+treats all costs as direct costs to projects and accounts for them as such. In the latter case, the GMO must
+be satisfied that the organization’s accounting system can adequately identify and support all costs as direct costs to the project. This includes being able to identify and segregate costs on the basis of a process
+that assigns costs commensurate with the benefits provided to individual projects (see Administrative
+Requirements—Management Systems and Procedures—Financial Management System Standards).
+Indirect cost rates are negotiated by CAS, DFAS in the Office of Acquisition Management and Policy,
+NIH (responsible for negotiating indirect cost rates for for-profit entities receiving awards from HHS), or
+other agency with cognizance for indirect cost rate (and other special rate) negotiation. If an applicant is
+advised by the GMO of the need to establish a rate, the GMO will indicate the responsible office to be
+contacted.
+Indirect cost proposals must be prepared in accordance with the applicable cost principles and guidance
+provided by the cognizant office or agency for indirect costs and must conform to cost policies in the
+NIHGPS. Further information concerning the establishment of indirect rates and the reimbursement of
+indirect costs may be obtained from DFAS (see Part III).
+Consistent with 45 CFR 75.414(f), recipients and subrecipients that do not have a current Federal negotiated (including provisional) indirect cost rate,  may elect to charge a de minimis rate of 10% of modified total direct costs (MTDC). Federal agencies and pass-through entities may not require recipients
+and subrecipients to use a de minimis rate lower than the negotiated indirect cost rate or the de minimis
+rate elected unless required by Federal statue or regulation. Recipients and subrecipients are not required
+to use the de minimis rate. When applying the de minimis rate, costs must be consistently charged as
+either direct or indirect costs but may not be double charged or inconsistently charged as both. The de
+minimis rate does not require documentation to justify its use and may be used indefinitely. Once elected, the recipient or subrecipient must use the de minimis rate for all Federal awards until the recipient
+and subrecipient chooses to receive a negotiated rate.
+(GPS page IIA-70)
+
+If a subrecipient already has a negotiated indirect cost rate established with their cognizant agency for
+indirect cost, the pass-through entity must accept the negotiated rate. If no approved rate exists, the passthrough entity must determine the appropriate rate in collaboration with the subrecipient, which is either:
+the negotiated indirect cost rate between the pass-through entity and the subrecipient; which can be
+based on a prior negotiated rate between a different PTE and the same subrecipient. If basing the rate on
+a previously negotiated rate, the pass-through entity is not required to collect information justifying this
+rate but may elect to do so; or the de minimis indirect cost rate. The pass-through entity must not require
+use of a de minimis indirect cost rate if the subrecipient has a Federally approved rate.  Subrecipients can
+elect to use the cost allocation method to account for indirect costs. The cost principles are designed to
+provide that Federal awards bear their fair share of costs recognized under these principles. (See 45 CFR
+75.100. Pass-through entities may, but are not required, to negotiate a rate with a proposed subrecipient
+that asks to do so. If the consortium is with a for-profit entity, such as a small business, the organization
+must have an established indirect cost rate before they can charge indirect costs. The default small business rate of 40 percent is only applicable to SBIR and STTR applications.
+Regardless of the type of recipient, the rate(s) in effect at the beginning of the competitive segment will
+be used to determine the amount budgeted for indirect costs for each year of the competitive segment. If
+the rate agreement does not extend to the end of the project period, the last rate in effect will be used to
+establish the total cost commitment for any remaining future years. NIH generally will not award additional indirect costs beyond those calculated in the approved budget.
+Indirect costs awarded may be subject to upward or downward adjustment, depending on the type of rate
+negotiated and recipient type. Generally, recipients may rebudget between direct and indirect costs (in
+either direction) without NIH prior approval, provided there is no change in the scope of the approved
+project. indirect cost reimbursement on grants to IHEs is based on the rates used in the award, which are
+not subject to adjustment in reimbursement except for the establishment of permanent rates when a provisional rate was used for funding (See 45 CFR 75 Appendix III Section C(7)(b)). Therefore per 45
+CFR 75 Appendix III, IHEs may not rebudget from direct costs to accommodate a rate increase if the
+indirect costs provided for a period were based on negotiated (final, fixed or predetermined) rates rather
+than provisional rates (See 45 CFR 75 Appendix III Section C(7)(a)).For recipients other than IHEs,
+Indirect cost reimbursement is based on the negotiated indirect rate agreement consistent with the time
+period when the cost is incurred, except if indirect costs were limited or not provided. Indirect costs are
+subject to downward adjustment if the proposal that served as the basis for the negotiation included unallowable costs.
+Some grants require negotiation of project costs annually, e.g., clinical trials. For these awards, the
+policies pertain to each year of support rather than to a multiyear competitive segment.
+Once NIH awards a grant, it is not obligated to make any supplemental or other award for additional
+indirect costs or for any other purpose. There are limited circumstances under which the GMO may
+award indirect costs where none were previously awarded or may increase the amount previously awarded. If an award does not include an amount for indirect costs because the applicant or recipient did not
+submit a timely indirect cost proposal and the recipient subsequently establishes a rate, the GMO may
+amend the award to provide an appropriate amount for indirect costs if the amendment can be made
+using funds from the same Federal fiscal year in which the award was made. However, the amount will
+be limited to the indirect costs applicable to the period after the date of the recipient’s indirect cost proposal submission. This provision does not affect local governmental agencies that are not required to submit their indirect cost proposals to the Federal government. They may charge indirect costs to NIH
+grants based on the rate computations they prepare and keep on file for subsequent Federal review.
+If funds are available, a GMO may amend an award to provide additional funds for indirect costs, but
+only under the following circumstances:
+(GPS page IIA-71)
+
+l NIH made an error in computing the award. This includes situations in which a higher rate than
+the rate used in the grant award is negotiated and the date of the rate agreement for the higher
+rate is before 1 calendar month prior to the beginning date of the grant budget period.
+ l NIH restores funds previously recaptured as part of a recipient’s unobligated balance.
+ l The recipient is eligible for additional indirect costs associated with additional direct costs awarded for the supplementation or extension of a project.
+NIH may use a rate different from the negotiated rate for a class of Federal awards or a single award
+only when required by Federal statute or regulation, or when approved by the agency head or delegate
+based on documented justification.
+NIH does not reimburse indirect costs under the following classes of awards:
+ l Fellowships. Indirect costs will not be provided on Kirschstein-NRSA individual fellowships or
+similar awards for which NIH funding is in the form of fixed amounts or is determined by the
+normal published tuition rates of an institution and for which the recipient is not required to
+account on an actual cost basis.
+ l Construction and Modernization. Indirect costs will not be provided on construction or modernization grants.
+ l Grants to Individuals. Indirect costs will not be provided on awards to individuals.
+ l Grants to Federal Institutions. Indirect costs will not be provided on grants to Federal institutions.
+ l Grants in Support of Scientific Meetings (Conference Grants). Indirect costs will not be
+provided under grants in support of scientific meetings.
+ l Endowment Grants. Indirect costs will not be provided for endowment grants.
+NIH limits the amounts included in the indirect cost base for the following type of costs:
+ l Genomic Arrays (GA) are a high-throughput genetic analysis technology which enables the
+study of genetic variation and gene expression at high resolution. Approaches such as genomewide association and gene expression profiling often depend upon manufactured products known
+as microarrays or bead arrays. These tools are exceptional among laboratory supplies in that they
+are almost always procured from a commercial source; have a relatively high unit cost and are
+often utilized in large numbers. The treatment of the costs for purchase of GA as “supplies” in
+these specialized award budgets at high levels of usage would result in the application of indirect
+cost recovery that is disproportionate to the actual administrative burden associated with the relatively high cost of the procurement of these GA. Accordingly, for purposes of budgeting for
+and award of high volume purchases of GA in excess of $50,000 per year, the standard treatment
+of these resources as supplies in determining the indirect base of an award will be non-applicable. Instead, the requested and reimbursed costs for GA will utilize as a surrogate the concept
+of subcontracts (consortium/contractual cost). Therefore, for each budget year, the first $50,000
+of GA will be treated as “supplies”, and any GA in excess of $50,000 (for high volume requirements) will use as a surrogate the budgeting and reimbursement concept utilized for subcontracts
+(consortium/contractual cost), providing consistent budgeting, accounting and reimbursement of
+these costs.
+NIH provides indirect costs without the need for a negotiated rate under the following classes of awards:
+(GPS page IIA-72)
+
+l Research Training and Education Grants (e.g., R25), and K Awards. Indirect costs under
+Kirschstein-NRSA institutional research training grants, educational and K awards will be
+budgeted and reimbursed at a rate of 8 percent of modified total direct costs, exclusive of tuition
+and fees, expenditures for equipment, and consortiums in excess of $25,000. State, local, and
+Indian tribes (or "federally recognized Indian tribes") may receive full indirect cost reimbursement under NIH Kirschstein-NRSA institutional research training grants and K awards. For
+this policy, State universities or hospitals are not considered governmental agencies.
+ l Grants to Foreign Organizations and International Organizations. With the exception of the
+American University of Beirut and the World Health Organization, which are eligible for full
+indirect cost reimbursement, indirect costs under grants to foreign and international organizations, including collaborative international research projects, will be funded at a fixed rate of
+8 percent of modified total direct costs, exclusive of tuition and related fees, direct expenditures
+for equipment, and subawards in excess of $25,000. These funds are paid to support the costs of
+compliance with federal requirements. Some examples of NIH compliance requirements are the
+protection of human subjects (including the required education in the protection of human
+research participants), animal welfare, invention reporting, other post-award reporting requirements, financial conflict of interest and research misconduct. Note, these are just a few representative examples of compliance requirement; this list is not all inclusive. NIH will not
+support the acquisition of or provide for depreciation on any capital expenses (facilities) or the
+normal general operations of foreign and international organizations. Therefore, these expenses
+may not be requested as a direct cost; however, equipment is an allowable direct cost. Other
+items normally treated as indirect costs (e.g., rent) may be requested as direct costs and will be
+evaluated by NIH for allowability.
+7.5 COST TRANSFERS, OVERRUNS, AND ACCELERATED
+AND DELAYED EXPENDITURES
+Cost transfers to NIH grants by recipients, consortium participants, or contractors under grants that represent corrections of clerical or bookkeeping errors should be accomplished within 90 days of when the
+error was discovered. The transfers must be supported by documentation that fully explains how the
+error occurred and a certification of the correctness of the new charge by a responsible organizational
+official of the recipient, consortium participant, or contractor. An explanation merely stating that the
+transfer was made “to correct error” or “to transfer to correct project” is not sufficient. Transfers of costs
+from one project to another or from one competitive segment to the next solely to cover cost overruns
+are not allowable.
+Recipients must maintain documentation of cost transfers, pursuant to 2 CFR Part 200.337, and must
+make it available for audit or other review (see Administrative Requirements—Monitoring—Record
+Retention and Access). The recipient should have systems in place to detect such errors within a reasonable time frame; untimely discovery of errors could be an indication of poor internal controls. Frequent errors in recording costs may indicate the need for accounting system improvements, enhanced
+internal controls, or both. If such errors occur, recipients are encouraged to evaluate the need for
+improvements and to make whatever improvements are deemed necessary to prevent reoccurrence. NIH
+also may require a recipient to take corrective action by imposing additional terms and conditions on an
+award(s).
+The GMO monitors recipient expenditure rates under individual grants within each budget period and
+within the overall project period. The funding that NIH provides for each budget period is based on an
+assessment of the effort to be performed during that period and the recipient’s associated budget, including the availability of unobligated balances. Although NIH allows recipients certain flexibilities with
+(GPS page IIA-73)
+
+respect to rebudgeting (see Administrative Requirements—Changes in Project and Budget), NIH expects
+the rate and types of expenditures to be consistent with the approved project and budget and may question or restrict expenditures that appear inconsistent with these expectations.
+The GMO may review recipient cash drawdowns to determine whether they indicate any pattern of accelerated or delayed expenditures. Expenditure patterns are of particular concern because they may indicate
+a deficiency in the recipient’s financial management system or internal controls. Accelerated or delayed
+expenditures may result in a recipient’s inability to complete the approved project within the approved
+budget and period of performance. In these situations, the GMO may seek additional information from
+the recipient and may make any necessary and appropriate adjustments.
+7.6 ALLOCATION OF COSTS AND CLOSELY RELATED
+WORK
+When salaries or other activities are supported by two or more sources, issues arise as to how the direct
+costs should be allocated among the sources of support. In general, a cost that benefits two or more projects or activities in proportions that can be determined without undue effort or cost should be allocated
+to the projects on the basis of the proportional benefit. A cost that benefits two or more projects or activities in proportions that cannot be determined because of the interrelationship of the work involved may
+be allocated or transferred to the benefiting projects on any reasonable basis as long as the costs charged
+are allowable, allocable, and reasonable under the applicable cost principles and the recipient’s financial
+management system includes adequate internal controls (for example, no one person has complete control over all aspects of a financial transaction).
+7.7 APPLICABLE CREDITS
+The term applicable credits refers to  transactions that operate to offset or reduce direct or indirect cost
+items. Typical examples are purchase discounts, rebates or allowances, recoveries or indemnities on
+losses, and adjustments for overpayments or erroneous charges. Additional information concerning
+applicable credits is included in the cost principles.
+Applicable credits to direct charges made to NIH grants must be treated as an adjustment on the recipient’s FFR, whether those credits accrue during or after the period of grant support. (See Administrative
+Requirements—Monitoring—Reporting and Administrative Requirements—Closeout—Final Federal Financial Reports.) The NIH awarding IC will notify the recipient of any additional actions that may be
+necessary.
+7.8 SERVICES PROVIDED BY AFFILIATED ORGANIZATIONS
+A number of universities and other organizations have established closely affiliated, but separately incorporated, organizations to facilitate the administration of research and other programs supported by
+Federal funds. Such legally independent entities are often referred to as “foundations,” although this term
+does not necessarily appear in the name of the organization. Sometimes, the parent organization provides
+considerable support services, in the form of administration, facilities, equipment, accounting, and other
+services, to its foundation, and the latter, acting in its own right as an NIH recipient, includes the cost of
+these services in its indirect proposal.
+Costs incurred by an affiliated, but separate, legal entity in support of a recipient foundation are allowable for reimbursement under NIH grants only if at least one of the following conditions is met:
+ l The affiliated organization is charged for, and is legally obligated to pay for, the services
+provided by the parent organization.
+(GPS page IIA-74)
+
+l The affiliated organizations are subject to State or local law that prescribes how Federal reimbursement for the costs of the parent organization’s services will be expended and requires that a
+State or local official acting in their official capacity approves such expenditures.
+ l There is a valid written agreement between the affiliated organizations whereby the parent organization agrees that the recipient foundation may retain Federal reimbursement of parent organization costs. The parent organization may either direct how the funds will be used or permit the
+recipient foundation that discretion.
+If none of the above conditions are met, the costs of the services provided by the parent organization to
+the recipient foundation are not allowable for reimbursement under an NIH grant. However, the services
+may be acceptable for cost-sharing (matching) purposes.
+Foundations that represent already existing recipient organizations should contact DGP, OPERA before
+attempting to become a separately recognized applicant organization.
+7.9 ALLOWABILITY OF COSTS/ACTIVITIES
+The governing cost principles address selected items of cost, some of which are mentioned in this section
+for emphasis. This section is not intended to be all-inclusive. The cost principles should be consulted for
+the complete explanation of whether or not a cost is allowed.
+This section also includes NIH-specific requirements concerning costs and activities. The allowability of
+costs under specific NIH awards may be subject to other requirements specified in the program legislation, regulations, or the specific terms and conditions of an award, which take precedence over the general discussion provided here. Specific program requirement may also be covered in other sections of the
+NIHGPS. Applicants or recipients that have questions concerning the allowability of particular costs
+should contact the GMO.
+If a cost is allowable, it is allocable as either a direct cost or an indirect cost, depending on the recipient’s accounting system. For some costs addressed in this section, the text specifies whether the cost is
+usually a direct cost or an indirect cost.
+Unless otherwise indicated in the NoA, an award based on an application that includes specific information concerning any costs or activities that require NIH prior approval constitutes the prior approval for
+those costs or activities. The recipient is not required to obtain any additional approval for those costs/activities. Post-award requests to incur costs or undertake activities requiring prior approval that are not
+described in the approved application are subject to the requirements in Administrative Requirements—
+Changes in Project and Budget.
+Consortium participants and contractors under grants are subject to the requirements of the cost principles otherwise applicable to their type of organization and to any requirements placed on them by the
+recipient to be able to comply with the terms and conditions of the NIH grant.
+The cost principles do not address profit or fee. NIH policy allows the payment of fee on SBIR/STTR
+grants (see Grants to For-Profit Organizations chapter in IIB) but NIH will not provide profit or fee to
+any other type of recipient under any other grant program or support mechanism. A fee may not be paid
+by a recipient to a consortium participant, including a for-profit organization. However, a fee (profit)
+may be paid to a contractor providing routine goods or services under a grant in accordance with normal
+commercial practice.
+7.9.1 Selected Items of Cost
+Exhibit 5:  Selected Items of Cost
+(GPS page IIA-75)
+
+The table presents specific items that may or may not be included in the cost portion of grants
+(GPS page IIA-76)
+
+Items
+Explanation of Allowable Costs
+Advertising and Public
+Relations
+ 1. The term advertising costs means the costs of advertising media and
+corollary administrative costs. Advertising media include magazines,
+newspapers, radio and television, direct mail, exhibits, electronic or
+computer transmittals, and the like.
+ 2. The only allowable advertising costs are those which are solely for:
+ a. The recruitment of personnel required by the recipient or
+subrecipient for performance of a Federal award (See also 2 CFR
+Part 200.463);
+ b. The procurement of goods and services for the performance of a
+Federal award;
+ c. The disposal of scrap or surplus materials acquired in the
+performance of a Federal award except when non-Federal
+entities are reimbursed for disposal costs at a predetermined
+amount; or
+ d. Program outreach and other specific purposes necessary to meet
+the requirements of the Federal award.
+ 3. The term ‘‘public relations’’ includes community relations and means
+those activities dedicated to maintaining the image of the recipient or
+subrecipient or maintaining or relations with the community or public at
+large or any segment of the public.
+ 4. The only allowable public relations costs are:
+ a. Costs specifically required by the Federal award;
+ b. Costs of communicating with the public and press pertaining to
+specific activities or accomplishments which result from
+performance of the Federal award (these costs are considered
+necessary as part of the outreach effort for the Federal award); or
+ c. Costs of conducting general liaison with news media and
+government public relations officers, to the extent that such
+activities are limited to communication and liaison necessary to
+keep the public informed on matters of public concern, such as
+notices of funding opportunities, financial matters, etc.
+ 5. Unallowable advertising and public relations costs include the following:
+ a. All advertising and public relations costs other than as specified in
+paragraphs (2) and (4) of this section;
+ b. Costs of meetings, conventions, convocations, or other events
+related to other activities of the entity (see also 2 CFR
+Part 200.432), including:
+ i. Costs of displays, demonstrations, and exhibits;
+ ii. Costs of meeting rooms, hospitality suites, and other
+special facilities used in conjunction with shows and other
+special events; and
+(GPS page IIA-77)
+
+Items
+Explanation of Allowable Costs
+ iii. Salaries and wages of employees engaged in setting up
+and displaying exhibits, making demonstrations, and
+providing briefings;
+ c. Costs of promotional items and memorabilia, including models,
+gifts, and souvenirs;
+ d. Costs of advertising and public relations designed solely to
+promote the recipient or subrecipient
+Alcoholic Beverages
+Unallowable as an entertainment expense, but allowable if within the scope of an
+approved research project.
+Alteration and
+Renovation
+Individual A&R projects that are treated as direct costs and that are determined
+to be minor are subject to the A&R policies specified in this exhibit and in the
+Construction Grants chapter, as applicable. Individual A&R projects determined
+to be major A&R will be subject to the requirements specified in the Construction
+Grants chapter.
+Routine maintenance and repair of the organization’s physical plant or
+equipment, which is allowable and is ordinarily treated as an indirect cost, is not
+considered A&R for purposes of applying this policy. Certain allowable costs of
+installing equipment, such as the temporary removal and replacement of wall
+sections and door frames to place equipment in its permanent location, or the
+costs of connecting utility lines, replacing finishes and furnishings, and installing
+any accessory devices required for the equipment’s proper and safe utilization,
+may be considered either equipment costs or A&R costs, depending on the
+recipient's accounting system.
+A&R costs are not allowable under grants to individuals, and grants in support of
+scientific meetings (conference grants). In all other cases, these costs are
+allowable unless the program legislation, implementing regulations, program
+guidelines, or other terms and conditions of the award specifically exclude such
+activity.
+The A&R must be consistent with the following criteria and documentation
+requirements:
+ l The building has a useful life consistent with program purposes and is
+architecturally and structurally suitable for conversion to the type of
+space required.
+ l The A&R is essential to the purpose of the grant-supported project.
+ l The space involved will be occupied by the project.
+ l The space is suitable for human occupancy before A&R work is started
+except where the purpose of the A&R is to make the space suitable for
+some purpose other than human occupancy, such as storage.
+ l If the space is rented, evidence is provided that the terms of the lease
+are compatible with the A&R proposed and cover the duration of the
+project period.
+(GPS page IIA-78)
+
+Items
+Explanation of Allowable Costs
+ l If the A&R will affect a site listed in (or eligible for inclusion in) the
+National Register of Historic Places, the requirements specified in
+“Preservation of Cultural and Historic Resources” have been followed.
+Work necessary to obtain an initial occupancy permit for the intended use is not
+an allowable A&R cost.
+A recipient may rebudget up to 25 percent of the total approved budget for a
+budget period into A&R costs without NIH prior approval unless such
+rebudgeting would result in a change in scope. If the rebudgeting will result in the
+addition of a major A&R project, NIH will consider the rebudgeting to be a change
+in scope, and the recipient must submit to the NIH awarding IC the
+documentation specified in the Construction Grants chapter for prior approval of
+A&R projects above that dollar level.
+Under foreign grants or foreign components under domestic grants, major A&R
+is unallowable. Minor A&R is generally allowable on grants made to foreign
+organizations or to the foreign component of a domestic grant, unless prohibited
+by the governing statute or implementing program regulations.
+Animals
+Allowable for the acquisition, care, use and rehoming / retirement of
+experimental animals, contingent upon compliance with the applicable
+requirements of the PHS Policy on Humane Care and Use of Laboratory Animals
+(see Public Policy Requirements and Objectives—Animal Welfare). If the
+recipient operates an animal resource facility, charges for use of the facility
+should be determined in accordance with the Cost Analysis and Rate Setting
+Manual for Animal Resource Facilities (PDF, 32 MB) — May 2000.
+Audiovisual Activities
+Allowable for the production of an audiovisual. “Audiovisual” means any product
+containing visual imagery, sound, or both, such as motion pictures, films,
+videotapes, live or recorded radio or television programs or public service
+announcements, slide shows, filmstrips, audio recordings, multimedia
+presentations, or exhibits where visual imagery, sound, or both are an integral
+part. “Production” refers to the steps and techniques used to create a finished
+audiovisual product including, but not limited to, design, layout, scriptwriting,
+filming or taping, fabrication, sound recording, and editing.
+A recipient with in-house production capability must determine whether it would
+be more efficient and economical to use that capability or to contract for the
+production of an audiovisual.
+If an audiovisual intended for members of the general public (i.e., people who are
+not researchers or health professions personnel or who are not directly involved
+in project activities as employees, trainees, or participants such as volunteers or
+patients) is produced under an NIH grant-supported project, the recipient must
+submit two copies of the finished product along with its annual or final progress
+report (see Administrative Requirements—Monitoring—Reporting and
+Administrative Requirements—Closeout). The costs of such copies are
+allowable project costs.
+Audiovisuals produced under an NIH grant-supported project must bear an
+acknowledgment and disclaimer, such as the following:
+(GPS page IIA-79)
+
+Items
+Explanation of Allowable Costs
+The production of this [type of audiovisual (motion picture, television
+program, etc.)] was supported by Grant No.____________ from [name of
+NIH awarding IC]. Its contents are solely the responsibility of [name of
+recipient organization] and do not necessarily represent the official views of
+[name of NIH awarding IC].
+Audit Services
+ 1. A reasonably proportionate share of the costs of audits required by, and
+performed in accordance with the Single Audit Act Amendments of 1996
+(31 U.S.C. 7501-7507) and the requirements of 2 CFR Part 200, are
+allowable. However, the following audit costs are unallowable:
+ a. Any costs when audits required by the Single Audit Act and
+Subpart F— Audit Requirements of 2 CFR Part 200  have not
+been conducted or have been conducted but not in accordance
+with the requirements; and
+ b. Any costs of auditing a non- federal entity that is exempted from
+having an audit conducted under the Single Audit Act and
+Subpart F—Audit Requirements of 2 CFR Part 200 because its
+expenditures under Federal awards are less than $1,000,000
+during its fiscal year.
+ 2. The costs of a financial statement audit of a recipient or subrecipient that
+does not currently have a Federal award may be included in the indirect
+cost pool for a cost allocation plan or indirect cost proposal.
+ 3. Pass-through entities may charge Federal awards for the cost of agreedupon-procedures engagements to monitor subrecipients (in accordance
+with Subpart D of 2 CFR Part 200.331 through 200.333) exempt from the
+requirements of the Single Audit Act and Subpart F of 2 CFR Part 200.
+This cost is allowable only if the agreed-upon-procedures engagements
+are:
+ a. Conducted in accordance with GAGAS or applicable international
+attestation standards, as appropriate;
+ b. Paid for and arranged by the pass-through entity; and
+ c. Limited in scope to one or more of the following types of
+compliance requirements: activities allowed or unallowed;
+allowable costs/cost principles; eligibility; and reporting.
+Bad Debts
+Bad debts (debts which have been determined to be uncollectable), including
+losses (whether actual or estimated) arising from uncollectable accounts and
+other claims, are unallowable. Related collection costs, and related legal costs,
+arising from such debts after they have been determined to be uncollectable are
+also unallowable. (See also 2 CFR Part 200.428).
+(GPS page IIA-80)
+
+Items
+Explanation of Allowable Costs
+Bonding
+ 1. Bonding costs arise when the Federal awarding agency requires
+assurance against financial loss to itself or others by reason of the act or
+default of the recipient or subrecipient. They arise also in instances
+where the recipient or subrecipient requires similar assurance, including:
+bonds as bid, performance, payment, advance payment, infringement,
+and fidelity bonds for employees and officials.
+ 2. Costs of bonding required pursuant to the terms and conditions of the
+Federal award are allowable.
+ 3. Costs of bonding required by the recipient or subrecipient in the general
+conduct of its operations are allowable as an indirect cost to the extent
+that such bonding is in accordance with sound business practice and the
+rates and premiums are reasonable under the circumstances.
+Books and Journals
+Allowable. If an organization has a library, books and journals generally should
+be provided as part of normal library services and treated as indirect costs.
+Building Acquisition
+Unallowable unless building acquisition or construction is specifically authorized
+by program legislation and is provided for in the NoA. For real property acquired
+with NIH grant support, the cost of title insurance may be charged to the grant in
+proportion to the Federal share of the acquisition cost. Filing fees for recording
+the Federal interest in the real property in appropriate records of the applicable
+jurisdiction also may be charged to the grant. (Also see Construction Grants—
+Allowable and Unallowable Costs and Activities in IIB).
+Capital Expenditures
+See Equipment and Other Capital Expenditures.
+Childcare Costs
+Allowable if incurred to assist individuals to participate as subjects in research
+projects. Such costs also may be allowable as a fringe benefit for individuals
+working on a grant-supported project (see Fringe Benefits and Travel Costs in
+this exhibit). NRSA Fellowship Grants may also be allowed to incur these costs
+(see 11.2.9.7  and 11.3.8.9 for specific eligibility criteria).
+Closeout Costs
+Administrative costs specifically associated with closeout activities of an award
+are allowable (for example, salaries of personnel preparing final reports,
+publication and printing costs, costs associated with the disposition of equipment
+and property, and related indirect costs), without NIH prior approval, and may be
+incurred until the due date of the final report(s). Incurred costs must be liquidated
+before the due date of the final report(s) and charged to the final budget period of
+the award unless otherwise specified by NIH.
+Collection of Improper
+Payments
+The costs incurred by a recipient or subrecipient to recover improper payments
+are allowable as either direct or indirect costs, as appropriate. Amounts collected
+may be used by the recipient or subrecipient in accordance with cash
+management standards set forth in 2 CFR Part 200.305.  (See Improper
+Payment).
+Communications
+Allowable. Such costs include local and long-distance telephone calls, express
+mail, and postage, and usually are treated as indirect costs.
+Conference Grant
+See Support of Scientific Meetings (Conference Grants) chapter in IIB for
+(GPS page IIA-81)
+
+Items
+Explanation of Allowable Costs
+Costs
+allowability of costs for scientific meetings (conferences).
+Consortium
+Agreements/
+Contracts under
+Grants
+Allowable to carry out a portion of the programmatic effort or for the acquisition of
+routine goods or services under the grant. Such arrangements may require NIH
+approval as specified in Administrative Requirements—Changes in Project and
+Budget. (See also Administrative Requirements—Management Systems and
+Procedures—Procurement System Standards and Requirements for policies
+that apply to the acquisition of routine goods and services and the Consortium
+Agreements chapter in IIB for policies that apply to recipient collaboration with
+other organizations in carrying out the grant-supported research).
+Construction
+Allowable only when program legislation specifically authorizes new
+construction, modernization, or major A&R, and NIH specifically authorizes such
+costs in the NoA. When authorized, construction activities may include
+construction of a new facility or projects in an existing building that are
+considered to be construction, such as relocation of exterior walls, roofs, and
+floors; attachment of fire escapes; or completion of unfinished shell space to
+make it suitable for human occupancy (see Construction Grants chapter in IIB).
+Consultant Services
+See Professional Services and Salaries and Wages/Intra-IHE Consulting.
+Contingency
+Provisions
+Unallowable. Payments made by the NIH awarding IC to the recipient or
+subrecipient's “contingency reserve” or any similar payment made for events the
+occurrence of which cannot be foretold with certainty as to the time or intensity,
+or with an assurance of their happening, are unallowable under non-construction
+grants. Contingency funds do not include pension funds, self-insurance funds,
+and normal accruals (also see Reserve Funds in this exhibit). (See also
+Construction Grants—Allowable and Unallowable Costs and Activities in IIB
+concerning contingency funds under construction grants).
+Customs and Import
+Duties
+Allowable under grants to domestic organizations when performance will take
+place entirely within the United States, its possessions, or its territories, or when
+foreign involvement in the project is incidental to the overall grant-supported
+project. Charges may include consular fees, customs surtaxes, value-added
+taxes, and other related charges. (See Taxes in this exhibit).
+Depreciation or Use
+Allowances
+Allowable. Such costs usually are treated as indirect costs. Depreciation or use
+charges on equipment or buildings acquired under a federally supported project
+are not allowable.
+Donor Costs
+Allowable as payment to volunteers or research subjects who contribute blood,
+urine samples, and other body fluids or tissues that are specifically projectrelated. Donor costs are not considered a research patient care expense (see
+the Research Patient Care Costs chapter in IIB). Also see Incentive Costs in this
+exhibit.
+Drugs
+Allowable if within the scope of an approved research project.
+Project funds may not be used to purchase drugs classified by FDA as
+“ineffective” or “possibly effective” except in approved clinical research projects
+or in cases where there is no alternative other than therapy with “possibly
+effective” drugs.
+(GPS page IIA-82)
+
+Items
+Explanation of Allowable Costs
+Dues or Membership
+Fees
+Allowable as an indirect cost for organizational membership in business,
+professional, or technical organizations or societies.
+Payment of dues or membership fees for an individual’s membership in a
+professional or technical organization is allowable as a fringe benefit or an
+employee development cost, if paid according to an established organizational
+policy consistently applied regardless of the source of funds.
+See also Membership, Subscription, and Professional Activity costs.
+Entertainment Costs
+Costs of entertainment, including amusement, diversion, and social activities
+and any associated costs (such as gifts) are unallowable, unless they have a
+specific and direct programmatic purpose and are included in a Federal award or
+with prior written approval of the NIH awarding IC.
+Equipment and Other
+Capital Expenditures
+The following rules of allowability must apply to equipment and other capital
+expenditures:
+ 1. Capital expenditures for general purpose equipment, buildings, and land
+are unallowable as direct charges, except with the prior written approval
+of the NIH awarding IC or pass-through entity.
+ 2. Capital expenditures for special purpose equipment are allowable as
+direct costs, provided that items that  relate to a change in scope (which
+may be indicated by a unit cost of $25,000 or more) have the prior
+written approval of the NIH awarding IC or pass-through entity.
+ 3. Capital expenditures for improvements to land, buildings, or equipment
+which materially increase their value or useful life are unallowable as a
+direct cost except with the prior written approval of the NIH awarding IC,
+or pass-through entity. See Depreciation  for rules on the allowability of
+depreciation on buildings, capital improvements, and equipment. See
+also Rental Costs of Real Property and Equipment.
+ 4. When approved as a direct charge pursuant to items (1) through (3)
+above, capital expenditures will be charged in the period in which the
+expenditure is incurred, or as otherwise determined appropriate and
+negotiated with the NIH awarding IC.
+ 5. The unamortized portion of any equipment written off as a result of a
+change in capitalization levels may be recovered by continuing to claim
+the otherwise allowable depreciation on the equipment, or by amortizing
+the amount to be written off over a period of years negotiated with the
+Federal cognizant agency for indirect cost.
+ 6. Cost of equipment disposal. If the recipient or subrecipient is instructed
+by the NIH awarding IC to otherwise dispose of or transfer the
+equipment the costs of such disposal or transfer are allowable.
+See also Capital Expenditures, Equipment, Special Purpose Equipment,
+General Purpose Equipment, Acquisition Cost, and Capital Assets.
+Federal (U.S.
+Government)
+See Grants to Federal Institutions and Payments to Federal Employees under
+Grants—Allowable and Unallowable Costs in IIB for the allowability of payments
+(GPS page IIA-83)
+
+Items
+Explanation of Allowable Costs
+Employees
+made to, or on behalf of, Federal employees under NIH grants, including grants
+to Federal institutions.
+Fines, Penalties,
+Damages and Other
+Settlements
+Costs resulting from recipient or subrecipient violations of, alleged violations of,
+or failure to comply with, Federal, state, tribal, local or foreign laws and
+regulations are unallowable, except when incurred as a result of compliance with
+specific provisions of the Federal award, or with prior written approval of the NIH
+awarding IC.
+Fringe Benefits
+Fringe benefits are allowances and services provided by employers to their
+employees as compensation in addition to regular salaries and wages. Fringe
+benefits include, but are not limited to, the costs of leave (vacation, family
+related, sick or military), employee insurance, pensions, and unemployment
+benefit plans. Except as provided elsewhere in 2 CFR Part 200, Subpart E, the
+costs of fringe benefits are allowable provided that the benefits are reasonable
+and are required by law, an organization-employee agreement, or an established
+policy of the recipient or  subrecipient.
+For policies applicable to tuition remission for students working on grantsupported research projects, see Fringe Benefits / IHE Tuition/Tuition Remission
+in this exhibit. See Ruth L. Kirschstein National Research Service Awards—
+Individual Fellowships—Allowable and Unallowable Costs—Tuition and Fees
+and Ruth L. Kirschstein National Research Service Awards—Institutional
+Research Training Grants—Allowable and Unallowable Costs—Trainee Tuition
+and Fees in IIB for the allowability of tuition costs for fellows and trainees.
+Fringe Benefits / IHE
+Tuition/Tuition
+Remission
+Tuition remission and other forms of compensation paid as, or in lieu of, wages to
+students under research grants are allowable, provided the following conditions
+are met:
+ 1. The individual is conducting activities necessary to the Federal award.
+ 2. Tuition remission and other support are provided,  in accordance with
+established institutional policy, of the IHE and consistently provided in a
+like manner to students in return for similar activities conducted under
+Federal awards as well as other activities.
+ 3. During the academic period, the student is enrolled in an advanced
+degree program at the IHE or affiliated institution and the activities of the
+student in relation to the Federal award are related to the degree
+program.
+ 4. The tuition or other payments are reasonable compensation for the work
+performed and are conditioned explicitly upon the performance of
+necessary work.
+ 5. It is the IHE's practice to similarly compensate students under Federal
+awards as well as other activities
+Charges for tuition remission and other forms of compensation paid to students
+as, or in lieu of, salaries and wages are subject to reporting requirements in 2
+CFR Part 200.430(i). NIH will determine the allowability and reasonableness of
+such compensation under a grant on the basis of 2 CFR Part 200, Subpart E.
+(GPS page IIA-84)
+
+Items
+Explanation of Allowable Costs
+The maximum amount NIH will award for compensation of a graduate student
+receiving support from a research grant is the zero-level Kirschstein-NRSA
+stipend in effect when NIH issues the grant award (see Stipends Summary -
+NRSA).
+Payments made for educational assistance (e.g., scholarships, fellowships, and
+student aid costs) may not be paid from NIH research grant funds even when
+they would appear to benefit the research project.
+Fringe Benefits /
+Insurance
+Allowable. Insurance usually is treated as an indirect cost. In certain situations,
+however, where special insurance is required as a condition of the grant because
+of risks peculiar to the project, the premium may be charged as a direct cost if
+doing so is consistent with organizational policy. Medical liability (malpractice)
+insurance is an allowable cost of research programs at all types of recipients only
+if the research involves human subjects. If so, the insurance must be treated as a
+direct cost and must be assigned to individual grants based on the manner in
+which the insurer allocates the risk to the population covered by the insurance.
+See also Reserve Funds.
+The cost of insuring equipment, whether purchased with project funds or
+furnished as federally owned property, normally should be included in indirect
+costs but may be allowable as a direct cost if this manner of charging is the
+normal organizational policy.
+Health insurance for trainees and fellows is addressed in the Ruth L. Kirschstein
+National Research Service Awards chapter in IIB.
+Fringe Benefits/Leave
+The cost of fringe benefits in the form of regular compensation paid to
+employees during periods of authorized leave (absences) from the job, such as
+for annual, family-related, sick, holidays, court, military, administrative, and
+other similar benefits, are allowable if all of the following criteria are met:
+ 1. They are provided under established written leave policies;
+ 2. The costs are equitably allocated to all related activities, including
+Federal awards; and
+ 3. The accounting basis (cash or accrual) selected for costing each type
+of leave is consistently followed by the recipient or subrecipient or a
+specified group of employees.
+See Ruth L. Kirschstein National Research Service Awards—Individual
+Fellowships—Other Terms and Conditions—Leave and Ruth L. Kirschstein
+National Research Service Awards—Institutional Research Training Grants—
+Other Terms and Conditions—Leave in IIB for NIH policy on leave for
+fellows and trainees.
+Fringe Benefits /
+Pension Plan Costs
+Pension plan costs which are incurred in accordance with the established written
+policies of the recipient or subrecipient are allowable, provided that:
+ 1. Such policies meet the test of reasonableness.
+ 2. The methods of cost allocation are not discriminatory.
+(GPS page IIA-85)
+
+Items
+Explanation of Allowable Costs
+ 3. For recipients using accrual-based accounting, the cost assigned to
+each fiscal year is determined in accordance with GAAP.
+ 4. The costs assigned to a given fiscal year are funded for all plan
+participants within six months after the end of that year. However,
+increases to normal and past service pension costs caused by a delay in
+funding the actuarial liability beyond 30 calendar days after each quarter
+of the year to which such costs are assignable are unallowable. The
+recipients or subrecipient may elect to follow the ‘‘Cost Accounting
+Standard for Composition and Measurement of Pension Costs’’ (48 CFR
+Part 9904.412).
+ 5. Premiums for pension plan termination insurance that are paid pursuant
+to the Employee Retirement Income Security Act (ERISA) of 1974 (29
+U.S.C. 1301–1461) are allowable. Late payment charges on such
+premiums are unallowable. Excise taxes on accumulated funding
+deficiencies and other penalties imposed under ERISA are unallowable.
+ 6. Pension plan costs may be computed using a pay-as-you-go method or
+an actuarial cost method recognized by GAAP and following the
+recipient’s or subrecipient’s established written policies.
+ a. For pension plans financed on a pay-as-you-go method,
+allowable costs will be limited to those representing actual
+payments to retirees or their beneficiaries.
+ b. Pension costs calculated using an actuarial cost-based method
+recognized by GAAP are allowable for a given fiscal year if they
+are funded for that year within six months after the end of that
+year. Costs funded after six months  (or a later period agreed to by
+the cognizant agency for indirect costs) are allowable in the year
+funded. The cognizant agency for indirect costs may agree to an
+extension  if an appropriate adjustment is made to compensate for
+the timing of the charges to the Federal government and related
+Federal reimbursement and the recipient's or subrecipient’s
+contribution to the pension fund. Adjustments may be made by
+cash refund or other equitable procedures to compensate the
+Federal government for the time value of Federal
+reimbursements in excess of contributions to the pension fund.
+ c. Amounts funded by the recipient or subrecipient in excess of the
+actuarially determined amount for a fiscal year may be used as
+the recipient's or subrecipient’s contribution in future periods.
+ d. When a recipient or subrecipient establishes or converts to an
+acceptable actuarial cost method, as defined by GAAP, and
+funds pension costs in accordance with this method, the
+unfunded liability at the time of conversion is allowable if
+amortized over a period of years in accordance with GAAP.
+(GPS page IIA-86)
+
+Items
+Explanation of Allowable Costs
+ e. Payments for unfunded pension costs must be charged in
+accordance with the allocation principles of 2 CFR 200.431.
+Specifically, the recipient or subrecipient may not charge
+unfunded pension costs directly to a Federal award if those
+unfunded pension costs are not allocable to that award.
+ f. The recipient or subrecipient must provide the Federal
+government an equitable share of any previously allowed pension
+costs (including subsequent earnings) that revert or inure to the
+recipient or subrecipient through a refund, withdrawal, or other
+credit.
+Fringe Benefits /
+Severance Pay
+ 1. Severance pay, also commonly referred to as dismissal wages, is a
+payment in addition to regular salaries and wages, by non-Federal
+entities to workers whose employment is being terminated. Costs of
+severance pay are allowable only to the extent that in each case, it is
+required by:
+ a. law,
+ b. employer-employee agreement,
+ c. established policy that constitutes, in effect, an implied
+agreement on the non- Federal entity’s part, or
+ d. circumstances of the particular employment.
+ 2. Costs of severance payments are divided into two categories as follows:
+ a. Actual normal turnover severance payments must be allocated to
+all activities; or, where the recipient or subrecipient provides for a
+reserve for normal severances, such method will be acceptable if
+the charge to current operations is reasonable in light of
+payments actually made for normal severances over a
+representative past period, and if amounts charged are allocated
+to all activities of the recipient or subrecipient.
+ b. Measuring the costs of abnormal or mass severance pay by
+means of an accrual method will not achieve equity for both
+parties. Therefore, accruals are not allowable. However, the
+Federal government recognizes its responsibility  to contribute its
+fair share toward a specific payment. Prior approval by the
+Federal  agency or cognizant agency for indirect cost, as
+appropriate, is required.
+ 3. Costs incurred in certain severance pay packages that are in excess of
+the standard severance pay provided by the recipient or subrecipient to
+an employee upon termination of employment and that are paid to the
+employee contingent upon a change in management control over, or
+ownership of, the recipient's or subrecipient’s assets, are unallowable.
+(GPS page IIA-87)
+
+Items
+Explanation of Allowable Costs
+ 4. Severance payments to foreign nationals employed by the recipient or
+subrecipient outside the United States, to the extent that the amount
+exceeds the customary or prevailing practices for the recipient or
+subrecipient in the United States, are unallowable, unless they are
+required by applicable foreign law necessary for the performance of
+Federal programs and approved by the NIH awarding IC.
+ 5. Severance payments to foreign nationals employed by the recipient or
+subrecipient outside the United States due to the termination of the
+foreign national as a result of the closing of, or curtailment of activities
+by, the recipient or subrecipient in that country, are unallowable, unless
+they are required by applicable foreign law or necessary for the
+performance of Federal programs and approved by the NIH awarding
+IC.
+Fundraising and
+Investment
+Management Costs
+ 1. Costs of organized fund raising, including financial campaigns,
+endowment drives, solicitation of gifts and bequests, and similar
+expenses incurred to raise capital or obtain contributions are
+unallowable. Fund raising costs for the purposes of meeting the Federal
+program objectives are allowable with prior written approval from the
+Federal awarding agency. (See also Proposal Costs).
+ 2. Costs of investment counsel and staff and similar expenses incurred to
+enhance income from investments are unallowable except when
+associated with investments covering pension, self-insurance, or other
+funds which include Federal participation allowed by 2 CFR Part 200.
+ 3. Costs related to the physical custody and control of monies and
+securities are allowable.
+ 4. Both allowable and unallowable fund raising and investment activities
+must be allocated as an appropriate share of indirect costs under the
+conditions described in 2 CFR Part 200.413.
+Genomic Arrays
+Allowable as a direct cost, but with specialized treatment of indirect cost
+reimbursement for costs exceeding $50,000 in each budget year.  See Cost
+Considerations-Reimbursement of Indirect Costs for more information.
+Hazardous Waste
+Disposal
+Allowable; usually treated as an indirect cost.
+Honoraria
+Unallowable when the primary intent is to confer distinction on, or to symbolize
+respect, esteem, or admiration for, the recipient of the honorarium. A payment for
+services rendered, such as a speaker’s fee under a conference grant, is
+allowable.
+Hospitalization
+See Research Patient Care in this exhibit.
+Incentive Costs
+Incentive payments to volunteers or patients participating in a grant-supported
+project or program are allowable. Incentive payments to individuals to motivate
+them to take advantage of grant-supported health care or other services are
+allowable if within the scope of an approved project. See Salaries and
+(GPS page IIA-88)
+
+Items
+Explanation of Allowable Costs
+Wages/Incentive Compensation in this exhibit for incentive payments to
+employees.
+Indemnification
+Absent express statutory authority, unallowable if the indemnification would
+result in liability that is indefinite, indeterminate or potentially unlimited. In those
+rare cases where authority does allow this cost, it would be reflected in the NoA.
+Independent
+Research and
+Development Costs
+Independent research and development is research and development which is
+conducted by an organization, and which is not sponsored by Federal or non-
+Federal awards, contracts, or other agreements. Independent research and
+development shall be allocated its proportionate share of indirect costs on the
+same basis as the allocation of indirect costs to sponsored research and
+development. The cost of independent research and development, including
+their proportionate share of indirect costs, are unallowable.
+Intellectual Property
+(Invention, Copyright,
+Patent, or Licensing
+Costs)
+Unallowable as a direct cost unless specifically authorized on the grant award.
+May be allowable as indirect costs, provided they are in accordance with 2 CFR
+Part 200.448 and are  included in the negotiation of indirect cost rates.
+Interest
+Allowable as an indirect cost for certain assets as specified in 2 CFR
+Part 200.449. Unallowable for hospitals. (2 CFR Part 200, Appendix IX, I.o.).
+(See Payment—Interest Earned on Advances of Grant Funds).
+IRB or IACUC Costs
+Costs associated with IRB review of human research protocols, or IACUC review
+of animal research protocols, are not allowable as direct charges to NIH-funded
+research unless such costs are not covered by the organization’s indirect cost
+rate.
+Laboratory Directed
+Research &
+Development
+NIH awards to DOE laboratories will not include the proportionate share of
+indirect costs for Laboratory Directed Research & Development (LDRD) in
+accordance with the MOU with the Department of Energy dated June 18, 1998,
+although NIH will not restrict the DOE laboratory contractors from recovering
+LDRD costs within the total funding included in an award. In addition, DOE has
+agreed to waive the Overhead Rate on all NIH grant awards to DOE laboratory
+contractors.
+Legal Services
+Allowable. Generally treated as an indirect cost but, subject to the limitations
+described in the applicable cost principles, may be treated as a direct cost for
+legal services provided by individuals who are not employees of the recipient
+organization. Before a recipient incurs legal costs that are extraordinary or
+unusual in nature, the recipient should make an advance agreement regarding
+the appropriateness and reasonableness of such costs with the GMO.
+Legal costs incurred in defending or prosecuting claims, whether equitable or
+monetary, including administrative grant appeals, are generally unallowable
+charges to NIH grant-supported projects, except as expressly permitted in the 2
+CFR Part 200.
+Library Services
+General library support is not allowable as a direct cost but may be included in
+the recipient’s indirect cost pool. However, such services are allowable as a
+direct cost when specifically required for the conduct of the project and when
+(GPS page IIA-89)
+
+Items
+Explanation of Allowable Costs
+identifiable as an integral part of the grant-supported activity (e.g., in those
+programs designed to develop and support such services).
+Lobbying
+Generally unallowable, in accordance with 2 CFR Part 200.450, including costs
+of lobbying activities to influence the introduction, enactment, or modification of
+legislation by the U.S. Congress or a State legislature. Under certain
+circumstances, costs associated with activities that might otherwise be
+considered “lobbying” that are directly related to the performance of a grant may
+be allowable. The recipient should obtain an advance understanding with the
+GMO if it intends to engage in these activities. Unallowable for State and Local
+governments and for-profit organizations. (Also see Public Policy Requirements
+and Objectives—Lobbying Prohibition, Appropriation Mandates – Lobbying –
+Appropriation Prohibition, and Administrative Requirements—Monitoring—
+Reporting concerning lobbying restrictions, the required certification, and
+reporting).
+Maintenance and
+Repair Costs
+Costs incurred for utilities, insurance, security, necessary maintenance, janitorial
+services, repair, or upkeep of buildings and equipment (including Federal
+property unless otherwise provided for) which neither add to the permanent
+value of the property nor appreciably prolong its intended life, but keep it in an
+efficient operating condition, are allowable. Costs incurred for improvements
+which add to the permanent value of the buildings and equipment or appreciably
+prolong their intended life must be treated as capital expenditures (see 2 CFR
+Part 200.439 and 45 CFR Part 75.439). These costs are only allowable to the
+extent that they are not paid through rental or other agreements.
+Materials and
+Supplies Costs,
+including Costs of
+Computing Devices.
+ 1. Costs incurred for materials, supplies, and fabricated parts necessary to
+carry out a Federal award are allowable.
+ 2. Purchased materials and supplies must be charged at their actual
+prices, net of applicable credits. Withdrawals from general stores or
+stockrooms should be charged at their actual net cost under any
+recognized method of pricing inventory withdrawals, consistently
+applied. Incoming transportation charges are a proper part of materials
+and supplies costs.
+ 3. Materials and supplies used for the performance of a Federal award may
+be charged as direct costs. In the specific case of computing devices,
+charging as direct costs is allowable for devices that are essential and
+allocable, but not solely dedicated, to the performance of a Federal
+award.
+ 4. Where federally-donated or furnished materials are used in performing
+the Federal award, such materials will be used without charge.
+Meals
+Allowable for subjects and patients under study, or where specifically approved
+as part of the project activity, provided that such charges are not duplicated in
+participants’ per diem or subsistence allowances, if any.
+When certain meals are an integral and necessary part of a meeting or
+conference (i.e., a working meal where business is transacted), grant funds may
+be used for such meals only when consistent with terms of award.
+(GPS page IIA-90)
+
+Items
+Explanation of Allowable Costs
+Recurring business meetings, such as staff meetings, should not be broadly
+considered as meetings for the primary purpose of disseminating technical
+information in order to justify charging meals or refreshment costs to grants.
+Membership,
+Subscription, and
+Professional Activity
+Costs
+ 1. Costs of the recipient's or subrecipient’s membership in business,
+technical, and professional organizations are allowable as an indirect
+cost.
+ 2. Costs of the recipient's or subrecipient’s subscriptions to business,
+professional, and technical periodicals are allowable.
+ 3. Costs of membership in any civic or community organization are
+allowable if the costs are used to support research and development
+activities and do not support advocacy or lobbying.
+ 4. Costs of membership in any country club or social or dining club or
+organization are unallowable.
+ 5. Costs of membership in organizations whose primary purpose is
+lobbying are unallowable. See also Lobbying.
+ 6. Payment of dues or membership fees for an individual’s membership in
+a professional or technical organization is allowable as a fringe benefit or
+an employee development cost, if paid according to an established
+organizational policy consistently applied regardless of the source of
+funds.
+Moving
+See Recruitment Costs, Relocation Costs, and Transportation Costs in this
+exhibit.
+Nursery Items
+Allowable for the purchase of items such as toys and games to allow patients to
+participate in research protocols.
+Overtime
+See Salaries and Wages/Extra Service Pay (Overtime) in this exhibit.
+Participant Support
+Costs
+Participant support costs are allowable without NIH prior approval if
+additional cost categories are not requested (i.e. souvenirs, t-shirts,
+memorabilia). The classification of items as participant support costs must be
+documented in the recipient’s or subrecipient’s written policies and procedures
+and treated consistently across all Federal awards.
+Pre-Award (Pre-
+Agreement) Costs
+Allowable. A recipient may, at its own risk and without NIH prior approval, incur
+obligations and expenditures to cover costs up to 90 days before the beginning
+date of the initial budget period of a new or renewal award if such costs:
+ l are necessary to conduct the project, and
+ l would be allowable under the grant, if awarded, without NIH prior
+approval.
+If specific expenditures would otherwise require prior approval, the recipient
+must obtain NIH approval before incurring the cost. NIH prior approval is
+required for any costs to be incurred more than 90 days before the beginning
+date of the initial budget period of a new or competing continuation award.  Pre-
+(GPS page IIA-91)
+
+Items
+Explanation of Allowable Costs
+award costs must be charged to the initial budget period of the award, unless
+otherwise specified by  NIH.
+Recipients may incur pre-award costs before the beginning date of a noncompeting continuation award without regard to the time parameters stated
+above.
+The incurrence of pre-award costs in anticipation of a competing or noncompeting award imposes no obligation on NIH either to make the award or to
+increase the amount of the approved budget if an award is made for less than the
+amount anticipated and is inadequate to cover the pre-award costs incurred.
+NIH expects the recipient to be fully aware that pre-award costs result in
+borrowing against future support and that such borrowing must not impair the
+recipient’s ability to accomplish the project objectives in the approved time frame
+or in any way adversely affect the conduct of the project.
+Pre-Award Costs are generally not applicable to training grants or fellowships.
+See respective sections for Individual Fellowships and Institutional Training
+Grants in the Ruth L. Kirschstein National Research Service Award chapter in IIB
+for additional information.
+Prizes or Challenges
+Allowable, without NIH prior approval, if they have a specific and direct
+programmatic purpose and are included in the Federal award.
+Professional Services
+Costs
+ 1. Costs of professional and consultant services rendered by persons who
+are members of a particular profession or possess a special skill, and
+who are not officers or employees of the recipient or subrecipient, are
+allowable, subject to paragraphs (b) and (c) below when reasonable in
+relation to the services rendered and when not contingent upon recovery
+of the costs from the Federal government. In addition, legal and related
+services are limited under 2 CFR Part 200.435.
+ 2. In determining the allowability of costs in a particular case, no single
+factor or any special combination of factors is necessarily determinative.
+However, the following factors are relevant:
+ a. The nature and scope of the service rendered in relation to the
+service required.
+ b. The necessity of contracting for the service, considering the
+recipient's or subrecipient’s capability in the particular area.
+ c. The past pattern of such costs, particularly in the years prior to
+Federal awards.
+ d. The impact of Federal awards on the recipient's or subrecipient’s
+business (i.e., what new problems have arisen).
+ e. Whether the proportion of Federal work to the recipient's or
+subrecipient’s total business is such as to influence the recipient
+or subrecipient in favor of incurring the cost, particularly where
+the services rendered are not of a continuing nature and have
+little relationship to work under Federal awards.
+(GPS page IIA-92)
+
+Items
+Explanation of Allowable Costs
+ f. Whether the service can be performed more economically by
+direct employment rather than contracting.
+ g. The qualifications of the individual or concern rendering the
+service and the customary fees charged, especially on nonfederally funded activities.
+ h. Adequacy of the contractual agreement for the service (e.g.,
+description of the service, estimate of time required, rate of
+compensation, and termination provisions).
+ 3. In addition to the factors in paragraph (b) above, to be allowable, retainer
+fees must be supported by evidence of bona fide services available or
+rendered.
+Recipients, consortium participants, and contractors under grants are
+encouraged to obtain written reports from consultants unless such a report is not
+feasible given the nature of the consultation or would not be useful.
+Documentation maintained by the receiving organization should include the
+name of the consulting firm or individual consultant; the nature of the services
+rendered and their relevance to the grant-supported activities, if not otherwise
+apparent from the nature of the services; the period of service; the basis for
+calculating the fee paid (e.g., rate per day or hour worked or rate per unit of
+service rendered); and the amount paid. This information may be included in the
+consultant’s invoice, in the report, or in another document.  See Grants to Federal
+Institutions and Payments to Federal Employees under Grants chapter in IIB for
+allowable costs associated with consultant payments to Federal employees and
+the circumstances of allowability.  See Salaries and Wages/Intra-IHE Consulting.
+Profit or Fee
+Except for grants awarded under the SBIR / STTR programs, under an NIH
+grant, no profit or fee will be provided to a for-profit organization, whether as a
+recipient or as a consortium participant. A profit or fee under a grant is not a cost,
+but is an amount in excess of actual allowable direct and indirect costs. In
+accordance with normal commercial practice, a profit / fee may be paid to a
+contractor under an NIH grant providing routine goods or services to the
+recipient.
+Proposal Costs
+Proposal costs are the costs of preparing bids, proposals, or applications on
+potential Federal and non-Federal awards or projects, including the development
+of data necessary to support the recipient's or subrecipient’s bids or proposals.
+Proposal costs of the current accounting period of both successful and
+unsuccessful bids and proposals normally should be treated as indirect  costs
+and allocated currently to all activities of the recipient or subrecipient. No
+proposal costs of past accounting periods will be allocable to the current period.
+Public Relations
+Costs
+See Advertising and Public Relations.
+(GPS page IIA-93)
+
+Items
+Explanation of Allowable Costs
+Publication and
+Printing Costs
+ 1. Publication costs for electronic and print media, including distribution,
+promotion, and general handling are allowable. These costs should be
+allocated as indirect costs to all benefiting activities of the recipient or
+subrecipient if they are not identifiable with a particular cost objective.
+ 2. Page charges, article processing charges (APCs) or similar fees such as
+open access fees for professional journal publications and other peerreviewed publications resulting from a Federal award are allowable
+where:
+ a. The publications report work supported by an NIH-funded project;
+and
+ b. The charges are levied impartially on all items published by the
+journal, whether or not under an NIH-funded project.
+ c. The recipient or subrecipient may charge the NIH  award as
+closeout  costs for the costs of publication or sharing of research
+results if the costs were not incurred during the period of
+performance (prior to the final year of the award) unless the terms
+and conditions do not allow for such costs under a specific
+project.
+Publications and journal articles produced under an NIH grant-supported project
+must bear an acknowledgment and disclaimer, as appropriate, as provided in
+Section 8.2, Administrative Requirements—Availability of Research Results:
+Publications, Intellectual Property Rights, and Sharing Research Resources.
+Rearrangement and
+Reconversion Costs
+See Alteration and Renovation costs.
+Recruiting Costs
+ 1. Subject to paragraphs (2) and (3) of this section, and provided that the
+size of the staff recruited and maintained is in keeping with workload
+requirements, costs of ‘‘help wanted’’ advertising, operating costs of an
+employment office necessary to secure and maintain an adequate staff,
+costs of operating an aptitude and educational testing program, travel
+costs of employees while engaged in recruiting personnel, travel costs of
+applicants for interviews for prospective employment, and relocation
+costs incurred incident to recruitment of new employees, are allowable
+to the extent that such costs are incurred pursuant to the recipient's or
+subrecipient’s standard recruitment program. Where the recipient or
+subrecipient uses employment agencies, costs not in excess of standard
+commercial rates for such services are allowable.
+ 2. Special emoluments, fringe benefits, and salary allowances incurred to
+attract professional personnel that do not meet the test of
+reasonableness or do not conform with the established practices of the
+recipient or subrecipient, are unallowable.
+(GPS page IIA-94)
+
+Items
+Explanation of Allowable Costs
+ 3. Where relocation costs incurred incident to recruitment of a new
+employee have been funded in whole or in part as a direct cost to a
+Federal award, and the newly hired employee resigns for reasons within
+the employee's control within 12 months after hire, the recipient or
+subrecipient will be required to refund or credit the Federal share of such
+relocation costs to the Federal government. See also Relocation Costs
+of Employees.
+ 4. Short-term, travel visa costs (as opposed to longer-term, immigration
+visas) are generally allowable expenses that may be proposed as a
+direct cost. Since short-term visas are issued for a specific period and
+purpose, they can be clearly identified as directly connected to work
+performed on a Federal award. For these costs to be directly charged to
+a Federal award, they must:
+ a. Be critical and necessary to conduct the project;
+ b. Be allowable under the applicable cost principles;
+ c. Be consistent with the recipient's or subrecipient’s cost
+accounting practices and established written policy; and
+ d. Meet the definition of ‘‘direct cost’’ as described in the applicable
+cost principles.
+Project funds may not be used for a prospective trainee’s travel costs to or from
+the recipient organization for the purpose of recruitment. However, other costs
+incurred in connection with recruitment under training programs, such as
+advertising, may be allocated to a grant-supported project according to the
+provisions of the applicable cost principles (also see Travel, Relocation Costs,
+and Visa Costs in this exhibit).
+Registration Fees (for
+Symposiums and
+Seminars)
+Allowable if necessary to accomplish project objectives.
+Relocation Costs of
+Employees
+Allowable—in other than change of recipient organization situations—when such
+costs are incurred incidental to a permanent change of duty assignment (for an
+indefinite period or for a stated period of no less than 12 months) for an existing
+employee working on a grant-supported project, or when a new employee is
+recruited for work on the project, provided that the move is for the recipient’s
+benefit rather than the individual’s and that payment is made according to
+established organizational policies consistently applied regardless of the source
+of funds. Relocation costs may include the cost of transporting the employee and
+their family, dependents, and household goods to the new location and certain
+expenses associated with the sale of the former home. If relocation costs have
+been incurred in connection with the recruitment of a new employee, whether as
+a direct cost or an indirect cost, and the employee resigns for reasons within their
+control within 12 months after hire, the recipient must credit the grant account for
+the full cost of the relocation charged to the grant.
+When there is a change in the recipient organization, the personal relocation
+(GPS page IIA-95)
+
+Items
+Explanation of Allowable Costs
+expenses of the PD/PI and others moving from the original recipient to the new
+recipient are not allowable charges to NIH grants (see Administrative
+Requirements—Changes in Project and Budget—Prior Approval Requirements).
+
+Rental or Lease of
+Facilities and
+Equipment
+Allowable subject to the limitations below. Rental costs are allowable to the
+extent that the rates are reasonable at the time of the decision to lease in light of
+such factors as rental costs of comparable property, if any; market conditions in
+the area; the type, life expectancy, condition, and value of the property leased;
+and available alternatives. Because of the complexity involved in determining the
+allowable amount under certain types of leases, recipients are encouraged to
+consult the GMO before entering into leases that will result in direct charges to
+the grant project.
+In general, the rental costs for facilities and equipment applicable to each budget
+period should be charged to that period. However, see Administrative
+Requirements—Management Systems and Procedures—Procurement System
+Standards and Requirements for an exception to this general rule.
+Rental costs under leases that create a material equity in the leased property, as
+defined in 2 CFR Part 200 Subpart E, are allowable only up to the amount that
+would be allowed had the recipient purchased the property on the date the lease
+agreement was executed. This would include depreciation or use allowances,
+maintenance, taxes, and insurance, but would exclude unallowable costs.
+When a recipient transfers property to a third party through sale, lease, or
+otherwise, and then leases the property back from that third party, the lease
+costs that may be charged to NIH projects generally may not exceed the amount
+that would be allowed if the recipient continued to own the property.
+Rental costs under “less-than-arms-length” leases are allowable only up to the
+amount that would be allowed under 2 CFR Part 200, Subpart E had title to the
+property been vested in the recipient. A less-than-arms-length lease is one in
+which one party to the lease agreement is able to control or substantially
+influence the actions of the other. Such leases include, but are not limited to,
+those between divisions of an organization; between organizations under
+common control through common officers, directors, or members; and between
+an organization and its directors, trustees, officers, or key employees (or the
+families of these individuals), directly or through corporations, trusts, or similar
+arrangements in which they hold a controlling interest.
+Research Patient
+Care
+The costs of routine and ancillary services provided by hospitals to individuals,
+including patients and volunteers, participating in research programs are
+allowable. Incurrence of patient care costs if not previously approved by NIH and
+rebudgeting additional funds into, or rebudgeting approved amounts out of, the
+research patient care costs category may be considered a change in scope and
+require prior approval by the NIH awarding IC.
+Routine services include the regular room services, minor medical and surgical
+supplies, and the use of equipment and facilities for which a separate charge is
+not customarily made. Ancillary services are those special services for which
+charges customarily are made in addition to routine services, e.g., x-ray,
+(GPS page IIA-96)
+
+Items
+Explanation of Allowable Costs
+operating room, laboratory, pharmacy, blood bank, and pathology. See the
+Research Patient Care Costs chapter in IIB for NIH policy concerning
+reimbursement of these costs.
+The following otherwise allowable costs are not classified as research patient
+care costs: items of personal expense such as patient travel; consulting
+physician fees; and any other direct payments to individuals, including inpatients,
+outpatients, subjects, volunteers, and donors. Such costs should be included in
+the “Other Expenses” category of the grant budget.
+Reserve Funds
+Contributions to a reserve fund for self-insurance are allowable as specified in
+the governing cost principles (also see Fringe Benefits/Insurance and
+Contingency Provisions in this exhibit).
+Salaries and  Wages /
+IHEs — Part-time
+faculty
+Charges for work performed on Federal awards by faculty members having only
+part-time appointments will be determined at a rate not in excess of that regularly
+paid for part-time assignments.
+Salaries and  Wages /
+IHEs — Periods
+outside the academic
+year
+ 1. Except as specified for teaching activity in paragraph (2) below, charges
+for work performed by faculty members on Federal awards during
+periods not included in the base salary period will be at a rate not in
+excess of the IBS.
+ 2. Charges for teaching activities performed by faculty members on
+Federal awards during periods not included in IBS period will be based
+on the normal written policy of the IHE governing compensation to
+faculty members for teaching assignments during such periods.
+Salaries and  Wages /
+IHEs — Sabbatical
+Leave Costs
+Sabbatical leave costs may be included in a fringe benefit rate or in the
+organization’s indirect cost rate. Salary may be charged directly to a project for
+services rendered to the project by individuals while they are on sabbatical leave,
+provided the salary is proportional to the service rendered and is paid according
+to established organizational policies applicable to all employees regardless of
+the source of funds. Sabbatical leave paid by an individual’s employer, in
+combination with other compensation (e.g., partial salary from an NIH grant),
+may not exceed 100 percent of that individual’s regular salary from their
+organization.
+Salaries and  Wages /
+Standards for
+Documentation of
+Personnel Expenses
+Salary and wage amounts charged to grant-supported projects for personal
+services must be based on an adequate payroll distribution system that
+documents such distribution in accordance with Federal Cost Principles and
+consistently applied institutional policy and practices. See 2 CFR Part 200.430(i).
+Salaries and Wages
+Allowable. Compensation for personal services covers all amounts, including
+fringe benefits, paid currently or accrued by the organization for employee
+services rendered to the grant-supported project. Compensation costs are
+allowable to the extent that they are reasonable, conform to the established
+policy of the organization consistently applied regardless of the source of funds,
+and reasonably reflect the percentage of time actually devoted to the NIH-funded
+project. Direct salary is exclusive of fringe benefits and indirect costs. This salary
+guidance does not apply to consultant payments or to contracts for routine goods
+(GPS page IIA-97)
+
+Items
+Explanation of Allowable Costs
+and services but it does apply to consortium participants (see the Consortium
+Agreements chapter in IIB). Salaries of federal employees with permanent
+appointments are unallowable except in certain circumstances (see the Grants
+to Federal Institutions and Payments to Federal Employees Under Grants
+chapter in IIB).
+Salaries and Wages /
+Extra Service Pay
+(Overtime)
+Extra Service Pay normally represents overload compensation, subject to
+institutional compensation policies for services above and beyond IBS. Where
+extra service pay is a result of Intra-IHE consulting, it is subject to the
+reasonableness standards for Salaries and Wages above. It is allowable if all of
+the following conditions are met:
+ 1. The IHE establishes consistent written policies which apply uniformly to
+all faculty members, not just those working on Federal awards.
+ 2. The IHE establishes a consistent written definition of work covered by
+IBS which is specific enough to determine conclusively when work
+beyond that level has occurred. This may be described in appointment
+letters or other documentations.
+ 3. The supplementation amount paid is commensurate with the IBS rate of
+pay and the amount of additional work performed.
+ 4. The salaries, as supplemented, fall within the salary structure and pay
+ranges established by and documented in writing or otherwise
+applicable to the IHE.
+ 5. The total salaries charged to Federal awards including extra service pay
+are subject to the Standards of Documentation as described in Salaries
+and Wages / IHEs.
+Salaries and Wages /
+Institutions of higher
+education (IHEs)
+Certain conditions require special consideration and possible limitations in
+determining allowable personnel compensation costs under Federal awards.
+Allowable activities: Charges to Federal awards may include reasonable
+amounts for activities contributing and directly related to work under an
+agreement, such as delivering special lectures about specific aspects of the
+ongoing activity, writing reports and articles, developing and maintaining
+protocols (human, animals, etc.), managing substances/chemicals, managing
+and securing project-specific data, coordinating research subjects, participating
+in appropriate seminars, consulting with colleagues and graduate students, and
+attending meetings and conferences.
+Salaries and Wages /
+Intra-IHE Consulting
+Intra-IHE consulting by faculty is assumed to be undertaken as an IHE obligation
+requiring no compensation in addition to IBS. However, in unusual cases where
+consultation is across departmental lines or involves a separate or remote
+operation, and the work performed by the faculty member is in addition to their
+regular responsibilities, any charges for such work representing additional
+compensation above IBS are allowable provided that such consulting
+arrangements are specifically provided for in the Federal award or approved in
+writing by the NIH awarding IC.
+Recipients, consortium participants, and contractors under grants that want to be
+(GPS page IIA-98)
+
+Items
+Explanation of Allowable Costs
+able to charge employee consulting costs to grant-supported projects must
+establish written guidelines permitting such payments regardless of the source of
+funding and indicating the conditions under which the payment of consulting fees
+to employees is proper. Under no circumstances may an individual be paid as a
+consultant and an employee under the same NIH grant.
+ Authorization for consulting fees paid to individuals serving as both employees
+and consultants of the same party must be documented in writing, on a case-bycase basis, by the head of the organization (or their designee) incurring the costs
+– i.e., the recipient organization, consortium participant, or contractor. If the
+designee is personally involved in the project, the authorization may be given
+only by the head of the recipient organization, consortium participant, or
+contractor. This authorization must include a determination that the required
+conditions are present and that there is no apparent or actual conflict of interest.
+Salaries and Wages /
+Nonprofit
+Organizations
+For compensation to members of nonprofit organizations, trustees, directors,
+associates, officers, or the immediate families thereof, determination should be
+made that such compensation is reasonable for the actual personal services
+rendered rather than a distribution of earnings in excess of costs. This may
+include director’s and executive committee member’s fees, incentive awards,
+allowances for off-site pay, incentive pay, location allowances, hardship pay, and
+cost-of-living differentials.
+Salaries and Wages /
+Professional Activities
+outside of the
+Recipient or
+Subrecipient
+Unless an arrangement is specifically authorized by an NIH awarding IC, a
+recipient or subrecipient must follow its written policies and practices concerning
+the permissible extent of professional services that can be provided outside the
+recipient or subrecipient for non-organizational compensation. Where such
+written policies do not exist or do not adequately define the permissible extent of
+consulting or other non-organizational activities undertaken for extra outside
+pay, the Federal government may require that the effort of professional staff
+working on Federal awards be allocated between:
+ 1. Recipient or subrecipient activities, and
+ 2. Non-organizational professional activities. If the NIH awarding IC
+considers the extent of non-organizational professional effort excessive
+or inconsistent with the conflicts-of-interest terms and conditions of the
+Federal award, appropriate arrangements governing compensation will
+be negotiated on a case-by-case basis.
+Salaries and Wages /
+Special
+Considerations
+Special considerations in determining allowability of compensation will be given
+to any change in a recipient or subrecipient’s compensation policy resulting in a
+substantial increase in its employees’ level of compensation (particularly when
+the change was concurrent with an increase in the ratio of Federal awards to
+other activities) or any change in the treatment of allowability of specific types of
+compensation due to changes in Federal policy.
+Salaries and Wages /
+Unallowable Costs
+ 1. Costs which are unallowable under other sections of these principles
+must not be allowable under this section solely on the basis that they
+constitute personnel compensation.
+(GPS page IIA-99)
+
+Items
+Explanation of Allowable Costs
+ 2. The allowable compensation for certain employees is subject to a ceiling
+in accordance with statute. For the amount of the ceiling for cost
+reimbursement contracts, the covered compensation subject to the
+ceiling, the covered employees, and other relevant provisions, see 10
+U.S.C. 2324(e)(1)(P), and 41 U.S.C. 1127 and 4304(a)(16). For other
+types of Federal awards, other statutory ceilings may apply.
+Salaries and Wages
+/Incentive
+Compensation
+Incentive compensation to employees based on cost reduction, or efficient
+performance, suggestion awards, safety awards, etc., is allowable to the extent
+that the overall compensation is determined to be reasonable and such costs are
+paid or accrued pursuant to an agreement entered into in good faith between the
+recipient or subrecipient and the employees before the services were rendered,
+or pursuant to an established plan followed by the recipient or subrecipient so
+consistently as to imply, in effect, an agreement to make such payment.
+Salaries and Wages
+/Overtime Premiums
+Premiums for overtime generally are allowable; however, such payments are not
+allowable for faculty members at institutions of higher education. If overtime
+premiums are allowable, the categories or classifications of employees eligible to
+receive overtime premiums should be determined according to the formally
+established policies of the organization consistently applied regardless of the
+source of funds.
+Salaries and Wages
+/Payments for Dual
+Appointments
+For investigators receiving compensation from the institution
+(recipient/contractor) and separately organized clinical practice plans,
+compensation from such sources may be included in the institutional base salary
+(IBS) budgeted and charged to NIH sponsored agreements if all of the following
+criteria are met:
+ l Clinical practice compensation must be set by the institution. *
+ l Clinical practice activity must be shown on the institution's payroll or
+salary appointment forms and records approved by the institution.
+ l Clinical practice compensation must be paid through or at the direction
+of the institution.
+ l Clinical practice activity must be included and accounted for in the
+institution's effort reporting and/or payroll distribution system.
+ l  The institution must assure that all financial reports and supporting
+documents associated with the combined IBS and resulting charges to
+NIH grants are retained and made available to Federal officials or their
+duly authorized representatives consistent with the requirements of 2
+CFR Part 200.430.
+*  “Set by the institution” means the recipient/contractor institution must be in a
+position to document and certify that the specified amount of clinical practice
+compensation is being paid in essentially the same manner as other specified
+amounts of the committed IBS (compensation) of the investigator. Further, this
+requires that the IBS not vary based on the specific clinical services provided by
+investigator within the periods for which total IBS is certified by the recipient
+institution.
+(GPS page IIA-100)
+
+Items
+Explanation of Allowable Costs
+Salaries and Wages
+/Support from Multiple
+Grants
+See Cost Considerations—Allocation of Costs and Closely Related Work.
+Selling and Marketing
+Costs
+Costs of selling and marketing any products or services of the recipient or
+subrecipient (unless allowed under 2 CFR Part 200.421) are generally not
+allowable, except as direct costs, with prior approval by the NIH awarding IC
+when necessary for the performance of the Federal award.
+Service Charge
+Allowable. The costs to a user of organizational services and central facilities
+owned by the recipient organization, such as central laboratory, technology
+infrastructure fees, computer services and next generation
+computing/communication costs, are allowable provided that they are not
+covered by indirect costs. They must be based on organizational fee schedules
+consistently applied regardless of the source of funds.
+Specialized Service
+Facilities
+ 1. The costs of services provided by highly complex or specialized facilities
+operated by the recipient or subrecipient, such as computing facilities,
+wind tunnels, and reactors are allowable, provided the charges for the
+services meet the conditions of either paragraphs (b) or (c) of this
+section, and, in addition, take into account any items of income or
+Federal financing that qualify as applicable credits under 2 CFR Part
+200.406.
+ 2. The costs of such services, when material, must be charged directly to
+applicable awards based on actual usage of the services on the basis of
+a schedule of rates or established methodology that:
+ a. Does not discriminate between activities under Federal awards
+and other activities of the recipient or subrecipient, including
+usage by the recipient or subrecipient for internal purposes, and
+ b. Is designed to recover only the aggregate costs of the services.
+The costs of each service must consist normally of both its direct
+costs and its allocable share of all indirect costs. Rates must be
+adjusted at least biennially and must take into consideration over
+/ under applied costs of the previous period(s).
+ c. Where the costs incurred for a service are not material, they may
+be allocated as indirect costs.
+ d. Under some extraordinary circumstances, where it is in the best
+interest of the Federal government and the recipient or
+subrecipient to establish alternative costing arrangements, such
+arrangements may be worked out with the Federal cognizant
+agency for indirect costs.
+Stipends
+Allowable as cost-of-living allowances for trainees and fellows only under
+Kirschstein-NRSA individual fellowships and institutional research training
+grants. These payments are made according to a preestablished schedule
+based on the individual’s experience and level of training. A stipend is not a feefor-service payment and is not subject to the cost accounting requirements of the
+(GPS page IIA-101)
+
+Items
+Explanation of Allowable Costs
+cost principles. Additional information, including NIH policy on stipend
+supplementation, is included in Ruth L. Kirschstein National Research Service
+Awards—Individual Fellowships—Supplementation of Stipends, Compensation,
+and Other Income—Stipend Supplementation and Ruth L. Kirschstein National
+Research Service Awards—Institutional Research Training Grants—Stipend
+Supplementation, Compensation, and Other Income—Stipend Supplementation
+in IIB. Stipends are not allowable under research grants even when they appear
+to benefit the research project. See Fringe Benefits / IHE Tuition/Tuition
+Remission in this exhibit.
+Subject Costs
+See Research Patient Care and Donor Costs in this exhibit.
+Taxes
+For nonprofit organizations and IHEs:
+ 1. In general, taxes which the recipient or subrecipient is required to pay
+and which are paid or accrued in accordance with GAAP, and payments
+made to local governments in lieu of taxes which are commensurate with
+the local government services received are allowable, except for:
+ a. Taxes from which exemptions are available to the recipient or
+subrecipient directly or which are available to the recipient and
+subrecipient based on an exemption afforded the Federal
+government and, in the latter case, when the NIH awarding IC
+makes available the necessary exemption certificates,
+ b. Special assessments on land which represent capital
+improvements, and
+ c. Federal income taxes.
+ 2. Any refund of taxes, and any payment to the recipient or subrecipient of
+interest thereon, which were allowed as Federal award costs, will be
+credited either as a cost reduction or cash refund, as appropriate, to the
+Federal government. However, any interest actually paid or credited to a
+recipient or subrecipient incident to a refund of tax, interest, and penalty
+will be paid or credited to the Federal government only to the extent that
+such interest accrued over the period during which the recipient or
+subrecipient has been reimbursed by the Federal government for the
+taxes, interest, and penalties.
+Termination or
+Suspension Costs
+Termination of a Federal award may lead to the incurrence of additional costs by
+the recipient or subrecipient, or the need for special treatment of costs, which
+would not have arisen had the NIH award not been terminated. Cost principles
+covering the allowability of termination costs are set forth in 2 CFR 200.472.
+They must be used in conjunction with termination requirements outlined in
+Section 8.5.2, Administrative Requirements—Enforcement Actions—
+Suspension, Termination, and Withholding of Support.
+If a grant is terminated or suspended, the recipient may not incur new obligations
+that are not directly associated with the termination after the effective date of the
+termination or suspension and must cancel as many outstanding obligations as
+possible (see Administrative Requirements—Enforcement Actions—
+(GPS page IIA-102)
+
+Items
+Explanation of Allowable Costs
+Suspension, Termination, and Withholding of Support). NIH will allow full credit
+to the recipient for the Federal share of otherwise allowable costs if the
+obligations were properly incurred by the recipient before suspension or
+termination—and not in anticipation of it—and, in the case of termination, are not
+cancelable.
+Trailers and Modular
+Units
+Allowable only if considered equipment as provided below. A “trailer” is defined
+as a portable vehicle built on a chassis that is designed to be hauled from one
+site to another by a separate means of propulsion and that serves, wherever
+parked, as a dwelling or place of business. A “modular unit” is a prefabricated
+portable unit designed to be moved to a site and assembled on a foundation to
+serve as a dwelling or a place of business. The determination of whether costs to
+acquire trailers or modular units are allowable charges to NIH grant-supported
+projects depends on whether such units are classified as real property or
+equipment. The classification will depend on whether the recipient’s intended
+use of the property is permanent or temporary.
+A trailer or modular unit is considered real property when the unit and its
+installation are designed or planned to be installed permanently at a given
+location so as to seem fixed to the land as a permanent structure or
+appurtenance thereto. Units classified as real property may not be charged to an
+NIH grant-supported project unless authorizing legislation permits construction
+or acquisition of real property and the specific purchase is approved by the NIH
+awarding IC.
+A trailer or modular unit is considered equipment when the unit and its
+installation are designed or planned to be used at any given location for a limited
+time only. Units classified as equipment may be charged to NIH grant-supported
+projects only if the terms and conditions of the award do not prohibit the
+purchase of equipment and NIH prior approval is obtained, as appropriate.
+A trailer or modular unit properly classified as real property or as equipment at
+the time of acquisition retains that classification for the life of the item, thereby
+determining the appropriate accountability requirements under 2 CFR Part
+200.439 or 200.465, as applicable.
+Trainee Costs
+Allowable only under predoctoral and postdoctoral training grants. (See Ruth L.
+Kirschstein National Research Service Awards—Institutional Research Training
+Grants—Allowable and Unallowable Costs in IIB for detailed information).
+Transportation Costs
+Costs incurred for freight, express, cartage, postage, and other transportation
+services relating either to goods purchased, in process, or delivered, are
+allowable. When such costs can readily be identified with the items involved,
+they may be charged directly as transportation costs or added to the cost of such
+items. Where identification with the materials received cannot readily be made,
+inbound transportation cost may be charged to the appropriate indirect cost
+accounts if the recipient or subrecipient follows a consistent, equitable procedure
+in this respect. Outbound freight, if reimbursable under the terms and conditions
+of the Federal award, should be treated as a direct cost.
+Travel
+Allowable as a direct cost where such travel will provide direct benefit to the
+project.
+(GPS page IIA-103)
+
+Items
+Explanation of Allowable Costs
+Travel/Employees
+Consistent with the organization’s established travel policy, these costs for
+employees working on the grant-supported project may include associated per
+diem or subsistence allowances and other travel-related expenses, such as
+mileage allowances if travel is by personal automobile.
+Domestic travel is travel performed within the recipient’s own country. For U.S.
+and Canadian recipients, it includes travel within and between any of the 50
+States of the United States and its possessions and territories and also travel
+between the United States and Canada and within Canada.
+Foreign travel is defined as any travel outside of Canada and the United States
+and its territories and possessions. However, for an organization located outside
+Canada and the United States and its territories and possessions, foreign travel
+means travel outside that country.
+In all cases, travel costs are limited to those allowed by formally established
+organizational policy and, in the case of air travel, the lowest reasonable
+commercial airfares must be used. For-profit recipients’ allowable travel costs
+may not exceed those established by the FTR, issued by GSA, including the
+maximum per diem and subsistence rates prescribed in those regulations. This
+information is available at http://www.gsa.gov. If a recipient organization has no
+established travel policy, those regulations will be used to determine the amount
+that may be charged for travel costs.
+Recipients are strongly encouraged to take advantage of discount fares for
+airline travel through advance purchase of tickets if travel schedules can be
+planned in advance (such as for national meetings and other scheduled events).
+Recipients must comply with the requirements of the Fly America Act (49 U.S.C.
+40118) which generally provides that foreign air travel funded by Federal funds
+may only be conducted on U.S. flag air carriers and under applicable Open Skies
+Agreements. For additional information regarding the Fly America Act and its
+exceptions, see Public Policy Requirements and Objectives—Fly America Act.
+Applicants and recipients should consult application instructions to determine
+how to budget for travel costs under specific mechanisms and for certain types of
+travelers, because they are not all required to be budgeted as travel (e.g.,
+research subjects).
+Travel/Research
+Patients
+If research patient care is an approved activity of the grant-supported project, the
+costs of transporting individuals participating in the research protocol to the site
+where services are being provided, including costs of public transportation, are
+allowable. The purchase of motor vehicles for this purpose also may be
+allowable. (See also Research Patient Care in this exhibit).
+Value Added Tax
+(VAT)
+Foreign taxes charged for the purchase of goods or services that a recipient or
+subrecipient is legally required to pay in country is an allowable expense under
+Federal awards. Foreign tax refunds or applicable credits under Federal awards
+refer to receipts, or reduction of expenditures, which operate to offset or reduce
+expense items that are allocable to Federal awards as direct or indirect costs. To
+the extent that such credits accrued or received by the recipient or subrecipient
+relate to allowable cost, these costs must be credited to the NIH awarding IC
+either as costs or cash refunds. If the costs are credited back to the Federal
+(GPS page IIA-104)
+
+Items
+Explanation of Allowable Costs
+award, the recipient or subrecipient may reduce the Federal share of costs by the
+amount of the foreign tax reimbursement, or where Federal award has not
+expired, use the foreign government tax refund for approved activities under the
+Federal award with prior approval of the NIH awarding IC. For many countries an
+exemption of this tax for research exists.  Consequently, requesting this cost
+should be unallowable for research grants involving such countries as a
+performance site.
+Visa Costs  (including
+short-term travel visa
+costs)
+Generally, allowable direct cost as part of recruiting costs on an NIH grant, as
+long as the institution has an employee/employer relationship with the individual.
+Visa costs may also be allowable when identified in specific NOFOs or when
+within the scope of an approved research project.
+Visa renewal costs for employees is not a recruiting cost and would not be an
+allowable charge to a grant. Expedited processing fees are generally
+unallowable unless and until they become part of standard processing fees.
+Fraud prevention and detection fees are allowable if they are required fees.
+Department of Homeland Security SEVIS Form I-901 is a required fee and is
+allowable.  See also  Recruiting Costs in this exhibit.
+(GPS page IIA-105)

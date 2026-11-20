@@ -1,10 +1,18 @@
 """PDF generation service — fallback report when no fillable template is attached."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.platypus import Paragraph, SimpleDocTemplate, Table
 
 import datetime
 import json
 import logging
 import re
 from io import BytesIO
+from pathlib import Path
+from threading import Lock
 
 logger = logging.getLogger(__name__)
 
@@ -269,7 +277,7 @@ def _format_inline(text: str) -> str:
     return text
 
 
-def _safe_paragraph(raw: str, style, **kwargs):
+def _safe_paragraph(raw: str, style: ParagraphStyle, *, bulletText: str | None = None) -> Paragraph:
     """Build a Paragraph from a markdown string, falling back to escaped text.
 
     Reportlab's paraparser raises ValueError on malformed mini-HTML (e.g. tags
@@ -279,19 +287,43 @@ def _safe_paragraph(raw: str, style, **kwargs):
     from reportlab.platypus import Paragraph
 
     try:
-        return Paragraph(_format_inline(raw), style, **kwargs)
+        return Paragraph(_format_inline(raw), style, bulletText=bulletText)
     except ValueError:
         logger.warning("PDF inline-markdown parse failed; falling back to plain text", exc_info=True)
-        return Paragraph(_xml_escape(raw), style, **kwargs)
+        return Paragraph(_xml_escape(raw), style, bulletText=bulletText)
 
 
-def _styles() -> dict:
+_WORKFLOW_FONT_LOCK = Lock()
+_WORKFLOW_FONTS_READY = False
+
+
+def _register_workflow_fonts() -> None:
+    """Embed bundled report text faces instead of relying on viewer substitutes."""
+    global _WORKFLOW_FONTS_READY
+    with _WORKFLOW_FONT_LOCK:
+        if _WORKFLOW_FONTS_READY:
+            return
+        import reportlab
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+
+        folder = Path(reportlab.__file__).parent / 'fonts'
+        for suffix, filename in (('', 'Vera.ttf'), ('-Bold', 'VeraBd.ttf'),
+                                 ('-Italic', 'VeraIt.ttf'), ('-BoldItalic', 'VeraBI.ttf')):
+            pdfmetrics.registerFont(TTFont('WorkflowSans' + suffix, str(folder / filename)))
+        pdfmetrics.registerFontFamily('WorkflowSans', normal='WorkflowSans', bold='WorkflowSans-Bold',
+                                     italic='WorkflowSans-Italic', boldItalic='WorkflowSans-BoldItalic')
+        _WORKFLOW_FONTS_READY = True
+
+
+def _styles() -> dict[str, ParagraphStyle]:
     """Build the named ParagraphStyle dictionary used by the renderer."""
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib import colors
 
+    _register_workflow_fonts()
     base = getSampleStyleSheet()
-    body_font = "Helvetica"
+    body_font = "WorkflowSans"
     body_size = 10.5
     body_leading = 15
 
@@ -299,6 +331,7 @@ def _styles() -> dict:
         "title": ParagraphStyle(
             "WfTitle",
             parent=base["Title"],
+            fontName="WorkflowSans-Bold",
             fontSize=22,
             leading=26,
             spaceAfter=4,
@@ -308,6 +341,7 @@ def _styles() -> dict:
         "meta": ParagraphStyle(
             "WfMeta",
             parent=base["Normal"],
+            fontName=body_font,
             fontSize=9,
             leading=12,
             textColor=colors.HexColor("#6b7280"),
@@ -316,7 +350,7 @@ def _styles() -> dict:
         "h1": ParagraphStyle(
             "WfH1",
             parent=base["Heading1"],
-            fontName="Helvetica-Bold",
+            fontName="WorkflowSans-Bold",
             fontSize=18,
             leading=22,
             spaceBefore=14,
@@ -326,7 +360,7 @@ def _styles() -> dict:
         "h2": ParagraphStyle(
             "WfH2",
             parent=base["Heading2"],
-            fontName="Helvetica-Bold",
+            fontName="WorkflowSans-Bold",
             fontSize=15,
             leading=19,
             spaceBefore=12,
@@ -336,7 +370,7 @@ def _styles() -> dict:
         "h3": ParagraphStyle(
             "WfH3",
             parent=base["Heading3"],
-            fontName="Helvetica-Bold",
+            fontName="WorkflowSans-Bold",
             fontSize=13,
             leading=17,
             spaceBefore=10,
@@ -346,7 +380,7 @@ def _styles() -> dict:
         "h4": ParagraphStyle(
             "WfH4",
             parent=base["Heading4"],
-            fontName="Helvetica-Bold",
+            fontName="WorkflowSans-Bold",
             fontSize=11.5,
             leading=15,
             spaceBefore=8,
@@ -356,7 +390,7 @@ def _styles() -> dict:
         "h5": ParagraphStyle(
             "WfH5",
             parent=base["Heading5"],
-            fontName="Helvetica-Bold",
+            fontName="WorkflowSans-Bold",
             fontSize=11,
             leading=14,
             spaceBefore=6,
@@ -366,7 +400,7 @@ def _styles() -> dict:
         "h6": ParagraphStyle(
             "WfH6",
             parent=base["Heading6"],
-            fontName="Helvetica-Bold",
+            fontName="WorkflowSans-Bold",
             fontSize=10.5,
             leading=13,
             spaceBefore=6,
@@ -390,6 +424,7 @@ def _styles() -> dict:
             leading=body_leading,
             leftIndent=18,
             bulletIndent=6,
+            bulletFontName=body_font,
             spaceAfter=2,
             textColor=colors.HexColor("#111827"),
         ),
@@ -401,13 +436,14 @@ def _styles() -> dict:
             leading=body_leading,
             leftIndent=38,
             bulletIndent=26,
+            bulletFontName=body_font,
             spaceAfter=2,
             textColor=colors.HexColor("#111827"),
         ),
         "blockquote": ParagraphStyle(
             "WfQuote",
             parent=base["Normal"],
-            fontName="Helvetica-Oblique",
+            fontName="WorkflowSans-Italic",
             fontSize=body_size,
             leading=body_leading,
             leftIndent=16,
@@ -442,7 +478,7 @@ def _styles() -> dict:
         "table_header": ParagraphStyle(
             "WfTableHeader",
             parent=base["Normal"],
-            fontName="Helvetica-Bold",
+            fontName="WorkflowSans-Bold",
             fontSize=9.5,
             leading=12,
             # Black text on the gold (#eab308) header — see _build_table_flowable.
@@ -452,7 +488,7 @@ def _styles() -> dict:
     return s
 
 
-def _heading_style(level: int, styles: dict):
+def _heading_style(level: int, styles: dict[str, ParagraphStyle]) -> ParagraphStyle:
     return styles[f"h{min(max(level, 1), 6)}"]
 
 
@@ -481,7 +517,7 @@ _GRID_NEVER_COLUMNS = 12
 _GRID_MAX_ROW_HEIGHT = 200.0  # points; a page body is about 650
 
 
-def _table_flowables(headers: list[str], rows: list[list[str]], styles: dict, usable_width: float) -> list:
+def _table_flowables(headers: list[str], rows: list[list[str]], styles: dict[str, ParagraphStyle], usable_width: float) -> list:
     """Flowables for a table: a grid, or one Field/Value block per row when too wide."""
     from reportlab.platypus import Paragraph, Spacer
 
@@ -509,7 +545,7 @@ def _table_flowables(headers: list[str], rows: list[list[str]], styles: dict, us
     return flow
 
 
-def _build_table_flowable(headers: list[str], rows: list[list[str]], styles: dict, usable_width: float):
+def _build_table_flowable(headers: list[str], rows: list[list[str]], styles: dict[str, ParagraphStyle], usable_width: float) -> Table:
     from reportlab.platypus import Table, TableStyle
     from reportlab.lib import colors
 
@@ -546,7 +582,7 @@ def _build_table_flowable(headers: list[str], rows: list[list[str]], styles: dic
         # Vandalizer brand gold header (#eab308) with black text.
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#eab308")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#111827")),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, 0), (-1, 0), "WorkflowSans-Bold"),
         ("FONTSIZE", (0, 0), (-1, 0), 9.5),
         ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
         ("TOPPADDING", (0, 0), (-1, 0), 8),
@@ -562,7 +598,7 @@ def _build_table_flowable(headers: list[str], rows: list[list[str]], styles: dic
     return table
 
 
-def _markdown_to_story(text: str, styles: dict, usable_width: float) -> list:
+def _markdown_to_story(text: str, styles: dict[str, ParagraphStyle], usable_width: float) -> list:
     """Convert a markdown string into a list of reportlab Flowables."""
     from reportlab.platypus import Paragraph, Spacer, Preformatted
 
@@ -694,7 +730,7 @@ def _markdown_to_story(text: str, styles: dict, usable_width: float) -> list:
     return story
 
 
-def _doc_template(buf: BytesIO):
+def _doc_template(buf: BytesIO) -> SimpleDocTemplate:
     """Build the default SimpleDocTemplate with letter pagesize and 1-inch margins."""
     from reportlab.platypus import SimpleDocTemplate
     from reportlab.lib.pagesizes import letter
@@ -711,11 +747,11 @@ def _doc_template(buf: BytesIO):
     )
 
 
-def _usable_width(doc) -> float:
-    return doc.width  # SimpleDocTemplate exposes width = pagesize - margins
+def _usable_width(doc: SimpleDocTemplate) -> float:
+    return float(doc.width)  # SimpleDocTemplate exposes width = pagesize - margins
 
 
-def _header_flowables(title: str, subtitle: str | None, styles: dict) -> list:
+def _header_flowables(title: str, subtitle: str | None, styles: dict[str, ParagraphStyle]) -> list:
     from reportlab.platypus import Paragraph
 
     flow = [Paragraph(_xml_escape(title), styles["title"])]
@@ -724,7 +760,7 @@ def _header_flowables(title: str, subtitle: str | None, styles: dict) -> list:
     return flow
 
 
-def _kv_table_flowable(data: dict | list[tuple], styles: dict, usable_width: float):
+def _kv_table_flowable(data: dict | list[tuple], styles: dict[str, ParagraphStyle], usable_width: float) -> Table:
     """Render a flat dict (or a list of name/value pairs) as a two-column Field/Value table."""
     headers = ["Field", "Value"]
     rows = []
@@ -754,7 +790,7 @@ def _kv_table_flowable(data: dict | list[tuple], styles: dict, usable_width: flo
         # Vandalizer brand gold header (#eab308) with black text.
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#eab308")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#111827")),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, 0), (-1, 0), "WorkflowSans-Bold"),
         ("FONTSIZE", (0, 0), (-1, 0), 9.5),
         ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
         ("TOPPADDING", (0, 0), (-1, 0), 8),
@@ -770,7 +806,7 @@ def _kv_table_flowable(data: dict | list[tuple], styles: dict, usable_width: flo
     return table
 
 
-def render_workflow_pdf(data, title: str = "Workflow Results", subtitle: str | None = None) -> bytes:
+def render_workflow_pdf(data: object, title: str = "Workflow Results", subtitle: str | None = None) -> bytes:
     """Render workflow output (markdown string / dict / list-of-dicts) to PDF bytes.
 
     Dispatches on the runtime type of ``data``:

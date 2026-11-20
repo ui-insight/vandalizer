@@ -240,7 +240,7 @@ _DATE_FORMATS = (
 )
 
 
-def _is_not_found(value) -> bool:
+def _is_not_found(value: object) -> bool:
     if value is None:
         return True
     return str(value).strip().lower() in _NOT_FOUND_VARIANTS
@@ -342,7 +342,7 @@ def _dates_in(text: str) -> set[date]:
     return out
 
 
-def same_value(a, b) -> bool:
+def same_value(a: object, b: object) -> bool:
     """Whether two extracted values are the same value.
 
     Formatting-tolerant in the same directions as the quote matcher: unicode
@@ -371,7 +371,7 @@ def same_value(a, b) -> bool:
 
 
 def value_supported_by_quote(
-    value, quote: Optional[str], *, enum_field: bool = False,
+    value: object, quote: Optional[str], *, enum_field: bool = False,
 ) -> tuple[Optional[bool], str]:
     """Is *value* actually supported by *quote*?
 

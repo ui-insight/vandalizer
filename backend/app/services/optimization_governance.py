@@ -40,7 +40,7 @@ async def _count_active_user_runs(user_id: str) -> int:
     """Count queued/running optimization runs the user owns, across all three
     run collections."""
 
-    async def _count(model) -> int:
+    async def _count(model: type[KBOptimizationRun] | type[WorkflowOptimizationRun] | type[ExtractionOptimizationRun]) -> int:
         return await model.find(
             {"user_id": user_id, "status": {"$in": _ACTIVE_STATUSES}}
         ).count()

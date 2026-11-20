@@ -13,6 +13,10 @@ import type { ChatMessage as ChatMessageType, Citation } from '../../types/chat'
 // These render the real component and assert on the DOM.
 
 vi.mock('../../api/feedback', () => ({ submitChatFeedback: vi.fn() }))
+// ChatMessage calls useToast on this branch.
+vi.mock('../../contexts/ToastContext', () => ({
+  useToast: () => ({ toast: vi.fn() }),
+}))
 vi.mock('../../contexts/CertificationPanelContext', () => ({
   useCertificationPanel: () => ({ openPanel: vi.fn(), isOpen: false }),
 }))

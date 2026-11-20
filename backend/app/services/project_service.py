@@ -56,6 +56,7 @@ async def create_project(
     title: str,
     description: str | None,
     user: User,
+    context: str | None = None,
 ) -> Project:
     """Create a project, allocating its root folder and implicit-KB name.
 
@@ -93,6 +94,7 @@ async def create_project(
         uuid=project_uuid,
         title=title,
         description=description,
+        context=(context or "").strip() or None,
         owner_user_id=user.user_id,
         team_id=None,
         state="active",
@@ -140,6 +142,7 @@ async def duplicate_project(source: Project, user: User) -> Project:
         uuid=new_uuid,
         title=title,
         description=source.description,
+        context=getattr(source, "context", None),
         owner_user_id=user.user_id,
         team_id=None,
         state="active",
@@ -250,7 +253,7 @@ async def copy_project_contents(
             uuid=new_doc_uuid,
             user_id=user_id,
             team_id=None,
-            folder=id_map.get(doc.folder),
+            folder=id_map.get(doc.folder) if doc.folder is not None else None,
             token_count=doc.token_count,
             num_pages=doc.num_pages,
             extraction_nonletter_ratio=doc.extraction_nonletter_ratio,
@@ -262,6 +265,8 @@ async def copy_project_contents(
             classification_confidence=doc.classification_confidence,
             classified_at=doc.classified_at,
             classified_by=doc.classified_by,
+            # A copy of a file Vandalizer wrote is still one.
+            generated_by=getattr(doc, "generated_by", None),
             valid=doc.valid,
             processing=False,
             chromadb_ready=False,
@@ -314,6 +319,7 @@ async def update_project(
     title: str | None = None,
     description: str | None = None,
     state: str | None = None,
+    context: str | None = None,
 ) -> Project:
     if title is not None:
         project.title = title
@@ -321,6 +327,8 @@ async def update_project(
         project.description = description
     if state is not None:
         project.state = state
+    if context is not None:
+        project.context = context.strip() or None
     project.updated_at = datetime.datetime.now()
     await project.save()
     return project
@@ -622,6 +630,11 @@ async def add_pin(project: Project, pin_type: str, target_id: str, user: User) -
         raise ValueError("Not allowed")
     if pin_type not in PIN_TYPES:
         raise ValueError("Invalid pin type")
+    if pin_type in ("skill", "artifact"):
+        await authorize_resource(pin_type, target_id, user)
+    elif await authorized_pin_name(pin_type, target_id, user) is None:
+        # Same answer for a missing id, so it never says whether one exists.
+        raise ValueError(pin_access_denied_message(pin_type))
     existing = await ProjectPin.find_one(
         ProjectPin.project_uuid == project.uuid,
         ProjectPin.pin_type == pin_type,
@@ -645,46 +658,127 @@ async def remove_pin(project: Project, pin_type: str, target_id: str, user: User
         ProjectPin.pin_type == pin_type,
         ProjectPin.target_id == target_id,
     ).delete()
+    if pin_type == "skill":
+        await Project.get_motor_collection().update_one(
+            {"uuid": project.uuid, "default_skill_uuid": target_id}, {"$set": {"default_skill_uuid": None}},
+        )
 
 
-async def _resolve_pin_name(pin: ProjectPin) -> str | None:
-    """The display name of a pin's target, or None if it no longer exists."""
-    from beanie import PydanticObjectId
+_PIN_LABELS = {
+    "workflow": "workflow",
+    "extraction": "extraction",
+    "automation": "automation",
+    "knowledge_base": "knowledge base",
+}
 
-    if pin.pin_type == "workflow":
-        from app.models.workflow import Workflow
-        try:
-            wf = await Workflow.get(PydanticObjectId(pin.target_id))
-        except Exception:
-            wf = None
-        return wf.name if wf else None
-    if pin.pin_type == "extraction":
-        from app.models.search_set import SearchSet
-        ss = await SearchSet.find_one(SearchSet.uuid == pin.target_id)
-        return ss.title if ss else None
-    if pin.pin_type == "automation":
-        from app.models.automation import Automation
-        try:
-            auto = await Automation.get(PydanticObjectId(pin.target_id))
-        except Exception:
-            auto = None
-        return auto.name if auto else None
-    if pin.pin_type == "knowledge_base":
-        from app.models.knowledge import KnowledgeBase
-        kb = await KnowledgeBase.find_one(KnowledgeBase.uuid == pin.target_id)
-        return kb.title if kb else None
+
+def pin_access_denied_message(pin_type: str) -> str:
+    return f"You don't have access to this {_PIN_LABELS.get(pin_type, 'item')}."
+
+
+async def authorized_pin_name(pin_type: str, target_id: str, user: User) -> str | None:
+    """The name of a workflow, extraction, automation or knowledge base pin's
+    target, or None when *user* may not open it (or it no longer exists).
+
+    A pin is a shortcut. It never grants access to what it points at, so
+    pinning, listing and running all check the person's own access to the
+    target: the same rule Skill and Page pins follow (``authorize_resource``).
+    """
+    from app.services import access_control
+
+    if pin_type == "workflow":
+        wf = await access_control.get_authorized_workflow(target_id, user)
+        return (wf.name or "Untitled workflow") if wf else None
+    if pin_type == "extraction":
+        ss = await access_control.get_authorized_search_set(target_id, user)
+        return (ss.title or "Untitled extraction") if ss else None
+    if pin_type == "automation":
+        auto = await access_control.get_authorized_automation(target_id, user)
+        return (auto.name or "Untitled automation") if auto else None
+    if pin_type == "knowledge_base":
+        kb = await access_control.get_authorized_knowledge_base(target_id, user)
+        return (kb.title or "Untitled knowledge base") if kb else None
     return None
 
 
-async def list_pins(project: Project) -> list[dict]:
+async def _pin_target_exists(pin: ProjectPin) -> bool:
+    """Whether a pin still points at something (a deleted target is a stale pin)."""
+    from beanie import PydanticObjectId
+
+    try:
+        if pin.pin_type == "workflow":
+            from app.models.workflow import Workflow
+            return await Workflow.get(PydanticObjectId(pin.target_id)) is not None
+        if pin.pin_type == "automation":
+            from app.models.automation import Automation
+            return await Automation.get(PydanticObjectId(pin.target_id)) is not None
+    except Exception:
+        return False
+    if pin.pin_type == "extraction":
+        from app.models.search_set import SearchSet
+        return await SearchSet.find_one(SearchSet.uuid == pin.target_id) is not None
+    if pin.pin_type == "knowledge_base":
+        from app.models.knowledge import KnowledgeBase
+        return await KnowledgeBase.find_one(KnowledgeBase.uuid == pin.target_id) is not None
+    return False
+
+
+async def authorize_resource(pin_type: str, target_id: str, user: User) -> str:
+    """Project references never confer access to their underlying resources."""
+    if pin_type == "skill":
+        from app.services.skill_service import authorize_skill
+        return (await authorize_skill(target_id, user)).title
+    from app.routers.artifacts import authorized
+    from app.services.artifacts import revision
+    title: str = revision(await authorized(target_id, user))["title"]
+    return title
+
+
+def _restricted_pin_name(pin_type: str) -> str:
+    label = _PIN_LABELS.get(pin_type, "item")
+    return f"{'An' if label[0] in 'aeiou' else 'A'} {label} you don't have access to"
+
+
+async def list_pins(
+    project: Project, user: User | None = None, *, include_restricted: bool = False,
+) -> list[dict]:
+    """The project's pins that *user* can open, each with its target's name.
+
+    A pin whose target the user can't access is left out, so its name is never
+    shown and it can't be picked to run. With *include_restricted* (the pins
+    list for someone who manages the project) such a pin is still listed, as
+    its type only and marked ``restricted``, so it can be removed.
+    """
     pins = await ProjectPin.find(
         ProjectPin.project_uuid == project.uuid
     ).to_list()
     result = []
     for pin in pins:
-        name = await _resolve_pin_name(pin)
+        name: str | None
+        if pin.pin_type in ("skill", "artifact"):
+            if user is None:
+                continue
+            from fastapi import HTTPException
+            try:
+                name = await authorize_resource(pin.pin_type, pin.target_id, user)
+            except HTTPException as exc:
+                if exc.status_code != 404:
+                    raise
+                continue
+        else:
+            # No viewer, no names: a pin's target is listed only for someone
+            # who can open it themselves.
+            name = await authorized_pin_name(pin.pin_type, pin.target_id, user) if user else None
+            if name is None and include_restricted and await _pin_target_exists(pin):
+                result.append({
+                    "pin_type": pin.pin_type,
+                    "target_id": pin.target_id,
+                    "name": _restricted_pin_name(pin.pin_type),
+                    "restricted": True,
+                })
+                continue
         if name is None:
-            continue  # target was deleted — skip stale pin
+            continue  # deleted, or not this user's to see
         result.append({
             "pin_type": pin.pin_type,
             "target_id": pin.target_id,
@@ -784,11 +878,13 @@ def serialize_project(project: Project) -> dict:
         "uuid": project.uuid,
         "title": project.title,
         "description": project.description,
+        "context": getattr(project, "context", None),
         "owner_user_id": project.owner_user_id,
         "team_id": project.team_id,
         "state": project.state,
         "root_folder_uuid": project.root_folder_uuid,
         "kb_uuid": project.kb_uuid,
+        "default_skill_uuid": getattr(project, "default_skill_uuid", None),
         "created_at": project.created_at.isoformat(),
         "updated_at": project.updated_at.isoformat(),
     }

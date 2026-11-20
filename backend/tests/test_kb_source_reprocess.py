@@ -163,3 +163,15 @@ def test_reindex_dispatch_keeps_retrieval_dates():
     kwargs = app.send_task.call_args.kwargs
     assert app.send_task.call_args.args[0] == "tasks.documents.kb_ingest_document"
     assert kwargs["args"] == ["src-1"] and kwargs["kwargs"] == {"retrieved": False}
+
+
+@pytest.mark.asyncio
+async def test_a_competing_document_restart_restores_source_state_and_returns_conflict():
+    from app.services.extraction_restarts import ExtractionRestartConflict
+    src = _source()
+    before = (src.status, src.error_message, src.refresh_queued_at)
+    with pytest.raises(ReprocessRefused) as error:
+        await _run(src, _doc(raw_text="", task_status="error"),
+                   restart=AsyncMock(side_effect=ExtractionRestartConflict()))
+    assert error.value.status_code == 409
+    assert (src.status, src.error_message, src.refresh_queued_at) == before

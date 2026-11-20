@@ -42,6 +42,10 @@ class LibraryItemResponse(BaseModel):
     name: str
     description: Optional[str] = None
     set_type: Optional[str] = None
+    # A Skill's "When to use" line. Support ticket: left out of this model, so
+    # every Library response dropped it; Edit Skill opened with the field empty
+    # and Update saved it empty, pausing the Skill as a core Skill.
+    when_to_use: Optional[str] = None
     tags: list[str] = []
     note: Optional[str] = None
     folder: Optional[str] = None

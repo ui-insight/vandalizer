@@ -14,6 +14,7 @@ from app.models.document import SmartDocument
 from app.models.folder import SmartFolder
 from app.models.knowledge import KnowledgeBase
 from app.models.library import Library, LibraryFolder, LibraryItem, LibraryItemKind, LibraryScope
+from app.models.project import Project, ProjectMembership
 from app.models.team import Team, TeamMembership
 from app.models.user import User
 from app.models.verification import VerificationRequest, VerificationStatus, VerifiedItemMetadata
@@ -96,6 +97,8 @@ async def get_team_access_context(user: User) -> TeamAccessContext:
     roles_by_uuid: dict[str, str] = {}
     roles_by_object_id: dict[str, str] = {}
     for team in teams:
+        if team.id is None:
+            continue
         role = role_by_team_id.get(team.id)
         if role:
             roles_by_uuid[team.uuid] = role
@@ -180,6 +183,39 @@ def can_manage_document(
     )
 
 
+async def find_folder_project(folder_uuid: str | None) -> Project | None:
+    """Find the nearest project root without walking beyond malformed cycles."""
+    ancestors: list[str] = []
+    cursor = folder_uuid
+    while isinstance(cursor, str) and cursor and cursor != "0" and cursor not in ancestors:
+        folder = await SmartFolder.find_one({"uuid": cursor})
+        if not folder:
+            break
+        ancestors.append(cursor)
+        cursor = folder.parent_id
+    if not ancestors:
+        return None
+    projects = await Project.find({"root_folder_uuid": {"$in": ancestors}}).to_list()
+    return min(projects, key=lambda project: ancestors.index(project.root_folder_uuid)) if projects else None
+
+
+async def project_root_folder_uuids(folder_uuids: list[str]) -> set[str]:
+    """Which of these folders are a project's root folder."""
+    if not folder_uuids:
+        return set()
+    projects = await Project.find({"root_folder_uuid": {"$in": folder_uuids}}).to_list()
+    return {project.root_folder_uuid for project in projects}
+
+
+async def _can_access_project_files(project: Project, user: User, access: TeamAccessContext, *, write: bool, allow_admin: bool) -> bool:
+    if project.owner_user_id == user.user_id or (allow_admin and user.is_admin):
+        return True
+    if project.team_id and _has_team_membership(project.team_id, access):
+        return True
+    membership = await ProjectMembership.find_one({"project_uuid": project.uuid, "user_id": user.user_id})
+    return bool(membership and membership.role in (("owner", "editor") if write else ("owner", "editor", "viewer")))
+
+
 async def get_authorized_folder(
     folder_uuid: str,
     user: User,
@@ -187,12 +223,16 @@ async def get_authorized_folder(
     manage: bool = False,
     allow_admin: bool = False,
     team_access: TeamAccessContext | None = None,
+    contribute: bool = False,
 ) -> SmartFolder | None:
     folder = await SmartFolder.find_one(SmartFolder.uuid == folder_uuid)
     if not folder:
         return None
 
     access = team_access or await get_team_access_context(user)
+    project = await find_folder_project(folder.uuid)
+    if project:
+        return folder if await _can_access_project_files(project, user, access, write=manage or contribute, allow_admin=allow_admin) else None
     allowed = (
         can_manage_folder(folder, user, access, allow_admin=allow_admin)
         if manage
@@ -214,6 +254,9 @@ async def get_authorized_document(
         return None
 
     access = team_access or await get_team_access_context(user)
+    project = await find_folder_project(document.folder)
+    if project:
+        return document if await _can_access_project_files(project, user, access, write=manage, allow_admin=allow_admin) else None
     allowed = (
         can_manage_document(document, user, access, allow_admin=allow_admin)
         if manage
@@ -434,7 +477,7 @@ async def has_library_backed_object_access(
 
 async def has_open_verification_review_access(
     item_kind: str,
-    object_id: "PydanticObjectId | str",
+    object_id: "PydanticObjectId | str | None",
     user: User,
 ) -> bool:
     """View access for examiners while an item's verification request is open.
@@ -448,7 +491,7 @@ async def has_open_verification_review_access(
     This closes the gap for exactly as long as the review is open, and grants
     view only — reviewers need to read and test-run a submission, never edit it.
     """
-    if not (user.is_examiner or user.is_admin):
+    if object_id is None or not (user.is_examiner or user.is_admin):
         return False
 
     try:
@@ -838,13 +881,35 @@ def can_manage_search_set(
     return False
 
 
+async def can_share_search_set_outside_team(search_set: "SearchSet", user: User) -> bool:
+    """Whether *user* may make a link that opens the item to people outside
+    its team: its creator, or an owner or admin of its team. Narrower than
+    manage on purpose — a site admin or an ordinary team member should not be
+    able to open someone else's work to everyone signed in."""
+    if search_set.user_id == user.user_id:
+        return True
+    if not search_set.team_id:
+        return False
+    team_access = await get_team_access_context(user)
+    return _team_role(search_set.team_id, team_access) in TEAM_MANAGE_ROLES
+
+
 async def get_authorized_search_set(
     search_set_uuid: str,
     user: User,
     *,
     manage: bool = False,
     allow_admin: bool = False,
+    allow_shared: bool = False,
 ) -> "SearchSet | None":
+    """Resolve *search_set_uuid* if *user* may access it at the requested level.
+
+    ``allow_shared`` also lets in someone who opened the item's share link.
+    It is off unless a caller asks, and only the paths that read a Skill for
+    chat ask: a link is for reading and using a Skill, so its holders must
+    not pass the many other view-level checks (validation data, exports,
+    filing in a library, submitting for verification). It never grants manage.
+    """
     from app.models.search_set import SearchSet
 
     ss = await SearchSet.find_one(SearchSet.uuid == search_set_uuid)
@@ -868,6 +933,10 @@ async def get_authorized_search_set(
         )
     if not allowed and not manage:
         allowed = await has_open_verification_review_access("search_set", ss.id, user)
+    if not allowed and not manage and allow_shared and ss.set_type == "prompt":
+        from app.services import skill_share_service
+
+        allowed = await skill_share_service.is_recipient(ss.uuid, user.user_id)
     return ss if allowed else None
 
 

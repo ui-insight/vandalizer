@@ -9,6 +9,8 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.config import Settings
+from app.routers.config import _generate_since_last_visit
+from app.services.chat_service import _relative_time
 from app.utils.security import create_access_token
 
 _TEST_SETTINGS = Settings(jwt_secret_key="test-secret-key", environment="development")
@@ -33,6 +35,34 @@ def _auth(user_id: str = "testuser"):
     token = create_access_token(user_id, _TEST_SETTINGS)
     csrf = secrets.token_urlsafe(32)
     return {"access_token": token, "csrf_token": csrf}, {"X-CSRF-Token": csrf}
+
+
+class TestTimezoneNormalization:
+    def test_since_last_visit_accepts_naive_mongo_timestamps(self):
+        """A BSON round-trip drops tzinfo; onboarding must never 500 for it."""
+        now = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+        last_login = (now - datetime.timedelta(hours=3)).replace(tzinfo=None)
+        recent_activity = [
+            SimpleNamespace(status="completed", last_updated_at=(now - datetime.timedelta(hours=1)).replace(tzinfo=None)),
+        ]
+        active_alerts = [
+            SimpleNamespace(created_at=(now - datetime.timedelta(hours=2)).replace(tzinfo=None)),
+        ]
+
+        summary = _generate_since_last_visit(
+            last_login_at=last_login,
+            recent_activity=recent_activity,
+            active_alerts=active_alerts,
+        )
+
+        assert summary is not None
+        assert "1 run completed successfully" in summary
+        assert "1 quality alert raised" in summary
+
+    def test_relative_time_accepts_naive_mongo_timestamp(self):
+        naive_now = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+
+        assert _relative_time(naive_now) == "just now"
 
 
 @pytest.fixture
@@ -424,3 +454,27 @@ class TestThemeRoute:
             )
 
         assert resp.status_code == 403
+
+
+class TestFeatureFlags:
+    """GET /api/config/features says whether web search is set up, so the
+    workflow editor can warn on a Web Search step that would stop its run."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("provider,enabled", [("tavily", True), ("", False)])
+    async def test_web_search_enabled_follows_the_provider(self, client, provider, enabled):
+        user = _make_user()
+        cookies, headers = _auth()
+        cfg = MagicMock()
+        cfg.is_compliance_enabled.return_value = False
+        cfg.model_dump.return_value = {"web_search_provider": provider}
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.config.SystemConfig") as MockCfg,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            MockCfg.get_config = AsyncMock(return_value=cfg)
+            resp = await client.get("/api/config/features", cookies=cookies, headers=headers)
+        assert resp.status_code == 200
+        assert resp.json()["web_search_enabled"] is enabled

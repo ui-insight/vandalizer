@@ -30,7 +30,7 @@ class KBSuggestion(Document):
         name = "kb_suggestions"
         indexes = ["uuid", "knowledge_base_uuid", "status"]
 
-    def __init__(self, **data):
+    def __init__(self, **data: object) -> None:
         super().__init__(**data)
         if not self.uuid:
             self.uuid = uuid4().hex

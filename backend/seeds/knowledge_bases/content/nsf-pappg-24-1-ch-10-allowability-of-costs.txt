@@ -1,0 +1,193 @@
+NSF PAPPG (NSF 24-1) — Chapter X: Allowability of Costs
+Source: https://www.nsf.gov/policies/pappg/24-1/ch-10-allowability-of-costs
+
+### A. Basic Considerations
+
+Expenditures under NSF cost reimbursement awards are governed by the Federal cost principles and must conform with NSF policies where articulated in the applicable award general terms and conditions, award special provisions and recipient internal policies. While recipients are encouraged to seek advice regarding the treatment of costs from the NSF Grants and Agreements Officer identified in the award notice, it is the recipient that is ultimately responsible for ensuring that all costs charged to NSF awards meet the requirements of the cost principles contained in 2 CFR § 200, Subpart E.[77], award terms and conditions, and any other specific requirements of both the award notice and the applicable program solicitation. In addition, recipients should ensure that their own internal policies and procedures and other requirements are met for all charges to NSF awards. Otherwise, such costs may be disallowed during audit resolution or by specific determination of an NSF Grants and Agreements Officer.
+
+In the event a recipient anticipates charging an item of direct cost that might subsequently be disputed, an authorized official of the recipient organization should discuss the matter with the cognizant NSF Grants and Agreements Officer and document the conditions or factors surrounding the item in order to avoid possible subsequent disallowance. If the NSF Grants and Agreements Officer determines that such costs are appropriate considering the special requirements of a particular NSF sponsored activity, this should be documented through an advance agreement or understanding. Advance agreements regarding the treatment of such costs may be incorporated by specific language in the award notice, or by other written correspondence.
+
+#### 1. Conflicting Guidelines
+
+It is NSF's intent that the following guidance on cost allowability be consistent with the Federal cost principles. However, in the event of any discrepancy between the summary information contained in this Chapter and any specific provision of the cost principles contained in 2 CFR § 200, Subpart E, the cost principles in effect as of the start date of the NSF award will govern. In the case of a discrepancy between the special provisions of an NSF award and the standards of the cost principles, the special provisions of the award will govern.
+
+#### 2. Other Considerations
+
+-
+Maximum Obligation
+
+The maximum obligation of NSF for support of the project will not exceed the amount specified in the award, as amended. NSF does not amend awards to provide additional funds for such purposes as reimbursement for unrecovered indirect costs resulting from the establishment of final negotiated rates, or for increases in salaries, fringe benefits and other costs.
+
+-
+Pre-Award Costs
+
+(1) Recipients may incur allowable pre-award costs within the 90-day period immediately preceding the start date of the award providing:
+
+-
+(a) the approval of pre-award spending is made and documented in accordance with the recipient's policies and procedures; and
+
+(b) the advanced funding is necessary for the effective and economical conduct of the project.[78]
+
+(2) Pre-award expenditures are made at the recipient's risk. Recipient authority to approve pre-award costs does not impose an obligation on NSF: (a) in the absence of appropriations; (b) if an award is not subsequently made; or (c) if an award is made for a lesser amount than the recipient anticipated.
+
+(3) Requests for pre-award costs for periods exceeding 90 days must be submitted to NSF via use of NSF's electronic systems. Pre-award expenditures prior to funding of an increment within a continuing grant are not subject to this limitation or approval requirement but are subject to paragraph (2) above.
+
+(4) Pre-award costs charged to NSF awards generally must be charged to the initial budget period of the award, unless otherwise determined by NSF or the prime recipient. (See 2 CFR § 200.458).
+
+Additional information on pre-award costs is available at 2 CFR §§ 200.308(e)(1) & (e)(4).
+
+-
+Post-End Date Costs
+
+NSF funds may not be expended subsequent to the end date of the award, except to liquidate valid commitments that were made on or before the end date, e.g., commitment of project funds for subrecipient or contractor for services rendered during that award period but not billed to the recipient until after the award ended. (See Chapter VIII.E.2.) Generally, the costs of equipment or materials and supplies ordered after the end date may not be charged to the project.
+
+In addition, the recipient typically should not purchase items of equipment, computing devices, or restocking of materials and supplies (see 2 CFR § 200.453) to expend remaining funds in anticipation of the end date of the award where there is little, or no time left for such items to be utilized in the actual conduct of the funded project.
+
+However, in accordance with 2 CFR § 200.461, recipients may charge the NSF award before closeout, for the costs of publication or sharing of research results, if the costs are not incurred during the period of performance of the award. Publication costs such as this should be charged in the final budget period of the award, unless otherwise specified by NSF.
+
+#### 3. Prior Written Approvals
+
+The funding of items identified in the approved NSF budget constitutes NSF's authorization for the recipient to incur these costs, provided there is not a specific limitation in the award language and the costs are otherwise allowable, allocable, and reasonable in accordance with the cost principles contained in 2 CFR § 200, Subpart E.
+
+If required in furtherance of the project, the recipient is authorized to transfer funds from one budget category to another for allowable expenditures. Recipients should refer to the applicable award general terms and conditions referenced in the award.
+
+The Research Terms and Conditions (RTC), Appendix A, (NSF column) and the NSF Prior Approval Matrix for State & Local Governments and For-Profit Organizations, as applicable, provide a consolidated listing of prior approvals that are required to be obtained from the Foundation for NSF awards. Unless otherwise specified in the award notice or the applicable award general terms and conditions, no additional prior approvals beyond those specified in RTC Appendix A are required. Chapter VII.A.2 also provides a listing of required notifications to NSF.
+
+When a change requires NSF approval as specified in RTC Appendix A, the request must be submitted via the Notification and Request Module in Research.gov. If no specific option is available for the request, the “Other Request” option must be used. The request should clearly state which budget items, if any, are to be changed and by what amounts, and should justify the reasons for any changes.
+
+### B. Direct Costs
+
+#### 1. Compensation - Personal Services
+
+-
+Salaries and Wages
+
+Compensation paid or accrued by the organization for employees working on the NSF-supported project during the award period is allowable, in accordance with 2 CFR § 200.430.
+
+-
+Fringe Benefits
+
+If the proposer's usual accounting practices provide that its contributions to employee benefits (leave, employee insurance, social security, retirement, other payroll-related taxes, etc.) be treated as direct costs, NSF award funds may be requested to fund fringe benefits as a direct cost. These are typically determined by application of a calculated fringe benefit rate for a particular class of employee (full time or part-time) applied to the salaries and wages requested. They also may be paid based on actual costs for individual employees, if that institutional policy has been approved by the cognizant Federal agency for Indirect Costs.
+
+Fringe benefits that are not accrued but are charged as direct costs and incurred under "pay as you go plans" may be subject to reasonableness determination where the benefits are earned under other work and charged to the last activity on which the employee was working. This is of particular concern for large lump sum payments for leave, disability, pregnancy, or other employee fringe benefits. See 2 CFR § 200.431 for the definition and allowability of fringe benefits.
+
+#### 2. Intra-University (IHE) Consulting
+
+Since intra-university consulting is assumed to be undertaken as a university obligation requiring no compensation in addition to full-time salary, the principles summarized in Chapter X.B.1, also apply to those who function as consultants or otherwise contribute to a project conducted by another faculty member of the same institution. However, in unusual cases where consultation is across departmental lines or involves a separate or remote operation, and the work performed by the consultant is in addition to the consultant’s regular appointment, any charges for such work representing extra compensation above the institutional base salary are allowable if consistent with established university policy and the applicable cost principles.
+
+#### 3. Federal Employees
+
+Employees of the Federal government (other than NSF) may be utilized as lecturers or staff members on a project and may receive compensation and/or expenses if they obtain prior approval from their agencies to participate, and if services to the project are performed outside their regular working hours or while they are on leave status from official duties. Under no circumstances may NSF employees receive compensation from an NSF-supported project.
+
+### C. Other Direct Costs
+
+#### 1. Build America, Buy America, and Made in America Statutes
+
+Except under certain programs, NSF does not normally make awards for construction or facility improvements. However, any form of construction, alteration, maintenance, or repair of infrastructure in the U.S. using Federal funds must follow the requirements specified in the Build America, Buy America provisions of the Infrastructure Investment and Jobs Act §§ IIJA P.L. 117-58, Sections 70911-70917 as follows:
+
+-
+(i) when using federal funds for the purchase of goods, products, and materials produced in the United States;
+
+(ii) all iron, steel, manufactured products, and construction materials used in Federally funded projects must be produced in the U.S;
+
+(iii) the awardee must implement these requirements in its procurements and the article must flow down to all subawards and contracts at any tier; and
+
+(iv) when supported by rationale, the awardee must submit a waiver request to the cognizant NSF Program Officer and Grants and Agreements Officer if these requirements cannot be met.
+
+#### 2. News Release Costs
+
+Costs of communicating with the public and press to announce the results and accomplishments of an NSF-supported project are allowable. Recipients should be aware of the restrictions on advertising, organizational promotion, and lobbying costs as outlined in the applicable cost principles. See 2 CFR § 200.421 for additional information on advertising and public relations.
+
+In the event the performing organization wishes to collaborate with NSF in a simultaneous news release, arrangements may be made through the NSF's Office of Legislative and Public Affairs, Public Affairs Group, telephone (703) 292-8070.
+
+#### 3. Travel and Temporary Dependent Care Costs
+
+Travel, meal, and hotel expenses of recipient employees who are not on travel status are unallowable. Costs of employees on travel status are limited to those specifically authorized by 2 CFR § 200.475.
+
+Temporary dependent care costs (a dependent is defined in 26 U.S.C. § 152) above and beyond regular dependent care that directly results from travel to conferences are allowable costs provided that the costs are:
+
+- a direct result of the individual's travel for the NSF conference award;
+- consistent with the recipient's documented travel policy for all employee travel; and
+- only temporary during the travel period.
+
+See 2 CFR § 200.475 for additional information on travel costs.
+
+### D. Indirect Costs
+
+#### 1. NSF Policy
+
+- Except as noted in an NSF program solicitation, it is NSF policy that recipients are entitled to reimbursement from award funds for indirect costs (F&A) allocable to the NSF share of allowable direct costs of a project. NSF program staff are not authorized to negotiate indirect costs as a discrete item of a proposal budget. NSF program staff also are not authorized to suggest or request that PIs seek reductions or waivers of indirect costs.
+-
+The awarded indirect cost rate is generally based upon a recipient's current Federally negotiated indirect cost rate agreement. When establishing an indirect rate for an award where the domestic recipient does not have a current negotiated rate agreement, NSF will consider the rate proposed in the budget, the recipient's indirect cost proposal submission, the amount of total funding requested and other pertinent financial factors. Supporting documentation is not required for organizations that request a de minimis rate of 10% (or less) of modified total direct costs.
+
+Foreign recipients that do not have a U.S. Federally negotiated indirect cost rate are limited to a de minimis indirect cost rate recovery of 10% of modified total direct costs. Foreign recipients that have a negotiated rate agreement with a U.S. Federal agency may recover indirect costs at the current negotiated rate.
+
+Since some types of rates limit indirect cost recoveries and require adjustments, recipients receiving awards should ensure that they understand the type of indirect cost rate, the applicable base and the type of rate used in the award.
+
+Types of indirect cost rates that are most frequently used on NSF awards are as follows:
+
+-
+(i) Predetermined Rate – As authorized by 41 U.S.C. § 4708 and recommended by the Federal cost principles in 2 CFR § 200, Appendices III, IV, and VI, NSF has elected to use predetermined rates, where appropriate. A predetermined rate is an indirect cost rate, applicable to a specified current or future period, usually the organization’s fiscal year. A predetermined rate is not subject to adjustment.
+
+In rare circumstances where recipients receive limited NSF funding, the Foundation may elect to set award specific rates as opposed to a formal annual negotiated indirect cost rate agreement. In these cases, the award notice will specify the rate type and application base.
+
+(ii) Provisional (or billing) rate – A provisional rate is a temporary indirect cost rate applicable to a specified period which is used for funding, interim reimbursement, and reporting indirect costs pending the establishment of a final rate for the period.
+
+Recipients with provisional rates are required to submit indirect cost proposals to their cognizant Federal Agency for rate negotiation within six months after the close of each fiscal year. Adjustments to awards for amounts previously billed at provisional rates are required after final indirect cost rates are established.
+
+(iii) Final rate – A final rate is an indirect cost rate applicable to a specified past period which is based on the actual costs of the period. A final rate is not subject to adjustment.
+
+Special Limitation concerning Colleges and Universities subject to 2 CFR § 200 Appendix III, paragraph C.7: This section contains an additional restriction on recovery of indirect costs for institutions of higher education. For these entities, the negotiated rate at the time the award is made shall be used throughout the life of the award. The applicable text from 2 CFR § 200 Appendix III, paragraph C.7 is repeated below:
+
+-
+7. Fixed Rates for the Life of the Sponsored Agreement.
+
+"Except as provided in paragraph (c)(1) of §200.414, Federal agencies must use the negotiated rates in effect at the time of the initial award throughout the life of the Federal award. Award levels for Federal awards may not be adjusted in future years as a result of changes in negotiated rates. "Negotiated rates" per the rate agreement include final, fixed, and predetermined rates and exclude provisional rates. "Life" for the purpose of this subsection means each competitive segment of a project. A competitive segment is a period of years approved by the Federal awarding agency at the time of the award. If negotiated rate agreements do not extend through the life of the Federal award at the time of the initial award, then the negotiated rate for the last year of the award must be extended through the end of the life of the Federal award."
+
+- NSF will not amend an award solely to provide additional funds for changes in indirect cost rates.
+- NSF will generally fund continuing grant increments and supplemental support using the negotiated indirect cost rate(s) approved at the time of the initial award. See Chapter VI.E.
+- Any negotiations with respect to business and financial matters on specific awards, including the amount of indirect cost reimbursement, are conducted by the cognizant Grants and Agreements Officer with an authorized official of the recipient’s organization. It is the responsibility of the recipient to ensure that its negotiated indirect cost rate agreements remain current. When a recipient does not have a current negotiated indirect cost rate in effect at the time of award but had a previous indirect cost rate agreement, the cognizant Grants and Agreements Officer may elect to use the most recently negotiated rate for award funding purposes or may request that the proposal budget be revised to apply the de minimis rate of 10% to modified total direct costs (MTDC). The NSF Cost Analysis and Pre-Award Review Branch in the Division of Institution and Award Support provides advisory assistance to the Grants and Agreements Officer.
+
+#### 2. NSF Cognizant Organizations
+
+NSF negotiates rates for those recipients over which it holds rate cognizance. For NSF to be the cognizant agency for indirect costs, NSF must provide the preponderance of a recipient’s direct federal funding. NSF does not negotiate rates for recipients who do not hold direct NSF funding or for those entities serving only as subrecipients.
+
+Organizations for which NSF is the cognizant agency must keep their rate agreements current. Recipients with provisional to final rate agreements are required to submit indirect cost rate proposals, prepared in accordance with NSF proposal submission requirements, within six months after the end of their fiscal year.
+
+Organizations that are unable to submit their indirect cost rate proposal within this time frame should request a submission extension. Failure to maintain a currently negotiated indirect cost rate agreement could lead to NSF restricting budgeted indirect costs to the 10% de minimus rate applied to the MTDC base.
+
+See the Indirect Cost Rate Proposal Submission Procedures site for indirect cost rate proposal submission requirements. The submission of indirect cost rate proposals and requests for submission extensions should be sent to bfacapidc@nsf.gov.
+
+### E. Fee Payments under NSF Awards
+
+Payment of fees (profit) is allowable only if expressly authorized by solicitation and the terms and conditions of the NSF award.
+
+### F. Prohibition on Certain Telecommunications and Video Surveillance Services or Equipment
+
+Section 889 of the National Defense Authorization Act (NDAA) for Fiscal Year (FY) 2019 (Public Law 115-232) prohibits the head of an executive agency from obligating or expending loan or award funds to procure or obtain, extend, or renew a contract to procure or obtain, or enter into a contract (or extend or renew a contract) to procure or obtain the equipment, services, or systems as identified in section 889 of the NDAA for FY 2019.
+
+(a) In accordance with 2 CFR § 200.216 and § 200.471, for all awards that are issued on or after August 13, 2020, recipients and subrecipients are prohibited from obligating or expending loan or award funds to:
+
+-
+(1) Procure or obtain;
+
+(2) Extend or renew a contract to procure or obtain; or
+
+(3) Enter into a contract (or extend or renew a contract) to procure or obtain equipment, services, or systems that uses covered telecommunications equipment or services as a substantial or essential component of any system, or as critical technology as part of any system. As described in Public Law 115-232, section 889, covered telecommunications equipment is telecommunications equipment produced by Huawei Technologies Company or ZTE Corporation (or any subsidiary or affiliate of such entities).
+
+-
+(i) For the purpose of public safety, security of government facilities, physical security surveillance of critical infrastructure, and other national security purposes, video surveillance and telecommunications equipment produced by Hytera Communications Corporation, Hangzhou Hikvision Digital Technology Company, or Dahua Technology Company (or any subsidiary or affiliate of such entities).
+
+(ii) Telecommunications or video surveillance services provided by such entities or using such equipment.
+
+(iii) Telecommunications or video surveillance equipment or services produced or provided by an entity that the Secretary of Defense, in consultation with the Director of the National Intelligence or the Director of the Federal Bureau of Investigation, reasonably believes to be an entity owned or controlled by, or otherwise connected to, the government of a covered foreign country.
+
+(b) In implementing the prohibition under Public Law 115-232, section 889, subsection (f), paragraph (1), heads of executive agencies administering loan, award, or subsidy programs shall prioritize available funding and technical support to ssist affected businesses, institutions and organizations as is reasonably necessary for those affected entities to transition from covered communications equipment and services, to procure replacement equipment and services, and to ensure that communications service to users and customers is sustained.
+
+(c) See Public Law 115-232, section 889 for additional information.
+
+#### Footnotes to Chapter X
+
+[77] Applicable cost principles for for-profit organizations are contained in Federal Acquisition Regulation Part 31.
+
+[78] In the case of a renewal award, recipients are reminded that costs incurred under the old grant cannot be transferred to the new award.

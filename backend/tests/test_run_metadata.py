@@ -336,7 +336,7 @@ async def test_status_payload_carries_run_metadata(monkeypatch):
     result.retrieved_sources = []
     result.document_title = None
     result.model = "openai/gpt-oss-120b"
-    result.run_config = {"vandalizer_version": "v4.15.0"}
+    result.run_config = {"vandalizer_version": "v4.15.0", "workflow": {"version": 2}}
     result.model_usage = [{"step_index": 1, "step": "S", "model": "gpt-oss-120b",
                            "tokens_input": 1, "tokens_output": 1, "requests": 1}]
     result.model_configs = []
@@ -349,3 +349,13 @@ async def test_status_payload_carries_run_metadata(monkeypatch):
     body = WorkflowStatusResponse(**status).model_dump()
     assert body["run_metadata"]["models_used"] == ["gpt-oss-120b"]
     assert body["run_metadata"]["default_model"] == "openai/gpt-oss-120b"
+    # The editor compares this with the workflow's current version, so a
+    # result from before a restore or chat edit is labelled, not passed off
+    # as the restored version's output.
+    assert body["workflow_version"] == 2
+    result.run_config = None
+    with patch("app.services.workflow_service.WorkflowResult") as wr, \
+            patch("app.services.workflow_service.Workflow") as wf:
+        wr.find_one = AsyncMock(return_value=result)
+        wf.get = AsyncMock(return_value=None)
+        assert WorkflowStatusResponse(**await get_workflow_status("sess1")).workflow_version is None

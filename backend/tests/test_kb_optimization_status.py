@@ -16,13 +16,14 @@ BEFORE = T0 - datetime.timedelta(days=1)
 AFTER = T0 + datetime.timedelta(days=2)
 
 
-def _run(*, uuid="run-1", snapshot=None, best_config=None, started_at=T0):
+def _run(*, uuid="run-1", snapshot=None, best_config=None, started_at=T0, tied_with_baseline=False):
     return SimpleNamespace(
         uuid=uuid,
         started_at=started_at,
         completed_at=T_APPLY,
         best_config=best_config if best_config is not None else {"k": 8},
         test_query_snapshot=snapshot,
+        tied_with_baseline=tied_with_baseline,
     )
 
 
@@ -86,6 +87,16 @@ def test_completed_run_with_settings_but_no_override_is_available():
     assert st.last_run_uuid == "run-9"
     assert st.last_run_at == T_APPLY
     assert st.applied_at is None
+
+
+def test_a_run_that_found_no_improvement_is_not_available():
+    # Support ticket: "Subaward Policies" said "Optimization available" after
+    # the optimizer, run from chat, found nothing better than the defaults.
+    st = _status(
+        rag_config_override=None, override_set_at=None, override_run_uuid=None,
+        latest_completed_run=_run(uuid="run-9", tied_with_baseline=True),
+    )
+    assert st is None
 
 
 def test_completed_run_without_best_config_is_not_available():

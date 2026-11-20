@@ -1,0 +1,219 @@
+{
+  "state": "design_draft",
+  "module_id": "governance",
+  "purpose": "Unpublished replacements; accountable handoff, capstone supervision and version-specific outcome assessment remain required.",
+  "module_patch": {
+    "subtitle": "Preserve ownership, decisions and earned history",
+    "description": "Prepare a bounded internal handoff and supervise scope, source checking, recovery and release without compulsory broad publication or staff grading.",
+    "objectives": [
+      "Document ownership, intended use, tested revision, limitations and review route",
+      "Record learner decisions across a bounded capstone and its actual handoff",
+      "Distinguish earned completion, separate library review and later artifact changes"
+    ],
+    "tips": [
+      "A shared link is not an accountable handoff.",
+      "Pending library review is separate from certification.",
+      "Inspect exported content and test resolved dependencies after import.",
+      "Later changes need new evidence and do not rewrite earned history."
+    ],
+    "estimatedMinutes": 30
+  },
+  "replacements": [
+    {
+      "id": "governance.organizing-for-reuse",
+      "revision": 4,
+      "title": "Make reuse accountable",
+      "variant": "concept",
+      "objective": "Name the intended use, owner, revision and limits before sharing an artifact.",
+      "content": "A reusable workflow needs more than a helpful name. A colleague should be able to determine what it does, which inputs it supports, who maintains it, which revision was tested and what still requires review.\n\nUse personal work for experiments and an appropriate team context for authorized collaboration. Inspect the actual audience and permissions before moving, copying or sharing an artifact. A folder name or a chat description does not establish who can open or edit the underlying workflow and its dependencies.\n\nDocument the supported input types, required fields, output meaning, source dependencies and model/configuration assumptions. Link the validation evidence to the tested revision and describe missing cases or known failure modes. State when source checking, approval or a release decision is required.\n\nName an accountable owner and a route for reporting a defect or proposing a change. The owner can be the learner for this exercise. A handoff does not require recruiting a staff examiner or creating an operational review burden merely to earn certification.\n\nKeep draft changes separate from the revision people rely on until the changes have useful evidence. Sharing a mutable artifact does not automatically preserve a tested release, notify every consumer or prove the new behavior remains suitable.\n\n**Practice:** Describe an extraction workflow so another person can tell when to use it, when to stop and which evidence to inspect before relying on its output.\n\n### Reuse instructions as Skills\n\nLibrary items previously called Prompts are now Skills: saved instructions that can guide agentic chat. Workflow Prompt steps retain their name and purpose. A Skill is reusable guidance, not a new workflow node or an executable package of arbitrary tools.\n\nOpen a Skill in the Library and choose Use Skill. Inspect instructions before sending your task. Selecting a Skill does not send a message or run the task. One Skill is active at a time; Change Skill or Remove Skill changes the guidance for subsequent turns.\n\nThe conversation pins the selected instructions. Editing the Library item does not silently update an active conversation; select the Skill again to use the edit. The application checks access again when the Skill is used. If access is lost, resolve the selection instead of assuming the saved instructions still grant access.\n\nYour current request and application rules take precedence over a Skill. Its instructions cannot approve actions, expand document access, override confirmation gates or enable unavailable tools. Inspect the actual scope and result even when a trusted colleague supplied the Skill.\n\nFor a shared Skill, record the intended task, owner and limitations. Review its instructions and test a bounded request before adopting it. Record the version selected for the conversation; changing the Library item does not rewrite earlier runs or their evidence.",
+      "knowledge_check": {
+        "question": "Which handoff makes a workflow meaningfully reusable?",
+        "options": [
+          {
+            "text": "A broad share link with no owner or limits.",
+            "correct": false,
+            "explanation": "Visibility does not explain responsibility or supported use."
+          },
+          {
+            "text": "A named owner, intended inputs/use, tested revision, evidence, limitations and change/review route.",
+            "correct": true,
+            "explanation": "These details let a recipient judge relevance and maintain the artifact."
+          },
+          {
+            "text": "An advanced-sounding name and a high historical score.",
+            "correct": false,
+            "explanation": "A name and summary score do not establish current scope or accountability."
+          }
+        ]
+      }
+    },
+    {
+      "id": "governance.sharing-with-everyone",
+      "revision": 7,
+      "title": "Separate sharing, review and certification",
+      "variant": "insight",
+      "objective": "Avoid using publication or a review badge as proof of learner competence or current correctness.",
+      "content": "Sharing controls access to an artifact. Library review evaluates a submitted item under a separate process. Certification records demonstrated learner outcomes for a course version. These are different facts and should not be used as substitutes for one another.\n\nThe product includes a request to share with everyone and a library review process. A submitted or pending request is not approval. A reviewed entry's quality details describe measured evidence; they do not certify every future output, confer institutional authority or establish that the artifact fits another team's use.\n\nUse the narrow audience appropriate to the task. Broad publication is not required merely to demonstrate an accountable handoff in this course. An internal handoff with an owner, tested revision, source-supported evidence and explicit limitations can demonstrate the required practice without creating a staff review queue.\n\nRead the actual validation scope, date and results behind a quality signal. Adoption can show that others use an artifact, but popularity does not establish correctness. A perfect score on unrepresentative cases may be less useful than a lower score whose limitations are clearly understood.\n\nIf an operational process separately requires authorized review, preserve its true status and follow that process for the real operation. Do not label it approved because a lesson was completed, or delay a learner's unrelated certification claim waiting for a library examiner.\n\nVandalizer offers four audiences. Your personal library is visible only to you; keep a draft there until it has been checked. A team library is visible to members of your current team, whose owners and admins manage membership; share there when the office that will use the artifact can see its owner, limits and evidence. A project gathers the documents, artifacts and people for one goal: collaborators join as viewers or editors, and a revocable join link can admit someone outside your team, such as a PI answering questions about one award, so check who holds the link before attaching anything sensitive. Sharing with everyone submits a verification request for the verified library; it stays submitted until a reviewer decides, and an approval describes the reviewed evidence, not every future use. Choose the narrowest audience that does the job, and correct a proposed target that reaches further than the task needs.\n\n**Practice:** An agent proposes sharing an extraction checked on two synthetic award notices with everyone so a colleague in your office can use it. Name the audience that fits and why, what the handoff must state first, and how you would describe a library request that is still pending.\n\n### Hosted HTML pages have separate sharing controls\n\nA hosted page is a saved, versioned page. New pages are private to their owner. Copy private link does not grant access: the reader must sign in as the owner or belong to the team granted access. The owner can select a team under Share → Workspace access and choose Save access.\n\nPublishing is a separate owner action: select the inspected revision and choose Publish version. Anyone with the public link can read that published page without signing in, including any source quotations embedded in it. This does not grant access to the source workspace. Public sharing may be disabled on a deployment.\n\nLater edits create a new private revision; the public link continues to show the published revision until the owner publishes another selected revision. Remove public link revokes access through the public link. It does not recall files or copies readers already saved. Changing team access is separate from unpublishing.\n\nThese pages support static HTML and CSS. Scripts, forms, frames and remote assets are blocked. Review the rendered page and sanitization warnings; a page that depends on JavaScript or a remote chart is not a supported interactive app. Private creation or revision through chat still follows the tool confirmation gate; the Skill cannot confirm it for you.\n\nA hosted page public link is direct publication of the selected page. It is separate from submitting a reusable Library item for review. For practice, describe the chosen audience and revision using fictional content; no public publication is required for certification.",
+      "knowledge_check": {
+        "question": "Your office's grants team needs an extraction you checked on two synthetic award notices. The agent proposes sharing it with everyone. Which target fits?",
+        "options": [
+          {
+            "text": "Share it with everyone so anyone who needs it can find it.",
+            "correct": false,
+            "explanation": "That submits a verified-library request the task does not need, and it stays pending until a reviewer decides."
+          },
+          {
+            "text": "Add it to your team library with its owner, limits and validation evidence stated.",
+            "correct": true,
+            "explanation": "The team library reaches the office that will use it, and nobody further."
+          },
+          {
+            "text": "Send a project join link so the whole office can open it.",
+            "correct": false,
+            "explanation": "A join link admits whoever holds it, including people outside your team; it is for one project's collaborators."
+          }
+        ]
+      }
+    },
+    {
+      "id": "governance.sharing-workflows-across-teams",
+      "revision": 3,
+      "title": "Hand off a workflow with its dependencies and evidence",
+      "variant": "concept",
+      "objective": "Prepare a portable, scoped handoff and verify imported behavior before relying on it.",
+      "content": "A useful handoff includes the saved artifact revision, intended task, owner, supported inputs, dependencies, model assumptions, validation evidence, known limits and required approval or release points. Identify the intended recipient and data scope before actually sharing anything.\n\nWithin an authorized team, confirm who can access and modify the underlying workflow and its source resources. A library bookmark alone is not proof that every dependency is accessible to the intended user. Keep ownership and change responsibility explicit.\n\nA Vandalizer workflow export can carry steps, task settings, prompts and embedded extraction definitions. It can also include text validation inputs and metadata about the exporter. Inspect the exported content before sending it; do not assume that an export contains only harmless structural information.\n\nPortability has limits. A selected document reference may need to be reselected after import, and a knowledge-base task can require a local knowledge base. An export does not automatically transfer all source files, access rights, configured models or a working integration. Read portability warnings and inspect the imported tasks.\n\nImport into an appropriate test context, resolve permitted local dependencies and run representative checks. Keep the original tested revision and the imported/adapted revision distinguishable. The old score is context for review, not proof that the new environment behaves identically.\n\n**Practice:** A colleague imports an extraction workflow but its document reference is empty. Explain the repair and evidence needed before use, without borrowing unrelated source access.",
+      "knowledge_check": {
+        "question": "A workflow imports successfully. What is still required?",
+        "options": [
+          {
+            "text": "Assume every source, permission and model setting transferred.",
+            "correct": false,
+            "explanation": "Successful import does not establish operational equivalence or access."
+          },
+          {
+            "text": "Inspect dependencies and warnings, resolve authorized local references and test the imported revision.",
+            "correct": true,
+            "explanation": "Portability must be verified in the receiving context."
+          },
+          {
+            "text": "Apply the original score to every future imported run.",
+            "correct": false,
+            "explanation": "Old evidence does not validate changed configuration and inputs."
+          }
+        ]
+      }
+    },
+    {
+      "id": "governance.establish-your-workflow-governance",
+      "revision": 5,
+      "title": "Prepare a bounded governance handoff",
+      "variant": "walkthrough",
+      "objective": "Create reviewable ownership, scope and change records without compulsory broad publication.",
+      "content": "Use the assigned artifact and capstone requirements for this course version. Prepare the handoff in the authorized exercise context; do not send real work to a broader audience merely to complete a lesson.\n\n1. Identify the exact saved artifact revision, intended use and supported source inputs. Name an accountable owner and the intended internal audience.\n2. Inspect the workflow's actual dependencies, model settings and external actions. State what is permitted, what needs an explicit decision and what remains unresolved.\n3. Link representative validation and source-checking evidence to the tested revision. Include known failures, missing coverage and the conditions under which the workflow should not be used.\n4. Write clear operating instructions: required inputs, expected outputs, source review, approval points and the action to take when a result is unavailable or unsupported.\n5. Record the change route and recovery plan. Preserve the tested version, identify how an amended version will be retested and explain how to stop using a defective revision without deleting its history.\n6. If export/import is part of the assigned task, inspect the exported content and portability warnings, resolve authorized dependencies and test the imported copy before any wider use.\n7. Review the concrete handoff and record your own scope and release decision. Preserve the actual sharing/delivery status; preparation alone does not prove a recipient received it.\n8. If the handoff includes an automation, review it as a standing action, not a single run. Check the trigger (Folder Watch, Schedule, API or M365), a watched folder's file-type and exclude filters, the workflow or extraction it runs, and every output: saved files, OneDrive delivery, email notifications, webhooks and follow-up automations. Creating one ends with a choice between Save disabled and Create & enable; keep it disabled until each output is internal and approved. Run now goes through the same pipeline as a real trigger, so its outputs fire as configured; test only after they are safe. Turning Enabled off stops further runs, and the automation's run history shows what each run processed and delivered.\n\n**Practice:** Explain which pieces of your handoff let a recipient use the artifact responsibly and which unresolved conditions would prevent release. Then take a proposed automation that watches a shared team folder with no filters and emails the sponsor on every new file: say whether it should be enabled, what you would change first, and how you would stop it and inspect what it already did.",
+      "knowledge_check": {
+        "question": "Which action demonstrates governance without creating unnecessary staff work?",
+        "options": [
+          {
+            "text": "Submitting every exercise to a staff examiner for certification grading.",
+            "correct": false,
+            "explanation": "An examiner queue is not required to demonstrate the learner's own decisions and evidence."
+          },
+          {
+            "text": "Preparing a scoped handoff with ownership, linked evidence, limits and recorded learner decisions.",
+            "correct": true,
+            "explanation": "The assessment can examine those records without mandatory broad publication."
+          },
+          {
+            "text": "Marking the workflow ready because its description is clear.",
+            "correct": false,
+            "explanation": "A description does not replace validation, scope and release evidence."
+          }
+        ]
+      }
+    },
+    {
+      "id": "governance.building-a-culture-of-reuse",
+      "revision": 4,
+      "title": "Preserve earned history when the artifact changes",
+      "variant": "concept",
+      "objective": "Distinguish earlier achievement from a later revision and an optional course upgrade.",
+      "content": "An assessment record describes demonstrated work under particular requirements. A later edit to the workflow, lesson or model configuration does not rewrite what the learner previously demonstrated. Keep the original assessed revision and its evidence traceable.\n\nA changed artifact needs evidence appropriate to the changed behavior. If a colleague alters a prompt that determines which budget amount is extracted, the prior passing run still documents the old prompt. Test the new prompt and describe any new limitation rather than silently carrying the old claim forward.\n\nCertification, library review and operational permission remain separate. A credential does not approve a pending library submission or authorize a new audience. A reviewed library item does not establish that a particular learner demonstrated the course outcomes. Record each status accurately.\n\nWhen a new course version is offered, existing learners should see the new requirements and any justified retained credit before explicitly choosing an optional upgrade. Earned work and original credentials should remain available. A new course title must not silently replace an active course or turn an older credential into a V5 credential.\n\nReading a lesson, answering practice questions or changing an artifact is not by itself a new credential. Use the actual assessed outcome and issuance records to describe completion. This lesson does not announce that you have passed the program.\n\n**Practice:** A completed learner changes a workflow while a separate library request is still pending. Explain what remains earned, what needs new evidence and which review status must stay pending.",
+      "knowledge_check": {
+        "question": "An assessed workflow changes after completion. Which claim is justified?",
+        "options": [
+          {
+            "text": "The original credential automatically certifies the changed workflow.",
+            "correct": false,
+            "explanation": "Earlier evidence describes the assessed revision, not every later edit."
+          },
+          {
+            "text": "Preserve the original achievement and assess changed behavior with new evidence.",
+            "correct": true,
+            "explanation": "History remains intact while new claims need their own support."
+          },
+          {
+            "text": "Erase the original completion until a library examiner approves the edit.",
+            "correct": false,
+            "explanation": "A separate review process does not rewrite earlier earned work."
+          }
+        ]
+      }
+    },
+    {
+      "id": "governance.worked-example-one-workflow-two-offices",
+      "revision": 3,
+      "title": "Supervise a handoff across two offices",
+      "variant": "walkthrough",
+      "objective": "Connect scope correction, source review, recovery and release to the learner's own decisions.",
+      "content": "Consider an illustrative internal handoff of a subaward-intake workflow from pre-award to post-award. The task is to summarize the assigned agreement for a named internal audience. The assistant proposes an unrelated source, an unsupported deadline and delivery to a broader group. These are decision points, not details to smooth over.\n\nFirst compare the proposal with the assigned task. Correct the source and intended audience before approving execution or release. Inspect the actual saved configuration; a chat promise to use the right source is not the configuration itself.\n\nNext run the approved scope and compare the extracted terms with the agreement. If the deadline is not established by the supplied source or an authorized rule, preserve it as unresolved and explain why. Do not replace it with a plausible date to make the report look complete.\n\nPrepare the handoff with its owner, exact artifact revision, operating instructions, validation evidence and limits. Open the generated report and check that the unresolved deadline remains visible. The learner records the review and release decision; the assistant cannot certify that the learner reviewed something merely by saying so.\n\nIf the delivery attempt returns an uncertain response, inspect the actual destination and delivery status before retrying. Recover only the justified failed action and preserve successful work. Record whether the artifact was received, remains pending or needs repair; do not equate generation with confirmed handoff.\n\nIf post-award later changes a prompt, preserve the original tested revision and test the changed version before relying on it. Shared visibility does not make every same-day edit an approved improvement.\n\n**Practice:** Write the scope correction, source-supported value decision, recovery decision and exact release decision for this scenario. Link each to the evidence that would justify it.",
+      "knowledge_check": {
+        "question": "The assistant says it checked the deadline and approved delivery for the learner. Is that sufficient?",
+        "options": [
+          {
+            "text": "Yes; an agent can substitute its assertion for all learner decisions.",
+            "correct": false,
+            "explanation": "The capstone requires the learner's own recorded judgments linked to evidence."
+          },
+          {
+            "text": "No; preserve source support and the learner's actual scope, review, recovery and release decisions.",
+            "correct": true,
+            "explanation": "Assistance is allowed, but the required judgments must be demonstrated by the learner."
+          },
+          {
+            "text": "Yes, if the report looks polished.",
+            "correct": false,
+            "explanation": "Presentation does not establish source correctness or authorization."
+          }
+        ]
+      }
+    },
+    {
+      "id": "governance.glossary-review",
+      "revision": 4,
+      "title": "Review accountable reuse and earned evidence",
+      "variant": "key-terms",
+      "objective": "Explain the boundaries among access, measured quality, learner decisions and completion.",
+      "content": "**Accountable handoff:** an artifact and instructions naming its owner, intended use, tested revision, evidence, limitations and change/review route. It is more than a share link.\n\n**Audience and permissions:** the actual people and capabilities authorized for the artifact and its dependencies. A library location, assistant suggestion or credential does not grant missing access or release authority.\n\n**Library review:** a separate process for a submitted reusable item. Pending remains pending until an actual decision exists. A review badge and adoption count do not prove the correctness of a current result.\n\n**Portability:** the ability to move supported definitions between contexts. Export/import may require source references, knowledge bases, models and other dependencies to be resolved and tested locally. Inspect the file before sharing.\n\n**Assessed revision:** the version of learner work and requirements associated with an assessment. Preserve its history; later edits and new course versions need appropriate new evidence.\n\n**Supervision:** the learner's recorded decisions about scope, approval, source support, correction, recovery and release. The assistant can help prepare and execute work but cannot invent those learner decisions.\n\n**Review task:** Present the bounded capstone and internal handoff with evidence for each required decision and no hidden critical error. Explain what was actually delivered, what remains unresolved and which separate review statuses are still pending. Refer to real outcome and issuance records when describing earned completion.",
+      "knowledge_check": {
+        "question": "What establishes program completion?",
+        "options": [
+          {
+            "text": "Reaching the final lesson or asking to share a workflow.",
+            "correct": false,
+            "explanation": "Reading and sharing do not demonstrate all required assessed outcomes."
+          },
+          {
+            "text": "The recorded required outcome results and corresponding completion/issuance records for the course version.",
+            "correct": true,
+            "explanation": "Completion claims must refer to actual assessed evidence and records."
+          },
+          {
+            "text": "An assistant congratulating the learner.",
+            "correct": false,
+            "explanation": "A conversational assertion cannot award or prove a credential."
+          }
+        ]
+      }
+    }
+  ]
+}

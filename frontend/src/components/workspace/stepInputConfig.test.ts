@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   deriveStepInput,
   effectiveTaskInput,
+  INPUT_SOURCE_LABELS,
   inputValuePatch,
   readInputValue,
   sameInputValue,
@@ -85,6 +86,15 @@ describe('sameInputValue', () => {
 })
 
 describe('deriveStepInput', () => {
+  it('keeps a pinned task document out of the shared step input', () => {
+    const pinned = task('pinned', { override_step_input: true, input_sources: ['select_document'], selected_document_uuid: 'private-reference' })
+    const sibling = task('sibling', { prompt: 'Summarize the previous step' })
+    const value = deriveStepInput(step({}, [pinned, sibling]))
+    expect(value.value).toEqual({ sources: ['step_input'], selectedDocUuid: '' })
+    expect(value.divergentTasks).toEqual([])
+    expect(effectiveTaskInput(step({}, [pinned, sibling]), pinned).selectedDocUuid).toBe('private-reference')
+    expect(effectiveTaskInput(step({}, [pinned, sibling]), sibling).sources).toEqual(['step_input'])
+  })
   it('uses the step when the step has been configured', () => {
     const s = step({ input_sources: ['workflow_documents'] }, [
       task('t1', { input_sources: ['step_input'] }),
@@ -150,5 +160,17 @@ describe('effectiveTaskInput', () => {
     const t = task('t1', { input_sources: ['workflow_documents'] })
     const s = step({}, [t])
     expect(effectiveTaskInput(s, t).sources).toEqual(['workflow_documents'])
+  })
+})
+
+describe('All Earlier Steps', () => {
+  it('survives reading and saving, so the editor never drops it', () => {
+    // A chat-built memo step reads every earlier step. The editor used to filter
+    // unknown sources out, so opening and saving it would have repointed the
+    // memo at the previous step alone.
+    const value = readInputValue({ input_sources: ['earlier_steps'] })
+    expect(value.sources).toEqual(['earlier_steps'])
+    expect(inputValuePatch(value)).toMatchObject({ input_sources: ['earlier_steps'], input_source: 'earlier_steps' })
+    expect(INPUT_SOURCE_LABELS.earlier_steps).toBe('All Earlier Steps')
   })
 })

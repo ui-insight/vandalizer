@@ -5,6 +5,7 @@ const mockUploadFile = vi.fn()
 
 vi.mock('../api/files', () => ({
   uploadFile: (...args: unknown[]) => mockUploadFile(...args),
+  getUploadPolicy: vi.fn().mockResolvedValue({ extensions: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt', 'md'], max_size_bytes: 10 }),
 }))
 
 import { useUpload } from './useUpload'
@@ -100,40 +101,48 @@ describe('useUpload', () => {
     expect(names).toContain('bad.pdf')
     expect(names).toContain('good.pdf')
   })
+})
 
-  // Support ticket: re-uploading a revised file under the same name opened the
-  // existing file, old content and all, as though the upload had worked.
-  it('reports a same-name file with different content as not uploaded, and does not open the old one', async () => {
-    mockUploadFile.mockResolvedValue({ complete: true, exists: true, uuid: 'old', changed: true })
-    const { result } = renderHook(() => useUpload('folder-1', vi.fn()))
 
-    await act(async () => {
-      await result.current.upload([makeFile('budget.pdf')])
-    })
+it('rejects a file over the server limit before reading or uploading it', async () => {
+  const { result } = renderHook(() => useUpload('folder-1', vi.fn()))
+  await act(async () => result.current.upload([new File(['01234567890'], 'large.txt')]))
+  expect(mockUploadFile).not.toHaveBeenCalled()
+  expect(result.current.uploads[0].error).toContain('per-file limit')
+})
 
-    expect(result.current.uploads[0].error).toMatch(/A different file named \u201cbudget\.pdf\u201d is already in this folder/)
-    expect(result.current.uploads[0].error).toMatch(/was not replaced/)
-    expect(result.current.lastUploadedUuid).toBeNull()
+// Support ticket: re-uploading a revised file under the same name opened the
+// existing file, old content and all, as though the upload had worked.
+it('reports a same-name file with different content as not uploaded, and does not open the old one', async () => {
+  mockUploadFile.mockResolvedValue({ complete: true, exists: true, uuid: 'old', changed: true })
+  const { result } = renderHook(() => useUpload('folder-1', vi.fn()))
 
-    // It stays until dismissed, like any other failed upload.
-    await act(async () => { vi.advanceTimersByTime(3000) })
-    expect(result.current.uploads).toHaveLength(1)
+  await act(async () => {
+    await result.current.upload([makeFile('budget.pdf')])
   })
 
-  it('still warns when the server cannot say whether the content differs', async () => {
-    mockUploadFile.mockResolvedValue({ complete: true, exists: true, uuid: 'old', changed: null })
-    const { result } = renderHook(() => useUpload('folder-1', vi.fn()))
-    await act(async () => { await result.current.upload([makeFile('budget.pdf')]) })
-    expect(result.current.uploads[0].error).toMatch(/was not updated/)
-    expect(result.current.lastUploadedUuid).toBeNull()
-  })
+  expect(result.current.uploads[0].error).toMatch(/A different file named \u201cbudget\.pdf\u201d is already in this folder/)
+  expect(result.current.uploads[0].error).toMatch(/was not replaced/)
+  expect(result.current.lastUploadedUuid).toBeNull()
 
-  it('opens the existing file and says nothing changed when the content is identical', async () => {
-    mockUploadFile.mockResolvedValue({ complete: true, exists: true, uuid: 'old', changed: false })
-    const { result } = renderHook(() => useUpload('folder-1', vi.fn()))
-    await act(async () => { await result.current.upload([makeFile('budget.pdf')]) })
-    expect(result.current.uploads[0].error).toBeUndefined()
-    expect(result.current.uploads[0].note).toMatch(/same content/)
-    expect(result.current.lastUploadedUuid).toBe('old')
-  })
+  // It stays until dismissed, like any other failed upload.
+  await act(async () => { vi.advanceTimersByTime(3000) })
+  expect(result.current.uploads).toHaveLength(1)
+})
+
+it('still warns when the server cannot say whether the content differs', async () => {
+  mockUploadFile.mockResolvedValue({ complete: true, exists: true, uuid: 'old', changed: null })
+  const { result } = renderHook(() => useUpload('folder-1', vi.fn()))
+  await act(async () => { await result.current.upload([makeFile('budget.pdf')]) })
+  expect(result.current.uploads[0].error).toMatch(/was not updated/)
+  expect(result.current.lastUploadedUuid).toBeNull()
+})
+
+it('opens the existing file and says nothing changed when the content is identical', async () => {
+  mockUploadFile.mockResolvedValue({ complete: true, exists: true, uuid: 'old', changed: false })
+  const { result } = renderHook(() => useUpload('folder-1', vi.fn()))
+  await act(async () => { await result.current.upload([makeFile('budget.pdf')]) })
+  expect(result.current.uploads[0].error).toBeUndefined()
+  expect(result.current.uploads[0].note).toMatch(/same content/)
+  expect(result.current.lastUploadedUuid).toBe('old')
 })

@@ -1,0 +1,72 @@
+.extraction-editor { container-type: inline-size; }
+.extraction-header { position: relative; gap: 8px !important; flex-wrap: nowrap !important; }
+.extraction-title-row { flex-wrap: nowrap !important; gap: 4px !important; }
+.extraction-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; line-height: 1.4; }
+.extraction-heading { min-width: 0; }
+.extraction-header button { min-width: 28px; min-height: 32px; align-items: center; justify-content: center; }
+.extraction-compact .extraction-tabs { display: grid !important; grid-template-columns: minmax(0, .9fr) minmax(0, .7fr) minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr); padding: 0 8px !important; }
+.extraction-compact .extraction-tabs > button { justify-content: center; padding: 10px 1px !important; min-height: 42px; }
+.extraction-inputs { margin: 16px 24px 0; padding: 12px; border: 1px solid #dce1e7; background: #f8fafc; border-radius: 8px; font-size: 12px; color: #475569; }
+.extraction-input-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.extraction-input-heading strong { display: flex; gap: 6px; align-items: center; color: #202124; font-size: 13px; }
+.extraction-input-heading p { margin: 4px 0 0; }
+.extraction-input-heading > button, .extraction-empty button { display: inline-flex; gap: 6px; align-items: center; justify-content: center; min-height: 36px; padding: 7px 10px; background: white; border: 1px solid #cbd5e1; border-radius: 6px; color: #202124; font: inherit; font-weight: 600; cursor: pointer; }
+.extraction-selected-documents { margin-top: 10px; overflow-wrap: anywhere; }
+.extraction-selected-documents summary { cursor: pointer; padding-block: 3px; }
+.extraction-selected-documents ul { list-style: none; margin: 6px 0 0; padding: 0; }
+.extraction-selected-documents li { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-top: 1px solid #e2e8f0; padding: 5px 0; }
+.extraction-selected-documents button { display: grid; place-items: center; flex-shrink: 0; width: 30px; height: 30px; border-radius: 4px; color: #475569; background: white; border: 1px solid #cbd5e1; cursor: pointer; }
+.extraction-combine { display: flex; align-items: flex-start; gap: 8px; border-top: 1px solid #dce1e7; margin-top: 10px; padding-top: 10px; }
+.extraction-combine input { margin-top: 3px; }
+.extraction-combine span span { display: block; margin-top: 3px; }
+.extraction-field-count { display: inline-block; padding: 2px 6px; margin-left: 5px; color: #475569; background: #f1f5f9; border-radius: 5px; font-size: 12px; }
+.extraction-field-heading { min-height: 36px; }
+.extraction-field-heading > button { min-height: 36px; overflow-wrap: anywhere; }
+.extraction-field-heading > button > svg { flex-shrink: 0; }
+.extraction-field-actions { display: flex; align-items: center; gap: 4px; padding-bottom: 10px; }
+.extraction-field-actions button { display: flex; align-items: center; justify-content: center; gap: 5px; min-height: 32px; min-width: 32px; border: 1px solid #cbd5e1 !important; border-radius: 5px; background: #fff !important; color: #334155; padding: 4px 8px; cursor: pointer; }
+.extraction-field-actions button:disabled { cursor: default; }
+.extraction-empty { padding: 20px 12px; border: 1px dashed #cbd5e1; border-radius: 8px; color: #475569; font-size: 13px; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.extraction-empty h3 { color: #202124; font-size: 16px; font-weight: 600; margin: 0; }
+.extraction-empty p { margin: 0; line-height: 1.55; }
+.extraction-empty button { text-align: left; justify-content: space-between; width: 100%; }
+.extraction-quality-link { position: relative; }
+.extraction-quality-link > button { display: inline-flex; gap: 4px; align-items: center; margin-top: 8px; padding: 4px 0; min-height: 28px; background: none; color: #334155; border: 0; font-size: 12px; font-weight: 600; cursor: pointer; }
+.extraction-run-hint { display: none; color: #475569; font-size: 12px; flex: 1; }
+.extraction-run-toolbar input { padding: 10px 64px 10px 12px !important; }
+.extraction-run-toolbar button:disabled { cursor: default; }
+.extraction-section-intro { color: #475569; margin: 0 0 16px; font-size: 13px; }
+.extraction-tool-card { border: 1px solid #dce1e7; background: #fff; border-radius: 8px; overflow: hidden; }
+.extraction-tool-card > button { width: 100%; padding: 16px; background: none; border: 0; cursor: pointer; text-align: left; font-family: inherit; }
+.extraction-tool-card > button:hover:not(:disabled) { background: #f8fafc; }
+.extraction-tool-card > button:focus-visible { outline: 2px solid #334155; outline-offset: -3px; }
+.extraction-tool-card > button:disabled { cursor: default; background: #f8fafc; }
+.extraction-tool-title { display: flex; gap: 6px; align-items: center; font-size: 14px; font-weight: 600; color: #202124; }
+.extraction-tool-description { display: block; margin-top: 5px; font-size: 12px; line-height: 1.55; color: #475569; }
+.extraction-tool-card > button:disabled .extraction-tool-title { color: #64748b; }
+.extraction-tool-card .extraction-tool-secondary { border-top: 1px solid #e2e8f0; padding: 12px 16px; font-size: 12px; font-weight: 600; color: #1d4ed8; }
+.extraction-tool-card .extraction-tool-secondary:disabled { color: #475569; }
+.extraction-tool-danger { border-color: #fecaca; }
+.extraction-tool-danger .extraction-tool-title { color: #b91c1c; }
+.extraction-tool-error { margin: 0 12px 12px; padding: 10px; border: 1px solid #fecaca; background: #fef2f2; color: #991b1b; font-size: 12px; border-radius: 6px; }
+.extraction-advanced select { max-width: 100%; min-width: 0; }
+.extraction-advanced [role="region"] { max-width: 100%; }
+@container (max-width: 480px) {
+  .extraction-header { padding: 12px !important; align-items: flex-start !important; }
+  .extraction-title { font-size: 15px !important; }
+  .extraction-title-row { flex-wrap: wrap !important; }
+  .extraction-title { flex: 1; }
+  .extraction-inputs { margin: 12px 12px 0; }
+  .extraction-design, .extraction-tools, .extraction-advanced { padding: 16px 12px !important; }
+  .extraction-field-heading > svg { display: none; }
+  .extraction-field-heading > span { width: 16px !important; margin-right: 0 !important; }
+  .extraction-tools-grid { grid-template-columns: minmax(0, 1fr) !important; gap: 12px !important; }
+  .extraction-field-value { margin-left: 0 !important; }
+  .extraction-run-hint { display: block; }
+  .extraction-field-entry { flex: 1 0 100% !important; }
+  .extraction-run-toolbar { padding: 10px 12px !important; }
+}
+
+.extraction-api-disclosure { border: 1px solid #dce1e7; border-radius: 8px; }
+.extraction-api-disclosure > summary { padding: 14px 16px; cursor: pointer; color: #334155; font-size: 13px; font-weight: 600; }
+.extraction-api-disclosure > div { border: 0 !important; border-radius: 0 0 8px 8px !important; }

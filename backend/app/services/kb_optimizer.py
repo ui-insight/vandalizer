@@ -14,7 +14,7 @@ import datetime
 import hashlib
 import logging
 import random
-from typing import Any
+from typing import Any, overload
 from uuid import uuid4
 
 from app.models.kb_optimization_run import KBOptimizationRun
@@ -30,6 +30,9 @@ from app.services.optimization_common import (
     WINNER_TIE_SIGMAS,
     build_apply_preview,
     pick_winner_variance_aware,
+    tie_band,
+    reported_baseline_score,
+    tied_on_reported_scores,
 )
 
 logger = logging.getLogger(__name__)
@@ -167,9 +170,9 @@ def _l0_distance_to_default(cfg: dict) -> int:
 
 
 def _split_train_holdout(
-    queries: list,
+    queries: list[KBTestQuery],
     kb_uuid: str,
-) -> tuple[list, list]:
+) -> tuple[list[KBTestQuery], list[KBTestQuery]]:
     """Deterministically partition queries into (train, holdout).
 
     Determinism is keyed on (kb_uuid, query_uuid) so re-running the same KB
@@ -180,7 +183,7 @@ def _split_train_holdout(
     if len(queries) < HOLDOUT_MIN_QUERIES:
         return list(queries), []
 
-    def _bucket(q) -> str:
+    def _bucket(q: KBTestQuery) -> str:
         uid = str(getattr(q, "uuid", "") or "")
         return hashlib.sha256(f"{kb_uuid}:{uid}".encode("utf-8")).hexdigest()
 
@@ -943,10 +946,30 @@ class KBOptimizer:
                 judge_variance=baselines.get("judge_variance"),
             )
 
+            # The tie was decided on training scores; the headline is the
+            # holdout score, and the paired test ran on it. Decide it again on
+            # what the run reports, so chat and the comparison card agree.
+            regated = tied_on_reported_scores(
+                tied=tied_with_baseline,
+                optimized_score=optimized_score,
+                baseline_score=reported_baseline_score(
+                    holdout_optimized_score=holdout_optimized_score,
+                    holdout_default_score=holdout_default_score,
+                    baseline_default_score=baselines.get("default_kb"),
+                ),
+                band=tie_band(blended_sigma, n_items_for_se),
+                lift_ci=lift_ci,
+            )
+            if regated and not tied_with_baseline:
+                winner_reason = "tied_on_reported_score"
+            tied_with_baseline = regated
+
             await self._update(
                 run_doc,
                 optimized_score=round(optimized_score, 4),
                 optimized_score_train=round(optimized_score_train, 4),
+                tied_with_baseline=tied_with_baseline,
+                winner_selection_reason=winner_reason,
                 holdout_default_score=(
                     round(holdout_default_score, 4)
                     if holdout_default_score is not None else None
@@ -1260,10 +1283,8 @@ class KBOptimizer:
         # Wrap _generate_kb_answer with a closure that injects this trial's config.
         original_gen = kb_validation_service._generate_kb_answer
 
-        async def trial_generate(kb_uuid_, query, model_name, k=kb_validation_service.DEFAULT_K, **kw):
-            # Strip any inbound config — this trial's overrides win.
-            kw.pop("config", None)
-            return await original_gen(kb_uuid_, query, model_name, k, config=cfg)
+        async def trial_generate(kb_uuid: str, query: str, model_name: str, k: int = kb_validation_service.DEFAULT_K, *, config: RAGConfig | None = None) -> tuple[str, list[dict], int]:
+            return await original_gen(kb_uuid, query, model_name, k, config=cfg)
 
         kb_validation_service._generate_kb_answer = trial_generate
 
@@ -1276,7 +1297,7 @@ class KBOptimizer:
         # Both comparisons live in judge-score units (the partial means are
         # raw judge scores from per-query verdicts).
         early_stop_callback = None
-        early_stop_reason = {"reason": None}  # mutable closure capture
+        early_stop_reason: dict[str, str | None] = {"reason": None}  # mutable closure capture
         if baseline_no_kb_score is not None or current_best_judge_score is not None:
             sigma = (
                 judge_variance if judge_variance is not None
@@ -1397,19 +1418,13 @@ class KBOptimizer:
         """
         cfg = RAGConfig(**cfg_dict) if cfg_dict else RAGConfig()
         effective_model = cfg.model or fallback_model
+        original_gen = kb_validation_service._generate_kb_answer
         if cfg_dict:
-            original_gen = kb_validation_service._generate_kb_answer
 
-            async def holdout_generate(
-                kb_uuid_, query, model_name,
-                k=kb_validation_service.DEFAULT_K, **kw,
-            ):
-                kw.pop("config", None)
-                return await original_gen(kb_uuid_, query, model_name, k, config=cfg)
+            async def holdout_generate(kb_uuid: str, query: str, model_name: str, k: int = kb_validation_service.DEFAULT_K, *, config: RAGConfig | None = None) -> tuple[str, list[dict], int]:
+                return await original_gen(kb_uuid, query, model_name, k, config=cfg)
 
             kb_validation_service._generate_kb_answer = holdout_generate
-        else:
-            original_gen = None
 
         try:
             judge_result = await kb_validation_service.judge_test_queries(
@@ -1417,7 +1432,7 @@ class KBOptimizer:
                 judge_model=judge_model or fallback_model,
             )
         finally:
-            if original_gen is not None:
+            if cfg_dict:
                 kb_validation_service._generate_kb_answer = original_gen
 
         judge_avg = float(judge_result.get("avg_judge_score") or 0.0)
@@ -1575,9 +1590,8 @@ class KBOptimizer:
             cfg = RAGConfig(**best_trial["config"])
             original_gen = kb_validation_service._generate_kb_answer
 
-            async def cross_generate(kb_uuid_, query, model_name, k=kb_validation_service.DEFAULT_K, **kw):
-                kw.pop("config", None)
-                return await original_gen(kb_uuid_, query, model_name, k, config=cfg)
+            async def cross_generate(kb_uuid: str, query: str, model_name: str, k: int = kb_validation_service.DEFAULT_K, *, config: RAGConfig | None = None) -> tuple[str, list[dict], int]:
+                return await original_gen(kb_uuid, query, model_name, k, config=cfg)
 
             kb_validation_service._generate_kb_answer = cross_generate
             try:
@@ -1600,9 +1614,9 @@ class KBOptimizer:
             # Compare judge-vs-judge: the trial's ``score`` field is the
             # blended quality, but cross-judge tests whether two judges agree,
             # which is a pure judge-score comparison.
+            primary_judge_score = best_trial.get("judge_score")
             primary_score = float(
-                best_trial.get("judge_score")
-                if best_trial.get("judge_score") is not None
+                primary_judge_score if primary_judge_score is not None
                 else (best_trial.get("score") or 0.0)
             )
 
@@ -1920,7 +1934,7 @@ class KBOptimizer:
             run_doc.reverted_at = None
             await run_doc.save()
 
-    async def _notify_terminal(self, run_doc: KBOptimizationRun, kb) -> None:
+    async def _notify_terminal(self, run_doc: KBOptimizationRun, kb: KnowledgeBase | None) -> None:
         """Tell the run's owner it finished — see ``optimizer_notifications``
         for who hears what. Best-effort — never raises into the caller.
 
@@ -1953,7 +1967,7 @@ class KBOptimizer:
         return " · ".join(bits)
 
     async def _finalize_cancelled(
-        self, run_doc: KBOptimizationRun, kb,
+        self, run_doc: KBOptimizationRun, kb: KnowledgeBase | None,
     ) -> KBOptimizationRun:
         """Transition a run to the cancelled terminal state and notify.
 
@@ -1971,7 +1985,7 @@ class KBOptimizer:
         return run_doc
 
     @staticmethod
-    async def _update(run_doc: KBOptimizationRun, **fields) -> None:
+    async def _update(run_doc: KBOptimizationRun, **fields: object) -> None:
         """Mutate-and-save helper. Keeps the run doc in sync with progress.
 
         Saves route through ``_save`` so a concurrently-requested cancel is
@@ -2045,6 +2059,14 @@ def _as_aware(dt: datetime.datetime | None) -> datetime.datetime | None:
     if dt.tzinfo is None:
         return dt.replace(tzinfo=datetime.timezone.utc)
     return dt
+
+
+@overload
+async def reap_one(run_doc: KBOptimizationRun) -> KBOptimizationRun: ...
+
+
+@overload
+async def reap_one(run_doc: None) -> None: ...
 
 
 async def reap_one(run_doc: KBOptimizationRun | None) -> KBOptimizationRun | None:

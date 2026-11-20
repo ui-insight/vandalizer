@@ -1,5 +1,7 @@
 export class ApiError extends Error {
   status: number
+  code?: string
+  existingReviewId?: string
   // Set on 403 DEMO_EXPIRED responses so callers can route an expired trial
   // user straight to the renewal screen.
   feedbackToken?: string | null
@@ -122,6 +124,18 @@ export async function rawFetch(
   return res
 }
 
+/** The readable text of a FastAPI error `detail`: a string, a validation
+ * list, or a structured `{code, message}` object. */
+export function errorDetailMessage(detail: unknown, fallback: string): string {
+  if (!detail) return fallback
+  if (typeof detail === 'string') return detail
+  if (Array.isArray(detail)) return detail.map((e: { msg?: string }) => e?.msg || String(e)).join('; ')
+  if (typeof detail === 'object' && typeof (detail as { message?: unknown }).message === 'string') {
+    return (detail as { message: string }).message || fallback
+  }
+  return String(detail)
+}
+
 export async function apiFetch<T>(
   url: string,
   options: RequestInit & { timeoutMs?: number } = {},
@@ -215,13 +229,13 @@ export async function apiFetch<T>(
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ detail: 'Request failed' }))
-    let message = body.detail || 'Request failed'
-    if (Array.isArray(message)) {
-      message = message.map((e: { msg?: string }) => e.msg || String(e)).join('; ')
-    } else if (typeof message !== 'string') {
-      message = String(message)
+    const error = new ApiError(res.status, errorDetailMessage(body.detail, 'Request failed'))
+    if (body.detail && typeof body.detail.code === 'string') error.code = body.detail.code
+    if (res.status === 409 && error.code === 'CERTIFICATION_REVIEW_EXISTS'
+      && typeof body.detail.attempt_id === 'string' && /^[a-f0-9]{32}$/.test(body.detail.attempt_id)) {
+      error.existingReviewId = body.detail.attempt_id
     }
-    throw new ApiError(res.status, message)
+    throw error
   }
 
   return res.json()

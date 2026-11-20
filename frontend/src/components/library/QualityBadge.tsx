@@ -1,77 +1,37 @@
-const tierColors: Record<string, { bg: string; text: string; border: string }> = {
-  excellent: { bg: '#f0fdf4', text: '#15803d', border: '#bbf7d0' },
-  good: { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' },
-  fair: { bg: '#fefce8', text: '#a16207', border: '#fde68a' },
-}
+import { qualityPresentation, type QualityEvidence } from '../../lib/qualityLabels'
+import { validationDate } from './CatalogSignals'
 
-const defaultColor = { bg: '#f9fafb', text: '#6b7280', border: '#e5e7eb' }
-
-// A regression the system has already detected outranks the tier the item used
-// to hold. Leaving the old colour up would keep endorsing something monitoring
-// has decided is broken, which is the one thing a quality badge must not do.
-const regressionColor = { bg: '#fef2f2', text: '#b91c1c', border: '#fecaca' }
-
-// A hand-typed catalog tier with no measured score behind it is a claim. It
-// renders in the neutral style whatever the tier word says, so a seeded
-// "excellent" cannot pass for one a validation run earned.
-const ASSERTED_TITLE =
-  'The rating came with the starter example from its author. Nobody here has run a ' +
-  'validation on it yet — validate it to get a measured score.'
-
-const REGRESSION_TITLE =
-  'Automatic revalidation scored this materially lower than before. ' +
-  'The previous rating no longer applies until someone reviews it.'
-
-export function QualityBadge({
-  tier,
-  score,
-  title,
-  regressionPending = false,
-  asserted = false,
-  variant = 'quality',
-}: {
-  tier: string | null
+export function QualityBadge({ tier, score, title, regressionPending = false, asserted = false,
+  testCaseCount, lastValidatedAt, outdated = false, limitedEvidence, grade, needsReview = false,
+}: QualityEvidence & {
+  tier: string | null | undefined
   score: number | null
   title?: string
   regressionPending?: boolean
-  /** The tier is a catalog assertion with no measured score — see ASSERTED_TITLE. */
-  asserted?: boolean
-  /** 'catalog': the badge on a shared entry, where a score means an examiner
-   *  checked it — leads with "Checked" instead of "Quality:". */
   variant?: 'quality' | 'catalog'
+  lastValidatedAt?: string | null
 }) {
-  const colors = regressionPending
-    ? regressionColor
-    : tier && !asserted
-      ? tierColors[tier] || defaultColor
-      : defaultColor
-  const tierLabel = tier ? tier.charAt(0).toUpperCase() + tier.slice(1) : null
-  const catalog = variant === 'catalog'
-  const baseLabel = tierLabel
-    ? asserted
-      ? `Rated ${tierLabel} by its author · not yet checked here`
-      : `${catalog ? 'Checked' : 'Quality:'} ${catalog ? '· ' : ''}${tierLabel}${score != null ? ` (${Math.round(score)}%)` : ''}`
-    : catalog ? 'Not yet checked here' : 'Unvalidated'
-  const label = regressionPending ? 'Regression pending review' : baseLabel
-
+  const quality = qualityPresentation({ tier, score, grade, asserted, testCaseCount, outdated, limitedEvidence, needsReview: regressionPending || needsReview })
+  const date = validationDate(lastValidatedAt)
   return (
-    <span
-      title={regressionPending ? REGRESSION_TITLE : asserted && tier ? ASSERTED_TITLE : title}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        fontSize: '11px',
-        lineHeight: '16px',
-        padding: '1px 6px',
-        borderRadius: '4px',
-        border: `1px solid ${colors.border}`,
-        backgroundColor: colors.bg,
-        color: colors.text,
-        fontWeight: 500,
-        whiteSpace: 'nowrap',
-      }}
-    >
-      {label}
-    </span>
+    <details onClick={event => event.stopPropagation()} style={{ display: 'inline-block', maxWidth: '100%', fontSize: 12, lineHeight: '18px', textAlign: 'left' }}>
+      <summary aria-label={`${quality.label}. View evaluation`} style={{
+        cursor: 'pointer', padding: '2px 6px', borderRadius: 4, overflowWrap: 'anywhere',
+        border: `1px solid ${quality.colors.border}`, backgroundColor: quality.colors.bg, color: quality.colors.text,
+      }}>
+        <span style={{ fontWeight: 600 }}>{quality.label}</span>
+        <span style={{ display: 'block', fontWeight: 400 }}>{quality.evidence}</span>
+      </summary>
+      <div role="region" aria-label="Evaluation details" style={{ padding: 8, color: '#374151', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 4, maxWidth: 340 }}>
+        {quality.measured && <p style={{ margin: '0 0 4px' }}>Recorded score: {score != null && Number.isFinite(score) ? `${Math.round(score)}/100` : 'Not recorded'}{grade ? ` · Rubric grade: ${grade}` : ''}</p>}
+        <p style={{ margin: '0 0 4px' }}>Examples: {quality.measured ? testCaseCount ?? 'Not recorded' : 'Not evaluated'} · Evaluated: {date || 'Not recorded'}</p>
+        {regressionPending && <p>A regression is awaiting review. The previous rating no longer describes current performance.</p>}
+        {outdated && <p>This evaluation may not describe the current configuration. Evaluate it again after reviewing changes.</p>}
+        {quality.limited && <p>Limited evidence: inspect the examples and add representative cases before drawing broader conclusions.</p>}
+        {asserted && <p>The author supplied a rating. No measured evaluation backs it here.</p>}
+        {title && <p>{title}</p>}
+        <p style={{ marginBottom: 0 }}>These results describe the examples tested. Inspect failed checks and coverage for your task; the score is not a guarantee for new inputs.</p>
+      </div>
+    </details>
   )
 }

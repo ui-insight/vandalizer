@@ -1,0 +1,26 @@
+# QA staging overlay for the certification 5.0 course. Never use in production:
+# releases published in QA staging mode refuse to serve learners when
+# ENVIRONMENT=production. See docs/certification-v5-qa-staging.md.
+#
+#   CERTIFICATION_STAGING_CATALOG=/srv/vandalizer/qa-catalog \
+#     docker compose -f compose.yaml -f compose.qa-staging.yaml up -d api celery
+#
+# The catalog directory is prepared on the host with
+# scripts/stage_certification_v5_qa.py and mounted read-only into every API and
+# Celery worker, so all workers read the same registry and packages.
+services:
+  api:
+    environment:
+      - ENVIRONMENT=staging
+      - CERTIFICATION_VERSIONING_ENABLED=${CERTIFICATION_VERSIONING_ENABLED:-true}
+      - CERTIFICATION_CATALOG_ROOT=/app/certification-staging
+    volumes:
+      - ${CERTIFICATION_STAGING_CATALOG:?Set CERTIFICATION_STAGING_CATALOG to the prepared staging catalog}:/app/certification-staging:ro
+
+  celery:
+    environment:
+      - ENVIRONMENT=staging
+      - CERTIFICATION_VERSIONING_ENABLED=${CERTIFICATION_VERSIONING_ENABLED:-true}
+      - CERTIFICATION_CATALOG_ROOT=/app/certification-staging
+    volumes:
+      - ${CERTIFICATION_STAGING_CATALOG:?Set CERTIFICATION_STAGING_CATALOG to the prepared staging catalog}:/app/certification-staging:ro

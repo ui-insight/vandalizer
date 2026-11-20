@@ -85,7 +85,7 @@ def ensure_model_identity_available(
                     )
 
 
-def _library_scope(user_id: str, team_id: str | None) -> dict:
+def _library_scope(user_id: str | None, team_id: str | None) -> dict:
     # Mirrors the default (no-scope) query in workflow_service.list_workflows
     # and search_set_service.list_search_sets: own items + current team items.
     if team_id:
@@ -180,7 +180,7 @@ async def ensure_workflow_name_available(
 
 
 async def search_set_title_taken(
-    title: str, set_type: str, user_id: str, team_id: str | None,
+    title: str, set_type: str, user_id: str | None, team_id: str | None,
     exclude_uuid: str | None = None,
 ) -> bool:
     query: dict = {"$and": [
@@ -193,7 +193,7 @@ async def search_set_title_taken(
 
 
 async def ensure_search_set_title_available(
-    title: str, set_type: str, user_id: str, team_id: str | None,
+    title: str, set_type: str, user_id: str | None, team_id: str | None,
     exclude_uuid: str | None = None,
 ) -> None:
     if await search_set_title_taken(title, set_type, user_id, team_id, exclude_uuid=exclude_uuid):

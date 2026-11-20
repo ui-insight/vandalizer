@@ -59,15 +59,10 @@ export function optimizedBadgeTitle(opt: KBOptimizationStatus, withTime = false)
   return `${head} Not the same as Checked, which is about someone having looked the content over.`
 }
 
-const chip = {
-  display: 'inline-flex', alignItems: 'center', gap: 3,
-  fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
-} as const
-
 export function VerifiedBadge() {
   return (
-    <span title={VERIFIED_KB_HOVER} style={{ ...chip, color: '#15803d', backgroundColor: '#dcfce7' }}>
-      <ShieldCheck size={10} />
+    <span title={VERIFIED_KB_HOVER} className="workspace-status-badge" data-tone="success">
+      <ShieldCheck size={14} aria-hidden="true" />
       Checked
     </span>
   )
@@ -88,32 +83,23 @@ export function OptimizedBadge({ kb, withTime = false }: {
   if (opt.state === 'available') {
     if (kb.can_manage === false) return null
     return (
-      <span title={title} style={{
-        ...chip, color: '#9ca3af', backgroundColor: 'rgba(156, 163, 175, 0.12)',
-        border: '1px dashed rgba(156, 163, 175, 0.4)',
-      }}>
-        <Sparkles size={10} />
+      <span title={title} className="workspace-status-badge" data-tone="neutral">
+        <Sparkles size={14} aria-hidden="true" />
         Optimization available
       </span>
     )
   }
   if (opt.state === 'stale') {
     return (
-      <span title={title} style={{
-        ...chip, color: '#fbbf24', backgroundColor: 'rgba(245, 158, 11, 0.12)',
-        border: '1px solid rgba(245, 158, 11, 0.35)',
-      }}>
-        <AlertTriangle size={10} />
+      <span title={title} className="workspace-status-badge" data-tone="warning">
+        <AlertTriangle size={14} aria-hidden="true" />
         Optimized · stale
       </span>
     )
   }
   return (
-    <span title={title} style={{
-      ...chip, color: '#a78bfa', backgroundColor: 'rgba(124, 58, 237, 0.12)',
-      border: '1px solid rgba(124, 58, 237, 0.3)',
-    }}>
-      <Sparkles size={10} />
+    <span title={title} className="workspace-status-badge" data-tone="info">
+      <Sparkles size={14} aria-hidden="true" />
       Optimized
     </span>
   )

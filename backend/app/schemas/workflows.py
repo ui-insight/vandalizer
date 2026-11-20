@@ -47,6 +47,8 @@ class WorkflowResponse(BaseModel):
     # Verified items are already shared; the editor's share callout hides.
     verified: bool = False
     created_by: Optional[AuthorRef] = None
+    # Current version number (the Versions tab's "Current" entry).
+    version: int = 1
 
 
 class WorkflowPageResponse(BaseModel):
@@ -99,6 +101,8 @@ class RunWorkflowRequest(BaseModel):
     folder_uuids: list[str] = []
     model: Optional[str] = None
     batch_mode: bool = False
+    # Explicit opt-in for this run; never inferred from the active workspace.
+    project_context_uuid: Optional[str] = None
     # Present when the workflow was opened via a share link. Grants the holder
     # run + poll access to a workflow they don't own / aren't on the team for.
     share_token: Optional[str] = None
@@ -122,12 +126,18 @@ class WorkflowStatusResponse(BaseModel):
     # "completed" that the stream (which sends the service dict) did not.
     delivery_failures: list[str] = []
     retrieved_sources: list[dict] = []
+    # The run's model, and the models its steps actually ran on (see
+    # WorkflowResult.models_used). Shown on every run view.
+    model: Optional[str] = None
+    models_used: list[str] = []
     workflow_name: Optional[str] = None
     document_title: Optional[str] = None
     start_time: Optional[datetime.datetime] = None
     # Models used, the settings each call was sent with, and the run's
     # configuration snapshot; None for runs recorded before it existed.
     run_metadata: Optional[dict] = None
+    # The workflow version the run executed; None for older runs.
+    workflow_version: Optional[int] = None
 
 
 class BatchStatusItem(BaseModel):

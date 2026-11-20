@@ -7,7 +7,7 @@ audit log with actor_type='api_key'.
 """
 
 import datetime
-from typing import Optional
+from typing import Optional, SupportsInt, SupportsIndex
 
 from bson.decimal128 import Decimal128
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -44,6 +44,8 @@ def _coerce_int(value: object) -> int:
         return 0
     if isinstance(value, Decimal128):
         return int(value.to_decimal())
+    if not isinstance(value, (str, bytes, bytearray, SupportsInt, SupportsIndex)):
+        raise TypeError("Aggregation value cannot be converted to an integer")
     return int(value)
 
 
@@ -226,7 +228,7 @@ async def _user_for_key(api_key: ApiKey) -> User:
 # ---------------------------------------------------------------------------
 
 @router.get("/stats", response_model=StatsResponse)
-async def stats(_: ApiKey = Depends(require_mgmt_scope("metrics:read"))):
+async def stats(_: ApiKey = Depends(require_mgmt_scope("metrics:read"))) -> StatsResponse:
     now = datetime.datetime.now(tz=datetime.timezone.utc)
     cutoff_30d = now - datetime.timedelta(days=30)
 
@@ -291,7 +293,7 @@ async def list_users(
     limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     organization_id: Optional[str] = None,
     _: ApiKey = Depends(require_mgmt_scope("users:read")),
-):
+) -> UserListResponse:
     limit = _clamp_limit(limit)
     filters: dict = {}
     if organization_id:
@@ -323,7 +325,7 @@ async def list_users(
 async def get_user(
     user_id: str,
     _: ApiKey = Depends(require_mgmt_scope("users:read")),
-):
+) -> UserItem:
     u = await User.find_one(User.user_id == user_id)
     if not u:
         raise HTTPException(status_code=404, detail="User not found")
@@ -349,7 +351,7 @@ async def list_teams(
     skip: int = Query(0, ge=0),
     limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     _: ApiKey = Depends(require_mgmt_scope("teams:read")),
-):
+) -> TeamListResponse:
     limit = _clamp_limit(limit)
     total = await Team.find_all().count()
     teams = await Team.find_all().skip(skip).limit(limit).to_list()
@@ -382,7 +384,7 @@ async def list_workflows(
     team_id: Optional[str] = None,
     user_id: Optional[str] = None,
     _: ApiKey = Depends(require_mgmt_scope("workflows:read")),
-):
+) -> WorkflowListResponse:
     limit = _clamp_limit(limit)
     filters: dict = {}
     if team_id:
@@ -393,7 +395,7 @@ async def list_workflows(
     query = Workflow.find(filters) if filters else Workflow.find_all()
     total = await query.count()
     workflows = (
-        await query.sort(-Workflow.updated_at).skip(skip).limit(limit).to_list()
+        await query.sort('-updated_at').skip(skip).limit(limit).to_list()
     )
     return WorkflowListResponse(
         items=[
@@ -422,18 +424,25 @@ async def list_workflow_runs(
     status_eq: Optional[str] = Query(None, alias="status"),
     workflow_id: Optional[str] = None,
     _: ApiKey = Depends(require_mgmt_scope("workflows:read")),
-):
+) -> WorkflowRunListResponse:
     limit = _clamp_limit(limit)
     filters: dict = {}
     if status_eq:
         filters["status"] = status_eq
     if workflow_id:
-        filters["workflow"] = workflow_id
+        from beanie import PydanticObjectId
+
+        # WorkflowResult.workflow is stored as an ObjectId; a string filter
+        # matched nothing, so every filtered listing came back empty.
+        try:
+            filters["workflow"] = PydanticObjectId(workflow_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid workflow id")
 
     query = WorkflowResult.find(filters) if filters else WorkflowResult.find_all()
     total = await query.count()
     results = (
-        await query.sort(-WorkflowResult.start_time)
+        await query.sort('-start_time')
         .skip(skip)
         .limit(limit)
         .to_list()
@@ -469,7 +478,7 @@ async def list_documents(
     team_id: Optional[str] = None,
     include_deleted: bool = False,
     _: ApiKey = Depends(require_mgmt_scope("documents:read")),
-):
+) -> DocumentListResponse:
     limit = _clamp_limit(limit)
     filters: dict = {}
     if team_id:
@@ -479,7 +488,7 @@ async def list_documents(
 
     query = SmartDocument.find(filters) if filters else SmartDocument.find_all()
     total = await query.count()
-    docs = await query.sort(-SmartDocument.created_at).skip(skip).limit(limit).to_list()
+    docs = await query.sort('-created_at').skip(skip).limit(limit).to_list()
     return DocumentListResponse(
         items=[
             DocumentItem(
@@ -516,7 +525,7 @@ async def list_activity(
     team_id: Optional[str] = None,
     since: Optional[datetime.datetime] = None,
     _: ApiKey = Depends(require_mgmt_scope("activity:read")),
-):
+) -> ActivityListResponse:
     limit = _clamp_limit(limit)
     filters: dict = {}
     if type_eq:
@@ -533,7 +542,7 @@ async def list_activity(
     query = ActivityEvent.find(filters) if filters else ActivityEvent.find_all()
     total = await query.count()
     events = (
-        await query.sort(-ActivityEvent.started_at).skip(skip).limit(limit).to_list()
+        await query.sort('-started_at').skip(skip).limit(limit).to_list()
     )
     return ActivityListResponse(
         items=[
@@ -569,7 +578,7 @@ async def list_audit(
     resource_type: Optional[str] = None,
     since: Optional[datetime.datetime] = None,
     _: ApiKey = Depends(require_mgmt_scope("audit:read")),
-):
+) -> AuditListResponse:
     limit = _clamp_limit(limit)
     filters: dict = {}
     if action:
@@ -584,7 +593,7 @@ async def list_audit(
     query = AuditLog.find(filters) if filters else AuditLog.find_all()
     total = await query.count()
     entries = (
-        await query.sort(-AuditLog.timestamp).skip(skip).limit(limit).to_list()
+        await query.sort('-timestamp').skip(skip).limit(limit).to_list()
     )
     return AuditListResponse(
         items=[
@@ -610,20 +619,21 @@ async def list_audit(
 # /config (redacted)
 # ---------------------------------------------------------------------------
 
-@router.get("/config")
+@router.get("/config", response_model=None)
 async def get_system_config(
     _: ApiKey = Depends(require_mgmt_scope("config:read")),
-):
+) -> dict:
     """Return the system config with all secret fields redacted."""
     cfg = await SystemConfig.get_config()
-    raw = cfg.model_dump()
+    raw: dict = cfg.model_dump()
 
     # Redact known secret-bearing fields. The admin router already has
     # _sanitize_models / _sanitize_providers helpers for this; mirror their
     # contract here so the mgmt surface never leaks decryptable secrets.
-    for m in raw.get("models", []) or []:
-        if m.get("api_key"):
-            m["api_key"] = "***"
+    for collection in ("available_models", "models"):
+        for m in raw.get(collection, []) or []:
+            if m.get("api_key"):
+                m["api_key"] = "***"
     for p in raw.get("oauth_providers", []) or []:
         if p.get("client_secret"):
             p["client_secret"] = "***"
@@ -632,6 +642,8 @@ async def get_system_config(
         "graph_client_state_secret",
         "config_encryption_key",
         "smtp_password",
+        "ocr_api_key",
+        "web_search_api_key",
     ):
         if raw.get(k):
             raw[k] = "***"
@@ -752,7 +764,7 @@ async def list_validation_runs(
     model: Optional[str] = None,
     since: Optional[datetime.datetime] = None,
     _: ApiKey = Depends(require_mgmt_scope("validation:read")),
-):
+) -> ValidationRunListResponse:
     limit = _clamp_limit(limit)
     filters: dict = {}
     if item_kind:
@@ -767,7 +779,7 @@ async def list_validation_runs(
     query = ValidationRun.find(filters) if filters else ValidationRun.find_all()
     total = await query.count()
     runs = (
-        await query.sort(-ValidationRun.created_at).skip(skip).limit(limit).to_list()
+        await query.sort('-created_at').skip(skip).limit(limit).to_list()
     )
     return ValidationRunListResponse(
         items=[_vrun_to_item(r) for r in runs],
@@ -779,7 +791,7 @@ async def list_validation_runs(
 async def get_validation_run(
     uuid: str,
     _: ApiKey = Depends(require_mgmt_scope("validation:read")),
-):
+) -> ValidationRunDetail:
     r = await ValidationRun.find_one(ValidationRun.uuid == uuid)
     if not r:
         raise HTTPException(status_code=404, detail="Validation run not found")
@@ -798,7 +810,7 @@ async def list_test_cases(
     limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     search_set_uuid: Optional[str] = None,
     _: ApiKey = Depends(require_mgmt_scope("validation:read")),
-):
+) -> TestCaseListResponse:
     limit = _clamp_limit(limit)
     filters: dict = {}
     if search_set_uuid:
@@ -811,7 +823,7 @@ async def list_test_cases(
     )
     total = await query.count()
     cases = (
-        await query.sort(-ExtractionTestCase.created_at)
+        await query.sort('-created_at')
         .skip(skip)
         .limit(limit)
         .to_list()
@@ -826,7 +838,7 @@ async def list_test_cases(
 async def get_test_case(
     uuid: str,
     _: ApiKey = Depends(require_mgmt_scope("validation:read")),
-):
+) -> TestCaseItem:
     tc = await ExtractionTestCase.find_one(ExtractionTestCase.uuid == uuid)
     if not tc:
         raise HTTPException(status_code=404, detail="Test case not found")
@@ -840,7 +852,7 @@ async def get_test_case(
 async def get_extraction_plan(
     search_set_uuid: str,
     _: ApiKey = Depends(require_mgmt_scope("validation:read")),
-):
+) -> ExtractionPlanResponse:
     ss = await SearchSet.find_one(SearchSet.uuid == search_set_uuid)
     if not ss:
         raise HTTPException(status_code=404, detail="Search set not found")
@@ -862,7 +874,7 @@ async def get_extraction_plan(
 async def get_workflow_plan(
     workflow_id: str,
     _: ApiKey = Depends(require_mgmt_scope("validation:read")),
-):
+) -> WorkflowPlanResponse:
     from beanie import PydanticObjectId
 
     try:
@@ -918,7 +930,7 @@ class UpdateWorkflowPlanBody(BaseModel):
 async def create_test_case(
     body: CreateTestCaseBody,
     api_key: ApiKey = Depends(require_mgmt_scope("validation:write")),
-):
+) -> TestCaseItem:
     user = await _user_for_key(api_key)
     tc = ExtractionTestCase(
         search_set_uuid=body.search_set_uuid,
@@ -939,7 +951,7 @@ async def create_test_case(
 async def create_test_cases_bulk(
     body: BulkCreateTestCasesBody,
     api_key: ApiKey = Depends(require_mgmt_scope("validation:write")),
-):
+) -> TestCaseListResponse:
     user = await _user_for_key(api_key)
     if not body.cases:
         raise HTTPException(status_code=400, detail="cases must not be empty")
@@ -967,7 +979,7 @@ async def update_test_case(
     uuid: str,
     body: UpdateTestCaseBody,
     _: ApiKey = Depends(require_mgmt_scope("validation:write")),
-):
+) -> TestCaseItem:
     tc = await ExtractionTestCase.find_one(ExtractionTestCase.uuid == uuid)
     if not tc:
         raise HTTPException(status_code=404, detail="Test case not found")
@@ -978,11 +990,11 @@ async def update_test_case(
     return _testcase_to_item(tc)
 
 
-@router.delete("/validation/test-cases/{uuid}")
+@router.delete("/validation/test-cases/{uuid}", response_model=None)
 async def delete_test_case(
     uuid: str,
     _: ApiKey = Depends(require_mgmt_scope("validation:write")),
-):
+) -> dict[str, object]:
     tc = await ExtractionTestCase.find_one(ExtractionTestCase.uuid == uuid)
     if not tc:
         raise HTTPException(status_code=404, detail="Test case not found")
@@ -990,12 +1002,12 @@ async def delete_test_case(
     return {"uuid": uuid, "deleted": True}
 
 
-@router.put("/validation/extractions/{search_set_uuid}/cross-field-rules")
+@router.put("/validation/extractions/{search_set_uuid}/cross-field-rules", response_model=None)
 async def update_cross_field_rules(
     search_set_uuid: str,
     body: UpdateCrossFieldRulesBody,
     _: ApiKey = Depends(require_mgmt_scope("validation:write")),
-):
+) -> dict[str, object]:
     from app.services.cross_field_rules import normalize_rules, validate_rule_shape
 
     ss = await SearchSet.find_one(SearchSet.uuid == search_set_uuid)
@@ -1030,7 +1042,7 @@ async def update_workflow_plan(
     workflow_id: str,
     body: UpdateWorkflowPlanBody,
     _: ApiKey = Depends(require_mgmt_scope("validation:write")),
-):
+) -> WorkflowPlanResponse:
     from beanie import PydanticObjectId
 
     try:
@@ -1079,13 +1091,13 @@ class RunExtractionBody(BaseModel):
     combined_context: bool = False
 
 
-@router.post("/validation/run")
+@router.post("/validation/run", response_model=None)
 @limiter.limit("10/minute", key_func=mgmt_key_func)
 async def run_validation(
     request: Request,
     body: RunValidationBody,
     api_key: ApiKey = Depends(require_mgmt_scope("validation:run")),
-):
+) -> dict:
     from app.services import extraction_validation_service as val_svc
     from app.services.access_control import get_authorized_search_set
 
@@ -1106,14 +1118,14 @@ async def run_validation(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/workflows/{workflow_id}/run")
+@router.post("/workflows/{workflow_id}/run", response_model=None)
 @limiter.limit("20/minute", key_func=mgmt_key_func)
 async def run_workflow_endpoint(
     request: Request,
     workflow_id: str,
     body: RunWorkflowBody,
     api_key: ApiKey = Depends(require_mgmt_scope("workflows:run")),
-):
+) -> dict[str, object]:
     from beanie import PydanticObjectId
 
     from app.models.activity import ActivityStatus, ActivityType
@@ -1134,7 +1146,10 @@ async def run_workflow_endpoint(
         team_id=str(user.current_team) if user.current_team else None,
         workflow=PydanticObjectId(workflow_id),
         steps_total=num_steps,
+        document_uuids=body.document_uuids,
     )
+    if activity.id is None:
+        raise RuntimeError("The activity must be saved before dispatching work")
 
     try:
         if body.batch_mode and len(body.document_uuids) > 1:
@@ -1165,13 +1180,13 @@ async def run_workflow_endpoint(
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.post("/extractions/run")
+@router.post("/extractions/run", response_model=None)
 @limiter.limit("30/minute", key_func=mgmt_key_func)
 async def run_extraction(
     request: Request,
     body: RunExtractionBody,
     api_key: ApiKey = Depends(require_mgmt_scope("extractions:run")),
-):
+) -> dict[str, object]:
     from app.models.activity import ActivityStatus, ActivityType
     from app.services import activity_service
     from app.services import search_set_service as ss_svc
@@ -1188,7 +1203,10 @@ async def run_extraction(
         user_id=user.user_id,
         team_id=str(user.current_team) if user.current_team else None,
         search_set_uuid=body.search_set_uuid,
+        document_uuids=body.document_uuids,
     )
+    if activity.id is None:
+        raise RuntimeError("The activity must be saved before dispatching work")
     try:
         # Same disclosure the in-app run makes — see the note there. A caller
         # automating against this endpoint is the least likely of all to spot

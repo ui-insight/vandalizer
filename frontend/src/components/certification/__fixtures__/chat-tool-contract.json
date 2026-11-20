@@ -1,0 +1,2467 @@
+[
+  {
+    "tool_name": "get_certification_progress",
+    "content": {
+      "total_xp": 150,
+      "level": "apprentice",
+      "certified": false,
+      "modules_completed": 0,
+      "modules_total": 11,
+      "next_module_id": "ai_literacy",
+      "modules": [
+        {
+          "module_id": "ai_literacy",
+          "title": "AI Literacy",
+          "xp": 50,
+          "completed": false,
+          "stars": 0
+        },
+        {
+          "module_id": "foundations",
+          "title": "Foundations",
+          "xp": 100,
+          "completed": false,
+          "stars": 0
+        },
+        {
+          "module_id": "process_mapping",
+          "title": "Thinking in Workflows",
+          "xp": 100,
+          "completed": false,
+          "stars": 0
+        },
+        {
+          "module_id": "workflow_design",
+          "title": "Workflow Design",
+          "xp": 100,
+          "completed": false,
+          "stars": 0
+        },
+        {
+          "module_id": "extraction_engine",
+          "title": "Extraction Engine",
+          "xp": 150,
+          "completed": false,
+          "stars": 0
+        },
+        {
+          "module_id": "multi_step",
+          "title": "Multi-Step Workflows",
+          "xp": 150,
+          "completed": false,
+          "stars": 0
+        },
+        {
+          "module_id": "advanced_nodes",
+          "title": "Advanced Nodes",
+          "xp": 200,
+          "completed": false,
+          "stars": 0
+        },
+        {
+          "module_id": "output_delivery",
+          "title": "Output & Delivery",
+          "xp": 200,
+          "completed": false,
+          "stars": 0
+        },
+        {
+          "module_id": "validation_qa",
+          "title": "Validation & QA",
+          "xp": 250,
+          "completed": false,
+          "stars": 0
+        },
+        {
+          "module_id": "batch_processing",
+          "title": "Batch Processing",
+          "xp": 250,
+          "completed": false,
+          "stars": 0
+        },
+        {
+          "module_id": "governance",
+          "title": "Governance",
+          "xp": 300,
+          "completed": false,
+          "stars": 0
+        }
+      ]
+    }
+  },
+  {
+    "tool_name": "get_certification_module",
+    "content": {
+      "module_id": "ai_literacy",
+      "title": "AI Literacy",
+      "xp": 50,
+      "completed": false,
+      "stars": 0,
+      "overview": "Complete the self-assessment reflection questions after reading all lessons. There is no hands-on exercise for this module — just share your honest thoughts.",
+      "instructions": [
+        "Work through the 6 lessons right here in chat — say \"start the lessons\" and the assistant will teach them one at a time.",
+        "After the lessons, answer the 3 self-assessment reflection questions in chat. There are no wrong answers.",
+        "The assistant saves your answers, verifies completion, and completes the module to award your 50 XP."
+      ],
+      "lesson_titles": [
+        "What is AI, and why is it in your office?",
+        "Structured vs. unstructured data",
+        "What is an LLM, really?",
+        "What AI is genuinely good at",
+        "What AI is genuinely bad at",
+        "AI for research administration",
+        "From generic chat to validated agentic chat",
+        "Worked example: Monday morning, 12 proposals",
+        "Glossary & Review"
+      ],
+      "expected_fields": [],
+      "star_criteria": {
+        "3": "Complete all 3 self-assessment reflection questions (everyone earns 3 stars)"
+      },
+      "sample_documents": [],
+      "provisioned_docs": [],
+      "assessment_keys": [
+        "experience",
+        "comfort",
+        "concern"
+      ],
+      "assessment_questions": [
+        {
+          "key": "experience",
+          "question": "Which best describes your experience with AI tools?",
+          "options": [
+            "I have not used any AI tools",
+            "I've tried a chatbot (ChatGPT, Copilot, etc.) a few times",
+            "I use AI tools occasionally for work or personal tasks",
+            "I use AI tools regularly and feel confident with them"
+          ]
+        },
+        {
+          "key": "comfort",
+          "question": "When you think about using AI in research administration, how do you feel?",
+          "options": [
+            "Skeptical — I worry about accuracy and whether it's appropriate for my work",
+            "Cautious but curious — I want to understand it before forming an opinion",
+            "Open to it if someone shows me how it helps with tasks I already do",
+            "Enthusiastic — I'm looking for ways to integrate AI into my workflows"
+          ]
+        },
+        {
+          "key": "concern",
+          "question": "What is your biggest concern about AI for research administration?",
+          "options": [
+            "That it will make mistakes I won't catch, especially with compliance or financial data",
+            "That it's a black box — I won't understand how it reaches its answers",
+            "That it will change my role in ways I'm not comfortable with",
+            "I don't have major concerns, but I want to learn the right way to use it"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "ai_literacy",
+      "module_title": "AI Literacy",
+      "lesson_number": 1,
+      "lesson_count": 9,
+      "lesson_id": "ai_literacy.what-is-ai-and-why-is-it-in-your-office",
+      "lesson_revision": 1,
+      "title": "What is AI, and why is it in your office?",
+      "objective": "After this lesson, you’ll be able to say in plain language what AI is, why it applies to research administration, and what this course will do for you.",
+      "variant": "concept",
+      "content": "Before any tools or terminology, the big picture.\n\n**What AI is** — software that has learned patterns from enormous amounts of example text, well enough to do useful reading and writing tasks on new material. That’s it. Not a mind, not magic — a very capable pattern machine.\n\n**Why it’s suddenly everywhere** — in the last few years these systems got good enough at ordinary language that they can do real office work: read a 50-page proposal and pull out the PI, the budget, the dates; summarize a progress report; draft a routine email.\n\n**Why it matters for research administration** — your job is unusually document-heavy. Proposals, award notices, subawards, progress reports — most of the work is reading documents and moving what they say into spreadsheets, systems, and summaries. That’s exactly the work this technology is best at drafting for you. It will not make judgment calls, know your institution’s policies, or take responsibility — that stays yours.\n\n**How this course helps** — module by module, you’ll turn one real process at a time into an AI-assisted pipeline you control and verify. Each module is bite-sized — 10–25 minutes — and saves your place, so it fits between meetings. No coding, no technical background needed.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "ai_literacy",
+      "module_title": "AI Literacy",
+      "lesson_number": 2,
+      "lesson_count": 9,
+      "lesson_id": "ai_literacy.structured-vs-unstructured-data",
+      "lesson_revision": 1,
+      "title": "Structured vs. unstructured data",
+      "objective": "After this lesson, you’ll be able to tell structured from unstructured data and explain why converting one to the other is the heart of this course.",
+      "variant": "concept",
+      "content": "One distinction carries this whole course — and it has nothing to do with how AI works under the hood.\n\n**Unstructured data** is prose meant for people: a proposal PDF, an award letter, a progress report. The information is in there, but every document says it differently and puts it somewhere different.\n\n**Structured data** is information in labeled slots: your award-tracking spreadsheet, a sponsor form, a database record. Every row has the same columns — PI, sponsor, amount, dates — so you can sort it, total it, compare it, report on it.\n\nNow name a large part of research administration work: reading unstructured documents and re-typing what they say into structured form. Proposal arrives → fields go into the tracking sheet. Award letter arrives → terms go into the system.\n\nThat conversion — unstructured in, structured out — is precisely what Vandalizer automates. You define the columns once; it drafts the row for every document. You review instead of re-type. When later modules say “extraction,” this is all they mean.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "ai_literacy",
+      "module_title": "AI Literacy",
+      "lesson_number": 3,
+      "lesson_count": 9,
+      "lesson_id": "ai_literacy.what-is-an-llm-really",
+      "lesson_revision": 1,
+      "title": "What is an LLM, really?",
+      "objective": "After this lesson, you'll be able to explain why LLMs make mistakes and why they're still useful.",
+      "variant": "concept",
+      "content": "A Large Language Model (LLM) is not thinking. It is not sentient. It does not understand your documents the way you do.\n\nAn LLM is a sophisticated pattern-completion engine trained on vast amounts of text. When you give it a prompt, it predicts the most likely next words based on patterns it learned during training. This is both why it's capable and why it makes mistakes.\n\nIt's capable because human language follows patterns. A grant proposal has a predictable structure: PI name, institution, budget, aims. The LLM has seen thousands of similar documents and can reliably identify these patterns.\n\nIt makes mistakes because pattern-matching is not understanding. The LLM doesn't know what a budget is. It knows that numbers near the word \"budget\" are likely dollar amounts. When the pattern breaks (unusual formatting, ambiguous language), the LLM may confidently produce wrong answers.",
+      "knowledge_check": {
+        "question": "An LLM generates text by...",
+        "options": [
+          {
+            "text": "Thinking through the problem logically, like a human would",
+            "correct": false,
+            "explanation": "LLMs don't \"think\". They predict patterns based on training data."
+          },
+          {
+            "text": "Predicting the most likely next words based on patterns from training data",
+            "correct": true,
+            "explanation": "Correct! LLMs are pattern-completion engines trained on vast text."
+          },
+          {
+            "text": "Looking up answers in a database of facts",
+            "correct": false,
+            "explanation": "LLMs don't have a database; they learned patterns from training text."
+          },
+          {
+            "text": "Running a search engine to find relevant information",
+            "correct": false,
+            "explanation": "LLMs generate text from learned patterns, not from searching the internet."
+          }
+        ]
+      },
+      "diagram": "how-llm-works",
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "ai_literacy",
+      "module_title": "AI Literacy",
+      "lesson_number": 4,
+      "lesson_count": 9,
+      "lesson_id": "ai_literacy.what-ai-is-genuinely-good-at",
+      "lesson_revision": 1,
+      "title": "What AI is genuinely good at",
+      "objective": "After this lesson, you'll know which research admin tasks are best suited for AI automation.",
+      "variant": "concept",
+      "content": "AI excels at tasks that involve pattern recognition across large volumes of text:\n\n• **Extracting specific information** from long documents — Finding the PI name, budget, and project period in a 50-page proposal.\n• **Summarizing** — Condensing a progress report into key findings and milestones.\n• **Comparing across documents** — Identifying differences between two versions of a budget justification.\n• **Drafting routine text** — Generating first drafts of compliance summaries or progress report templates.\n• **Processing many documents consistently** — Applying the same extraction to 200 proposals and getting results in the same format every time.\n\nThe common thread: these are tasks where a human would be doing repetitive reading and data entry. AI handles the volume; you handle the judgment.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "ai_literacy",
+      "module_title": "AI Literacy",
+      "lesson_number": 5,
+      "lesson_count": 9,
+      "lesson_id": "ai_literacy.what-ai-is-genuinely-bad-at",
+      "lesson_revision": 1,
+      "title": "What AI is genuinely bad at",
+      "objective": "After this lesson, you'll be able to identify AI limitations and avoid common pitfalls in research administration.",
+      "variant": "insight",
+      "content": "Honesty about AI's limitations is essential for responsible use in research administration:\n\n• **Judgment calls requiring institutional knowledge** — AI doesn't know your university's internal policies, political dynamics, risk tolerance, or historical context.\n• **Catching its own mistakes** — An LLM cannot reliably self-check. If it extracts the wrong budget figure, it won't flag the error. That's your job.\n• **Math** — LLMs frequently make arithmetic errors. Never trust an LLM to add up budget line items. Use code execution nodes for calculations.\n• **Novel or unusual document formats** — If a document doesn't follow standard patterns (hand-written notes, unusual layouts, scanned images with poor OCR), extraction quality drops significantly.\n• **Replacing professional judgment on compliance** — AI can flag potential issues, but determining whether a proposal actually meets regulatory requirements requires your expertise.\n\nThe pattern: AI is a powerful first-pass tool. It does the reading; you do the thinking.",
+      "knowledge_check": {
+        "question": "Which task is AI worst at?",
+        "options": [
+          {
+            "text": "Extracting PI names from grant proposals",
+            "correct": false,
+            "explanation": "This is actually a strong suit for AI — it's pattern-based extraction from structured documents."
+          },
+          {
+            "text": "Summarizing progress reports",
+            "correct": false,
+            "explanation": "Summarization is one of AI's strengths — it's good at condensing text."
+          },
+          {
+            "text": "Making judgment calls that require institutional knowledge",
+            "correct": true,
+            "explanation": "Correct! AI doesn't know your institution's policies, politics, or historical context. That requires your expertise."
+          },
+          {
+            "text": "Processing 200 documents in the same format",
+            "correct": false,
+            "explanation": "Batch processing with consistent format is ideal for AI — it handles repetition well."
+          }
+        ]
+      },
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "ai_literacy",
+      "module_title": "AI Literacy",
+      "lesson_number": 6,
+      "lesson_count": 9,
+      "lesson_id": "ai_literacy.ai-for-research-administration",
+      "lesson_revision": 1,
+      "title": "AI for research administration",
+      "objective": "After this lesson, you'll be able to describe where AI fits in common research admin workflows and where it doesn't.",
+      "variant": "concept",
+      "content": "Here's what AI-assisted research administration looks like in practice:\n\n• **Proposal intake** — Upload 30 new proposals to a secure, institutionally managed AI environment. A workflow extracts PI name, agency, budget, and key dates from each one in minutes instead of hours — without exposing sensitive proposal data to consumer AI tools or free-tier services.\n• **Progress report processing** — Extract accomplishments, publications, and expenditures from annual reports. Flag any that are missing required sections.\n• **Compliance pre-screening** — Check proposals against a list of required elements (human subjects approval, data management plan, budget justification) and flag gaps.\n• **Subaward review** — Extract parties, amounts, and terms from subaward agreements. Compare against institutional templates.\n\nThe pattern in every case: AI does the first pass of extraction, you do the second pass of verification and judgment. The AI handles volume and consistency. You bring expertise and accountability.",
+      "knowledge_check": null,
+      "diagram": "ai-human-pattern",
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "ai_literacy",
+      "module_title": "AI Literacy",
+      "lesson_number": 7,
+      "lesson_count": 9,
+      "lesson_id": "ai_literacy.from-generic-chat-to-validated-agentic-chat",
+      "lesson_revision": 1,
+      "title": "From generic chat to validated agentic chat",
+      "objective": "After this lesson, you'll understand why Vandalizer's chat is different from ChatGPT or Copilot, and how it turns conversation into a professional workflow system.",
+      "variant": "insight",
+      "content": "You may have used ChatGPT or Copilot to ask questions about a document. It's convenient, but for professional research administration work the generic experience falls short:\n\n• **Inconsistent format** — Ask the same question twice and you get differently structured answers.\n• **No audit trail** — There's no record of what was extracted, when, or from which document.\n• **Can't scale** — You shouldn't paste 200 proposals into a consumer chatbot one at a time.\n• **No verification** — There's no systematic way to check whether the answers are correct.\n• **No institutional grounding** — The model doesn't know your policies, your OSP handbook, or your team's proven processes.\n\nVandalizer 5.0 takes the same conversational interface you're already comfortable with and puts a trust layer underneath it. The chat can still answer ad-hoc questions — but when it matters, it drives **validated workflows**, **verified extractions**, and **sourced knowledge bases** on your behalf:\n\n• **Every tool call is logged.** Ask the agent to run an extraction and you see the exact tool, inputs, and outputs — captured in the audit log.\n• **Every result carries a quality score.** Accuracy, consistency, and the number of test cases behind a template all surface inline. You can tell at a glance whether an answer is ready to act on.\n• **Writes require confirmation.** Creating a knowledge base or dispatching a workflow pauses for a preview step before anything changes.\n• **Answers cite their sources.** Knowledge-base replies show the document passages they used; click any passage to jump to the source.\n• **The system gets smarter with use.** Turn a good extraction into a test case in one click. The more your team verifies, the higher the quality tier climbs.\n\nThis is the bridge from \"AI as a toy\" to \"AI as a professional tool.\" The rest of this certification teaches you to design the validated workflows the agent calls, verify their accuracy, and deploy them across your office — so the chat your team uses every day is backed by trust signals no generic AI can offer. When you complete all 11 modules, you'll earn your Vandal Workflow Architect certification.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "ai_literacy",
+      "module_title": "AI Literacy",
+      "lesson_number": 8,
+      "lesson_count": 9,
+      "lesson_id": "ai_literacy.worked-example-monday-morning-12-proposals",
+      "lesson_revision": 1,
+      "title": "Worked example: Monday morning, 12 proposals",
+      "objective": "",
+      "variant": "walkthrough",
+      "content": "The same task, twice.\n\n**Without AI** — Twelve new proposals in the inbox. For each one: open the PDF, scroll for the cover page, copy the PI name into the tracking sheet, find the total budget (page 2? page 14?), copy it, find the project period, the agency, the deadline… about 15 careful minutes each. Three hours of re-typing, and by proposal nine, attention is fading — which is when a $485,000 becomes a $48,500.\n\n**With a workflow** — The twelve PDFs are uploaded and a saved workflow runs. It reads each proposal and returns the same labeled fields for every one: PI Name, Institution, Total Budget, Project Period, Sponsoring Agency. In a few minutes there’s a table — one row per proposal, ready to check and export.\n\n**What you do instead** — the 30-minute version of the job that’s actually yours: scan the table against the source documents, catch the one proposal whose budget page was a scanned image and extracted oddly, and make the judgment calls — which proposals need a compliance look, which PI needs a call.\n\nBy Module 9 you will have built exactly this.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "ai_literacy",
+      "module_title": "AI Literacy",
+      "lesson_number": 9,
+      "lesson_count": 9,
+      "lesson_id": "ai_literacy.glossary-review",
+      "lesson_revision": 1,
+      "title": "Glossary & Review",
+      "objective": "",
+      "variant": "key-terms",
+      "content": "LLM (Large Language Model) — You've now seen how LLMs are used to extract structured fields from grant proposals and summarize documents. The key: an LLM is a pattern-completion engine, not a thinking machine. It predicts likely text based on training patterns. When you build a workflow step, you're giving it patterns to match — the clearer your field names and prompts, the better the results.\n\nPrompt — The instructions you give an LLM. You'll write many of these as you build workflows. Quality matters: \"Extract the PI name from the proposal cover page\" outperforms \"find the PI.\"\n\nHallucination — When an LLM generates a plausible-sounding value that isn't actually in the document. The #1 risk in research administration AI use. It's why you'll learn to build validation plans in Module 8.\n\nStructured Output — The mechanism that makes batch processing possible. Instead of free-form text, the LLM is constrained to return JSON matching your field definitions — same fields, same format, every document, every time.\n\nJSON — The fill-in-the-form format structured output arrives in: each of your field names paired with the value found for it, like a completed intake form. You will see JSON in results; you never have to write it.\n\nToken — The unit AI models use to measure text — roughly ¾ of a word. The only time it matters to you: very long documents can exceed what a model reads at once, the way an email attachment can exceed a size limit.\n\nRAG (Retrieval-Augmented Generation) — How the chat feature works. Relevant document excerpts are retrieved and provided to the LLM before it answers. This grounds responses in your actual documents rather than the LLM's training data.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": true
+    }
+  },
+  {
+    "tool_name": "get_certification_module",
+    "content": {
+      "module_id": "foundations",
+      "title": "Foundations",
+      "xp": 100,
+      "completed": false,
+      "stars": 0,
+      "overview": "Build your first extraction workflow using a sample NSF proposal — driving the whole process from chat. Click **Set Up Lab** below to add the PDF to your workspace, then have a conversation with the agent to design, run, and verify the extraction. When you click **Check Progress**, the system validates that your extraction captured the correct values from the document.",
+      "instructions": [
+        "Work through the lessons here in chat, then ask the assistant to set up the lab — it adds the sample NSF proposal to your Certification Lab folder.",
+        "Ask: \"What documents do I have about NSF proposals?\" — confirm the sample PDF is listed.",
+        "Ask the assistant to create an extraction for grant proposals with fields: PI Name, Institution, Total Budget, Project Period, Sponsoring Agency. Confirm when prompted.",
+        "Name the resulting extraction set \"NSF Proposal Extractor\" (or rename it later from the Library).",
+        "Ask the assistant to run that extraction on nsf-proposal-alpine-ecology.pdf.",
+        "Review the inline quality score and extracted table. Verify: PI Name = Sarah Chen, Total Budget = $485,000.",
+        "When the values check out, ask the assistant to check your progress and complete the module."
+      ],
+      "lesson_titles": [
+        "What is a workflow?",
+        "What you'll build",
+        "The document pipeline",
+        "Build your first workflow",
+        "Why structured extraction matters",
+        "Glossary & Review"
+      ],
+      "expected_fields": [
+        "PI Name",
+        "Institution",
+        "Total Budget",
+        "Project Period",
+        "Sponsoring Agency"
+      ],
+      "star_criteria": {
+        "1": "Extract 3+ required fields and run the workflow",
+        "2": "Extract all 5 required fields",
+        "3": "Extract 8+ fields including Co-PI, Abstract, Program Officer"
+      },
+      "sample_documents": [
+        "nsf-proposal-alpine-ecology.pdf"
+      ],
+      "provisioned_docs": [],
+      "assessment_keys": [],
+      "assessment_questions": []
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "foundations",
+      "module_title": "Foundations",
+      "lesson_number": 1,
+      "lesson_count": 6,
+      "lesson_id": "foundations.what-is-a-workflow",
+      "lesson_revision": 1,
+      "title": "What is a workflow?",
+      "objective": "After this lesson, you'll understand how workflows differ from ad-hoc chat and why that matters for research administration.",
+      "variant": "concept",
+      "content": "A workflow is a reusable pipeline that processes a document through a series of defined steps — build it once, run it against any document. Unlike ad-hoc chat, workflows produce consistent, structured output. That consistency is what lets you process 500 grant proposals the same way you process one.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "foundations",
+      "module_title": "Foundations",
+      "lesson_number": 2,
+      "lesson_count": 6,
+      "lesson_id": "foundations.what-you-ll-build",
+      "lesson_revision": 1,
+      "title": "What you'll build",
+      "objective": "",
+      "variant": "walkthrough",
+      "content": "Here's the end state for this module's lab exercise:\n\n• A workflow called something like \"Grant Proposal Extractor\"\n• An Extraction with at least 5 fields: PI Name, Total Budget, Sponsoring Agency, Project Period, Institution\n• A run result showing Dr. Sarah Chen extracted from the sample NSF proposal, with a budget of $485,000\n\nThe lessons that follow explain each piece. By the time you reach the lab, every step will be familiar.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "foundations",
+      "module_title": "Foundations",
+      "lesson_number": 3,
+      "lesson_count": 6,
+      "lesson_id": "foundations.the-document-pipeline",
+      "lesson_revision": 1,
+      "title": "The document pipeline",
+      "objective": "After this lesson, you'll understand what happens to a document between upload and extraction.",
+      "variant": "concept",
+      "content": "When you upload a document, Vandalizer prepares it for you automatically — you never manage any of this:\n\n1. **It reads the text out of the file** — PDFs, Word documents, spreadsheets, web pages.\n2. **It builds an index of the content** — like the index at the back of a book, so questions and searches can jump straight to the right passage.\n\nThat’s all you need to know to use it. When a workflow runs an Extraction step, the AI reads the document text alongside your field list and hands back one filled-in record — every field name paired with the value it found.\n\n*For the curious (safe to skip):* the index is built by splitting the text into overlapping passages and storing them in a search database — the technique behind the chat feature’s ability to quote your documents.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "foundations",
+      "module_title": "Foundations",
+      "lesson_number": 4,
+      "lesson_count": 6,
+      "lesson_id": "foundations.build-your-first-workflow",
+      "lesson_revision": 1,
+      "title": "Build your first workflow",
+      "objective": "After this lesson, you'll be ready to run your first extraction workflow on a real document.",
+      "variant": "walkthrough",
+      "content": "When you start the lab exercise, here's what you'll do:\n\n1. Click **Set Up Lab** (the button at the top of this module) to load the sample NSF proposal into your workspace.\n2. Go to the **Library** tab and click **New** to create a new workflow.\n3. Give your workflow a clear name, like \"Grant Proposal Extractor\", and add a description such as \"Extracts key details from grant proposals\".\n4. Add a step and give it a name, like \"Extract Grant Details\". Then add an Extraction task to that step.\n5. In the Extraction task settings, select an existing Extraction or create a new one.\n6. Add at least 3 fields to your Extraction — for example: \"Principal Investigator\", \"Funding Amount\", \"Sponsoring Agency\".\n7. Select the sample NSF proposal in the file browser — tick the checkbox next to its name (opening the file in the viewer also selects it). **The Run button stays greyed out until a document is selected**; its tooltip says what’s missing.\n8. Click **Run** and review the extracted results in the output panel.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "foundations",
+      "module_title": "Foundations",
+      "lesson_number": 5,
+      "lesson_count": 6,
+      "lesson_id": "foundations.why-structured-extraction-matters",
+      "lesson_revision": 1,
+      "title": "Why structured extraction matters",
+      "objective": "",
+      "variant": "insight",
+      "content": "Unstructured AI responses vary every time — different formatting, different phrasing, different levels of detail. Structured extraction forces the AI to return consistent, machine-readable JSON. This means you can reliably extract the same fields from hundreds of documents and compare, aggregate, or export the results. It turns documents from unstructured text into queryable data.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "foundations",
+      "module_title": "Foundations",
+      "lesson_number": 6,
+      "lesson_count": 6,
+      "lesson_id": "foundations.glossary-review",
+      "lesson_revision": 1,
+      "title": "Glossary & Review",
+      "objective": "",
+      "variant": "key-terms",
+      "content": "Workflow — You just built one. A saved pipeline that processes documents through a series of steps. The recipe analogy holds: define it once, run it against any document. The extraction workflow from this module is the foundation for everything that follows.\n\nStep — One stage in your pipeline. Your first workflow had one step (extraction). Later modules add reasoning and delivery steps to create more powerful pipelines.\n\nTask — The specific operation inside a step. The Extraction task you configured defined which fields the AI should find and return as one filled-in record (JSON — the form-like format from Module 0; you read it, never write it).\n\nExtraction — The collection of fields you defined. Think of it as your data dictionary — it tells the LLM exactly what to look for and what format to return it in.\n\nExtract Key — Each individual field in your Extraction: \"PI Name\", \"Total Budget\", \"Sponsoring Agency\". Well-named extract keys get better results because the LLM uses the name as a clue about what to find.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": true
+    }
+  },
+  {
+    "tool_name": "get_certification_module",
+    "content": {
+      "module_id": "process_mapping",
+      "title": "Thinking in Workflows",
+      "xp": 100,
+      "completed": false,
+      "stars": 0,
+      "overview": "Reflect on your team's document processes. There is no hands-on exercise — answer the 4 process reflection questions to complete.",
+      "instructions": [
+        "Work through the 6 lessons here in chat to build your process thinking skills.",
+        "Think about a specific repetitive task your team does that involves processing documents.",
+        "Answer the 4 Process Reflection questions in chat — the assistant asks them one at a time.",
+        "The assistant saves your answers, verifies completion, and completes the module to award your 100 XP."
+      ],
+      "lesson_titles": [
+        "From one workflow to many",
+        "Finding the repetition",
+        "The AI suitability test",
+        "Walkthrough: Mapping a real process",
+        "Common processes that become workflows",
+        "Worked example: mapping progress-report review",
+        "Glossary & Review"
+      ],
+      "expected_fields": [],
+      "star_criteria": {
+        "3": "Complete all 4 process reflection questions (everyone earns 3 stars)"
+      },
+      "sample_documents": [],
+      "provisioned_docs": [],
+      "assessment_keys": [
+        "process",
+        "time_sink",
+        "judgment",
+        "outcome"
+      ],
+      "assessment_questions": [
+        {
+          "key": "process",
+          "question": "Which of these best describes a repetitive process in your work?",
+          "options": [
+            "Processing incoming grant proposals (reading, extracting key details, filing)",
+            "Reviewing progress reports (checking completeness, summarizing findings)",
+            "Preparing compliance documentation (gathering data from multiple documents)",
+            "Routing and tracking subaward agreements or award modifications"
+          ]
+        },
+        {
+          "key": "time_sink",
+          "question": "When you do this process manually, what takes the most time?",
+          "options": [
+            "Reading through documents to find specific information",
+            "Re-typing data from documents into spreadsheets or forms",
+            "Comparing information across multiple documents",
+            "Writing summaries or reports based on document contents"
+          ]
+        },
+        {
+          "key": "judgment",
+          "question": "Which part of this process most requires your expertise and judgment?",
+          "options": [
+            "Deciding whether extracted information meets compliance requirements",
+            "Interpreting ambiguous or unusual document content",
+            "Making recommendations based on institutional knowledge and context",
+            "All of the above — I need to review everything the AI produces"
+          ]
+        },
+        {
+          "key": "outcome",
+          "question": "If you could build a workflow for this process, what would the ideal output be?",
+          "options": [
+            "A structured spreadsheet with extracted data from all documents",
+            "A summary report highlighting key findings and potential issues",
+            "A compliance checklist showing what's present and what's missing",
+            "A complete package ready for review (data + summary + checklist)"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "process_mapping",
+      "module_title": "Thinking in Workflows",
+      "lesson_number": 1,
+      "lesson_count": 7,
+      "lesson_id": "process_mapping.from-one-workflow-to-many",
+      "lesson_revision": 1,
+      "title": "From one workflow to many",
+      "objective": "After this lesson, you'll be able to identify repeatable processes in your daily work that are ready for automation.",
+      "variant": "concept",
+      "content": "You've built a basic workflow. Now the question is: what else in your office should be a workflow?\n\nModule 1 taught you the mechanics. This module gives you a framework for finding the processes worth automating. The pattern you're looking for: any task where you spend 80% of your time reading documents and 20% making decisions about what you found. The reading is automatable. The deciding stays yours.\n\nBy the end of this module, you'll have mapped a real process from your own work to a workflow architecture — not a hypothetical, but something you could actually build next.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "process_mapping",
+      "module_title": "Thinking in Workflows",
+      "lesson_number": 2,
+      "lesson_count": 7,
+      "lesson_id": "process_mapping.finding-the-repetition",
+      "lesson_revision": 1,
+      "title": "Finding the repetition",
+      "objective": "After this lesson, you'll have a practical test for identifying which processes to automate.",
+      "variant": "concept",
+      "content": "The best candidates for workflows are tasks that share three properties:\n\n1. **You do them repeatedly** — not once, but dozens or hundreds of times. Processing proposals, reviewing progress reports, checking compliance documents.\n\n2. **You follow the same steps each time** — you look for the same information, in the same kinds of documents, and produce the same kind of output.\n\n3. **Most of the time is spent reading, not thinking** — you spend 80% of your time finding information in documents and 20% making decisions about it.\n\nHere's a quick test: could you write step-by-step instructions for a new hire to do this task? If yes, it's a workflow. If the instructions would be \"use your judgment,\" that specific step stays human.\n\nCommon research admin processes that pass this test:\n• Processing incoming proposals (extracting key fields)\n• Reviewing progress reports (checking completeness)\n• Pre-screening for compliance (finding required elements)\n• Summarizing subaward terms (extracting parties and obligations)\n• Preparing data for reports (gathering numbers from multiple documents)",
+      "knowledge_check": {
+        "question": "What makes a process a good candidate for AI automation?",
+        "options": [
+          {
+            "text": "It requires deep institutional knowledge and professional judgment",
+            "correct": false,
+            "explanation": "Tasks requiring judgment should stay with humans — AI handles the repetitive reading part."
+          },
+          {
+            "text": "It's repetitive, document-based, and most time is spent reading rather than thinking",
+            "correct": true,
+            "explanation": "Correct! The best AI candidates are repetitive tasks where you spend most time extracting information from documents."
+          },
+          {
+            "text": "It only happens once or twice a year",
+            "correct": false,
+            "explanation": "Rare tasks don't benefit much from automation — the setup cost outweighs the time saved."
+          },
+          {
+            "text": "It involves making complex financial decisions",
+            "correct": false,
+            "explanation": "Complex decisions require human expertise. AI is better at the extraction that feeds into those decisions."
+          }
+        ]
+      },
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "process_mapping",
+      "module_title": "Thinking in Workflows",
+      "lesson_number": 3,
+      "lesson_count": 7,
+      "lesson_id": "process_mapping.the-ai-suitability-test",
+      "lesson_revision": 1,
+      "title": "The AI suitability test",
+      "objective": "After this lesson, you'll have a decision framework for choosing between Extraction, Code Execution, and keeping a step human.",
+      "variant": "insight",
+      "content": "Not every step in your process should be automated. Here's a practical framework:\n\n**AI-suitable** (automate these):\n• Reading a document and finding specific, fixed fields → Extraction\n• Reading a short or context-heavy document and answering a question about it → Prompt, given the whole document\n• Summarizing or paraphrasing document content → Prompt\n• Comparing information across documents → Prompt\n• Reformatting data from one structure to another → Formatter\n• Drafting routine text based on extracted data → Prompt\n\n**Use code, not AI**:\n• Adding up numbers or computing percentages → Code Execution\n• Date calculations or comparisons → Code Execution\n• Applying deterministic rules (\"if budget > $500K, flag for review\") → Code Execution\n\n**Keep human**:\n• Deciding whether something meets a policy requirement\n• Interpreting ambiguous or unusual situations\n• Making recommendations that require institutional context\n• Anything where a mistake has serious consequences and can't be easily caught\n\nThe pattern: AI reads and extracts. Code computes. Humans judge.",
+      "knowledge_check": null,
+      "diagram": "ai-suitability",
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "process_mapping",
+      "module_title": "Thinking in Workflows",
+      "lesson_number": 4,
+      "lesson_count": 7,
+      "lesson_id": "process_mapping.walkthrough-mapping-a-real-process",
+      "lesson_revision": 1,
+      "title": "Walkthrough: Mapping a real process",
+      "objective": "",
+      "variant": "walkthrough",
+      "content": "Let's decompose \"processing incoming proposals\" step by step:\n\n1. **Receive the proposal document** (PDF) → Input: this is your workflow trigger.\n\n2. **Find PI name, institution, budget, project dates, agency** → AI-suitable: this is reading and extracting. Map to an Extraction step.\n\n3. **Check whether required sections are present** (data management plan, budget justification, biosketches) → AI-suitable: checking for presence of sections. Map to a Prompt step.\n\n4. **Verify the budget adds up** → Use code: map to a Code Execution step that sums extracted line items.\n\n5. **Decide whether to flag for compliance review** → Keep human: this requires institutional judgment. This is where your workflow ends and your review begins.\n\n6. **Enter data into your tracking system** → The workflow's structured output makes this copy-paste or even automated via API.\n\nResult: a 3-step workflow (Extract → Check sections → Verify budget) that does 70% of the work, leaving you to do the 30% that requires your expertise.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "process_mapping",
+      "module_title": "Thinking in Workflows",
+      "lesson_number": 5,
+      "lesson_count": 7,
+      "lesson_id": "process_mapping.common-processes-that-become-workflows",
+      "lesson_revision": 1,
+      "title": "Common processes that become workflows",
+      "objective": "",
+      "variant": "concept",
+      "content": "Here are the most common research administration processes and how they map to workflows:\n\n• **Proposal intake** — Extract key fields, check completeness, flag gaps. 3-4 steps.\n• **Progress report review** — Extract accomplishments, publications, expenditures. Summarize and compare to milestones. 3 steps.\n• **Compliance pre-screening** — Extract required elements, check against a compliance checklist, produce a gap report. 3-4 steps.\n• **Budget review** — Extract line items, compute totals, compare to limits, produce a summary. 4 steps.\n• **Subaward processing** — Extract parties, amounts, terms, deliverables. Flag deviations from templates. 3 steps.\n• **Award closeout** — Gather final expenditures, publications, and deliverables from multiple documents. 4-5 steps.\n\nNotice the pattern: every workflow starts by *reading* the document and ends with either a human review point or a produced deliverable. The middle steps are where analysis, comparison, and computation happen.\n\nThe reading step is usually an Extraction, because these processes want the same fixed fields from every document. It does not have to be. A two-page award amendment or a sponsor email is often better read by a Prompt that sees the whole file — there are no fields to pull, and the answer depends on the full context. Extraction is a tool for a job, not a mandatory first step.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "process_mapping",
+      "module_title": "Thinking in Workflows",
+      "lesson_number": 6,
+      "lesson_count": 7,
+      "lesson_id": "process_mapping.worked-example-mapping-progress-report-review",
+      "lesson_revision": 1,
+      "title": "Worked example: mapping progress-report review",
+      "objective": "",
+      "variant": "walkthrough",
+      "content": "Apply the five elements to a second real process, end to end.\n\n**Input** — A PI’s annual progress report (PDF) lands two weeks before the sponsor deadline.\n\n**Steps** — (1) Read it and pull out accomplishments, publications, students supported, and expenditures to date. (2) Check that every section the sponsor requires is present. (3) Compare reported spending against the award budget. (4) Draft the cover summary for the sponsor portal.\n\n**Decision points** — Is the spending variance large enough to question? Is a thin “Results” section acceptable this year? These stay human.\n\n**Handoffs** — Missing sections go back to the PI; a large variance goes to the fiscal officer.\n\n**Output** — A completed portal entry and a filed summary.\n\nNow the sort: steps 1 and 2 are reading → AI-suitable (Extraction, Prompt). Step 3 is arithmetic → code, never an LLM. Step 4 is drafting from extracted data → AI-suitable, human-reviewed. The decision points and handoffs stay exactly where they are — with you.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "process_mapping",
+      "module_title": "Thinking in Workflows",
+      "lesson_number": 7,
+      "lesson_count": 7,
+      "lesson_id": "process_mapping.glossary-review",
+      "lesson_revision": 1,
+      "title": "Glossary & Review",
+      "objective": "",
+      "variant": "key-terms",
+      "content": "Use these five elements to describe any process you're considering automating. You've seen them applied to proposal intake — now practice applying them to a process from your own work.\n\nInput — What triggers this process? Usually a document arriving: a proposal, a report, a subaward agreement, a budget justification.\n\nSteps — The discrete actions you take, in order. Each step has a clear purpose: \"find the PI name,\" \"check the budget,\" \"write a summary.\"\n\nDecision Points — Where you apply judgment: \"Is this budget reasonable?\" \"Does this meet compliance requirements?\" These are where human expertise is essential and AI steps back.\n\nHandoffs — Where work passes between people: \"Send to compliance officer for review,\" \"Return to PI for corrections.\"\n\nOutput — What's produced at the end: a completed form, a summary report, a recommendation, data entered into a system.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": true
+    }
+  },
+  {
+    "tool_name": "get_certification_module",
+    "content": {
+      "module_id": "workflow_design",
+      "title": "Workflow Design",
+      "xp": 100,
+      "completed": false,
+      "stars": 0,
+      "overview": "Reflect on how you would design workflows for your processes. There is no hands-on exercise — answer the 4 design reflection questions to complete.",
+      "instructions": [
+        "Work through the 6 lessons here in chat to understand workflow design principles.",
+        "Think about how you would translate one of your team's processes into a workflow architecture.",
+        "Answer the 4 Design Reflection questions in chat — the assistant asks them one at a time.",
+        "The assistant saves your answers, verifies completion, and completes the module to award your 100 XP."
+      ],
+      "lesson_titles": [
+        "From process map to workflow architecture",
+        "The extract-reason-deliver pattern",
+        "Designing for your reviewer",
+        "Walkthrough: Designing a compliance review pipeline",
+        "When to split, when to combine",
+        "Worked example: designing subaward intake",
+        "Chat-driven workflow design (v5.0)",
+        "Glossary & Review"
+      ],
+      "expected_fields": [],
+      "star_criteria": {
+        "3": "Complete all 4 design reflection questions (everyone earns 3 stars)"
+      },
+      "sample_documents": [],
+      "provisioned_docs": [],
+      "assessment_keys": [
+        "step_splitting",
+        "pattern",
+        "concern",
+        "human_role"
+      ],
+      "assessment_questions": [
+        {
+          "key": "step_splitting",
+          "question": "When you think about a process in your work, how would you decide where to split it into separate workflow steps?",
+          "options": [
+            "Wherever I naturally take a break or hand off work to someone else",
+            "When the type of work changes (reading → analyzing → writing)",
+            "When I would want to verify output before proceeding to the next part",
+            "I'm not sure yet — I need to see more examples before I can decide"
+          ]
+        },
+        {
+          "key": "pattern",
+          "question": "For the documents your team processes, which workflow pattern seems most useful?",
+          "options": [
+            "Extract then verify: pull structured data, then I review it",
+            "Extract, analyze, report: pull data, reason over it, produce a deliverable",
+            "Extract and compare: pull the same fields from multiple documents and compare them",
+            "Compliance pipeline: extract, check against rules, flag issues automatically"
+          ]
+        },
+        {
+          "key": "concern",
+          "question": "What's your biggest concern about designing workflows for your team's processes?",
+          "options": [
+            "I'm not sure how to break our processes into clear, discrete steps",
+            "I worry about choosing the wrong task types for each step",
+            "I'm concerned about maintaining and updating workflows as our processes change",
+            "I need help getting buy-in from my team to adopt workflow-based approaches"
+          ]
+        },
+        {
+          "key": "human_role",
+          "question": "When would you keep a step manual rather than adding it to the workflow?",
+          "options": [
+            "When the step requires interpreting nuance or institutional context",
+            "When the stakes are too high for any AI error (regulatory compliance decisions)",
+            "When the input is too varied or unpredictable for consistent AI processing",
+            "All of the above — human judgment is irreplaceable for certain decisions"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "workflow_design",
+      "module_title": "Workflow Design",
+      "lesson_number": 1,
+      "lesson_count": 8,
+      "lesson_id": "workflow_design.from-process-map-to-workflow-architecture",
+      "lesson_revision": 1,
+      "title": "From process map to workflow architecture",
+      "objective": "After this lesson, you'll be able to map each step in a process to a specific Vandalizer task type.",
+      "variant": "concept",
+      "content": "In Module 2, you decomposed a process into steps and identified which are AI-suitable vs. which stay human. Now you'll map each AI-suitable step to a specific Vandalizer task type — turning your process map into a buildable architecture.\n\nThe mapping is straightforward:\n• \"Find specific fields in a document\" → Extraction task with an Extraction\n• \"Read a short or context-heavy document and answer a question about it\" → Prompt task with the document as its input (no Extraction first)\n• \"Analyze or summarize the extracted data\" → Prompt task\n• \"Compute, total, or apply rules\" → Code Execution task\n• \"Check a document for specific sections or elements\" → Prompt task\n• \"Produce a formatted report or export\" → Document Renderer or Data Export\n• \"Compare this document to another\" → Add Document + Prompt task\n\nThe key insight: you're not starting from scratch asking \"what can this tool do?\" You're starting from your process and asking \"which tool handles this step?\"",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "workflow_design",
+      "module_title": "Workflow Design",
+      "lesson_number": 2,
+      "lesson_count": 8,
+      "lesson_id": "workflow_design.the-extract-reason-deliver-pattern",
+      "lesson_revision": 1,
+      "title": "The extract-reason-deliver pattern",
+      "objective": "After this lesson, you'll understand the most reliable workflow pattern for research administration and why it works.",
+      "variant": "concept",
+      "content": "The most common and most effective workflow pattern in research administration has three phases:\n\n1. **Extract** — Pull structured data from the document. This is your Extraction step with a well-designed Extraction. The output is clean, consistent JSON.\n\n2. **Reason** — Analyze the extracted data. This might be a Prompt step that summarizes findings, a Code Execution step that computes totals, or both. The output is analysis or computed results.\n\n3. **Deliver** — Produce something useful. A formatted report, a CSV export, a compliance checklist, or structured data ready for your tracking system.\n\nThis pattern works because it separates concerns. If your final report is wrong, you can check: did the extraction get the right data? (Check step 1's output.) Did the analysis interpret it correctly? (Check step 2.) You can fix the broken step without rebuilding the whole workflow.\n\n**The Extract phase is optional, and task-dependent.** \"Extract\" means *get what you need out of the document*, and the Extraction task is one way to do that — the right way when you want the same fixed fields from every document, when the document is long enough that the reasoning step should not see all of it, or when you need values you can check one by one. For a short or context-heavy document — a two-page amendment letter, a sponsor email, a memo where the answer depends on the whole narrative — an Extraction step in front adds a hop without adding reliability. Send the whole file to the Prompt instead: the first step after the Document trigger receives the workflow's documents automatically, and any later step can choose **Workflow Documents** or **Selected Document** as its input source. Teams that have tried both report that for those documents the direct Prompt gives better answers. Reason and Deliver stay the same either way.",
+      "knowledge_check": {
+        "question": "When is it better to skip the Extraction step and send the whole document straight to a Prompt?",
+        "options": [
+          {
+            "text": "Never — a workflow should always start with an Extraction task",
+            "correct": false,
+            "explanation": "Extraction is optional and task-dependent. It earns its place when you need fixed fields or checkable values; a short or context-heavy document is often read better by a Prompt that sees the whole file."
+          },
+          {
+            "text": "When the document is short or the answer depends on its full context, and you don't need fixed fields",
+            "correct": true,
+            "explanation": "Correct! A two-page letter or a memo has no field list to pull and its meaning lives in the whole text. The first step after the Document trigger receives the document automatically — no Extraction needed. Reason and Deliver still follow."
+          },
+          {
+            "text": "When the document is very long",
+            "correct": false,
+            "explanation": "Long documents are where Extraction earns its keep: it narrows what the reasoning step sees and gives you values you can verify one by one."
+          },
+          {
+            "text": "When you need machine-readable output for a spreadsheet",
+            "correct": false,
+            "explanation": "Consistent, structured fields are exactly what the Extraction task is for. That is the case where you keep it."
+          }
+        ]
+      },
+      "diagram": "extract-reason-deliver",
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "workflow_design",
+      "module_title": "Workflow Design",
+      "lesson_number": 3,
+      "lesson_count": 8,
+      "lesson_id": "workflow_design.designing-for-your-reviewer",
+      "lesson_revision": 1,
+      "title": "Designing for your reviewer",
+      "objective": "After this lesson, you'll be able to design workflow output that makes human review fast rather than cumbersome.",
+      "variant": "insight",
+      "content": "Here's a truth about AI in research administration: someone will always review the output. Maybe it's you, maybe it's a compliance officer, maybe it's a PI. Your workflow should make that review easy and efficient.\n\nDesign principles for reviewable output:\n\n• **Show your sources** — When the workflow extracts a budget figure, the output should make it easy to verify against the source document.\n• **Flag uncertainty** — If a field couldn't be found or the value seems unusual, the output should say so.\n• **Structure for scanning** — The reviewer should be able to scan the output in 30 seconds and know if everything looks right.\n• **Separate data from analysis** — Show the raw extracted data first, then the analysis or recommendations.\n\nThe workflow's job is not to eliminate review. It's to make review fast and focused.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "workflow_design",
+      "module_title": "Workflow Design",
+      "lesson_number": 4,
+      "lesson_count": 8,
+      "lesson_id": "workflow_design.walkthrough-designing-a-compliance-review-pipeline",
+      "lesson_revision": 1,
+      "title": "Walkthrough: Designing a compliance review pipeline",
+      "objective": "",
+      "variant": "walkthrough",
+      "content": "Process: \"Check whether a grant proposal includes all required compliance elements.\"\n\n**Step 1** — Decompose the process:\n• Read the proposal and identify which compliance sections are present\n• Extract specific compliance data (human subjects, data management, conflict of interest)\n• Compare against the required elements checklist\n• Produce a gap report showing what's present and what's missing\n\n**Step 2** — Map to task types:\n• \"Read and extract compliance data\" → Extraction task\n• \"Compare against checklist\" → Prompt task\n• \"Produce gap report\" → Document Renderer task\n\n**Step 3** — Design data flow:\n• Step 1 output: JSON with compliance field values (or \"not found\")\n• Step 2 input: that JSON. Output: analysis text with present/missing/incomplete categories\n• Step 3 input: analysis text. Output: formatted compliance checklist document\n\nResult: A 3-step workflow. Upload a proposal, click Run, download a compliance checklist.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "workflow_design",
+      "module_title": "Workflow Design",
+      "lesson_number": 5,
+      "lesson_count": 8,
+      "lesson_id": "workflow_design.when-to-split-when-to-combine",
+      "lesson_revision": 1,
+      "title": "When to split, when to combine",
+      "objective": "",
+      "variant": "insight",
+      "content": "A common question: should this be one step or two?\n\n**Split into separate steps when:**\n• You'd want to check the intermediate output\n• The operations are different types — extraction and analysis are different skills\n• You might reuse one part\n• Debugging would be easier\n\n**Combine into one step when:**\n• The operations are tightly coupled\n• The intermediate output isn't useful on its own\n• The combined prompt is simple and focused\n• The document is short or context-heavy and one focused Prompt over the whole file answers the question — an Extraction in front would only add a hop\n\nRule of thumb: start with more steps. You can always combine later once you know the workflow works. But splitting a monolithic step that's producing bad output is much harder than combining two steps that work well individually.",
+      "knowledge_check": null,
+      "diagram": "step-granularity",
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "workflow_design",
+      "module_title": "Workflow Design",
+      "lesson_number": 6,
+      "lesson_count": 8,
+      "lesson_id": "workflow_design.worked-example-designing-subaward-intake",
+      "lesson_revision": 1,
+      "title": "Worked example: designing subaward intake",
+      "objective": "",
+      "variant": "walkthrough",
+      "content": "Process: “A signed subaward agreement arrives; get its terms into our tracking system and flag anything unusual.”\n\n**Decompose** — (1) Pull the parties, amounts, period, deliverables, and reporting requirements out of the agreement. (2) Compare those terms against our standard template. (3) Write up deviations for the subaward officer. (4) Enter the data.\n\n**Map to task types** — (1) Extraction task — structured fields. (2) Prompt task — “compare these extracted terms to the standard terms below; list deviations.” (3) Document Renderer — a one-page deviation memo. (4) The workflow’s structured output makes entry copy-paste.\n\n**Design the data flow** — Step 1 outputs labeled fields; step 2 receives them (not the whole 40-page agreement — cleaner input, better analysis); step 3 formats step 2’s findings. A 40-page agreement with fixed terms is exactly where Extraction belongs. If the input were a two-page amendment letter instead, step 1 would be a Prompt reading the letter itself, and the pipeline would be two steps.\n\n**Reviewer check** — the memo leads with the extracted terms table, then the flagged deviations, so the officer verifies in one glance. Three steps, one human checkpoint at the end — built in Module 5.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "workflow_design",
+      "module_title": "Workflow Design",
+      "lesson_number": 7,
+      "lesson_count": 8,
+      "lesson_id": "workflow_design.chat-driven-workflow-design-v5-0",
+      "lesson_revision": 1,
+      "title": "Chat-driven workflow design (v5.0)",
+      "objective": "After this lesson, you'll be able to design and dispatch workflows from conversation, using the agent as a design partner.",
+      "variant": "insight",
+      "content": "In Vandalizer 5.0, you don't have to translate your process map into a workflow by yourself. The agent can help.\n\n**Design in chat.** Describe the process in plain English: *\"I need a 3-step workflow for subaward review. Step 1 extracts parties, amounts, and compliance terms. Step 2 analyzes key obligations. Step 3 formats a compliance summary.\"* The agent proposes an architecture with the right task types at each step. You refine it in the editor.\n\n**Dispatch from chat.** Once built, you don't navigate to the workflow every time — you just ask: *\"Run the subaward review on this agreement.\"* The agent picks the right workflow, streams each step as it runs, and shows you the output inline. Approval gates still pause for human review.\n\n**Build faster with propose-then-refine.** For extractions specifically, you can say *\"Propose an extraction set for NIH R01 proposals based on this document\"* and the agent analyzes the document, suggests fields, and creates the template on confirmation. You save 20 minutes of field-by-field config.\n\nThe trade-off is still the same as any AI output: the agent's proposal is a starting point, not the final design. Use it to skip boilerplate, then apply your expertise to the parts that matter.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "workflow_design",
+      "module_title": "Workflow Design",
+      "lesson_number": 8,
+      "lesson_count": 8,
+      "lesson_id": "workflow_design.glossary-review",
+      "lesson_revision": 1,
+      "title": "Glossary & Review",
+      "objective": "",
+      "variant": "key-terms",
+      "content": "These are the design decisions you'll face for every workflow you build. You've seen them applied in the compliance review walkthrough — use this as a reference when designing your own pipelines.\n\nStep granularity — How many steps should your workflow have? Each step should do one clear thing. If you can't describe a step's purpose in one sentence, split it.\n\nTask type selection — Choose the simplest task type that gets the job done. If you need structured data from a document, use Extraction — don't write a Prompt asking the LLM to produce JSON. If you need a judgement or a narrative about a short document, a Prompt reading the document itself is usually the simpler tool. Extraction is a choice, not a mandatory first step.\n\nData flow — Each step receives the previous step's output. Design your steps so the output of one naturally feeds the next. Extraction produces JSON; a Prompt can analyze that JSON; a Renderer can format the analysis.\n\nHuman checkpoints — Decide where a human should review before the workflow continues. In most research admin workflows, the answer is: review after the final output, not after every step.\n\nError tolerance — What happens if the LLM extracts a field incorrectly? Design your workflow so errors are visible in the output, not hidden. Show source data alongside conclusions.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": true
+    }
+  },
+  {
+    "tool_name": "get_certification_module",
+    "content": {
+      "module_id": "extraction_engine",
+      "title": "Extraction Engine",
+      "xp": 150,
+      "completed": false,
+      "stars": 0,
+      "overview": "Create a comprehensive extraction with 15+ fields using a sample NIH R01 proposal. Click **Set Up Lab** to add the PDF, then work with the agent to propose an extraction set from the document and validate your results.",
+      "instructions": [
+        "Work through the lessons here in chat, then ask the assistant to set up the lab — it adds the sample NIH R01 proposal to your workspace.",
+        "Ask: \"Propose a comprehensive extraction set for NIH R01 proposals based on nih-r01-neuroscience.pdf. Include fields for PI, institution, grant number, all budget categories (personnel, equipment, travel, indirect costs), specific aims, human subjects, vertebrate animals, and key personnel.\"",
+        "Review the proposed field list, ask the assistant to add any that are missing, and confirm creation when prompted.",
+        "Ask the assistant to run the new extraction on nih-r01-neuroscience.pdf.",
+        "Review the results. Verify PI Name = James Park, Total Budget = $1,250,000.",
+        "If a field looks wrong, ask the assistant to open guided verification so you can record the correct value as a test case."
+      ],
+      "lesson_titles": [
+        "One-pass vs. two-pass extraction",
+        "Configuring fields for accuracy",
+        "Build a comprehensive extraction",
+        "When to use consensus repetition",
+        "Worked example: fixing a weak field list",
+        "Glossary & Review"
+      ],
+      "expected_fields": [
+        "PI Name",
+        "Institution",
+        "Grant Number",
+        "Project Title",
+        "Project Period",
+        "Total Budget",
+        "Personnel Costs",
+        "Equipment Costs",
+        "Travel Costs",
+        "Supplies Costs",
+        "Indirect Costs",
+        "Indirect Cost Rate",
+        "Specific Aims",
+        "Human Subjects",
+        "Vertebrate Animals",
+        "Key Personnel",
+        "Department",
+        "Sponsoring Agency",
+        "FOA Number",
+        "Study Section"
+      ],
+      "star_criteria": {
+        "1": "Extract 15+ fields from the NIH proposal",
+        "2": "Extract 20+ fields, with each budget category as its own field (Personnel Costs, Equipment Costs, Travel Costs, Supplies Costs, Indirect Costs)",
+        "3": "Extract 25+ fields, using Allowed values to constrain categorical fields and marking situational fields as optional"
+      },
+      "sample_documents": [
+        "nih-r01-neuroscience.pdf"
+      ],
+      "provisioned_docs": [],
+      "assessment_keys": [],
+      "assessment_questions": []
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "extraction_engine",
+      "module_title": "Extraction Engine",
+      "lesson_number": 1,
+      "lesson_count": 6,
+      "lesson_id": "extraction_engine.one-pass-vs-two-pass-extraction",
+      "lesson_revision": 1,
+      "title": "One-pass vs. two-pass extraction",
+      "objective": "After this lesson, you'll know when to use two-pass vs. consensus extraction and what quality tradeoff you're making.",
+      "variant": "concept",
+      "content": "Vandalizer offers two extraction strategies:\n\n**One-pass extraction** sends the document and field definitions to the LLM in a single call. It's faster and cheaper, but can miss nuances in complex documents.\n\n**Two-pass extraction** (the default) works in two stages:\n• Pass 1: The LLM creates a draft extraction, thinking through each field.\n• Pass 2: A second LLM call refines the draft, using structured output to produce clean, validated JSON.\n\nThe two-pass approach is more accurate because the second pass can correct mistakes from the first, and the structured output format prevents formatting errors.",
+      "knowledge_check": {
+        "question": "What makes two-pass extraction more accurate than one-pass?",
+        "options": [
+          {
+            "text": "It processes large documents by splitting them into chunks",
+            "correct": false,
+            "explanation": "That's chunking, a separate feature. Two-pass is about using a second LLM call to refine the first draft."
+          },
+          {
+            "text": "A second LLM call refines the first draft, correcting mistakes and enforcing structured output",
+            "correct": true,
+            "explanation": "Correct! The second pass reviews and cleans up the first pass, producing validated JSON with fewer errors."
+          },
+          {
+            "text": "It uses a smarter model for the second pass to catch errors from the first",
+            "correct": false,
+            "explanation": "Both passes use the same model. The improvement comes from the second pass having a draft to refine, not from a model change."
+          },
+          {
+            "text": "It runs the same extraction twice and averages the results",
+            "correct": false,
+            "explanation": "That's consensus repetition, not two-pass. Two-pass uses the first draft as context for a more accurate second attempt."
+          }
+        ]
+      },
+      "diagram": "extraction-output-example",
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "extraction_engine",
+      "module_title": "Extraction Engine",
+      "lesson_number": 2,
+      "lesson_count": 6,
+      "lesson_id": "extraction_engine.configuring-fields-for-accuracy",
+      "lesson_revision": 1,
+      "title": "Configuring fields for accuracy",
+      "objective": "After this lesson, you'll be able to configure extraction fields that minimize hallucinations and missed values.",
+      "variant": "concept",
+      "content": "The way you configure your Extraction fields directly impacts extraction quality:\n\n**Field names** should be specific and unambiguous. \"PI Name\" is better than \"Name\". \"Total Budget (USD)\" is better than \"Budget\".\n\n**Allowed values** (the field setting labeled \"Allowed values\" in the Extraction editor, sometimes called *enum values* in technical docs) constrain a field to a fixed list of options. For a field like \"Document Type\", you might set Allowed values to \"Grant Proposal, Progress Report, Budget Justification\". The LLM must pick one of those; it can't invent a new category. Use this any time the answer should be one of a known set: Yes/No, a status, a document type, a funding mechanism, etc.\n\n**Optional fields** should be marked as such. If a field like \"Co-PI\" won't appear in every document, marking it optional tells the extraction engine not to hallucinate a value when one doesn't exist.\n\n**Field descriptions** (in the title/searchphrase) give the LLM additional context about what to look for.",
+      "knowledge_check": {
+        "question": "When should you mark an Extraction field as optional?",
+        "options": [
+          {
+            "text": "When you're not sure what value to expect",
+            "correct": false,
+            "explanation": "Uncertainty about value isn't the reason to mark optional. Optional means the field might not exist in the document at all."
+          },
+          {
+            "text": "When the field may not appear in every document of that type",
+            "correct": true,
+            "explanation": "Correct! Marking a field optional tells the extraction engine not to hallucinate a value when the field simply isn't present."
+          },
+          {
+            "text": "When you want the LLM to skip the field to save processing time",
+            "correct": false,
+            "explanation": "Optional fields still get processed. The flag tells the engine it's acceptable to return null, not to skip the field."
+          },
+          {
+            "text": "When the field contains numbers instead of text",
+            "correct": false,
+            "explanation": "Data type doesn't determine optionality. A budget figure might always be present; that's not optional."
+          }
+        ]
+      },
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "extraction_engine",
+      "module_title": "Extraction Engine",
+      "lesson_number": 3,
+      "lesson_count": 6,
+      "lesson_id": "extraction_engine.build-a-comprehensive-extraction",
+      "lesson_revision": 1,
+      "title": "Build a comprehensive extraction",
+      "objective": "",
+      "variant": "walkthrough",
+      "content": "1. Create a new Extraction or expand an existing one to 15+ fields.\n2. Group related fields logically — e.g., personnel fields together, budget fields together.\n3. For any categorical field (status, type, category), open the field and fill in the **Allowed values** setting with the list of valid options.\n4. Mark fields that may not always be present as optional.\n5. Add descriptive titles to help the LLM understand ambiguous fields.\n6. Run the extraction on a test document and review the results.\n7. Iterate: adjust field names and add Allowed values for any fields that extracted poorly.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "extraction_engine",
+      "module_title": "Extraction Engine",
+      "lesson_number": 4,
+      "lesson_count": 6,
+      "lesson_id": "extraction_engine.when-to-use-consensus-repetition",
+      "lesson_revision": 1,
+      "title": "When to use consensus repetition",
+      "objective": "",
+      "variant": "insight",
+      "content": "Consensus repetition runs the same extraction 3 times and takes the majority answer for each field. Use it when the stakes are high — compliance data, financial figures, legal terms — and the cost of an incorrect extraction outweighs the 3x processing cost. For routine extractions or exploratory work, two-pass is usually sufficient.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "extraction_engine",
+      "module_title": "Extraction Engine",
+      "lesson_number": 5,
+      "lesson_count": 6,
+      "lesson_id": "extraction_engine.worked-example-fixing-a-weak-field-list",
+      "lesson_revision": 1,
+      "title": "Worked example: fixing a weak field list",
+      "objective": "",
+      "variant": "walkthrough",
+      "content": "A first draft of an NIH R01 extraction, and the repair.\n\n**Draft fields** — “Name”, “Budget”, “People”, “Animals”. The run comes back muddled: “Name” returns the grants officer from the cover letter, “Budget” returns Year 1 direct costs instead of the total, “People” returns a paragraph, and “Animals” hallucinates “N/A” wording not in the document.\n\n**The repairs, one principle each:**\n• “Name” → “PI Name” — the field name is the LLM’s biggest clue; make it point at exactly one thing.\n• “Budget” → “Total Budget (all years, direct + indirect)” — when a document holds five budget numbers, the name must say which one.\n• “People” → “Key Personnel” plus a separate “Co-Investigator” marked **optional** — one field, one value; optional stops made-up answers when no Co-I exists.\n• “Animals” → “Vertebrate Animals” with **Allowed values** “Yes, No” — constrained fields can’t invent prose.\n\nRe-run: James Park, $1,250,000, a clean personnel list, “Yes”. Same document — the configuration was the difference.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "extraction_engine",
+      "module_title": "Extraction Engine",
+      "lesson_number": 6,
+      "lesson_count": 6,
+      "lesson_id": "extraction_engine.glossary-review",
+      "lesson_revision": 1,
+      "title": "Glossary & Review",
+      "objective": "",
+      "variant": "key-terms",
+      "content": "Structured Output — You've now seen this in action: the LLM is constrained to return data matching a schema built from your Extraction fields. This is what prevents formatting errors and ensures you get the same JSON structure every time, regardless of how different the source documents look.\n\nThinking Mode — When enabled, the LLM reasons step-by-step before answering. Two-pass extraction uses Thinking Mode in Pass 1 for accuracy and disables it in Pass 2 for speed — you get both benefits.\n\nConsensus Repetition — Runs the same extraction 3 times and takes the majority answer for each field. The right choice when stakes are high: compliance data, financial figures, legal terms. 3x the cost, but highest accuracy.\n\nChunking — When you have many fields (20+), the extraction splits into smaller batches to stay within the LLM's context window. Vandalizer handles this automatically when you exceed the threshold.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": true
+    }
+  },
+  {
+    "tool_name": "get_certification_module",
+    "content": {
+      "module_id": "multi_step",
+      "title": "Multi-Step Workflows",
+      "xp": 150,
+      "completed": false,
+      "stars": 0,
+      "overview": "Build a multi-step workflow pipeline using a sample subaward agreement. Click **Set Up Lab** to add the PDF, then describe the process to the agent so it can help you design a 3+ step workflow that chains extraction, analysis, and formatting.",
+      "instructions": [
+        "Work through the lessons here in chat, then ask the assistant to set up the lab — it adds the sample subaward agreement to your workspace.",
+        "Describe the process you want: \"I need a 3-step workflow for subaward review. Step 1 extracts parties, amounts, period, PI, deliverables, and compliance terms. Step 2 analyzes the extracted data to identify key obligations and deadlines. Step 3 formats the analysis into a compliance summary report.\"",
+        "Work with the assistant to refine the workflow — the Extraction task (Step 1), the Prompt task (Step 2), and the Formatter task (Step 3). You can fine-tune it in the workflow editor at any point.",
+        "Ask the assistant to run the new workflow on subaward-agreement.pdf.",
+        "Watch each step complete in the live status view and confirm the pipeline chains: extraction → analysis → formatted report.",
+        "Why Extraction first here: the terms you want are fixed fields the lab checks one by one, and the point of this lab is to chain three steps. Extraction is optional and task-dependent — a short or context-heavy document can go straight to a Prompt that reads the whole file (the first step receives the document automatically). See Module 3’s lesson on the extract-reason-deliver pattern."
+      ],
+      "lesson_titles": [
+        "How steps chain together",
+        "The Prompt node: reasoning over data",
+        "Build a 3-step analysis workflow",
+        "Design principle: separate reading from reasoning",
+        "Worked example: watching data flow through three steps",
+        "Glossary & Review"
+      ],
+      "expected_fields": [
+        "Prime Recipient",
+        "Subrecipient",
+        "Subaward Amount",
+        "Performance Period",
+        "PI Name",
+        "Deliverables",
+        "Reporting Schedule",
+        "Compliance Requirements"
+      ],
+      "star_criteria": {
+        "1": "Build a 3-step workflow with Extraction + Prompt + Formatter",
+        "2": "Build a 4+ step workflow with clear data flow between steps",
+        "3": "Build a 5+ step workflow using 4+ different task types"
+      },
+      "sample_documents": [
+        "subaward-agreement.pdf"
+      ],
+      "provisioned_docs": [],
+      "assessment_keys": [],
+      "assessment_questions": []
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "multi_step",
+      "module_title": "Multi-Step Workflows",
+      "lesson_number": 1,
+      "lesson_count": 6,
+      "lesson_id": "multi_step.how-steps-chain-together",
+      "lesson_revision": 1,
+      "title": "How steps chain together",
+      "objective": "After this lesson, you'll understand how data flows between steps in a multi-step workflow.",
+      "variant": "concept",
+      "content": "A multi-step workflow forms a pipeline where each step's output becomes the next step's input. The workflow engine executes steps in order (technically, in topological order of a directed acyclic graph, or DAG).\n\nFor example, a 3-step workflow might work like this:\n• Step 1 (Extraction): Pulls structured fields from the document → outputs JSON.\n• Step 2 (Prompt): Receives that JSON and asks the LLM to analyze it → outputs analysis text.\n• Step 3 (Format): Takes the analysis and formats it into a clean report → outputs final document.\n\nEach step can see the output of the step before it, creating a chain of increasingly refined output.",
+      "knowledge_check": {
+        "question": "What does a step receive as input by default?",
+        "options": [
+          {
+            "text": "The original uploaded document, regardless of step position",
+            "correct": false,
+            "explanation": "After step 1, the input source switches to the previous step's output, not the original document."
+          },
+          {
+            "text": "The output of the previous step",
+            "correct": true,
+            "explanation": "Correct! Each step's default input source is \"step_input\": the output of the step before it in the chain."
+          },
+          {
+            "text": "All outputs from every previous step, combined into one",
+            "correct": false,
+            "explanation": "Steps receive their immediate predecessor's output by default, not a combined history of all prior steps."
+          },
+          {
+            "text": "A fresh, empty context with only the system prompt",
+            "correct": false,
+            "explanation": "Steps are connected; each one builds on the previous step's work."
+          }
+        ]
+      },
+      "diagram": "workflow-result-example",
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "multi_step",
+      "module_title": "Multi-Step Workflows",
+      "lesson_number": 2,
+      "lesson_count": 6,
+      "lesson_id": "multi_step.the-prompt-node-reasoning-over-data",
+      "lesson_revision": 1,
+      "title": "The Prompt node: reasoning over data",
+      "objective": "After this lesson, you'll know when to use an Extraction task vs. a Prompt task and why the distinction matters.",
+      "variant": "concept",
+      "content": "The Prompt node is one of the most powerful tools in your workflow. It sends the previous step's output to the LLM along with your custom prompt, and returns the LLM's response.\n\nUse it to:\n• Summarize extracted data\n• Compare and analyze\n• Generate recommendations\n• Transform formats\n\nThe key insight is that extraction gives you structured data, and prompts let you reason over that data.\n\nA Prompt does not need an Extraction in front of it. As the first step it receives the workflow's documents directly; later in a chain, set the step's input source to **Workflow Documents** or **Selected Document** to hand it the whole file. For a short or context-heavy document that is often the better design — this module's lab uses Extraction first because its terms are fixed fields the lab checks one by one, and the lab exists to practise chaining steps.",
+      "knowledge_check": {
+        "question": "What's the key difference between an Extraction task and a Prompt task?",
+        "options": [
+          {
+            "text": "Extraction is faster; Prompt produces more detailed output",
+            "correct": false,
+            "explanation": "Speed isn't the defining difference. The distinction is about what kind of operation you're performing."
+          },
+          {
+            "text": "Extraction pulls structured fields from a document; Prompt reasons over data with a custom instruction",
+            "correct": true,
+            "explanation": "Correct! Use Extraction to get structured data out of a document. Use Prompt to analyze, summarize, or reason over that data."
+          },
+          {
+            "text": "Extraction only works on PDFs; Prompt works on any text format",
+            "correct": false,
+            "explanation": "Both task types work on text — the difference is in the operation, not the document format."
+          },
+          {
+            "text": "Extraction supports Thinking Mode; Prompt does not",
+            "correct": false,
+            "explanation": "Both task types can use Thinking Mode. The distinction is about extraction vs. reasoning, not about model settings."
+          }
+        ]
+      },
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "multi_step",
+      "module_title": "Multi-Step Workflows",
+      "lesson_number": 3,
+      "lesson_count": 6,
+      "lesson_id": "multi_step.build-a-3-step-analysis-workflow",
+      "lesson_revision": 1,
+      "title": "Build a 3-step analysis workflow",
+      "objective": "",
+      "variant": "walkthrough",
+      "content": "1. Create a new workflow and add 3 steps.\n2. Step 1 — Add an Extraction task. Select an Extraction with fields relevant to your document.\n3. Step 2 — Add a Prompt task. Write a prompt that analyzes the extracted data.\n4. Step 3 — Add a Formatter task. Write a template that structures the final output.\n5. Select a document and run the workflow. Observe how data flows through each step.\n6. Review each step's output individually using the step-by-step output panel.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "multi_step",
+      "module_title": "Multi-Step Workflows",
+      "lesson_number": 4,
+      "lesson_count": 6,
+      "lesson_id": "multi_step.design-principle-separate-reading-from-reasoning",
+      "lesson_revision": 1,
+      "title": "Design principle: separate reading from reasoning",
+      "objective": "",
+      "variant": "insight",
+      "content": "*You've seen this principle before in Module 3 — that's intentional. Spaced repetition builds retention. Let's revisit it and see how it applies when chaining multiple steps.*\n\nA common mistake is trying to do everything in one big prompt. Instead, separate reading (getting the facts out of the document) from reasoning (drawing conclusions from those facts). This makes each step simpler, more reliable, and easier to debug. If your final output is wrong, you can check: did the reading step get the right data? Or did the reasoning step misinterpret it? This separation is what makes workflows more reliable than one-shot prompting.\n\nThe principle is *separation of concerns*, not \"Extraction goes first.\" For a long document with fixed fields, the reading step is an Extraction task. For a short or context-heavy document, the reading step can be a Prompt that takes the whole file — the important part is that the step that reads and the step that judges are not the same step.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "multi_step",
+      "module_title": "Multi-Step Workflows",
+      "lesson_number": 5,
+      "lesson_count": 6,
+      "lesson_id": "multi_step.worked-example-watching-data-flow-through-three-steps",
+      "lesson_revision": 1,
+      "title": "Worked example: watching data flow through three steps",
+      "objective": "",
+      "variant": "walkthrough",
+      "content": "The subaward pipeline from this module’s lab, with the actual baton-passes visible.\n\n**Step 1 — Extraction** reads the agreement and outputs labeled fields:\nParties = University of Idaho; Boise State University · Total = $148,500 · Period = 09/01/2025–08/31/2027 · Reports due = quarterly · Deliverables = sensor data + annual analysis.\n\n**Step 2 — Prompt** receives those fields (not the 40-page PDF) with the instruction “Analyze these subaward terms; flag obligations and deadlines.” It outputs a short analysis: quarterly reporting is tighter than our standard semi-annual; first report due 12/31/2025; deliverables assign data ownership ambiguously.\n\n**Step 3 — Formatter** turns that analysis into the compliance summary’s house format: a header, a terms table, a numbered obligations list.\n\nTwo things to notice: each step’s output is exactly the next step’s input — and each step got a *simpler, cleaner* job than “read this agreement and write a summary” in one leap. That’s why chained steps beat one giant prompt.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "multi_step",
+      "module_title": "Multi-Step Workflows",
+      "lesson_number": 6,
+      "lesson_count": 6,
+      "lesson_id": "multi_step.glossary-review",
+      "lesson_revision": 1,
+      "title": "Glossary & Review",
+      "objective": "",
+      "variant": "key-terms",
+      "content": "Input Source — Controls what data a step receives. You've now seen \"step_input\" in action — the default that passes each step's output to the next. Other options let you inject a specific document or all workflow documents at any point in the chain.\n\nPrompt Node — The reasoning engine in your pipeline. It takes the previous step's output and your custom instruction, and returns the LLM's analysis. You used it to transform extracted JSON into a compliance summary.\n\nFormat Node — Transforms structured data into formatted text (markdown, plain text). Use it when you want a human-readable report from raw extracted data without writing a custom prompt.\n\nPost-process Prompt — An optional final LLM call on any node's output. Use it to clean up or lightly reformat results without adding a full extra step to your pipeline.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": true
+    }
+  },
+  {
+    "tool_name": "get_certification_module",
+    "content": {
+      "module_id": "advanced_nodes",
+      "title": "Advanced Nodes",
+      "xp": 200,
+      "completed": false,
+      "stars": 0,
+      "overview": "Use advanced workflow nodes (the Deep Analysis node) and parallel tasks to process a sample budget justification. Click **Set Up Lab** to add the PDF, then build a workflow with an advanced node and a step that runs two tasks at once.",
+      "instructions": [
+        "Work through the lessons here in chat, then ask the assistant to set up the lab — it adds the sample budget justification to your workspace.",
+        "Create a workflow that processes the budget document using advanced nodes:",
+        "  Step 1 — Extraction: extract the salary table, supply costs, travel, subawards, and indirect costs.",
+        "  Step 2 — Research node: analyze the extracted figures and check whether the line items add up to the stated total. The Research node makes two LLM passes over the data — no URL or API key needed.",
+        "  Step 2 (parallel) — add a second task to the same step: a Prompt task that writes a short budget narrative summary. Two tasks in one step run concurrently.",
+        "Run the workflow against budget-justification.pdf.",
+        "Verify the Research node produces a report and that both parallel tasks complete.",
+        "Note: the Code Execution node (sandboxed Python) is an admin-only power node — the Research node covers this exercise for everyone."
+      ],
+      "lesson_titles": [
+        "Beyond extraction and prompts",
+        "Code Execution: custom logic in your pipeline",
+        "Running tasks in parallel",
+        "Build a workflow with advanced nodes",
+        "Worked example: a budget check with parallel tasks",
+        "Glossary & Review"
+      ],
+      "expected_fields": [
+        "Personnel",
+        "Fringe Benefits",
+        "Supplies",
+        "Travel",
+        "Subaward Costs",
+        "Indirect Costs",
+        "Indirect Cost Rate",
+        "Total Direct Costs",
+        "Total Budget"
+      ],
+      "star_criteria": {
+        "1": "Use one advanced node (Research, API, or Crawler) and a step with 2+ parallel tasks",
+        "2": "Use 2+ different advanced node types",
+        "3": "Run 3+ parallel tasks within a single step"
+      },
+      "sample_documents": [
+        "budget-justification.pdf"
+      ],
+      "provisioned_docs": [],
+      "assessment_keys": [],
+      "assessment_questions": []
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "advanced_nodes",
+      "module_title": "Advanced Nodes",
+      "lesson_number": 1,
+      "lesson_count": 6,
+      "lesson_id": "advanced_nodes.beyond-extraction-and-prompts",
+      "lesson_revision": 1,
+      "title": "Beyond extraction and prompts",
+      "objective": "",
+      "variant": "concept",
+      "content": "Vandalizer has 17 different node types. So far you've used Extraction, Prompt, and Format — but the advanced nodes let you go much further:\n\n• **Deep Analysis** — Two-pass analysis: first analyzes the data, then synthesizes findings into a report. Works on your document — no URL or API key needed.\n• **API Call** — Make HTTP requests to external services.\n• **Crawler** — Fetch and extract text from websites.\n• **Add Document / Add Website** — Inject additional context mid-workflow.\n• **Code Execution** — Run sandboxed Python for calculations or custom logic. This is an admin-only power node and is not in the standard palette, so you won't use it in this challenge.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "advanced_nodes",
+      "module_title": "Advanced Nodes",
+      "lesson_number": 2,
+      "lesson_count": 6,
+      "lesson_id": "advanced_nodes.code-execution-custom-logic-in-your-pipeline",
+      "lesson_revision": 1,
+      "title": "Code Execution: custom logic in your pipeline",
+      "objective": "After this lesson, you'll know which kinds of logic belong in Code Execution rather than Prompt nodes.",
+      "variant": "concept",
+      "content": "The Code Execution node lets you write Python that runs inside your workflow. It is an **admin-only power node** that is not in the standard palette — you won't add it in this module, but it's worth knowing when it's the right tool. It is powerful for:\n\n• **Data transformation** — Normalize dates, convert currencies, merge fields.\n• **Calculations** — Compute totals, percentages, or ratios from extracted numbers.\n• **Filtering** — Remove irrelevant results or flag outliers.\n• **Format conversion** — Reshape JSON into a different structure.\n\nThe code runs in a sandbox: no file system access, no network access, no imports beyond the standard library. For document analysis without code — like checking whether a budget adds up — the Deep Analysis node is the everyday equivalent.",
+      "knowledge_check": {
+        "question": "Which task should use Code Execution instead of a Prompt node?",
+        "options": [
+          {
+            "text": "Extracting structured fields from a grant proposal",
+            "correct": false,
+            "explanation": "That's what Extraction tasks are for. Code Execution is for logic that requires precision, not pattern recognition."
+          },
+          {
+            "text": "Summarizing a progress report into bullet points",
+            "correct": false,
+            "explanation": "Summarization is a Prompt task — it's language work that LLMs do well."
+          },
+          {
+            "text": "Adding up budget line items or computing percentages from extracted numbers",
+            "correct": true,
+            "explanation": "Correct! Math requires precision. LLMs frequently make arithmetic errors, so use Code Execution for any numerical computation."
+          },
+          {
+            "text": "Comparing two documents and identifying differences",
+            "correct": false,
+            "explanation": "Document comparison is a Prompt task — it involves language understanding, which is LLM territory."
+          }
+        ]
+      },
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "advanced_nodes",
+      "module_title": "Advanced Nodes",
+      "lesson_number": 3,
+      "lesson_count": 6,
+      "lesson_id": "advanced_nodes.running-tasks-in-parallel",
+      "lesson_revision": 1,
+      "title": "Running tasks in parallel",
+      "objective": "",
+      "variant": "concept",
+      "content": "Within a single step, you can add multiple tasks. These tasks run concurrently — the workflow engine starts them all at the same time and waits for them to finish together, instead of running them one after another.\n\nThis is useful when you need multiple independent operations:\n• Extract from two different Extractions at the same time\n• Call multiple APIs in parallel\n• Run an extraction while simultaneously fetching enrichment data from a website\n\nTo add parallel tasks, open a step in the workflow editor and click \"Add Task\" multiple times.",
+      "knowledge_check": {
+        "question": "When you add multiple tasks to a single step, how do they run?",
+        "options": [
+          {
+            "text": "One at a time, in the order you added them",
+            "correct": false,
+            "explanation": "Sequential execution would defeat the purpose of parallel tasks. Vandalizer runs them concurrently."
+          },
+          {
+            "text": "Concurrently, they all run at the same time",
+            "correct": true,
+            "explanation": "Correct! Multiple tasks within a step run in parallel: they all start at roughly the same time, and the step waits for them all to finish. Their results are collected and passed to the next step."
+          },
+          {
+            "text": "In a random order determined by server load",
+            "correct": false,
+            "explanation": "Tasks run concurrently, not in a random order. All start at roughly the same time."
+          },
+          {
+            "text": "Only the first task runs; the rest are treated as fallbacks if it fails",
+            "correct": false,
+            "explanation": "All tasks run. There's no fallback logic between tasks in a step."
+          }
+        ]
+      },
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "advanced_nodes",
+      "module_title": "Advanced Nodes",
+      "lesson_number": 4,
+      "lesson_count": 6,
+      "lesson_id": "advanced_nodes.build-a-workflow-with-advanced-nodes",
+      "lesson_revision": 1,
+      "title": "Build a workflow with advanced nodes",
+      "objective": "",
+      "variant": "walkthrough",
+      "content": "1. Create a workflow with at least 3 steps.\n2. In one step, add a **Deep Analysis** task. Give it a question like \"Do these budget line items add up to the stated total?\" and point its input at the document or the previous step's output.\n3. In the same step, add a second task (for example a Prompt task that writes a narrative summary) so two tasks run in parallel.\n4. Run the workflow and review how the parallel tasks' outputs are combined.\n5. (Optional) Swap the Deep Analysis node for an API Call or Crawler node to see other advanced node types.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "advanced_nodes",
+      "module_title": "Advanced Nodes",
+      "lesson_number": 5,
+      "lesson_count": 6,
+      "lesson_id": "advanced_nodes.worked-example-a-budget-check-with-parallel-tasks",
+      "lesson_revision": 1,
+      "title": "Worked example: a budget check with parallel tasks",
+      "objective": "",
+      "variant": "walkthrough",
+      "content": "The budget justification from this module’s lab claims a $542,800 total. Two tasks in one step, running at the same time on the same document:\n\n**Task A — Deep Analysis** gets the question “Do the line items sum to the stated total?” It works through the figures: personnel $312,400 + supplies $48,900 + travel $22,500 + subaward $159,000 = $542,800 — and reports that the arithmetic checks out, noting Year 2 travel relies on conference estimates.\n\n**Task B — Prompt** drafts the budget narrative paragraph for the proposal file from the same document.\n\nBoth finish, and the step hands their combined output — verification first, narrative second — to the next step, which formats a review memo.\n\nWhy parallel? The two tasks are independent — neither needs the other’s answer — so running them side by side can reduce waiting when capacity is available. And why Deep Analysis rather than trusting a plain prompt with the math? Checking arithmetic is exactly where ordinary LLM answers are least reliable; the analysis node is built to work the numbers rather than guess at them.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "advanced_nodes",
+      "module_title": "Advanced Nodes",
+      "lesson_number": 6,
+      "lesson_count": 6,
+      "lesson_id": "advanced_nodes.glossary-review",
+      "lesson_revision": 1,
+      "title": "Glossary & Review",
+      "objective": "",
+      "variant": "key-terms",
+      "content": "Parallel Tasks — You've now run multiple tasks within a single step concurrently. Their results are collected and passed to the next step together. The benefit: independent operations (two extractions, or an extraction + API call) happen simultaneously instead of sequentially.\n\nCode Execution — Python in a restricted sandbox with a 10-second timeout. The previous step's output is available as `input_data`. Assign your result to `output`. Use for any math, date calculations, or deterministic logic — never for work that needs language understanding.\n\nAPI Call — Connects your workflow to external services. Supports GET, POST, PUT, and PATCH. You can pass authentication headers and use the previous step's output in the request body — enabling real-time lookups and integrations.\n\nDeep Analysis Node — Two-stage analysis: first passes through the data to identify patterns, then synthesizes findings into a coherent report. Use when you need more depth than a single Prompt call provides.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": true
+    }
+  },
+  {
+    "tool_name": "get_certification_module",
+    "content": {
+      "module_id": "output_delivery",
+      "title": "Output & Delivery",
+      "xp": 200,
+      "completed": false,
+      "stars": 0,
+      "overview": "Create a workflow that produces a downloadable deliverable from a sample progress report. Click **Set Up Lab** to add the PDF, then use chat to scaffold a pipeline that extracts, summarizes, and exports the data.",
+      "instructions": [
+        "Work through the lessons here in chat, then ask the assistant to set up the lab — it adds the sample progress report to your workspace.",
+        "Describe the pipeline: \"Design a 3-step workflow for annual progress reports. Step 1 extracts accomplishments, publications, students trained, budget expenditures, and milestones. Step 2 summarizes progress and highlights key achievements. Step 3 produces a downloadable report.\"",
+        "Open the workflow in the editor (you can keep chat beside it) and add a Document Renderer or Data Export to Step 3 — the assistant can suggest which fits your use case.",
+        "Ask the assistant to run the workflow on progress-report-year2.pdf.",
+        "Open the workflow run in the editor, download the output file, and verify it contains the extracted data.",
+        "Extraction is optional: for a short or context-heavy document, a Prompt reading the whole file can replace Steps 1 and 2, and the Step 3 output node builds the deliverable the same way."
+      ],
+      "lesson_titles": [
+        "From analysis to deliverables",
+        "Designing end-to-end deliverable workflows",
+        "Build a deliverable workflow",
+        "Worked example: one report in, two deliverables out",
+        "Glossary & Review"
+      ],
+      "expected_fields": [
+        "Project Title",
+        "PI Name",
+        "Reporting Period",
+        "Accomplishments",
+        "Publications",
+        "Students Trained",
+        "Budget Spent",
+        "Remaining Budget",
+        "Upcoming Milestones"
+      ],
+      "star_criteria": {
+        "1": "Use a Document Renderer, Data Export, or Form Filler and run the workflow",
+        "2": "Use 2+ different output node types",
+        "3": "Turn on Include in deliverables for 2+ steps and run the workflow, so the download is a ZIP with multiple output files"
+      },
+      "sample_documents": [
+        "progress-report-year2.pdf"
+      ],
+      "provisioned_docs": [],
+      "assessment_keys": [],
+      "assessment_questions": []
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "output_delivery",
+      "module_title": "Output & Delivery",
+      "lesson_number": 1,
+      "lesson_count": 5,
+      "lesson_id": "output_delivery.from-analysis-to-deliverables",
+      "lesson_revision": 1,
+      "title": "From analysis to deliverables",
+      "objective": "After this lesson, you'll know which output node to use for different types of deliverables.",
+      "variant": "concept",
+      "content": "So far, your workflows produce text output that you view in the app. But real research administration often requires deliverables: compliance reports to submit, data exports for spreadsheets, or document packages with multiple files.\n\nVandalizer's output nodes transform your workflow results into downloadable files:\n\n• **Document Renderer** — Generates a markdown or text file from your workflow output.\n• **Data Export** — Exports structured data as JSON or CSV.\n• **Package Builder** (coming soon) — Will bundle multiple output files into one ZIP. Until it ships, turn on **Include in deliverables** for two or more steps and the download comes as a ZIP.\n• **Form Filler** — Takes a template with placeholders and fills it with extracted data.",
+      "knowledge_check": {
+        "question": "You need to export extracted data from 50 proposals into a spreadsheet. Which output node is the right choice?",
+        "options": [
+          {
+            "text": "Document Renderer — it produces a formatted text file from workflow output",
+            "correct": false,
+            "explanation": "Document Renderer creates a readable document, not structured tabular data. It's better for reports you'd read, not data you'd analyze in Excel."
+          },
+          {
+            "text": "Package Builder — it bundles multiple files into a ZIP",
+            "correct": false,
+            "explanation": "Package Builder is for collecting multiple output files together, not for producing spreadsheet-compatible data."
+          },
+          {
+            "text": "Data Export — it converts structured data to CSV or JSON",
+            "correct": true,
+            "explanation": "Correct! Data Export with CSV format turns your extracted JSON into columns and rows that open directly in Excel or Google Sheets."
+          },
+          {
+            "text": "Form Filler — it fills placeholders in a template with extracted values",
+            "correct": false,
+            "explanation": "Form Filler is for template-based documents (like filling out a standard form), not for exporting tabular data."
+          }
+        ]
+      },
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "output_delivery",
+      "module_title": "Output & Delivery",
+      "lesson_number": 2,
+      "lesson_count": 5,
+      "lesson_id": "output_delivery.designing-end-to-end-deliverable-workflows",
+      "lesson_revision": 1,
+      "title": "Designing end-to-end deliverable workflows",
+      "objective": "",
+      "variant": "concept",
+      "content": "The most powerful workflows go from raw document to finished deliverable in one run:\n\n1. **Extract** — Pull structured data from the source document.\n2. **Analyze** — Use Prompt nodes to reason over the data, flag issues, or generate summaries.\n3. **Render** — Use output nodes to produce the final deliverable.\n\nThe result: upload a grant proposal, click Run, and download a completed compliance checklist.\n\nPhase 1 is an Extraction task when you need fixed fields from a long document. For a short or context-heavy source, the Prompt reads the document directly and phases 1 and 2 collapse into one step — the deliverable is built the same way.",
+      "knowledge_check": {
+        "question": "What are the three phases of a complete end-to-end deliverable workflow?",
+        "options": [
+          {
+            "text": "Upload, Run, Download",
+            "correct": false,
+            "explanation": "Those are UI actions, not the workflow's internal phases. The phases describe what the steps do, not what the user does."
+          },
+          {
+            "text": "Extract, Analyze, Render",
+            "correct": true,
+            "explanation": "Correct! Extract structured data, analyze or reason over it, then render a deliverable. This maps to the task types: Extraction → Prompt → Output node — or, for a short document, Prompt over the document → Output node."
+          },
+          {
+            "text": "Prompt, Format, Export",
+            "correct": false,
+            "explanation": "Those are task type names, not the three-phase pattern. The pattern is higher-level: Extract → Analyze → Render."
+          },
+          {
+            "text": "Parse, Validate, Deliver",
+            "correct": false,
+            "explanation": "Parse and Validate aren't workflow phases in Vandalizer. The pattern is Extract (get data), Analyze (reason about it), Render (produce output)."
+          }
+        ]
+      },
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "output_delivery",
+      "module_title": "Output & Delivery",
+      "lesson_number": 3,
+      "lesson_count": 5,
+      "lesson_id": "output_delivery.build-a-deliverable-workflow",
+      "lesson_revision": 1,
+      "title": "Build a deliverable workflow",
+      "objective": "",
+      "variant": "walkthrough",
+      "content": "1. Start with a workflow that extracts and analyzes data (from Module 3).\n2. Add a new step at the end of your workflow.\n3. Add a Document Renderer or Data Export task to that step.\n4. For Document Renderer: the previous step's output will be rendered as a downloadable file.\n5. For Data Export: choose JSON or CSV format.\n6. Run the workflow on a document.\n7. In the results panel, you'll see a download link for the generated file.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "output_delivery",
+      "module_title": "Output & Delivery",
+      "lesson_number": 4,
+      "lesson_count": 5,
+      "lesson_id": "output_delivery.worked-example-one-report-in-two-deliverables-out",
+      "lesson_revision": 1,
+      "title": "Worked example: one report in, two deliverables out",
+      "objective": "",
+      "variant": "walkthrough",
+      "content": "The Year-2 progress report from this module’s lab, taken all the way to files you could attach to an email.\n\n**Step 1 — Extraction**: accomplishments, publications (4), students trained (3), expenditures by category.\n\n**Step 2 — Prompt**: “Summarize progress against the original aims; note anything under-spent or behind schedule.” Output: a tight summary noting Aim 2 is a semester behind and equipment is 40% under-spent.\n\n**Step 3 — two tasks, side by side:**\n• **Document Renderer** → “Year-2-Progress-Summary.pdf” — the summary formatted with a title, for the award file and the PI.\n• **Data Export** → “expenditures.csv” — the expenditure fields as a spreadsheet, ready to reconcile against the ledger.\n\nOne run, one download, both deliverables. The pattern to notice: the *same* extracted data fanned out into a document for people and a dataset for systems — which audience each output serves decided its format, not habit.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "output_delivery",
+      "module_title": "Output & Delivery",
+      "lesson_number": 5,
+      "lesson_count": 5,
+      "lesson_id": "output_delivery.glossary-review",
+      "lesson_revision": 1,
+      "title": "Glossary & Review",
+      "objective": "",
+      "variant": "key-terms",
+      "content": "Document Renderer — You've now generated downloadable files from workflow output. Document Renderer takes the previous step's text and wraps it into a file. Best for reports, summaries, and compliance checklists that people will read.\n\nData Export — Converts structured JSON data into CSV or JSON files. When using CSV, each extracted key becomes a column header. Best for data that will be loaded into spreadsheets, databases, or other systems.\n\nPackage Builder (coming soon) — Will collect outputs from multiple steps and bundle them into a single ZIP file; until it ships, Include in deliverables (below) does the same job. Use it when your workflow produces several distinct deliverables that should be distributed together.\n\nForm Filler — Takes a template string with placeholder syntax and produces a filled-in version using your extracted data. Best when the output must follow a fixed format (like a standard institutional form).\n\nInclude in deliverables — A per-step toggle that marks the step's output as part of the downloadable result. Mark multiple steps to bundle their outputs as a ZIP. If no step is marked, the last step is used by default. Use it to control which steps are deliverables vs. intermediate processing steps.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": true
+    }
+  },
+  {
+    "tool_name": "get_certification_module",
+    "content": {
+      "module_id": "validation_qa",
+      "title": "Validation & QA",
+      "xp": 250,
+      "completed": false,
+      "stars": 0,
+      "overview": "Turn the extraction from Module 1 into a validated, trustworthy template by building a test-case library from chat. The more test cases you add, the higher the quality tier climbs and the stronger the trust signals your team sees inline.",
+      "instructions": [
+        "Work through the lessons here in chat. This module reuses the NSF proposal from the Foundations module (already in your workspace if you completed it).",
+        "Ask: \"List the test cases for my NSF Proposal Extractor.\" If none exist yet, that's expected.",
+        "Ask the assistant to propose a test case from nsf-proposal-alpine-ecology.pdf using your NSF Proposal Extractor, then confirm each extracted value (PI Name, Total Budget, etc.) in the guided verification.",
+        "Ask the assistant to run a validation across your test cases — it reports the accuracy and consistency score.",
+        "Click the quality badge on the results to see the score breakdown. Check the tier (excellent / good / fair / poor) and active alerts.",
+        "Iterate: add at least one more test case, then run validation again to see the score change."
+      ],
+      "lesson_titles": [
+        "Why validation matters",
+        "Building effective validation plans",
+        "Set up validation for your workflow",
+        "Validation as a safety net",
+        "Worked example: five checks and a failing run",
+        "Trust signals & quality tiers (v5.0)",
+        "Guided verification (v5.0)",
+        "Glossary & Review"
+      ],
+      "expected_fields": [],
+      "star_criteria": {
+        "1": "Create a validation plan with 2+ checks and run a validated workflow",
+        "2": "Create a validation plan with 5+ quality checks",
+        "3": "Create a validation plan with 8+ checks covering completeness, accuracy, and format"
+      },
+      "sample_documents": [
+        "nsf-proposal-alpine-ecology.pdf"
+      ],
+      "provisioned_docs": [],
+      "assessment_keys": [],
+      "assessment_questions": []
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "validation_qa",
+      "module_title": "Validation & QA",
+      "lesson_number": 1,
+      "lesson_count": 8,
+      "lesson_id": "validation_qa.why-validation-matters",
+      "lesson_revision": 1,
+      "title": "Why validation matters",
+      "objective": "After this lesson, you'll understand why validation is essential before deploying a workflow for production use.",
+      "variant": "concept",
+      "content": "An extraction workflow that works on one document might fail on the next. Different document layouts, writing styles, or terminology can cause the LLM to miss fields or return incorrect values.\n\nValidation lets you define what \"correct\" looks like for your workflow, test it against sample documents, and track reliability over time.",
+      "knowledge_check": {
+        "question": "What is the primary purpose of a validation plan?",
+        "options": [
+          {
+            "text": "To prevent users from accidentally running a workflow on the wrong document type",
+            "correct": false,
+            "explanation": "That's a permissions or UI concern. Validation plans are about output quality, not access control."
+          },
+          {
+            "text": "To define what correct output looks like, test it against samples, and track reliability over time",
+            "correct": true,
+            "explanation": "Correct! A validation plan defines correctness, tests against known documents, and builds a quality history you can track over time."
+          },
+          {
+            "text": "To automatically fix extraction errors before they reach the user",
+            "correct": false,
+            "explanation": "Validation detects problems — it doesn't fix them. You use the results to improve your extraction configuration."
+          },
+          {
+            "text": "To comply with institutional data governance requirements",
+            "correct": false,
+            "explanation": "Validation is about workflow quality, not regulatory compliance. It helps you trust your workflow's output."
+          }
+        ]
+      },
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "validation_qa",
+      "module_title": "Validation & QA",
+      "lesson_number": 2,
+      "lesson_count": 8,
+      "lesson_id": "validation_qa.building-effective-validation-plans",
+      "lesson_revision": 1,
+      "title": "Building effective validation plans",
+      "objective": "After this lesson, you'll be able to design a validation plan that catches the most important failure modes.",
+      "variant": "concept",
+      "content": "Good validation plans check multiple dimensions of quality:\n\n• **Completeness** — Did the workflow extract all expected fields?\n• **Accuracy** — Do extracted values match the known-correct values?\n• **Format** — Are dates in the right format? Are numbers parsed correctly?\n• **Consistency** — When run multiple times, does the workflow produce the same results?\n\nStart with 2-3 high-value checks and expand as you gain confidence.",
+      "knowledge_check": {
+        "question": "A good validation plan checks two foundational dimensions of quality. What are they?",
+        "options": [
+          {
+            "text": "Speed (tokens per second) and cost (dollars per run)",
+            "correct": false,
+            "explanation": "Those are performance metrics, not quality dimensions. A fast, cheap workflow that extracts the wrong data is useless."
+          },
+          {
+            "text": "Completeness (all fields extracted) and accuracy (values are correct)",
+            "correct": true,
+            "explanation": "Correct! Completeness checks that nothing was missed. Accuracy checks that what was extracted is actually right."
+          },
+          {
+            "text": "Model version and prompt version",
+            "correct": false,
+            "explanation": "Those are configuration metadata. Quality checks what the workflow actually produces, not what configuration it uses."
+          },
+          {
+            "text": "Document count and processing time",
+            "correct": false,
+            "explanation": "Those are throughput metrics. Validation is about output quality, not volume or speed."
+          }
+        ]
+      },
+      "diagram": "validation-plan-example",
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "validation_qa",
+      "module_title": "Validation & QA",
+      "lesson_number": 3,
+      "lesson_count": 8,
+      "lesson_id": "validation_qa.set-up-validation-for-your-workflow",
+      "lesson_revision": 1,
+      "title": "Set up validation for your workflow",
+      "objective": "",
+      "variant": "walkthrough",
+      "content": "1. Open your workflow in the editor and go to the Validate tab.\n2. Add validation inputs — paste sample text or select documents.\n3. Create a validation plan with at least 2 quality checks.\n4. Run validation. The system executes your workflow and grades the results.\n5. Review the results: which checks passed, which failed, and why.\n6. Use improvement suggestions to iterate on your extraction.\n7. Check quality history to see how your workflow improves over time.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "validation_qa",
+      "module_title": "Validation & QA",
+      "lesson_number": 4,
+      "lesson_count": 8,
+      "lesson_id": "validation_qa.validation-as-a-safety-net",
+      "lesson_revision": 1,
+      "title": "Validation as a safety net",
+      "objective": "After this lesson, you'll understand when to re-run validation and why it should be set up before a workflow goes into production.",
+      "variant": "insight",
+      "content": "The best time to set up validation is before you need it. When you change your Extraction fields, update a prompt, or when the underlying LLM model is updated, your workflow's behavior might change. If you have a validation plan, you can re-run it immediately to check for regressions.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "validation_qa",
+      "module_title": "Validation & QA",
+      "lesson_number": 5,
+      "lesson_count": 8,
+      "lesson_id": "validation_qa.worked-example-five-checks-and-a-failing-run",
+      "lesson_revision": 1,
+      "title": "Worked example: five checks and a failing run",
+      "objective": "",
+      "variant": "walkthrough",
+      "content": "A validation plan for the Module 1 NSF extractor, and what it caught.\n\n**The checks:**\n1. PI Name equals “Sarah Chen” (exact expected value — we know this document).\n2. Total Budget equals $485,000.\n3. Project Period contains two dates.\n4. Sponsoring Agency is one of: NSF, NIH, DOE, USDA.\n5. No required field is empty.\n\n**Run 1** — 5/5 pass. The score is recorded in quality history.\n\n**Two weeks later** someone “tidies” the field name “Total Budget” to just “Budget”. **Run 2** — check 2 fails: the extraction returned $178,000, the Year 1 amount. Without validation this silently ships to the tracking sheet; with it, the run is flagged the same day, quality history shows exactly when the score dropped, and the fix is a rename.\n\nThe habit to copy: checks 1–2 pin known documents to known answers, 3–4 verify *shape* on any document, 5 catches silent blanks. Five checks, written once — they guard every future run.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "validation_qa",
+      "module_title": "Validation & QA",
+      "lesson_number": 6,
+      "lesson_count": 8,
+      "lesson_id": "validation_qa.trust-signals-quality-tiers-v5-0",
+      "lesson_revision": 1,
+      "title": "Trust signals & quality tiers (v5.0)",
+      "objective": "After this lesson, you'll be able to read a quality badge in chat and know what each score, tier, and alert means.",
+      "variant": "insight",
+      "content": "In Vandalizer 5.0, every validated template carries a trust signal that shows up inline in chat replies. Use it to understand which examples were checked, then inspect the sources for your current result.\n\nThe badge encodes four things:\n\n• **Tier (color)** — `excellent` (green, 90+), `good` (blue, 75–89), `fair` (yellow, 50–74), `poor` (red, <50). Tiers are thresholds over the unified score.\n• **Score (0–100)** — A weighted combination of accuracy (does the extraction match ground truth?) and consistency (do repeated runs produce identical values?).\n• **Grade** — Letter grade assigned at the most recent ValidationRun.\n• **Active alerts** — Unacknowledged QualityAlerts for the template. A critical alert means accuracy dropped below floor; a warning typically means the score is stale.\n\nOpen the badge with a click, tap or keyboard to inspect the available scores, test-case count and last validation date. A score describes the measured examples; it does not certify the current answer.\n\n**What can improve a score:** fewer mismatches with manually checked expected values and more consistent results. Adding representative test cases improves coverage; it can also lower the score by exposing failures.\n\n**What makes a score drop:** consistency failures (same extraction returning different values across runs) or accuracy regressions after a model/prompt change.\n\n**What the LLM can and can't do:** The LLM is told that a result is validated, but it cannot see or fabricate the actual score. The number on the badge comes from stored ValidationRun records, not the model's opinion.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "validation_qa",
+      "module_title": "Validation & QA",
+      "lesson_number": 7,
+      "lesson_count": 8,
+      "lesson_id": "validation_qa.guided-verification-v5-0",
+      "lesson_revision": 1,
+      "title": "Guided verification (v5.0)",
+      "objective": "After this lesson, you'll know how to promote a good extraction into a test case from chat, using the guided verification modal.",
+      "variant": "insight",
+      "content": "Good test cases are the fuel for every quality score. In 5.0, building them is a conversation.\n\n**The flow:**\n1. You run an extraction that looks right — say *\"Extract PI and budget from this proposal.\"*\n2. You tell the agent to promote it: *\"Save this as a test case.\"*\n3. The agent calls `propose_test_case`, which returns a VerificationSession and opens the guided verification modal in the document viewer.\n4. The modal shows each extracted field with its value and a link back to the document passage. You confirm each value or correct it in place.\n5. On save, a persisted test case joins the ground-truth set. Next validation run uses it.\n\n**Why it matters:** Without guided verification, building test cases requires opening every document manually and transcribing correct values — a chore nobody does. Use it to save an extraction as a test case after checking every expected value against its source. Validation may reveal weaknesses as well as improvements; adding a case does not guarantee a higher score.\n\n**When to use it:**\n• An unvalidated template returns a clean result — lock it in as the first test case.\n• A template in the `fair` tier has a weak field — add test cases that specifically exercise that field on documents where it's clear.\n• You're training a new template on a new domain — 3 to 5 test cases from different documents unlock a meaningful score.\n\n**What to watch for:** If the agent proposes a test case and several fields are wrong, don't just correct them silently. Ask *\"Why did these fields fail?\"* — the agent will flag common issues (document format, ambiguous field names, etc.) you can fix in the template itself.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "validation_qa",
+      "module_title": "Validation & QA",
+      "lesson_number": 8,
+      "lesson_count": 8,
+      "lesson_id": "validation_qa.glossary-review",
+      "lesson_revision": 1,
+      "title": "Glossary & Review",
+      "objective": "",
+      "variant": "key-terms",
+      "content": "Validation Plan — The definition of \"correct\" for your workflow. You've now built one: a list of checks that specify what good output looks like. This is what separates a workflow you trust from one you hope works.\n\nValidation Input — The sample documents or text you test your workflow against. Good validation inputs are representative — they should reflect the range of documents the workflow will encounter in production.\n\nValidation Run — An execution of your workflow against validation inputs, automatically graded against your plan. Each run adds a data point to your quality history.\n\nQuality History — A log of validation run scores over time. This is how you detect regressions: if a score drops after you change a field name or update a model, quality history shows you exactly when.\n\nImprovement Suggestions — LLM-generated recommendations for improving extraction accuracy based on which checks failed and why. A starting point for iteration, not a final answer.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": true
+    }
+  },
+  {
+    "tool_name": "get_certification_module",
+    "content": {
+      "module_id": "batch_processing",
+      "title": "Batch Processing",
+      "xp": 250,
+      "completed": false,
+      "stars": 0,
+      "overview": "Run an extraction across multiple documents at once, all from chat. Click **Set Up Lab** to add three sample proposals, then ask the agent to process them in batch and verify the results.",
+      "instructions": [
+        "Work through the lessons here in chat, then ask the assistant to set up the lab — it adds three sample NSF proposals to your workspace.",
+        "Ask: \"List my extraction sets.\" — confirm your NSF Proposal Extractor (from the Foundations module) or similar is available.",
+        "Ask the assistant to run that extraction on proposal-batch-1.pdf, proposal-batch-2.pdf, and proposal-batch-3.pdf together.",
+        "Watch the streaming tool call — a single extraction run covers all documents in the batch.",
+        "Review the combined results table in the chat response.",
+        "Verify all 3 documents completed successfully with correct PI names: Maria Lopez, Robert Kim, Amara Okafor."
+      ],
+      "lesson_titles": [
+        "Single vs. batch execution",
+        "Monitoring and debugging batch runs",
+        "Choosing the right model for batch work",
+        "Run your first batch",
+        "Worked example: thirty proposals, one bad scan",
+        "Glossary & Review"
+      ],
+      "expected_fields": [
+        "PI Name",
+        "Institution",
+        "Total Budget",
+        "Research Area",
+        "Sponsoring Agency"
+      ],
+      "star_criteria": {
+        "1": "Run a batch of 3+ documents with all completing successfully",
+        "2": "Run a batch of 5+ documents",
+        "3": "Run a batch of 10+ documents"
+      },
+      "sample_documents": [
+        "proposal-batch-1.pdf",
+        "proposal-batch-2.pdf",
+        "proposal-batch-3.pdf"
+      ],
+      "provisioned_docs": [],
+      "assessment_keys": [],
+      "assessment_questions": []
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "batch_processing",
+      "module_title": "Batch Processing",
+      "lesson_number": 1,
+      "lesson_count": 6,
+      "lesson_id": "batch_processing.single-vs-batch-execution",
+      "lesson_revision": 1,
+      "title": "Single vs. batch execution",
+      "objective": "After this lesson, you'll understand when and how to use batch mode for large-scale document processing.",
+      "variant": "concept",
+      "content": "So far you've been running workflows on one document at a time. Batch mode lets you process multiple documents in a single operation.\n\nIn batch mode, the workflow runs once per document, sequentially. Each document gets its own WorkflowResult, and you can monitor progress for the entire batch.\n\nThis is the core value proposition of Vandalizer: define a workflow once, validate it, then run it across hundreds of documents with confidence.",
+      "knowledge_check": {
+        "question": "What does batch mode do that single-document mode doesn't?",
+        "options": [
+          {
+            "text": "Uses a more powerful model to produce higher-quality results",
+            "correct": false,
+            "explanation": "Batch mode doesn't change the model. You can choose any model in either mode."
+          },
+          {
+            "text": "Runs the workflow once per selected document, giving each its own result",
+            "correct": true,
+            "explanation": "Correct! Batch mode queues one workflow execution per document. Each run is independent with its own WorkflowResult you can review separately."
+          },
+          {
+            "text": "Skips validation checks to process documents faster",
+            "correct": false,
+            "explanation": "Batch mode doesn't skip validation. It just applies the workflow across multiple documents automatically."
+          },
+          {
+            "text": "Merges the output of all documents into a single combined result",
+            "correct": false,
+            "explanation": "Each document gets its own result. Merging outputs is a workflow design choice, not something batch mode does automatically."
+          }
+        ]
+      },
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "batch_processing",
+      "module_title": "Batch Processing",
+      "lesson_number": 2,
+      "lesson_count": 6,
+      "lesson_id": "batch_processing.monitoring-and-debugging-batch-runs",
+      "lesson_revision": 1,
+      "title": "Monitoring and debugging batch runs",
+      "objective": "",
+      "variant": "concept",
+      "content": "When running a batch:\n\n• **Real-time progress** — The UI shows which document is currently processing.\n• **Per-document results** — Each document's result is stored independently.\n• **Error handling** — Common failures include documents that are too long, unexpected formats, or missing expected fields.\n\nAlways test your workflow on a single document before running a batch.",
+      "knowledge_check": {
+        "question": "What should you always do before running a batch?",
+        "options": [
+          {
+            "text": "Export your workflow as a .vandalizer.json file for backup",
+            "correct": false,
+            "explanation": "Exporting is useful for sharing, but not a prerequisite for batch runs."
+          },
+          {
+            "text": "Increase the model's context window to handle larger documents",
+            "correct": false,
+            "explanation": "Context window is a model property you can't configure directly. The right prep step is validating your workflow works on a sample."
+          },
+          {
+            "text": "Test the workflow on a single document first to confirm it works",
+            "correct": true,
+            "explanation": "Correct! Always validate with a single document before scaling up. Debugging a batch of 200 failed runs is much harder than fixing one."
+          },
+          {
+            "text": "Create a validation plan with at least 5 checks",
+            "correct": false,
+            "explanation": "A validation plan is a good practice, but the essential step is a single-document test run to confirm the workflow produces usable output."
+          }
+        ]
+      },
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "batch_processing",
+      "module_title": "Batch Processing",
+      "lesson_number": 3,
+      "lesson_count": 6,
+      "lesson_id": "batch_processing.choosing-the-right-model-for-batch-work",
+      "lesson_revision": 1,
+      "title": "Choosing the right model for batch work",
+      "objective": "",
+      "variant": "insight",
+      "content": "Model selection matters more for batch processing because costs and time multiply across documents. Consider speed, cost, accuracy, and data privacy tradeoffs.\n\nYou can override the model per-workflow or per-task. Consider using a faster model for format/prompt steps and a more capable model for extraction steps.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "batch_processing",
+      "module_title": "Batch Processing",
+      "lesson_number": 4,
+      "lesson_count": 6,
+      "lesson_id": "batch_processing.run-your-first-batch",
+      "lesson_revision": 1,
+      "title": "Run your first batch",
+      "objective": "",
+      "variant": "walkthrough",
+      "content": "1. Ensure you have a workflow that works reliably on a single document.\n2. Upload at least 3 documents of the same type to your workspace.\n3. Select all 3 documents, then open your workflow.\n4. Choose \"Batch\" mode.\n5. Start the batch. Watch the real-time progress.\n6. When complete, review the results for each document.\n7. If any failed, inspect the error, fix the issue, and re-run just the failed documents.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "batch_processing",
+      "module_title": "Batch Processing",
+      "lesson_number": 5,
+      "lesson_count": 6,
+      "lesson_id": "batch_processing.worked-example-thirty-proposals-one-bad-scan",
+      "lesson_revision": 1,
+      "title": "Worked example: thirty proposals, one bad scan",
+      "objective": "",
+      "variant": "walkthrough",
+      "content": "Proposal deadline week: 30 PDFs to triage into the tracking sheet.\n\n**Setup** — Select all 30 documents, pick the proposal extractor, run as a batch. Each document gets its own independent run — same workflow, 30 separate results.\n\n**Monitoring** — The batch view fills in: 28 complete, then 29… and one sits at *error*. Proposal #17 is a scanned image with garbled text — the extraction returned mostly empty fields.\n\n**The part worth copying** — nothing about the other 29 is blocked or redone. Their results export to CSV now. #17 gets handled alone: re-uploaded so the text can be read properly, then re-run — one document, not thirty-one.\n\n**Spot-check before you trust** — open three results at random against their PDFs. Budgets match, one “Project Period” picked up the submission date instead — noted, corrected, and a candidate for a validation check so it’s caught automatically next deadline.\n\nThis is an illustrative scenario, not a measured time-saving result. Compare task time and source-checking errors on your own representative documents before adopting the batch process.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "batch_processing",
+      "module_title": "Batch Processing",
+      "lesson_number": 6,
+      "lesson_count": 6,
+      "lesson_id": "batch_processing.glossary-review",
+      "lesson_revision": 1,
+      "title": "Glossary & Review",
+      "objective": "",
+      "variant": "key-terms",
+      "content": "Batch Mode — You've now run a workflow across multiple documents in one operation. In batch mode, the workflow executes once per document — each run independent, each result stored separately. This is the core of what makes Vandalizer useful at scale.\n\nBatch ID — A unique identifier for the batch run. All documents processed in the same batch share this ID, making it easy to find and review the full set of results.\n\nSession ID — Each individual document execution within a batch has its own session ID. Use it when you need to review or debug a specific document's result.\n\nBatch Status — The aggregated view: how many documents completed successfully, how many failed, and how many are still in progress. Check this to know when your batch is done and whether anything needs reprocessing.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": true
+    }
+  },
+  {
+    "tool_name": "get_certification_module",
+    "content": {
+      "module_id": "governance",
+      "title": "Governance",
+      "xp": 300,
+      "completed": false,
+      "stars": 0,
+      "overview": "Make your team's work discoverable: share workflows with everyone, have an examiner check them, and cite them from every chat. This module uses workflows you've already built — no new documents needed.",
+      "instructions": [
+        "Work through the lessons here in chat. This module uses workflows you've already built — no new documents needed.",
+        "If you don't already have multiple spaces, create a second space from the Spaces page.",
+        "Ask the assistant to build or duplicate a workflow in your second space.",
+        "Ensure your workflow has a clear description explaining what it does.",
+        "Submit the workflow for verification — this completes the module. An examiner reviews it later; you don't wait on that to finish your certification.",
+        "Try exporting the workflow as a .vandalizer.json file and importing it into another space.",
+        "You now have a submitted, portable, well-documented workflow."
+      ],
+      "lesson_titles": [
+        "Organizing for reuse",
+        "Sharing with everyone",
+        "Sharing workflows across teams",
+        "Establish your workflow governance",
+        "Building a culture of reuse",
+        "Worked example: one workflow, two offices",
+        "Glossary & Review"
+      ],
+      "expected_fields": [],
+      "star_criteria": {
+        "1": "Share a workflow with everyone",
+        "2": "Have 1+ shared workflow accepted by an examiner (Checked)",
+        "3": "Have 2+ shared workflows accepted by an examiner (Checked)"
+      },
+      "sample_documents": [],
+      "provisioned_docs": [],
+      "assessment_keys": [],
+      "assessment_questions": []
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "governance",
+      "module_title": "Governance",
+      "lesson_number": 1,
+      "lesson_count": 7,
+      "lesson_id": "governance.organizing-for-reuse",
+      "lesson_revision": 1,
+      "title": "Organizing for reuse",
+      "objective": "After this lesson, you'll understand the three tiers of workflow organization and when to use each.",
+      "variant": "concept",
+      "content": "As your team builds more workflows, organization becomes critical. Use personal work for drafting, then move the workflows your team should reuse into shared team libraries, and share the ones the whole institution could use with everyone.\n\nThink about organization in terms of ownership and audience:\n• **Personal work** — early drafts, experiments, and one-off variations.\n• **Team libraries** — shared workflows your group actively maintains.\n• **Everyone** — workflows an examiner has checked over and shared with everyone at your institution, with a measured score attached.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "governance",
+      "module_title": "Governance",
+      "lesson_number": 2,
+      "lesson_count": 7,
+      "lesson_id": "governance.sharing-with-everyone",
+      "lesson_revision": 1,
+      "title": "Sharing with everyone",
+      "objective": "After this lesson, you'll know what a \"Checked\" shared entry does and doesn't promise, and how to read one.",
+      "variant": "concept",
+      "content": "Sharing with everyone has two halves. You ask to share a workflow; an examiner checks it over and accepts it. The **Checked** badge on the shared entry then tells a colleague four measured things:\n\n1. **Score** — how it did on its validation cases, and how many cases that was.\n2. **Consistency** — whether it gave the same answers across repeated runs.\n3. **Adoption** — how many people already use it.\n4. **When it was last checked** — monitoring re-runs the baseline and flags a drop.\n\nWhat it does *not* claim: that the output format fits your team, or that it is \"production-ready\" for your process. Those are your calls to make from the numbers — which is why the numbers, not the badge, are the point. A workflow at 84% that four colleagues rely on is a good candidate; a perfect score nobody uses tells you less.\n\nSharing is the part you control, and it's what completes this module. Examiner review happens on its own schedule — you'll get a notification when it lands.",
+      "knowledge_check": {
+        "question": "What does a \"Checked\" shared entry actually tell you?",
+        "options": [
+          {
+            "text": "The workflow is locked and cannot be edited by other team members",
+            "correct": false,
+            "explanation": "Checked is not a lock. Anyone can copy a shared item and edit their copy."
+          },
+          {
+            "text": "An examiner looked it over, and its score, consistency and adoption are shown so you can judge fit yourself",
+            "correct": true,
+            "explanation": "Correct. Checked means someone looked at it and it was measured, not endorsed for every use. The numbers on the entry are what you decide from."
+          },
+          {
+            "text": "The workflow was created by an admin-level user",
+            "correct": false,
+            "explanation": "Any team member can ask to share a workflow with everyone. An examiner looks it over and accepts it based on the workflow's quality, not the creator's role."
+          },
+          {
+            "text": "The workflow only uses LLM models approved by your institution",
+            "correct": false,
+            "explanation": "Model approval is a separate concern. Checked is about the look-over and the measurements, not the model."
+          }
+        ]
+      },
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "governance",
+      "module_title": "Governance",
+      "lesson_number": 3,
+      "lesson_count": 7,
+      "lesson_id": "governance.sharing-workflows-across-teams",
+      "lesson_revision": 1,
+      "title": "Sharing workflows across teams",
+      "objective": "",
+      "variant": "concept",
+      "content": "Workflows can be shared in two ways:\n\n• **Within the same team** — Duplicate or adapt workflows inside the team workspace and library.\n• **Cross-team sharing via export/import** — Export a workflow as a .vandalizer.json file. Send it to a colleague, who can import it.\n\nShared, checked workflows that teams reuse are how organizational standards form.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "governance",
+      "module_title": "Governance",
+      "lesson_number": 4,
+      "lesson_count": 7,
+      "lesson_id": "governance.establish-your-workflow-governance",
+      "lesson_revision": 1,
+      "title": "Establish your workflow governance",
+      "objective": "",
+      "variant": "walkthrough",
+      "content": "1. Pick a workflow that is ready to share beyond your personal work.\n2. Build or duplicate that workflow into the team context where others should reuse it.\n3. Make sure your workflow has a clear description.\n4. If you completed Module 8, ensure your validation plan passes — its score is what the shared entry will show.\n5. Share the workflow with everyone (⋯ → Share with everyone). That completes this module — an examiner looks it over on their own schedule, and your certification does not wait on them.\n6. Try exporting and importing the workflow.\n7. You now have a submitted, portable, well-documented workflow.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "governance",
+      "module_title": "Governance",
+      "lesson_number": 5,
+      "lesson_count": 7,
+      "lesson_id": "governance.building-a-culture-of-reuse",
+      "lesson_revision": 1,
+      "title": "Building a culture of reuse",
+      "objective": "",
+      "variant": "insight",
+      "content": "The highest-performing teams draw on the pool of checked, shared workflows that cover common document types, then adapt and extend them as needed.\n\nBy completing this module, you've demonstrated every skill in the Vandal Workflow Architect program: understanding AI, decomposing processes, designing pipelines, building extractions, chaining multi-step workflows, using advanced nodes, producing deliverables, validating quality, processing at scale, and governing shared workflows.\n\nYou're now a certified VWA — the person on your team who knows how to turn any document-heavy process into a reliable, AI-powered pipeline. That's a rare and valuable skill.",
+      "knowledge_check": {
+        "question": "Your workflow passes its validation plan from Module 8. A colleague asks whether that makes it \"Checked\". What's the difference?",
+        "options": [
+          {
+            "text": "They are the same thing — passing validation makes a workflow Checked",
+            "correct": false,
+            "explanation": "Validation is a test you run on your own workflow. Checked only appears after you share it with everyone and an examiner accepts it."
+          },
+          {
+            "text": "Validation is your own test: its cases and the score it gets on them. Checked means you shared it with everyone and an examiner accepted it, and the shared entry shows that score to others",
+            "correct": true,
+            "explanation": "Correct. Validation measures the workflow; Checked is what a shared entry carries once an examiner has looked it over. The score on a Checked entry comes from the validation cases."
+          },
+          {
+            "text": "Checked replaces validation — once an examiner accepts the workflow, its validation cases no longer matter",
+            "correct": false,
+            "explanation": "The cases are where the score on a Checked entry comes from, and monitoring re-runs them to flag a drop. Checked does not retire them."
+          },
+          {
+            "text": "Checked means an examiner certified the workflow as production-ready for every team",
+            "correct": false,
+            "explanation": "Checked makes no production-ready claim. It says the workflow was looked over and measured; whether it fits your process is your call, from the numbers."
+          }
+        ]
+      },
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "governance",
+      "module_title": "Governance",
+      "lesson_number": 6,
+      "lesson_count": 7,
+      "lesson_id": "governance.worked-example-one-workflow-two-offices",
+      "lesson_revision": 1,
+      "title": "Worked example: one workflow, two offices",
+      "objective": "",
+      "variant": "walkthrough",
+      "content": "The pre-award office builds “Subaward Intake” and it works well. The post-award office hears about it. What happens next decides whether this becomes shared infrastructure or a rumor.\n\n**Without governance** — someone emails a description, post-award rebuilds it from memory as “subaward_test_v2_FINAL”, the two copies drift, and six months later nobody knows which extracts the right indirect-cost field.\n\n**With the practices from this module** —\n1. The workflow is named to say what it does: “Subaward Intake — Terms & Deviations”, with a description naming its expected input.\n2. It’s shared to the team library — one copy, visible to both offices.\n3. It’s shared with everyone, and an examiner looks it over against a real agreement and accepts it — the entry now carries its score, how consistent it is, and how many people use it.\n4. Post-award improves the deviation prompt — in the shared copy, so pre-award benefits the same day.\n\nThe rule of thumb it illustrates: share the workflow, not a description of it — and let the shared entry’s score and adoption, not word of mouth, show which copy is the one to use.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": false
+    }
+  },
+  {
+    "tool_name": "get_certification_lesson",
+    "content": {
+      "module_id": "governance",
+      "module_title": "Governance",
+      "lesson_number": 7,
+      "lesson_count": 7,
+      "lesson_id": "governance.glossary-review",
+      "lesson_revision": 1,
+      "title": "Glossary & Review",
+      "objective": "",
+      "variant": "key-terms",
+      "content": "Personal work — Workflows and resources that only you can see and edit. The right place for experiments, drafts, and one-off variations. Graduate your best work to the team context when it's ready to share.\n\nValidation — Your own test of a workflow (Module 8): cases with expected answers, and the score it gets on them. It measures the workflow; on its own it doesn't make anything Checked.\n\nChecked — The badge on a shared entry. You've now asked to share a workflow with everyone; once an examiner accepts it, the entry carries its score, how many cases that was measured on, its consistency across runs, and how many people use it. It says the item was looked at and measured — not that it fits every team's process. Not a technical lock.\n\nExport (.vandalizer.json) — A portable file containing your workflow's complete definition: steps, tasks, field configurations, prompts. It can be imported into any Vandalizer instance and is the standard format for cross-team sharing.\n\nTeam — A group of users who share access to team workflows, libraries, and folders. Members have roles: owner, admin, or member. Shared workflows your team adopts become the standards you build on.",
+      "knowledge_check": null,
+      "diagram": null,
+      "is_last": true
+    }
+  }
+]

@@ -39,8 +39,9 @@ interface OptimizationProgressCardProps<TConfig> {
   scoreFloorLabel?: string
   /** Description for the score-floor sub-card. Default explains the baseline concept. */
   scoreFloorDescription?: string
-  /** Suffix on best-so-far lift readout. Default "vs baseline". */
-  liftLabel?: string
+  /** What the best-so-far score is compared against, e.g. "no custom
+   *  settings". The readout says "N pts better than" / "N pts worse than" it. */
+  baselineName?: string
   /** Heading on the token-spend progress bar. Default "Token budget". Set to
    *  e.g. "Judge spend" when the tracked tokens are only one slice of the
    *  total cost so users aren't misled into reading the bar as total spend. */
@@ -52,10 +53,15 @@ export function OptimizationProgressCard<TConfig>({
   runningLabel = 'Optimization running',
   queuedLabel = 'Optimization queued',
   scoreFloorLabel = 'Score to beat (baseline)',
-  scoreFloorDescription = 'How well the system performs without this optimization — the result needs to clear this bar.',
-  liftLabel = 'vs baseline',
+  scoreFloorDescription = 'How well the system performs without this optimization. The result needs to clear this bar.',
+  baselineName = 'the baseline',
   tokensBarLabel = 'Token budget',
 }: OptimizationProgressCardProps<TConfig>) {
+  // Between the two whole percents shown, so "88%" against "91%" is 3 pts.
+  const floorGap = run.best_score_so_far != null && scoreFloor != null
+    ? Number((run.best_score_so_far * 100).toFixed(0)) - Number((scoreFloor * 100).toFixed(0))
+    : null
+  const aheadOfFloor = floorGap != null && floorGap > 0
   const trialPct = run.total_trials_planned > 0
     ? (run.current_trial_index / run.total_trials_planned) * 100
     : 0
@@ -70,29 +76,30 @@ export function OptimizationProgressCard<TConfig>({
   const elapsedSeconds = useElapsedSeconds(run.elapsed_seconds, run.started_at, run.status)
 
   return (
-    <div role="status" aria-live="polite" style={{
-      padding: 16, background: 'linear-gradient(135deg, #1a1f2e 0%, #1f1f1f 100%)',
-      border: '1px solid rgba(124, 58, 237, 0.3)', borderRadius: 8,
+    <div style={{
+      padding: 'var(--workspace-space-16)', background: 'var(--workspace-canvas)',
+      border: '1px solid rgba(124, 58, 237, 0.3)', borderRadius: 'var(--workspace-radius-medium)',
     }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <Loader2 size={16} aria-hidden="true" style={{ color: '#a78bfa', animation: 'spin 1s linear infinite' }} />
-        <span style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>
+      <span className="sr-only" role="status" aria-atomic="true">{run.status === 'queued' ? queuedLabel : runningLabel}. {run.phase}{run.cancel_requested ? '. Cancellation requested.' : ''}</span>
+      {/* Timer, token counters and trial streaming are deliberately outside the live region. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-12)' }}>
+        <Loader2 size={16} aria-hidden="true" style={{ color: 'var(--workspace-info)', animation: 'spin 1s linear infinite' }} />
+        <span style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: 'var(--workspace-text)' }}>
           {run.status === 'queued' ? queuedLabel : runningLabel}
         </span>
         {elapsedSeconds != null && (
           <span style={{
-            marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4,
-            fontSize: 11, color: '#9ca3af', fontVariantNumeric: 'tabular-nums',
+            marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+            fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', fontVariantNumeric: 'tabular-nums',
           }}>
             <Clock size={11} style={{ color: '#6b7280' }} />
             {formatElapsed(elapsedSeconds)}
           </span>
         )}
         <span style={{
-          marginLeft: elapsedSeconds != null ? 0 : 'auto', fontSize: 10, fontWeight: 600,
-          padding: '2px 8px', borderRadius: 8,
-          color: '#a78bfa', backgroundColor: 'rgba(124, 58, 237, 0.15)',
+          marginLeft: elapsedSeconds != null ? 0 : 'auto', fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
+          padding: "var(--workspace-space-2) var(--workspace-space-8)", borderRadius: 'var(--workspace-radius-medium)',
+          color: 'var(--workspace-info)', backgroundColor: 'rgba(124, 58, 237, 0.15)',
         }}>
           {run.phase}
         </span>
@@ -100,9 +107,9 @@ export function OptimizationProgressCard<TConfig>({
 
       {/* Progress message */}
       <div style={{
-        padding: '10px 12px', marginBottom: 12,
-        backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 6,
-        fontSize: 12, color: '#ddd', minHeight: 20,
+        padding: "var(--workspace-space-12) var(--workspace-space-12)", marginBottom: 'var(--workspace-space-12)',
+        backgroundColor: 'var(--workspace-surface)', borderRadius: 'var(--workspace-radius-small)',
+        fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)', minHeight: 20,
       }}>
         {run.progress_message || 'Initializing…'}
       </div>
@@ -113,7 +120,7 @@ export function OptimizationProgressCard<TConfig>({
           label="Trials"
           subtitle={`${run.current_trial_index} of ${run.total_trials_planned}`}
           pct={trialPct}
-          color="#a78bfa"
+          color="var(--workspace-info)"
         />
       )}
       {/* Tokens bar — only when a budget was set. Without a budget the bar
@@ -124,31 +131,31 @@ export function OptimizationProgressCard<TConfig>({
           label={tokensBarLabel}
           subtitle={`${formatTokens(run.tokens_used)} / ${formatTokens(run.token_budget)}`}
           pct={tokenPct}
-          color={tokenPct > 90 ? '#f59e0b' : '#3b82f6'}
+          color={tokenPct > 90 ? 'var(--workspace-warning)' : '#3b82f6'}
         />
       )}
 
       {/* Score floor (no-tool / no-KB / no-workflow baseline) */}
       {scoreFloor != null && (
         <div style={{
-          marginTop: 12, padding: '10px 12px',
-          display: 'flex', alignItems: 'center', gap: 10,
+          marginTop: 'var(--workspace-space-12)', padding: "var(--workspace-space-12) var(--workspace-space-12)",
+          display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)',
           backgroundColor: 'rgba(245, 158, 11, 0.08)',
-          border: '1px solid rgba(245, 158, 11, 0.25)', borderRadius: 6,
+          border: '1px solid rgba(245, 158, 11, 0.25)', borderRadius: 'var(--workspace-radius-small)',
         }}>
-          <Target size={16} style={{ color: '#f59e0b', flexShrink: 0 }} />
+          <Target size={16} style={{ color: 'var(--workspace-warning)', flexShrink: 0 }} />
           <div style={{ flex: 1 }}>
             <div style={{
-              fontSize: 10, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: 0.5,
-              marginBottom: 2,
+              fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-warning)', textTransform: 'uppercase', letterSpacing: 0.5,
+              marginBottom: 'var(--workspace-space-2)',
             }}>
               {scoreFloorLabel}
             </div>
-            <div style={{ fontSize: 11, color: '#aaa' }}>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
               {scoreFloorDescription}
             </div>
           </div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: '#fff' }}>
+          <div style={{ fontSize: 'var(--workspace-font-page-title)', fontWeight: 700, color: 'var(--workspace-text)' }}>
             {(scoreFloor * 100).toFixed(0)}%
           </div>
         </div>
@@ -157,29 +164,27 @@ export function OptimizationProgressCard<TConfig>({
       {/* Best-so-far */}
       {run.best_score_so_far != null && (
         <div style={{
-          marginTop: 12, padding: '10px 12px',
-          backgroundColor: 'rgba(34, 197, 94, 0.08)',
-          border: '1px solid rgba(34, 197, 94, 0.25)', borderRadius: 6,
+          marginTop: 'var(--workspace-space-12)', padding: "var(--workspace-space-12) var(--workspace-space-12)",
+          backgroundColor: aheadOfFloor ? 'rgba(34, 197, 94, 0.08)' : 'var(--workspace-canvas)',
+          border: `1px solid ${aheadOfFloor ? 'rgba(34, 197, 94, 0.25)' : 'var(--workspace-border)'}`, borderRadius: 'var(--workspace-radius-small)',
         }}>
           <div style={{
-            fontSize: 10, color: '#22c55e', textTransform: 'uppercase', letterSpacing: 0.5,
-            marginBottom: 2,
+            fontSize: 'var(--workspace-font-meta)', color: aheadOfFloor ? 'var(--workspace-success)' : 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5,
+            marginBottom: 'var(--workspace-space-2)',
           }}>
-            <Sparkles size={10} style={{ display: 'inline', marginRight: 4 }} />
+            <Sparkles size={10} style={{ display: 'inline', marginRight: 'var(--workspace-space-4)' }} />
             Best so far
-            {scoreFloor != null && (
-              <span style={{ marginLeft: 8, color: '#888', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
-                {run.best_score_so_far > scoreFloor
-                  ? `+${((run.best_score_so_far - scoreFloor) * 100).toFixed(0)}pp ${liftLabel}`
-                  : `${((run.best_score_so_far - scoreFloor) * 100).toFixed(0)}pp ${liftLabel}`}
+            {floorGap != null && (
+              <span style={{ marginLeft: 'var(--workspace-space-8)', color: 'var(--workspace-muted)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
+                {describeGap(floorGap, baselineName)}
               </span>
             )}
           </div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: '#fff' }}>
+          <div style={{ fontSize: 'var(--workspace-font-section-title)', fontWeight: 700, color: 'var(--workspace-text)' }}>
             {(run.best_score_so_far * 100).toFixed(0)}%
           </div>
           {run.best_config_so_far && (
-            <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginTop: 'var(--workspace-space-2)' }}>
               {summariseConfig(run.best_config_so_far)}
             </div>
           )}
@@ -188,16 +193,16 @@ export function OptimizationProgressCard<TConfig>({
 
       {/* Recent trials mini-list */}
       {run.trials.length > 0 && (
-        <div style={{ marginTop: 12 }}>
-          <div style={{ fontSize: 10, color: '#666', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+        <div style={{ marginTop: 'var(--workspace-space-12)' }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 'var(--workspace-space-6)' }}>
             Recent trials
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)' }}>
             {run.trials.slice(-5).reverse().map(t => (
               <div key={t.trial_id} style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                padding: '5px 8px', fontSize: 11, color: '#aaa',
-                backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: 4,
+                display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)',
+                padding: "var(--workspace-space-6) var(--workspace-space-8)", fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)',
+                backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: 'var(--workspace-radius-small)',
               }}>
                 <span style={{
                   width: 6, height: 6, borderRadius: '50%',
@@ -206,7 +211,7 @@ export function OptimizationProgressCard<TConfig>({
                 <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {summariseConfig(t.config)}
                 </span>
-                <span style={{ fontWeight: 600, color: '#e5e5e5' }}>
+                <span style={{ fontWeight: 600, color: 'var(--workspace-text)' }}>
                   {(t.score * 100).toFixed(0)}%
                 </span>
               </div>
@@ -216,17 +221,17 @@ export function OptimizationProgressCard<TConfig>({
       )}
 
       {/* Cancel */}
-      <div style={{ marginTop: 14, display: 'flex', justifyContent: 'flex-end' }}>
+      <div style={{ marginTop: 'var(--workspace-space-16)', display: 'flex', justifyContent: 'flex-end' }}>
         <button
           onClick={onCancel}
           disabled={cancelling || run.cancel_requested}
           style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            padding: '5px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
-            color: run.cancel_requested ? '#666' : '#fca5a5',
+            display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+            padding: "var(--workspace-space-6) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+            color: run.cancel_requested ? 'var(--workspace-muted)' : 'var(--workspace-danger)',
             backgroundColor: 'transparent',
-            border: '1px solid ' + (run.cancel_requested ? '#444' : 'rgba(239, 68, 68, 0.3)'),
-            borderRadius: 5,
+            border: '1px solid ' + (run.cancel_requested ? 'var(--workspace-border)' : 'rgba(239, 68, 68, 0.3)'),
+            borderRadius: 'var(--workspace-radius-small)',
             cursor: cancelling || run.cancel_requested ? 'not-allowed' : 'pointer',
           }}
         >
@@ -331,4 +336,13 @@ function useElapsedSeconds(
 
   if (!active || !hasAnchor) return null
   return elapsed
+}
+
+
+/** "3 pts better than X" / "3 pts worse than X" / "same as X". A run that
+ *  trailed showed "88% · −3pp better than no custom settings" in green. */
+export function describeGap(pts: number, baselineName: string): string {
+  if (pts === 0) return `same as ${baselineName}`
+  const n = Math.abs(pts)
+  return `${n} ${n === 1 ? 'pt' : 'pts'} ${pts > 0 ? 'better' : 'worse'} than ${baselineName}`
 }

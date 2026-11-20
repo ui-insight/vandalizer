@@ -32,6 +32,19 @@ describe('normalizeWithMap', () => {
     expect(norm).toBe('cooperative plan')
   })
 
+  it('lets a quote taken from the markdown text match the PDF text layer', () => {
+    // Support ticket: Inspect source on FOA Number showed "passage not matched".
+    const pdfText = 'Funding Opportunity\nFOA Number: PA-23-152 Parent R01'
+    for (const quote of ['**FOA Number:** PA-23-152', '## FOA Number: PA-23-152', '| FOA Number: | `PA-23-152` |']) {
+      const needle = normalizeWithMap(quote).norm
+      expect(needle).toBe('foa number: pa-23-152')
+      const doc = normalizeWithMap(pdfText)
+      const at = doc.norm.indexOf(needle)
+      expect(at).toBeGreaterThan(-1)
+      expect(pdfText.slice(doc.map[at], doc.map[at + needle.length - 1] + 1)).toBe('FOA Number: PA-23-152')
+    }
+  })
+
   it('lets an LLM-quoted passage match a PDF text layer with different punctuation', () => {
     const pdfText = 'In the event of any inconsistency among the terms — “precedence” applies.'
     const quote = 'the terms - "precedence" applies.'

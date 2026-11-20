@@ -12,8 +12,11 @@ initialized Beanie connection (field-expression queries need one otherwise).
 import datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
+import pytest
 
 from app.services import certification_service as cs
+
+pytestmark = pytest.mark.usefixtures('certification_rubric')
 
 
 def _query(items):
@@ -95,7 +98,8 @@ async def test_validate_batch_processing_passes_on_completed_batch_of_three():
         SimpleNamespace(batch_id="b1", status="completed", workflow="wf-1"),
     ]
     with patch.object(cs, "Workflow", _model(workflows)), \
-         patch.object(cs, "WorkflowResult", _model(batch)):
+         patch.object(cs, "WorkflowResult", _model(batch)), \
+         patch("app.models.activity.ActivityEvent", _model([])):
         result = await cs._validate_batch_processing("user-1")
     assert result["passed"] is True
     assert all(c["passed"] for c in result["checks"])
@@ -105,7 +109,8 @@ async def test_validate_batch_processing_no_workflows_does_not_raise():
     # The original bug raised AttributeError here; now it returns a clean
     # "not passed" result instead of a 500.
     with patch.object(cs, "Workflow", _model([])), \
-         patch.object(cs, "WorkflowResult", _model([])):
+         patch.object(cs, "WorkflowResult", _model([])), \
+         patch("app.models.activity.ActivityEvent", _model([])):
         result = await cs._validate_batch_processing("user-1")
     assert result["passed"] is False
     assert result["stars"] == 0
@@ -119,12 +124,24 @@ async def test_validate_batch_processing_fails_when_a_doc_did_not_complete():
         SimpleNamespace(batch_id="b1", status="queued", workflow="wf-1"),
     ]
     with patch.object(cs, "Workflow", _model(workflows)), \
-         patch.object(cs, "WorkflowResult", _model(batch)):
+         patch.object(cs, "WorkflowResult", _model(batch)), \
+         patch("app.models.activity.ActivityEvent", _model([])):
         result = await cs._validate_batch_processing("user-1")
     # Batch size of 3 passes the first check, but "All succeeded" fails.
     all_ok = next(c for c in result["checks"] if c["name"] == "All succeeded")
     assert all_ok["passed"] is False
     assert result["passed"] is False
+
+
+async def test_validate_batch_processing_counts_chat_driven_run():
+    # A single chat extraction (SEARCH_SET_RUN activity) across 3+ documents
+    # counts as a batch even with no workflow batches at all.
+    events = [SimpleNamespace(documents_touched=3)]
+    with patch.object(cs, "Workflow", _model([])), \
+         patch.object(cs, "WorkflowResult", _model([])), \
+         patch("app.models.activity.ActivityEvent", _model(events)):
+        result = await cs._validate_batch_processing("user-1")
+    assert result["passed"] is True
 
 
 def _batch(batch_id: str, statuses: list[str], day: int) -> list[SimpleNamespace]:
@@ -135,9 +152,15 @@ def _batch(batch_id: str, statuses: list[str], day: int) -> list[SimpleNamespace
     ]
 
 
-async def _grade_batches(results):
+async def _grade_batches(results, events=()):
+    # The frozen legacy-2026-10-02.1 package keeps the grader it was preserved
+    # with, weaknesses included (see certification-data/courses/README.md), so
+    # the retry fix applies to the live grader only.
+    if cs.__name__ != "app.services.certification_service":
+        pytest.skip("preserved course package keeps its original batch grading")
     with patch.object(cs, "Workflow", _model([SimpleNamespace(id="wf-1")])), \
-         patch.object(cs, "WorkflowResult", _model(results)):
+         patch.object(cs, "WorkflowResult", _model(results)), \
+         patch("app.models.activity.ActivityEvent", _model(list(events))):
         return await cs._validate_batch_processing("user-1")
 
 
@@ -173,6 +196,17 @@ async def test_batch_stars_come_from_the_largest_fully_successful_batch():
     assert result["stars"] == 2
 
 
+async def test_batch_failed_chat_run_counts_as_the_most_recent_batch():
+    ok = _batch("b1", ["completed"] * 3, day=10)
+    chat_failed = SimpleNamespace(documents_touched=3, status="failed", started_at=datetime.datetime(2026, 11, 12))
+    result = await _grade_batches(ok, [chat_failed])
+    assert result["passed"] is False
+
+    chat_retry = SimpleNamespace(documents_touched=3, status="completed", started_at=datetime.datetime(2026, 11, 13, tzinfo=datetime.timezone.utc))
+    result = await _grade_batches(ok, [chat_failed, chat_retry])
+    assert result["passed"] is True
+
+
 async def test_batch_still_running_is_not_judged_yet():
     # Checking while a new batch runs must not say "fix the problem".
     ok = _batch("b1", ["completed"] * 3, day=10)
@@ -184,3 +218,12 @@ async def test_batch_still_running_is_not_judged_yet():
     assert result["passed"] is False
     all_ok = next(c for c in result["checks"] if c["name"] == "All succeeded")
     assert all_ok["detail"] == "Your batch is still running; check again when it finishes"
+
+
+async def test_batch_chat_run_that_raised_counts_at_its_started_size():
+    # A run that raises is finished before documents_touched is written; its
+    # document titles were recorded when it started.
+    ok = _batch("b1", ["completed"] * 3, day=10)
+    crashed = SimpleNamespace(documents_touched=0, document_titles=["a.pdf", "b.pdf", "c.pdf"], status="failed", started_at=datetime.datetime(2026, 11, 12))
+    result = await _grade_batches(ok, [crashed])
+    assert result["passed"] is False

@@ -1,4 +1,5 @@
 import { apiFetch, rawFetch } from './client'
+import { filenameFromDisposition } from '../utils/contentDisposition'
 import type { Folder } from '../types/document'
 
 export function createFolder(data: { name: string; parent_id: string; folder_type?: string }) {
@@ -30,9 +31,7 @@ export async function exportFolder(folderUuid: string, fallbackName = 'folder') 
   const res = await rawFetch(`/api/folders/${folderUuid}/export`)
   if (!res.ok) throw new Error('Export failed')
   // Honor the server-provided filename, falling back to the folder title.
-  const disposition = res.headers.get('Content-Disposition') || ''
-  const match = disposition.match(/filename="?([^"]+)"?/)
-  const filename = match?.[1] || `${fallbackName}.zip`
+  const filename = filenameFromDisposition(res.headers.get('Content-Disposition'), `${fallbackName}.zip`)
   const blob = await res.blob()
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')

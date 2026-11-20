@@ -1,35 +1,49 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { hasOutcomeAssessment } from '../../lib/certificationAssessment'
+import { ModuleOutcomePreview } from './ModuleOutcomePreview'
+import type { ReadinessIdentity } from '../../api/moduleReadiness'
 import {
   BookOpen,
-  Check,
-  CheckCircle2,
   ChevronDown,
   ChevronRight,
   FlaskConical,
   Lightbulb,
-  Loader2,
   Star,
   Target,
-  Upload,
   Zap,
 } from 'lucide-react'
 import { cn } from '../../lib/cn'
+import { renderCertificationMarkdown } from '../../lib/certificationMarkdown'
 import { useToast } from '../../contexts/ToastContext'
-import type { ModuleDefinition, CertExercise } from '../../types/certification'
+import type { ModuleDefinition, CertExercise, OutcomeCompletionSelection } from '../../types/certification'
 import { ICON_MAP } from './constants'
 import { SelfAssessment, MODULE_ASSESSMENTS } from './SelfAssessment'
 import { LessonStepper } from './LessonStepper'
+import { EditorialCorrection } from './EditorialCorrection'
+import { ScenarioAssessment } from './ScenarioAssessment'
+import { ChatPracticeCheck } from './ChatPracticeCheck'
+import { PracticalReview } from './PracticalReview'
+import { ProcessDesign } from './ProcessDesign'
+import { WorkflowDesign } from './WorkflowDesign'
+import { ConnectedWorkflow } from './ConnectedWorkflow'
+import { BudgetWorkflow } from './BudgetWorkflow'
+import { OutputWorkflow } from './OutputWorkflow'
+import { BatchAssessment } from './BatchAssessment'
+import { GovernanceAssessment } from './GovernanceAssessment'
+import { ValidationSuite } from './ValidationSuite'
+import { LabSetupStatus } from './LabSetupStatus'
 
 function Stars({ count, max = 3, size = 16 }: { count: number; max?: number; size?: number }) {
   return (
-    <div className="flex gap-0.5">
+    <div className="flex shrink-0 gap-0.5" role="img" aria-label={`${count} of ${max} stars`}>
       {Array.from({ length: max }).map((_, i) => (
         <Star
+          aria-hidden="true"
           key={i}
           size={size}
           className={cn(
             'transition-all duration-300',
-            i < count ? 'text-yellow-400 fill-yellow-400' : 'text-gray-400',
+            i < count ? 'text-amber-700 fill-amber-700' : 'text-gray-500',
           )}
         />
       ))}
@@ -37,39 +51,41 @@ function Stars({ count, max = 3, size = 16 }: { count: number; max?: number; siz
   )
 }
 
-function ProgressWidget({ moduleProgress, lessonsCount }: {
+function ProgressWidget({ moduleProgress, lessonsCount, outcomeAssessment }: {
   moduleProgress: { completed: boolean; stars: number; attempts: number } | null
   lessonsCount: number
+  outcomeAssessment: boolean
 }) {
   const completed = moduleProgress?.completed || false
   return (
     <div
-      className="flex items-center gap-4 p-3 bg-gray-50 border border-gray-200 text-xs"
+      className="flex flex-wrap items-center gap-2 sm:gap-4 p-3 bg-gray-50 border border-gray-200 text-xs"
       style={{ borderRadius: 'var(--ui-radius, 12px)' }}
     >
       <div className="flex items-center gap-1.5">
-        <BookOpen size={12} className="text-gray-400" />
+        <BookOpen size={12} aria-hidden="true" className="text-gray-400" />
         <span className="text-gray-600">Lessons: {lessonsCount}</span>
       </div>
-      <div className="w-px h-4 bg-gray-200" />
+      <div className="hidden sm:block w-px h-4 bg-gray-200" />
       <div className="flex items-center gap-1.5">
-        <Target size={12} className="text-gray-400" />
+        <Target size={12} aria-hidden="true" className="text-gray-400" />
         <span className="text-gray-600">
-          Challenge: {completed ? 'Complete' : 'Not started'}
+          {outcomeAssessment ? `Module: ${completed ? 'Complete' : 'Not complete'}` : `Challenge: ${completed ? 'Complete' : 'Not started'}`}
         </span>
       </div>
-      <div className="w-px h-4 bg-gray-200" />
-      <Stars count={moduleProgress?.stars || 0} size={12} />
+      {!outcomeAssessment && <><div className="hidden sm:block w-px h-4 bg-gray-200" />
+        <Stars count={moduleProgress?.stars || 0} size={12} /></>}
     </div>
   )
 }
 
-export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, onProvision, onSubmitAssessment, onTabChange, exercise, validating, completing, provisioning, submittingAssessment }: {
+export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, onProvision, onOpenWorkspace, onSubmitAssessment, onTabChange, exercise, validating, completing, provisioning, submittingAssessment, enrollmentId, savedLessonId, onSavePosition, onReloadPosition, onScenarioSaved, openChallengeRequest, courseIdentity, onCompleteOutcomes, outcomeCompletionPending, progressRefreshPending, requirementCheck = 'unchecked' }: {
   module: ModuleDefinition
-  moduleProgress: { completed: boolean; stars: number; attempts: number; provisioned_docs?: string[]; self_assessment?: Record<string, string> } | null
+  moduleProgress: { completed: boolean; stars: number; attempts: number; provisioned_docs?: string[]; self_assessment?: Record<string, string>; scenario_attempt_id?: string } | null
   onValidate: () => void
   onComplete: () => void
   onProvision: () => void
+  onOpenWorkspace?: () => Promise<void>
   onSubmitAssessment: (answers: Record<string, string>) => void
   onTabChange?: () => void
   exercise: CertExercise | null
@@ -77,8 +93,26 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
   completing: boolean
   provisioning: boolean
   submittingAssessment: boolean
+  enrollmentId?: string
+  savedLessonId?: string
+  onSavePosition?: (lessonId: string) => Promise<void>
+  onReloadPosition?: () => Promise<void>
+  onScenarioSaved?: () => Promise<void>
+  openChallengeRequest?: number
+  onCompleteOutcomes?: (selection: OutcomeCompletionSelection) => Promise<void>
+  outcomeCompletionPending?: boolean
+  progressRefreshPending?: boolean
+  requirementCheck?: 'unchecked' | 'met' | 'remaining' | 'checking' | 'unavailable'
+  courseIdentity?: ReadinessIdentity
 }) {
-  const [tab, setTab] = useState<'learn' | 'challenge'>('learn')
+  const [tab, setTab] = useState<'learn' | 'challenge'>(() => openChallengeRequest === undefined ? 'learn' : 'challenge')
+  const challengeButton = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (openChallengeRequest === undefined) return
+    setTab('challenge')
+    const frame = requestAnimationFrame(() => challengeButton.current?.focus())
+    return () => cancelAnimationFrame(frame)
+  }, [openChallengeRequest])
 
   const handleTabChange = (t: 'learn' | 'challenge') => {
     setTab(t)
@@ -88,22 +122,25 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
   const { toast } = useToast()
   const Icon = ICON_MAP[module.icon] || BookOpen
   const completed = moduleProgress?.completed || false
+  const requirementsMet = requirementCheck === 'met'
   const isProvisioned = (moduleProgress?.provisioned_docs?.length ?? 0) > 0
   const hasDocuments = (exercise?.documents?.length ?? 0) > 0
+  const challengeNeedsLab = hasDocuments && !isProvisioned && !hasOutcomeAssessment(module)
+  const assessmentDef = module.scenarioAssessment || module.processAssessment || module.workflowDesignAssessment || module.connectedWorkflowAssessment || module.budgetWorkflowAssessment || module.outputWorkflowAssessment || module.validationAssessment || module.batchAssessment || module.governanceAssessment ? null : module.assessment === undefined ? MODULE_ASSESSMENTS[module.id] : module.assessment
 
   const handleAllLessonsRead = useCallback(() => {
     if (!completed) {
-      toast('All lessons complete \u2014 ready for the challenge!', 'success')
+      toast('All lessons viewed \u2014 ready for the challenge!', 'success')
     }
   }, [toast, completed])
 
   return (
     <div
-      className="bg-white border-2 border-highlight/30 cert-slide-in overflow-hidden"
+      className="mx-auto w-full max-w-4xl bg-white border-2 border-highlight/30 cert-slide-in overflow-hidden"
       style={{ borderRadius: 'var(--ui-radius, 12px)' }}
     >
       {/* Header */}
-      <div className="p-6 pb-0">
+      <div className="p-[8px] pb-0 sm:p-6 sm:pb-0">
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-3">
             <div
@@ -118,18 +155,16 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
               </h3>
               <p className="text-sm text-gray-500">
                 {module.subtitle}
-                {module.estimatedMinutes && (
-                  <span className="text-gray-500"> · ~{module.estimatedMinutes} min — your place is saved if you leave</span>
-                )}
+                <span className="text-gray-500"> · {enrollmentId ? 'Use Save this place to resume later.' : 'Reading place is saved in this browser.'}</span>
               </p>
             </div>
           </div>
-          {completed && <Stars count={moduleProgress?.stars || 0} size={20} />}
+          {completed && !hasOutcomeAssessment(module) && <Stars count={moduleProgress?.stars || 0} size={20} />}
         </div>
 
         {/* Progress widget */}
         <div className="mb-3">
-          <ProgressWidget moduleProgress={moduleProgress} lessonsCount={module.lessons.length} />
+          <ProgressWidget moduleProgress={moduleProgress} lessonsCount={module.lessons.length} outcomeAssessment={hasOutcomeAssessment(module)} />
         </div>
 
         {/* Tabs */}
@@ -150,17 +185,18 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
             </span>
           </button>
           <button
+            ref={challengeButton}
             onClick={() => handleTabChange('challenge')}
-            disabled={hasDocuments && !isProvisioned}
+            disabled={challengeNeedsLab}
             className={cn(
               'px-4 py-2.5 text-sm font-medium transition-all border-b-2 -mb-px',
               tab === 'challenge'
                 ? 'border-highlight text-gray-900'
                 : 'border-transparent text-gray-500 hover:text-gray-700',
-              hasDocuments && !isProvisioned && 'opacity-40 cursor-not-allowed',
+              challengeNeedsLab && 'opacity-40 cursor-not-allowed',
             )}
             style={tab === 'challenge' ? { borderColor: 'var(--highlight-color)' } : undefined}
-            title={hasDocuments && !isProvisioned ? 'Set up your lab first to unlock the challenge' : undefined}
+            title={challengeNeedsLab ? 'Set up your lab first to unlock the challenge' : undefined}
           >
             <span className="flex items-center gap-1.5">
               <Target size={14} />
@@ -171,92 +207,33 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
       </div>
 
       {/* Set Up Lab — shown above tab content so it's always accessible */}
-      {hasDocuments && (
-        <div className="px-6 pt-4">
-          <div
-            className={cn(
-              'p-4 border-2',
-              isProvisioned ? 'border-green-200 bg-green-50/50' : 'border-blue-200 bg-blue-50/50',
-            )}
-            style={{ borderRadius: 'var(--ui-radius, 12px)' }}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {isProvisioned ? (
-                  <CheckCircle2 size={18} className="text-green-600" />
-                ) : (
-                  <Upload size={18} className="text-blue-600" />
-                )}
-                <div>
-                  <span className={cn('text-sm font-semibold', isProvisioned ? 'text-green-800' : 'text-blue-800')}>
-                    {isProvisioned ? 'Documents ready in your workspace' : 'Set up your lab to load sample documents'}
-                  </span>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {exercise?.documents.map(d => d.replace('.pdf', '')).join(', ')}
-                  </p>
-                  {isProvisioned && (
-                    <a
-                      href="/"
-                      className="text-xs font-medium mt-1 inline-block hover:underline"
-                      style={{ color: 'var(--highlight-on-light, #806600)' }}
-                    >
-                      Open Workspace &rarr;
-                    </a>
-                  )}
-                </div>
-              </div>
-              <button
-                onClick={onProvision}
-                disabled={provisioning}
-                className={cn(
-                  'flex items-center gap-2 px-4 py-2 text-sm font-semibold transition-all disabled:opacity-50',
-                  isProvisioned
-                    ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                    : 'bg-blue-600 text-white hover:bg-blue-700',
-                )}
-                style={{ borderRadius: 'var(--ui-radius, 12px)' }}
-              >
-                {provisioning ? (
-                  <>
-                    <Loader2 size={14} className="animate-spin" />
-                    Setting up...
-                  </>
-                ) : isProvisioned ? (
-                  <>
-                    <Check size={14} />
-                    Ready
-                  </>
-                ) : (
-                  <>
-                    <Upload size={14} />
-                    Set Up Lab
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {hasDocuments && <div className="px-4 pt-4 sm:px-6">
+        <LabSetupStatus key={`${enrollmentId || 'legacy'}:${module.id}`} assignmentKey={JSON.stringify(moduleProgress?.provisioned_docs || [])}
+          moduleId={module.id} enrollmentId={enrollmentId} filenames={exercise!.documents}
+          onProvision={onProvision} provisioning={provisioning} onOpenWorkspace={onOpenWorkspace} />
+      </div>}
 
       {/* Tab content */}
-      <div className="p-6">
+      <div className="p-[8px] sm:p-6">
+        {tab === 'challenge' && <EditorialCorrection moduleId={module.id} manifestSha256={courseIdentity?.manifest_sha256} content={module.description} />}
         {tab === 'learn' ? (
-          <div className="space-y-4">
+          <div className="mx-auto max-w-3xl space-y-4">
+            <EditorialCorrection moduleId={module.id} manifestSha256={courseIdentity?.manifest_sha256} content={module.description} />
             <p className="text-sm text-gray-700 mb-2">{module.description}</p>
 
-            {/* Lab-ready callout — shown when documents are provisioned */}
+            {/* Assignment makes directions available; it does not prove readiness. */}
             {isProvisioned && exercise && (
               <div
-                className="flex items-center justify-between p-2.5 bg-green-50 border border-green-200"
+                className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-gray-50 border border-gray-200"
                 style={{ borderRadius: 'var(--ui-radius, 12px)' }}
               >
-                <span className="flex items-center gap-1.5 text-sm font-medium text-green-800">
-                  <CheckCircle2 size={14} className="text-green-600 shrink-0" />
-                  Lab ready. Challenge has {exercise.instructions.length} steps.
+                <span className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
+                  <BookOpen size={14} aria-hidden="true" className="shrink-0" />
+                  {exercise.instructions.length} challenge steps
                 </span>
                 <button
                   onClick={() => handleTabChange('challenge')}
-                  className="flex items-center gap-1 text-xs font-semibold hover:underline shrink-0"
+                  className="flex min-h-11 items-center gap-1 text-xs font-semibold hover:underline shrink-0"
                   style={{ color: 'var(--highlight-on-light, #806600)' }}
                 >
                   Go to challenge
@@ -269,32 +246,57 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
             <LessonStepper
               lessons={module.lessons}
               moduleId={module.id}
+              enrollmentId={enrollmentId}
+              savedLessonId={savedLessonId}
+              manifestSha256={courseIdentity?.manifest_sha256}
+              onSavePosition={onSavePosition}
+              onReloadPosition={onReloadPosition}
               exercise={exercise}
               onAllLessonsRead={handleAllLessonsRead}
-              onGoToChallenge={() => hasDocuments && !isProvisioned ? undefined : setTab('challenge')}
+              onGoToChallenge={() => challengeNeedsLab ? undefined : setTab('challenge')}
               onStepChange={onTabChange}
-              onProvision={onProvision}
-              provisioning={provisioning}
               isProvisioned={isProvisioned}
               hasDocuments={hasDocuments}
             />
           </div>
         ) : (
           <div>
+            {module.governanceAssessment ? (enrollmentId ? <div className="space-y-6">
+              {module.scenarioAssessment && <ScenarioAssessment key={`${enrollmentId}:${module.scenarioAssessment.bank_sha256}`} definition={module.scenarioAssessment} enrollmentId={enrollmentId} attemptId={moduleProgress?.scenario_attempt_id} onSaved={onScenarioSaved} />}
+              <GovernanceAssessment key={`governance:${enrollmentId}:${module.governanceAssessment.case_sha256}`} enrollmentId={enrollmentId} definition={module.governanceAssessment} />
+            </div> : <p role="alert">Refresh your course to load this assessment’s enrollment.</p>) : module.batchAssessment ? (enrollmentId ? <BatchAssessment key={`batch:${enrollmentId}:${module.batchAssessment.case_sha256}`} enrollmentId={enrollmentId} definition={module.batchAssessment} /> : <p role="alert">Refresh your course to load this assessment’s enrollment.</p>) : module.validationAssessment ? (enrollmentId ? <div className="space-y-6">
+              {module.scenarioAssessment && <ScenarioAssessment key={`${enrollmentId}:${module.scenarioAssessment.bank_sha256}`} definition={module.scenarioAssessment} enrollmentId={enrollmentId} attemptId={moduleProgress?.scenario_attempt_id} onSaved={onScenarioSaved} />}
+              <ValidationSuite key={`validation:${enrollmentId}:${module.validationAssessment.case_sha256}`} enrollmentId={enrollmentId} definition={module.validationAssessment} />
+            </div> : <p role="alert">Refresh your course to load this assessment’s enrollment.</p>) : module.outputWorkflowAssessment ? (enrollmentId ? <OutputWorkflow key={`output:${enrollmentId}:${module.outputWorkflowAssessment.case_sha256}`} enrollmentId={enrollmentId} definition={module.outputWorkflowAssessment} /> : <p role="alert">Refresh your course to load this assessment’s enrollment.</p>) : module.budgetWorkflowAssessment ? (enrollmentId ? <BudgetWorkflow key={`budget:${enrollmentId}:${module.budgetWorkflowAssessment.case_sha256}`} enrollmentId={enrollmentId} definition={module.budgetWorkflowAssessment} /> : <p role="alert">Refresh your course to load this assessment’s enrollment.</p>) : module.connectedWorkflowAssessment ? (enrollmentId ? <ConnectedWorkflow key={`connected:${enrollmentId}:${module.connectedWorkflowAssessment.case_sha256}`} enrollmentId={enrollmentId} definition={module.connectedWorkflowAssessment} /> : <p role="alert">Refresh your course to load this assessment’s enrollment.</p>) : module.workflowDesignAssessment ? (enrollmentId ? <WorkflowDesign key={`workflow:${enrollmentId}:${module.workflowDesignAssessment.case_sha256}`} enrollmentId={enrollmentId} definition={module.workflowDesignAssessment} /> : <p role="alert">Refresh your course to load this assessment’s enrollment.</p>) : module.processAssessment ? (enrollmentId ? <ProcessDesign key={`process:${enrollmentId}:${module.processAssessment.case_sha256}`} enrollmentId={enrollmentId} definition={module.processAssessment} /> : <p role="alert">Refresh your course to load this assessment’s enrollment.</p>) : module.decisionPrompts?.length ? (enrollmentId ? <PracticalReview
+              key={`${enrollmentId}:${module.id}`}
+              enrollmentId={enrollmentId}
+              moduleId={module.id}
+              prompts={module.decisionPrompts}
+              prepareEnabled={module.practicalPreparation === true}
+              repairAssignment={module.repairAssignment}
+              assignment={exercise}
+            /> : <p role="alert">Refresh your course to load this assessment’s enrollment.</p>) : module.scenarioAssessment ? (enrollmentId ? <div className="space-y-6">
+              {exercise?.chat_practice && <ChatPracticeCheck enrollmentId={enrollmentId} practice={exercise.chat_practice} />}
+              <ScenarioAssessment
+              key={`${enrollmentId}:${module.scenarioAssessment.bank_sha256}`}
+              definition={module.scenarioAssessment}
+              enrollmentId={enrollmentId}
+              attemptId={moduleProgress?.scenario_attempt_id}
+              onSaved={onScenarioSaved}
+            /></div> : <p role="alert">Refresh your course to load this assessment’s enrollment.</p>) : <>
             {/* Challenge overview */}
             {exercise?.overview && (
-              <p className="text-sm text-gray-600 mb-5 leading-relaxed"
-                dangerouslySetInnerHTML={{
-                  __html: exercise.overview
-                    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>'),
-                }}
+              <div className="cert-lesson-markdown text-sm text-gray-600 mb-5 leading-relaxed"
+                dangerouslySetInnerHTML={{ __html: renderCertificationMarkdown(exercise.overview) }}
               />
             )}
 
             {/* Self-assessment (modules with reflection questions) */}
-            {MODULE_ASSESSMENTS[module.id] && (
+            {assessmentDef && (
               <SelfAssessment
                 moduleId={module.id}
+                enrollmentId={enrollmentId}
+                definition={assessmentDef}
                 existingAnswers={moduleProgress?.self_assessment}
                 onSubmit={onSubmitAssessment}
                 submitting={submittingAssessment}
@@ -312,21 +314,14 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
                   {exercise.instructions.map((instruction, i) => (
                     <li key={i} className="flex items-start gap-2 text-sm">
                       <div
-                        className={cn(
-                          'w-5 h-5 flex items-center justify-center shrink-0 mt-0.5',
-                          completed ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500',
-                        )}
+                        className="w-5 h-5 flex items-center justify-center shrink-0 mt-0.5 bg-gray-100 text-gray-500"
                         style={{ borderRadius: 'var(--ui-radius, 12px)' }}
                       >
-                        {completed ? <Check size={12} /> : <span className="text-xs font-medium">{i + 1}</span>}
+                        <span className="text-xs font-medium">{i + 1}</span>
                       </div>
-                      <span
-                        className={cn('text-gray-700', completed && 'text-green-800')}
-                        dangerouslySetInnerHTML={{
-                          __html: instruction
-                            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                            .replace(/`(.+?)`/g, '<code class="px-1 py-0.5 bg-gray-100 rounded text-xs font-mono">$1</code>'),
-                        }}
+                      <div
+                        className="cert-lesson-markdown min-w-0 break-words text-gray-700"
+                        dangerouslySetInnerHTML={{ __html: renderCertificationMarkdown(instruction) }}
                       />
                     </li>
                   ))}
@@ -382,6 +377,8 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
             <div className="mb-5">
               <button
                 onClick={() => setShowTips(!showTips)}
+                aria-expanded={showTips}
+                aria-controls={`certification-tips-${module.id}`}
                 className="flex items-center gap-1.5 text-sm font-semibold text-gray-600 hover:text-gray-900"
               >
                 <Lightbulb size={14} className="text-yellow-500" />
@@ -389,7 +386,7 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
                 {showTips ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               </button>
               {showTips && (
-                <ul className="mt-2 space-y-1.5 pl-5">
+                <ul id={`certification-tips-${module.id}`} className="mt-2 space-y-1.5 pl-5">
                   {module.tips.map((tip, i) => (
                     <li key={i} className="text-sm text-gray-600 list-disc">{tip}</li>
                   ))}
@@ -399,7 +396,6 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
 
             {/* Incomplete requirements warning */}
             {!completed && (() => {
-              const assessmentDef = MODULE_ASSESSMENTS[module.id]
               const needsAssessment = assessmentDef &&
                 !assessmentDef.questions.every(q => moduleProgress?.self_assessment?.[q.key])
               const needsLab = hasDocuments && !isProvisioned
@@ -419,11 +415,19 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
             })()}
 
             {/* Action buttons */}
+            {!completed && <p className="mb-3 text-sm text-gray-700">{{
+              met: 'The last check met the module requirements. Complete Module checks your current work again before saving earned credit.',
+              remaining: 'Review the remaining checks below, update your work, then check progress again.',
+              unavailable: 'Your last feedback is preserved. Try Check Progress again to confirm the current requirements.',
+              checking: 'Checking the current module requirements…',
+              unchecked: 'Check your progress to see which requirements remain. Complete Module checks your current work before saving earned credit.',
+            }[requirementCheck]}</p>}
             <div className="flex items-center gap-3">
               <button
                 onClick={onValidate}
                 disabled={validating}
-                className="flex items-center gap-2 px-4 py-2.5 border-2 border-gray-200 text-sm font-semibold text-gray-700 hover:border-highlight hover:text-highlight-text hover:bg-highlight transition-all disabled:opacity-50"
+                className={cn('flex items-center gap-2 px-4 py-2.5 border-2 text-sm font-semibold transition-all disabled:opacity-50',
+                  requirementsMet && !completed ? 'border-gray-200 bg-white text-gray-700 hover:border-highlight' : 'border-transparent bg-highlight text-highlight-text hover:brightness-90')}
                 style={{ borderRadius: 'var(--ui-radius, 12px)' }}
               >
                 <FlaskConical size={16} />
@@ -433,7 +437,8 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
                 <button
                   onClick={onComplete}
                   disabled={completing}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-highlight text-highlight-text text-sm font-bold hover:brightness-90 transition-all disabled:opacity-50"
+                  className={cn('flex items-center gap-2 px-4 py-2.5 border-2 text-sm font-bold transition-all disabled:opacity-50',
+                    requirementsMet ? 'border-transparent bg-highlight text-highlight-text hover:brightness-90' : 'border-gray-200 bg-white text-gray-700 hover:border-highlight')}
                   style={{ borderRadius: 'var(--ui-radius, 12px)' }}
                 >
                   <Zap size={16} />
@@ -444,10 +449,13 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
 
             {moduleProgress && (
               <p className="mt-3 text-xs text-gray-500">
-                {moduleProgress.attempts} attempt{moduleProgress.attempts !== 1 ? 's' : ''}
+                {moduleProgress.attempts ?? 0} attempt{moduleProgress.attempts !== 1 ? 's' : ''}
                 {completed && moduleProgress.completed ? ' \u00b7 Completed' : ''}
               </p>
             )}
+            </>}
+            {courseIdentity?.enrollment_id === enrollmentId && hasOutcomeAssessment(module) && courseIdentity &&
+              <ModuleOutcomePreview identity={courseIdentity} moduleId={module.id} onComplete={onCompleteOutcomes} completed={completed} completionPending={outcomeCompletionPending} progressRefreshPending={progressRefreshPending} />}
           </div>
         )}
       </div>

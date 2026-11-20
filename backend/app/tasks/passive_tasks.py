@@ -6,6 +6,14 @@ Uses pymongo (sync) for DB access.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from celery import Task
+
+from pymongo.database import Database
+from typing import NotRequired, TypedDict
+
 import logging
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
@@ -16,10 +24,22 @@ from app.exceptions import TrialSpendBlockedError
 from app.celery_app import celery_app
 from app.tasks import TRANSIENT_EXCEPTIONS, get_sync_db
 
+class _ExtractionDelivery(TypedDict):
+    storage: dict[str, str] | None
+    notifications: list[dict[str, object]]
+    webhooks: list[dict[str, object]]
+
+
+class _WorkflowDelivery(_ExtractionDelivery):
+    onedrive: dict[str, str] | None
+    chains: list[dict[str, str]]
+    artifact: NotRequired[object]
+
+
 logger = logging.getLogger(__name__)
 
 
-def _find_automation(db, automation_id: str | None) -> dict | None:
+def _find_automation(db: Database[dict], automation_id: str | None) -> dict | None:
     """Look up an automation by its stringified ObjectId, tolerating junk ids."""
     if not automation_id:
         return None
@@ -42,7 +62,7 @@ def _find_automation(db, automation_id: str | None) -> dict | None:
     max_retries=3,
     default_retry_delay=10,
 )
-def process_pending_triggers(self) -> dict:
+def process_pending_triggers(self: Task) -> dict:
     """Evaluate pending WorkflowTriggerEvents and dispatch execution.
 
     Runs every minute via Celery Beat.
@@ -163,11 +183,9 @@ def process_pending_triggers(self) -> dict:
                 if run_docs and not any(d.get("raw_text") for d in run_docs):
                     still_processing = any(d.get("processing") for d in run_docs)
                     created = event.get("created_at")
-                    try:
-                        waited = (now - created).total_seconds() if created else 0
-                    except TypeError:
-                        # Legacy events may carry a naive created_at.
-                        waited = 0
+                    if created and created.tzinfo is None:
+                        created = created.replace(tzinfo=timezone.utc)
+                    waited = (now - created).total_seconds() if created else 0
                     if still_processing and waited < 300:
                         db.workflow_trigger_event.update_one(
                             {"_id": event["_id"]},
@@ -187,10 +205,12 @@ def process_pending_triggers(self) -> dict:
                     continue
 
             # Queue for execution
-            db.workflow_trigger_event.update_one(
-                {"_id": event["_id"]},
+            claim = db.workflow_trigger_event.update_one(
+                {"_id": event["_id"], "status": "pending"},
                 {"$set": {"status": "queued", "queued_at": now}},
             )
+            if claim.modified_count == 0:
+                continue
 
             execute_workflow_passive.delay(str(event["_id"]))
             processed += 1
@@ -231,7 +251,7 @@ def process_pending_triggers(self) -> dict:
     max_retries=3,
     default_retry_delay=10,
 )
-def process_scheduled_automations(self) -> dict:
+def process_scheduled_automations(self: Task) -> dict:
     """Evaluate schedule-based automations and create trigger events when due.
 
     Runs every minute via Celery Beat. A schedule is due when the first slot
@@ -425,7 +445,10 @@ def _is_context_length_error(exc: Exception) -> bool:
     return "context length" in str(exc).lower()
 
 
-def _explain_context_length_error(db, result_id, steps_data, model, sys_config) -> str:
+def _explain_context_length_error(
+    db: Database[dict], result_id: ObjectId | None, steps_data: list[dict],
+    model: str | None, sys_config: dict,
+) -> str:
     """The message an automation's owner sees after a context-length rejection.
 
     The interactive run refuses oversize documents before any model call
@@ -459,7 +482,7 @@ def _explain_context_length_error(db, result_id, steps_data, model, sys_config) 
     bind=True,
     name="tasks.passive.execute_workflow_passive",
 )
-def execute_workflow_passive(self, trigger_event_id: str) -> dict:
+def execute_workflow_passive(self: Task, trigger_event_id: str) -> dict:
     """Execute a workflow for a passive trigger event."""
     from app.services.workflow_engine import build_workflow_engine
 
@@ -467,6 +490,20 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
     event = db.workflow_trigger_event.find_one({"_id": ObjectId(trigger_event_id)})
     if not event:
         return {"error": "Trigger event not found"}
+
+    # Celery can redeliver a message. Only the queued event may start an
+    # attempt; another worker, a completed run, or a delayed retry owns every
+    # other state. Claim before creating results or performing any step.
+    if event.get("status") != "queued":
+        return {"status": event.get("status"), "event_id": str(event["_id"]),
+                "workflow_result_id": str(event["workflow_result"]) if event.get("workflow_result") else None}
+    now = datetime.now(timezone.utc)
+    claim = db.workflow_trigger_event.update_one(
+        {"_id": event["_id"], "status": "queued"},
+        {"$set": {"status": "running", "started_at": now}},
+    )
+    if claim.modified_count == 0:
+        return {"status": "already_claimed", "event_id": str(event["_id"])}
 
     workflow = db.workflow.find_one({"_id": event.get("workflow")})
     if not workflow:
@@ -476,22 +513,15 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
         )
         return {"error": "Workflow not found"}
 
-    now = datetime.now(timezone.utc)
     sys_config = db.system_config.find_one() or {}
     # Bound before the try so the failure handler can reference it even when the
     # run dies before the result document is created.
     result_id = None
     # Read by the failure path below, which can run before either is built.
-    steps_data: list = []
-    model = None
+    steps_data: list[dict] = []
+    model: str | None = None
 
     try:
-        # Mark running
-        db.workflow_trigger_event.update_one(
-            {"_id": event["_id"]},
-            {"$set": {"status": "running", "started_at": now}},
-        )
-
         # Create WorkflowResult
         # The run records which automation and trigger event produced it, so
         # a reaper that finds it dead later can tell the person who set the
@@ -521,6 +551,10 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
         # this run with the reason rather than covering fewer documents than
         # the workflow was set up with (same check as manual runs).
         from app.tasks.workflow_tasks import (
+            FixedDocumentsDenied,
+            _denied_fixed_documents,
+            _denied_knowledge_bases,
+            knowledge_bases_denied_message,
             _missing_fixed_documents,
             build_steps_data,
             default_model_for_owner,
@@ -548,6 +582,38 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
         # the wrong document and reporting success. The builder merges the
         # fixed documents itself, so only the trigger's documents go in.
         trigger_step_data = {"doc_uuids": doc_uuids, "user_id": workflow.get("user_id")}
+
+        # An automated run acts as the workflow's owner: a fixed document they
+        # can't open is never read.
+        denied_fixed = _denied_fixed_documents(db, workflow, trigger_step_data)
+        if denied_fixed:
+            msg = str(FixedDocumentsDenied(len(denied_fixed)))
+            db.workflow_result.update_one(
+                {"_id": result_id},
+                {"$set": {"status": "error", "error": msg,
+                          "error_payload": {"code": "fixed_documents_access_denied",
+                                            "count": len(denied_fixed)}}},
+            )
+            db.workflow_trigger_event.update_one(
+                {"_id": event["_id"]}, {"$set": {"status": "failed", "error": msg}},
+            )
+            return {"error": msg, "result_id": str(result_id)}
+
+        # Likewise a knowledge base its owner can't open is never queried.
+        denied_kbs = _denied_knowledge_bases(db, workflow, trigger_step_data)
+        if denied_kbs:
+            msg = knowledge_bases_denied_message(len(denied_kbs))
+            db.workflow_result.update_one(
+                {"_id": result_id},
+                {"$set": {"status": "error", "error": msg,
+                          "error_payload": {"code": "knowledge_bases_access_denied",
+                                            "count": len(denied_kbs)}}},
+            )
+            db.workflow_trigger_event.update_one(
+                {"_id": event["_id"]}, {"$set": {"status": "failed", "error": msg}},
+            )
+            return {"error": msg, "result_id": str(result_id)}
+
         steps_data, _ = build_steps_data(
             db, workflow, str(workflow["_id"]), trigger_step_data,
         )
@@ -579,6 +645,8 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
             system_config_doc=sys_config,
             allow_code_execution=wf_is_admin,
             config_override=workflow.get("config_override"),
+            # An automation run is a real run: workspace steps act.
+            workspace_actions=True,
         )
 
         from app.services.run_metadata import record_pass_usage, snapshot_run_config
@@ -616,7 +684,7 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
         )
 
         # Update event
-        started_at = event.get("started_at") or now
+        started_at = now
         duration_ms = int((completed_at - started_at).total_seconds() * 1000)
         db.workflow_trigger_event.update_one(
             {"_id": event["_id"]},
@@ -690,7 +758,7 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
             )
 
         completed_at = datetime.now(timezone.utc)
-        started_at = event.get("started_at") or now
+        started_at = now
         duration_ms = int((completed_at - started_at).total_seconds() * 1000) if started_at else 0
 
         doc_ids = event.get("documents", [])
@@ -821,7 +889,7 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
     max_retries=3,
     default_retry_delay=10,
 )
-def process_outputs(self, workflow_result_id: str) -> dict:
+def process_outputs(self: Task, workflow_result_id: str) -> dict:
     """Process output configuration after a workflow run finishes.
 
     Dispatched for failed runs too, so a user who configured "notify me on
@@ -874,12 +942,19 @@ def process_outputs(self, workflow_result_id: str) -> dict:
         })
     if automation and automation.get("output_config"):
         output_config = automation["output_config"]
+        result_doc["automation_user_id"] = automation.get("user_id")
 
-    outputs = {"storage": None, "onedrive": None, "notifications": [], "webhooks": [], "chains": []}
+    outputs: _WorkflowDelivery = {"storage": None, "onedrive": None, "notifications": [], "webhooks": [], "chains": []}
 
     # Failed runs get notifications and webhooks (both carry the status) but no
     # deliverables — see the docstring.
     run_succeeded = result_doc.get("status") == "completed"
+
+    from app.services.artifacts import deliver_workflow_artifact, output_enabled
+    if run_succeeded and output_enabled(output_config):
+        outputs["artifact"] = deliver_workflow_artifact(db, result_doc, (automation or {}).get("user_id") or workflow["user_id"])
+        if trigger_event:
+            db.workflow_trigger_event.update_one({"_id": trigger_event["_id"]}, {"$set": {"output_delivery.artifact": outputs["artifact"]}})
 
     # 1. Local storage
     storage_cfg = output_config.get("storage", {})
@@ -1055,7 +1130,7 @@ def process_outputs(self, workflow_result_id: str) -> dict:
         if temp_uuids:
             db.smart_document.delete_many({"uuid": {"$in": temp_uuids}})
 
-    return outputs
+    return dict(outputs)
 
 
 # ---------------------------------------------------------------------------
@@ -1072,13 +1147,13 @@ def process_outputs(self, workflow_result_id: str) -> dict:
     default_retry_delay=10,
 )
 def process_extraction_outputs(
-    self,
+    self: Task,
     automation_id: str,
     search_set_uuid: str,
     document_uuids: list[str],
     user_id: str,
     *,
-    results: dict | None = None,
+    results: dict | list[dict] | None = None,
     extraction_event_id: str | None = None,
 ) -> dict:
     """Run extraction and/or process output_config for an automation.
@@ -1107,6 +1182,11 @@ def process_extraction_outputs(
 
     # Mark extraction event as running
     ext_started_at = datetime.now(timezone.utc)
+    started_event = (
+        db.extraction_trigger_event.find_one({"_id": ObjectId(extraction_event_id)}, {"trigger_context": 1})
+        if extraction_event_id else None
+    )
+    started_by = ((started_event or {}).get("trigger_context") or {}).get("trigger_type")
     if extraction_event_id:
         db.extraction_trigger_event.update_one(
             {"_id": ObjectId(extraction_event_id)},
@@ -1147,7 +1227,8 @@ def process_extraction_outputs(
         field_metadata = [
             {"key": item["searchphrase"],
              "is_optional": item.get("is_optional", False),
-             "enum_values": item.get("enum_values", [])}
+             "enum_values": item.get("enum_values", []),
+             "description": item.get("description")}
             for item in ss_items
         ]
 
@@ -1225,6 +1306,7 @@ def process_extraction_outputs(
                     "completed_at": datetime.now(timezone.utc),
                 }},
             )
+        _notify_automatic_run_finished(db, auto, run_status, started_by, extraction_event_id, document_uuids)
         return {"status": run_status, "results": results}
 
     automation_dict = {
@@ -1235,13 +1317,14 @@ def process_extraction_outputs(
     }
 
     result_doc = {
+        "automation_user_id": auto.get("user_id"),
         "status": run_status,
         "error": run_error,
         "trigger_type": auto.get("trigger_type", "api"),
         "final_output": {"output": results},
     }
 
-    outputs = {"storage": None, "notifications": [], "webhooks": []}
+    outputs: _ExtractionDelivery = {"storage": None, "notifications": [], "webhooks": []}
 
     # Storage — nothing worth writing when every document errored.
     storage_cfg = output_config.get("storage", {})
@@ -1280,6 +1363,32 @@ def process_extraction_outputs(
                 "status": "failed",
                 "error": str(e),
             })
+
+    # Outputs that failed are disclosed, not swallowed (#810): the extraction
+    # ran, but a library save, notification or webhook never left the building.
+    delivery_failures: list[str] = []
+    if outputs["storage"] and outputs["storage"].get("status") == "failed":
+        delivery_failures.append(f"library save failed: {str(outputs['storage'].get('error'))[:200]}")
+    for n in outputs["notifications"]:
+        if n.get("status") == "failed":
+            delivery_failures.append(f"notification ({n.get('channel') or 'configured'}) failed: {str(n.get('error'))[:200]}")
+    for w in outputs["webhooks"]:
+        if w.get("status") == "failed":
+            delivery_failures.append(f"webhook ({w.get('url') or 'configured'}) failed: {str(w.get('error'))[:200]}")
+    if delivery_failures:
+        # delivery_failed, not automation_failed: the extraction RAN and its
+        # results exist; coalescing onto automation_failed would overwrite an
+        # unread genuine dispatch failure's detail.
+        from app.services.failure_notifications import notify_delivery_failed
+
+        notify_delivery_failed(
+            db, automation=auto,
+            detail=(
+                "The extraction ran, but "
+                f"{len(delivery_failures)} configured output(s) failed to "
+                "deliver: " + "; ".join(delivery_failures)
+            ),
+        )
 
     # Persist results and close out the extraction event
     if extraction_event_id:
@@ -1326,7 +1435,32 @@ def process_extraction_outputs(
                 user_id=user_id,
             )
 
+    _notify_automatic_run_finished(db, auto, run_status, started_by, extraction_event_id, document_uuids)
     return {"status": run_status, "outputs": outputs}
+
+
+# Runs nobody clicked: a file arriving in a watched folder, or a schedule.
+AUTOMATIC_TRIGGERS = frozenset({"folder_watch", "schedule"})
+
+
+def _notify_automatic_run_finished(
+    db: Database[dict], auto: dict, run_status: str, started_by: str | None,
+    extraction_event_id: str | None, document_uuids: list[str],
+) -> None:
+    """Bell the owner when an automatic extraction run completes.
+
+    Failures already bell (notify_automation_failed). A run someone clicked
+    Run now on is watched in the editor and needs no bell.
+    """
+    if run_status != "completed" or started_by not in AUTOMATIC_TRIGGERS:
+        return
+    from app.services.run_notifications import notify_automation_run_completed
+
+    title = None
+    if len(document_uuids) == 1:
+        doc = db.smart_document.find_one({"uuid": document_uuids[0]}, {"title": 1})
+        title = (doc or {}).get("title")
+    notify_automation_run_completed(db, automation=auto, run_id=extraction_event_id, document_title=title)
 
 
 # ---------------------------------------------------------------------------
@@ -1344,7 +1478,7 @@ CALLBACK_RETRY_DELAYS = [10, 30, 90, 270, 810]
     default_retry_delay=10,
 )
 def deliver_callback(
-    self,
+    self: Task,
     trigger_event_id: str,
     callback_url: str,
     payload: dict,
@@ -1406,7 +1540,7 @@ def deliver_callback(
     max_retries=3,
     default_retry_delay=10,
 )
-def cleanup_old_trigger_events(self) -> dict:
+def cleanup_old_trigger_events(self: Task) -> dict:
     """Delete completed/failed/skipped trigger events older than 30 days."""
     db = get_sync_db()
     cutoff = datetime.now(timezone.utc) - timedelta(days=30)

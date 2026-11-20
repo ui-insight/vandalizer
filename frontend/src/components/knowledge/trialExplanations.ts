@@ -49,9 +49,9 @@ export function explainTrialParameters(config: TrialConfig): ParamExplanation[] 
   const c = withDefaults(config)
 
   const promptWhy: Record<string, string> = {
-    default: 'Balanced — answers normally from whatever the search turned up.',
-    strict: "Cautious — only answers when the passages clearly back it up, and says “I don’t know” otherwise. Cuts down on made-up answers.",
-    concise: 'Brief — keeps answers short and to the point, trimming extra explanation.',
+    default: 'Balanced: answers normally from whatever the search turned up.',
+    strict: "Cautious: only answers when the passages clearly back it up, and says “I don’t know” otherwise. Cuts down on made-up answers.",
+    concise: 'Brief: keeps answers short and to the point, trimming extra explanation.',
   }
   const promptLabel: Record<string, string> = {
     default: 'Balanced', strict: 'Strict', concise: 'Concise',
@@ -91,7 +91,7 @@ export function explainTrialParameters(config: TrialConfig): ParamExplanation[] 
         ? 'Before searching, the AI rephrases and expands the question so it ' +
           'can find documents that use different wording. Helps on vaguely ' +
           'phrased questions, but can occasionally drift off-topic.'
-        : 'The question is searched exactly as written — no rephrasing. ' +
+        : 'The question is searched exactly as written, with no rephrasing. ' +
           'Predictable, but may miss documents that word things differently.',
     },
     {
@@ -119,9 +119,9 @@ export function explainTrialParameters(config: TrialConfig): ParamExplanation[] 
       label: 'Answer variability',
       value: c.answer_temperature === 0 ? 'Deterministic (0.0)' : `Varied (${c.answer_temperature})`,
       why: c.answer_temperature === 0
-        ? 'Temperature 0 — the AI gives the same, most-likely answer every time. ' +
+        ? 'Temperature 0: the AI gives the same, most-likely answer every time. ' +
           'Best for factual, repeatable results.'
-        : `Temperature ${c.answer_temperature} — the AI varies its wording a ` +
+        : `Temperature ${c.answer_temperature}: the AI varies its wording a ` +
           'little for more natural phrasing, at the cost of some repeatability.',
     },
   ]
@@ -158,11 +158,11 @@ export function describeTrialPlainly(config: TrialConfig): string {
 /** Plain-English reason an early-stopped trial bailed before finishing. */
 export function explainEarlyStop(reason: OptimizationTrial['early_stop_reason']): string | null {
   if (reason === 'below_no_kb') {
-    return 'Stopped early — its answers were scoring below what the AI manages ' +
+    return 'Stopped early: its answers were scoring below what the AI manages ' +
       'with no knowledge base at all, so finishing wasn’t worth the cost.'
   }
   if (reason === 'below_best') {
-    return 'Stopped early — it was trailing the best configuration so far by ' +
+    return 'Stopped early: it was trailing the best configuration so far by ' +
       'enough that finishing wouldn’t have changed the winner.'
   }
   return null
@@ -187,15 +187,15 @@ export function explainTrialOutcome(trial: OptimizationTrial): string {
   }
   const liftPts = Math.round(lift * 100)
   if (liftPts > 0) {
-    return `This configuration scored ${scorePct}% — about ${liftPts} point` +
+    return `This configuration scored ${scorePct}%, about ${liftPts} point` +
       `${liftPts === 1 ? '' : 's'} higher than your current settings. The ` +
       'parameters below are what it changed to get there.'
   }
   if (liftPts < 0) {
-    return `This configuration scored ${scorePct}% — about ${Math.abs(liftPts)} point` +
+    return `This configuration scored ${scorePct}%, about ${Math.abs(liftPts)} point` +
       `${Math.abs(liftPts) === 1 ? '' : 's'} lower than your current settings, ` +
       'so the changes below didn’t help here.'
   }
-  return `This configuration scored ${scorePct}% — roughly tied with your ` +
+  return `This configuration scored ${scorePct}%, roughly tied with your ` +
     'current settings.'
 }

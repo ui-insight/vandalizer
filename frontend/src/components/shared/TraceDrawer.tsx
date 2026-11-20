@@ -1,4 +1,5 @@
-import { useEffect } from 'react'
+import { usePanelEffect } from './usePanelEffect'
+import { FocusTrap } from './PanelFocusTrap'
 import { X } from 'lucide-react'
 import type { PerQueryResult } from '../../api/knowledge'
 
@@ -23,7 +24,7 @@ interface Props {
  */
 export function TraceDrawer({ open, onClose, optimized, baseline, noKb }: Props) {
   // Close on Escape.
-  useEffect(() => {
+  usePanelEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)
@@ -35,30 +36,31 @@ export function TraceDrawer({ open, onClose, optimized, baseline, noKb }: Props)
   return (
     <div
       style={{
-        position: 'fixed', inset: 0, zIndex: 80,
+        position: 'fixed', inset: 0, zIndex: 1000,
         display: 'flex', justifyContent: 'flex-end',
         backgroundColor: 'rgba(0,0,0,0.55)',
       }}
       onClick={onClose}
     >
-      <div
+      <FocusTrap focusTrapOptions={{ escapeDeactivates: false, allowOutsideClick: true, tabbableOptions: { displayCheck: import.meta.env.MODE === 'test' ? 'none' : 'full' } }}>
+      <div role="dialog" aria-modal="true" aria-label="Question trace"
         onClick={e => e.stopPropagation()}
         style={{
           width: 'min(680px, 92vw)', height: '100%',
-          backgroundColor: '#161616', borderLeft: '1px solid #2e2e2e',
-          padding: 20, overflowY: 'auto',
-          display: 'flex', flexDirection: 'column', gap: 14,
+          backgroundColor: 'var(--workspace-canvas)', borderLeft: '1px solid var(--workspace-border)',
+          overflow: 'hidden', overflowWrap: 'anywhere',
+          display: 'flex', flexDirection: 'column',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <h3 style={{ margin: 0, fontSize: 14, color: '#fff', flex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)', padding: "var(--workspace-space-12) var(--workspace-space-20)", flexShrink: 0, borderBottom: '1px solid var(--workspace-border)' }}>
+          <h3 style={{ margin: 0, fontSize: 'var(--workspace-font-body)', color: 'var(--workspace-text)', flex: 1 }}>
             Trace
           </h3>
           <button
             onClick={onClose}
             style={{
-              background: 'transparent', border: 'none', color: '#888',
-              cursor: 'pointer', padding: 4, fontFamily: 'inherit',
+              background: 'transparent', border: 'none', color: 'var(--workspace-muted)',
+              cursor: 'pointer', padding: 'var(--workspace-space-4)', minWidth: 36, minHeight: 'var(--workspace-control-height)', fontFamily: 'inherit',
             }}
             aria-label="Close"
           >
@@ -66,6 +68,7 @@ export function TraceDrawer({ open, onClose, optimized, baseline, noKb }: Props)
           </button>
         </div>
 
+        <div role="region" aria-label="Question trace details" tabIndex={0} style={{ minHeight: 0, overflowY: 'auto', padding: 'var(--workspace-space-20)', display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-16)' }}>
         <Section label="Query">
           <Body body={optimized.query} />
         </Section>
@@ -91,7 +94,7 @@ export function TraceDrawer({ open, onClose, optimized, baseline, noKb }: Props)
 
         {(optimized.retrieved_sources?.length ?? 0) > 0 && (
           <Section label="Retrieved sources">
-            <div style={{ fontSize: 11, color: '#888' }}>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
               {(optimized.retrieved_sources || []).join(', ')}
             </div>
           </Section>
@@ -101,7 +104,7 @@ export function TraceDrawer({ open, onClose, optimized, baseline, noKb }: Props)
           <Section label="Default-config answer" muted>
             <Body body={baseline.actual_answer} muted />
             {baseline.reasoning && (
-              <div style={{ marginTop: 6, fontSize: 11, color: '#777' }}>
+              <div style={{ marginTop: 'var(--workspace-space-6)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
                 <em>Judge:</em> {baseline.reasoning}
               </div>
             )}
@@ -113,7 +116,9 @@ export function TraceDrawer({ open, onClose, optimized, baseline, noKb }: Props)
             <Body body={noKb.actual_answer} muted />
           </Section>
         )}
+        </div>
       </div>
+      </FocusTrap>
     </div>
   )
 }
@@ -125,7 +130,7 @@ function ScoreRow({
     <div style={{
       display: 'grid',
       gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-      gap: 8,
+      gap: 'var(--workspace-space-8)',
     }}>
       <ScoreCell label="Optimized" score={optimized.score} verdict={optimized.verdict} primary />
       {baseline && <ScoreCell label="Default" score={baseline.score} verdict={baseline.verdict} />}
@@ -137,19 +142,19 @@ function ScoreRow({
 function ScoreCell({
   label, score, verdict, primary = false,
 }: { label: string; score: number; verdict?: string | null; primary?: boolean }) {
-  const color = score >= 0.7 ? '#22c55e' : score >= 0.4 ? '#f59e0b' : '#ef4444'
+  const color = score >= 0.7 ? 'var(--workspace-success)' : score >= 0.4 ? 'var(--workspace-warning)' : 'var(--workspace-danger)'
   return (
     <div style={{
-      padding: 10, borderRadius: 6,
-      backgroundColor: primary ? 'rgba(34, 197, 94, 0.06)' : '#1f1f1f',
-      border: `1px solid ${primary ? 'rgba(34, 197, 94, 0.3)' : '#2e2e2e'}`,
+      padding: 'var(--workspace-space-12)', borderRadius: 'var(--workspace-radius-small)',
+      backgroundColor: primary ? 'rgba(34, 197, 94, 0.06)' : 'var(--workspace-surface)',
+      border: `1px solid ${primary ? 'rgba(34, 197, 94, 0.3)' : 'var(--workspace-border)'}`,
     }}>
-      <div style={{ fontSize: 9, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
-      <div style={{ fontSize: 20, fontWeight: 700, color, marginTop: 2 }}>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
+      <div style={{ fontSize: 'var(--workspace-font-page-title)', fontWeight: 700, color, marginTop: 'var(--workspace-space-2)' }}>
         {(score * 100).toFixed(0)}%
       </div>
       {verdict && (
-        <div style={{ fontSize: 10, color: '#888', marginTop: 2 }}>{verdict}</div>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginTop: 'var(--workspace-space-2)' }}>{verdict}</div>
       )}
     </div>
   )
@@ -161,8 +166,8 @@ function Section({ label, muted = false, children }: {
   return (
     <div>
       <div style={{
-        fontSize: 10, color: muted ? '#666' : '#888',
-        textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4,
+        fontSize: 'var(--workspace-font-meta)', color: muted ? 'var(--workspace-muted)' : 'var(--workspace-muted)',
+        textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 'var(--workspace-space-4)',
       }}>{label}</div>
       {children}
     </div>
@@ -172,11 +177,11 @@ function Section({ label, muted = false, children }: {
 function Body({ body, muted = false }: { body: string; muted?: boolean }) {
   return (
     <div style={{
-      fontSize: 12, color: muted ? '#999' : '#e5e5e5',
+      fontSize: 'var(--workspace-font-meta)', color: muted ? 'var(--workspace-muted)' : 'var(--workspace-text)',
       whiteSpace: 'pre-wrap' as const, lineHeight: 1.5,
-      padding: 10, borderRadius: 6,
-      backgroundColor: '#1a1a1a',
-      border: '1px solid #2a2a2a',
+      padding: 'var(--workspace-space-12)', borderRadius: 'var(--workspace-radius-small)',
+      backgroundColor: 'var(--workspace-canvas)',
+      border: '1px solid var(--workspace-border)',
     }}>
       {body}
     </div>
@@ -186,10 +191,10 @@ function Body({ body, muted = false }: { body: string; muted?: boolean }) {
 function FactList({
   label, items, tone,
 }: { label: string; items: string[]; tone: 'warn' | 'bad' }) {
-  const color = tone === 'bad' ? '#fca5a5' : '#fbbf24'
+  const color = tone === 'bad' ? 'var(--workspace-danger)' : 'var(--workspace-warning)'
   return (
     <Section label={label}>
-      <ul style={{ margin: 0, paddingLeft: 18, color, fontSize: 12, lineHeight: 1.5 }}>
+      <ul style={{ margin: 0, paddingLeft: 'var(--workspace-space-20)', color, fontSize: 'var(--workspace-font-meta)', lineHeight: 1.5 }}>
         {items.map((it, i) => <li key={i}>{it}</li>)}
       </ul>
     </Section>

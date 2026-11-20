@@ -10,7 +10,13 @@ from __future__ import annotations
 import os
 from datetime import datetime, timezone
 
-BASE_URL = os.environ.get("VANDALIZER_BASE_URL", "http://localhost:5173")
+def _site_url() -> str:
+    from app.config import Settings
+
+    return os.environ.get("VANDALIZER_BASE_URL", "").strip().rstrip("/") or Settings().frontend_url
+
+
+BASE_URL = _site_url()
 
 
 def build_work_item_card(work_item_doc: dict, result_doc: dict | None = None) -> dict:

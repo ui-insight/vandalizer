@@ -16,7 +16,9 @@ export function pollStatus(docid: string) {
 /** Stop an in-flight extraction (e.g. a stuck OCR read). The document is
  *  left in a retryable error state, so `retryExtraction` restarts it. */
 export function cancelExtraction(docUuid: string) {
-  return apiFetch<{ uuid: string; status: string }>(
+  // restored_previous_text: the stopped run was a re-read, and the document
+  // has the text it had before.
+  return apiFetch<{ uuid: string; status: string; restored_previous_text?: boolean }>(
     `/api/documents/${docUuid}/cancel-extraction`,
     { method: 'POST' }
   )

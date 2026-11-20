@@ -15,8 +15,11 @@ from app.database import init_db
 from app.exceptions import AppError
 from app.middleware.csrf import CSRFMiddleware
 from app.observability import init_sentry
+from app.routers import artifacts, page_templates
 from app.rate_limit import limiter
-from app.routers import activity, admin, audit, auth, automations, browser_automation, certification, chat, config, credentials, demo, documents, extractions, feedback, feedback_admin, feedback_prompt, files, folders, graph_webhooks, knowledge, library, mgmt, notifications, office, optimizer_inbox, organizations, projects, reviews, spaces, support, teams, telemetry, verification, workflows
+from app.routers import award_snapshots, page_feedback
+from app.routers import assistant
+from app.routers import activity, admin, audit, auth, automations, browser_automation, certification, chat, config, contact, credentials, demo, documents, extractions, feedback, feedback_admin, feedback_prompt, files, folders, graph_webhooks, knowledge, library, mgmt, notifications, obligations, office, optimizer_inbox, organizations, projects, reviews, spaces, support, teams, telemetry, verification, verification_sessions, workflows
 
 
 @lru_cache
@@ -73,6 +76,18 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
     if get_settings().enable_trial_system:
         from app.services.feedback_prompt_service import seed_default_prompts
         await seed_default_prompts()
+
+    # Documents OCR'd before raw OCR envelopes were decoded still hold the
+    # JSON wrapper as their text; repair them in place until a sweep finishes
+    # clean. Queued, never run here: it scans the documents collection.
+    try:
+        from app.models.system_config import SystemConfig
+        config = await SystemConfig.find_one()
+        if config is None or config.ocr_envelope_repair_completed_at is None:
+            from app.celery_app import celery_app
+            celery_app.send_task("tasks.document.repair_ocr_envelopes", queue="documents")
+    except Exception:
+        logger.warning("Could not queue the OCR envelope repair sweep", exc_info=True)
 
     # One-time bell notification to admins when the bundled catalog is newer
     # than what's applied. Best-effort — never block startup on it.
@@ -161,11 +176,14 @@ class SecurityHeadersMiddleware:
             if message["type"] == "http.response.start":
                 headers = MutableHeaders(scope=message)
                 headers["X-Content-Type-Options"] = "nosniff"
-                headers["X-Frame-Options"] = "DENY"
-                headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+                headers["X-Frame-Options"] = headers.get("X-Frame-Options", "DENY")
+                headers["Referrer-Policy"] = headers.get("Referrer-Policy", "strict-origin-when-cross-origin")
+                if scope.get("path", "").startswith("/api/pages"):
+                    headers["Cache-Control"] = "no-store"
+                    headers["X-Robots-Tag"] = "noindex, nofollow"
                 headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
                 headers["X-XSS-Protection"] = "1; mode=block"
-                headers["Content-Security-Policy"] = (
+                headers["Content-Security-Policy"] = headers.get("Content-Security-Policy") or (
                     "default-src 'self'; "
                     "script-src 'self'; "
                     "style-src 'self' 'unsafe-inline'; "
@@ -198,6 +216,17 @@ if settings.is_production and not settings.use_secure_cookies:
         "for anything internet-facing.",
         settings.frontend_url,
     )
+if settings.environment != "development" and settings.frontend_url_is_local:
+    # Calendar files, reminder/feedback emails and sign-in links would all
+    # point at this machine and open nothing for users.
+    logger.error(
+        "FRONTEND_URL is %s in a %s deployment: links in calendar files, emails "
+        "and sign-in messages will not open for users. Set FRONTEND_URL (or "
+        "VANDALIZER_BASE_URL) in backend/.env to the site's public address, "
+        "e.g. https://vandalizer.example.edu, and restart the api and celery "
+        "containers.",
+        settings.frontend_url, settings.environment,
+    )
 _cors_origins = [settings.frontend_url]
 if not settings.is_production:
     _cors_origins.append("http://localhost:5173")
@@ -207,7 +236,10 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "X-API-Key", "X-CSRF-Token"],
-    expose_headers=["X-Conversation-UUID", "X-Activity-ID"],
+    expose_headers=[
+        "X-Conversation-UUID", "X-Activity-ID",
+        "X-Chat-Error", "X-Missing-Documents", "X-Missing-Reason",
+    ],
 )
 
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
@@ -226,15 +258,23 @@ app.include_router(extractions.router, prefix="/api/extractions", tags=["extract
 app.include_router(workflows.router, prefix="/api/workflows", tags=["workflows"])
 app.include_router(config.router, prefix="/api/config", tags=["config"])
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
+app.include_router(page_feedback.router, prefix="/api/pages", tags=["pages"])
+app.include_router(artifacts.router, prefix="/api/pages", tags=["pages"])
+app.include_router(page_templates.router, prefix="/api/page-templates", tags=["page-templates"])
 app.include_router(activity.router, prefix="/api/activity", tags=["activity"])
 app.include_router(library.router, prefix="/api/library", tags=["library"])
 app.include_router(feedback.router, prefix="/api/feedback", tags=["feedback"])
 app.include_router(feedback_admin.router, prefix="/api/feedback/admin", tags=["feedback-admin"])
 app.include_router(verification.router, prefix="/api/verification", tags=["verification"])
+app.include_router(verification_sessions.router, prefix="/api/verification-sessions", tags=["verification-sessions"])
 app.include_router(office.router, prefix="/api/office", tags=["office"])
 app.include_router(automations.router, prefix="/api/automations", tags=["automations"])
 app.include_router(credentials.router, prefix="/api/credentials", tags=["credentials"])
 app.include_router(knowledge.router, prefix="/api/knowledge", tags=["knowledge"])
+# Landing-page demo-request form is always-on (not gated by trial system).
+# Mounted under /api/demo so the route `/api/demo/request-contact` works
+# regardless of whether the trial waitlist is enabled for this install.
+app.include_router(contact.router, prefix="/api/demo", tags=["contact"])
 if _boot_settings.enable_trial_system:
     app.include_router(demo.router, prefix="/api/demo", tags=["demo"])
 app.include_router(graph_webhooks.router, prefix="/api/webhooks/graph", tags=["webhooks"])
@@ -247,6 +287,9 @@ app.include_router(reviews.router, prefix="/api/reviews", tags=["reviews"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
 app.include_router(spaces.router, prefix="/api/spaces", tags=["spaces"])
 app.include_router(projects.router, prefix="/api/projects", tags=["projects"])
+app.include_router(award_snapshots.router, prefix="/api/projects", tags=["projects"])
+app.include_router(obligations.router, prefix="/api/obligations", tags=["obligations"])
+app.include_router(assistant.router, prefix="/api/assistant", tags=["assistant"])
 app.include_router(support.router, prefix="/api/support", tags=["support"])
 app.include_router(mgmt.router, prefix="/api/mgmt/v1", tags=["mgmt"])
 if _boot_settings.enable_trial_system:
@@ -329,9 +372,9 @@ async def health() -> JSONResponse:
 
     # ChromaDB
     try:
-        from app.services.document_manager import get_chroma_client
+        from app.services.document_manager import get_document_manager
 
-        chroma = get_chroma_client(settings.chromadb_persist_dir)
+        chroma = get_document_manager().client
         chroma.heartbeat()
         checks["chromadb"] = "ok"
     except Exception as e:
