@@ -16,6 +16,7 @@ from typing import Optional
 from pydantic_ai.tools import RunContext
 
 from app.services.chat_deps import AgenticChatDeps
+from app.services.workflow_diagnostics import inline_extraction_fields
 
 logger = logging.getLogger(__name__)
 
@@ -48,8 +49,9 @@ def _describe_step(step: dict) -> dict:
         if data.get(key):
             described["instruction"] = str(data[key])[:2000]
             break
-    if data.get("extractions"):
-        described["extractions"] = [str(f) for f in data["extractions"]][:100]
+    fields = inline_extraction_fields(data)
+    if fields:
+        described["extractions"] = fields[:100]
     if data.get("search_set_uuid"):
         described["extraction_set_uuid"] = data["search_set_uuid"]
     if data.get("kb_uuid"):

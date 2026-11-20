@@ -34,19 +34,36 @@ class Diagnostic(TypedDict, total=False):
 # ---------------------------------------------------------------------------
 
 
+def inline_extraction_fields(task_data: dict) -> list[str]:
+    """The fields an Extraction task runs with when no saved set is linked.
+
+    Read the way the engine reads them (``workflow_engine.ExtractionNode``):
+    ``searchphrases`` first, then ``keys``, then ``extractions``. The first two
+    are older shapes that seeded catalog workflows still use, with
+    ``searchphrases`` as one comma-separated string; reading only
+    ``extractions`` made those steps look as if they had no fields.
+    """
+    for key in ("searchphrases", "keys", "extractions"):
+        raw = task_data.get(key)
+        parts = raw.split(",") if isinstance(raw, str) else raw if isinstance(raw, list) else []
+        out: list[str] = []
+        for ext in parts:
+            if isinstance(ext, str):
+                name = ext.strip()
+            elif isinstance(ext, dict):
+                name = str(ext.get("key", "")).strip()
+            else:
+                name = ""
+            if name:
+                out.append(name)
+        if out:
+            return out
+    return []
+
+
 def _extraction_fields(task_data: dict) -> list[str]:
     """Field keys produced by an Extraction task, regardless of legacy shape."""
-    out: list[str] = []
-    for ext in task_data.get("extractions", []) or []:
-        if isinstance(ext, str):
-            key = ext.strip()
-        elif isinstance(ext, dict):
-            key = str(ext.get("key", "")).strip()
-        else:
-            key = ""
-        if key:
-            out.append(key)
-    return out
+    return inline_extraction_fields(task_data)
 
 
 def _step_tasks(step: dict) -> list[dict]:
