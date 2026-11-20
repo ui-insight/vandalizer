@@ -220,13 +220,19 @@ _NOT_A_SKILL = "Only Skills have a share link that works outside the team."
 async def mint_search_set_share_token(uuid: str, user: User = Depends(get_current_user)) -> dict[str, str]:
     """Create (or return) a Skill's share link token.
 
-    Only someone who can edit the Skill can make its link. Anyone signed in
+    Only the Skill's creator, or an owner or admin of its team, can make its
+    link. Anyone signed in
     who opens the link can then read the Skill and use it in their chats;
     they cannot edit it or see anything else attached to it.
     """
     ss = await _get_search_set_or_404(uuid, user, manage=True)
     if ss.set_type != "prompt":
         raise HTTPException(status_code=400, detail=_NOT_A_SKILL)
+    if not await access_control.can_share_search_set_outside_team(ss, user):
+        raise HTTPException(
+            status_code=403,
+            detail="Only the Skill's creator or a team owner or admin can share it outside the team.",
+        )
     token = await skill_share_service.create_link(ss.uuid, user.user_id)
     await audit_service.log_event(
         action="skill.share_link_copy", actor_user_id=user.user_id,

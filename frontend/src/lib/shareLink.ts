@@ -51,39 +51,56 @@ export function parseIdList(value: unknown): string[] {
   return [...new Set(String(value).split(',').map(s => s.trim()).filter(Boolean))]
 }
 
+/**
+ * Copy text that is only known after a request. Safari refuses a clipboard
+ * write that starts after an await (the click no longer counts), so where the
+ * browser allows it the write starts at once with the text still pending.
+ */
+async function copyWhenReady(text: Promise<string>): Promise<void> {
+  if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+    const blob = text.then(value => new Blob([value], { type: 'text/plain' }))
+    await navigator.clipboard.write([new ClipboardItem({ 'text/plain': blob })])
+    return
+  }
+  await navigator.clipboard.writeText(await text)
+}
+
+class NoLinkError extends Error {}
+
 export function useShareLink() {
   const { toast } = useToast()
   return useCallback(
     async (kind: ShareableKind, uuid: string, label?: string) => {
-      let shareToken: string | undefined
       // Whether the link lets in someone who could not already open the item.
       let open = false
-      if (kind === 'workflow') {
-        try {
-          const r = await mintWorkflowShareToken(uuid)
-          shareToken = r.share_token
-          open = true
-        } catch {
-          toast('Could not generate share link.', 'error')
-          return
-        }
-      } else if (kind === 'extraction') {
-        // A Skill gets an open link when the person can edit it. An
-        // extraction, or a Skill they cannot edit, is refused by the server
-        // and keeps the link for people who already have access.
-        try {
-          shareToken = (await mintSearchSetShareToken(uuid)).share_token
-          open = true
-        } catch (err) {
-          if (!(err instanceof ApiError) || ![400, 403, 404].includes(err.status)) {
-            toast('Could not generate share link.', 'error')
-            return
+      const url = (async () => {
+        let shareToken: string | undefined
+        if (kind === 'workflow') {
+          try {
+            shareToken = (await mintWorkflowShareToken(uuid)).share_token
+            open = true
+          } catch {
+            throw new NoLinkError()
+          }
+        } else if (kind === 'extraction') {
+          // A Skill gets an open link when the person may share it outside
+          // the team. An extraction, or a Skill they may not share, is
+          // refused by the server and keeps the link for people who already
+          // have access.
+          try {
+            shareToken = (await mintSearchSetShareToken(uuid)).share_token
+            open = true
+          } catch (err) {
+            if (!(err instanceof ApiError) || ![400, 403, 404].includes(err.status)) throw new NoLinkError()
           }
         }
-      }
-      const url = buildShareUrl(kind, uuid, shareToken)
+        return buildShareUrl(kind, uuid, shareToken)
+      })()
+      let made = true
+      url.catch(() => { made = false })
       try {
-        await navigator.clipboard.writeText(url)
+        await copyWhenReady(url)
+        await url
         const what = label ? `“${label}”` : 'Link'
         toast(
           open
@@ -92,7 +109,7 @@ export function useShareLink() {
           'success',
         )
       } catch {
-        toast('Could not copy link to clipboard.', 'error')
+        toast(made ? 'Could not copy link to clipboard.' : 'Could not generate share link.', 'error')
       }
     },
     [toast],

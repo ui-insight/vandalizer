@@ -12,6 +12,7 @@ import secrets
 from typing import Any
 
 from pymongo import ReturnDocument
+from pymongo.errors import DuplicateKeyError
 
 from app.models.search_set_share import SearchSetShare
 
@@ -25,19 +26,25 @@ def _shares() -> Any:
 async def create_link(search_set_uuid: str, user_id: str) -> str:
     """The Skill's link token, made on first use. One write, so two people
     copying the link at once get the same token."""
-    doc = await _shares().find_one_and_update(
-        {"search_set_uuid": search_set_uuid},
-        {"$setOnInsert": {
-            "search_set_uuid": search_set_uuid,
-            "token": secrets.token_urlsafe(32),
-            "recipients": [],
-            "created_by": user_id,
-            "created_at": datetime.datetime.now(tz=datetime.timezone.utc),
-        }},
-        upsert=True,
-        return_document=ReturnDocument.AFTER,
-    )
-    return doc["token"]
+    query = {"search_set_uuid": search_set_uuid}
+    try:
+        doc = await _shares().find_one_and_update(
+            query,
+            {"$setOnInsert": {
+                "token": secrets.token_urlsafe(32),
+                "recipients": [],
+                "created_by": user_id,
+                "created_at": datetime.datetime.now(tz=datetime.timezone.utc),
+            }},
+            upsert=True,
+            return_document=ReturnDocument.AFTER,
+        )
+    except DuplicateKeyError:
+        # Two first copies raced and the other one's insert won.
+        doc = await _shares().find_one(query)
+    if not doc:
+        raise RuntimeError("share link could not be created")
+    return str(doc["token"])
 
 
 async def turn_off(search_set_uuid: str) -> int:
@@ -56,12 +63,13 @@ async def open_link(search_set_uuid: str, token: str, user_id: str) -> bool:
         {"search_set_uuid": search_set_uuid, "token": token},
         {"$addToSet": {"recipients": user_id}},
     )
-    return result.matched_count == 1
+    return bool(result.matched_count == 1)
 
 
 async def is_recipient(search_set_uuid: str, user_id: str | None) -> bool:
     if not user_id:
         return False
-    return await _shares().count_documents(
+    found = await _shares().count_documents(
         {"search_set_uuid": search_set_uuid, "recipients": user_id}, limit=1,
-    ) > 0
+    )
+    return bool(found)

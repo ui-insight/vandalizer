@@ -881,6 +881,19 @@ def can_manage_search_set(
     return False
 
 
+async def can_share_search_set_outside_team(search_set: "SearchSet", user: User) -> bool:
+    """Whether *user* may make a link that opens the item to people outside
+    its team: its creator, or an owner or admin of its team. Narrower than
+    manage on purpose — a site admin or an ordinary team member should not be
+    able to open someone else's work to everyone signed in."""
+    if search_set.user_id == user.user_id:
+        return True
+    if not search_set.team_id:
+        return False
+    team_access = await get_team_access_context(user)
+    return _team_role(search_set.team_id, team_access) in TEAM_MANAGE_ROLES
+
+
 async def get_authorized_search_set(
     search_set_uuid: str,
     user: User,

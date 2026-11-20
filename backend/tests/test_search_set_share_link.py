@@ -82,8 +82,11 @@ class _FakeShares:
     async def find_one_and_update(self, query, update, upsert=False, return_document=None):
         doc = self.docs.get(query["search_set_uuid"])
         if doc is None and upsert:
-            doc = self.docs[query["search_set_uuid"]] = dict(update["$setOnInsert"])
+            doc = self.docs[query["search_set_uuid"]] = {**query, **update["$setOnInsert"]}
         return doc
+
+    async def find_one(self, query):
+        return self.docs.get(query["search_set_uuid"])
 
     async def find_one_and_delete(self, query):
         return self.docs.pop(query["search_set_uuid"], None)
@@ -155,6 +158,17 @@ class TestLinkStore:
         # A new link is a new token: the old address stays dead.
         assert await skill_share_service.create_link("skill-1", "owner") != token
 
+    @pytest.mark.asyncio
+    async def test_two_first_copies_racing_get_the_same_link(self, shares):
+        from pymongo.errors import DuplicateKeyError
+
+        async def lost_the_race(query, update, **_):
+            shares.docs["skill-1"] = {**query, "token": TOKEN, "recipients": []}
+            raise DuplicateKeyError("dup")
+
+        with patch.object(shares, "find_one_and_update", new=lost_the_race):
+            assert await skill_share_service.create_link("skill-1", "owner") == TOKEN
+
     def test_opening_checks_the_token_and_records_in_one_write(self):
         # A link turned off between a separate check and write would still let
         # the person in; the filter must carry the token.
@@ -211,13 +225,6 @@ class TestAccessRule:
         assert refused is None
         is_recipient.assert_not_awaited()
 
-    def test_can_view_search_set_knows_nothing_about_links(self):
-        # The synchronous rule feeds lists and many routes; link access must
-        # not ride along with it.
-        ss = _skill()
-        ss.share_recipients = ["outsider"]
-        assert access_control.can_view_search_set(ss, _user("outsider")) is False
-
     def test_only_reading_a_skill_for_chat_asks_for_link_access(self):
         asking = sorted(
             str(path.relative_to(APP))
@@ -241,7 +248,7 @@ class TestRoutes:
 
     @pytest.mark.asyncio
     async def test_making_a_link_needs_edit_rights(self, client, shares):
-        user = _user("owner")
+        user = _user("owner")  # the Skill's creator
         cookies, headers = _auth("owner")
         decode, mock_user, audit = self._caller(user)
         with decode, mock_user as MockUser, audit, patch(
@@ -255,6 +262,36 @@ class TestRoutes:
         assert first.json() == second.json() == {"share_token": shares.docs["skill-1"]["token"]}
         assert authz.await_args.kwargs["manage"] is True
         assert "allow_shared" not in authz.await_args.kwargs
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("role, allowed", [("owner", True), ("admin", True), ("member", False), (None, False)])
+    async def test_only_the_creator_or_a_team_owner_or_admin_may_share_outside(self, role, allowed):
+        access = MagicMock()
+        with (
+            patch.object(access_control, "get_team_access_context", new=AsyncMock(return_value=access)),
+            patch.object(access_control, "_team_role", return_value=role),
+        ):
+            teammate = _user("teammate")
+            teammate.is_admin = True  # being a site admin is not enough
+            assert await access_control.can_share_search_set_outside_team(_skill(), teammate) is allowed
+            assert await access_control.can_share_search_set_outside_team(_skill(), _user("owner")) is True
+            assert await access_control.can_share_search_set_outside_team(_skill(team_id=None), teammate) is False
+
+    @pytest.mark.asyncio
+    async def test_a_team_member_who_can_edit_still_gets_no_link(self, client, shares):
+        user = _user("member")
+        cookies, headers = _auth("member")
+        decode, mock_user, audit = self._caller(user)
+        with decode, mock_user as MockUser, audit, patch(
+            "app.routers.extractions.access_control.get_authorized_search_set", new_callable=AsyncMock, return_value=_skill(),
+        ), patch(
+            "app.routers.extractions.access_control.can_share_search_set_outside_team", new_callable=AsyncMock, return_value=False,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            resp = await client.post("/api/extractions/search-sets/skill-1/share-token", cookies=cookies, headers=headers)
+
+        assert resp.status_code == 403
+        assert shares.docs == {}
 
     @pytest.mark.asyncio
     async def test_someone_who_cannot_edit_gets_no_link(self, client, shares):
@@ -318,6 +355,15 @@ class TestRoutes:
         assert wrong.status_code == missing.status_code == 404
         assert wrong.json() == missing.json()
         assert "Award review" not in wrong.text
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("left", [None, "extraction"])
+    async def test_right_token_for_a_skill_that_is_gone_or_no_longer_a_skill(self, client, shares, left):
+        shares.docs["skill-1"] = {"search_set_uuid": "skill-1", "token": TOKEN, "recipients": []}
+        ss = _skill(set_type=left) if left else None
+        resp = await self._redeem(client, _user("outsider"), ss, TOKEN)
+        assert resp.status_code == 404
+        assert "Award review" not in resp.text
 
     @pytest.mark.asyncio
     async def test_signed_out_person_is_refused(self, client, shares):

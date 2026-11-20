@@ -78,6 +78,46 @@ describe('share links', () => {
     expect(api.toast).toHaveBeenCalledWith('Could not generate share link.', 'error')
   })
 
+  it('starts the copy at once where the browser can take text that is still pending', async () => {
+    // Safari refuses a clipboard write that begins after the request returns.
+    const write = vi.fn().mockResolvedValue(undefined)
+    class Item { parts: Record<string, Promise<Blob>>; constructor(parts: Record<string, Promise<Blob>>) { this.parts = parts } }
+    vi.stubGlobal('ClipboardItem', Item)
+    Object.defineProperty(navigator, 'clipboard', { value: { write, writeText: api.write }, configurable: true })
+    let release!: (value: { share_token: string }) => void
+    api.mintSet.mockReturnValue(new Promise(resolve => { release = resolve }))
+    try {
+      const { result } = renderHook(() => useShareLink())
+      const done = result.current('extraction', 'skill-1')
+      await Promise.resolve()
+      expect(write).toHaveBeenCalledTimes(1) // before the token exists
+      release({ share_token: 'tok' })
+      await done
+      const blob = await (write.mock.calls[0][0][0] as Item).parts['text/plain']
+      expect(blob.type).toBe('text/plain')
+      expect(blob.size).toBe(`${window.location.origin}/shared?item=skill-1&token=tok`.length)
+      expect(api.write).not.toHaveBeenCalled()
+      expect(api.toast).toHaveBeenCalledWith('Link copied. Anyone signed in can open it.', 'success')
+
+      // A link that could not be made is reported as that, not as a clipboard problem.
+      api.toast.mockClear()
+      write.mockImplementation(async (items: Item[]) => { await items[0].parts['text/plain'] })
+      api.mintSet.mockRejectedValue(new ApiError(500, 'boom'))
+      await result.current('extraction', 'skill-1')
+      expect(api.toast).toHaveBeenCalledWith('Could not generate share link.', 'error')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('reports a clipboard that refuses the copy', async () => {
+    api.mintSet.mockResolvedValue({ share_token: 'tok' })
+    api.write.mockRejectedValue(new Error('denied'))
+    const { result } = renderHook(() => useShareLink())
+    await result.current('extraction', 'skill-1')
+    expect(api.toast).toHaveBeenCalledWith('Could not copy link to clipboard.', 'error')
+  })
+
   it('builds the tokenless extraction link unchanged', () => {
     expect(new URL(buildShareUrl('extraction', 'ss-1')).search).toBe('?extraction=ss-1')
   })
