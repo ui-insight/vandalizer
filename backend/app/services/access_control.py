@@ -858,6 +858,10 @@ def can_view_search_set(
         return True
     if search_set.is_global:
         return True
+    # Someone who opened the item's share link (see `share_token`).
+    recipients = getattr(search_set, "share_recipients", None)
+    if user.user_id and isinstance(recipients, list) and user.user_id in recipients:
+        return True
     if search_set.team_id and team_access:
         if search_set.team_id in team_access.team_uuids or search_set.team_id in team_access.team_object_ids:
             return True

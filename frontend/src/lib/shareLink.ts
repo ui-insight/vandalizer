@@ -1,10 +1,16 @@
 import { useCallback } from 'react'
 import { useToast } from '../contexts/ToastContext'
 import { mintWorkflowShareToken } from '../api/workflows'
+import { mintSearchSetShareToken } from '../api/extractions'
 
 export type ShareableKind = 'workflow' | 'extraction' | 'kb'
 
 export function buildShareUrl(kind: ShareableKind, uuid: string, shareToken?: string): string {
+  // A Skill or extraction link with a token goes through /shared, which
+  // records the person opening it before the item is shown.
+  if (kind === 'extraction' && shareToken) {
+    return `${window.location.origin}/shared?${new URLSearchParams({ item: uuid, token: shareToken }).toString()}`
+  }
   const params = new URLSearchParams({ [kind]: uuid })
   if (shareToken) params.set(`${kind}_share_token`, shareToken)
   return `${window.location.origin}/?${params.toString()}`
@@ -49,20 +55,35 @@ export function useShareLink() {
   return useCallback(
     async (kind: ShareableKind, uuid: string, label?: string) => {
       let shareToken: string | undefined
+      // Whether the link lets in someone who could not already open the item.
+      let open = false
       if (kind === 'workflow') {
         try {
           const r = await mintWorkflowShareToken(uuid)
           shareToken = r.share_token
+          open = true
         } catch {
           toast('Could not generate share link.', 'error')
           return
         }
+      } else if (kind === 'extraction') {
+        // Only someone who can edit the item can make its open link; anyone
+        // else still gets a link for people who already have access.
+        try {
+          shareToken = (await mintSearchSetShareToken(uuid)).share_token
+          open = true
+        } catch { /* fall through to the plain link */ }
       }
       const url = buildShareUrl(kind, uuid, shareToken)
       try {
         await navigator.clipboard.writeText(url)
         const what = label ? `“${label}”` : 'Link'
-        toast(`${what} copied. Share it with anyone.`, 'success')
+        toast(
+          open
+            ? `${what} copied. Anyone signed in can open it.`
+            : `${what} copied. It opens for people who already have access.`,
+          'success',
+        )
       } catch {
         toast('Could not copy link to clipboard.', 'error')
       }

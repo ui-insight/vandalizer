@@ -209,6 +209,70 @@ async def get_search_set(uuid: str, user: User = Depends(get_current_user)) -> S
     return await _ss_response(ss, can_manage=can_manage)
 
 
+class _ShareTokenBody(BaseModel):
+    share_token: str
+
+
+@router.post("/search-sets/{uuid}/share-token", response_model=None)
+async def mint_search_set_share_token(uuid: str, user: User = Depends(get_current_user)) -> dict[str, str]:
+    """Create (or return) the share link token for a Skill or extraction.
+
+    Only someone who can edit the item can make its link. Anyone signed in who
+    opens the link can then view the item, use it and copy it; they cannot
+    edit the original.
+    """
+    import secrets
+
+    ss = await _get_search_set_or_404(uuid, user, manage=True)
+    if not ss.share_token:
+        ss.share_token = secrets.token_urlsafe(32)
+        await ss.set({"share_token": ss.share_token})
+        await audit_service.log_event(
+            action="search_set.share_link_create", actor_user_id=user.user_id,
+            resource_type="search_set", resource_id=ss.uuid, resource_name=ss.title,
+            team_id=ss.team_id,
+        )
+    return {"share_token": ss.share_token}
+
+
+@router.delete("/search-sets/{uuid}/share-token", response_model=None)
+async def revoke_search_set_share_token(uuid: str, user: User = Depends(get_current_user)) -> dict[str, bool]:
+    """Turn the share link off: the token stops working and everyone who got
+    access through it loses that access."""
+    ss = await _get_search_set_or_404(uuid, user, manage=True)
+    removed = len(ss.share_recipients or [])
+    await ss.set({"share_token": None, "share_recipients": []})
+    await audit_service.log_event(
+        action="search_set.share_link_revoke", actor_user_id=user.user_id,
+        resource_type="search_set", resource_id=ss.uuid, resource_name=ss.title,
+        team_id=ss.team_id, detail={"recipients_removed": removed},
+    )
+    return {"ok": True}
+
+
+@router.post("/search-sets/{uuid}/share-token/redeem", response_model=None)
+@limiter.limit("30/minute")
+async def redeem_search_set_share_token(
+    request: Request, uuid: str, body: _ShareTokenBody, user: User = Depends(get_current_user),
+) -> dict[str, str]:
+    """Open a share link: record the signed-in person as someone the item is
+    shared with. A wrong token and an item that does not exist answer alike."""
+    import secrets
+
+    ss = await SearchSet.find_one(SearchSet.uuid == uuid)
+    token = ss.share_token if ss else None
+    if not ss or not token or not secrets.compare_digest(token.encode(), body.share_token.encode()):
+        raise HTTPException(status_code=404, detail="This share link is not valid. Ask for a new one.")
+    if user.user_id != ss.user_id and user.user_id not in (ss.share_recipients or []):
+        await ss.update({"$addToSet": {"share_recipients": user.user_id}})
+        await audit_service.log_event(
+            action="search_set.share_link_open", actor_user_id=user.user_id,
+            resource_type="search_set", resource_id=ss.uuid, resource_name=ss.title,
+            team_id=ss.team_id,
+        )
+    return {"uuid": ss.uuid, "title": ss.title, "set_type": ss.set_type}
+
+
 @router.patch("/search-sets/{uuid}", response_model=SearchSetResponse)
 async def update_search_set(uuid: str, req: UpdateSearchSetRequest, user: User = Depends(get_current_user)) -> SearchSetResponse:
     await _get_search_set_or_404(uuid, user, manage=True)

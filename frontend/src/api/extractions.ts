@@ -23,6 +23,19 @@ export function getSearchSet(uuid: string) {
   return apiFetch<SearchSet>(`/api/extractions/search-sets/${uuid}`)
 }
 
+// Share link: only someone who can edit the item can create its
+// link; anyone signed in can open one.
+export function mintSearchSetShareToken(uuid: string) {
+  return apiFetch<{ share_token: string }>(`/api/extractions/search-sets/${uuid}/share-token`, { method: 'POST' })
+}
+
+export function redeemSearchSetShareToken(uuid: string, shareToken: string) {
+  return apiFetch<{ uuid: string; title: string; set_type: string }>(
+    `/api/extractions/search-sets/${uuid}/share-token/redeem`,
+    { method: 'POST', body: JSON.stringify({ share_token: shareToken }) },
+  )
+}
+
 export function updateSearchSet(uuid: string, data: { title?: string; extraction_config?: Record<string, unknown>; when_to_use?: string }) {
   return apiFetch<SearchSet>(`/api/extractions/search-sets/${uuid}`, {
     method: 'PATCH',

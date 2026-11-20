@@ -55,6 +55,12 @@ class SearchSet(Document):
     # by the revert endpoint.
     extraction_config_override: Optional[dict] = None
     extraction_config_override_set_at: Optional[datetime.datetime] = None
+    # "Copy share link": anyone signed in who opens the link with this token
+    # is added to `share_recipients` and can then view and use the item (not
+    # edit it). Turning the link off clears both. Neither is ever sent to a
+    # client other than the token to someone who can manage the item.
+    share_token: Optional[str] = None
+    share_recipients: list[str] = []
 
     class Settings:
         name = "search_set"
