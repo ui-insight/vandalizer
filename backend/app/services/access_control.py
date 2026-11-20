@@ -858,10 +858,6 @@ def can_view_search_set(
         return True
     if search_set.is_global:
         return True
-    # Someone who opened the item's share link (see `share_token`).
-    recipients = getattr(search_set, "share_recipients", None)
-    if user.user_id and isinstance(recipients, list) and user.user_id in recipients:
-        return True
     if search_set.team_id and team_access:
         if search_set.team_id in team_access.team_uuids or search_set.team_id in team_access.team_object_ids:
             return True
@@ -891,7 +887,16 @@ async def get_authorized_search_set(
     *,
     manage: bool = False,
     allow_admin: bool = False,
+    allow_shared: bool = False,
 ) -> "SearchSet | None":
+    """Resolve *search_set_uuid* if *user* may access it at the requested level.
+
+    ``allow_shared`` also lets in someone who opened the item's share link.
+    It is off unless a caller asks, and only the paths that read a Skill for
+    chat ask: a link is for reading and using a Skill, so its holders must
+    not pass the many other view-level checks (validation data, exports,
+    filing in a library, submitting for verification). It never grants manage.
+    """
     from app.models.search_set import SearchSet
 
     ss = await SearchSet.find_one(SearchSet.uuid == search_set_uuid)
@@ -915,6 +920,10 @@ async def get_authorized_search_set(
         )
     if not allowed and not manage:
         allowed = await has_open_verification_review_access("search_set", ss.id, user)
+    if not allowed and not manage and allow_shared and ss.set_type == "prompt":
+        from app.services import skill_share_service
+
+        allowed = await skill_share_service.is_recipient(ss.uuid, user.user_id)
     return ss if allowed else None
 
 

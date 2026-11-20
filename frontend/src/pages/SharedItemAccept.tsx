@@ -6,9 +6,9 @@ import { redeemSearchSetShareToken } from '../api/extractions'
 type Status = 'loading' | 'needsAuth' | 'error'
 
 /**
- * Where a Skill or extraction share link lands. Records the signed-in person
- * as someone the item is shared with, then opens it: a Skill in a new chat,
- * an extraction in the Library. They can use and copy it, not edit it.
+ * Where a Skill's share link lands. Records the signed-in person as someone
+ * the Skill is shared with, then opens it in a new chat, where they read and
+ * accept its instructions before it is used. They cannot edit it.
  */
 export default function SharedItemAccept() {
   const { user, loading: authLoading } = useAuth()
@@ -32,16 +32,14 @@ export default function SharedItemAccept() {
     startedRef.current = true
     redeemSearchSetShareToken(item, token)
       .then(shared => {
-        const base = {
-          mode: undefined, tab: undefined, workflow: undefined, extraction: undefined,
-          automation: undefined, kb: undefined, project: undefined, workflow_share_token: undefined,
-        }
         navigate({
           to: '/',
           replace: true,
-          search: shared.set_type === 'prompt'
-            ? { ...base, mode: 'chat' as const, skill: shared.uuid }
-            : { ...base, tab: 'library' as const, extraction: shared.uuid },
+          search: {
+            mode: 'chat' as const, tab: undefined, workflow: undefined, extraction: undefined,
+            automation: undefined, kb: undefined, project: undefined, workflow_share_token: undefined,
+            skill: shared.uuid,
+          },
         })
       })
       .catch(err => {
@@ -56,13 +54,13 @@ export default function SharedItemAccept() {
         {status === 'loading' && (
           <>
             <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-highlight-on-dark border-t-transparent" />
-            <p className="mt-4 text-gray-300" role="status">Opening the shared item…</p>
+            <p className="mt-4 text-gray-300" role="status">Opening the shared Skill…</p>
           </>
         )}
 
         {status === 'needsAuth' && (
           <>
-            <h1 className="text-xl font-bold text-white">Someone shared an item with you</h1>
+            <h1 className="text-xl font-bold text-white">Someone shared a Skill with you</h1>
             <p className="mt-4 text-sm text-gray-400">Sign in or create an account, then re-open this link.</p>
             <a
               href="/landing"

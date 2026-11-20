@@ -2,12 +2,13 @@ import { useCallback } from 'react'
 import { useToast } from '../contexts/ToastContext'
 import { mintWorkflowShareToken } from '../api/workflows'
 import { mintSearchSetShareToken } from '../api/extractions'
+import { ApiError } from '../api/client'
 
 export type ShareableKind = 'workflow' | 'extraction' | 'kb'
 
 export function buildShareUrl(kind: ShareableKind, uuid: string, shareToken?: string): string {
-  // A Skill or extraction link with a token goes through /shared, which
-  // records the person opening it before the item is shown.
+  // A Skill link with a token goes through /shared, which records the person
+  // opening it before the Skill is shown.
   if (kind === 'extraction' && shareToken) {
     return `${window.location.origin}/shared?${new URLSearchParams({ item: uuid, token: shareToken }).toString()}`
   }
@@ -67,12 +68,18 @@ export function useShareLink() {
           return
         }
       } else if (kind === 'extraction') {
-        // Only someone who can edit the item can make its open link; anyone
-        // else still gets a link for people who already have access.
+        // A Skill gets an open link when the person can edit it. An
+        // extraction, or a Skill they cannot edit, is refused by the server
+        // and keeps the link for people who already have access.
         try {
           shareToken = (await mintSearchSetShareToken(uuid)).share_token
           open = true
-        } catch { /* fall through to the plain link */ }
+        } catch (err) {
+          if (!(err instanceof ApiError) || ![400, 403, 404].includes(err.status)) {
+            toast('Could not generate share link.', 'error')
+            return
+          }
+        }
       }
       const url = buildShareUrl(kind, uuid, shareToken)
       try {

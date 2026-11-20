@@ -18,7 +18,7 @@ beforeEach(() => {
 })
 
 it('opens a shared Skill in a new chat, once', async () => {
-  api.redeem.mockResolvedValue({ uuid: 'skill-1', title: 'Award review', set_type: 'prompt' })
+  api.redeem.mockResolvedValue({ uuid: 'skill-1', title: 'Award review' })
   render(<StrictMode><SharedItemAccept /></StrictMode>)
 
   await waitFor(() => expect(api.navigate).toHaveBeenCalled())
@@ -30,16 +30,6 @@ it('opens a shared Skill in a new chat, once', async () => {
   expect(target.search).toMatchObject({ mode: 'chat', skill: 'skill-1', extraction: undefined })
   // The token must not travel on into the workspace address.
   expect(JSON.stringify(target.search)).not.toContain('tok')
-})
-
-it('opens a shared extraction in the Library', async () => {
-  api.redeem.mockResolvedValue({ uuid: 'ss-9', title: 'NOA fields', set_type: 'extraction' })
-  render(<SharedItemAccept />)
-
-  await waitFor(() => expect(api.navigate).toHaveBeenCalled())
-  const target = api.navigate.mock.calls[0][0]
-  expect(target.search).toMatchObject({ tab: 'library', extraction: 'ss-9' })
-  expect(target.search.skill).toBeUndefined()
 })
 
 it('says so when the link is not valid, and opens nothing', async () => {
@@ -61,7 +51,7 @@ it('asks a signed-out person to sign in before anything is recorded', async () =
 it('waits for sign-in state, and rejects a link with a part missing', async () => {
   auth = { user: null, loading: true }
   const { unmount } = render(<SharedItemAccept />)
-  expect(screen.getByRole('status')).toHaveTextContent('Opening the shared item…')
+  expect(screen.getByRole('status')).toHaveTextContent('Opening the shared Skill…')
   expect(api.redeem).not.toHaveBeenCalled()
   unmount()
 

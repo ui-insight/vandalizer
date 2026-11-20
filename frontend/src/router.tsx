@@ -185,7 +185,7 @@ const joinProjectRoute = createRoute({
   component: JoinProjectAccept,
 })
 
-// A Skill or extraction share link ("Copy share link").
+// A Skill's share link ("Copy share link").
 const sharedItemRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/shared',

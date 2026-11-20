@@ -5,6 +5,7 @@ const api = vi.hoisted(() => ({ toast: vi.fn(), mintWorkflow: vi.fn(), mintSet: 
 vi.mock('../contexts/ToastContext', () => ({ useToast: () => ({ toast: api.toast }) }))
 vi.mock('../api/workflows', () => ({ mintWorkflowShareToken: api.mintWorkflow }))
 vi.mock('../api/extractions', () => ({ mintSearchSetShareToken: api.mintSet }))
+import { ApiError } from '../api/client'
 
 import { buildShareUrl, useShareLink } from './shareLink'
 
@@ -17,7 +18,7 @@ beforeEach(() => {
 const copied = () => new URL(api.write.mock.calls[0][0] as string)
 
 describe('share links', () => {
-  it('gives a Skill or extraction a link anyone signed in can open', async () => {
+  it('gives a Skill a link anyone signed in can open', async () => {
     api.mintSet.mockResolvedValue({ share_token: 'tok/en+1' })
     const { result } = renderHook(() => useShareLink())
     await result.current('extraction', 'skill-1', 'Award review')
@@ -29,8 +30,10 @@ describe('share links', () => {
     expect(api.toast).toHaveBeenCalledWith('“Award review” copied. Anyone signed in can open it.', 'success')
   })
 
-  it('still copies a plain link, and says who it works for, when the person cannot make an open one', async () => {
-    api.mintSet.mockRejectedValue(new Error('SearchSet not found'))
+  it.each([
+    ['an extraction', 400], ['a Skill the person cannot edit', 404], ['a refused request', 403],
+  ])('copies a plain link for %s and says who it works for', async (_what, status) => {
+    api.mintSet.mockRejectedValue(new ApiError(status, 'refused'))
     const { result } = renderHook(() => useShareLink())
     await result.current('extraction', 'skill-1')
 
@@ -38,6 +41,16 @@ describe('share links', () => {
     expect(copied().search).toBe('?extraction=skill-1')
     expect(api.toast).toHaveBeenCalledWith('Link copied. It opens for people who already have access.', 'success')
   })
+
+  it.each([new ApiError(500, 'boom'), new TypeError('Failed to fetch')])(
+    'copies nothing when the link could not be made (%s)', async (failure) => {
+      api.mintSet.mockRejectedValue(failure)
+      const { result } = renderHook(() => useShareLink())
+      await result.current('extraction', 'skill-1')
+
+      expect(api.write).not.toHaveBeenCalled()
+      expect(api.toast).toHaveBeenCalledWith('Could not generate share link.', 'error')
+    })
 
   it('does not promise open access for a knowledge base link', async () => {
     const { result } = renderHook(() => useShareLink())
