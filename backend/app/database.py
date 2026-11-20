@@ -11,6 +11,7 @@ from app.models.team import Team, TeamMembership, TeamInvite, TeamJoinLink
 from app.models.document import SmartDocument
 from app.models.folder import SmartFolder
 from app.models.search_set import SearchSet, SearchSetItem
+from app.models.search_set_share import SearchSetShare
 from app.models.workflow import (
     Workflow,
     WorkflowStep,
@@ -90,6 +91,7 @@ ALL_MODELS: list[type[Document]] = [
     SmartFolder,
     SearchSet,
     SearchSetItem,
+    SearchSetShare,
     Workflow,
     WorkflowStep,
     WorkflowStepTask,
