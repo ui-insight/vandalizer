@@ -8,7 +8,7 @@ const EXT = 'vandalizer-extension'
 
 /** Tools the extension carries out. record_value runs on the server. */
 export const BROWSER_TOOL_NAMES: ReadonlySet<string> = new Set([
-  'browser_open', 'browser_read', 'browser_click', 'browser_type', 'browser_select',
+  'browser_open', 'browser_read', 'browser_click', 'browser_type', 'browser_select', 'browser_finish',
 ])
 
 // Five seconds shorter than the server's wait for each tool
@@ -44,7 +44,8 @@ function listen() {
       if (!resolve) return
       pending.delete(msg.id)
       const result = msg.result
-      if (result && typeof result === 'object' && 'error' in result && result.error === 'extension_unavailable') ready = false
+      if (result && typeof result === 'object' && 'error' in result
+        && ['extension_unavailable', 'browser_not_connected', 'not_allowed'].includes(String(result.error))) ready = false
       resolve(result && typeof result === 'object' && !Array.isArray(result)
         ? result as Record<string, unknown>
         : { error: 'browser_bad_result' })
@@ -77,20 +78,22 @@ export async function runBrowserTool(
   args: Record<string, unknown>,
   /** The administrator's site list for this call, which the extension enforces on redirects and links. */
   allowedHosts?: string[],
+  conversation?: string,
 ): Promise<Record<string, unknown>> {
   listen()
-  // The reply needs the extension's background worker, which Chrome suspends
-  // after about 30 seconds idle; waking it can take over a second. At 500 ms
-  // a connected browser was reported as not connected mid-task.
-  if (!(await detectBrowserExtension(RELAY_PING_TIMEOUT_MS))) return Promise.resolve({ error: 'browser_not_connected', message: 'The Vandalizer browser extension is not connected on this page.' })
+  // A known bridge can dispatch the command and wake Chrome's service worker.
+  // Requiring a second, short ping on every click lost a working connection
+  // whenever the chat tab was in the background.
+  if (!ready && !(await detectBrowserExtension(RELAY_PING_TIMEOUT_MS))) return { error: 'browser_not_connected', message: 'The Vandalizer browser extension is not connected on this page.' }
   const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
       pending.delete(id)
+      ready = false
       resolve({ error: 'browser_timeout', message: 'The browser extension did not answer.' })
     }, browserCommandTimeoutMs(tool))
     pending.set(id, (result) => { clearTimeout(timer); resolve(result) })
-    window.postMessage({ source: PAGE, type: 'command', id, tool, args, ...(allowedHosts?.length ? { allowedHosts } : {}) }, window.location.origin)
+    window.postMessage({ source: PAGE, type: 'command', id, tool, args, ...(conversation ? { conversation } : {}), ...(allowedHosts?.length ? { allowedHosts } : {}) }, window.location.origin)
   })
 }
 

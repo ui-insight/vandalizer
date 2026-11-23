@@ -6,6 +6,8 @@ export function readPage(query: string, maxChars: number): {
   text: string
   truncated: boolean
   login_required: boolean
+  unread_frames?: number
+  pdf_viewer?: boolean
   query_not_found?: boolean
 }
 export function clickRef(ref: number): Record<string, unknown>

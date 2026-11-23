@@ -227,6 +227,27 @@ class TestPdfHasOcrableContent:
         path = _save_pdf(doc, tmp_path, "scan.pdf")
         assert pdf_has_ocrable_content(path) is True
 
+    @pytest.mark.parametrize("faint_character", [False, True])
+    def test_scanned_separator_dust_is_blank_but_a_faint_character_is_content(self, tmp_path, faint_character):
+        import pymupdf
+        from app.services import document_readers as dr
+
+        width = 200
+        pixels = bytearray([255]) * (width * width)
+        for y in range(15, 180, 18):
+            pixels[y * width + y] = 190
+        if faint_character:
+            for y in range(25, 34):
+                pixels[y * width + 60:y * width + 62] = bytes([225, 225])
+        image = pymupdf.Pixmap(pymupdf.csGRAY, width, width, bytes(pixels), 0)
+        with pymupdf.open() as doc:
+            page = doc.new_page(width=width, height=width)
+            page.insert_image(page.rect, pixmap=image)
+            path = str(tmp_path / "scanned.pdf")
+            doc.save(path)
+        assert pdf_has_ocrable_content(path) is faint_character
+        assert dr._pages_are_blank(path, [0]) is (not faint_character)
+
     def test_vector_ink_counts_as_content(self, tmp_path):
         """Outlined/vector text has no text layer and no images — it is only
         drawings. The raster pass must see its ink and let OCR run."""
@@ -351,6 +372,42 @@ class TestPdfInspectorFastPath:
                 y += 16
             y += 10
         return _save_pdf(doc, tmp_path, name)
+
+    @pytest.mark.parametrize("second_page_needs_ocr", [False, True])
+    def test_nonempty_markdown_cannot_drop_a_rate_table(self, tmp_path, monkeypatch, second_page_needs_ocr):
+        from types import SimpleNamespace
+
+        import pymupdf
+        from app.services import document_readers as dr
+
+        path = tmp_path / "rates.pdf"
+        footer = "Effective period until amended. Use the rates for the prior fiscal year."
+        with pymupdf.open() as doc:
+            page = doc.new_page()
+            page.insert_text((50, 50), "\n".join([
+                "Facilities and administrative costs for sponsored programs",
+                "Organized research on campus 50.00 percent",
+                "Organized research off campus 26.00 percent",
+                "Modified total direct costs exclude equipment, tuition and participant support.",
+                "University accounting office negotiated agreement. Instruction and other activities follow.",
+                footer,
+            ]))
+            doc.new_page().insert_text((50, 50), "Signatures and terms of agreement")
+            doc.save(path)
+
+        classification = SimpleNamespace(pdf_type="text_based", confidence=0.99, pages_needing_ocr=[])
+        monkeypatch.setattr(dr, "_classify_pdf", lambda _: classification)
+        parsed = SimpleNamespace(pages_with_tables=[], pages=[
+            SimpleNamespace(page=0, markdown=footer, needs_ocr=False),
+            SimpleNamespace(page=1, markdown="## Signatures and terms of agreement", needs_ocr=second_page_needs_ocr),
+        ])
+        monkeypatch.setattr("pdf_inspector.extract_pages_markdown", lambda _: parsed)
+        monkeypatch.setattr(dr, "ocr_extract_text_from_pdf", lambda *a, **kw: "Signatures and terms of agreement")
+        text, markers = dr.extract_text_with_markers(str(path), "pdf")
+        assert "on campus 50.00" in text and "off campus 26.00" in text
+        assert text.count(footer) == 1
+        assert [m["value"] for m in markers] == [1, 2]
+        assert "off campus 26.00" in text[:markers[1]["char_offset"]]
 
     def test_confident_text_pdf_skips_ocr_via_markers(self, tmp_path):
         from unittest.mock import patch

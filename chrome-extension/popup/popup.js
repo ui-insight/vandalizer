@@ -47,13 +47,25 @@ document.getElementById('open-vandalizer').addEventListener('click', async () =>
     const tabs = await chrome.tabs.query({ url: `${connectedOrigin}/*` })
     if (tabs.length) await focusTab(tabs[0])
     else await chrome.tabs.create({ url: `${connectedOrigin}/assistant#browser-setup` })
-    if (!connectionPage) window.close()
+    if (connectionPage) {
+      const setupTab = await chrome.tabs.getCurrent()
+      if (setupTab && !setupTab.pinned) await chrome.tabs.remove(setupTab.id)
+    } else window.close()
   } catch { show('Could not open Vandalizer. Select your Vandalizer tab and try again.', true) }
 })
 
 document.getElementById('open-working')?.addEventListener('click', async () => {
   try { await focusTab(await chrome.tabs.get(workingTabId)); window.close() }
   catch { show('The working tab has closed. Ask chat to open the site again.', true) }
+})
+
+document.getElementById('close-working')?.addEventListener('click', async () => {
+  try {
+    const state = await chrome.storage.session.get('workingTabId')
+    if (state.workingTabId === workingTabId && typeof workingTabId === 'number') await chrome.tabs.remove(workingTabId)
+    document.getElementById('open-working').hidden = true
+    document.getElementById('close-working').hidden = true
+  } catch { show('Could not close the working tab. Check whether it is still open.', true) }
 })
 
 async function load() {
@@ -71,7 +83,11 @@ async function load() {
     const session = await chrome.storage.session.get('workingTabId')
     workingTabId = session.workingTabId
     if (typeof workingTabId === 'number') {
-      try { await chrome.tabs.get(workingTabId); document.getElementById('open-working').hidden = false } catch { /* Tab closed. */ }
+      try {
+        await chrome.tabs.get(workingTabId)
+        document.getElementById('open-working').hidden = false
+        document.getElementById('close-working').hidden = false
+      } catch { /* Tab closed. */ }
     }
   }
   await listSites(vandalizerOrigin)
@@ -156,7 +172,7 @@ form.addEventListener('submit', async (event) => {
       if (stale.length) {
         try { await chrome.permissions.remove({ origins: stale }) } catch { /* Chrome keeps a grant it will not remove. */ }
       }
-      try { await chrome.storage.session.remove('workingTabId') } catch { /* no working tab to forget */ }
+      try { await chrome.storage.session.remove(['workingTabId', 'workingOwnerTabId', 'workingConversation', 'workingTabInspected']) } catch { /* no working tab to forget */ }
     }
     await chrome.storage.local.set({ vandalizerOrigin: origin })
     // Register for future loads, then attach to already open tabs immediately.

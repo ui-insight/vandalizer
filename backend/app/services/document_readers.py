@@ -54,9 +54,8 @@ MAX_XLSX_COMMENT_LEN = 500
 # speed when unsure" posture as the rest of this module.
 _PDF_INSPECTOR_MIN_CONFIDENCE = 0.8
 
-# A rendered grayscale pixel this bright or brighter counts as blank paper.
-# Real content — even faint anti-aliased text — pulls pixels well below this.
-_BLANK_PAGE_INK_THRESHOLD = 250
+# Grayscale levels below 250 in a rendered page.
+_INK_PIXELS = re.compile(rb"[\x00-\xf9]")
 
 # A page whose reading holds fewer characters than this while a picture covers
 # at least this fraction of it is a picture of content — a scanned or pasted
@@ -284,6 +283,28 @@ def _pymupdf_page_text(page: Page) -> str:
     return page_text or ""
 
 
+def _rendered_page_has_ink(page: Page, *, scanned: bool) -> bool:
+    """Preserve ink, ignoring a few isolated light specks on scanned paper."""
+    import pymupdf
+
+    pix = page.get_pixmap(colorspace=pymupdf.csGRAY, alpha=False)
+    samples = pix.samples
+    if not scanned:
+        return _INK_PIXELS.search(samples) is not None
+    # At the default 72 dpi even a small letter produces a cluster. Keep any
+    # dark mark or substantial amount of ink. Only examine the neighborhood
+    # of a few faint pixels on an otherwise white scan.
+    specks: list[tuple[int, int]] = []
+    for match in _INK_PIXELS.finditer(samples):
+        if samples[match.start()] < 160 or len(specks) >= 48:
+            return True
+        specks.append(divmod(match.start(), pix.width))
+    return any(
+        sum(abs(y - other_y) <= 4 and abs(x - other_x) <= 4 for other_y, other_x in specks) >= 7
+        for y, x in specks
+    )
+
+
 def _page_has_unread_content(page: Page, text: str) -> bool:
     """True when ``page`` shows content that its reading ``text`` does not hold.
 
@@ -305,16 +326,14 @@ def _page_has_unread_content(page: Page, text: str) -> bool:
             bbox = info.get("bbox")
             if bbox:
                 covered += abs(pymupdf.Rect(bbox) & page.rect)
-        if covered / area >= _UNREAD_PAGE_IMAGE_COVERAGE:
-            return True
+        scanned = covered / area >= _UNREAD_PAGE_IMAGE_COVERAGE
         if stripped:
             # A short page of real text with no picture over it is just short.
-            return False
+            return scanned
         # Not page.get_images(): it lists every image in the page's resources,
         # including shared ones the page never draws, so a blank page in such a
         # PDF would be flagged. Drawn images show up as ink below.
-        pix = page.get_pixmap(colorspace=pymupdf.csGRAY, alpha=False)
-        return bool(pix.samples) and min(pix.samples) < _BLANK_PAGE_INK_THRESHOLD
+        return _rendered_page_has_ink(page, scanned=scanned)
     except Exception as e:  # noqa: BLE001 — a coverage check must never fail a read
         logger.warning(
             "Could not check page %s for unread content: %s", getattr(page, "number", "?"), e,
@@ -1337,9 +1356,8 @@ def pdf_has_ocrable_content(pdf_path: str) -> bool:
     fabrication is long enough to pass the MIN_PDF_TEXT_LENGTH acceptance
     gate. So before OCR runs, prove there is something to read.
 
-    A page counts as having content if it has a text layer, an embedded
-    image (scanned page), or a filled form field. Pages with none of those
-    are rasterized and tested for ink — rendering is the ground truth,
+    A page counts as having content if it has a text layer or a filled
+    form field. Other pages, including scans, are tested for rendered ink,
     since OCR consumes the rendered page: vector/outlined text (fonts
     converted to curves) shows up as dark pixels, while a decorative white
     background rectangle does not. A page that rasterizes to uniform white
@@ -1355,14 +1373,11 @@ def pdf_has_ocrable_content(pdf_path: str) -> bool:
             for page in doc:
                 if (page.get_text("text") or "").strip():
                     return True
-                if page.get_images(full=True):
-                    return True
                 if any(
                     (w.field_value or "").strip() for w in page.widgets() or []
                 ):
                     return True
-                pix = page.get_pixmap(colorspace=pymupdf.csGRAY, alpha=False)
-                if pix.samples and min(pix.samples) < _BLANK_PAGE_INK_THRESHOLD:
+                if _rendered_page_has_ink(page, scanned=bool(page.get_image_info())):
                     return True
     except Exception as e:
         logger.warning(
@@ -1433,7 +1448,7 @@ def _local_markdown_extract_from_pdf(
         )
         return None
 
-    joined = _join_pages({p.page + 1: p.markdown or "" for p in result.pages})
+    joined = _join_pages(_checked_markdown_pages(pdf_path, result, problem))
     if joined is None:
         return None
     text, markers = joined
@@ -1495,6 +1510,42 @@ def _fast_path_parse(pdf_path: str, classification: PdfClassification | None) ->
     return result, problem
 
 
+def _checked_markdown_pages(
+    pdf_path: str, result: PagesExtractionResult, problem: list[int],
+) -> dict[int, str]:
+    """Recover substantial native text omitted from an otherwise successful local parse.
+
+    A rate agreement returned just the last table row and footer without
+    setting needs_ocr. Only check unflagged pages of a confident text-based
+    PDF. Flagged pages and forced OCR keep their own recovery paths.
+    """
+    import pymupdf
+
+    pages = {p.page + 1: p.markdown or "" for p in result.pages if p.page not in problem}
+    try:
+        with pymupdf.open(pdf_path) as doc:
+            for number, markdown in pages.items():
+                if not markdown.strip():
+                    continue
+                page = doc[number - 1]
+                native = page.get_text("text")
+                if len(markdown) * 2 >= len(native):
+                    continue
+                native_words = set(_COVERAGE_WORD_RE.findall(native.lower()))
+                matched = native_words.intersection(_COVERAGE_WORD_RE.findall(markdown.lower()))
+                # Require overlapping readings and substantial missing vocabulary:
+                # whitespace and repeated text alone do not justify a replacement.
+                if (
+                    len(matched) >= 3
+                    and len(native_words - matched) >= _COVERAGE_MIN_WORDS
+                    and len(matched) * 2 < len(native_words)
+                ):
+                    pages[number] = _pymupdf_page_text(page)
+    except Exception as exc:
+        logger.warning("Could not check local Markdown coverage for %s: %s", pdf_path, exc)
+    return pages
+
+
 def _join_pages(page_texts: dict[int, str]) -> tuple[str, list[dict]] | None:
     """Join 1-indexed page texts in page order, with a marker per page that
     has text. None when the whole is too short to count as a reading."""
@@ -1553,14 +1604,10 @@ def _fast_path_with_page_ocr(
     if parsed is None:
         return None
     result, problem = parsed
-    read_pages = {
-        p.page: p.markdown or "" for p in result.pages if p.page not in problem
-    }
-    if (
-        not problem
-        or len(problem) > _MAX_PAGES_OCR_ONE_BY_ONE
-        or not any(t.strip() for t in read_pages.values())
-    ):
+    if not problem or len(problem) > _MAX_PAGES_OCR_ONE_BY_ONE:
+        return None
+    page_texts = _checked_markdown_pages(pdf_path, result, problem)
+    if not any(t.strip() for t in page_texts.values()):
         return None
 
     import tempfile
@@ -1572,11 +1619,10 @@ def _fast_path_with_page_ocr(
     _report_stage(on_stage, "ocr")
     logger.info(
         "pdf-inspector fast path for %s: keeping %d page(s) read locally, "
-        "sending page(s) %s to OCR", pdf_path, len(read_pages),
+        "sending page(s) %s to OCR", pdf_path, len(page_texts),
         [n + 1 for n in problem],
     )
 
-    page_texts = {n + 1: t for n, t in read_pages.items()}
     unread: list[int] = []
     outage = False
     with tempfile.TemporaryDirectory() as tmp, pymupdf.open(pdf_path) as doc:
