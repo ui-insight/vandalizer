@@ -11,7 +11,7 @@ async function popup(search = '', granted = true, savedOrigin = '', access = tru
   vi.stubGlobal('location', { search })
   const close = vi.spyOn(window, 'close').mockImplementation(() => {})
   const chrome = {
-    tabs: { query: vi.fn(async () => [{ id: 42, windowId: 7, url: activeUrl }]), create: vi.fn(), get: vi.fn(async () => ({ id: 43, windowId: 7 })), update: vi.fn() },
+    tabs: { query: vi.fn(async () => [{ id: 42, windowId: 7, url: activeUrl }]), create: vi.fn(), get: vi.fn(async () => ({ id: 43, windowId: 7 })), update: vi.fn(), getCurrent: vi.fn(async () => ({ id: 44 })), remove: vi.fn() },
     windows: { update: vi.fn() },
     runtime: { getURL: (path: string) => `chrome-extension://test/${path}` },
     permissions: { contains: vi.fn(async () => access), getAll: vi.fn(async () => ({ origins: [] })), request: vi.fn(async () => granted), remove: vi.fn() },
@@ -87,11 +87,15 @@ it('shows reconnect help after a host permission is revoked', async () => {
   expect(document.getElementById('connected-actions')).not.toBeVisible()
 })
 it('replaces approval with a return action after connecting', async () => {
-  const { submit } = await popup('?origin=https%3A%2F%2Fvandalizer.example.edu')
+  const { chrome, submit } = await popup('?origin=https%3A%2F%2Fvandalizer.example.edu')
   submit()
   await waitFor(() => expect(document.getElementById('page-title')).toHaveTextContent('Your browser is ready'))
   expect(document.getElementById('connect')).not.toBeVisible()
-  expect(document.getElementById('open-vandalizer')).toHaveTextContent('Return to Vandalizer')
+  const back = document.getElementById('open-vandalizer')!
+  expect(back).toHaveTextContent('Return to Vandalizer')
+  back.click()
+  await waitFor(() => expect(chrome.tabs.remove).toHaveBeenCalledWith(44))
+  expect(chrome.tabs.remove).toHaveBeenCalledTimes(1)
 })
 it('offers the existing working tab without reading it', async () => {
   const { chrome } = await popup('', true, 'https://vandalizer.example.edu')
@@ -103,4 +107,21 @@ it('does not ask a connected user to reconnect from a browser settings tab', asy
   await popup('', true, 'https://vandalizer.example.edu', true, 'chrome://extensions')
   expect(document.getElementById('connection-label')).toHaveTextContent('Connected')
   expect(document.getElementById('status')).toBeEmptyDOMElement()
+})
+
+it('closes only the managed tab shown when the menu opened', async () => {
+  const { chrome } = await popup('', true, 'https://vandalizer.example.edu')
+  const closeWorking = document.getElementById('close-working')!
+  closeWorking.click()
+  await waitFor(() => expect(closeWorking).not.toBeVisible())
+  expect(chrome.tabs.remove.mock.calls).toEqual([[43]])
+})
+
+it('leaves a replacement working tab alone when a stale popup asks to close', async () => {
+  const { chrome } = await popup('', true, 'https://vandalizer.example.edu')
+  chrome.storage.session.get.mockResolvedValue({ workingTabId: 99 })
+  const closeWorking = document.getElementById('close-working')!
+  closeWorking.click()
+  await waitFor(() => expect(closeWorking).not.toBeVisible())
+  expect(chrome.tabs.remove).not.toHaveBeenCalled()
 })

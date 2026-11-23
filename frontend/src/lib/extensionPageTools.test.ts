@@ -61,6 +61,11 @@ describe('browser_click refuses controls that could write', () => {
 })
 
 describe('browser_click allows ordinary navigation and filters', () => {
+  it('routes new-window links through the working tab and still checks the action first', () => {
+    expect(click('<a target="_blank" href="https://example.edu/search">Directory</a>')).toMatchObject({ open_url: 'https://example.edu/search' })
+    expect(click('<a target="_blank" href="https://example.edu/delete">Delete</a>')).toMatchObject({ error: 'blocked_write_action' })
+  })
+
   it.each([
     ['a "Purchase Orders" link', '<a href="/finance/po">Purchase Orders</a>'],
     ['a "Change Requests" tab', '<div role="tab">Change Requests</div>'],
@@ -173,6 +178,24 @@ describe('browser_type and browser_select only work in search and filter fields'
 })
 
 describe('reading and finding numbered controls', () => {
+  it('describes a public embedded form without reading it or forwarding a signed URL', () => {
+    document.body.innerHTML = '<iframe title="Directory search" src="https://directory.example/search"></iframe><iframe title="Private view" src="https://private.example/p?ticket=secret"></iframe>'
+    for (const frame of document.querySelectorAll('iframe')) {
+      Object.defineProperty(frame, 'contentDocument', { get: () => null })
+    }
+    const page = readPage('', 20000)
+    expect(page.unread_frames).toBe(2)
+    expect(page.text).toContain('Embedded page "Directory search" (not read): https://directory.example/search')
+    expect(page.text).not.toContain('private.example')
+  })
+
+  it('distinguishes the browser PDF viewer from a page containing an attachment', () => {
+    document.body.innerHTML = '<embed type="application/pdf">'
+    expect(readPage('', 20000).pdf_viewer).toBe(true)
+    document.body.insertAdjacentHTML('afterbegin', '<p>Ordinary page with an attached file</p>')
+    expect(readPage('', 20000).pdf_viewer).toBeUndefined()
+  })
+
   it('reads what sits inside display:contents wrappers', () => {
     document.body.innerHTML = '<div style="display:contents"><p>Remaining balance 15,000.00</p><a href="/award/1">Award 1</a></div>'
     const page = readPage('', 20000)

@@ -117,7 +117,7 @@ CAPABILITIES: tuple[Capability, ...] = (
         "browser", "Use your browser",
         "With the Vandalizer browser extension, opens the sites you allow in your own Chrome, signed in as you, "
         "and reads figures from them. It only reads: it will not submit, save or approve anything.",
-        ("browser_open", "browser_read", "browser_click", "browser_type", "browser_select", "record_value"),
+        ("browser_open", "browser_read", "browser_click", "browser_type", "browser_select", "browser_finish", "record_value"),
     ),
     Capability(
         "ra_inbox", "RA inbox",

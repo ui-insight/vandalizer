@@ -30,7 +30,7 @@ from app.services.chat_deps import AgenticChatDeps
 logger = logging.getLogger(__name__)
 
 BROWSER_TOOL_NAMES: frozenset[str] = frozenset({
-    "browser_open", "browser_read", "browser_click", "browser_type", "browser_select", "record_value",
+    "browser_open", "browser_read", "browser_click", "browser_type", "browser_select", "browser_finish", "record_value",
 })
 # Tools whose work happens in the extension; record_value runs here.
 RELAYED_TOOL_NAMES: frozenset[str] = BROWSER_TOOL_NAMES - {"record_value"}
@@ -50,8 +50,9 @@ MAX_PAGES_PER_TURN = 30
 # connected: the call then comes back with one of these from the chat page.
 _DISCONNECTED_ERRORS = frozenset({"browser_not_connected", "extension_unavailable", "browser_unavailable"})
 _DISCONNECTED_HINT = (
-    "Tell the person their browser isn't connected and that they can reconnect it at "
-    "[Assistant settings → Set up Vandalizer Browser](/assistant#browser-setup). Do not read the page "
+    "Ask the person to check the connection with Continue browser task. If the browser still isn't connected, reconnect at "
+    "[Assistant settings → Set up Vandalizer Browser](/assistant#browser-setup). After recovery, "
+    "read the working tab first to preserve the selected section. Do not read the page "
     "with fetch_url or a web search in this reply as if it were their browser."
 )
 _NOT_CONNECTED = {
@@ -248,6 +249,16 @@ async def browser_open(context: RunContext[AgenticChatDeps], url: str, confirmed
     ``[12]``; pass that number to browser_click, browser_type or
     browser_select. Numbers are valid only until the next read.
 
+    After completing the browser task and recording the evidence, call
+    browser_finish before replying. Keep the tab available when waiting for
+    the person to sign in, navigate, or inspect a result.
+
+    A labeled embedded page may have a separate address and site permission.
+    If it contains the requested form, use its displayed address with the
+    normal browser_open approval flow. An unread frame is not a failed search.
+    A pdf_viewer result means the browser opened the file but could not read
+    its text; ask for the PDF as an attachment.
+
     If the result says ``login_required`` or ``unapproved_site`` (for example a
     single sign-on page), stop and ask the person to sign in or allow the site
     in that tab, then continue when they say so. Never ask for their password.
@@ -305,6 +316,16 @@ async def browser_select(context: RunContext[AgenticChatDeps], ref: int, option:
     return await _run(context, "browser_select", {"ref": ref, "option": option}, ACTION_TIMEOUT_SECONDS)
 
 
+async def browser_finish(context: RunContext[AgenticChatDeps]) -> dict:
+    """Release the working tab once the requested browser research is complete.
+
+    Call after collecting the evidence and before giving the final answer.
+    Keep the tab available if the person wants it open or needs to sign in,
+    navigate or inspect a source to continue. Recorded values remain available.
+    """
+    return await _run(context, "browser_finish", {}, ACTION_TIMEOUT_SECONDS)
+
+
 _CURRENCY = re.compile(r"[$€£]")
 _THOUSANDS = re.compile(r"(?<=\d),(?=\d)")
 _SPACE = re.compile(r"\s+")
@@ -354,7 +375,9 @@ async def record_value(context: RunContext[AgenticChatDeps], label: str, value: 
     this turn, as a whole value (currency signs, thousands commas and spacing
     may differ, not digits); anything else
     is refused. Report only recorded values, and give the page each came
-    from. Use the calculate tool for totals or differences.
+    from. Record a single literal field at a time; put its description in
+    label. Cite attached document values using document tools instead. Use
+    the calculate tool for totals or differences.
     """
     page = _found_on(value, context.deps.browser_pages)
     if page is None:
@@ -377,4 +400,4 @@ async def record_value(context: RunContext[AgenticChatDeps], label: str, value: 
     return {"recorded": True, **entry}
 
 
-TOOLS: list[ToolFuncContext[AgenticChatDeps, Any]] = [browser_open, browser_read, browser_click, browser_type, browser_select, record_value]
+TOOLS: list[ToolFuncContext[AgenticChatDeps, Any]] = [browser_open, browser_read, browser_click, browser_type, browser_select, browser_finish, record_value]

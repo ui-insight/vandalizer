@@ -39,6 +39,7 @@ it('runs browser calls in the extension in order, posts each result, and tells t
   act(() => { sending = result.current.send('Check the balance') })
   expect(vi.mocked(streamChat).mock.calls[0].at(-1)).toBe(true)
   expect(isBrowserExtensionReady).toHaveBeenCalled()
+  act(() => vi.mocked(streamChat).mock.calls[0][12]?.({ conversationUuid: 'c', activityId: 'a' }))
 
   act(() => emit({ kind: 'tool_call', content: '', tool_name: 'browser_open', tool_call_id: 'open-1', args: { url: 'https://fin.example.edu' }, relay: true }))
   act(() => emit({ kind: 'tool_call', content: '', tool_name: 'browser_read', tool_call_id: 'read-1', args: { query: 'balance' }, relay: true, browser_allowed_hosts: ['example.edu'] }))
@@ -54,9 +55,9 @@ it('runs browser calls in the extension in order, posts each result, and tells t
     ['open-1', { page: { text: 'opened' } }],
     ['read-1', { page: { text: 'read' } }],
   ])
-  expect(runBrowserTool).toHaveBeenCalledWith('browser_open', { url: 'https://fin.example.edu' }, undefined)
+  expect(runBrowserTool).toHaveBeenCalledWith('browser_open', { url: 'https://fin.example.edu' }, undefined, 'c')
   // The administrator's site list travels with the call for the extension to enforce.
-  expect(runBrowserTool).toHaveBeenCalledWith('browser_read', { query: 'balance' }, ['example.edu'])
+  expect(runBrowserTool).toHaveBeenCalledWith('browser_read', { query: 'balance' }, ['example.edu'], 'c')
   await act(async () => { finish(); await sending })
 })
 
