@@ -36,12 +36,11 @@ it('uses one working tab across opens and closes it only with the last owning ch
   expect(session.workingTabId).toBeUndefined()
 })
 
-it.each(['inspected', 'pinned', 'active'])('leaves the %s working tab with its user', async mode => {
+it.each(['inspected', 'pinned'])('leaves the %s working tab with its user', async mode => {
   const { chrome, state, session, tab } = worker()
   await state.openWorkingTab(tab.url, { id: 1, windowId: 3, index: 1 })
   if (mode === 'inspected') chrome.tabs.onActivated.addListener.mock.calls[0][0]({ tabId: tab.id })
-  else if (mode === 'pinned') tab.pinned = true
-  else tab.active = true
+  else tab.pinned = true
   chrome.tabs.onRemoved.addListener.mock.calls[0][0](1)
   await state.tabIdle()
   expect(chrome.tabs.remove).not.toHaveBeenCalled()
@@ -192,4 +191,25 @@ it('navigates and reads a same-site new-context link in the existing tab', async
   expect(result.page.url).toBe(destination)
   expect(chrome.tabs.update).toHaveBeenCalledWith(tab.id, { url: destination })
   expect(chrome.tabs.create).toHaveBeenCalledTimes(1)
+})
+
+it('cleans up a background tab Chrome automatically selects when its opener closes', async () => {
+  const { chrome, state, tab } = worker()
+  await state.openWorkingTab(tab.url, { id: 1, windowId: 3, index: 1 })
+  tab.active = true
+  chrome.tabs.get.mockRejectedValueOnce(new Error('No tab with id 1'))
+  chrome.tabs.onActivated.addListener.mock.calls[0][0]({ tabId: tab.id })
+  chrome.tabs.onRemoved.addListener.mock.calls[0][0](1)
+  await state.tabIdle()
+  expect(chrome.tabs.remove.mock.calls).toEqual([[tab.id]])
+})
+
+it('preserves a foreground page when research finishes with its owner still open', async () => {
+  const { chrome, state, tab } = worker()
+  chrome.permissions.contains.mockResolvedValue(true)
+  const sender = { id: 'ours', origin: 'https://vandalizer.example.edu', tab: { id: 1 } }
+  await state.openWorkingTab(tab.url, sender.tab, 'research')
+  tab.active = true
+  expect(await state.handleCommand({ tool: 'browser_finish', conversation: 'research' }, sender)).toEqual({ ok: true, working_tab: 'kept' })
+  expect(chrome.tabs.remove).not.toHaveBeenCalled()
 })

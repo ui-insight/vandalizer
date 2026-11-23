@@ -165,8 +165,12 @@ const tabKeys = ['workingTabId', 'workingOwnerTabId', 'workingConversation', 'wo
 
 chrome.tabs.onActivated.addListener(({ tabId }) => {
   void changeWorkingTab(async () => {
-    const { workingTabId } = await chrome.storage.session.get('workingTabId')
-    if (tabId === workingTabId) await chrome.storage.session.set({ workingTabInspected: true })
+    const { workingTabId, workingOwnerTabId } = await chrome.storage.session.get(tabKeys)
+    if (tabId !== workingTabId || typeof workingOwnerTabId !== 'number') return
+    // Chrome selects a neighbor when an active tab closes. That automatic
+    // activation is not the person choosing to keep the research page.
+    try { await chrome.tabs.get(workingOwnerTabId) } catch { return }
+    await chrome.storage.session.set({ workingTabInspected: true })
   }).catch(console.error)
 })
 
@@ -176,20 +180,20 @@ chrome.tabs.onRemoved.addListener((tabId) => {
     if (state.workingTabId === tabId) {
       await chrome.storage.session.remove(tabKeys)
     } else if (state.workingOwnerTabId === tabId) {
-      await releaseWorkingTab(tabId, state.workingConversation)
+      await releaseWorkingTab(tabId, state.workingConversation, true)
     }
   }).catch(console.error)
 })
 
 // Release exactly the page this chat acquired. A completion from a detached
 // conversation can arrive after a different conversation opened its source.
-async function releaseWorkingTab(ownerId, conversation) {
+async function releaseWorkingTab(ownerId, conversation, ownerClosed = false) {
   const state = await chrome.storage.session.get(tabKeys)
   if (!state.workingTabId || state.workingOwnerTabId !== ownerId || state.workingConversation !== conversation) {
     return { ok: true, working_tab: 'none' }
   }
   const tab = await workingTab()
-  const keep = tab && (state.workingTabInspected || tab.active || tab.pinned)
+  const keep = tab && (state.workingTabInspected || tab.pinned || (tab.active && !ownerClosed))
   if (tab && !keep) await chrome.tabs.remove(tab.id)
   await chrome.storage.session.remove(tabKeys)
   return { ok: true, working_tab: !tab ? 'none' : keep ? 'kept' : 'closed' }
