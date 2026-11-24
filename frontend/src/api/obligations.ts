@@ -46,6 +46,8 @@ export interface Obligation {
   entered_by_hand?: boolean
   /** That person's note on where it comes from, as typed. Not a verified citation. */
   source_note?: string | null
+  /** A hand-entered deadline you can edit or delete: you own or edit its project, and no document confirmed it or amendment replaced it. */
+  editable?: boolean
 }
 
 /** Home's list across your projects, or one project's when *projectUuid* is given. */
@@ -78,6 +80,19 @@ export function addDeadlineByHand(projectUuid: string, title: string, dueDate: s
     method: 'POST',
     body: JSON.stringify({ project_uuid: projectUuid, title, due_date: dueDate, source_note: sourceNote || null }),
   })
+}
+
+/** Correct a hand-entered deadline, for everyone on the project. */
+export function editDeadlineByHand(uuid: string, title: string, dueDate: string, sourceNote?: string) {
+  return apiFetch<Obligation>(`/api/obligations/${encodeURIComponent(uuid)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ title, due_date: dueDate, source_note: sourceNote || null }),
+  })
+}
+
+/** Delete a hand-entered deadline, for everyone on the project. */
+export function deleteDeadlineByHand(uuid: string) {
+  return apiFetch<{ deleted: boolean }>(`/api/obligations/${encodeURIComponent(uuid)}`, { method: 'DELETE' })
 }
 
 export function setInboxHidden(inboxHidden: boolean) {

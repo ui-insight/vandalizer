@@ -31,6 +31,12 @@ async def _obligation_for(obligation_uuid: str, user: User, *, manage: bool) -> 
     return ob, project
 
 
+async def _row(ob: Obligation, project: Project, user: User) -> dict:
+    """One item for someone who may only be viewing: Edit and Delete are offered to owners and editors."""
+    can_manage = obligation_service.hand_editable(ob) and await project_service.can_manage_project(project, user)
+    return await obligation_service.serialize_checked(ob, user, project.title, can_manage=can_manage)
+
+
 @router.get("", response_model=None)
 async def list_obligations(
     project_uuid: Optional[str] = None,
@@ -145,7 +151,7 @@ async def download_calendar(
 async def get_obligation(obligation_uuid: str, user: User = Depends(get_current_user)) -> dict:
     """One item, for a reminder's link to it."""
     ob, project = await _obligation_for(obligation_uuid, user, manage=False)
-    return await obligation_service.serialize_checked(ob, user, project.title)
+    return await _row(ob, project, user)
 
 
 @router.get("/{obligation_uuid}/calendar.ics", response_model=None)
@@ -178,7 +184,7 @@ async def create_obligations(body: CreateObligationsRequest, user: User = Depend
             manual.append(accepted)
     created = [await obligation_service.save_checked(project, user, a["clean"]) for a in manual]
     return {
-        "created": [obligation_service.serialize(o, user, project.title) for o in created],
+        "created": [obligation_service.serialize(o, user, project.title, can_manage=True) for o in created],
         "rejected": checked["rejected"],
     }
 
@@ -199,7 +205,56 @@ async def add_by_hand(body: AddByHandRequest, user: User = Depends(get_current_u
     )
     if ob is None:
         raise HTTPException(status_code=422, detail=reason)
-    return obligation_service.serialize(ob, user, project.title)
+    return obligation_service.serialize(ob, user, project.title, can_manage=True)
+
+
+class InboxSettingsRequest(BaseModel):
+    inbox_hidden: bool
+
+
+@router.put("/home-settings", response_model=None)
+async def update_home_settings(body: InboxSettingsRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
+    """Turn the whole RA inbox on Home off or back on, for this account."""
+    user.home_inbox_hidden = body.inbox_hidden
+    await user.save()
+    return {"inbox_hidden": user.home_inbox_hidden}
+
+
+class EditByHandRequest(BaseModel):
+    title: str
+    due_date: str
+    source_note: Optional[str] = None
+
+
+async def _hand_entered_for(obligation_uuid: str, user: User) -> tuple[Obligation, Project]:
+    ob, project = await _obligation_for(obligation_uuid, user, manage=True)
+    if not obligation_service.hand_editable(ob):
+        raise HTTPException(
+            status_code=409,
+            detail="An amendment replaced this deadline; it can no longer be changed." if getattr(ob, "entered_by_hand", False)
+            else "This item comes from a document, so it can't be edited or deleted here. Mark it done or dismiss it instead.",
+        )
+    return ob, project
+
+
+@router.put("/{obligation_uuid}", response_model=None)
+async def edit_by_hand(obligation_uuid: str, body: EditByHandRequest, user: User = Depends(get_current_user)) -> dict:
+    """Correct a deadline that was added by hand, for everyone on the project (#1165)."""
+    ob, project = await _hand_entered_for(obligation_uuid, user)
+    edited, reason = await obligation_service.edit_by_hand(
+        ob, user, title=body.title, due_date=body.due_date, source_note=body.source_note,
+    )
+    if edited is None:
+        raise HTTPException(status_code=422, detail=reason)
+    return obligation_service.serialize(edited, user, project.title, can_manage=True)
+
+
+@router.delete("/{obligation_uuid}", response_model=None)
+async def delete_by_hand(obligation_uuid: str, user: User = Depends(get_current_user)) -> dict[str, bool]:
+    """Delete a deadline that was added by hand, for everyone on the project (#1165)."""
+    ob, _project = await _hand_entered_for(obligation_uuid, user)
+    await obligation_service.delete_by_hand(ob, user)
+    return {"deleted": True}
 
 
 class DoneRequest(BaseModel):
@@ -213,7 +268,7 @@ async def mark_done(obligation_uuid: str, body: DoneRequest, user: User = Depend
     if ob.status == "superseded":
         raise HTTPException(status_code=409, detail="An amendment replaced this item; update the newer one instead.")
     ob = await obligation_service.set_done(ob, user, body.done)
-    return await obligation_service.serialize_checked(ob, user, project.title)
+    return await obligation_service.serialize_checked(ob, user, project.title, can_manage=True)
 
 
 class KeepRequest(BaseModel):
@@ -225,7 +280,7 @@ async def keep_without_source(obligation_uuid: str, body: KeepRequest, user: Use
     """Keep an item whose source file was deleted, for everyone on the project."""
     ob, project = await _obligation_for(obligation_uuid, user, manage=True)
     ob = await obligation_service.set_kept_without_source(ob, body.keep)
-    return await obligation_service.serialize_checked(ob, user, project.title)
+    return await obligation_service.serialize_checked(ob, user, project.title, can_manage=True)
 
 
 class DismissRequest(BaseModel):
@@ -237,16 +292,4 @@ async def dismiss(obligation_uuid: str, body: DismissRequest, user: User = Depen
     """Hide (or restore) an item on your own Home. Teammates still see it."""
     ob, project = await _obligation_for(obligation_uuid, user, manage=False)
     ob = await obligation_service.set_dismissed(ob, user, body.dismissed)
-    return await obligation_service.serialize_checked(ob, user, project.title)
-
-
-class InboxSettingsRequest(BaseModel):
-    inbox_hidden: bool
-
-
-@router.put("/home-settings", response_model=None)
-async def update_home_settings(body: InboxSettingsRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
-    """Turn the whole RA inbox on Home off or back on, for this account."""
-    user.home_inbox_hidden = body.inbox_hidden
-    await user.save()
-    return {"inbox_hidden": user.home_inbox_hidden}
+    return await _row(ob, project, user)

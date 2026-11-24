@@ -34,6 +34,7 @@ from app.services.access_control import (
 from app.services import name_conflicts, step_knowledge_access
 from app.services.config_service import get_user_model_name
 from app.services.run_metadata import describe_run
+from app.services.workflow_diagnostics import inline_extraction_field_details, use_linked_set_fields
 
 if TYPE_CHECKING:
     from app.models.user import User
@@ -51,6 +52,28 @@ class _ExtractionFieldInfo(TypedDict):
     description: NotRequired[str]
     optional: NotRequired[bool]
     allowed_values: NotRequired[list[str]]
+
+
+def _extraction_plan_fields(task_data: dict) -> list[_ExtractionFieldInfo]:
+    """An Extraction task's own fields, as the validation plan describes them.
+
+    Read in every stored shape. Reading only ``extractions`` told the planner
+    that a catalog step, whose fields are stored as ``searchphrases``, produced
+    0 fields.
+    """
+    fields: list[_ExtractionFieldInfo] = []
+    for ext in inline_extraction_field_details(task_data)[:30]:
+        if len(ext) == 1:
+            fields.append({"key": ext["key"]})
+            continue
+        field_info: _ExtractionFieldInfo = {"key": ext["key"], "description": str(ext.get("description") or "")}
+        if ext.get("is_optional"):
+            field_info["optional"] = True
+        enum_vals = ext.get("enum_values")
+        if isinstance(enum_vals, list) and enum_vals:
+            field_info["allowed_values"] = [str(v) for v in enum_vals]
+        fields.append(field_info)
+    return fields
 
 
 def _sanitize_for_json(value: object) -> object:
@@ -1360,7 +1383,7 @@ async def test_step(
             SearchSetItem.searchset == task_data["search_set_uuid"],
             SearchSetItem.searchtype == "extraction",
         ).to_list()
-        task_data["keys"] = [item.searchphrase for item in items]
+        use_linked_set_fields(task_data, [item.searchphrase for item in items])
 
     result = celery_app.send_task(
         "tasks.workflow_next.execution_step_test",
@@ -2024,23 +2047,8 @@ async def generate_validation_plan(workflow_id: str, user: User) -> list[dict]:
             task_name = task["name"]
 
             if task_name == "Extraction":
-                extractions = data.get("extractions", [])
-                fields_detail = []
-                for ext in extractions[:30]:
-                    if isinstance(ext, str):
-                        field_info: _ExtractionFieldInfo = {"key": ext.strip()}
-                    else:
-                        key = ext.get("key", "")
-                        desc = ext.get("description", "")
-                        is_optional = ext.get("is_optional", False)
-                        enum_vals = ext.get("enum_values", [])
-                        field_info = {"key": key, "description": desc}
-                        if is_optional:
-                            field_info["optional"] = True
-                        if enum_vals:
-                            field_info["allowed_values"] = enum_vals
-                    fields_detail.append(field_info)
-                    all_extracted_fields.append(field_info)
+                fields_detail = _extraction_plan_fields(data)
+                all_extracted_fields.extend(fields_detail)
 
                 step_desc_parts.append(
                     "**Extraction task** — extracts the following fields from the input:\n"

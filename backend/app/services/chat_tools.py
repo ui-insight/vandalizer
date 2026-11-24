@@ -3642,9 +3642,10 @@ async def propose_test_case(
 
     user_id = context.deps.user_id
     team_id = context.deps.team_id
-    if not ss.verified and ss.user_id != user_id:
-        if not (team_id and ss.team_id == team_id):
-            return {"error": "You do not have access to this extraction set."}
+    # Test cases and validation runs change the set's shared quality record:
+    # its creator or a team admin only, as on the Validate tab (#1164).
+    if not ss.verified and not await _can_manage_extraction_set(context, ss):
+        return {"error": "Only this extraction set's creator or a team admin can add test cases or validate it. Clone it to work on your own copy."}
 
     doc = await SmartDocument.find_one(SmartDocument.uuid == document_uuid)
     if not doc:
@@ -4115,10 +4116,10 @@ async def run_validation(
         )
 
     user_id = context.deps.user_id
-    team_id = context.deps.team_id
-    if not ss.verified and ss.user_id != user_id:
-        if not (team_id and ss.team_id == team_id):
-            return {"error": "You do not have access to this extraction set."}
+    # Test cases and validation runs change the set's shared quality record:
+    # its creator or a team admin only, as on the Validate tab (#1164).
+    if not ss.verified and not await _can_manage_extraction_set(context, ss):
+        return {"error": "Only this extraction set's creator or a team admin can add test cases or validate it. Clone it to work on your own copy."}
 
     tc_count = await ExtractionTestCase.find(
         ExtractionTestCase.search_set_uuid == extraction_set_uuid
@@ -4254,6 +4255,16 @@ _OPTIMIZE_KIND_ALIASES = {
 }
 
 
+async def _can_manage_extraction_set(context: RunContext[AgenticChatDeps], ss: SearchSet) -> bool:
+    """The creator or an owner/admin of the set's team, as the editor enforces."""
+    if ss.user_id == context.deps.user_id:
+        return True
+    from app.services import access_control
+
+    team_access = await access_control.get_team_access_context(context.deps.user)
+    return access_control.can_manage_search_set(ss, context.deps.user, team_access=team_access)
+
+
 async def _get_optimizable_item(context: RunContext[AgenticChatDeps], item_kind: str, item_uuid: str | None) -> tuple[KnowledgeBase | SearchSet | Workflow | None, str | None, dict | None]:
     """Resolve + manage-level authorize the parent item of an optimization.
 
@@ -4279,8 +4290,8 @@ async def _get_optimizable_item(context: RunContext[AgenticChatDeps], item_kind:
         ss = await SearchSet.find_one(SearchSet.uuid == item_uuid)
         if not ss:
             return None, None, {"error": f"Extraction set '{item_uuid}' not found."}
-        if ss.user_id != user_id and not (team_id and ss.team_id == team_id):
-            return None, None, {"error": "You need manage access to this extraction set to optimize it."}
+        if not await _can_manage_extraction_set(context, ss):
+            return None, None, {"error": "Only this extraction set's creator or a team admin can optimize it. Clone it to tune your own copy."}
         return ss, ss.title, None
 
     if item_kind == "workflow":

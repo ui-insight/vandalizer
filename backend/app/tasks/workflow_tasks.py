@@ -21,6 +21,7 @@ import logging
 from app.celery_app import celery_app
 from app.services.form_fill import DOC_META_TASKS, document_meta
 from app.services.run_metadata import record_pass_usage, snapshot_run_config
+from app.services.workflow_diagnostics import use_linked_set_fields
 from app.exceptions import TrialSpendBlockedError
 from app.tasks import TRANSIENT_EXCEPTIONS
 
@@ -293,7 +294,10 @@ def build_steps_data(db: Database[dict], workflow_doc: dict, workflow_id: str, t
                         "searchset": task_data["search_set_uuid"],
                         "searchtype": "extraction",
                     }))
-                    task_data["keys"] = [item["searchphrase"] for item in items]
+                    # The set is the source of truth: the step's own lists go,
+                    # including an older `searchphrases` the engine would read
+                    # before the set's fields.
+                    use_linked_set_fields(task_data, [item["searchphrase"] for item in items])
                     # Preserve per-field validation (enum_values) and optional
                     # designations (is_optional) so workflow extraction honors the
                     # same constraints as a standalone run. Without this, the saved
@@ -317,10 +321,6 @@ def build_steps_data(db: Database[dict], workflow_doc: dict, workflow_id: str, t
                         task_data["cross_field_rules"] = (
                             list(task_data.get("cross_field_rules") or []) + set_rules
                         )
-                    # UI is mutually exclusive between saved-set and manual fields,
-                    # but older workflows may have both persisted. Drop stale manual
-                    # fields so the saved set is unambiguously the source of truth.
-                    task_data.pop("extractions", None)
 
             # Resolve a linked saved Prompt/Formatter into its inline body.
             _resolve_saved_prompt_formatter(db, task_doc.get("name"), task_data)

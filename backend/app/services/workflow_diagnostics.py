@@ -17,6 +17,7 @@ The aggregator :func:`run_diagnostics` returns a flat list of
 from __future__ import annotations
 
 import json
+import math
 import re
 from typing import Any, TypedDict
 
@@ -34,19 +35,79 @@ class Diagnostic(TypedDict, total=False):
 # ---------------------------------------------------------------------------
 
 
+INLINE_FIELD_KEYS = ("searchphrases", "keys", "extractions")
+
+
+def _field_name(value: object) -> str:
+    """One stored field name as text; ``""`` for anything that is not a name.
+
+    Text is trimmed and a number becomes its text. The frontend applies the
+    same rule (``lib/extractionFields.ts``).
+    """
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, bool):
+        return ""
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float) and math.isfinite(value):
+        return str(int(value)) if value.is_integer() else str(value)
+    return ""
+
+
+def inline_extraction_field_details(task_data: dict) -> list[dict]:
+    """The fields an Extraction task runs with when no saved set is linked.
+
+    Each entry is ``{"key": name}``; an entry stored as an object keeps its
+    other keys (``description``, ``is_optional``, ``enum_values``).
+
+    This is the one place the stored shapes are read: the engine
+    (``workflow_engine.ExtractionNode``), the diagnostics, the validation plan
+    and chat's workflow description all call it, and the editor's
+    ``lib/extractionFields.ts`` follows the same rules. ``searchphrases`` is
+    read first, then ``keys``, then ``extractions``. The first two are older
+    shapes that seeded catalog workflows still use, with ``searchphrases`` as
+    one comma-separated string. Blank entries are dropped, and a shape with
+    nothing left falls through to the next one.
+    """
+    for key in INLINE_FIELD_KEYS:
+        raw = task_data.get(key)
+        parts = raw.split(",") if isinstance(raw, str) else raw if isinstance(raw, list) else []
+        out: list[dict] = []
+        for ext in parts:
+            if isinstance(ext, dict):
+                name = _field_name(ext.get("key"))
+                if name:
+                    out.append({**ext, "key": name})
+            else:
+                name = _field_name(ext)
+                if name:
+                    out.append({"key": name})
+        if out:
+            return out
+    return []
+
+
+def inline_extraction_fields(task_data: dict) -> list[str]:
+    """Names of the fields an Extraction task runs with (see above)."""
+    return [field["key"] for field in inline_extraction_field_details(task_data)]
+
+
+def use_linked_set_fields(task_data: dict, field_names: list[str]) -> None:
+    """Make a linked saved set's fields the ones the task runs with.
+
+    The step's own lists are removed: ``searchphrases`` is read before
+    ``keys``, so one left behind from before the set was linked would run in
+    place of the set the editor shows.
+    """
+    for key in INLINE_FIELD_KEYS:
+        task_data.pop(key, None)
+    task_data["keys"] = list(field_names)
+
+
 def _extraction_fields(task_data: dict) -> list[str]:
     """Field keys produced by an Extraction task, regardless of legacy shape."""
-    out: list[str] = []
-    for ext in task_data.get("extractions", []) or []:
-        if isinstance(ext, str):
-            key = ext.strip()
-        elif isinstance(ext, dict):
-            key = str(ext.get("key", "")).strip()
-        else:
-            key = ""
-        if key:
-            out.append(key)
-    return out
+    return inline_extraction_fields(task_data)
 
 
 def _step_tasks(step: dict) -> list[dict]:

@@ -11,6 +11,7 @@ person enters in the inbox, saved as unchecked and labeled that way.
 
 import datetime
 import html
+import logging
 import re
 import uuid as uuid_mod
 from typing import Any, Collection, Iterable, Optional
@@ -22,10 +23,13 @@ from app.models.obligation import (
     DEADLINE_TYPES,
     OBLIGATION_KINDS,
     Obligation,
+    ObligationReminder,
     ObligationSource,
 )
 from app.models.project import Project
 from app.models.user import User
+
+logger = logging.getLogger(__name__)
 
 _TAG_RE = re.compile(r"<[^>]+>")
 
@@ -879,16 +883,8 @@ async def propose(project: Project, user: User, items: list[dict]) -> dict:
 _MAX_NOTE = 300
 
 
-async def add_by_hand(
-    project: Project, user: User, *, title: str, due_date: str, source_note: Optional[str] = None,
-) -> tuple[Optional[Obligation], Optional[str]]:
-    """Save a deadline typed into the inbox. Returns ``(obligation, None)`` or ``(None, reason)``.
-
-    Support ticket: chat refuses a deadline it can't verify against the
-    document and says to add it in the inbox, which had no way to add one. The
-    item is saved as ``entered_by_hand``, with the person's own note on where it
-    comes from, and never replaces a document-backed deadline.
-    """
+def _hand_fields(title: str, due_date: str, source_note: Optional[str]) -> tuple[Optional[dict[str, Any]], Optional[str]]:
+    """The title, date and note a person typed, cleaned; or the reason they can't be saved."""
     clean_title = " ".join((title or "").split())[:200]
     if not clean_title:
         return None, "Give the deadline a title."
@@ -901,37 +897,139 @@ async def add_by_hand(
     if not 1900 <= due.year <= 2999:
         return None, "Give a due date between 1900 and 2999."
     note = " ".join((source_note or "").split())[:_MAX_NOTE] or None
-    clean: dict[str, Any] = {
-        "kind": "deadline", "title": clean_title, "deadline_type": "other",
-        "due_at": due, "due_text": None, "sources": [],
-    }
-    # Same date and same title only. find_existing also treats any two
-    # "other" deadlines on one day as the same, which would refuse a second,
-    # different deadline someone types for that day.
+    return {"title": clean_title, "due_at": due, "source_note": note}, None
+
+
+async def _hand_duplicate(
+    project_uuid: str, user: User, title: str, due: datetime.datetime, *, skip_uuid: Optional[str] = None,
+) -> Optional[str]:
+    """Why *title* on *due* can't be saved: the project's inbox already has it.
+
+    Same date and same title only. find_existing also treats any two "other"
+    deadlines on one day as the same, which would refuse a second, different
+    deadline someone types for that day.
+    """
     candidates = await Obligation.find(
-        {"project_uuid": project.uuid, "kind": "deadline", "status": {"$in": list(_KNOWN_STATUSES)}},
+        {"project_uuid": project_uuid, "kind": "deadline", "status": {"$in": list(_KNOWN_STATUSES)}},
     ).to_list()
     existing = next((
         ob for ob in sorted(candidates, key=lambda o: o.status != "open")
-        if ob.due_at and ob.due_at.date() == due.date()
-        and (_title_words(ob.title) or {_norm_title(ob.title)}) == (_title_words(clean_title) or {_norm_title(clean_title)})
+        if ob.uuid != skip_uuid and ob.due_at and ob.due_at.date() == due.date()
+        and (_title_words(ob.title) or {_norm_title(ob.title)}) == (_title_words(title) or {_norm_title(title)})
     ), None)
-    if existing is not None:
-        where = ("marked done" if existing.status == "done"
-                 else "dismissed from your Home" if user.user_id in (existing.dismissed_by or [])
-                 else "open")
-        return None, f'"{existing.title}" on that date is already in this project\'s inbox ({where}).'
+    if existing is None:
+        return None
+    where = ("marked done" if existing.status == "done"
+             else "dismissed from your Home" if user.user_id in (existing.dismissed_by or [])
+             else "open")
+    return f'"{existing.title}" on that date is already in this project\'s inbox ({where}).'
+
+
+async def add_by_hand(
+    project: Project, user: User, *, title: str, due_date: str, source_note: Optional[str] = None,
+) -> tuple[Optional[Obligation], Optional[str]]:
+    """Save a deadline typed into the inbox. Returns ``(obligation, None)`` or ``(None, reason)``.
+
+    Support ticket: chat refuses a deadline it can't verify against the
+    document and says to add it in the inbox, which had no way to add one. The
+    item is saved as ``entered_by_hand``, with the person's own note on where it
+    comes from, and never replaces a document-backed deadline.
+    """
+    fields, reason = _hand_fields(title, due_date, source_note)
+    if fields is None:
+        return None, reason
+    reason = await _hand_duplicate(project.uuid, user, fields["title"], fields["due_at"])
+    if reason:
+        return None, reason
     ob = Obligation(
         uuid=uuid_mod.uuid4().hex,
         project_uuid=project.uuid,
         team_id=project.team_id,
         created_by=user.user_id,
         entered_by_hand=True,
-        source_note=note,
-        **clean,
+        kind="deadline", deadline_type="other", due_text=None, sources=[],
+        **fields,
     )
     await ob.insert()
     return ob, None
+
+
+def hand_editable(ob: Obligation) -> bool:
+    """Only a deadline a person typed can be edited or deleted (#1165).
+
+    A document-backed item is what its document says, and a hand-entered one
+    that a document later confirmed (``save_checked``) is document-backed from
+    then on. One an amendment replaced is history.
+    """
+    return bool(getattr(ob, "entered_by_hand", False)) and ob.status != "superseded"
+
+
+async def edit_by_hand(
+    ob: Obligation, user: User, *, title: str, due_date: str, source_note: Optional[str] = None,
+) -> tuple[Optional[Obligation], Optional[str]]:
+    """Correct a hand-entered deadline's title, date or note, for everyone on the project.
+
+    The item keeps its uuid, done state and dismissals. Reminders are keyed by
+    due date, so a changed date is reminded on its new schedule and the old
+    date's unread bell items are cleared. A corrected title alone keeps them
+    unread and respells them: that stage has been sent and won't be again, so
+    clearing it would leave the people it reminded with nothing.
+    """
+    fields, reason = _hand_fields(title, due_date, source_note)
+    if fields is None:
+        return None, reason
+    reason = await _hand_duplicate(ob.project_uuid, user, fields["title"], fields["due_at"], skip_uuid=ob.uuid)
+    if reason:
+        return None, reason
+    old_title, old_due = ob.title, ob.due_at
+    for key, value in fields.items():
+        setattr(ob, key, value)
+    ob.edited_by = user.user_id
+    ob.updated_at = _now()
+    await ob.save()
+    if old_due != ob.due_at:
+        # A bell item saying "due in N days" for the old date is no longer true.
+        await _clear_notifications(ob.uuid)
+    elif old_title != ob.title:
+        await _retitle_notifications(ob.uuid, old_title, ob.title)
+    return ob, None
+
+
+async def delete_by_hand(ob: Obligation, user: User) -> None:
+    """Remove a hand-entered deadline for everyone: the inbox, reminders and calendar feeds."""
+    await ob.delete()
+    await ObligationReminder.find({"obligation_uuid": ob.uuid}).delete()
+    await _clear_notifications(ob.uuid)
+    logger.info("Hand-entered deadline %s (project %s) deleted by %s", ob.uuid, ob.project_uuid, user.user_id)
+
+
+async def _clear_notifications(obligation_uuid: str) -> None:
+    from app.models.notification import Notification
+
+    await Notification.find(
+        {"item_kind": "obligation", "item_id": obligation_uuid, "read": False},
+    ).update_many({"$set": {"read": True}})
+
+
+async def _retitle_notifications(obligation_uuid: str, old_title: str, new_title: str) -> None:
+    """Respell a deadline's unread bell reminders after its title was corrected.
+
+    A reminder's title is a lead-in plus the deadline's title ("Due in 3 days:
+    Final report") and ``item_name`` is the title alone; the body never names
+    it. One that doesn't end with the old title is left as it is.
+    """
+    from app.models.notification import Notification
+
+    unread = await Notification.find(
+        {"item_kind": "obligation", "item_id": obligation_uuid, "read": False},
+    ).to_list()
+    for note in unread:
+        if not old_title or not (note.title or "").endswith(old_title):
+            continue
+        await Notification.find({"uuid": note.uuid, "read": False}).update_many({"$set": {
+            "title": note.title[: -len(old_title)] + new_title,
+            "item_name": new_title,
+        }})
 
 
 def _sort_key(ob: Obligation) -> tuple[int, datetime.datetime, datetime.datetime]:
@@ -977,16 +1075,25 @@ def awaiting_source_decision(ob: Obligation, deleted: Collection[str]) -> bool:
     return source_deleted(ob, deleted) and not getattr(ob, "kept_without_source", False)
 
 
-async def serialize_checked(ob: Obligation, user: User, project_title: str | None = None) -> dict:
+async def serialize_checked(
+    ob: Obligation, user: User, project_title: str | None = None, *, can_manage: bool = False,
+) -> dict:
     """``serialize`` for one item, with its sources checked for deletion."""
-    return serialize(ob, user, project_title, await deleted_source_uuids([ob]))
+    return serialize(ob, user, project_title, await deleted_source_uuids([ob]), can_manage=can_manage)
 
 
 def serialize(
     ob: Obligation, user: User, project_title: str | None = None,
     deleted: Collection[str] = (),
+    *,
+    can_manage: bool = False,
 ) -> dict:
-    """*deleted* is ``deleted_source_uuids`` for the items being listed."""
+    """*deleted* is ``deleted_source_uuids`` for the items being listed.
+
+    *can_manage*: *user* is the project's owner or an editor. Only then is a
+    hand-entered deadline ``editable``, so the inbox offers Edit and Delete
+    where the server will accept them.
+    """
     return {
         "uuid": ob.uuid,
         "project_uuid": ob.project_uuid,
@@ -1006,6 +1113,7 @@ def serialize(
         "kept_without_source": bool(getattr(ob, "kept_without_source", False)),
         "entered_by_hand": bool(getattr(ob, "entered_by_hand", False)),
         "source_note": getattr(ob, "source_note", None),
+        "editable": can_manage and hand_editable(ob),
         "status": ob.status,
         "supersedes": ob.supersedes,
         "superseded_by": ob.superseded_by,
@@ -1038,7 +1146,18 @@ async def inbox(
         obligations = [o for o in obligations if user.user_id not in (o.dismissed_by or [])]
     obligations.sort(key=_sort_key)
     deleted = await deleted_source_uuids(obligations)
-    return [serialize(o, user, projects[o.project_uuid].title, deleted) for o in obligations]
+    manageable = await _manageable(user, [projects[uuid] for uuid in {o.project_uuid for o in obligations if hand_editable(o)}])
+    return [
+        serialize(o, user, projects[o.project_uuid].title, deleted, can_manage=o.project_uuid in manageable)
+        for o in obligations
+    ]
+
+
+async def _manageable(user: User, projects: Iterable[Project]) -> set[str]:
+    """Which of *projects* the user owns or edits. Asked once per project, not per row."""
+    from app.services.project_service import can_manage_project
+
+    return {p.uuid for p in projects if await can_manage_project(p, user)}
 
 
 async def project_obligations(project: Project, user: User) -> list[dict]:
@@ -1067,11 +1186,7 @@ async def set_done(ob: Obligation, user: User, done: bool) -> Obligation:
     await ob.save()
     if done:
         # A finished deadline stops asking for attention in anyone's bell.
-        from app.models.notification import Notification
-
-        await Notification.find(
-            {"item_kind": "obligation", "item_id": ob.uuid, "read": False},
-        ).update_many({"$set": {"read": True}})
+        await _clear_notifications(ob.uuid)
     return ob
 
 
