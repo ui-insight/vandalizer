@@ -46,7 +46,7 @@ export function BrowserRun({ calls, results, running = false }: { calls: ToolCal
     // only by a page on that site: reading B says nothing about A timing out.
     const site = text(entry.value.site) || host(entry.call.args?.url)
     return later.some(next => {
-      if (!next.call.tool_name.startsWith('browser_') || next.value.error) return false
+      if (!next.call.tool_name.startsWith('browser_') || next.call.tool_name === 'browser_finish' || next.value.error) return false
       const reached = host(record(next.value.page).url)
       if (!reached) return !site && next.value.ok === true
       return !site || reached === site || reached.replace(/:\d+$/, '') === site

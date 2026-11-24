@@ -41,7 +41,7 @@ WRITE_TOOLS = {
 # from compaction. Classify them without changing their runtime behavior.
 SEQUENTIAL_READ_TOOLS = {"get_html_artifact", "find_pages", "compare_page_versions", "find_page_templates", "get_page_template"}
 # Browser tools only read, but drive one tab, so they must run in order.
-SEQUENTIAL_READ_TOOLS |= {"browser_open", "browser_read", "browser_click", "browser_type", "browser_select", "record_value"}
+SEQUENTIAL_READ_TOOLS |= {"browser_open", "browser_read", "browser_click", "browser_type", "browser_select", "browser_finish", "record_value"}
 
 
 class TestParallelSafeClassification:

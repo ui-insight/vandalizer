@@ -51,10 +51,18 @@ export function browserMessage(result: Result, args: Result = {}): string {
       return 'Your browser was not connected to this Vandalizer site. Reconnect it in Assistant settings.'
     case 'browser_timeout':
       return 'The browser did not answer in time. Check that the working tab is still open and that no permission window is waiting.'
+    case 'pdf_viewer':
+      return 'Chrome opened the PDF. To let chat read its contents, download the file and choose Add a source → Add Document in this conversation.'
     case 'no_open_page':
       return 'The working tab was closed. Ask chat to open the site again.'
     case 'bad_url':
       return 'Chat tried an address that is not a web page, so nothing was opened.'
+    case 'link_needs_open':
+      return result.url ? 'This link leads to another site. Chat can open it in the working tab after checking site access.' : 'Open the linked section in the working tab, then ask chat to read the page.'
+    case 'browser_busy':
+      return 'Another browser action is using the working tab. Continue when that action finishes.'
+    case 'working_tab_changed':
+      return 'Another chat is using the working tab. Continue to reopen the source for this conversation.'
     case 'value_not_on_page': {
       const value = text(args.value)
       return `Chat could not find ${value ? `“${value}”` : 'a value'} on the pages it read, so it was not recorded.`

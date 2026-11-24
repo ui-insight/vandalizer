@@ -1,6 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { conversationEvidence } from './conversationEvidence'
 describe('conversation export evidence', () => {
+  it('exports recorded browser fields with their actual sources in streamed and saved messages', () => {
+    const value = { recorded: true, label: 'Version', value: 'Synopsis 8', url: 'https://grants.example/opportunity', captured_at: '2026-11-23T20:00:00Z' }
+    const results = [
+      { tool_name: 'record_value', tool_call_id: '1', content: value, quality: null },
+      { tool_name: 'record_value', tool_call_id: '2', content: { ...value, recorded: false, value: 'Unsupported' }, quality: null },
+    ]
+    const saved = conversationEvidence({ role: 'assistant', content: '', tool_results: results })
+    const streamed = conversationEvidence({ role: 'assistant', content: '', segments: results.map(result => ({ kind: 'tool_result', result })) })
+    expect(streamed).toEqual(saved)
+    expect(saved).toContain('Version: Synopsis 8\nhttps://grants.example/opportunity')
+    expect(saved).toContain(value.captured_at)
+    expect(saved).not.toMatch(/Unsupported|No source references/)
+  })
   it('retains approximate pages, quoted evidence and source names without upgrading support', () => {
     const text = conversationEvidence({ role: 'assistant', content: 'Budget is 200.', interruption: 'connection', unsupported_figures: ['200'], citations: [{ document_title: 'Budget.pdf', document_uuid: 'doc-1', page: 2, page_end: 3, page_approximate: true, kb_title: 'Sponsor rules', kb_uuid: 'kb-1', url: 'https://example.test/rules', content_preview: 'Budget is 150.', source_reference: 'Section 4' }] })
     for (const value of ['partial output', 'Unconfirmed figures: 200', 'p. ~2–3', 'Budget is 150.', 'Budget.pdf', 'Knowledge base: Sponsor rules', 'https://example.test/rules', 'Section 4']) expect(text).toContain(value)
