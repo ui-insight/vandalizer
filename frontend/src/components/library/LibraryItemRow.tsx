@@ -368,7 +368,8 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
                       setMenuOpen(false)
                     }}
                   />
-                  {onEdit && (item.set_type === 'prompt' || item.set_type === 'formatter') && (
+                  {/* A teammate's Skill can be used and cloned, not changed (#1164). */}
+                  {onEdit && item.can_edit_underlying !== false && (item.set_type === 'prompt' || item.set_type === 'formatter') && (
                     <MenuItem disabled={busy}
                       icon={<Pencil size={14} />}
                       label="Edit"

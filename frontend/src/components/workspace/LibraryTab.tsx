@@ -1916,7 +1916,8 @@ export function LibraryTab() {
                   >
                     {editingItem.set_type === 'prompt' ? 'Run Skill' : 'Use in Assistant'}
                   </button>
-                  <button
+                  {/* A teammate's Skill can be run and cloned, not changed (#1164). */}
+                  {editingItem.can_edit_underlying !== false && <button
                     disabled={editLoading || !!editLoadError}
                     onClick={() => setEditMode('edit')}
                     style={{
@@ -1931,7 +1932,7 @@ export function LibraryTab() {
                     }}
                   >
                     Edit
-                  </button>
+                  </button>}
                   <button
                     onClick={closeEditModal}
                     style={{

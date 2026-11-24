@@ -197,4 +197,18 @@ describe('Library row actions', () => {
     fireEvent.click(favorite)
     expect(defaultProps.onFavorite).not.toHaveBeenCalled()
   })
+
+  it("offers Edit on a Skill the user may change, not on a teammate's (#1164)", () => {
+    const skill = makeItem({ kind: 'search_set', set_type: 'prompt', name: 'Award review', item_uuid: 'ss-1' })
+    const view = render(<LibraryItemRow item={{ ...skill, can_edit_underlying: true }} {...defaultProps} scope="team" />)
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
+    expect(screen.getByText('Edit')).toBeTruthy()
+    view.unmount()
+
+    render(<LibraryItemRow item={{ ...skill, can_edit_underlying: false }} {...defaultProps} scope="team" />)
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
+    expect(screen.queryByText('Edit')).toBeNull()
+    // Using it and making a copy of your own stay available.
+    expect(screen.getByText('Download JSON')).toBeTruthy()
+  })
 })
