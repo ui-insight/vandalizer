@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { detectBrowserExtension, resetBrowserExtensionForTests, runBrowserTool } from './browserExtension'
 
 // jsdom's postMessage leaves source and origin empty; a real page sets both.
@@ -42,6 +42,23 @@ describe('browser extension bridge', () => {
     ])
     expect(opened).toEqual({ tool: 'browser_open', args: { url: 'https://fin.example.edu' } })
     expect(read).toEqual({ tool: 'browser_read', args: { query: 'balance' } })
+  })
+
+  it('dispatches a click once when an established bridge is slow to answer pings', async () => {
+    const answer = vi.fn(() => ({ ok: true }))
+    const listener = (event: MessageEvent) => {
+      const msg = event.data
+      if (msg?.source === 'vandalizer-page' && msg.type === 'command') {
+        fromThisPage({ source: 'vandalizer-extension', type: 'result', id: msg.id, result: answer() })
+      }
+    }
+    window.addEventListener('message', listener)
+    remove = () => window.removeEventListener('message', listener)
+    const detected = detectBrowserExtension()
+    fromThisPage({ source: 'vandalizer-extension', type: 'ready' })
+    expect(await detected).toBe(true)
+    expect(await runBrowserTool('browser_click', { ref: 1 })).toEqual({ ok: true })
+    expect(answer).toHaveBeenCalledOnce()
   })
 
   it("sends the administrator's site list with a command, and nothing when there is none", async () => {

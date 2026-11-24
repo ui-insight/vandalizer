@@ -147,6 +147,7 @@ async def test_record_value_accepts_whole_values_however_they_are_formatted(valu
 def test_only_calls_that_will_run_are_sent_to_the_browser():
     deps = _context().deps
     assert browser.should_relay("browser_open", True, deps)
+    assert browser.should_relay("browser_finish", True, deps)
     # Server-side tool, bad arguments, unknown validation, no extension, switched off.
     assert not browser.should_relay("record_value", True, deps)
     assert not browser.should_relay("browser_type", False, deps)

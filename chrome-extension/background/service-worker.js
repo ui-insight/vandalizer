@@ -82,35 +82,61 @@ async function handleCommand(msg, sender) {
   if (!(await chrome.permissions.contains({ origins: [`${vandalizerOrigin}/*`] }))) {
     return { error: 'browser_not_connected', message: 'Reconnect this Vandalizer site in the extension popup.' }
   }
+  if (msg.tool === 'browser_status') return { ok: true, version: chrome.runtime.getManifest().version }
+  if (msg.tool === 'browser_focus') return withTab(sender.tab.id, null, async (tab) => {
+    await chrome.windows.update(tab.windowId, { focused: true })
+    await chrome.tabs.update(tab.id, { active: true })
+    return { ok: true }
+  })
+  if (browserActionPending) return { error: 'browser_busy', message: 'Another browser action is running. Wait for it to finish, then read the working tab again.' }
+  browserActionPending = true
+  try {
+    return await runBrowserAction(msg, sender.tab, vandalizerOrigin)
+  } finally {
+    browserActionPending = false
+  }
+}
+
+let browserActionPending = false
+async function runBrowserAction(msg, chatTab, vandalizerOrigin) {
   const args = msg.args || {}
+  const conversation = typeof msg.conversation === 'string' ? msg.conversation : null
   // The sites the Vandalizer administrator allows, sent with each chat
   // command; empty means no limit beyond what the person allowed.
   const hosts = Array.isArray(msg.allowedHosts)
     ? msg.allowedHosts.filter((h) => typeof h === 'string' && h).map((h) => h.toLowerCase())
     : []
   switch (msg.tool) {
-    case 'browser_status': return { ok: true, version: chrome.runtime.getManifest().version }
-    case 'browser_focus': return withTab(async (tab) => {
-      await chrome.windows.update(tab.windowId, { focused: true })
-      await chrome.tabs.update(tab.id, { active: true })
-      return { ok: true }
-    })
-    case 'browser_open': return openUrl(String(args.url || ''), sender.tab, vandalizerOrigin, hosts)
-    case 'browser_read': return withTab((tab) => readTab(tab, String(args.query || ''), hosts))
-    case 'browser_click': return withTab(async (tab) => {
+    case 'browser_open': return openUrl(String(args.url || ''), chatTab, vandalizerOrigin, hosts, conversation)
+    case 'browser_finish': return changeWorkingTab(() => releaseWorkingTab(chatTab.id, conversation))
+    case 'browser_read': return withTab(chatTab.id, conversation, (tab) => readTab(tab, String(args.query || ''), hosts))
+    case 'browser_click': return withTab(chatTab.id, conversation, async (tab) => {
       const blocked = await guardSite(tab, hosts)
       if (blocked) return blocked
       const outcome = await runInTab(tab.id, clickRef, [Number(args.ref)])
+      if (outcome?.open_url) {
+        const target = new URL(outcome.open_url)
+        if (target.origin !== new URL(tab.url).origin) {
+          if (!adminAllows(target.hostname, hosts)) return notOnAdminList(target.hostname)
+          if (target.username || target.password || target.search || target.hash) {
+            return { error: 'link_needs_open', site: target.hostname, message: 'The link opens another site and includes parameterized address details. Ask the person to open the requested section in the working tab, then continue.' }
+          }
+          return { error: 'link_needs_open', url: target.href, site: target.hostname, message: 'Use browser_open with this URL and normal site approval to reuse the working tab.' }
+        }
+        await chrome.tabs.update(tab.id, { url: target.href })
+        await settle(tab.id)
+        return { clicked: outcome.clicked, ...(await readTab(await chrome.tabs.get(tab.id), '', hosts)) }
+      }
       if (!outcome?.ok) return outcome
       await settle(tab.id)
       return { ...outcome, ...(await readTab(await chrome.tabs.get(tab.id), '', hosts)) }
     })
-    case 'browser_type': return withTab(async (tab) => {
+    case 'browser_type': return withTab(chatTab.id, conversation, async (tab) => {
       const blocked = await guardSite(tab, hosts)
       if (blocked) return blocked
       return runInTab(tab.id, typeRef, [Number(args.ref), String(args.text ?? '')])
     })
-    case 'browser_select': return withTab(async (tab) => {
+    case 'browser_select': return withTab(chatTab.id, conversation, async (tab) => {
       const blocked = await guardSite(tab, hosts)
       if (blocked) return blocked
       const outcome = await runInTab(tab.id, selectRef, [Number(args.ref), String(args.option ?? '')])
@@ -126,19 +152,90 @@ async function handleCommand(msg, sender) {
 
 // ── The working tab ────────────────────────────────────────────────────────
 
+// An open from two chat tabs can arrive before either has saved its tab ID.
+// Serialize allocation and cleanup, but never hold this queue while waiting
+// for permission or a page load.
+let tabChanges = Promise.resolve()
+function changeWorkingTab(action) {
+  const changed = tabChanges.then(action)
+  tabChanges = changed.catch(() => {})
+  return changed
+}
+const tabKeys = ['workingTabId', 'workingOwnerTabId', 'workingConversation', 'workingTabInspected']
+
+chrome.tabs.onActivated.addListener(({ tabId }) => {
+  void changeWorkingTab(async () => {
+    const { workingTabId, workingOwnerTabId } = await chrome.storage.session.get(tabKeys)
+    if (tabId !== workingTabId || typeof workingOwnerTabId !== 'number') return
+    // Chrome selects a neighbor when an active tab closes. That automatic
+    // activation is not the person choosing to keep the research page.
+    try { await chrome.tabs.get(workingOwnerTabId) } catch { return }
+    await chrome.storage.session.set({ workingTabInspected: true })
+  }).catch(console.error)
+})
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  void changeWorkingTab(async () => {
+    const state = await chrome.storage.session.get(tabKeys)
+    if (state.workingTabId === tabId) {
+      await chrome.storage.session.remove(tabKeys)
+    } else if (state.workingOwnerTabId === tabId) {
+      await releaseWorkingTab(tabId, state.workingConversation, true)
+    }
+  }).catch(console.error)
+})
+
+// Release exactly the page this chat acquired. A completion from a detached
+// conversation can arrive after a different conversation opened its source.
+async function releaseWorkingTab(ownerId, conversation, ownerClosed = false) {
+  const state = await chrome.storage.session.get(tabKeys)
+  if (!state.workingTabId || state.workingOwnerTabId !== ownerId || state.workingConversation !== conversation) {
+    return { ok: true, working_tab: 'none' }
+  }
+  const tab = await workingTab()
+  const keep = tab && (state.workingTabInspected || tab.pinned || (tab.active && !ownerClosed))
+  if (tab && !keep) await chrome.tabs.remove(tab.id)
+  await chrome.storage.session.remove(tabKeys)
+  return { ok: true, working_tab: !tab ? 'none' : keep ? 'kept' : 'closed' }
+}
+
+function openWorkingTab(url, chatTab, conversation = null) {
+  return changeWorkingTab(async () => {
+    // A site approval can arrive after the requesting chat tab was closed.
+    await chrome.tabs.get(chatTab.id)
+    const state = await chrome.storage.session.get(tabKeys)
+    let tab = await workingTab()
+    const sameChat = state.workingOwnerTabId === chatTab.id && state.workingConversation === conversation
+    if (tab && (tab.pinned || (!sameChat && (state.workingTabInspected || tab.active)))) tab = null
+    if (tab) {
+      tab = await chrome.tabs.update(tab.id, { url })
+      await chrome.storage.session.set({ workingOwnerTabId: chatTab.id, workingConversation: conversation })
+    } else {
+      tab = await chrome.tabs.create({ url, active: false, openerTabId: chatTab.id, windowId: chatTab.windowId, index: chatTab.index + 1 })
+      await chrome.storage.session.set({ workingTabId: tab.id, workingOwnerTabId: chatTab.id, workingConversation: conversation, workingTabInspected: false })
+    }
+    return tab
+  })
+}
+
 async function workingTab() {
   const { workingTabId } = await chrome.storage.session.get('workingTabId')
   if (typeof workingTabId !== 'number') return null
   try { return await chrome.tabs.get(workingTabId) } catch { return null }
 }
 
-async function withTab(fn) {
+async function withTab(ownerId, conversation, fn) {
+  const { workingOwnerTabId, workingConversation } = await chrome.storage.session.get(tabKeys)
+  if ((typeof workingOwnerTabId === 'number' && workingOwnerTabId !== ownerId)
+      || (conversation && workingConversation && workingConversation !== conversation)) {
+    return { error: 'working_tab_changed', message: 'Another chat opened a different working page. Reopen the requested source in this chat before reading or using its controls.' }
+  }
   const tab = await workingTab()
   if (!tab) return { error: 'no_open_page', message: 'No page is open yet. Use browser_open first.' }
   return fn(tab)
 }
 
-async function openUrl(raw, chatTab, vandalizerOrigin, hosts = []) {
+async function openUrl(raw, chatTab, vandalizerOrigin, hosts = [], conversation = null) {
   let url
   try { url = new URL(raw) } catch { return { error: 'bad_url', message: `Not a web address: ${raw}` } }
   if (url.protocol !== 'https:' && url.protocol !== 'http:') return { error: 'bad_url', message: 'Only http and https addresses can be opened.' }
@@ -154,13 +251,7 @@ async function openUrl(raw, chatTab, vandalizerOrigin, hosts = []) {
     }
   }
 
-  let tab = await workingTab()
-  if (tab) {
-    tab = await chrome.tabs.update(tab.id, { url: url.href })
-  } else {
-    tab = await chrome.tabs.create({ url: url.href, active: false, windowId: chatTab.windowId, index: chatTab.index + 1 })
-    await chrome.storage.session.set({ workingTabId: tab.id })
-  }
+  const tab = await openWorkingTab(url.href, chatTab, conversation)
   await settle(tab.id)
   return readTab(await chrome.tabs.get(tab.id), '', hosts)
 }
@@ -220,6 +311,10 @@ async function readTab(tab, query, hosts = []) {
   if (blocked) return blocked
   const page = await runInTab(tab.id, readPage, [query, MAX_PAGE_CHARS])
   if (!page || page.error) return page || { error: 'read_failed' }
+  if (page.pdf_viewer) return {
+    error: 'pdf_viewer', site: new URL(tab.url).hostname,
+    message: 'Chrome opened a PDF viewer. Its document text is unavailable to the browser tool. Ask the person to attach the PDF, then read the attachment with document tools.',
+  }
   return {
     page,
     ...(page.login_required ? {

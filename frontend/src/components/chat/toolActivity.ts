@@ -27,6 +27,7 @@ export const TOOL_META: Record<string, { label: string; category: ToolCategory }
   browser_click:         { label: 'Clicking in your browser', category: 'read' },
   browser_type:          { label: 'Typing a search in your browser', category: 'read' },
   browser_select:        { label: 'Choosing an option in your browser', category: 'read' },
+  browser_finish:        { label: 'Finishing browser research', category: 'read' },
   record_value:          { label: 'Recording a figure from the page', category: 'read' },
   web_search:            { label: 'Searching the web',        category: 'read' },
   run_extraction:        { label: 'Running extraction',       category: 'extract' },

@@ -881,13 +881,35 @@ def can_manage_search_set(
     return False
 
 
+async def can_share_search_set_outside_team(search_set: "SearchSet", user: User) -> bool:
+    """Whether *user* may make a link that opens the item to people outside
+    its team: its creator, or an owner or admin of its team. Narrower than
+    manage on purpose — a site admin or an ordinary team member should not be
+    able to open someone else's work to everyone signed in."""
+    if search_set.user_id == user.user_id:
+        return True
+    if not search_set.team_id:
+        return False
+    team_access = await get_team_access_context(user)
+    return _team_role(search_set.team_id, team_access) in TEAM_MANAGE_ROLES
+
+
 async def get_authorized_search_set(
     search_set_uuid: str,
     user: User,
     *,
     manage: bool = False,
     allow_admin: bool = False,
+    allow_shared: bool = False,
 ) -> "SearchSet | None":
+    """Resolve *search_set_uuid* if *user* may access it at the requested level.
+
+    ``allow_shared`` also lets in someone who opened the item's share link.
+    It is off unless a caller asks, and only the paths that read a Skill for
+    chat ask: a link is for reading and using a Skill, so its holders must
+    not pass the many other view-level checks (validation data, exports,
+    filing in a library, submitting for verification). It never grants manage.
+    """
     from app.models.search_set import SearchSet
 
     ss = await SearchSet.find_one(SearchSet.uuid == search_set_uuid)
@@ -911,6 +933,10 @@ async def get_authorized_search_set(
         )
     if not allowed and not manage:
         allowed = await has_open_verification_review_access("search_set", ss.id, user)
+    if not allowed and not manage and allow_shared and ss.set_type == "prompt":
+        from app.services import skill_share_service
+
+        allowed = await skill_share_service.is_recipient(ss.uuid, user.user_id)
     return ss if allowed else None
 
 

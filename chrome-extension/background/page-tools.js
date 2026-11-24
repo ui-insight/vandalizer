@@ -98,6 +98,19 @@ export function readPage(query, maxChars) {
         flush()
       } else {
         skippedFrames += 1
+        // Read only the enclosing page's visible frame label and public address.
+        // Opening the embedded site still goes through browser_open's permission
+        // checks. Do not advertise session-bearing or parameterized addresses.
+        const label = labelOf(el)
+        if (label && el.getAttribute('src')) {
+          try {
+            const url = new URL(el.src, el.ownerDocument.baseURI)
+            if (['https:', 'http:'].includes(url.protocol) && !url.username && !url.password && !url.search && !url.hash) {
+              flush()
+              lines.push(`Embedded page ${quote(label)} (not read): ${url.href}`)
+            }
+          } catch { /* An opaque frame has no address to offer. */ }
+        }
       }
       return
     }
@@ -159,12 +172,16 @@ export function readPage(query, maxChars) {
   let text = kept.join('\n')
   const truncated = text.length > maxChars
   if (truncated) text = text.slice(0, maxChars) + '\n… (page continues; read again with a query to see a specific part)'
+  const pdfEmbed = document.querySelector('embed[type="application/pdf"]')
+  const pdfViewer = document.contentType === 'application/pdf' || (!text.trim() && pdfEmbed && visible(pdfEmbed))
   return {
     url: location.href,
     title: document.title,
     text,
     truncated,
     login_required: loginRequired,
+    ...(skippedFrames ? { unread_frames: skippedFrames } : {}),
+    ...(pdfViewer ? { pdf_viewer: true } : {}),
     ...(terms.length && !matched ? { query_not_found: true } : {}),
   }
 }
@@ -313,6 +330,13 @@ export function clickRef(ref) {
       error: verdict.error,
       label: verdict.label,
       message: verdict.message,
+    }
+  }
+  if (el.tagName === 'A' && !el.hasAttribute('download')) {
+    const target = (el.getAttribute('target') || el.ownerDocument.querySelector('base[target]')?.target || '_self').toLowerCase()
+    if (!['_self', '_top', '_parent'].includes(target) && /^https?:\/\//i.test(el.href)) {
+      // A synthetic click here would open a second tab and read the old one.
+      return { open_url: el.href, clicked: verdict.label.slice(0, 80) }
     }
   }
   el.scrollIntoView({ block: 'center' })
