@@ -1,5 +1,9 @@
 import {
   BookOpen,
+  MessageSquare,
+  FolderOpen,
+  Globe,
+  ClipboardCheck,
   Compass,
   FileOutput,
   FlaskConical,
@@ -16,6 +20,10 @@ import type { TierDefinition } from '../../types/certification'
 export const ICON_MAP: Record<string, React.ComponentType<{ className?: string; size?: number }>> = {
   Lightbulb,
   BookOpen,
+  MessageSquare,
+  FolderOpen,
+  Globe,
+  ClipboardCheck,
   Search,
   Compass,
   FlaskConical,

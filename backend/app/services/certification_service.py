@@ -541,6 +541,14 @@ def _touch_activity(prog: CertificationProgress) -> None:
 CERT_FOLDER_TITLE = "Certification Lab"
 
 
+def lab_used_in_lessons(module_id: str) -> bool:
+    operation = current_operation()
+    if not operation:
+        return False
+    exercise = operation.package.json('exercises.json').get(module_id, {})
+    return exercise.get('lab_used_in_lessons') is True
+
+
 @course_operation(write=True)
 async def provision_module_documents(user: User, module_id: str, settings: Settings, *, enrollment_id: str | None = None) -> dict:
     """Provision sample documents for a certification module.

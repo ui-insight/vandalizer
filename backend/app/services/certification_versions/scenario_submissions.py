@@ -22,6 +22,7 @@ from bson import ObjectId
 from app.models.certification import CertificationEnrollment, CertificationProgress, CertificationScenarioAttempt
 from .attempts import encode
 from .catalog import CourseCatalogError
+from .core_work_sample import SampleSelection, capture_sample
 from .enrollments import EnrollmentConflict
 from .outcomes import package_outcomes
 from .scenario_assessment import ScenarioBank
@@ -47,11 +48,29 @@ def module_bank(package: CoursePackage, module_id: str) -> ScenarioBank:
         raise CourseCatalogError('The scenario bank does not match this course’s outcome contract') from exc
 
 
+def work_sample_case(package: CoursePackage, module_id: str) -> dict | None:
+    if 'work-sample.json' in package.manifest.artifacts:
+        case = package.json('work-sample.json')
+        if isinstance(case, dict) and case['module_id'] == module_id:
+            return case
+    return None
+
+
+def public_scenarios(package: CoursePackage, module_id: str) -> dict:
+    definition = module_bank(package, module_id).public_definition()
+    if case := work_sample_case(package, module_id):
+        definition['work_sample_project'] = case['project_title']
+    return definition
+
+
 def answers_digest(record: dict) -> str:
     """Exact deterministic assessment inputs, excluding a browser request UUID."""
-    return encode({key: record[key] for key in (
+    fields = {key: record[key] for key in (
         'user_id', 'enrollment_id', 'module_id', 'course_version', 'manifest_sha256',
-        'bank_sha256', 'answers', 'submission_channel')})[1]
+        'bank_sha256', 'answers', 'submission_channel')}
+    if 'work_sample' in record:
+        fields['work_sample'] = record['work_sample']
+    return encode(fields)[1]
 
 
 class ScenarioSubmissionRepository:
@@ -118,7 +137,7 @@ class ScenarioSubmissionRepository:
                 return record
         return None
 
-    async def submit(self, operation: CourseOperation, module_id: str, request_id: str, bank_sha256: str, answers: dict[str, str], *, actor_user_id: str) -> dict:
+    async def submit(self, operation: CourseOperation, module_id: str, request_id: str, bank_sha256: str, answers: dict[str, str], *, actor_user_id: str, sample: SampleSelection | None = None) -> dict:
         progress, package = operation.progress, operation.package
         if not operation.writable or actor_user_id != operation.user_id or not re.fullmatch(r'[a-f0-9]{32}', request_id):
             raise EnrollmentConflict('Scenario submission requires the authenticated learner and a writable course operation')
@@ -132,9 +151,12 @@ class ScenarioSubmissionRepository:
         identity = {'uuid': request_id, 'user_id': actor_user_id, 'enrollment_id': progress.enrollment_id,
                     'module_id': module_id, 'course_version': package.manifest.release_id,
                     'manifest_sha256': package.manifest_sha256}
-        request_sha256 = encode({**identity, 'bank_sha256': bank_sha256, 'answers': answers})[1]
-        digest = answers_digest({**identity, 'bank_sha256': bank_sha256, 'answers': answers,
-                                 'submission_channel': 'authenticated_learner_request'})
+        case = work_sample_case(package, module_id)
+        if bool(case) != bool(sample):
+            raise EnrollmentConflict('Select a work sample only when the assigned case requires one')
+        inputs = {**identity, 'bank_sha256': bank_sha256, 'answers': answers}
+        request_sha256 = encode({**inputs, **({'selection': sample.model_dump()} if sample else {})})[1]
+        evidence = {}
         record: dict | None
         existing = await self.records.find_one({'uuid': request_id})
         if existing is not None:
@@ -142,6 +164,9 @@ class ScenarioSubmissionRepository:
                 raise EnrollmentConflict('This scenario request was already used for different answers or another enrollment')
             record = self.decode(existing)
         else:
+            if sample and case:
+                evidence['work_sample'] = await capture_sample(operation, sample, bank, answers, case)
+            digest = answers_digest({**inputs, **evidence, 'submission_channel': 'authenticated_learner_request'})
             record = await self.matching_answers(identity, digest)
         if record is None:
             try:
@@ -149,7 +174,7 @@ class ScenarioSubmissionRepository:
             except ValueError as exc:
                 raise EnrollmentConflict(str(exc)) from exc
             record = {**identity, 'request_sha256': request_sha256, 'bank_sha256': bank_sha256,
-                      'answers': answers, 'result': result,
+                      'answers': answers, 'result': result, **evidence,
                       'previous_attempt_id': progress.modules.get(module_id, {}).get('scenario_attempt_id'),
                       'submitted_at': datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
                       'submission_channel': 'authenticated_learner_request'}

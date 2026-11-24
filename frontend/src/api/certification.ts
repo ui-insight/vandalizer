@@ -1,3 +1,4 @@
+import type { CoreSampleSelection } from '../types/certification'
 import { apiFetch, ApiError, rawFetch } from './client'
 import type { CertificationProgress, ValidationResult, CompletionResult, CertExercise, CourseDefinition, PositionSaved, ScenarioSubmission, SavedScenarioSubmission, ChatPracticeJudgment, ChatPracticeResult, LessonCheckResult } from '../types/certification'
 
@@ -199,9 +200,9 @@ export function checkChatPractice(enrollmentId: string, body: { passage_quote: s
   })
 }
 
-export function submitScenarios(enrollmentId: string, moduleId: string, requestId: string, bankSha256: string, answers: Record<string, string>) {
+export function submitScenarios(enrollmentId: string, moduleId: string, requestId: string, bankSha256: string, answers: Record<string, string>, workSample?: CoreSampleSelection) {
   return apiFetch<ScenarioSubmission>(enrolledPath(`/api/certification/modules/${encodeURIComponent(moduleId)}/scenarios`, enrollmentId), {
-    method: 'POST', body: JSON.stringify({ request_id: requestId, bank_sha256: bankSha256, answers }),
+    method: 'POST', body: JSON.stringify({ request_id: requestId, bank_sha256: bankSha256, answers, work_sample: workSample }),
   })
 }
 

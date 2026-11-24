@@ -18,8 +18,8 @@ VERSION = 'v5.0-isolated-test.1'
 
 def test_full_preview_uses_every_new_lesson_and_assessment_without_touching_application_catalog(tmp_path):
     registry = (CATALOG_ROOT / 'registry.json').read_bytes()
-    output = preview.assemble(tmp_path / 'first', VERSION)
-    preview.assemble(tmp_path / 'second', VERSION)
+    output = preview.assemble(tmp_path / 'first', VERSION, track='advanced')
+    preview.assemble(tmp_path / 'second', VERSION, track='advanced')
     package = CourseCatalog(output).load(VERSION, preview=True)
     second = CourseCatalog(tmp_path / 'second').load(VERSION, preview=True)
     assert package.manifest_bytes == second.manifest_bytes
@@ -70,13 +70,13 @@ def test_full_preview_uses_every_new_lesson_and_assessment_without_touching_appl
     assert (CATALOG_ROOT / 'registry.json').read_bytes() == registry
     assert set(json.loads(before)) == {'schema_version', 'releases'}
     with pytest.raises(ValueError, match='new output'):
-        preview.assemble(output, VERSION)
+        preview.assemble(output, VERSION, track='advanced')
 
 
 @pytest.mark.parametrize('location', [CATALOG_ROOT, CATALOG_ROOT / 'unapproved-preview'])
 def test_preview_cannot_write_to_application_registry(location):
     with pytest.raises(ValueError, match='outside'):
-        preview.assemble(location, VERSION)
+        preview.assemble(location, VERSION, track='advanced')
 
 
 @pytest.mark.parametrize('problem', ['missing_case', 'mismatched_case', 'stale_lesson', 'legacy_scoring', 'stale_scenario_bank'])
@@ -109,6 +109,49 @@ def test_incomplete_or_contradictory_preview_leaves_no_partial_output(tmp_path, 
             value['scope_proposal_sha256'] = '0' * 64
         path.write_text(json.dumps(value))
     with pytest.raises((ValueError, FileNotFoundError)):
-        preview.assemble(tmp_path / 'output', VERSION, data_root=data)
+        preview.assemble(tmp_path / 'output', VERSION, track='advanced', data_root=data)
     assert not (tmp_path / 'output').exists()
     assert not list(tmp_path.glob('.certification-preview-*'))
+
+
+def test_core_is_the_default_and_packages_only_its_own_sources(tmp_path):
+    from app.services.certification_versions.scenario_submissions import module_bank
+    output = preview.assemble(tmp_path / 'core', VERSION)
+    course = json.loads((output / 'public-course.json').read_text())
+    report = json.loads((output / 'preview-report.json').read_text())
+    assert (report['track'], report['modules'], report['lessons'], report['required_outcomes']) == ('core', 6, 12, 9)
+    assert sum(m['estimatedMinutes'] for m in course['modules']) == 41
+    assert course['modules'][0]['id'] == 'core_chat'
+    assert course['modules'][-1]['scenarioAssessment']['work_sample_project'] == 'Cedar Creek CC-17'
+    package = CourseCatalog(output).load(VERSION, preview=True)
+    assert set(package.json('exercises.json')) == {m['id'] for m in course['modules']}
+    assert set((output / VERSION / 'documents').iterdir()) == {
+        output / VERSION / 'documents' / name for name in ('cedar-creek-award.pdf', 'training-travel-policy.pdf')}
+    assert package.json('exercises.json')['core_chat']['lab_used_in_lessons'] is True
+    for module in course['modules']:
+        bank = module_bank(package, module['id'])
+        assert 'correct_choice_id' not in json.dumps(module)
+        assert bank.grade({}, expected_sha256=bank.digest)['passed'] is False
+
+
+@pytest.mark.parametrize('missing', ['award', 'knowledge_base', 'skill', 'record', 'finish'])
+def test_core_note_requires_each_observed_action(tmp_path, missing):
+    from app.services.certification_versions.core_work_sample import SampleIncomplete, check_case
+    from app.services.certification_versions.scenario_submissions import module_bank
+    output = preview.assemble(tmp_path / 'core', VERSION)
+    package = CourseCatalog(output).load(VERSION, preview=True)
+    case = package.json('work-sample.json')
+    bank = module_bank(package, case['module_id'])
+    answers = {q.id: q.correct_choice_id for q in bank.questions}
+    note = '\n'.join(c.text for q in bank.questions for c in q.choices if c.id == answers[q.id])
+    messages = [{'role': 'user', 'source_documents': [{'uuid': 'other' if missing == 'award' else 'award'}]},
+                {'role': 'assistant', 'content': 'The award authorizes $48,000.',
+                 'active_skill': None if missing == 'skill' else {'uuid': 'skill', 'version': '1'},
+                 'tool_results': [
+                     {'tool_name': 'search_knowledge_base', 'content': [
+                         {'document_uuid': 'other' if missing == 'knowledge_base' else 'policy', 'content': case['policy_passage']}]},
+                     {'tool_name': 'record_value', 'content': {'recorded': True, 'value': case['browser_value'],
+                      'url': 'https://example.org' if missing == 'record' else case['browser_url']}},
+                     {'tool_name': 'browser_finish', 'content': {'ok': True, 'working_tab': 'kept' if missing == 'finish' else 'closed'}}]}]
+    with pytest.raises(SampleIncomplete):
+        check_case(case, bank, answers, note, messages, ['award'], ['policy'])

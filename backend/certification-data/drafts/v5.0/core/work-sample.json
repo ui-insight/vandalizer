@@ -1,0 +1,10 @@
+{
+  "module_id": "core_case",
+  "award_module": "core_chat",
+  "policy_module": "core_knowledge",
+  "browser_url": "https://www.iana.org/help/example-domains",
+  "browser_value": "example.org",
+  "policy_passage": "written approval before booking",
+  "project_title": "Cedar Creek CC-17",
+  "award_value": "$48,000"
+}

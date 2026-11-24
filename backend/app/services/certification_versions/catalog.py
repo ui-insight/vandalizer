@@ -93,7 +93,7 @@ class CourseModule(BaseModel):
 class CourseManifest(BaseModel):
     model_config = ConfigDict(extra='forbid', frozen=True)
     schema_version: Literal[1] = 1
-    course_id: Literal['vandal-workflow-architect'] = 'vandal-workflow-architect'
+    course_id: Literal['vandal-workflow-architect', 'vandalizer-core'] = 'vandal-workflow-architect'
     release_id: str
     title: str
     description: str
@@ -255,6 +255,11 @@ class CourseCatalog:
         package_progression_policy(package)
         contract = package_outcomes(package)
         manifest = package.manifest
+        if manifest.course_id == 'vandalizer-core':
+            if 'work-sample.json' not in manifest.artifacts:
+                raise ValueError('Core requires its pinned practical work sample')
+            from .core_work_sample import validate_case
+            validate_case(package)
         for path in manifest.artifacts:
             if path.startswith('governance-cases/'):
                 from .governance_case import load_governance_case

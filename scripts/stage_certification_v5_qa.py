@@ -36,8 +36,6 @@ from app.services.certification_versions.rubrics import competency_v5  # noqa: E
 from assemble_certification_v5_preview import DATA, assemble  # noqa: E402
 
 LEGACY = 'legacy-2026-10-02.1'
-DEFAULT_RELEASE = 'v5.0-qa-staging.1'
-TITLE = 'Vandalizer 5.0 certification (QA staging)'
 
 
 def write_json(path, value):
@@ -70,13 +68,14 @@ def mark_for_qa(folder: Path, release_id: str):
         'statement': 'Synthetic readiness metadata for QA testers only. Not calibration, rollout or production authorization.',
     })
     manifest = json.loads((folder / 'manifest.json').read_text())
-    manifest['title'] = TITLE
+    manifest['title'] += ' (QA staging)'
     manifest['artifacts'] = {str(path.relative_to(folder)): digest(path)
                              for path in sorted(folder.rglob('*')) if path.is_file() and path.name != 'manifest.json'}
     write_json(folder / 'manifest.json', manifest)
 
 
-def prepare(output, release_id=DEFAULT_RELEASE, *, data_root=DATA, source_root=CATALOG_ROOT):
+def prepare(output, release_id=None, *, track='core', data_root=DATA, source_root=CATALOG_ROOT):
+    release_id = release_id or f'v5.0-{track}-qa.1'
     output = Path(output).resolve()
     if output == CATALOG_ROOT.resolve() or output.is_relative_to(CATALOG_ROOT.resolve()):
         raise ValueError('The QA staging catalog must stay outside the application course catalog')
@@ -86,7 +85,7 @@ def prepare(output, release_id=DEFAULT_RELEASE, *, data_root=DATA, source_root=C
     legacy_entry = source.registry()['releases'][LEGACY]
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='.certification-qa-', dir=output.parent) as temporary:
-        preview = assemble(Path(temporary) / 'preview', release_id, data_root=data_root)
+        preview = assemble(Path(temporary) / 'preview', release_id, track=track, data_root=data_root)
         staging = Path(temporary) / 'catalog'
         staging.mkdir()
         shutil.copytree(preview / release_id, staging / release_id)
@@ -171,7 +170,8 @@ def main():
     actions = parser.add_subparsers(dest='action', required=True)
     first = actions.add_parser('prepare')
     first.add_argument('output', type=Path)
-    first.add_argument('--release-id', default=DEFAULT_RELEASE)
+    first.add_argument('--release-id')
+    first.add_argument('--track', choices=('core', 'advanced'), default='core')
     second = actions.add_parser('publish')
     second.add_argument('output', type=Path)
     second.add_argument('--cohort-inventory', type=Path, required=True,
@@ -182,7 +182,7 @@ def main():
     third.add_argument('output', type=Path)
     args = parser.parse_args()
     if args.action == 'prepare':
-        result = {'catalog': str(args.output.resolve()), 'manifests': prepare(args.output, args.release_id)}
+        result = {'catalog': str(args.output.resolve()), 'manifests': prepare(args.output, args.release_id, track=args.track)}
     elif args.action == 'publish':
         result = publish_qa(args.output, inventory=json.loads(args.cohort_inventory.read_text()),
                             reason=args.reason, actor=args.actor)

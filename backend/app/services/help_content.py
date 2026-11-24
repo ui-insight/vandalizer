@@ -483,13 +483,14 @@ HELP_TOPICS: list[dict] = [
     },
     {
         "id": "certification",
-        "title": "Vandal Workflow Architect certification",
+        "title": "Vandalizer certification",
         "aliases": [
             "certification", "cert", "certified", "badge", "vandal architect",
             "modules", "lessons", "training", "tutorial", "learn vandalizer",
         ],
         "body": (
-            "The **Vandal Workflow Architect** program teaches document-workflow skills. "
+            "Look at the course title in your enrollment. **Vandalizer Core** teaches Chat, Projects, Knowledge Bases, Skills and browser controls. "
+            "**Advanced Builder** covers extraction and workflow authoring. The original **Vandal Workflow Architect** course has its own requirements. "
             "Your selected course defines its modules, assessments and XP; an earned "
             "certificate records that course's requirements.\n\n"
             "**To start or resume:** ask *\"start the certification course\"* or open "
