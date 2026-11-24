@@ -1,5 +1,6 @@
+import { usePanelEffect } from './usePanelEffect'
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from './panelPortal'
 
 interface InfoHintProps {
   /** Tooltip body. Plain text or nodes. */
@@ -53,7 +54,7 @@ export function InfoHint({ content, label = 'More information', theme = 'dark' }
     reposition()
   }, [open, reposition])
 
-  useEffect(() => {
+  usePanelEffect(() => {
     if (!open) return
     function onDocClick(e: MouseEvent) {
       const t = e.target as Node
@@ -100,9 +101,9 @@ export function InfoHint({ content, label = 'More information', theme = 'dark' }
   }
 
   const isDark = theme === 'dark'
-  const tipBg = isDark ? '#1f1f2e' : '#fff'
-  const tipBorder = isDark ? '#3a3a4a' : '#d1d5db'
-  const tipText = isDark ? '#e5e5e5' : '#1f2937'
+  const tipBg = isDark ? '#1f1f2e' : 'var(--workspace-text)'
+  const tipBorder = isDark ? '#3a3a4a' : 'var(--workspace-border)'
+  const tipText = isDark ? 'var(--workspace-text)' : '#1f2937'
 
   return (
     <span ref={wrapRef} style={{ display: 'inline-flex' }}>
@@ -125,10 +126,10 @@ export function InfoHint({ content, label = 'More information', theme = 'dark' }
         aria-expanded={open}
         aria-label={label}
         style={{
-          fontSize: 11, color: isDark ? '#888' : '#6b7280',
+          fontSize: 'var(--workspace-font-meta)', color: isDark ? 'var(--workspace-muted)' : '#6b7280',
           cursor: 'help', userSelect: 'none',
           background: 'transparent',
-          border: `1px solid ${isDark ? '#444' : '#9ca3af'}`,
+          border: `1px solid ${isDark ? 'var(--workspace-border)' : 'var(--workspace-border)'}`,
           borderRadius: '50%',
           width: 14, height: 14, padding: 0, lineHeight: '12px',
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -150,14 +151,14 @@ export function InfoHint({ content, label = 'More information', theme = 'dark' }
             visibility: pos ? 'visible' : 'hidden',
             minWidth: 240,
             maxWidth: 320,
-            padding: '10px 12px',
+            padding: "var(--workspace-space-12) var(--workspace-space-12)",
             background: tipBg,
             border: `1px solid ${tipBorder}`,
-            borderRadius: 6,
+            borderRadius: 'var(--workspace-radius-small)',
             boxShadow: isDark
               ? '0 6px 24px rgba(0,0,0,0.4)'
               : '0 6px 24px rgba(0,0,0,0.12)',
-            fontSize: 12,
+            fontSize: 'var(--workspace-font-meta)',
             lineHeight: 1.5,
             color: tipText,
             fontWeight: 400,

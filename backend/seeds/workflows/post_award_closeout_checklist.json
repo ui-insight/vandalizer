@@ -7,7 +7,6 @@
     "seed_id": "wf-post-award-closeout",
     "display_name": "Closeout Checklist Generator",
     "description": "Generates a comprehensive, timeline-ordered closeout checklist from award terms and conditions.",
-    "quality_tier": "excellent",
     "collections": [
       "post-award"
     ]
@@ -56,6 +55,34 @@
               }
             }
           ]
+        }
+      ],
+      "validation_plan": [
+        {
+          "id": "fc2d62f6-aecf-57f2-a9f5-270825c2c196",
+          "name": "Figures match the source",
+          "category": "accuracy",
+          "description": "Every deadline, award end date and day count in the output appears in the source document with the same value, unit and (for dates) year. A figure the output calculated says how it was calculated and the arithmetic is right. FAIL if any value differs from the source, or appears with no basis in it."
+        },
+        {
+          "id": "cfb3df97-3798-58e8-ba47-67aae8284637",
+          "name": "Closeout deadlines follow from the award",
+          "category": "accuracy",
+          "description": "Each deadline is either quoted from the award or computed from its end date with the rule named (for example 120 days after the project end), and the computed date is right. FAIL for a wrong date or a deadline with no basis in the award."
+        },
+        {
+          "id": "f0a80a4c-7d8e-5289-a683-5cc48186f6ae",
+          "name": "Every closeout obligation is included",
+          "category": "completeness",
+          "description": "Every closeout obligation the award states (final reports, invention statement, property and equipment, subrecipient closeout, records retention, cost sharing, unspent funds) is in the checklist. FAIL for each one omitted."
+        }
+      ],
+      "validation_inputs": [
+        {
+          "id": "bacd900d-f30a-57f2-a877-0706f835e57e",
+          "type": "text",
+          "label": "Fictional notice of award. Answer key: award EXA-2027-0412; project period July 1, 2027 to June 30, 2029; budget period 1 July 1, 2027 to June 30, 2028; this action $250,000 ($200,000 direct, $50,000 indirect); total anticipated $510,000; indirect 25% of MTDC; no cost sharing; annual progress report and SF-425 due 90 days after each budget period (September 28, 2028 for period 1); final reports and invention statement due 120 days after the project end (October 28, 2029); prior approval for a PI change, foreign travel, rebudgeting participant support, equipment over $10,000 per item, and a PI effort reduction over 25%; one no-cost extension, requested at least 10 days before the end (by June 20, 2029); records kept 3 years from the final SF-425. Not stated: a data management plan requirement.",
+          "text": "FICTIONAL QA MATERIAL — NOT A REAL AWARD\nNotice of Award — Example Science Agency\nAward Number: EXA-2027-0412\nFederal Award Identification Number (FAIN): EXA20270412\nRecipient: Example State University\nPrincipal Investigator: Jordan Sample\nProject Title: Watershed Sensor Network Pilot\nProject period: July 1, 2027 through June 30, 2029\nBudget period 1: July 1, 2027 through June 30, 2028\nAmount of this action (budget period 1): $250,000, of which direct costs $200,000 and indirect costs $50,000.\nTotal anticipated award for both budget periods, subject to the availability of funds: $510,000.\nIndirect costs: 25% of modified total direct costs (MTDC), per the recipient's negotiated rate agreement dated March 3, 2026.\nCost sharing: none required.\n\nReporting\n- An annual progress report is due 90 days after the end of each budget period.\n- An annual Federal Financial Report (SF-425) is due 90 days after the end of each budget period.\n- The final progress report, final SF-425 and final invention statement are due 120 days after the end of the project period.\n\nPrior approval\nPrior written approval from the agency is required for (a) a change of principal investigator, (b) foreign travel, and (c) rebudgeting of participant support costs.\nEquipment purchases over $10,000 per item require prior approval.\nThe principal investigator commits 1.2 calendar months per year; a reduction of more than 25% requires prior approval.\nOne no-cost extension may be requested, at least 10 days before the end of the project period.\n\nRecords\nRecords must be kept for 3 years from the date the final SF-425 is submitted."
         }
       ]
     }

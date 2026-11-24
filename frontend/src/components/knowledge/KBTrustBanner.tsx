@@ -1,4 +1,5 @@
 import { TrendingUp, ShieldQuestion, Minus } from 'lucide-react'
+import type { KnowledgeBase } from '../../types/knowledge'
 
 interface Props {
   /** With-KB accuracy from the latest validation run (0–1). */
@@ -9,6 +10,8 @@ interface Props {
   lift?: number | null
   /** ISO timestamp of the latest validation run. */
   validatedAt?: string | null
+  metric?: KnowledgeBase['last_validation_metric']
+  configState?: KnowledgeBase['last_validation_config_state']
 }
 
 function formatRelativeTime(iso: string | null | undefined): string | null {
@@ -27,31 +30,33 @@ function formatRelativeTime(iso: string | null | undefined): string | null {
  * Headline banner for the KB detail view that answers, in plain language:
  * "does the AI actually answer my questions better when it has this KB?"
  *
- * KBs are a trust mechanism — this banner is the proof. When unvalidated,
+ * Keep the scope of measured evidence explicit. When unvalidated,
  * the banner prompts the owner to run validation so they (and their team)
  * can see whether the KB is pulling its weight.
  */
-export function KBTrustBanner({ score, baseline, lift, validatedAt }: Props) {
-  const hasRun = lift != null || (score != null && baseline != null)
-  const liftPts = lift != null ? Math.round(lift * 100) : null
+export function KBTrustBanner({ score, baseline, lift, validatedAt, metric, configState }: Props) {
+  const hasRun = score != null || lift != null
+  const composite = metric === 'composite_quality'
+  const measuredLift = composite ? null : lift ?? (score != null && baseline != null ? score - baseline : null)
+  const liftPts = measuredLift != null ? Math.round(measuredLift * 100) : null
   const scorePct = score != null ? Math.round(score * 100) : null
   const baselinePct = baseline != null ? Math.round(baseline * 100) : null
   const relTime = formatRelativeTime(validatedAt)
 
   const positive = hasRun && liftPts != null && liftPts > 0
 
-  let accent = '#9ca3af'
-  let bg = 'rgba(255,255,255,0.04)'
-  let border = 'rgba(255,255,255,0.08)'
+  let accent = 'var(--workspace-muted)'
+  let bg = 'var(--workspace-canvas)'
+  let border = 'var(--workspace-border)'
   let Icon = Minus
 
   if (!hasRun) {
-    accent = '#fbbf24'
+    accent = 'var(--workspace-warning)'
     bg = 'rgba(251, 191, 36, 0.08)'
     border = 'rgba(251, 191, 36, 0.25)'
     Icon = ShieldQuestion
   } else if (positive) {
-    accent = '#22c55e'
+    accent = 'var(--workspace-success)'
     bg = 'rgba(34, 197, 94, 0.08)'
     border = 'rgba(34, 197, 94, 0.3)'
     Icon = TrendingUp
@@ -60,64 +65,76 @@ export function KBTrustBanner({ score, baseline, lift, validatedAt }: Props) {
   return (
     <div
       style={{
-        display: 'flex', gap: 14, alignItems: 'flex-start',
-        padding: '12px 14px', borderRadius: 10,
+        display: 'flex', gap: 'var(--workspace-space-16)', alignItems: 'flex-start',
+        padding: "var(--workspace-space-12) var(--workspace-space-16)", borderRadius: 'var(--workspace-radius-large)',
         backgroundColor: bg, border: `1px solid ${border}`,
-        marginBottom: 16,
+        marginBottom: 'var(--workspace-space-16)',
       }}
     >
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        width: 36, height: 36, borderRadius: 10,
-        backgroundColor: 'rgba(255,255,255,0.05)', color: accent, flexShrink: 0,
+        width: 36, height: 36, borderRadius: 'var(--workspace-radius-large)',
+        backgroundColor: 'var(--workspace-canvas)', color: accent, flexShrink: 0,
       }}>
         <Icon size={18} />
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
-          fontSize: 10, fontWeight: 700, color: '#9ca3af',
-          textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2,
+          fontSize: 'var(--workspace-font-meta)', fontWeight: 700, color: 'var(--workspace-muted)',
+          textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 'var(--workspace-space-2)',
         }}>
-          AI Trust
+          {composite ? 'Retrieval quality' : 'Answer quality'}
         </div>
 
         {!hasRun ? (
           <>
-            <div style={{ fontSize: 14, fontWeight: 600, color: '#e5e5e5', marginBottom: 4 }}>
-              AI accuracy not yet measured
+            <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 'var(--workspace-space-4)' }}>
+              Not evaluated
             </div>
-            <div style={{ fontSize: 12, color: '#9ca3af', lineHeight: 1.5 }}>
-              Run validation below to see how much more accurate the AI is at answering
-              questions about this material when it can read the KB, compared to answering
-              from training data alone.
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
+              Test representative questions with and without this knowledge base. Scores describe this test set; they do not guarantee future answers.
+            </div>
+          </>
+        ) : composite ? (
+          <>
+            <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 'var(--workspace-space-4)' }}>
+              Evaluation recorded · {configState === 'applied' ? 'Settings applied in this run' : configState === 'reverted' ? 'Application reverted' : configState === 'default' ? 'Default settings tested' : configState === 'no_improvement' ? 'No improvement found' : 'Proposed settings'}
+            </div>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
+              This combines retrieval and answer quality on the tested questions. It is not answer accuracy or a comparison with the AI alone.
+              {configState === 'proposed' && ' Review and apply the settings before using them in chat.'}
+              {configState === 'no_improvement' && ' No tested settings measurably beat the current ones, so the current settings were kept and there is nothing to apply.'}
+              {configState === 'reverted' && ' This evaluation describes the tested settings, not the restored settings.'}
+              {relTime && <span> · Last tested {relTime}</span>}
+              <details><summary style={{ cursor: 'pointer' }}>View evaluation</summary>Composite quality: {scorePct}/100</details>
             </div>
           </>
         ) : (
           <>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
-              {liftPts != null && (
-                <span style={{ fontSize: 22, fontWeight: 700, color: accent }}>
-                  {liftPts > 0 ? '+' : ''}{liftPts} pts
-                </span>
-              )}
-              <span style={{ fontSize: 13, color: '#cbd5e1' }}>
-                {positive
-                  ? 'more accurate than asking the AI alone'
-                  : 'no measured improvement over the AI alone'}
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--workspace-space-12)', flexWrap: 'wrap', marginBottom: 'var(--workspace-space-4)' }}>
+              <span style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: 'var(--workspace-text)' }}>
+                {liftPts == null ? 'Evaluation recorded · no AI-only comparison yet' : positive
+                  ? 'Improved on tested questions'
+                  : 'No measured improvement over the AI alone'}
               </span>
             </div>
-            <div style={{ fontSize: 12, color: '#9ca3af', lineHeight: 1.5 }}>
-              {scorePct != null && baselinePct != null ? (
-                <>
-                  The AI answered {scorePct}% of the test questions correctly with this KB,
-                  versus {baselinePct}% without it.
-                </>
-              ) : scorePct != null ? (
-                <>The AI answered {scorePct}% of the test questions correctly with this KB.</>
-              ) : null}
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
+              <details>
+                <summary style={{ cursor: 'pointer' }}>View evaluation</summary>
+                {liftPts != null && <div>Difference: {liftPts > 0 ? '+' : ''}{liftPts} pts on tested questions</div>}
+                {scorePct != null && baselinePct != null ? (
+                  <>
+                    Average answer accuracy: {scorePct}% with this KB,
+                    versus {baselinePct}% without it.
+                  </>
+                ) : scorePct != null ? (
+                  <>Average answer accuracy: {scorePct}% with this KB.</>
+                ) : null}
+              </details>
+              <span> These results describe the tested questions, not a guarantee of future answers.</span>
               {relTime && (
-                <span style={{ color: '#666' }}> · Last validated {relTime}</span>
+                <span style={{ color: 'var(--workspace-muted)' }}> · Last validated {relTime}</span>
               )}
             </div>
           </>

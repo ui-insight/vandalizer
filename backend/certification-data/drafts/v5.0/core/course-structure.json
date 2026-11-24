@@ -1,0 +1,48 @@
+{
+  "levels": [
+    {
+      "name": "novice",
+      "xp": 0
+    },
+    {
+      "name": "apprentice",
+      "xp": 100
+    },
+    {
+      "name": "specialist",
+      "xp": 250
+    }
+  ],
+  "tiers": [
+    {
+      "name": "Start the case",
+      "theme": "Chat and Projects",
+      "narrative": "Find one answer, recognize a missing term and reopen your private case.",
+      "moduleIds": [
+        "core_chat",
+        "core_projects"
+      ],
+      "celebration": "Your award and open question are ready for policy review."
+    },
+    {
+      "name": "Check the sources",
+      "theme": "Knowledge Bases, Skills and browser controls",
+      "narrative": "Check policy, review a Skill-assisted answer and verify the listed contact domain.",
+      "moduleIds": [
+        "core_knowledge",
+        "core_skills",
+        "core_browser"
+      ],
+      "celebration": "Use these sources in your private handoff."
+    },
+    {
+      "name": "Finish the case",
+      "theme": "Private case note",
+      "narrative": "Bring the three sources and the human question together. Advanced Builder is an optional next course.",
+      "moduleIds": [
+        "core_case"
+      ],
+      "celebration": "Review your Core credential status."
+    }
+  ]
+}

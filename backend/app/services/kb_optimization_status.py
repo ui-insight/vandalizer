@@ -20,7 +20,9 @@ module decides, per KB, one of:
                   questions have changed materially since (re-run
                   Validate & improve);
 * ``available`` — a completed optimization has settings that were never
-                  applied, or were reverted.
+                  applied, or were reverted. Not when that run found no
+                  measurable improvement (``tied_with_baseline``): it has
+                  nothing worth applying, and the newest run decides.
 
 "Materially" is ``STALE_FRACTION`` of what the run saw: at least one change,
 and at least 10% of the sources (added or removed) or 10% of the test
@@ -32,6 +34,7 @@ around it batch the lookups for a listing page.
 """
 
 from __future__ import annotations
+from app.models.kb_optimization_run import KBOptimizationRun
 
 import datetime
 import hashlib
@@ -109,8 +112,8 @@ def compute_optimization_status(
     rag_config_override: Optional[dict],
     override_set_at: Optional[datetime.datetime],
     override_run_uuid: Optional[str],
-    applied_run,
-    latest_completed_run,
+    applied_run: KBOptimizationRun | None,
+    latest_completed_run: KBOptimizationRun | None,
     sources: list[SourceStamp],
     queries: list[QueryStamp],
 ) -> Optional[OptimizationStatus]:
@@ -121,15 +124,23 @@ def compute_optimization_status(
     ``override_run_uuid`` (may be None for overrides written before that was
     recorded); ``latest_completed_run`` the newest completed run for the KB.
     Both are read for ``uuid``, ``started_at``, ``completed_at``,
-    ``best_config`` and ``test_query_snapshot`` only.
+    ``best_config``, ``tied_with_baseline`` and ``test_query_snapshot`` only.
     """
-    has_override = isinstance(rag_config_override, dict) and bool(rag_config_override)
     latest = latest_completed_run
     last_run_at = _utc(getattr(latest, "completed_at", None)) if latest else None
     last_run_uuid = getattr(latest, "uuid", None) if latest else None
 
-    if not has_override:
-        if latest is not None and getattr(latest, "best_config", None):
+    if not rag_config_override:
+        # A run tied with the current settings still records a best_config
+        # (the simplest of the tied trials), but apply was suppressed because
+        # nothing beat what chat already uses. Support ticket: "Subaward
+        # Policies" said "Optimization available" after chat reported no
+        # improvement.
+        if (
+            latest is not None
+            and getattr(latest, "best_config", None)
+            and not getattr(latest, "tied_with_baseline", False)
+        ):
             return OptimizationStatus(
                 state="available", last_run_at=last_run_at, last_run_uuid=last_run_uuid,
             )

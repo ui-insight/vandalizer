@@ -21,7 +21,7 @@ describe('useWorkflowRunner.start and ticked folders', () => {
   it('sends folder_uuids with the run when folders are ticked', async () => {
     runWorkflow.mockResolvedValue({ session_id: 's1', activity_id: 'a1' })
     const { result, unmount } = renderHook(() => useWorkflowRunner())
-    await act(() => result.current.start('wf1', ['D1'], undefined, false, ['F1', 'F2']))
+    await act(() => result.current.start('wf1', ['D1'], undefined, false, undefined, ['F1', 'F2']))
     expect(runWorkflow).toHaveBeenCalledWith('wf1', expect.objectContaining({
       document_uuids: ['D1'], folder_uuids: ['F1', 'F2'],
     }), undefined)
@@ -31,7 +31,7 @@ describe('useWorkflowRunner.start and ticked folders', () => {
   it('omits folder_uuids when none are ticked or the run takes none', async () => {
     runWorkflow.mockResolvedValue({ session_id: 's1', activity_id: 'a1' })
     const { result, unmount } = renderHook(() => useWorkflowRunner())
-    await act(() => result.current.start('wf1', [], undefined, false, []))
+    await act(() => result.current.start('wf1', [], undefined, false, undefined, []))
     await act(() => result.current.start('wf1', ['D1']))
     for (const [, body] of runWorkflow.mock.calls) expect(body).not.toHaveProperty('folder_uuids')
     unmount()

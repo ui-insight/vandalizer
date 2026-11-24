@@ -1,9 +1,14 @@
-import { useCallback, useMemo, useState, useRef, useEffect, type DragEvent } from 'react'
+import { documentIssue, documentReadinessMessage, documentReadinessState, type DocumentReadiness } from '../../utils/documentReadiness'
+import { WorkspaceSectionHeader } from '../shared/WorkspaceSectionHeader'
+import { useCallback, useMemo, useState, useRef, useEffect, type ReactNode, type DragEvent, type Ref } from 'react'
 import { Plus, Folder as FolderIcon, Upload, Trash2, Download, FolderInput } from 'lucide-react'
 import { useTeams } from '../../hooks/useTeams'
+import { useAuth } from '../../hooks/useAuth'
+import { formatContentsSummary } from '../../utils/fileDisplay'
+import { documentFilterCounts, matchesDocumentFilter, type DocumentFilter } from '../../utils/documentFilters'
 import { useDocuments } from '../../hooks/useDocuments'
 import { useBreadcrumbs } from '../../hooks/useFolders'
-import { useUpload } from '../../hooks/useUpload'
+import { useUpload, fileToBase64 } from '../../hooks/useUpload'
 import { Breadcrumbs } from './Breadcrumbs'
 import { FileList } from './FileList'
 import { UploadZone } from './UploadZone'
@@ -13,18 +18,28 @@ import { RenameDialog } from './RenameDialog'
 import { CreateFolderDialog } from './CreateFolderDialog'
 import { MoveFolderDialog } from './MoveFolderDialog'
 import { MoveFileDialog } from './MoveFileDialog'
+import { ExistingFilesDialog } from './ExistingFilesDialog'
 import { useConfirm } from '../shared/useConfirm'
 import { useToast } from '../../contexts/ToastContext'
-import { deleteFile, renameFile, downloadFile, downloadFilesAsZip, moveFile, fetchDocumentUsage, type DeleteFileResult, type DocumentUsage } from '../../api/files'
+import { deleteFile, renameFile, downloadFile, downloadFilesAsZip, moveFile, duplicateFile, fetchDocumentUsage, uploadFileVersion, type DeleteFileResult, type DocumentUsage } from '../../api/files'
+import { VersionHistoryDialog } from './VersionHistoryDialog'
 import { DocumentUsageDialog, UsageSummaryList, UsageCheckFailedNote, RemoveFromKnowledgeBasesOption, describeDeleteEffects, mergeUsage, summarizeUsage, type UsageGroups } from './DocumentUsageDialog'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { createFolder, renameFolder, deleteFolder, convertFolderToTeam, moveFolder, exportFolder } from '../../api/folders'
 import { listAutomations } from '../../api/automations'
+import { retryExtraction } from '../../api/documents'
 import type { Document, Folder } from '../../types/document'
 import { isDocReady } from '../../utils/processingStatus'
 import { SUPPORTED_ACCEPT_ATTR } from '../../utils/fileTypes'
 
-export type SortColumn = 'name' | 'modified'
+// Remembered per browser: someone who keeps folders out of the way wants
+// them out of the way in the next folder and the next visit too.
+const FOLDERS_COLLAPSED_KEY = 'files:foldersCollapsed'
+function readFoldersCollapsed(): boolean {
+  try { return localStorage.getItem(FOLDERS_COLLAPSED_KEY) === '1' } catch { return false }
+}
+
+export type SortColumn = 'name' | 'size' | 'modified'
 export type SortDirection = 'asc' | 'desc'
 export interface SortState {
   column: SortColumn
@@ -51,10 +66,20 @@ export interface ContentMatch {
 }
 
 interface FileBrowserProps {
+  // The file rows are the only part of the panel that scrolls. The owner can
+  // hold that region (to restore its position) and hear how far it has moved.
+  listScrollRef?: Ref<HTMLDivElement>
+  onListScroll?: (scrollTop: number) => void
+  searchField?: ReactNode
+  selectedDocumentUuids?: string[]
+  selectedFolderUuids?: string[]
   onDocClick?: (doc: Document) => void
+  contentSearchState?: 'loading' | 'error' | null
+  onRetryContentSearch?: () => void
   searchQuery?: string
   contentMatches?: ContentMatch[]
   onSelectionChange?: (docUuids: string[]) => void
+  onDocumentReadinessChange?: (docs: DocumentReadiness[]) => void
   onDocNamesChange?: (names: Record<string, string>) => void
   onFolderSelectionChange?: (folderUuids: string[]) => void
   onFolderNamesChange?: (names: Record<string, string>) => void
@@ -105,16 +130,17 @@ function keptKnowledgeBasesMessage(results: DeleteFileResult[]): string | null {
 // The delete confirmation names what it deletes; past this many, "and N more".
 const DELETE_NAME_CAP = 8
 
-export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSelectionChange, onDocNamesChange, onFolderSelectionChange, onFolderNamesChange, onSelectionProcessingChange, currentFolder: controlledFolder, onFolderNavigate, onAskAboutFolder, onRunWorkflowOnFolder, onAddFolderToKB, rootFolder = null, rootLabel, teamScopeUuid }: FileBrowserProps) {
+export function FileBrowser({ listScrollRef, onListScroll, searchField, selectedDocumentUuids, selectedFolderUuids, onDocClick, searchQuery = '', contentMatches, contentSearchState, onRetryContentSearch, onSelectionChange, onDocNamesChange, onDocumentReadinessChange, onFolderSelectionChange, onFolderNamesChange, onSelectionProcessingChange, currentFolder: controlledFolder, onFolderNavigate, onAskAboutFolder, onRunWorkflowOnFolder, onAddFolderToKB, rootFolder = null, rootLabel, teamScopeUuid }: FileBrowserProps) {
   const { currentTeam } = useTeams()
+  const { user } = useAuth()
   const confirm = useConfirm()
   const { toast } = useToast()
 
   const [internalFolder, setInternalFolder] = useState<string | null>(null)
   const currentFolder = controlledFolder !== undefined ? controlledFolder : internalFolder
   const setCurrentFolder = onFolderNavigate ?? setInternalFolder
-  const { documents, folders, loading, refresh } = useDocuments(currentFolder, teamScopeUuid ?? currentTeam?.uuid)
-  const { breadcrumbs } = useBreadcrumbs(currentFolder)
+  const { documents, folders, loading, error: contentsError, refresh } = useDocuments(currentFolder, teamScopeUuid ?? currentTeam?.uuid)
+  const { breadcrumbs, error: breadcrumbError, refresh: refreshBreadcrumbs } = useBreadcrumbs(currentFolder)
 
   // When rooted at a project folder, trim the breadcrumb trail to start at that
   // folder so the project root acts as "Home" and ancestors above it are hidden.
@@ -163,15 +189,27 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
   }, [])
 
   // Bulk selection
-  const [selectedUuids, setSelectedUuids] = useState<Set<string>>(new Set())
+  const [internalSelection, setInternalSelection] = useState<Set<string>>(new Set())
+  const selectedUuids = useMemo(() => {
+    if (selectedDocumentUuids === undefined) return internalSelection
+    const visible = new Set([...documents, ...folders, ...(contentMatches ?? [])].map(item => item.uuid))
+    return new Set([...selectedDocumentUuids, ...(selectedFolderUuids ?? [])].filter(uuid => visible.has(uuid)))
+  }, [internalSelection, selectedDocumentUuids, selectedFolderUuids, documents, folders, contentMatches])
+  // Only explicit selection actions change chat scope. A list refresh must
+  // never emit an empty selection over a document just attached in chat.
+  const setSelectedUuids = useCallback((update: Set<string> | ((previous: Set<string>) => Set<string>)) => {
+    const next = typeof update === 'function' ? update(selectedUuids) : update
+    setInternalSelection(next)
+    const folderIds = new Set(folders.map(folder => folder.uuid))
+    onSelectionChange?.([...next].filter(uuid => !folderIds.has(uuid)))
+    onFolderSelectionChange?.([...next].filter(uuid => folderIds.has(uuid)))
+  }, [selectedUuids, folders, onSelectionChange, onFolderSelectionChange])
   const [bulkDeleting, setBulkDeleting] = useState(false)
 
   // Sync selected document UUIDs (excluding folders) to parent
   useEffect(() => {
     if (!onSelectionChange) return
     const selectedDocs = documents.filter(d => selectedUuids.has(d.uuid))
-    const docUuids = selectedDocs.map(d => d.uuid)
-    onSelectionChange(docUuids)
     // Also emit a names map so the chat can show pills with document titles
     const names: Record<string, string> = {}
     for (const d of selectedDocs) names[d.uuid] = d.title
@@ -187,11 +225,14 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
     )
   }, [selectedUuids, documents, onSelectionChange, onDocNamesChange, onSelectionProcessingChange])
 
+  useEffect(() => {
+    onDocumentReadinessChange?.([...documents, ...(contentMatches ?? [])].map(doc => ({ uuid: doc.uuid, title: doc.title, message: documentReadinessMessage(doc), state: documentReadinessState(doc) })))
+  }, [documents, contentMatches, onDocumentReadinessChange])
+
   // Sync selected folder UUIDs to parent
   useEffect(() => {
     if (!onFolderSelectionChange) return
     const selectedFolders = folders.filter(f => selectedUuids.has(f.uuid))
-    onFolderSelectionChange(selectedFolders.map(f => f.uuid))
     // Names too, so the chat can title the folder chips (mirrors onDocNamesChange)
     const names: Record<string, string> = {}
     for (const f of selectedFolders) names[f.uuid] = f.title
@@ -199,9 +240,13 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
   }, [selectedUuids, folders, onFolderSelectionChange, onFolderNamesChange])
 
   // Clear selection when navigating folders
+  const previousFolder = useRef(currentFolder)
   useEffect(() => {
+    if (previousFolder.current === currentFolder) return
+    previousFolder.current = currentFolder
     setSelectedUuids(new Set())
-  }, [currentFolder])
+    setDocumentFilter('all')
+  }, [currentFolder, setSelectedUuids])
 
   // Search (query provided via prop, content matches from API)
   const filteredFolders = useMemo(() => {
@@ -280,12 +325,56 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
           const bTime = b.updated_at ? new Date(b.updated_at).getTime() : 0
           return aTime - bTime
         }
+        case 'size':
+          return (a.size_bytes ?? -1) - (b.size_bytes ?? -1)
         default:
           return 0
       }
     })
     return sort.direction === 'desc' ? sorted.reverse() : sorted
   }, [filteredDocuments, sort])
+
+  // Folders section collapse, and the chips on the Documents heading.
+  const [foldersCollapsed, setFoldersCollapsed] = useState(readFoldersCollapsed)
+  const toggleFoldersCollapsed = useCallback(() => {
+    setFoldersCollapsed(previous => {
+      const next = !previous
+      try { localStorage.setItem(FOLDERS_COLLAPSED_KEY, next ? '1' : '0') } catch { /* stays for this visit */ }
+      return next
+    })
+  }, [])
+  const [chosenFilter, setDocumentFilter] = useState<DocumentFilter>('all')
+  const filterCounts = useMemo(() => documentFilterCounts(sortedDocuments), [sortedDocuments])
+  // A chip whose count reaches 0 (the last failing file was retried, or a
+  // search left none of that type) falls back to All, never an empty list.
+  const documentFilter: DocumentFilter = filterCounts[chosenFilter] > 0 ? chosenFilter : 'all'
+  // Forget the fallen-back choice too, so a later failure or a cleared search
+  // can't narrow the list again without the user asking.
+  if (documentFilter !== chosenFilter) setDocumentFilter('all')
+  const shownDocuments = useMemo(
+    () => documentFilter === 'all' ? sortedDocuments : sortedDocuments.filter(d => matchesDocumentFilter(d, documentFilter)),
+    [sortedDocuments, documentFilter],
+  )
+  const shownFolders = useMemo(() => foldersCollapsed ? [] : sortedFolders, [foldersCollapsed, sortedFolders])
+  // What the rows on screen are. The selection itself can hold more (chat
+  // attachments, or rows a chip has since hidden) and must keep them, since it
+  // is also the chat's scope; bulk actions act on the visible part only.
+  const shownUuids = useMemo(
+    () => new Set([...shownFolders, ...shownDocuments].map(item => item.uuid)),
+    [shownFolders, shownDocuments],
+  )
+  const actionableUuids = useMemo(
+    () => new Set([...selectedUuids].filter(uuid => shownUuids.has(uuid))),
+    [selectedUuids, shownUuids],
+  )
+  const hiddenSelection = useMemo(() => {
+    const hidden = (items: { uuid: string }[]) => items.filter(item => selectedUuids.has(item.uuid) && !shownUuids.has(item.uuid)).length
+    const folders = hidden(sortedFolders)
+    const documents = hidden(sortedDocuments)
+    // The rest of the hidden selection is what the search leaves out.
+    const search = [...selectedUuids].filter(uuid => !shownUuids.has(uuid)).length - folders - documents
+    return { folders, documents, search }
+  }, [selectedUuids, sortedFolders, sortedDocuments, shownUuids])
 
   const handleToggleSelect = useCallback((uuid: string) => {
     setSelectedUuids(prev => {
@@ -294,20 +383,27 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
       else next.add(uuid)
       return next
     })
-  }, [])
+  }, [setSelectedUuids])
 
+  // Select all covers the rows on screen; anything a chip or the collapsed
+  // Folders section hides keeps whatever state it had.
   const handleToggleAll = useCallback(() => {
-    const allUuids = [...filteredFolders.map(f => f.uuid), ...filteredDocuments.map(d => d.uuid)]
+    const allUuids = [...shownUuids]
     setSelectedUuids(prev => {
       const allSelected = allUuids.every(u => prev.has(u))
-      return allSelected ? new Set() : new Set(allUuids)
+      const next = new Set(prev)
+      for (const uuid of allUuids) {
+        if (allSelected) next.delete(uuid)
+        else next.add(uuid)
+      }
+      return next
     })
-  }, [filteredFolders, filteredDocuments])
+  }, [shownUuids, setSelectedUuids])
 
   const handleBulkDelete = useCallback(async () => {
-    if (selectedUuids.size === 0) return
-    const folderCount = [...selectedUuids].filter(u => folders.some(f => f.uuid === u)).length
-    const fileCount = selectedUuids.size - folderCount
+    if (actionableUuids.size === 0) return
+    const folderCount = [...actionableUuids].filter(u => folders.some(f => f.uuid === u)).length
+    const fileCount = actionableUuids.size - folderCount
     const parts: string[] = []
     if (fileCount > 0) parts.push(`${fileCount} file${fileCount === 1 ? '' : 's'}`)
     if (folderCount > 0) parts.push(`${folderCount} folder${folderCount === 1 ? '' : 's'}`)
@@ -316,8 +412,8 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
     // let a wrong selection through, and a file can be a knowledge-base
     // source, an extraction test case, or a workflow's fixed document
     // without anything here saying so.
-    const selectedFolderNames = folders.filter(f => selectedUuids.has(f.uuid)).map(f => f.title)
-    const selectedDocs = documents.filter(d => selectedUuids.has(d.uuid))
+    const selectedFolderNames = folders.filter(f => actionableUuids.has(f.uuid)).map(f => f.title)
+    const selectedDocs = documents.filter(d => actionableUuids.has(d.uuid))
     const docUuids = selectedDocs.map(d => d.uuid)
     const names = [...selectedDocs.map(d => d.title), ...selectedFolderNames]
     const shownNames = names.slice(0, DELETE_NAME_CAP)
@@ -334,7 +430,7 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
           {folderCount > 0 ? ' Folders will be removed along with everything inside them.' : ''} This cannot be undone.
           {usage === undefined && <UsageCheckFailedNote many={!oneDoc} />}
           {usage && usage.total > 0 && (
-            <div style={{ marginTop: 8 }}>
+            <div style={{ marginTop: 'var(--workspace-space-8)' }}>
               {oneDoc ? <><strong>{selectedDocs[0].title}</strong> is</> : 'These files are'} {summarizeUsage(usage)}.
               {' '}{describeDeleteEffects(usage, { many: !oneDoc, removeOffered: kbCount > 0 })}
               <UsageSummaryList usage={usage} />
@@ -349,27 +445,63 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
     if (!ok) return
     setBulkDeleting(true)
     try {
-      const promises: Promise<unknown>[] = []
-      const fileDeletes: Promise<DeleteFileResult>[] = []
-      for (const uuid of selectedUuids) {
-        const isFolder = folders.some(f => f.uuid === uuid)
-        if (isFolder) promises.push(deleteFolder(uuid))
-        else fileDeletes.push(deleteFile(uuid, { removeFromKnowledgeBases: removeFromKbs }))
-      }
-      const [, results] = await Promise.all([Promise.all(promises), Promise.all(fileDeletes)])
-      const kept = keptKnowledgeBasesMessage(results)
+      const targets = [...actionableUuids].map(uuid => ({ uuid, folder: folders.some(f => f.uuid === uuid) }))
+      const outcomes = await Promise.allSettled(targets.map(async target => {
+        const result = target.folder
+          ? await deleteFolder(target.uuid)
+          : await deleteFile(target.uuid, { removeFromKnowledgeBases: removeFromKbs })
+        if (!result.ok) throw new Error('The server did not confirm deletion.')
+        return result
+      }))
+      const failed = targets.filter((_, index) => outcomes[index].status === 'rejected')
+      const fileResults = outcomes.flatMap((outcome, index) => outcome.status === 'fulfilled' && !targets[index].folder ? [outcome.value as DeleteFileResult] : [])
+      const kept = keptKnowledgeBasesMessage(fileResults)
       if (kept) toast(kept, 'info')
-    } catch (err: unknown) {
-      toast(err instanceof Error ? err.message : 'Failed to delete', 'error')
+      // Keep failed items selected so retry targets only those items. Wait for
+      // every request before reconciling; a fast failure must not hide siblings.
+      // Selected rows a chip hides were not part of this delete and stay selected.
+      const deleted = new Set(targets.filter((_, index) => outcomes[index].status === 'fulfilled').map(target => target.uuid))
+      setSelectedUuids(prev => new Set([...prev].filter(uuid => !deleted.has(uuid))))
+      if (failed.length) {
+        const failedNames = failed.map(target => [...documents, ...folders].find(item => item.uuid === target.uuid)?.title || target.uuid)
+        const firstFailure = outcomes.find(outcome => outcome.status === 'rejected') as PromiseRejectedResult
+        const reason = firstFailure.reason instanceof Error ? firstFailure.reason.message : 'Please try again.'
+        toast(`${targets.length - failed.length} deleted; ${failed.length} could not be deleted: ${failedNames.slice(0, 3).join(', ')}${failed.length > 3 ? '…' : ''}. ${reason} Failed items remain selected for retry.`, 'error')
+      } else {
+        toast(`Deleted ${summary}.`, 'success')
+      }
     } finally {
-      // Always clear selection + refresh: the user confirmed a destructive
-      // action and the state of the items is now uncertain. Refresh
-      // reconciles what's actually left on the server.
-      setSelectedUuids(new Set())
       refresh()
       setBulkDeleting(false)
     }
-  }, [selectedUuids, folders, documents, refresh, confirm])
+  }, [actionableUuids, folders, documents, refresh, confirm, setSelectedUuids, toast])
+
+  // Retry from the row: the same re-run the open file offers. It re-reads the
+  // text and rebuilds the search index, so it clears both kinds of failure.
+  const [retryingUuids, setRetryingUuids] = useState<Set<string>>(() => new Set())
+  const handleRetryDoc = useCallback(async (doc: Document) => {
+    // A re-read clears the stored text before it starts. That costs nothing
+    // for a file with no text, but one that only failed indexing or read
+    // poorly still has text chat can use: say so before replacing it.
+    if (!['no_text', 'stopped'].includes(documentIssue(doc)?.kind ?? '')) {
+      const ok = await confirm({
+        title: `Read ${doc.title} again?`,
+        message: 'This reads the file again and rebuilds its search index. Its current text is replaced, and if the new read fails the file will have no text until it is retried.',
+        confirmLabel: 'Read again',
+      })
+      if (!ok) return
+    }
+    setRetryingUuids(prev => new Set(prev).add(doc.uuid))
+    try {
+      await retryExtraction(doc.uuid)
+      // The list polls while a file is processing, so the row updates itself.
+      await refresh()
+    } catch (err) {
+      toast(err instanceof Error ? `Could not retry ${doc.title}: ${err.message}` : `Could not retry ${doc.title}`, 'error')
+    } finally {
+      setRetryingUuids(prev => { const next = new Set(prev); next.delete(doc.uuid); return next })
+    }
+  }, [refresh, toast, confirm])
 
   const handleDropFile = useCallback(async (fileUuid: string, folderUuid: string) => {
     try {
@@ -381,17 +513,45 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
   }, [refresh, toast])
 
   const handleBulkDownload = useCallback(() => {
-    const docUuids = [...selectedUuids].filter(u => documents.some(d => d.uuid === u))
+    const docUuids = [...actionableUuids].filter(u => documents.some(d => d.uuid === u))
     if (docUuids.length === 0) return
     if (docUuids.length === 1) {
       downloadFile(docUuids[0])
     } else {
       downloadFilesAsZip(docUuids)
     }
-  }, [selectedUuids, documents])
+  }, [actionableUuids, documents])
 
   // Context menu state
   const [usageTarget, setUsageTarget] = useState<{ uuid: string; title: string } | null>(null)
+  const [versionsTarget, setVersionsTarget] = useState<{ uuid: string; title: string } | null>(null)
+  const versionInput = useRef<HTMLInputElement>(null)
+  const versionTarget = useRef<Document | null>(null)
+  const uploadVersion = useCallback(async (file: File) => {
+    const doc = versionTarget.current
+    versionTarget.current = null
+    if (!doc) return
+    try {
+      const result = await uploadFileVersion(doc.uuid, {
+        contentAsBase64String: await fileToBase64(file),
+        fileName: file.name,
+        extension: file.name.split('.').pop() || '',
+      })
+      toast(`Uploaded version ${result.version_number} of ${doc.title}. Pages built from it will offer an update.`, 'success')
+      refresh()
+    } catch (err: unknown) {
+      toast(err instanceof Error ? err.message : 'Could not upload the new version', 'error')
+    }
+  }, [refresh, toast])
+  const handleDuplicate = useCallback(async (doc: Document) => {
+    try {
+      const copy = await duplicateFile(doc.uuid)
+      toast(`Created ${copy.title}.`, 'success')
+      refresh()
+    } catch (err: unknown) {
+      toast(err instanceof Error ? err.message : `Could not duplicate ${doc.title}`, 'error')
+    }
+  }, [refresh, toast])
   const { openWorkflow, openExtraction, activateKB } = useWorkspace()
   const [contextMenu, setContextMenu] = useState<{
     x: number
@@ -402,6 +562,7 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
 
   // + Add dropdown
   const [addMenuOpen, setAddMenuOpen] = useState(false)
+  const [existingFilesDestination, setExistingFilesDestination] = useState<{ uuid: string; title: string } | null>(null)
   const addMenuRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -504,15 +665,12 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
   const handleMoveFolder = useCallback(
     async (parentId: string) => {
       if (!moveTarget) return
-      try {
-        await moveFolder(moveTarget.uuid, parentId)
-      } catch (err: unknown) {
-        toast(err instanceof Error ? err.message : 'Failed to move folder', 'error')
-      }
+      await moveFolder(moveTarget.uuid, parentId)
       setMoveTarget(null)
+      toast('Folder moved', 'success')
       refresh()
     },
-    [moveTarget, refresh],
+    [moveTarget, refresh, toast],
   )
 
   const handleMoveFiles = useCallback(
@@ -521,20 +679,19 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
       const results = await Promise.allSettled(
         moveFileTarget.uuids.map(uuid => moveFile(uuid, folderId)),
       )
-      const failed = results.find(
-        (r): r is PromiseRejectedResult => r.status === 'rejected',
-      )
-      if (failed) {
-        toast(
-          failed.reason instanceof Error ? failed.reason.message : 'Failed to move file',
-          'error',
-        )
-      }
-      setMoveFileTarget(null)
-      setSelectedUuids(new Set())
+      const failedUuids = moveFileTarget.uuids.filter((_, index) => results[index].status === 'rejected')
+      const succeeded = new Set(moveFileTarget.uuids.filter(uuid => !failedUuids.includes(uuid)))
+      setSelectedUuids(previous => new Set([...previous].filter(uuid => !succeeded.has(uuid))))
       refresh()
+      if (failedUuids.length) {
+        const names = moveFileTarget.uuids.flatMap((uuid, index) => failedUuids.includes(uuid) ? [moveFileTarget.names[index]] : [])
+        setMoveFileTarget({ ...moveFileTarget, uuids: failedUuids, names })
+        throw new Error(`${succeeded.size} moved; ${failedUuids.length} could not be moved. Only the remaining files will be retried: ${names.slice(0, 3).join(', ')}${names.length > 3 ? '…' : ''}. Choose a destination to retry.`)
+      }
+      toast(`${succeeded.size} file${succeeded.size === 1 ? '' : 's'} moved`, 'success')
+      setMoveFileTarget(null)
     },
-    [moveFileTarget, refresh, toast],
+    [moveFileTarget, refresh, toast, setSelectedUuids],
   )
 
   const handleDelete = useCallback(
@@ -586,7 +743,7 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
       }
       refresh()
     },
-    [refresh, folders, documents, confirm],
+    [refresh, folders, documents, confirm, toast],
   )
 
   if (loading && documents.length === 0 && folders.length === 0) {
@@ -601,17 +758,15 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
 
   return (
     <div
-      style={{ padding: '0px 45px 45px 45px' }}
+      className="file-browser"
+      style={{ padding: "0 var(--workspace-space-24) var(--workspace-space-32)" }}
       onDragEnter={handlePanelDragEnter}
       onDragOver={handlePanelDragOver}
       onDragLeave={handlePanelDragLeave}
       onDrop={handlePanelDrop}
     >
-      <UploadZone onFilesSelected={(files) => upload(files)} highlighted={panelDragOver} />
-      <UploadProgress uploads={uploads} onDismiss={dismissUpload} />
-
-      {/* + Add button with dropdown menu - matches Flask _add_button.html */}
-      <div ref={addMenuRef} className="relative inline-block mt-4">
+      <WorkspaceSectionHeader title="Files" actions={<>
+      <div ref={addMenuRef} className="relative inline-block">
         <button
           type="button"
           onClick={() => setAddMenuOpen(!addMenuOpen)}
@@ -629,7 +784,7 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
             role="menu"
             aria-label="Add"
             onKeyDown={(e) => { if (e.key === 'Escape') setAddMenuOpen(false) }}
-            className="absolute left-0 z-[1000] mt-2 min-w-[180px] rounded-lg border bg-white p-1.5"
+            className="absolute right-0 z-[1000] mt-2 min-w-[180px] rounded-lg border bg-white p-1.5"
             style={{
               borderColor: 'rgba(0,0,0,.15)',
               boxShadow: '0 8px 24px rgba(0,0,0,.12)',
@@ -672,6 +827,16 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
               <Upload className="h-4 w-4 shrink-0" style={{ width: 18 }} />
               <span>Upload Files</span>
             </button>
+            {rootFolder && <button
+              role="menuitem"
+              type="button"
+              onClick={() => {
+                const uuid = currentFolder || rootFolder
+                setExistingFilesDestination({ uuid, title: breadcrumbs.find(folder => folder.uuid === uuid)?.title || rootLabel || 'Project files' })
+                setAddMenuOpen(false)
+              }}
+              className="flex w-full items-center gap-2.5 rounded-md px-3.5 py-2.5 text-left text-sm hover:bg-black/[.04]"
+            ><FolderInput className="h-4 w-4 shrink-0" /><span>From my files</span></button>}
           </div>
         )}
 
@@ -688,6 +853,9 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
           }}
         />
       </div>
+      </>}>{searchField}</WorkspaceSectionHeader>
+      <UploadZone onFilesSelected={(files) => upload(files)} highlighted={panelDragOver} />
+      <UploadProgress uploads={uploads} onDismiss={dismissUpload} />
 
       {/* Breadcrumbs - matches Flask _breadcrumbs.html */}
       <Breadcrumbs
@@ -696,21 +864,34 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
         floor={rootFolder}
         homeLabel={rootFolder ? (rootLabel ?? 'Project') : 'Home'}
         onDropFile={handleDropFile}
+        summary={contentsError ? undefined : formatContentsSummary(folders.length, documents.length)}
       />
+
+      {breadcrumbError && <p role="alert" className="mt-2 text-sm text-red-800">Folder path unavailable. {breadcrumbError} <button type="button" className="underline" onClick={() => void refreshBreadcrumbs()}>Retry folder path</button></p>}
 
       {/* Bulk action toolbar */}
       {selectedUuids.size > 0 && (
         <div
-          className="mt-2.5 flex items-center gap-2 rounded-lg px-3 py-2"
+          role="group" aria-label="Selected files and bulk actions"
+          className="mt-2.5 flex flex-wrap items-center gap-2 rounded-lg px-3 py-2"
           style={{ backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 10%, white)', border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 30%, white)' }}
         >
           <span className="text-sm font-medium" style={{ color: '#374151' }}>
-            {selectedUuids.size} selected
+            {actionableUuids.size} selected
+            {hiddenSelection.folders + hiddenSelection.documents + hiddenSelection.search > 0 && (
+              <span className="font-normal text-gray-500">
+                {' · '}{[
+                  hiddenSelection.search > 0 && `${hiddenSelection.search} hidden by the search`,
+                  hiddenSelection.documents > 0 && `${hiddenSelection.documents} hidden by the filter`,
+                  hiddenSelection.folders > 0 && `${hiddenSelection.folders} in collapsed Folders`,
+                ].filter(Boolean).join(', ')} (not included)
+              </span>
+            )}
           </span>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex max-w-full flex-wrap items-center gap-2">
             <button
               onClick={handleBulkDownload}
-              disabled={![...selectedUuids].some(u => documents.some(d => d.uuid === u))}
+              disabled={![...actionableUuids].some(u => documents.some(d => d.uuid === u))}
               className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               <Download className="h-3.5 w-3.5" />
@@ -718,7 +899,7 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
             </button>
             <button
               onClick={() => {
-                const docs = documents.filter(d => selectedUuids.has(d.uuid))
+                const docs = documents.filter(d => actionableUuids.has(d.uuid))
                 if (docs.length === 0) return
                 setMoveFileTarget({
                   uuids: docs.map(d => d.uuid),
@@ -726,7 +907,7 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
                   fromFolderId: currentFolder,
                 })
               }}
-              disabled={![...selectedUuids].some(u => documents.some(d => d.uuid === u))}
+              disabled={![...actionableUuids].some(u => documents.some(d => d.uuid === u))}
               className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               <FolderInput className="h-3.5 w-3.5" />
@@ -734,8 +915,8 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
             </button>
             <button
               onClick={handleBulkDelete}
-              disabled={bulkDeleting}
-              className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50 transition-colors"
+              disabled={bulkDeleting || actionableUuids.size === 0}
+              className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-50 transition-colors"
             >
               <Trash2 className="h-3.5 w-3.5" />
               {bulkDeleting ? 'Deleting...' : 'Delete'}
@@ -744,20 +925,28 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
               onClick={() => setSelectedUuids(new Set())}
               className="text-xs text-gray-500 hover:text-gray-700 px-1.5"
             >
-              Cancel
+              Clear selection
             </button>
           </div>
         </div>
       )}
 
-      {/* File table - matches Flask .styled-table */}
+      {contentSearchState === 'error' && <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">Content search is unavailable. Name matches from this folder remain available. <button onClick={onRetryContentSearch} className="ml-2 rounded border border-red-300 px-2 py-1 underline">Retry search</button></div>}
+      {contentsError && <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">Could not load this folder. {documents.length || folders.length ? 'Previously loaded items are shown.' : 'Its contents are unavailable.'} <button onClick={() => refresh()} className="ml-2 rounded border border-red-300 px-2 py-1 underline">Retry folder</button></div>}
+      {/* File list surface */}
       <div
-        className="mt-2.5 rounded-[12px] overflow-hidden"
-        style={{ boxShadow: '0 0 20px rgba(0, 0, 0, 0.15)' }}
+        ref={listScrollRef}
+        onScroll={onListScroll ? (event) => onListScroll(event.currentTarget.scrollTop) : undefined}
+        className="file-list-surface"
       >
-        <FileList
+        {contentsError && !documents.length && !folders.length ? null : searchQuery.trim() && !sortedFolders.length && !sortedDocuments.length ? <p role="status" className="p-6 text-sm text-gray-600">{contentSearchState === 'loading' ? 'Searching document contents…' : contentSearchState === 'error' ? 'No matching names in this folder. Retry content search above, or change the search.' : <>No files or folders match “{searchQuery}”. Change the search or clear it to see this folder again.</>}</p> : currentFolder && !sortedFolders.length && !sortedDocuments.length ? <p role="status" className="p-6 text-sm text-gray-600">{rootFolder ? 'This folder is empty. Use Add → From my files to move existing files here, or upload new files.' : 'This folder is empty. Upload files here or use Add to create a folder.'}</p> : <FileList
           folders={sortedFolders}
-          documents={sortedDocuments}
+          documents={shownDocuments}
+          allDocuments={sortedDocuments}
+          documentFilter={documentFilter}
+          onDocumentFilterChange={setDocumentFilter}
+          foldersCollapsed={foldersCollapsed}
+          onToggleFoldersCollapsed={toggleFoldersCollapsed}
           onFolderClick={setCurrentFolder}
           onFolderContextMenu={handleFolderContextMenu}
           onDocContextMenu={handleDocContextMenu}
@@ -771,9 +960,16 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
           sort={sort}
           onSort={handleSort}
           watchedFolderUuids={watchedFolderUuids}
-        />
+          onRetryDoc={handleRetryDoc}
+          retryingUuids={retryingUuids}
+        />}
       </div>
 
+      <input ref={versionInput} type="file" hidden accept={SUPPORTED_ACCEPT_ATTR} aria-hidden="true" tabIndex={-1}
+        onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void uploadVersion(file) }} />
+      {versionsTarget && (
+        <VersionHistoryDialog docUuid={versionsTarget.uuid} docTitle={versionsTarget.title} onClose={() => setVersionsTarget(null)} />
+      )}
       {usageTarget && (
         <DocumentUsageDialog
           docUuid={usageTarget.uuid}
@@ -827,6 +1023,11 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
                   })
                 }
           }
+          onDuplicate={
+            contextMenu.type === 'doc'
+              ? () => { void handleDuplicate(contextMenu.item as Document) }
+              : undefined
+          }
           onExport={
             contextMenu.type === 'folder'
               ? async () => {
@@ -847,12 +1048,25 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
                 }
               : undefined
           }
-          onCopyUuid={() => {
-            navigator.clipboard.writeText(contextMenu.item.uuid)
-          }}
+          // An identifier only someone working with the API needs.
+          onCopyUuid={
+            user?.is_admin
+              ? () => { navigator.clipboard.writeText(contextMenu.item.uuid) }
+              : undefined
+          }
           onShowUsage={
             contextMenu.type === 'doc'
               ? () => setUsageTarget({ uuid: contextMenu.item.uuid, title: contextMenu.item.title })
+              : undefined
+          }
+          onUploadVersion={
+            contextMenu.type === 'doc'
+              ? () => { versionTarget.current = contextMenu.item as Document; versionInput.current?.click() }
+              : undefined
+          }
+          onShowVersions={
+            contextMenu.type === 'doc'
+              ? () => setVersionsTarget({ uuid: contextMenu.item.uuid, title: contextMenu.item.title })
               : undefined
           }
           onConvertToTeam={
@@ -902,6 +1116,7 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
           onClose={() => setMoveFileTarget(null)}
         />
       )}
+      {existingFilesDestination && <ExistingFilesDialog destination={existingFilesDestination} onClose={() => setExistingFilesDestination(null)} />}
     </div>
   )
 }

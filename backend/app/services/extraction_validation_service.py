@@ -65,7 +65,7 @@ async def get_test_case(uuid: str) -> Optional[ExtractionTestCase]:
     return await ExtractionTestCase.find_one(ExtractionTestCase.uuid == uuid)
 
 
-async def update_test_case(uuid: str, **fields) -> Optional[ExtractionTestCase]:
+async def update_test_case(uuid: str, **fields: object) -> Optional[ExtractionTestCase]:
     tc = await get_test_case(uuid)
     if not tc:
         return None
@@ -337,7 +337,7 @@ async def run_validation(
                 is_challenging = True
             if is_challenging:
                 error_types = f.get("error_types", {})
-                most_common_error = max(error_types, key=error_types.get) if error_types else "none"
+                most_common_error = max(error_types, key=lambda key: error_types[key]) if error_types else "none"
                 challenging_fields.append({
                     "field_name": f["field_name"],
                     "source_label": tcr["label"],
@@ -469,7 +469,7 @@ async def _validate_test_case(
         }
 
     # Run extraction N times concurrently (each in its own thread with a fresh engine)
-    async def _single_run():
+    async def _single_run() -> dict:
         engine = ExtractionEngine(system_config_doc=sys_config_doc)
         result = await asyncio.to_thread(
             engine.extract,
@@ -626,7 +626,7 @@ _NOT_FOUND_VARIANTS = frozenset({
 })
 
 
-def _is_not_found(value) -> bool:
+def _is_not_found(value: object) -> bool:
     """Return True if a value is a 'not found' sentinel."""
     if value is None:
         return True
@@ -789,7 +789,7 @@ def _try_parse_date(value: str) -> Optional[tuple[int, int, int]]:
 
 def _classify_error(extracted: Optional[str], expected: str) -> str:
     """Classify the type of extraction error."""
-    if _is_not_found(extracted):
+    if extracted is None or _is_not_found(extracted):
         return "missing"
     # Check truncation: one is a substantial prefix of the other
     e_lower = extracted.lower().strip()
@@ -1098,7 +1098,7 @@ async def run_validation_v2(
             if is_challenging:
                 # Most common error type
                 error_types = f.get("error_types", {})
-                most_common_error = max(error_types, key=error_types.get) if error_types else "none"
+                most_common_error = max(error_types, key=lambda key: error_types[key]) if error_types else "none"
                 challenging_fields.append({
                     "field_name": f["field_name"],
                     "source_label": sr["source_label"],

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import { ExploreTab } from './ExploreTab'
 import type { VerifiedCatalogItem } from '../../types/library'
 
@@ -220,7 +220,7 @@ describe('ExploreTab KB adopt', () => {
 })
 
 describe('ExploreTab quality tiers', () => {
-  it('spotlights measured excellent items ahead of asserted ones and labels assertions', async () => {
+  it('spotlights measured strong items and leaves author assertions unevaluated', async () => {
     // #908/#909: the spotlight is keyed on the tier the measurement pipeline
     // emits, a validated item leads it, and a seeded tier is shown as a claim.
     const measured = makeItem({ id: 'c-1', item_id: 'wf-1', name: 'Measured WF', source_uuid: 'wf-1', quality_tier: 'excellent', quality_score: 94 })
@@ -229,15 +229,16 @@ describe('ExploreTab quality tiers', () => {
     vi.mocked(listVerifiedItems).mockResolvedValue({ items: [asserted, good, measured], total: 3 })
     render(<ExploreTab />)
 
-    const heading = await screen.findByText('Top Rated')
-    expect(heading.parentElement?.textContent).toContain('2 excellent-tier items')
+    const heading = await screen.findByRole('heading', { name: 'Strong on tested examples' })
+    expect(heading.parentElement?.textContent).toContain('2 items with strong measured results')
     const spotlight = heading.parentElement!.parentElement!
     const names = Array.from(spotlight.querySelectorAll('button')).map(b => b.textContent || '')
-    expect(names.findIndex(n => n.includes('Measured WF'))).toBeLessThan(names.findIndex(n => n.includes('Seeded WF')))
-    expect(names.some(n => n.includes('Good WF'))).toBe(false)
+    expect(names.some(n => n.includes('Measured WF'))).toBe(true)
+    expect(names.some(n => n.includes('Seeded WF'))).toBe(false)
+    expect(names.some(n => n.includes('Good WF'))).toBe(true)
 
-    expect(screen.getByText('Rated Excellent by its author · not yet checked here')).toBeTruthy()
-    expect(screen.getByText('Checked · Excellent (94%)')).toBeTruthy()
+    expect(screen.getByText('Author rating · no measured evaluation')).toBeTruthy()
+    expect(screen.getAllByLabelText('Strong on tested examples. View evaluation')).toHaveLength(2)
   })
 })
 
@@ -253,11 +254,37 @@ describe('ExploreTab adoption and stability signals', () => {
     await screen.findByText('Measured WF')
     // Each chip appears once per card; the modal is closed.
     expect(screen.getAllByText('on 12 cases')).toHaveLength(1)
-    expect(screen.getAllByText('same answer 91% of the time')).toHaveLength(1)
+    expect(screen.getAllByText('Consistency measured · view evaluation')).toHaveLength(1)
     expect(screen.getAllByText('4 people use it')).toHaveLength(1)
     expect(screen.getAllByText('1 person uses it')).toHaveLength(1)
     expect(screen.getAllByText('Starter example')).toHaveLength(1)
     expect(screen.queryByText('on 3 cases')).toBeNull()
     expect(screen.queryByText('same answer 50% of the time')).toBeNull()
   })
+})
+
+
+it('names a prompt correctly and shows its inputs before validation evidence in details', async () => {
+  const item = makeItem({ kind: 'search_set', set_type: 'prompt', description: 'Rewrite supplied instructions.', usage: { input: 'Provide the context requested by the prompt.', output: 'A generated response.', output_names: [], notes: [] } })
+  vi.mocked(listVerifiedItems).mockResolvedValue({ items: [item], total: 1 })
+  render(<ExploreTab />)
+  const title = await screen.findByRole('button', { name: item.name })
+  const card = title.closest('article')!
+  expect(within(card).getByText('Skill', { exact: true })).toBeInTheDocument()
+  expect(within(card).getByText(item.usage!.input)).toBeInTheDocument()
+  fireEvent.click(title)
+  const dialog = screen.getByRole('dialog', { name: item.name })
+  expect(within(dialog).getByText('Shared Skill')).toBeInTheDocument()
+  const usage = within(dialog).getByRole('region', { name: 'Inputs and output' })
+  const evidence = within(dialog).getByRole('region', { name: 'Validation evidence' })
+  expect(usage.compareDocumentPosition(evidence) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+})
+
+it('identifies a formatter as a formatter on its card and in its details', async () => {
+  vi.mocked(listVerifiedItems).mockResolvedValue({ items: [makeItem({ kind: 'search_set', set_type: 'formatter', name: 'Award summary format' })], total: 1 })
+  render(<ExploreTab />)
+  const title = await screen.findByRole('button', { name: 'Award summary format' })
+  expect(within(title.closest('article')!).getByText('Formatter')).toBeInTheDocument()
+  fireEvent.click(title)
+  expect(within(await screen.findByRole('dialog')).getByText('Shared Formatter')).toBeInTheDocument()
 })

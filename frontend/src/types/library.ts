@@ -29,6 +29,8 @@ export interface LibraryItem {
   name: string
   description: string | null
   set_type: string | null
+  /** Skills only: the author's line on which tasks the Skill is for. */
+  when_to_use?: string | null
   tags: string[]
   note: string | null
   folder: string | null
@@ -49,6 +51,9 @@ export interface LibraryItem {
   created_by?: AuthorRef | null
   /** Whether the current user may permanently delete the backing workflow/extraction. */
   can_delete_underlying?: boolean
+  /** Whether the current user may edit the backing Skill, formatter or extraction:
+   *  its creator, an owner or admin of its team, or a site admin. */
+  can_edit_underlying?: boolean
 }
 
 export interface LibraryFolder {
@@ -156,6 +161,8 @@ export interface VerifiedItemMetadata {
 }
 
 export interface VerifiedCatalogItem {
+  set_type?: string | null
+  usage?: { input: string; output: string; output_names: string[]; notes: string[] }
   id: string
   item_id: string
   kind: LibraryItemKind

@@ -137,7 +137,7 @@ export function improvePrompt(data: {
 // grants the holder run access to a workflow they don't own / aren't on the team for.
 export function runWorkflow(
   workflowId: string,
-  data: { document_uuids?: string[]; folder_uuids?: string[]; model?: string; batch_mode?: boolean },
+  data: { document_uuids?: string[]; folder_uuids?: string[]; model?: string; batch_mode?: boolean; project_context_uuid?: string },
   shareToken?: string,
 ) {
   return apiFetch<{ session_id?: string; batch_id?: string; activity_id?: string }>(`/api/workflows/${workflowId}/run`, {
@@ -655,10 +655,47 @@ export interface RunHistoryEntry {
   result_snapshot: Record<string, unknown>
   /** Set while the run is parked on an approval gate — links to the review. */
   pending_review_uuid?: string | null
-  /** Models the run's calls used, most tokens first; empty for older runs. */
+  /** Models the run used, most tokens first (configured models for runs
+   * recorded before calls were metered). */
   models?: string[]
   /** Each step's models, in step order (steps that called no model are absent). */
   step_models?: { index: number; name: string | null; models: string[] }[]
+}
+
+export interface WorkflowVersionEntry {
+  id: string
+  number: number
+  note: string
+  source: 'original' | 'chat' | 'editor' | 'restore' | string
+  created_by_user_id: string | null
+  created_by_name: string | null
+  created_at: string | null
+  restored_from: number | null
+  name: string | null
+  step_names: string[]
+  is_current: boolean
+}
+
+export interface WorkflowVersionHistory {
+  versions: WorkflowVersionEntry[]
+  unsaved_changes: boolean
+  can_manage: boolean
+}
+
+export function listWorkflowVersions(workflowId: string) {
+  return apiFetch<WorkflowVersionHistory>(`/api/workflows/${workflowId}/versions`)
+}
+
+export function saveWorkflowVersion(workflowId: string, note: string) {
+  return apiFetch<{ id: string; number: number }>(`/api/workflows/${workflowId}/versions`, {
+    method: 'POST', body: JSON.stringify({ note }),
+  })
+}
+
+export function restoreWorkflowVersion(workflowId: string, versionId: string) {
+  return apiFetch<{ id: string; number: number; restored_from: number; name_note: string | null }>(
+    `/api/workflows/${workflowId}/versions/${versionId}/restore`, { method: 'POST' },
+  )
 }
 
 export function getWorkflowHistory(workflowId: string, limit = 50) {
@@ -687,6 +724,8 @@ export function getWorkflowImprovementSuggestions(workflowId: string) {
 // Quality status
 
 export interface WorkflowQualityStatus {
+  num_test_cases?: number | null
+  num_runs?: number | null
   status: 'validated' | 'unvalidated'
   score: number | null
   tier: string | null
@@ -695,6 +734,12 @@ export interface WorkflowQualityStatus {
   last_validated_at: string | null
   /** Monitoring found a regression here and nobody has reviewed it yet. */
   regression_pending_review?: boolean
+  /** A catalog author's rating with no measurement behind it; status is unvalidated. */
+  tier_asserted?: string | null
+  /** The model or graded cases changed since the score was measured (#1013 §5). */
+  model_changed?: boolean
+  test_cases_changed?: boolean
+  drift_reasons?: string[]
 }
 
 export function getWorkflowQualityStatus(workflowId: string) {
@@ -768,6 +813,12 @@ export type WorkflowOptimizationRun = {
   baseline_no_workflow_score: number | null
   baseline_default_score: number | null
   optimized_score: number | null
+  /** Held-out re-scores: present when the run split its test set. The
+   *  headline is held-out exactly when holdout_optimized_score is set; pair
+   *  scores with reportedBaselineScore (shared/optimizerScores). */
+  optimized_score_train?: number | null
+  holdout_default_score?: number | null
+  holdout_optimized_score?: number | null
   judge_variance: number | null
   judge_score_se: number | null
   judge_model: string | null

@@ -1,0 +1,81 @@
+NIH Grants Policy Statement (FY 2026 revision) — Chapter 13: Modular Applications and Awards
+Source: https://grants.nih.gov/policy-and-compliance/nihgps
+
+13 MODULAR APPLICATIONS AND AWARDS
+13.1 GENERAL
+Modular applications and awards employ a simplified process for developing and reviewing application
+budgets, documenting approved budgets, and making post-award budgetary changes.
+13.2 APPLICABILITY
+Modular procedures are required to be used for new, renewal, and resubmission applications as well as
+for revisions for the following grants and their cooperative agreement equivalents that request up to a
+total of $250,000 of direct costs per year (excluding consortium indirect costs), regardless of whether the
+application is an investigator-initiated application or is one submitted in response to a PA/RFA: Research
+Project Grants Program (R01/U01), Small Grant Program (R03), Exploratory/Development Research
+Grant Award (R21/UH2), Clinical Trial Planning Grant Program (R34/U34) and Academic Research
+Enhancement Awards (R15/UA5). Modular procedures do not apply to SBIR and STTR Phase I grants
+(R43 and R41), and do not apply to foreign (non-U.S.) organizations.
+Instructions for specific grant mechanisms other than the R01 and guidelines for IC programs may indicate a particular number or range of modules allowed.
+Modular applications and awards may also be subject to other simplified procedures, specifically Just-in-
+Time requirements and SNAP.
+13.3 APPLICATION REQUIREMENTS
+Modular applications must be submitted on the SF424 (R&R) forms. Paper-based applications that
+include modular budgets will no longer be accepted.
+13.3.1 Budget
+Modular applications request direct cost funding in modules of $25,000, for up to $250,000 each year for
+covered activity codes. Indirect costs for subcontracts are not included in determining the direct cost
+modular amount or the total cost amount requested. The modules should be a reasonable estimate of
+allowable, allocable, and reasonable costs for the proposed project. In addition, indirect costs at the negotiated rate for the applicant institution are also allowable.
+Since only limited budget information is required for submission of a modular application, the PHS 398
+Modular Budget Component, which is included as part of the electronic SF424 (R&R) form set, must be
+submitted to NIH through Grants.gov. Sample modular application budget pages are available at
+Develop Your Budget. The standard SF 424 Research and Related Budget Component is not used for
+application using modular budgets.
+The PHS 398 Modular Budget Component includes information on direct costs modules as well as indirect costs; budget justifications for all personnel by position, role, and level of effort (measured in person
+months); consultants; and ‘to be appointed’ positions. No individual salary information should be
+provided. Applicants must use the current legislatively imposed salary limitation when determining the
+number of modules to request (see Cost Considerations—Allowability of Costs/Activities—Selected
+Items of Cost—Salaries and Wages in IIA). Given the authority to rebudget and carry forward unobligated balances, funds generally should be available to cover modest increases in any statutorily imposed
+salary cap. NIH also limits the compensation for graduate students. Compensation includes salary or
+(GPS page IIB-100)
+
+wages, fringe benefits, and tuition remission. These limits should be used when estimating the number of
+modules. See Cost Considerations—Allowability of Costs/Activities—Selected Items of Cost—Salaries
+and Wages in IIA for more information on compensation of graduate students.
+When applicable, a separate budget justification must address consortium/contractual costs (including
+applicable indirect costs) rounded to the nearest $1,000. The narrative should list the individuals and
+organizations with whom consortium or contractual arrangements have been (or will be) made, the level
+of effort of senior/key personnel (measured in person months) and their role on the project, and indicate
+whether the collaborating organization is foreign or domestic.
+A typical modular application will request the same number of modules for each year. However, well-justified modular increments (up to the $250,000 modular ceiling) or decrements in the total direct costs for
+any year of the project that reflect substantial changes in expected future activities may be requested at
+the outset. For example, a major equipment purchase in the first year may justify a higher overall budget
+in that year, but not necessarily in succeeding years. There is no provision for escalation in future years.
+NIH requires additional narrative budget justification if there is a variation in the number of modules
+requested from year to year. Further, when the pre-award review warrants such a request, NIH ICs may
+request a detailed budget as part of the Just-in-Time process.
+13.4 APPLICATION REVIEW AND AWARD
+SRGs evaluate the budget on the basis of a general, expert estimate of the total effort and resources
+required to carry out the proposed research. If the SRG recommends an adjustment in the project budget,
+the recommended adjustment will be in terms of an entire module.
+Following peer review, for applications being considered for award, the IC will request information
+about “Other Support” and, as applicable, the use of human subjects or vertebrate animals, and education
+in the protection of human research participants. Additional budget information will be requested before
+award only under special circumstances.
+NIH will attempt to make awards at or close to the level of total direct costs recommended by the SRG,
+taking other support into account. An IC may need to reduce the award amount to accommodate the IC’s
+cost management plan.
+The award budget will be a noncategorical budget specifying approved total direct costs and indirect
+costs, if applicable.
+13.5 POST-AWARD ADMINISTRATION
+Recipients have discretion in determining how to allocate and account for costs related to modular
+awards within their organizational accounting system. However, institutions are still required to ensure
+that all costs charged to modular awards are in accordance with applicable costs principles, the NIHGPS,
+and any legislatively imposed restrictions.
+Modular awards are subject to the standard NIH Terms of Award and may be awarded under the SNAP
+authorities. However, since the award is issued without direct cost budget categories, the significant
+rebudgeting provision described as a potential change of scope indicator does not apply to modular
+grants.
+Recipients may submit requests for administrative supplements to the CGMO of the NIH awarding IC,
+but must provide a detailed (non-modular) budget.
+Competing Revisions should be submitted to NIH using the modular budget component.
+(GPS page IIB-101)

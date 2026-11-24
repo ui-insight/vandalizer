@@ -33,6 +33,8 @@ class TestDocumentDeleteAudit:
         doc.folder = "folder-1"
         doc.downloadpath = None
         doc.path = None
+        doc.previous_version_uuid = None  # not part of a version chain
+        doc.superseded_by = None
         doc.delete = AsyncMock()
 
         with patch.object(file_service.access_control, "get_authorized_document", AsyncMock(return_value=doc)), \

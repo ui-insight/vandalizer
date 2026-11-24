@@ -31,7 +31,7 @@ class TestExpandFoldersToDocumentUuids:
 
         with patch.object(folder_service.access_control, "get_team_access_context", AsyncMock(return_value=MagicMock())), \
              patch.object(folder_service.access_control, "get_authorized_folder", AsyncMock(return_value=root)), \
-             patch.object(folder_service.access_control, "can_view_document", side_effect=lambda d, u, t, allow_admin=False: d.uuid != "blocked"), \
+             patch.object(folder_service.access_control, "get_authorized_document", new=AsyncMock(side_effect=lambda uuid, user, **kwargs: uuid != "blocked")), \
              patch.object(folder_service, "SmartFolder", MagicMock(find=MagicMock(return_value=folder_find))), \
              patch.object(folder_service, "SmartDocument", MagicMock(find=doc_find_fn)):
             result = await folder_service.expand_folders_to_document_uuids(["root"], user)
@@ -65,16 +65,18 @@ def _matches(doc: dict, query: dict) -> bool:
     return True
 
 
-class TestExpansionSkipsDeletedDocuments:
-    """A ticked folder used to run a workflow on documents retention had
-    soft-deleted. The query itself is applied here to a set of stored rows, so
-    a dropped filter fails the test."""
+class TestExpansionSkipsOldVersionsAndDeletedDocuments:
+    """A ticked folder used to run a workflow on every version of a revised
+    file and on documents retention had soft-deleted. The query itself is
+    applied here to a set of stored rows, so a dropped filter fails the test."""
 
     @pytest.mark.asyncio
-    async def test_only_live_documents_are_returned(self):
+    async def test_only_current_live_documents_are_returned(self):
         user = MagicMock(user_id="u1", is_admin=False)
         rows = [
             {"uuid": "plain", "folder": "root"},
+            {"uuid": "v1", "folder": "root", "superseded_by": "v2"},
+            {"uuid": "v2", "folder": "root", "superseded_by": None},
             {"uuid": "deleted", "folder": "root", "soft_deleted": True},
             {"uuid": "kept", "folder": "root", "soft_deleted": False},
             {"uuid": "elsewhere", "folder": "other"},
@@ -89,9 +91,9 @@ class TestExpansionSkipsDeletedDocuments:
         folder_find.to_list = AsyncMock(return_value=[])
         with patch.object(folder_service.access_control, "get_team_access_context", AsyncMock(return_value=MagicMock())), \
              patch.object(folder_service.access_control, "get_authorized_folder", AsyncMock(return_value=MagicMock(uuid="root"))), \
-             patch.object(folder_service.access_control, "can_view_document", MagicMock(return_value=True)), \
+             patch.object(folder_service.access_control, "get_authorized_document", AsyncMock(return_value=True)), \
              patch.object(folder_service, "SmartFolder", MagicMock(find=MagicMock(return_value=folder_find))), \
              patch.object(folder_service, "SmartDocument", MagicMock(find=find)):
             result = await folder_service.expand_folders_to_document_uuids(["root"], user)
 
-        assert result == ["plain", "kept"]
+        assert result == ["plain", "v2", "kept"]

@@ -131,7 +131,7 @@ export function CostEstimator() {
           {OPERATIONS.map((op) => (
             <div key={op.id}>
               <label className="block text-sm text-gray-300 mb-1.5" htmlFor={`count-${op.id}`}>
-                {op.label} <span className="text-gray-500">({op.unit})</span>
+                {op.label} <span className="text-gray-400">({op.unit})</span>
               </label>
               <input
                 id={`count-${op.id}`}
@@ -229,7 +229,7 @@ export function CostEstimator() {
             value={cachePct}
             onChange={(e) => setCachePct(Number(e.target.value))}
           />
-          <p className="text-xs text-gray-500 mt-1.5">
+          <p className="text-xs text-gray-400 mt-1.5">
             Repeated document and knowledge-base context caches well; cached reads bill at roughly
             a tenth of the standard input rate. Leave at 0% for a worst-case figure.
           </p>
@@ -250,20 +250,20 @@ export function CostEstimator() {
         <div className="bg-[#262626] rounded-lg p-6 border border-[#f1b300]/30">
           <div className={LABEL}>Per user / month</div>
           <div className="text-4xl font-bold text-[#f1b300]">{formatUsd(result.costPerUser)}</div>
-          <div className="text-xs text-gray-500 mt-2">
+          <div className="text-xs text-gray-400 mt-2">
             {formatUsd(result.costPerUser * 12)} per user / year
           </div>
         </div>
         <div className="bg-[#262626] rounded-lg p-6 border border-white/15">
           <div className={LABEL}>Deployment / month</div>
           <div className="text-4xl font-bold text-white">{formatUsd(result.costTotal)}</div>
-          <div className="text-xs text-gray-500 mt-2">
+          <div className="text-xs text-gray-400 mt-2">
             {formatUsd(result.costTotal * 12)} per year at {toNumber(users) || 0} users
           </div>
         </div>
       </div>
 
-      <div className="bg-[#262626] rounded-lg overflow-x-auto">
+      <div tabIndex={0} role="region" aria-label="Scrollable documentation example" className="bg-[#262626] rounded-lg overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-white/10 text-left">
@@ -279,7 +279,7 @@ export function CostEstimator() {
               <tr key={row.operation.id} className="border-b border-white/5">
                 <td className="p-3">
                   <div className="text-white">{row.operation.label}</div>
-                  <div className="text-xs text-gray-500 mt-0.5 max-w-md leading-relaxed">
+                  <div className="text-xs text-gray-400 mt-0.5 max-w-md leading-relaxed">
                     {row.operation.description}
                   </div>
                 </td>
@@ -386,7 +386,7 @@ export function CostEstimator() {
         >
           Open the Configurator &rarr;
         </a>
-        <p className="text-xs text-gray-500 mt-3 leading-relaxed">
+        <p className="text-xs text-gray-400 mt-3 leading-relaxed">
           External tool, not affiliated with Vandalizer. It sizes hardware; it does not account for
           staff time, cooling, or rack space.
         </p>
@@ -403,8 +403,8 @@ export function CostEstimator() {
         <code className="bg-white/10 text-[#f1b300] px-1.5 py-0.5 rounded text-xs">estimated</code>{' '}
         are ones where the provider returned no usage data and tokens were counted locally.
       </p>
-      <div className="bg-[#262626] rounded-lg p-4 font-mono text-sm text-gray-300 overflow-x-auto">
-        <div className="text-gray-500"># Mean tokens per operation, by feature, last 30 days</div>
+      <div tabIndex={0} role="region" aria-label="Scrollable documentation example" className="bg-[#262626] rounded-lg p-4 font-mono text-sm text-gray-300 overflow-x-auto">
+        <div className="text-gray-400"># Mean tokens per operation, by feature, last 30 days</div>
         <div>db.llm_usage.aggregate([</div>
         <div>&nbsp;&nbsp;{'{'} $match: {'{'} timestamp: {'{'} $gte: cutoff {'}'} {'}'} {'}'},</div>
         <div>

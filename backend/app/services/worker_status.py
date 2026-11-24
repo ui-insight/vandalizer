@@ -42,8 +42,10 @@ def queue_for(task_name: str) -> str:
 
     for pattern, route in (celery_app.conf.task_routes or {}).items():
         if fnmatch.fnmatchcase(task_name, pattern) and "queue" in route:
-            return route["queue"]
-    return celery_app.conf.task_default_queue
+            queue: str = route["queue"]
+            return queue
+    default_queue: str = celery_app.conf.task_default_queue
+    return default_queue
 
 
 def _inspect_queues() -> frozenset[str]:

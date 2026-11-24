@@ -52,8 +52,8 @@ def last_checked(source: KnowledgeBaseSource) -> datetime.datetime | None:
         _aware(getattr(source, name, None))
         for name in ("last_refresh_attempted_at", "processed_at", "created_at")
     ]
-    stamps = [s for s in stamps if s is not None]
-    return max(stamps) if stamps else None
+    recorded_stamps = [s for s in stamps if s is not None]
+    return max(recorded_stamps) if recorded_stamps else None
 
 
 def is_in_flight(source: KnowledgeBaseSource, now: datetime.datetime) -> bool:
@@ -66,8 +66,8 @@ def is_in_flight(source: KnowledgeBaseSource, now: datetime.datetime) -> bool:
         _aware(getattr(source, name, None))
         for name in ("refresh_queued_at", "last_refresh_attempted_at", "created_at")
     ]
-    stamps = [s for s in stamps if s is not None]
-    return not stamps or now - max(stamps) < STALE_IN_FLIGHT
+    recorded_stamps = [s for s in stamps if s is not None]
+    return not recorded_stamps or now - max(recorded_stamps) < STALE_IN_FLIGHT
 
 
 def is_stalled(source: KnowledgeBaseSource, now: datetime.datetime) -> bool:
@@ -199,7 +199,7 @@ async def refresh_due_sources(now: datetime.datetime | None = None) -> dict[str,
     queued = 0
     for kb in kbs:
         try:
-            interval = INTERVALS[kb.url_refresh_interval]
+            interval = INTERVALS[kb.url_refresh_interval or ""]
             sources = await KnowledgeBaseSource.find(
                 {"knowledge_base_uuid": kb.uuid, "source_type": "url"},
             ).to_list()

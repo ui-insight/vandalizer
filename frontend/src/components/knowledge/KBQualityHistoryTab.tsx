@@ -1,8 +1,9 @@
 import { useCallback } from 'react'
-import { downloadKBValidationRunExport, getKBQuality } from '../../api/knowledge'
-import { QualityTimeline, type QualityRunExportFormat } from '../shared/QualityTimeline'
+import { downloadKBValidationRunExport, getKBQuality, type KBValidationResult } from '../../api/knowledge'
+import { QualityTimeline, type QualityHistoryItem, type QualityRunExportFormat } from '../shared/QualityTimeline'
 
 interface Props {
+  onOpenRun?: (uuid: string, result: KBValidationResult, createdAt?: string) => void
   kbUuid: string
   onSwitchToAutovalidate?: () => void
   /** Bumped by the panel when a validation run finishes, to refetch history. */
@@ -15,7 +16,7 @@ interface Props {
 }
 
 /** Thin adapter over the shared QualityTimeline (Phase 4). */
-export function KBQualityHistoryTab({ kbUuid, onSwitchToAutovalidate, refreshKey, polling, kbHasSources = true }: Props) {
+export function KBQualityHistoryTab({ onOpenRun, kbUuid, onSwitchToAutovalidate, refreshKey, polling, kbHasSources = true }: Props) {
   const fetchHistory = useCallback(() => getKBQuality(kbUuid), [kbUuid])
   const exportRun = useCallback(
     (runUuid: string, format: QualityRunExportFormat) =>
@@ -32,9 +33,19 @@ export function KBQualityHistoryTab({ kbUuid, onSwitchToAutovalidate, refreshKey
       refreshKey={refreshKey}
       polling={polling}
       onExportRun={exportRun}
+      canOpenRun={hasSavedResult}
+      onOpenRun={onOpenRun ? item => {
+        if (hasSavedResult(item)) onOpenRun(item.uuid!, item.result_snapshot as KBValidationResult, item.created_at)
+      } : undefined}
       blockedReason={kbHasSources
         ? null
         : 'Add at least one source, then run Validate & improve to record a quality score here.'}
     />
   )
+}
+
+// Legacy and optimizer-apply rows may have no per-question snapshot.
+function hasSavedResult(item: QualityHistoryItem): boolean {
+  const snapshot = item.result_snapshot as Partial<KBValidationResult> | null | undefined
+  return !!item.uuid && item.source !== 'optimizer_apply' && Array.isArray(snapshot?.retrieval_precision?.details)
 }

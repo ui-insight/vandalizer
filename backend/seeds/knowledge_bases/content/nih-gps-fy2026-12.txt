@@ -1,0 +1,767 @@
+NIH Grants Policy Statement (FY 2026 revision) — Chapter 12: Research Career Development (K) Awards
+Source: https://grants.nih.gov/policy-and-compliance/nihgps
+
+12 Research Career Development ("K") Awards
+12 RESEARCH CAREER DEVELOPMENT ("K")
+AWARDS
+12.1 GENERAL
+This chapter includes general information about research career development awards (CDAs), also
+known as “K” awards. It supplements the general information found in IIA that applies to all NIH
+awards.
+The objective of NIH career development programs is to help ensure that  highly trained scientists are
+available in adequate numbers and in appropriate research areas to address the Nation’s biomedical, behavioral, and clinical research needs. Among NIH ICs, a variety of programs are available for scientists
+who require additional mentored or independent experience in a productive scientific environment in
+order to further develop their careers in independent biomedical, behavioral and clinical research.
+For mentored programs, support is provided to cover protected time for supervised career development
+experiences with a goal of leading to research independence. Independent (non-mentored) programs
+foster the development of outstanding scientists and enable them to expand their potential to make significant contributions to a field of research.
+12.1.1 Background
+The research CDA program was established in 1961 to enable investigators who have demonstrated
+research potential to develop further their research careers. The program is authorized by sections 301,
+402 and 405 of the PHS Act, 42 U.S.C. 241, 282 and 284. In general, CDAs provide up to five years of
+salary support and guarantee substantial protected time to engage in research and related activities. The
+award is available to persons who have demonstrated independent research accomplishments but need
+additional experience to establish or sustain an independent research program.
+12.2 TYPES OF CAREER DEVELOPMENT AWARDS
+12.2.1 General
+NIH offers a wide variety of CDAs: mentored awards to individuals, including unique career transition
+programs; non-mentored awards to individuals (mid-career and senior stages), and institutional programs
+that provide mentored experiences for multiple individuals who are selected by the institution. Some
+CDAs are linked to other types of NIH awards. Applicants are encouraged to review the NOFO for
+information about IC-specific utilization of the wide variety of CDAs. Specific questions may be directed to the appropriate NIH scientific/research staff or grants management staff named in the NOFO.
+Further information about specific NIH CDAs is found at the K Kiosk.
+12.2.2 Individual Mentored Career Development Awards
+Individual mentored CDAs (e.g. K01, K07 (developmental), K08, K22, K23, K25, K99/R00) provide
+support for a sustained period of “protected time” (generally three, four, or five years) for intensive
+research career development under the guidance of an experienced mentor or sponsor in the biomedical,
+behavioral, or clinical sciences. Through the sustained period of research career development and training provided by mentored CDAs, recipients are expected to gain the skills and experience necessary for
+independent and productive research careers. Mentored CDAs are not renewable, nor are they
+(GPS page IIB-79)
+
+12 Research Career Development ("K") Awards
+transferable from one individual to another. No-cost extensions in time are permitted; however, all terms
+and conditions, including appointment and minimum effort requirements, remain during the extension
+period.
+Generally, mentored CDA programs are covered by NIH-wide Parent NOFOs. In addition, some ICs
+may issue IC-specific NOFOs for specialized programs. Specific program requirements for each mentored CDA program are found in the NOFOs. Some programmatic information is provided below for programs with unique policies.
+12.2.2.1 Mentor
+Individual mentored CDA applications require the candidate to identify a mentor (sometimes referred to
+as a sponsor) with extensive and appropriate research experience. The candidate must name a primary
+mentor/sponsor, who, together with the candidate is responsible for the planning, direction, and execution of the program. The mentor should be recognized as an accomplished investigator in the proposed
+research area; have a track record of success in training independent investigators; and should have sufficient independent research support to cover any costs of the proposed research project in excess of the
+allowable costs of the CDA award. Candidates may have co-mentors/sponsors as appropriate to the goals
+of the program.
+12.2.3 Career Transition Awards
+In general, the career transition award programs (K22 and K99/R00) provides protected time through
+salary and research support to facilitate the transition of postdoctoral individuals or junior faculty in
+mentored positions to research independence.
+12.2.3.1 K22 Phase
+In general, the K22 program supports two phases of research: 1) a mentored phase (2 years); and, 2) an
+independent phase (up to 3 years), for a total of up to 5 years of combined support. Some programs, however, support only the newly-independent phase of an investigator’s research career development. Applicants for K22 programs need not be affiliated with an applicant institution, e.g., NIH intramural scientists.
+Planning, direction, and execution of the proposed K22 award are the responsibility of the candidate.
+Only a few ICs support K22 programs and each has specific eligibility criteria and award provisions.
+There is no parent NOFO.
+When the applicant is an intramural scientist, NIH issues a provisional award letter and the actual NoA is
+issued after identifying a suitable position at an extramural research institution. The position may include
+continuation of a postdoctoral segment.
+12.2.3.2 Pathway to Independence Award (K99/R00)
+The objective of the Pathway to Independence Award (K99/R00) is to assist postdoctoral investigators in
+transitioning to a stable independent research position with independent research funding. The K99/R00
+program offers a two-phase award, generally providing up to a total of 5 years of support. Phase I (K99)
+provides support for up to 2 years of intensive, mentored research career development; Phase II (R00)
+provides support for up to 3 years of independent research, contingent on securing an independent
+research position. Phase II is also contingent upon an administrative review and approval by the awarding IC of a transition application.
+12.2.3.2.1 Eligibility
+The K99/R00 program has several unique eligibility criteria that are not generally applicable to other
+CDA programs.
+(GPS page IIB-80)
+
+12 Research Career Development ("K") Awards
+ l U.S. citizens and non-U.S. citizens with the skills, knowledge and resources necessary to carry
+out the proposed research and career development activities are eligible to apply.
+ l K99/R00 applicants must not have more than 4 years of postdoctoral research training as of the
+relevant application due date regardless of whether it is a new or resubmission application. NIH
+will consider requests for extension of the K99 eligibility window for various reasons, including
+medical concerns, disability, family care, extended periods of clinical training, natural disasters,
+and active duty military service. Each of these requests is reviewed on a case by case basis.  NIH
+will approve an extension of one year for childbirth within the 4 year K99 eligibility window.
+Applicants who will be PD/PIs on a K99 application must provide the child’s date of birth in the
+extension request justification submitted to IC program officials and/or scientific/research contacts listed in the NOFO at least 12 weeks before submitting an application.
+ l NIH intramural scientists are eligible to apply. If selected for funding, the K99 phase is supported by the NIH IC intramural laboratory in which the candidate conducts research. The R00
+phase is supported via an extramural award once an acceptable position at an extramural organization is secured.
+ l It is expected that K99 recipients will benefit from no less than 12 months of mentored research
+training and career development before transitioning to the R00 phase.
+ l If an applicant achieves independence prior to initiating the K99 phase, neither the K99 nor the
+R00 phase will be awarded.
+12.2.3.2.2 K99 Phase
+Generally, the K99 phase is for 2 years; however, award recipients may transition earlier than 2 years
+when the recipient has been offered an acceptable position. It is expected that K99 recipients will receive
+at least 12 months of career development support from the award before transitioning to the R00 phase.
+If an applicant achieves independence prior to initiating the K99 phase, neither the K99 nor the R00
+phase will be awarded. Recipients are advised to contact the awarding IC if early transition is being considered. In all cases, early transition is considered a prior approval request and therefore subject to the
+approval of NIH in accordance with Requests for Prior Approval.
+Since the K99 and R00 phases are awarded independently, a no-cost extension may be allowed should
+additional time be needed to complete the goals of the K99 phase. However, no-cost extensions for K99
+awards are not automatic and require prior approval by NIH. All terms and conditions of the K99/R00
+award (including minimum effort requirements) remain in effect when the grant is in a no-cost extension.
+In requesting a no-cost extension, K99 recipients wishing to continue to seek a tenure-track or equivalent
+position should submit a plan for continued career development and a timely transition to an independent
+position. If an application for the R00 Phase with a suitable position is not submitted within the one-year
+period of the no-cost extension, the R00 will not be awarded. Those not continuing to seek to transition
+to the R00 will be permitted to extend without additional funds, in order to permit an orderly phase-out
+of the project.
+Carryover of Funds: Carryover from the K99 phase to the R00 phase may be allowed provided the K99
+phase was funded by extramural support. The K99 recipient should consult with the awarding IC as to its
+practices regarding carryover.
+12.2.3.2.3 Transition to the R00 Phase
+The K99 award recipient is required to secure a tenure track, full-time assistant professor position or
+equivalent in order to transition to the R00 independent phase. Transition to the R00 phase is not guaranteed. The transition application for the R00 phase is administratively reviewed by NIH staff and is not
+(GPS page IIB-81)
+
+12 Research Career Development ("K") Awards
+peer reviewed by a study section. There should not be any delay between the K99 phase and the R00
+phase. R00 award recipients will be expected to compete successfully for independent R01 support from
+NIH during the R00 phase of the award.
+Additional information on the K99/R00 and the NOFO are found on the New Investigators Program web
+page.
+12.2.4 Individual Non-mentored (Independent) Career Development
+Awards
+Independent (non-mentored) CDAs (e.g. K02, K05, K07 leadership, K24) provide protected time for scientists who can demonstrate the need for a period of intensive research focus as a means of enhancing
+their research careers. Independent CDAs are intended to foster the development of outstanding scientists
+and to enable them to expand their potential to make significant contributions to their field of research.
+Some Independent CDAs also require the candidates to serve as research mentors for junior researchers.
+Candidates for independent CDAs must have a doctoral degree and independent, peer-reviewed support
+at the time the award is made. Some of the participating NIH ICs require candidates to have an NIH
+research grant from their IC at the time of application. Other NIH ICs will accept candidates with peerreviewed, independent research support from other sources.
+Planning, direction, and execution of the proposed career development program and research project are
+the responsibility of the applicant and sponsoring institution. Independent CDAs are not transferable
+from one PD/PI to another. Non-mentored awards are sometimes renewable.
+12.2.5 Institutional Scientist Development Programs
+The institutional mentored research scientist development program (K12 and KL2) provides support to
+an institution for the development of independent basic or clinical scientists. The goal is to enhance
+research career development for individuals (known as ‘scholars’) selected by the institution who are
+training for careers in specified research areas. A specified number of scholar positions are awarded in a
+K12. The K12 is solicited only by IC-specific NOFOs. Although the K12 is subject to NIH Standard
+Terms of Award, the carryover of unobligated balances from one budget period to the next generally
+requires prior written approval. K12 awards are generally not transferable to another institution. When
+institutional mentored research development programs are incorporated as part of a Clinical and Translational Science Award Consortium the KL2 activity code is used.
+The Clinical Research Curriculum Award (K30) is awarded to an institution to stimulate the inclusion of
+high-quality, multidisciplinary, didactic training as part of the career development of clinical investigators. It supports the development and/or improvement of core courses designed as in-depth instruction
+in the fundamental skills, methodologies, and theories necessary for the well-trained, independent, clinical researcher.
+12.3 ELIGIBILITY
+Eligibility can vary depending on the type of award and may even vary by NIH IC within a particular
+program. However, there are some eligibility criteria which are consistent across all CDA programs and
+these criteria are discussed in this section. Candidates are always strongly encouraged to carefully review
+the eligibility criteria in a specific NOFO and to contact the scientific/research and/or grants management contacts in the relevant IC prior to preparing an application to discuss issues of eligibility.
+These contacts are listed in the individual NOFO for each CDA.
+(GPS page IIB-82)
+
+12 Research Career Development ("K") Awards
+12.3.1 Eligible Institutions
+Applications for CDAs may be submitted on behalf of the candidate by any domestic for-profit or nonprofit public or private institution/organization such as universities, colleges, hospitals, and laboratories
+to support a research program in a specified area(s) of research. Foreign organizations are not eligible to
+apply for CDAs, but foreign components may apply.
+12.3.2 Eligible Individuals
+Any individual with the skills, knowledge, and resources necessary to carry out the proposed research as
+the candidate (called the PD/PI) is invited to work with their organization to develop an application for a
+CDA program. Individuals from all backgrounds  are always encouraged to apply for NIH programs. Multiple PD/PI applications are not accepted for individual CDAs; institutional CDAs should check the
+NOFO for the allowability of Multiple PD/PIs.
+For mentored CDA programs, candidates who are well-established in their fields are considered
+ineligible. Some indications of having achieved this status are tenure or the equivalent, a substantial publication record or considerable research support that already requires commitment of a major part of the
+candidate's time. Applicants who meet one or more of these criteria must provide justification in the
+application that they are not already established in their field.
+12.3.3 Degree Requirements
+Degree requirements for CDAs are outlined in the specific NOFO. Applicants are generally required to
+hold a research or health-professional doctoral degree or its equivalent; eligibility for some CDAs is limited to only applicants with health professional doctoral degrees.
+12.3.4 Citizenship
+For CDA programs other than the K99/R00 program, only U.S. citizens, non-citizen nationals or individuals lawfully admitted for permanent residence at the time an offer of an award is made, are eligible
+for this award. Individuals on temporary or student visas are not eligible to apply for a CDA unless they
+have begun the process for becoming a permanent resident and expect to be admitted as a permanent resident by the earliest possible award date. In an application package, on the PHS398 Career Development
+Award Supplemental Form, the option of selecting “Non-citizen with temporary visa” is applicable to
+K99/R00 candidates only.
+Noncitizen nationals are individuals who, although not citizens of the United States, owe permanent allegiance to the United States. They generally are born in outlying possessions of the United States (e.g.,
+American Samoa and Swains Island).
+Individuals who have been lawfully admitted for permanent residence must have a currently valid Permanent Resident Card (USCIS Form I-551) or other legal verification of such status. For example, if an
+individual has the proper validation on their passport, a notarized photocopy of the passport could suffice. Because there is a 6-month limitation on this validation, it is the applicant organization’s responsibility to follow up and ensure that the candidate receives the I-551 before the 6-month expiration date.
+An individual expecting to be admitted as a permanent resident by the earliest possible award date listed
+in the career award NOFO may submit an application recognizing that no award will be made until legal
+verification of permanent resident status is provided to  NIH. The submission of documentation concerning permanent residency is not required as part of the initial application.
+(GPS page IIB-83)
+
+12 Research Career Development ("K") Awards
+Applicants who have been lawfully admitted for permanent residence, i.e., have a Permanent Resident
+Card or other legal verification of such status, should check the Permanent Resident of U.S. box in Section 3. Citizenship of the PHS398 Career Development Award Supplemental Form. Applicants who have
+applied for and have not yet been granted admission as a permanent resident or have been granted Conditional Permanent Residency Status should also check the same box.
+If a candidate’s citizenship status changes after submission of an application, the new status should be
+reported in the candidate’s Personal Profile in the eRA Commons.
+In all cases involving any type of Permanent Residency status, when an application is selected to receive
+an award, prior to any award being issued, a notarized statement will be required that documents that a
+licensed notary has seen the candidate’s valid Permanent Resident Card or other valid verification from
+the U.S. Immigration and Naturalization Service of legal admission to the U.S. In all cases where Permanent Residency status is involved, it is the responsibility of the recipient institution to assure the individual remains eligible for the project period of the award.
+12.3.5 Type of Appointment
+By the time of award, all CDA recipients must have a full-time appointment at the applicant institution.
+With prior approval from NIH, award recipients may hold part-time appointments for limited periods during the course of their awards (see Temporary Adjustments to the Full-Time Institutional Appointment
+Requirement below). Full-time or part-time is as defined by applicant institutional policy.
+Candidates who hold additional appointments with an independent clinical practice plan, the VA or other
+organizations should contact the scientific/research and/or grants management contact in the relevant IC
+prior to preparing an application to discuss their eligibility. Responsibilities outside of the applicant
+organization appointment are not restricted; however, these types of additional appointments cannot be
+used to meet the full-time appointment requirement nor the effort requirement discussed below. If a candidate has a dual appointment, they must also have a full-time appointment at the applicant institution to
+qualify for a CDA.
+12.3.5.1 Temporary Adjustments to the Full-Time Institutional Appointment
+Requirement
+Temporary adjustment of the full-time requirement for awarded CDAs is allowed under certain circumstances. At the time of the award, the candidate must meet the full-time appointment requirement (as
+well as any minimum effort requirement); however, recipients may request a temporary reduction in their
+appointment to less than full-time (but not less than three-quarter time) for a period not to exceed 12 continuous months during the CDA award project period. Circumstances requiring such a change in appointment status might include personal or family situations such as parental leave, childcare, elder care,
+medical conditions, or a disability. Permission to change appointment status will not be approved to
+accommodate job opportunities, clinical practice, clinical training, or joint appointments.
+When requesting approval to change to a part-time appointment status, the recipient must continue to
+commit at least 75% effort (of the part-time appointment) to research and career development activities.
+The recipient is encouraged to consider increasing their percent effort to greater than 75% (e.g., 85%) to
+compensate for the anticipated effect of the part-time appointment on the recipient’s career progress.
+On behalf of the K recipient, the recipient institution must submit a request and documentation to the
+NIH awarding IC supporting the need for a reduced faculty appointment and assuring the institution’s
+continuing commitment to the scientific and research career development of the recipient. The request
+should justify reducing the appointment to less than full-time status and must describe the anticipated
+impact of the requested change on their career progress during the remainder of the award period. In
+(GPS page IIB-84)
+
+12 Research Career Development ("K") Awards
+addition, the recipient must submit assurance of their intention to return to a full-time faculty appointment as soon as possible. The mentor must provide a revised mentoring plan and specifically describe
+updated milestones for the recipient’s progression to independence. Lastly, a revised statement of institutional commitment to the recipient must ensure continued “protected time” and describe additional support that will assist the recipient to continue to make progress toward their goals during the requested
+period of the reduced appointment. During the period of reduced appointment, the salary and other costs
+supported by the award will be reduced accordingly. Requests must be submitted by the recipient institution to the awarding Institute or Center (IC) where they will be considered on a case-by-case basis.
+For transition CDAs (K22 and K99/R00), because of the relatively short duration of the mentored phase
+of the award, a request for reduction in the appointment must address the impact of this action on the
+recipient’s ability to make sufficient progress to meet the goals of the program. For example, a K99 recipient must describe how the request will affect the recipient’s ability to transition to the R00 phase of the
+award.
+This policy also allows recipients to temporarily reduce the level of effort devoted to the CDA award;
+that policy is described below in Level of Effort. While these 2 policies are similar in overall goals, a
+recipient may not simultaneously request a reduction in appointment status from full-time to part-time
+AND a reduction in percent effort to less than 75%.
+12.3.6 Level of Effort
+In addition to the full-time appointment requirement described above, mentored and non-mentored CDA
+recipients are required to devote and maintain a minimum level of effort to the award. During a no-cost
+extension, the recipient is required to maintain any effort minimum and can only reduce their effort with
+prior approval of the awarding IC.
+CDA recipients who hold additional appointments with an independent clinical practice plan, the VA or
+other organizations may not use these additional appointments to meet the minimum effort requirement.
+Responsibilities outside of the applicant organization appointment are not restricted; however, they also
+cannot be used to meet any minimum effort requirement. If a CDA recipient has a dual appointment,
+they must also have a full-time appointment at the applicant institution and be able to meet the minimum
+effort requirement as part of that full-time appointment in order to qualify for a CDA. Candidates are
+strongly encouraged to contact the scientific/research and/or grants management contact in the relevant
+IC prior to preparing an application to discuss their eligibility.
+12.3.6.1 Mentored CDAs
+Mentored CDA recipients are required to devote a minimum commitment equivalent of 9 calendar person months (75% of their full-time appointment at the applicant institution) to the career development
+and research objectives of the program specified in each NOFO. The remaining 3 person months (25%
+effort), if applicable, can be divided among other research, clinical, and teaching activities only if these
+activities are consistent with the goals of the mentored CDA, i.e., the recipient’s development into an
+independent investigator. Some NIH ICs allow less than 75% (but not lower than 50%) effort for certain
+clinical specialties (e.g., surgical and procedure-intensive specialties). Applicants must consult the
+NOFO and also IC Program staff for this exception.
+Mentored K recipients are encouraged to apply for additional research grants during the tenure of their K
+award (see Concurrent Support below). Mentored CDA recipients are allowed to devote complementary
+effort without salary support on other research grants that include related research between the CDA and
+the research grant. In such cases where there is scientific overlap, the percent effort on the research grant
+is subsumed within the required effort of the CDA. However, there should not be significant duplication
+(GPS page IIB-85)
+
+12 Research Career Development ("K") Awards
+of the scope of the research supported by the CDA. Further, the related research must be consistent with
+the goals and objectives of the CDA.
+12.3.6.2 Concurrent Support
+Provided they remain in a mentored status, mentored CDA recipients in the final two years of their support period are permitted to reduce the level of effort required for the CDA when they have competed
+successfully for peer-reviewed research awards from NIH or any Federal agency, if programmatic policy
+of the other Federal agency allows such an arrangement, or non-Federal sources (e.g., foundations or professional societies) of at least $100,000 in direct costs. Recipients are encouraged to obtain funding from
+NIH or other Federal sources either as a PD/PI on a competing research grant award or cooperative agreement or as a project leader on a competing multi-project award.
+Budgets for a competing research grant or a subproject on a multi-project grant should request appropriate amounts for the salary and associated costs for the CDA recipient’s effort. At the time the research
+grant is awarded the effort required on the CDA may be reduced to no less than 6 person months (50%
+full-time professional effort at the recipient organization) and replaced by effort and corresponding
+salary from the research award so that the total level of research commitment remains at 9 person
+months (75% full-time professional effort) or more for the duration of the mentored CDA. This policy
+applies to the following mentored CDA activity codes: K01, K07 (developmental), K08, K22, K23, and
+K25, as well as individuals mentored through institutional K12 or KL2 awards. To be eligible for salary
+support from peer-reviewed research awards from any Federal agency:
+ l The CDA recipient must be one of the named PD/PIs on a competing NIH research grant application (R01, R03, R15, R21, R34, or equivalent application from another Federal agency) or a
+sub-project director on a competing multi-component research or center grant or cooperative
+agreement application (P01, P50, U01, etc. or an equivalent application from another Federal
+agency).
+ l The CDA must be active when the competing research grant application is submitted.
+ l The CDA must be in its final two years before the reduction in effort to 6 person months (50%
+full-time professional effort) is permitted.
+For submissions to NIH, a letter must accompany the research grant application from the chair of the
+mentored award recipient’s department or other responsible institutional official providing: (1) evidence
+that the recipient will continue to focus on the development of their research career; (2) will continue to
+have access to their mentor; and (3) that the recipient’s total level of research effort will be maintained
+and protected at a minimum of 9 person months (75% full-time professional effort). For submissions to
+other Federal agencies, this type of institutional commitment letter is strongly encouraged; however,
+applicants should check with that agency for guidance on the allowability of such a letter.
+When a mentored CDA recipient obtains independent support, as described above, the NIH awarding IC
+supporting the CDA will adjust the level of effort committed to the CDA to no less than 6 person months
+(50% effort) consistent with maintaining total research effort at 9 person months or 75% or more of the
+full-time appointment. NIH will adjust the total salary support committed to the K award consistent with
+the adjusted level of effort. However, NIH will continue to provide full research development support
+costs (i.e., Other Personnel, Equipment, Travel, Participant/Trainee Support, and Other Direct Costs
+budget categories) as indicated on the original Notice of Award. If necessary, the K award may also be
+adjusted to avoid any additional budget overlap.
+(GPS page IIB-86)
+
+12 Research Career Development ("K") Awards
+12.3.6.3 Non-mentored CDAs
+Established investigators on independent (non-mentored) CDAs are generally required to devote a minimum of 3-6 person months (25-50% effort) conducting research and research career development
+related activities during the period of the award. Some independent CDAs allow and may require more
+than 6 person months (50% effort). For example, K02 recipients are required to devote 9 person months
+(75% effort) to research.
+Generally, an independent or leadership recipient may receive additional salary support from other
+NIH/PHS grants for effort not committed to the CDA and there are no limitations to receiving other
+salary support. Where applicable, specific policies are noted in the NOFO. The candidate must be able to
+demonstrate that the requested period of salary support and protected time will foster their career and
+capacity to contribute to the specified field.
+12.3.6.4 Temporary Adjustments to the Percent Effort Requirement
+At the time of the CDA award, the candidate must still meet the applicable effort requirement (as well as
+the full-time appointment requirement); however, under certain circumstances, recipients may request a
+temporary reduction in their effort for a period not to exceed 12 continuous months during the award project period. For programs that require a 75% effort minimum (equivalent to 9 person months), a recipient
+can request a reduction to no less than 50%. Circumstances requiring such a change in effort might
+include personal or family situations such as parental leave, childcare, elder care, medical conditions, or
+a disability. Permission to temporarily reduce effort will not be approved to accommodate job opportunities, clinical practice, clinical training, or joint appointments.
+On behalf of the K recipient, the recipient institution must submit a request and documentation to the
+NIH awarding IC supporting the need for reduced effort and assuring the institution’s continuing commitment to the scientific and research career development of the recipient. The request should justify
+reducing effort and must describe the anticipated impact of the requested change on their career progress
+during the remainder of the award period. In addition, the recipient must submit assurance of their intention to return to 75% effort as soon as possible. The mentor must provide a revised mentoring plan and
+specifically describe updated milestones for the recipient’s progression to independence. Lastly, a
+revised statement of institutional commitment to the recipient must ensure continued “protected time”
+and describe additional support that will assist the recipient to continue to make progress toward their
+goals during the requested period of the reduced appointment. During the period of reduced effort, NIH
+will adjust the total salary amount committed to the K award consistent with the adjusted level of effort.
+However, NIH will continue to provide full research costs in other budget categories as indicated on the
+original Notice of Award. In addition, the K recipient may request to extend the duration of the award to
+account for the reduced effort. Requests must be submitted by the recipient institution to the awarding
+Institute or Center (IC) where they will be considered on a case-by-case basis.
+This option is not available for Independent CDAs that require only 25-50% effort; e.g., K07 leadership,
+K05, and K24.
+While this temporary adjustment in effort policy is similar to the policy described above allowing a temporary adjustment in the full-time appointment requirement, recipient may not simultaneously request a
+reduction in appointment status from full-time to part-time AND a reduction in percent effort to less than
+75%.
+12.3.7 Prior Research Support
+For most mentored career development awards, individuals are eligible to apply if they have previously
+served as the PD/PI of an NIH Small Grant (R03), Exploratory/Developmental Grant (R21), Planning
+(GPS page IIB-87)
+
+12 Research Career Development ("K") Awards
+Grant (R34/U34), Dissertation Award (R36), SBIR/STTR Award, Transition Scholar Award (K38) or
+been appointed to an institutional career development program (K12, KL2).  The K99/R00 program, however, has different eligibility requirements related to prior research support and those are detailed in the
+Notice of Funding Opportunity.
+In general, for mentored CDAs, individuals are NOT eligible if they:
+ l Are current and former PDs/PIs on NIH research project (R01), program project (P01), center
+grants (P50), other major individual career development awards (e.g., DP5, K01, K07, K08,
+K22, K23, K25, K76, K99/R00), or
+ l Project Leads of program project (P01) or center grant (P50) sub-projects, or the equivalent.
+Most independent (non-mentored) CDAs require that the applicant have independent, peer-reviewed support at the time the award is made. Some of the participating NIH ICs require the candidate to have an
+NIH research grant at the time of application and that the support be from their IC. Other NIH ICs will
+accept candidates with peer-reviewed, independent research support from other sources. Applicants must
+check the NOFO for specific eligibility requirements.
+12.4 APPLICATION REQUIREMENTS AND DUE DATES
+12.4.1 Application
+Before applying for a CDA, applicants should carefully review the guidelines in the NOFO for the specific career award(s) of interest, noting especially the eligibility requirements, award provisions, requirements for a mentor, and review criteria. The participating ICs may have distinctive guidelines,
+requirements, and funding amounts for each NOFO in order to accommodate the career needs of
+researchers working in fields related to their specific research missions. Candidates are therefore strongly
+encouraged to contact the staff person in the relevant IC listed in the NOFO prior to preparing an application to discuss any specific provisions of the award.
+The specific NOFO provides links to the application forms package as well as the appropriate application instruction guide. As with all NIH programs using electronic submission, a CDA application uses a
+combination of SF424(R&R) and PHS398 forms. A separate section (Section I.7) of the SF424(R&R)
+Application Guide is included that provides supplemental instructions for preparing a CDA application.
+Further information is available from the NIH Grants & Funding website.
+Applications must contain Candidate Information, Statements of Support, Environment and Institutional
+Commitment to the Candidate, as well as a Research Plan. The Candidate Information section includes
+required information about the candidate and must justify the need for the requested period of support,
+be tailored to the prior research experience and career development needs of the candidate, and for mentored CDAs be designed to move the candidate from a mentored phase to an independent status. The
+research plan must have intrinsic research importance as well as serve as a suitable vehicle for learning
+the methodology, theories, and skills necessary for a well-trained independent researcher. For mentored
+award programs, the research plan must also include a description of the relationship between the
+mentor’s research and the candidate’s proposed research plan.
+Other than the K22 application from an unaffiliated candidate, all applications require documents describing the Environmental and Institutional commitment to the candidate.
+For mentored award programs the career development application also must include Statement by
+Mentor(s), Co-Mentor(s), Consultant(s) and Contributor(s) as well as a statement describing the institution’s commitment to the candidate’s development.
+(GPS page IIB-88)
+
+12 Research Career Development ("K") Awards
+The requirement for ORCID identifiers will be enforced at the time of application for individual career
+development awards, including the following: K01, K02, K05, K07, K08, K18, K22, K23, K24, K25,
+K26, K38, K43, K76, and K99/R00.
+eRA system validations will check whether applicants have ORCID iDs and applications will not be
+accepted unless an ORCID iD is linked to the PD/PI's eRA Commons Personal Profile.
+To either link their eRA profiles to existing ORCID accounts or create ORCID profiles and link them
+back to the eRA Commons. Prospective applicants for individual career development awards may follow
+the ORCID link from their Personal Profiles in the eRA Commons.
+12.4.1.1 Letters of Reference
+At least three (but no more than five) letters of reference are required for all new and resubmission mentored CDA applications. The letters should be from individuals not directly involved in the application,
+but who are familiar with the candidate’s qualifications, training, and interests and include advisory committee members (if applicable). However, the candidate’s mentor(s) of the application must not submit a
+separate letter of reference because a mentor’s statement is required as part of the application. The letters
+of reference should address the candidate's competence and potential to develop into an independent biomedical, behavioral, or clinical investigator.
+Electronic submission of CDA applications requires electronic submission of reference letters as well.
+However, reference letters are submitted directly by the referee through the eRA Commons and not as
+part of the electronic application that goes through Grants.gov. Reference letters will be joined with the
+electronic application within the eRA system once an application completes the submission process.
+Applications that are missing the required letters may be delayed in the review process or not accepted at
+all. Complete instructions for candidates and referees are found in Part I, Section 7.3 of the SF424(R&R)
+Application Guide for Adobe Applications.
+12.4.1.2 Concurrent Applications
+NIH will not accept any application in response to an NOFO that is essentially the same as one currently
+pending initial review unless the applicant withdraws the pending application. NIH will not accept any
+application that is essentially the same as one already reviewed. This does not preclude the submission of
+a substantial resubmission of an application already reviewed, but such applications must include an
+Introduction addressing the previous critique.
+12.4.1.3 Environment and Institutional Commitment to the Candidate
+The applicant organization must define and document a strong, well-established research and career
+development program related to the candidate's area of interest, including a high-quality research environment with staff capable of productive collaboration with the candidate. The institution must provide a
+statement of commitment to the candidate's development into a productive, independent investigator and
+to meeting the requirements of the award. The institution should indicate how the necessary facilities and
+other resources will be made available for career enhancement as well as the research proposed in the
+application. The applicant should describe opportunities for intellectual interactions with other investigators, including courses offered, journal clubs, seminars, and presentations.
+The institution should provide a document on institutional letterhead that describes its commitment to the
+candidate and the candidate’s career development. The document should include the institution’s agreement to provide adequate time and support for the candidate to devote the proposed protected time to
+research and career development for the entire period of the proposed award. The institution should
+provide the equipment, facilities, and resources necessary for a structured research career development
+(GPS page IIB-89)
+
+12 Research Career Development ("K") Awards
+experience. It is essential to document the institution's commitment to the retention, development, and
+advancement of the candidate during the period of the award.
+Because of the diverse types of CDAs, applicants should contact the appropriate awarding IC scientific/research contact named in the specific NOFO to determine the level of commitment required for
+the application. Institutional commitment to the candidate may not be contingent upon the receipt of the
+CDA.
+Off-Site Training Experience. A candidate may propose a career award experience that involves sites
+beyond the applicant organization, provided that the goals of the total experience are encompassed and
+supported under the appointment with the applicant organization.
+12.4.1.4 Training in the Responsible Conduct of Research
+All CDA applicants (mentored and non-mentored) must include a description of the formal and informal
+activities related to instruction in the responsible conduct of research planned for the proposed research
+program. Specifically, applicants must include a description of a plan for instruction in responsible conduct of research. This description should document prior instruction in or the nature of the applicant’s
+participation in responsible conduct of research instruction (lecturer, discussion leader, etc.) during the
+applicant’s current career stage (including the dates of last occurrence) and propose plans to receive or
+participate in instruction in responsible conduct of research. Such plans must address the five instructional components, format, subject matter, faculty participation, duration of instruction, and frequency of
+instruction, as outlined below. Applications lacking a plan for instruction or participation in responsible
+conduct of research will be considered incomplete and may be delayed in the review process. Plans and
+past record will be rated as acceptable or unacceptable and the summary statement will provide the consensus rating of the review committee. Applications with unacceptable plans will not be funded until the
+applicant provides an acceptable, revised plan.  For additional information see the specific NOFO.
+1. Format. Discussion-based instruction in the responsible conduct of research is expected to remain a
+key feature of RCR training and to include substantive face-to-face interaction among participants and
+faculty. However, recognizing that advances in video conferencing now allow for effective “face-toface” discussions to occur electronically, institutions may wish to consider incorporating video conferencing options into their RCR instruction, provided that those options are utilized in a way that fosters
+discussion, active learning, engagement, and interaction among the participants. At the same time, video
+conferencing should not be the sole means for meeting the requirement for RCR instruction, and a plan
+that employs only video conferencing will not be considered acceptable, except in special instances of
+short-term training programs (see below), or unusual and well-justified circumstances.
+2. Subject Matter. While there are no specific curricular requirements for instruction in responsible conduct of research, the following topics have been incorporated into most acceptable plans for such instruction:
+ (a) conflict of interest – personal, professional, and financial – and conflict of commitment, in allocating time, effort, or other research resources
+ (b) policies regarding human subjects, live vertebrate animal subjects in research, and safe laboratory practices
+ (c) mentor/mentee responsibilities and relationships
+ (d) safe research environments (e.g., those that  are free of sexual, racial, ethnic, disability and other
+forms of discriminatory harassment)
+ (e) collaborative research including collaborations with industry and investigators and institutions in
+other countries
+(GPS page IIB-90)
+
+12 Research Career Development ("K") Awards
+ (f) peer review, including the responsibility for maintaining confidentiality and security in peer
+review
+ (g) data acquisition and analysis; laboratory tools (e.g., tools for analyzing data and creating or working with digital images); recordkeeping practices, including methods such as electronic laboratory notebooks;
+ (h) secure and ethical data use; data confidentiality, management, sharing and ownership
+ (i) research misconduct and policies for handling misconduct
+ (j) responsible authorship and publication
+ (k) the scientist as a responsible member of society, contemporary ethical issues in biomedical
+research, and the environmental and societal impacts of scientific research
+While courses related to professional ethics, ethical issues in clinical research, or research involving vertebrate animals may form a part of instruction in responsible conduct of research, they generally are not
+sufficient to cover all aspects of responsible research conduct.
+3. Faculty Participation. Mentors and other appropriate faculty are highly encouraged to contribute both
+to formal and informal instruction in responsible conduct of research. Informal instruction occurs in the
+course of laboratory interactions and in other informal situations throughout the year. For institutional
+Career Awards, training faculty may contribute to formal instruction in responsible conduct of research
+as discussion leaders, speakers, lecturers, and/or course directors. Rotation of training faculty as course
+directors, instructors, and/or discussion leaders may be a useful way to achieve the ideal of full faculty
+participation in formal responsible conduct of research courses over a period of time.
+4. Duration of Instruction. Instruction should involve substantive contact hours between the career recipient/scholars, mentors and other appropriate faculty. Acceptable programs generally involve at least eight
+contact hours. A semester-long series of seminars/programs may be more effective than a single seminar
+or one-day workshop because it is expected that topics will then be considered in sufficient depth, learning will be better consolidated, and the subject matter will be synthesized within a broader conceptual
+framework.
+5. Frequency of Instruction. Existing policy and guidance call for RCR instruction to be undertaken at
+least once during each career stage, and at a frequency of no less than once every four years. As institutions consider how to optimize the timing and delivery of instruction in the responsible conduct of
+research, they are encouraged to bear in mind the value of ongoing and discipline-specific training as
+individuals progress in their research careers. For example, while broad-based instruction in the responsible conduct of research is often appropriate early in graduate school; a more tailored, discipline-specific
+approach may better fit the needs of advanced graduate students and those who have transitioned to
+postdoctoral status. If advanced students and postdoctorates have been exposed to the full range of topics
+traditionally included in RCR instruction early in their scientific training, it may make sense for their
+ongoing and/or subsequent RCR training to focus on subjects most relevant to their fields, and institutions may wish to consider this approach, where applicable.
+12.4.1.5 Budget
+CDAs provide limited costs, generally covering only applicable salary and fringe benefits for the candidates, as well as a fixed amount for research development support. Costs requested and awarded for
+CDA programs must be consistent with applicable Federal cost principles. Salary amounts as well as the
+research development costs can vary by CDA program and then within a particular program even by
+each participating NIH IC. Applicants are advised to consult the relevant NOFO for guidelines on allowable costs and budget limitations.
+(GPS page IIB-91)
+
+12 Research Career Development ("K") Awards
+The transition to electronic submission included a change in business process with respect to budget
+information. Detailed budget information is now required as part of the initial application; however it is
+limited to the senior/key person information for only the candidate and then the total amount of requested research development support in budget section F.1. Other Direct Costs/Materials and Supplies. A
+budget justification is also required and should be used to provide a detailed description for the specific
+research development support costs. Instructions are provided in the applicable Application Guide and
+specific NOFOs.
+As with all NIH training programs, indirect costs for CDAs are provided at a rate of 8% of modified
+total direct costs.
+12.4.1.6 Submission Dates
+For all parent CDA NOFOs, NIH receives applications three times each year using standard submission
+dates. For a list of the standard submission dates and review cycle are posted on NIH's web site. IC-specific NOFOs may use special submission dates instead of the standards dates, but the NOFO will clearly
+indicate if standard or special submission dates are used.
+12.5 REVIEW
+All CDA applications will undergo peer review as noted in The Peer Review Process in Part I; however,
+the actual review criteria and other review considerations are different as described herein.
+12.5.1 Overall Impact
+Reviewers should provide their assessment of the likelihood for the candidate to develop and/or maintain
+a strong research program, taking into consideration the criteria below in determining the overall impact
+score.
+12.5.2 Scored Review Criteria
+For CDA applications, reviewers will consider each of the five review criteria below in the determination
+of the scientific and technical merit and give a separate score for each. An application does not need to
+be strong in all categories to be judged likely to have a major scientific impact. The scored criteria are:
+ l Candidate
+ l Career Development Plan/Career Goals & Objectives/Plan to Provide Mentoring
+ l Research Plan
+ l Mentor(s), Co-Mentor(s), Consultant(s), Collaborator(s); and for non-Mentors the Mentoring
+Plan
+ l Environment and Institutional Commitment to the Candidate
+These criteria are listed in logical order and not in order of priority. Since the specifics for each of these
+criteria can vary for the various CDA programs, the review criteria are described in detail in the NOFO.
+Note that different ICs may employ additional review criteria.
+12.5.3 Additional Review Criteria
+As applicable for the project proposed, reviewers will evaluate the following additional items while
+determining scientific and technical merit, and in providing an overall impact score, but will not give separate scores for these items.
+(GPS page IIB-92)
+
+12 Research Career Development ("K") Awards
+ l Protection of Human Subjects
+ l Inclusion of Women, Minorities and Individuals Across the Lifespan
+ l Vertebrate Animals
+ l Biohazards
+ l Resubmission Applications
+ l Renewal Applications
+ l Revision Applications
+The NOFO should be consulted for further information describing each of the relevant additional review
+criteria.
+12.5.4 Additional Review Considerations
+As applicable for the project proposed, reviewers will address each of the following items, but will not
+give scores for these items and should not consider them in providing an overall impact score.
+ l Training in the Responsible Conduct of Research
+ l Select Agents
+ l Authentication of Key Biological and/or Chemical Resources
+ l Resource Sharing Plans
+ l Budget and Period of Support
+Candidates should carefully review the applicable NOFO for complete information associated with the
+peer review process including further information describing each of the relevant additional review considerations.
+12.6 NOTIFICATION OF ACTION
+Shortly after the initial peer review meeting, candidates receive an e-mail indicating that the SRG recommendation/impact score is available in the eRA Commons. The candidate is also notified via an e-mail
+when the summary statement (written critique) is available in the eRA Commons.
+The PO may notify the applicant about the final review recommendation. The applicant should direct any
+questions about initial review recommendations and funding possibilities to the designated IC PO, not
+the SRO of the SRG. Name and contact information of the assigned PO is also available in the eRA
+Commons. If the application is under consideration for funding, NIH will request additional information.
+After all program and administrative issues have been resolved, the NoA will be issued for those applications selected for funding.
+12.7 PERIOD OF SUPPORT
+The NIH awarding IC will notify the individual of the intention to make an award and confirm the plans
+for the start of support. An award is for a period of 3 to 5 years and provides support for salary and
+research-development support costs. Support beyond the first year shall be based on an assessment by
+NIH staff of the effectiveness of the development opportunity and continued opportunity for growth, as
+reflected in the recipient’s annual progress report. Continuation of awards is contingent upon future
+Federal appropriations.
+(GPS page IIB-93)
+
+12 Research Career Development ("K") Awards
+Mentored CDAs are not renewable. Non-mentored CDAs may be renewable; awards may be competitively renewed at the discretion of the participating NIH ICs. Only a few of NIH ICs permit competitive renewals.
+Note the period of support for the K99/R00 program is awarded in 2 distinct phases. Phase I covers only
+the K99 period; phase II is the R00 portion and is contingent upon meeting certain criteria, including the
+submission and acceptance of a R00 application by the NIH IC.
+Some K22 programs also have 2 distinct funding phases where specific criteria must be met before funding is provided for the second phase.
+Note, the K99/R00 and some K22 programs allow NIH intramural scientist to apply. For those selected
+for funding, the period of support on any award issued will only reflect the period funded by NIH extramural funds. Any period of support supported by NIH intramural funds will not be evident in the NoA.
+12.8 ALLOWABLE AND UNALLOWABLE COSTS
+Policies included in the applicable cost principles in 2 CFR Part 200, Subpart E and the NIHGPS govern
+the expenditure of all CDA funds, unless otherwise indicated in the NoA.
+12.8.1 Salaries and Fringe Benefits
+Requested salary and fringe benefit amounts must be in accordance with institutional policies applied
+consistently to individuals in like circumstances and must be supported by acceptable accounting principles. If full-time, 12-month salaries are not currently paid to comparable staff members, the salary proposed must be appropriately related to the existing salary structure. Salary amounts requested on CDA
+grants must be based on the investigator’s institutional base salary (IBS) prorated for their commitment
+on the project. While requested salary and fringe benefit information is provided in the initial application, confirmation of these costs may be required prior to the issuance of an award.
+The amount funded as salary for a CDA is not uniform throughout the NIH participating ICs. Salary limits vary by IC and are noted in the NOFO. Note the limit is on salary only; applicable fringe benefits are
+provided in addition to the salary. The candidate is strongly advised to contact the relevant awarding IC
+for any distinct guidelines, requirements, and allowable funds. Salary costs charged cannot exceed the
+applicable legislative salary cap.
+The recipient institution may supplement the NIH salary contribution on the CDA up to a level that is
+consistent with the institution's salary scale. For effort directly committed to the CDA, salary supplementation is allowable, but must be from non-Federal sources (including institutional sources). In no
+case may PHS funds be used for such salary supplementation. Non-federal or institutional supplementation of salary must not require extra duties or responsibilities that would interfere with the goals
+of the CDA. For effort not directly committed to the CDA, CDA recipients may devote effort, with compensation, on Federal or non-Federal grants as the Program Director/Principal Investigator (PD/PI) or in
+another role (e.g., co-Investigator), as long as the specific aims of the other supporting grant(s) differ
+from those of the CDA.
+NIH IC limitations on awarded salary levels do not limit the recipient’s rebudgeting authority. Institutions may rebudget the total costs awarded to cover additional salary charges, provided they are within
+the approved scope of the project and consistent with the institution's salary scale as long as the cost
+charged is within the applicable legislative salary cap.
+Salary support for ancillary personnel (e.g. administrative assistance or secretarial support) on CDAs is
+not allowable.
+Salary support for mentors is not allowable on individual mentored CDAs.
+(GPS page IIB-94)
+
+12 Research Career Development ("K") Awards
+Salary support for research technicians or study coordinators for clinical studies are generally allowable
+but are budgeted as part of the Research Development Support Costs described below.
+12.8.2 Research Development Support Costs
+CDAs may include a fixed amount for research development support costs. This amount may vary by IC
+and is commonly used for supplies, equipment, technical personnel, travel to research meetings or training, tuition/fees for courses and computational services.
+12.8.3 Proposal Preparation Costs
+Mentored CDA programs provide support with a goal of leading to research independence for an individual. Since research independence is achieved through applying for other research support, consistent
+with these objectives, it is allowable for effort devoted to proposal preparation costs for subsequent
+research support to be charged to a mentored CDA award. This can be considered part of the awarded
+effort commitment of the mentored CDA or an increase to that commitment with the allowable salary
+provided as applicable.
+12.8.4 Indirect Costs
+For career awards other than the R00 phase of the K99/R00 and other than State, local, or Indian tribe
+(or "federally recognized Indian tribes"), recipients will receive indirect costs at 8 percent of modified
+total direct costs. State and local agencies, and Indian tribes (or "federally recognized Indian tribes") are
+eligible for full indirect cost reimbursement. For this policy, State universities or hospitals are not considered governmental agencies.
+12.9 REBUDGETING OF FUNDS
+Funds awarded on CDAs may typically be rebudgeted within direct cost categories without prior
+approval; however restrictions on rebudgeting may be noted in the NoA.
+Rebudgeting of salary funds in an NIH-supported research grant for the salaries or fringe benefits of individuals which are freed as a result of a career award, may not be rebudgeted without the prior approval
+of the NIH awarding IC.
+12.10 CARRYOVER AUTHORITY
+Unless otherwise noted by a specific term of award, Individual CDAs have automatic carryover authority. However, for most Institutional CDAs, carryover requires prior approval. The NoA will specify
+whether or not the recipient must obtain prior approval to carry over funds.
+For the two-phased K99/R00 program, carryover from the K99 phase to the R00 phase may be allowed
+provided the K99 phase was funded by extramural support. The K99 recipient should consult with the
+awarding IC as to its practices regarding carryover.
+12.11 REPORTING REQUIREMENTS
+Failure to comply with reporting requirements and to submit the required forms in a timely manner may
+result in an expenditure disallowance or a delay in any continuation funding.
+(GPS page IIB-95)
+
+12 Research Career Development ("K") Awards
+12.11.1 Progress Reports
+Most individual CDA awards (mentored and non-mentored) are awarded under SNAP authorities.  Progress reports for SNAP awards must be submitted using the Research Performance Project Report
+(RPPR).  The RPPR must be submitted electronically using the RPPR module in the eRA Commons.  For
+progress reports submitted using the RPPR, the IDP requirement described in Non-Competing Continuation Progress Reports will apply.  Progress reports for non-SNAP awards should be submitted in accordance with the PHS 2590 instructions, including Section 4, Additional Instructions for Preparing
+Continuation Career Development Award (CDA) Progress Reports. PHS 2590 progress report forms and
+instructions are available from the Forms Directory.
+Following completion or termination of a project period, the recipient must submit a Final RPPR to the
+NIH awarding IC within 120 days after the end of grant support as part of the Closeout documents
+described below.
+12.11.2 Federal Financial Report
+For individual CDAs awarded under the SNAP authorities, an annual electronic FFR is not required.
+Only a final FFR is required at the end of the project period (see Administrative Requirements—Monitoring—Reporting—Financial Reports and Administrative Requirements—Closeout—Final Reports in
+IIA).
+12.11.3 Closeout
+The Closeout requirements included in IIA (see Administrative Requirements—Closeout—Final
+Reports) apply to all Individual CDAs (mentored and non-mentored). For Institutional Scientist Development Programs the closeout requirements apply with the exception of the Final Invention Statement;
+invention reporting is not applicable to K12s & KL2s thus a final invention statement is not required as
+part of the closeout process.
+12.11.4 Post Closeout Evaluation
+In carrying out its stewardship of human resource-related programs, NIH may request information essential to an assessment of the effectiveness of CDA programs. Accordingly, CDA recipients may be contacted after the completion of any CDA award for periodic updates on various aspects of their
+employment history, publications, support from research grants or contracts, honors and awards, professional activities, and other information helpful in evaluating the impact of the program.
+12.12 CHANGES IN THE PROJECT
+The approval of the NIH awarding IC is required for a transfer of the CDA to another institution, or a
+project change. Note, individual mentored and non-mentored CDAs may not be transferred to another
+PD/PI.
+The Change of Recipient Organization policies described in IIA apply to Individual CDAs as long as the
+transfer is between domestic institutions. For mentored CDAs, the recipient must have a mentor at the
+new institution. If the transfer also involves a change in mentor, supporting documentation from the new
+mentor will be required. Consultation with the applicable NIH program staff and/or grants management
+staff is strongly encouraged when a change of institution is being considered.
+CDAs are awarded under the NIH Standard Terms of Award and as such recipients have the authority to
+extend the final budget period of a project period without additional funds for up to 12 months.
+(GPS page IIB-96)
+
+12 Research Career Development ("K") Awards
+Recipients are reminded that all terms and conditions and programmatic requirements apply during the
+extension period. For instance, the full-time appointment and minimum effort requirements must continue for the entire extension period. Recipients should be mindful of these requirements when deciding
+how much additional time is needed.
+12.12.1 Temporary Off-Site Career Development Experience
+A temporary career development experience at another institution, including a foreign laboratory, may be
+permitted if the proposed experience is directly related to the overall goals and purpose of the K award.
+Only local institutional approval is required if such an arrangement does not exceed 3 months. For longer
+periods (not to exceed 12 months), prior written approval from the NIH awarding IC is required. The
+written request must document the approval of the recipient organization and the adequacy of arrangements for off-site training. Support from the career award will continue during such an off-site experience. For some CDAs additional information is required as part of any prior approval request:
+ l For transition CDAs (K22 and K99/R00), because of the relatively short duration of the mentored phase of each of these awards, a request for approval of an off-site training experience lasting more than 3 months must address the impact of such action on the recipient’s ability to make
+sufficient progress to meet the goals of the award. For example, for a K99 phase recipient, the
+request must describe how the off-site experience will affect the recipient’s ability to transition
+to the R00 phase.
+ l For K05, K07 leadership, and K24 recipients, the request must include a letter assuring that
+arrangements have been made to continue to commit the appropriate effort to the research and to
+provide mentoring.
+ l For K12 and KL2 Scholar appointees, because of the short duration of the mentored phase of
+each of these awards, a request for approval of an off-site training experience lasting more than 3
+months must address the impact of such action on the scholar’s ability to make sufficient progress to meet the goals of the program.
+12.13 OTHER TERMS AND CONDITIONS
+Except as otherwise noted below, the provisions of IIA apply to all CDA programs. This includes all
+Public Policy Requirements, Objectives, and Other Appropriation Mandates such as civil rights; the protection of human subjects, including data and safety monitoring requirements; the humane care and use
+of live vertebrate animals; human embryonic stem cells; and/or research involving recombinant or synthetic nucleic acid molecules. See Subpart IIA for a complete list of applicable requirements.
+In addition, all Administrative Requirements described in IIA also apply to CDA program unless an
+exception is noted below. These include requirements such as prior approvals; availability of research results, publications, NIH Public Access policy, invention reporting, and program income. See IIA for a
+complete list of applicable administrative requirements.
+12.13.1 Leave
+Since CDA recipients are employees of the institution, applicable institutional leave policies for leave
+such as vacation, sick, parental, etc. apply to individuals supported by NIH CDAs.
+CDAs are expected to be for continuous support of an individual; however, in certain circumstances, candidates will be permitted to take a leave of absence. Circumstances include personal or family situations
+such as parental leave, childcare, elder care, medical conditions, or a disability. A leave of absence or
+(GPS page IIB-97)
+
+12 Research Career Development ("K") Awards
+sabbatical greater than three months must be requested and approved in writing by the NIH awarding IC.
+A leave of absence less than 3 months only requires institutional prior approval.
+For some CDAs additional information is required as part of any prior approval request:
+ l For transition CDAs (K22 and K99/R00), because of the relatively short duration of the mentored phase of each of these awards, a request for approval of a leave of absence lasting more
+than 3 months must address the impact of such action on the recipient’s ability to make sufficient progress to meet the goals of the award. For example, a K99 phase recipient must
+describe how the leave will affect the recipient’s ability to transition to the R00 phase.
+ l For K05, K07 leadership, and K24 recipients, the request for a leave of absence lasting more
+than 3 months must include a letter assuring that arrangements have been made to continue to
+commit the appropriate effort to the research and to provide mentoring.
+ l For K12 and KL2 Scholar appointees, because of the short duration of the mentored phase of
+each of these awards, a request for a leave of absence lasting more than 3 months must address
+the impact of such action on the scholar’s ability to make sufficient progress to meet the goals of
+the program.
+12.13.1.1 Unpaid Leave
+Leave without award support may not exceed 12 months. Such leave requires prior written approval of
+the awarding component and will be granted only with justification. When approved, the K award will
+be placed in a no-cost extension for the duration of the unpaid leave and no charges to the grant will be
+allowed during that period, although continued coverage of health insurance would be allowable if in
+accordance with institutional policy. Such leave does not reduce the total number of months of program
+support for which an individual is eligible.
+12.13.2 Statement of Appointment—Institutional CDAs Only
+At the time of the initial appointment of K12 or KL2 scholars, the Program Director may submit a Statement of Appointment (Form PHS 2271) for each scholar to the NIH awarding IC to document the
+appointment of scholars to institutional CDAs. This policy varies with ICs and is specified in the Notice
+of Funding Opportunity. When 2271s are required, this information must be submitted using the xTrain
+feature in the eRA Commons.
+12.13.3 Early Termination
+Consultation with the applicable NIH program staff and/or grants management staff is strongly encouraged when a termination is being considered before the scheduled project end date. When an institution
+plans to terminate an award, the awarding IC must be notified in writing at the earliest possible time, so
+that appropriate instructions can be given for termination. NIH will issue a revised NoA to specify the
+changed period of support.
+NIH may terminate a CDA before its normal completion date if it determines that the recipient has materially failed to comply with the terms and conditions of the award or to carry out the purpose for which it
+was made. If an award is terminated, NIH will notify the recipient in writing of the determination, the
+reasons for the determination, the effective date, and the right to appeal the decision.
+The NIH awarding IC should be notified immediately if a sponsoring institution wants to terminate a
+K12 scholar, or if the scholar decides to terminate the appointment before the scheduled completion date.
+(GPS page IIB-98)
+
+12 Research Career Development ("K") Awards
+12.13.4 Other Income: Generation and Disposition of Professional
+Fees
+CDA recipients may retain royalties and fees from activities such as scholarly writing, service on an
+advisory group, honoraria from other institutions for lectures or seminars, fees resulting from clinical
+practice, professional consultation, or other comparable activities, provided these activities remain incidental, are not required by the research and research-related activities of the CDA, and provided that the
+retention of such pay is consistent with the policies and practices of the recipient institution. No other
+income or fees may be retained by the CDA recipient and must be assigned to the recipient institution
+for disposition by any of the following methods:
+ l The funds may be expended by the recipient institution in accordance with NIH policy on supplementation of career award salaries and to provide fringe benefits in proportion to such supplementation. Such salary supplementation and fringe benefit payments must be within the
+established policies of the recipient institution.
+ l The funds may be used for health-related research purposes.
+ l The funds may be paid to miscellaneous receipts of the U.S. Treasury. Checks should be made
+payable to the Department of Health and Human Services and forwarded to the Director, Office
+of Financial Management, NIH, Bethesda, MD  20892. Checks must identify the relevant award
+account and reason for payment.
+Adequate records regarding the source, receipt and disposition of fees and other income are to be maintained by the institution for the applicable retention time period(s) specified in 2 CFR Part 200.307.
+(GPS page IIB-99)

@@ -50,3 +50,21 @@ describe('ScheduleConfigFields', () => {
     expect(screen.queryByText('Award.pdf')).not.toBeInTheDocument()
   })
 })
+
+
+describe('Schedule preview freshness', () => {
+  it('hides the old run while settings change, then offers retry after a failed preview', async () => {
+    vi.mocked(previewSchedule).mockResolvedValueOnce({ next_runs: ['2026-09-24T00:00:00Z'] } as never)
+    const { rerender } = render(<ScheduleConfigFields value={cfg} onChange={vi.fn()} folders={[]} />)
+    await screen.findByText(/Next run:/)
+    vi.mocked(previewSchedule).mockRejectedValueOnce(new Error('Preview unavailable'))
+    rerender(<ScheduleConfigFields value={{ ...cfg, time: '10:00' }} onChange={vi.fn()} folders={[]} />)
+    expect(screen.queryByText(/Next run:/)).not.toBeInTheDocument()
+    expect(screen.getByText(/Working out the next run/)).toBeInTheDocument()
+    await screen.findByRole('button', { name: 'Retry preview' })
+    vi.mocked(previewSchedule).mockResolvedValueOnce({ next_runs: [] } as never)
+    fireEvent.click(screen.getByRole('button', { name: 'Retry preview' }))
+    await screen.findByText('No upcoming runs were returned for these settings.')
+    expect(screen.queryByText(/Invalid Date/)).not.toBeInTheDocument()
+  })
+})

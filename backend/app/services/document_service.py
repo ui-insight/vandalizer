@@ -1,8 +1,16 @@
+import asyncio
+import datetime
+from pathlib import Path
+from typing import Any, Optional
+
+from pydantic import BaseModel, Field
+
 from app.config import Settings
 from app.models.document import SmartDocument
 from app.models.folder import SmartFolder
 from app.models.user import User
 from app.services import access_control
+from app.services.extraction_restarts import claim_extraction_restart
 
 
 #: Human-readable text for each stored ingestion-warning code. Kept beside the
@@ -95,6 +103,113 @@ def is_extraction_low_quality(doc: SmartDocument) -> bool:
     return ratio > Settings().extraction_max_nonletter_ratio
 
 
+class _ChildDocument(BaseModel):
+    """Just enough of a document to count it and date its folder; the list
+    must not pull every child's ``raw_text`` to say "12 items"."""
+
+    folder: Optional[str] = None
+    user_id: Optional[str] = None
+    team_id: Optional[str] = None
+    updated_at: Optional[datetime.datetime] = None
+
+
+class _ChildFolder(BaseModel):
+    id: Any = Field(default=None, alias="_id")
+    parent_id: Optional[str] = None
+    user_id: Optional[str] = None
+    team_id: Optional[str] = None
+
+
+def _created_at(object_id: Any) -> datetime.datetime | None:
+    """A folder stores no dates; its ObjectId carries when it was created.
+
+    Returned naive in server-local time, the convention ``SmartDocument``'s
+    ``datetime.now()`` timestamps already use, so the two compare and render
+    alike.
+    """
+    generated = getattr(object_id, "generation_time", None)
+    if not isinstance(generated, datetime.datetime):
+        return None
+    return generated.astimezone().replace(tzinfo=None)
+
+
+async def _folder_summaries(
+    folders: list[SmartFolder], user: User, *, in_project: bool
+) -> dict[str, dict]:
+    """Item count and last-modified date for each listed folder.
+
+    Both are derived at read time. The count is the folder's direct contents
+    as this viewer would see them on opening it (same owner/team rule as the
+    listing itself). "Modified" is the newest of: the folder's creation, a
+    file in it being added or changed, a subfolder being created in it.
+    """
+    if not folders:
+        return {}
+    uuids = [f.uuid for f in folders]
+    # A project root's contents belong to several people; so does everything
+    # under a project. Those are not narrowed to the viewer's own items.
+    shared = set(uuids) if in_project else await access_control.project_root_folder_uuids(uuids)
+    by_uuid = {f.uuid: f for f in folders}
+
+    def visible(parent_uuid: str | None, item: Any) -> bool:
+        parent = by_uuid.get(parent_uuid or "")
+        if parent is None:
+            return False
+        if parent.uuid in shared:
+            return True
+        if parent.team_id:
+            return bool(item.team_id == parent.team_id)
+        return bool(item.user_id == user.user_id)
+
+    child_documents = await SmartDocument.find(
+        {"folder": {"$in": uuids}, "soft_deleted": {"$ne": True}, "superseded_by": None},
+        projection_model=_ChildDocument,
+    ).to_list()
+    child_folders = await SmartFolder.find(
+        {"parent_id": {"$in": uuids}}, projection_model=_ChildFolder
+    ).to_list()
+
+    counts = {u: 0 for u in uuids}
+    latest: dict[str, datetime.datetime | None] = {f.uuid: _created_at(f.id) for f in folders}
+
+    def note(parent_uuid: str, when: Any) -> None:
+        counts[parent_uuid] += 1
+        if isinstance(when, datetime.datetime):
+            if when.tzinfo is not None:
+                when = when.astimezone().replace(tzinfo=None)
+            current = latest.get(parent_uuid)
+            if current is None or when > current:
+                latest[parent_uuid] = when
+
+    for d in child_documents:
+        if d.folder and visible(d.folder, d):
+            note(d.folder, d.updated_at)
+    for child in child_folders:
+        if child.parent_id and visible(child.parent_id, child):
+            note(child.parent_id, _created_at(child.id))
+
+    summaries: dict[str, dict] = {}
+    for u in uuids:
+        modified = latest.get(u)
+        summaries[u] = {"item_count": counts[u], "updated_at": modified.isoformat() if modified else ""}
+    return summaries
+
+
+def _stored_sizes(documents: list[SmartDocument]) -> dict[str, int]:
+    """Size on disk of each listed file, keyed by uuid. Files that are not
+    there (or sit outside the upload root) are simply absent."""
+    root = Path(Settings().upload_dir).resolve()
+    sizes: dict[str, int] = {}
+    for d in documents:
+        try:
+            target = (root / d.path).resolve()
+            if target.is_relative_to(root) and target.is_file():
+                sizes[d.uuid] = target.stat().st_size
+        except (OSError, TypeError, ValueError):
+            continue
+    return sizes
+
+
 async def list_contents(
     *,
     user: User,
@@ -106,6 +221,7 @@ async def list_contents(
 
     folders: list[SmartFolder] = []
     documents: list[SmartDocument] = []
+    in_project = False
 
     if folder_id != "0":
         current_folder = await access_control.get_authorized_folder(
@@ -114,7 +230,14 @@ async def list_contents(
         if not current_folder:
             return {"folders": [], "documents": []}
 
-        if current_folder.team_id:
+        project = await access_control.find_folder_project(current_folder.uuid)
+        if project:
+            in_project = True
+            candidate_folders = await SmartFolder.find({"parent_id": current_folder.uuid}).to_list()
+            folders = [f for f in candidate_folders if await access_control.get_authorized_folder(f.uuid, user, team_access=team_access)]
+            candidate_documents = await SmartDocument.find({"folder": current_folder.uuid, "soft_deleted": {"$ne": True}, "superseded_by": None}).to_list()
+            documents = [d for d in candidate_documents if await access_control.get_authorized_document(d.uuid, user, team_access=team_access)]
+        elif current_folder.team_id:
             folders = await SmartFolder.find(
                 SmartFolder.parent_id == current_folder.uuid,
                 SmartFolder.team_id == current_folder.team_id,
@@ -124,6 +247,7 @@ async def list_contents(
                     "folder": current_folder.uuid,
                     "team_id": current_folder.team_id,
                     "soft_deleted": {"$ne": True},
+                    "superseded_by": None,
                 }
             ).to_list()
         else:
@@ -136,6 +260,7 @@ async def list_contents(
                     "folder": current_folder.uuid,
                     "user_id": user.user_id,
                     "soft_deleted": {"$ne": True},
+                    "superseded_by": None,
                 }
             ).to_list()
     else:
@@ -158,8 +283,12 @@ async def list_contents(
                 "folder": "0",
                 "user_id": user.user_id,
                 "soft_deleted": {"$ne": True},
+                "superseded_by": None,
             }
         ).to_list()
+
+    summaries = await _folder_summaries(folders, user, in_project=in_project)
+    sizes = await asyncio.to_thread(_stored_sizes, documents)
 
     return {
         "folders": [
@@ -170,6 +299,7 @@ async def list_contents(
                 "parent_id": f.parent_id,
                 "is_shared_team_root": f.is_shared_team_root,
                 "team_id": f.team_id,
+                **summaries.get(f.uuid, {"item_count": 0, "updated_at": ""}),
             }
             for f in folders
         ],
@@ -186,6 +316,8 @@ async def list_contents(
                 "folder": d.folder,
                 "created_at": d.created_at.isoformat() if d.created_at else "",
                 "updated_at": d.updated_at.isoformat() if d.updated_at else "",
+                # None when the stored file is not on disk (nothing to measure).
+                "size_bytes": sizes.get(d.uuid),
                 "token_count": d.token_count,
                 "num_pages": d.num_pages,
                 "classification": d.classification,
@@ -194,11 +326,13 @@ async def list_contents(
                 "classified_by": d.classified_by,
                 "retention_hold": d.retention_hold,
                 "soft_deleted": d.soft_deleted,
+                "version_number": d.version_number,
                 "chromadb_ready": d.chromadb_ready,
                 "chunk_count": d.chunk_count,
                 "ingest_error": d.ingest_error,
                 "error_message": d.error_message,
                 "error_retryable": d.error_retryable,
+                "extraction_stopped": extraction_stopped(d),
                 "extraction_low_quality": is_extraction_low_quality(d),
                 "ingestion_warnings": ingestion_warnings(d),
                 # The list endpoint is what feeds the file browser; serving
@@ -229,6 +363,24 @@ async def collect_folder_document_uuids(
     if not root:
         return None
 
+    project = await access_control.find_folder_project(root.uuid)
+    if project:
+        # Project collaborators may contribute files under different user IDs;
+        # traverse the authorized subtree rather than the current user's files.
+        folder_uuids = [root.uuid]
+        frontier = [root.uuid] if include_subfolders else []
+        seen = {root.uuid}
+        while frontier:
+            children = await SmartFolder.find({"parent_id": {"$in": frontier}}).to_list()
+            frontier = []
+            for child in children:
+                if child.uuid not in seen and await access_control.get_authorized_folder(child.uuid, user, team_access=team_access):
+                    seen.add(child.uuid)
+                    folder_uuids.append(child.uuid)
+                    frontier.append(child.uuid)
+        documents = await SmartDocument.find({"folder": {"$in": folder_uuids}, "soft_deleted": {"$ne": True}, "superseded_by": None}).to_list()
+        return [d.uuid for d in documents if await access_control.get_authorized_document(d.uuid, user, team_access=team_access)]
+
     # Resolve the set of folder uuids to scan (root + descendants).
     folder_uuids = [root.uuid]
     if include_subfolders:
@@ -246,12 +398,12 @@ async def collect_folder_document_uuids(
         queue = [root.uuid]
         seen = {root.uuid}
         while queue:
-            current = queue.pop()
-            for child in children_by_parent.get(current, []):
-                if child not in seen:
-                    seen.add(child)
-                    folder_uuids.append(child)
-                    queue.append(child)
+            pending_folder_uuid = queue.pop()
+            for descendant_uuid in children_by_parent.get(pending_folder_uuid, []):
+                if descendant_uuid not in seen:
+                    seen.add(descendant_uuid)
+                    folder_uuids.append(descendant_uuid)
+                    queue.append(descendant_uuid)
 
     scope = (
         {"team_id": root.team_id}
@@ -262,6 +414,8 @@ async def collect_folder_document_uuids(
         {
             "folder": {"$in": folder_uuids},
             "soft_deleted": {"$ne": True},
+            # A revised file's older versions stay in its version history only.
+            "superseded_by": None,
             **scope,
         }
     ).to_list()
@@ -293,6 +447,7 @@ async def poll_status(doc_uuid: str, user: User) -> dict | None:
         "path": doc.path,
         "error_message": doc.error_message,
         "error_retryable": doc.error_retryable,
+        "extraction_stopped": extraction_stopped(doc),
         "processing": doc.processing,
         "extension": (doc.extension or "").lower().lstrip(".") or None,
         "title": doc.title,
@@ -316,42 +471,79 @@ EXTRACTION_STOPPED_MESSAGE = (
 )
 
 
-async def cancel_extraction(doc: SmartDocument) -> bool:
+def extraction_stopped(doc: SmartDocument) -> bool:
+    """The document has no reading because someone stopped it, not because
+    reading it failed. Shown as "Stopped", not as a failure."""
+    return doc.task_status == "error" and doc.error_message == EXTRACTION_STOPPED_MESSAGE
+
+
+async def cancel_extraction(doc: SmartDocument) -> Optional[str]:
     """Stop a document's in-flight extraction so it can be restarted.
 
-    Flips the document to a retryable error first, then revokes the worker.
-    The DB write is the source of truth: clearing ``task_id`` is what makes
-    the extraction task drop its result if the revoke does not reach it (a
-    pool that cannot terminate, a worker mid-write), since every write that
-    task makes is filtered on its own task id. Callers check authorization.
+    When the stopped run was a re-read of a document that already had text,
+    and it had not stored a new reading yet, the previous reading is put back
+    and the document is as it was before the re-read ("restored"). Otherwise
+    the document is flipped to a retryable error ("stopped").
 
-    Returns False when nothing was in flight by the time the write landed.
+    Either way the DB write comes first, then the worker is revoked. The
+    write is the source of truth: clearing ``task_id`` is what makes the
+    extraction task drop its result if the revoke does not reach it (a pool
+    that cannot terminate, a worker mid-write), since every write that task
+    makes is filtered on its own task id. Callers check authorization.
+
+    Returns None when nothing was in flight by the time the write landed.
     """
     import logging
 
     # Lazy: the tasks module and the Celery app pull in the worker stack.
     from app.celery_app import celery_app
+    from app.services import extraction_snapshots
     from app.tasks.document_tasks import _IN_PROGRESS_TASK_STATUSES
 
     task_id = doc.task_id
-    result = await SmartDocument.get_motor_collection().update_one(
-        {
-            "_id": doc.id,
-            "$or": [
-                {"processing": True},
-                {"task_status": {"$in": _IN_PROGRESS_TASK_STATUSES}},
-            ],
-        },
-        {"$set": {
-            "processing": False,
-            "task_status": "error",
-            "task_id": None,
-            "error_message": EXTRACTION_STOPPED_MESSAGE,
-            "error_retryable": True,
-        }},
-    )
-    if not result.matched_count:
-        return False
+    collection = SmartDocument.get_motor_collection()
+    in_flight = {"$or": [
+        {"processing": True},
+        {"task_status": {"$in": _IN_PROGRESS_TASK_STATUSES}},
+    ]}
+    # Like a restart: the stopped run's later steps (update, ingestion,
+    # cleanup) are filtered on the revision and now match nothing.
+    bump = {"$inc": {"_extraction_restart_revision": 1}}
+
+    outcome: Optional[str] = None
+    previous = await extraction_snapshots.previous_reading(doc.uuid)
+    if previous is not None:
+        fields = previous["fields"]
+        # The copy can only have been taken from a settled document; anything
+        # else (a stale run that was re-claimed) settles as read.
+        if fields.get("task_status") not in ("complete", "error", None):
+            fields["task_status"] = "complete"
+        restored = await collection.update_one(
+            # Only into the run the copy was taken for, and only while that
+            # run has stored nothing: once it has written its own reading,
+            # that newer text is the document's text.
+            {"_id": doc.id, **in_flight,
+             "_extraction_restart_revision": previous["revision"], "raw_text": ""},
+            {"$set": {**fields, "processing": False, "task_id": None}, **bump},
+        )
+        if restored.matched_count:
+            outcome = "restored"
+            await extraction_snapshots.discard(doc.uuid)
+
+    if outcome is None:
+        result = await collection.update_one(
+            {"_id": doc.id, **in_flight},
+            {"$set": {
+                "processing": False,
+                "task_status": "error",
+                "task_id": None,
+                "error_message": EXTRACTION_STOPPED_MESSAGE,
+                "error_retryable": True,
+            }, **bump},
+        )
+        if not result.matched_count:
+            return None
+        outcome = "stopped"
 
     # SIGTERM the prefork child reading it; a task still queued (or waiting
     # out an OCR retry backoff under the same id) is dropped when it arrives.
@@ -363,13 +555,17 @@ async def cancel_extraction(doc: SmartDocument) -> bool:
                 "Failed to revoke extraction task %s for document %s",
                 task_id, doc.uuid, exc_info=True,
             )
-    return True
+    return outcome
 
 
 async def restart_extraction(
     doc: SmartDocument, user_id: str, *, request_ocr: bool = False,
 ) -> dict:
     """Clear a document's extracted text and re-dispatch the upload chain.
+
+    The text is cleared because every later step reads it from the document;
+    a copy of the previous reading is kept so ``cancel_extraction`` can
+    restore it if the run is stopped before it stores a new one.
 
     Shared by the document's Retry extraction and a knowledge-base source's
     Reprocess, so both re-read a page the same way. Callers check
@@ -412,23 +608,24 @@ async def restart_extraction(
         request_ocr or doc.task_status == "error" or low_quality or missed_pages
     )
     ocr_required = is_pdf and (low_quality or doc.text_layer_rejected)
-    if ocr_required:
-        doc.text_layer_rejected = True
+    # Keep what the document reads as now, so stopping this run can put it
+    # back. Taken before the claim clears it, and tagged with the revision
+    # the claim is about to take.
+    from app.services import extraction_snapshots
 
-    doc.task_status = "extracting"
-    doc.processing = True
-    # Takes ownership away from any earlier extraction still running (a
-    # stale lock being retried past): its writes are filtered on its task id.
-    doc.task_id = None
-    doc.updated_at = _datetime.datetime.now()
-    doc.error_message = None
-    doc.error_retryable = None
-    doc.raw_text = ""
-    doc.token_count = 0
-    doc.text_markers = []
-    doc.extraction_nonletter_ratio = None
-    doc.ingestion_warnings = []
-    await doc.save()
+    await extraction_snapshots.save_previous_reading(doc, doc._extraction_restart_revision + 1)
+    await claim_extraction_restart(doc, {
+        'task_status': 'extracting', 'processing': True,
+        'validating': True, '_validation_heartbeat_at': _datetime.datetime.now(),
+        # Takes ownership from any earlier run still going: its writes are
+        # filtered on its own task id (and on this claim's new revision).
+        'task_id': None,
+        'updated_at': _datetime.datetime.now(), 'error_message': None,
+        'error_retryable': None,
+        'raw_text': '', 'token_count': 0, 'text_markers': [],
+        'extraction_nonletter_ratio': None, 'ingestion_warnings': [],
+        **({'text_layer_rejected': True} if ocr_required else {}),
+    })
 
     task_id = dispatch_upload_tasks(
         document_uuid=doc.uuid,
@@ -437,6 +634,7 @@ async def restart_extraction(
         user_id=user_id,
         force_ocr=force_ocr,
         ocr_required=ocr_required,
+        extraction_revision=doc._extraction_restart_revision,
     )
     return {
         "task_id": task_id,

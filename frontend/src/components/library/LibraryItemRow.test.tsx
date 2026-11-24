@@ -75,7 +75,7 @@ describe('LibraryItemRow', () => {
 
   it('shows kind label for extraction (search_set)', () => {
     render(<LibraryItemRow item={makeItem({ kind: 'search_set', name: 'NSF Extractor' })} {...defaultProps} />)
-    expect(screen.getByText('Extraction Task')).toBeTruthy()
+    expect(screen.getByText('Extraction')).toBeTruthy()
   })
 
   it('renders tags', () => {
@@ -135,6 +135,13 @@ describe('LibraryItemRow', () => {
       expect(screen.getByText('Share with a team')).toBeTruthy()
     })
 
+    it('names a Skill or formatter by its real type in the wizard', () => {
+      // The row passes the item's set_type on; without it both read "extraction".
+      openMenu(makeItem({ kind: 'search_set', set_type: 'prompt' }))
+      fireEvent.click(screen.getByText('Share…'))
+      expect(screen.getByRole('heading', { name: 'Share this Skill' })).toBeTruthy()
+    })
+
     it('"Share with a team" hands off with a way back to the wizard', () => {
       openMenu(makeItem())
       fireEvent.click(screen.getByText('Share…'))
@@ -159,5 +166,49 @@ describe('LibraryItemRow', () => {
       openMenu(makeItem({ verified: true }), 'team')
       expect(screen.queryByText('Share…')).toBeNull()
     })
+  })
+})
+
+describe('Library row actions', () => {
+  it('moves the exact item with a keyboard-accessible inline folder choice', () => {
+    const move = vi.fn()
+    render(<LibraryItemRow item={makeItem()} {...defaultProps} onMoveToFolder={move} folders={[{ uuid: 'destination', name: 'Team evidence', item_count: 0 } as import('../../types/library').LibraryFolder]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Move to folder' }))
+    const destination = screen.getByRole('button', { name: 'Team evidence' })
+    destination.focus()
+    expect(destination).toHaveFocus()
+    fireEvent.click(destination)
+    expect(move).toHaveBeenCalledExactlyOnceWith('item-1', 'destination')
+    expect(defaultProps.onOpen).not.toHaveBeenCalled()
+  })
+  it('closes actions with Escape and restores the trigger', () => {
+    render(<LibraryItemRow item={makeItem()} {...defaultProps} />)
+    const trigger = screen.getByRole('button', { name: 'More actions' })
+    fireEvent.click(trigger)
+    fireEvent.keyDown(screen.getByRole('group', { name: 'Actions for Budget Analyzer' }), { key: 'Escape' })
+    expect(screen.queryByRole('group', { name: 'Actions for Budget Analyzer' })).not.toBeInTheDocument()
+    expect(trigger).toHaveFocus()
+  })
+  it('disables mutation controls while the item action is pending', () => {
+    render(<LibraryItemRow item={makeItem()} {...defaultProps} busy />)
+    const favorite = screen.getByRole('button', { name: 'Favorite (shows in all views)' })
+    expect(favorite).toBeDisabled()
+    fireEvent.click(favorite)
+    expect(defaultProps.onFavorite).not.toHaveBeenCalled()
+  })
+
+  it("offers Edit on a Skill the user may change, not on a teammate's (#1164)", () => {
+    const skill = makeItem({ kind: 'search_set', set_type: 'prompt', name: 'Award review', item_uuid: 'ss-1' })
+    const view = render(<LibraryItemRow item={{ ...skill, can_edit_underlying: true }} {...defaultProps} scope="team" />)
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
+    expect(screen.getByText('Edit')).toBeTruthy()
+    view.unmount()
+
+    render(<LibraryItemRow item={{ ...skill, can_edit_underlying: false }} {...defaultProps} scope="team" />)
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
+    expect(screen.queryByText('Edit')).toBeNull()
+    // Using it and making a copy of your own stay available.
+    expect(screen.getByText('Download JSON')).toBeTruthy()
   })
 })

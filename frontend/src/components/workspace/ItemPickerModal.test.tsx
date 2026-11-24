@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { RetainedPanel } from '../shared/PanelVisibility'
 import { ItemPickerModal } from './ItemPickerModal'
 import type { LibraryItem } from '../../types/library'
 import React from 'react'
@@ -96,4 +97,67 @@ describe('ItemPickerModal pin/favorite ordering', () => {
       expect.stringContaining('Beta Workflow'),
     ])
   })
+})
+
+
+describe('ItemPickerModal recovery', () => {
+  it('keeps a failed request distinct from empty results and retries without closing or selecting', async () => {
+    listItems.mockReset().mockRejectedValueOnce(new Error('Offline')).mockResolvedValueOnce([
+      makeItem({ name: 'Recovered workflow', item_id: 'recovered' }),
+    ])
+    const onSelect = vi.fn()
+    render(<ItemPickerModal kind="workflow" currentId="recovered" onSelect={onSelect} onClose={vi.fn()} />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not load items')
+    expect(screen.queryByText(/No workflows saved/)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry loading' }))
+    const item = await screen.findByRole('button', { name: /Recovered workflow/ })
+    expect(item).toHaveAttribute('aria-pressed', 'true')
+    expect(onSelect).not.toHaveBeenCalled()
+    fireEvent.click(item)
+    expect(onSelect).toHaveBeenCalledWith('recovered', 'Recovered workflow')
+  })
+})
+
+
+it('consumes picker Escape before a parent window handler can dismiss its draft', async () => {
+  listItems.mockReset().mockResolvedValue([])
+  const onClose = vi.fn()
+  const parentEscape = vi.fn()
+  window.addEventListener('keydown', parentEscape)
+  try {
+    render(<ItemPickerModal kind="workflow" onSelect={vi.fn()} onClose={onClose} />)
+    await screen.findByText('No workflows saved in your library yet.')
+    const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    fireEvent(screen.getByLabelText('Search workflows'), event)
+    expect(onClose).toHaveBeenCalledOnce()
+    expect(event.defaultPrevented).toBe(true)
+    expect(parentEscape).not.toHaveBeenCalled()
+  } finally {
+    window.removeEventListener('keydown', parentEscape)
+  }
+})
+
+
+describe('picker overlay placement', () => {
+  it('renders viewport dialogs outside workspace stacking contexts and removes them on unmount', async () => {
+    listItems.mockResolvedValue([])
+    const { container, unmount } = render(<div style={{ position: 'relative', zIndex: 1 }}><ItemPickerModal kind="workflow" onSelect={vi.fn()} onClose={vi.fn()} /></div>)
+    const dialog = await screen.findByRole('dialog', { name: 'Select Workflow' })
+    expect(container.contains(dialog)).toBe(false)
+    expect(document.body.contains(dialog)).toBe(true)
+    unmount()
+    expect(document.body.contains(dialog)).toBe(false)
+  })
+})
+
+
+it('hides a portaled picker when its retained workspace panel becomes inactive', async () => {
+  listItems.mockResolvedValue([])
+  const picker = <ItemPickerModal kind="workflow" onSelect={vi.fn()} onClose={vi.fn()} />
+  const { rerender } = render(<RetainedPanel active>{picker}</RetainedPanel>)
+  await screen.findByRole('dialog', { name: 'Select Workflow' })
+  rerender(<RetainedPanel active={false}>{picker}</RetainedPanel>)
+  expect(screen.queryByRole('dialog', { name: 'Select Workflow' })).not.toBeInTheDocument()
+  rerender(<RetainedPanel active>{picker}</RetainedPanel>)
+  expect(screen.getByRole('dialog', { name: 'Select Workflow' })).toBeInTheDocument()
 })

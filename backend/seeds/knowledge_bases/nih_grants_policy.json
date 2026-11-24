@@ -5,17 +5,154 @@
   "_seed_meta": {
     "seed_id": "kb-nih-gps",
     "display_name": "NIH Grants Policy Statement",
-    "description": "NIH Grants Policy Statement (GPS) - the authoritative reference for NIH grant application, review, and management policies.",
+    "description": "NIH Grants Policy Statement (FY 2026 revision), bundled in full: the terms and conditions of NIH awards.",
     "quality_tier": "excellent",
-    "collections": ["federal-agency", "reference-knowledge"]
-  },
-  "items": [{
-    "title": "NIH Grants Policy Statement",
-    "description": "Knowledge base covering NIH application requirements, review criteria, terms of award, and administrative requirements from the NIH GPS.",
-    "sources": [
-      {"source_type": "url", "url": "https://grants.nih.gov/grants/policy/nihgps/index.htm", "url_title": "Redirector"},
-      {"source_type": "url", "url": "https://grants.nih.gov/grants/how-to-apply-application-guide.html", "url_title": "How to Apply \u2013 Application Guide | Grants & Funding"},
-      {"source_type": "url", "url": "https://grants.nih.gov/grants/guide/notice-files/NOT-OD-24-084.html", "url_title": "NOT-OD-24-084: Overview of Grant Application and Review Changes for Due Dates on or after January 25, 2025"}
+    "collections": [
+      "federal-agency",
+      "reference-knowledge"
+    ],
+    "retired_source_urls": [
+      "https://grants.nih.gov/grants/how-to-apply-application-guide.html",
+      "https://grants.nih.gov/grants/policy/nihgps/index.htm"
     ]
-  }]
+  },
+  "items": [
+    {
+      "title": "NIH Grants Policy Statement",
+      "description": "The full text of the NIH Grants Policy Statement (FY 2026 revision, current with Guide Notices through March 17, 2026), one source per chapter: glossary, application and review, terms and conditions, cost considerations, prior approvals, fellowships, career awards, consortium and foreign awards. Page labels such as (GPS page IIA-76) match the official PDF.",
+      "sources": [
+        {
+          "source_type": "url",
+          "url": "https://grants.nih.gov/policy-and-compliance/nihgps#ch0",
+          "content_file": "content/nih-gps-fy2026-00.txt",
+          "url_title": "NIH Grants Policy Statement (FY 2026 revision) — Introduction"
+        },
+        {
+          "source_type": "url",
+          "url": "https://grants.nih.gov/policy-and-compliance/nihgps#ch1",
+          "content_file": "content/nih-gps-fy2026-01.txt",
+          "url_title": "NIH Grants Policy Statement (FY 2026 revision) — Chapter 1: Glossary"
+        },
+        {
+          "source_type": "url",
+          "url": "https://grants.nih.gov/policy-and-compliance/nihgps#ch2",
+          "content_file": "content/nih-gps-fy2026-02.txt",
+          "url_title": "NIH Grants Policy Statement (FY 2026 revision) — Chapter 2: The National Institutes of Health as a Grant-Making Organization"
+        },
+        {
+          "source_type": "url",
+          "url": "https://grants.nih.gov/policy-and-compliance/nihgps#ch3",
+          "content_file": "content/nih-gps-fy2026-03.txt",
+          "url_title": "NIH Grants Policy Statement (FY 2026 revision) — Chapter 3: Overview of Terms and Conditions"
+        },
+        {
+          "source_type": "url",
+          "url": "https://grants.nih.gov/policy-and-compliance/nihgps#ch4",
+          "content_file": "content/nih-gps-fy2026-04.txt",
+          "url_title": "NIH Grants Policy Statement (FY 2026 revision) — Chapter 4: Public Policy Requirements, Objectives and Other Appropriation Mandates"
+        },
+        {
+          "source_type": "url",
+          "url": "https://grants.nih.gov/policy-and-compliance/nihgps#ch5",
+          "content_file": "content/nih-gps-fy2026-05.txt",
+          "url_title": "NIH Grants Policy Statement (FY 2026 revision) — Chapter 5: The Notice of Award"
+        },
+        {
+          "source_type": "url",
+          "url": "https://grants.nih.gov/policy-and-compliance/nihgps#ch6",
+          "content_file": "content/nih-gps-fy2026-06.txt",
+          "url_title": "NIH Grants Policy Statement (FY 2026 revision) — Chapter 6: Payment"
+        },
+        {
+          "source_type": "url",
+          "url": "https://grants.nih.gov/policy-and-compliance/nihgps#ch7",
+          "content_file": "content/nih-gps-fy2026-07.txt",
+          "url_title": "NIH Grants Policy Statement (FY 2026 revision) — Chapter 7: Cost Consideration"
+        },
+        {
+          "source_type": "url",
+          "url": "https://grants.nih.gov/policy-and-compliance/nihgps#ch8",
+          "content_file": "content/nih-gps-fy2026-08.txt",
+          "url_title": "NIH Grants Policy Statement (FY 2026 revision) — Chapter 8: Administrative Requirements"
+        },
+        {
+          "source_type": "url",
+          "url": "https://grants.nih.gov/policy-and-compliance/nihgps#ch9",
+          "content_file": "content/nih-gps-fy2026-09.txt",
+          "url_title": "NIH Grants Policy Statement (FY 2026 revision) — Chapter 9: Multiple Program Director/Principal Investigator Applications and Awards"
+        },
+        {
+          "source_type": "url",
+          "url": "https://grants.nih.gov/policy-and-compliance/nihgps#ch10",
+          "content_file": "content/nih-gps-fy2026-10.txt",
+          "url_title": "NIH Grants Policy Statement (FY 2026 revision) — Chapter 10: Construction, Modernization, or Major Alteration and Renovation of Research Facilities"
+        },
+        {
+          "source_type": "url",
+          "url": "https://grants.nih.gov/policy-and-compliance/nihgps#ch11",
+          "content_file": "content/nih-gps-fy2026-11.txt",
+          "url_title": "NIH Grants Policy Statement (FY 2026 revision) — Chapter 11: Ruth L. Kirschstein National Research Service Awards"
+        },
+        {
+          "source_type": "url",
+          "url": "https://grants.nih.gov/policy-and-compliance/nihgps#ch12",
+          "content_file": "content/nih-gps-fy2026-12.txt",
+          "url_title": "NIH Grants Policy Statement (FY 2026 revision) — Chapter 12: Research Career Development (K) Awards"
+        },
+        {
+          "source_type": "url",
+          "url": "https://grants.nih.gov/policy-and-compliance/nihgps#ch13",
+          "content_file": "content/nih-gps-fy2026-13.txt",
+          "url_title": "NIH Grants Policy Statement (FY 2026 revision) — Chapter 13: Modular Applications and Awards"
+        },
+        {
+          "source_type": "url",
+          "url": "https://grants.nih.gov/policy-and-compliance/nihgps#ch14",
+          "content_file": "content/nih-gps-fy2026-14.txt",
+          "url_title": "NIH Grants Policy Statement (FY 2026 revision) — Chapter 14: Support of Scientific Meetings (Conference Grants)"
+        },
+        {
+          "source_type": "url",
+          "url": "https://grants.nih.gov/policy-and-compliance/nihgps#ch15",
+          "content_file": "content/nih-gps-fy2026-15.txt",
+          "url_title": "NIH Grants Policy Statement (FY 2026 revision) — Chapter 15: Consortium Agreements"
+        },
+        {
+          "source_type": "url",
+          "url": "https://grants.nih.gov/policy-and-compliance/nihgps#ch16",
+          "content_file": "content/nih-gps-fy2026-16.txt",
+          "url_title": "NIH Grants Policy Statement (FY 2026 revision) — Chapter 16: Grants to Foreign Organizations, International Organizations, Domestic Grants with Foreign Components and Collaborative International Research Awards"
+        },
+        {
+          "source_type": "url",
+          "url": "https://grants.nih.gov/policy-and-compliance/nihgps#ch17",
+          "content_file": "content/nih-gps-fy2026-17.txt",
+          "url_title": "NIH Grants Policy Statement (FY 2026 revision) — Chapter 17: Grants to Federal Institutions and Payments to Federal Employees Under Grants"
+        },
+        {
+          "source_type": "url",
+          "url": "https://grants.nih.gov/policy-and-compliance/nihgps#ch18",
+          "content_file": "content/nih-gps-fy2026-18.txt",
+          "url_title": "NIH Grants Policy Statement (FY 2026 revision) — Chapter 18: Grants to For-Profit Organizations"
+        },
+        {
+          "source_type": "url",
+          "url": "https://grants.nih.gov/policy-and-compliance/nihgps#ch19",
+          "content_file": "content/nih-gps-fy2026-19.txt",
+          "url_title": "NIH Grants Policy Statement (FY 2026 revision) — Chapter 19: Research Patient Care Costs"
+        },
+        {
+          "source_type": "url",
+          "url": "https://grants.nih.gov/policy-and-compliance/nihgps#ch20",
+          "content_file": "content/nih-gps-fy2026-20.txt",
+          "url_title": "NIH Grants Policy Statement (FY 2026 revision) — Chapter 20: Institutes and Centers"
+        },
+        {
+          "source_type": "url",
+          "url": "https://grants.nih.gov/grants/guide/notice-files/NOT-OD-24-084.html",
+          "url_title": "NOT-OD-24-084: Overview of Grant Application and Review Changes for Due Dates on or after January 25, 2025"
+        }
+      ]
+    }
+  ]
 }

@@ -1,0 +1,307 @@
+"""A multi-step chat request reports its true state (support ticket).
+
+"Set up this subaward: create a project, add its reporting deadlines to the RA
+inbox, extract the key details, and make a one-page snapshot Page" ended with
+"✓ All 4 steps completed" and "Award snapshot saved" while four approval
+cards waited, no Page, a .md file instead, an inbox step that failed before
+the project was approved, three identical inbox cards, and two clearly
+anchored NIFA deadlines refused.
+"""
+import datetime
+import types
+from unittest.mock import AsyncMock, patch
+
+import pytest
+from pydantic_ai import ModelRetry
+
+from app.models.obligation import ObligationSource
+from app.services import approval_claims, chat_tools
+from app.services.relative_deadlines import calculate_deadlines
+
+
+def _deps(pending=(), marker=7, **extra):
+    conversation = types.SimpleNamespace(pending_confirmations=[{"fp": f"fp{i}", "turn": turn, "tool": tool} for i, (tool, turn) in enumerate(pending)],
+                                         save=AsyncMock())
+    return types.SimpleNamespace(plan_state=None, conversation=conversation, turn_marker=marker,
+                                 completion_claim_retry_used=False, **extra)
+
+
+def _task(content, status):
+    return {"content": content, "active_form": content + "ing", "status": status}
+
+
+# ── Plan status ─────────────────────────────────────────────────────────────
+
+async def test_plan_cannot_be_all_done_while_this_turns_cards_wait():
+    deps = _deps(pending=[("move_documents_to_project", 7), ("propose_obligations", 7), ("save_to_folder", 7)])
+    ctx = types.SimpleNamespace(deps=deps)
+    tasks = [_task(name, "completed") for name in ("Create project", "Add deadlines", "Extract details", "Make page")]
+    refused = await chat_tools.update_plan(ctx, tasks)
+    assert "error" in refused and "3 approval card(s)" in refused["error"] and "awaiting_approval" in refused["hint"]
+    assert deps.plan_state is None
+
+    honest = [tasks[0], *(_task(t["content"], "awaiting_approval") for t in tasks[1:])]
+    ok = await chat_tools.update_plan(ctx, honest)
+    assert ok["ok"] and ok["completed"] == 1 and ok["awaiting_approval"] == 3 and not ok["all_done"]
+
+
+async def test_cards_from_earlier_turns_dont_block_a_finished_plan():
+    deps = _deps(pending=[("create_project", 3)])
+    ok = await chat_tools.update_plan(types.SimpleNamespace(deps=deps), [_task("A", "completed"), _task("B", "completed")])
+    assert ok["all_done"]
+
+
+async def test_one_in_progress_is_still_required_while_work_remains():
+    deps = _deps()
+    bad = await chat_tools.update_plan(types.SimpleNamespace(deps=deps), [_task("A", "completed"), _task("B", "pending")])
+    assert "Exactly one task must be in_progress" in bad["error"]
+    two = await chat_tools.update_plan(types.SimpleNamespace(deps=deps), [_task("A", "in_progress"), _task("B", "in_progress")])
+    assert "Exactly one task must be in_progress" in two["error"]
+
+
+async def test_a_step_waiting_on_another_steps_approval_stays_pending():
+    # The ticket's end state: the inbox step waits for Create project
+    # (propose_obligations says to keep it pending) while cards wait.
+    deps = _deps(pending=[("create_project", 7), ("save_to_folder", 7)])
+    tasks = [_task("Create project", "awaiting_approval"), _task("Add deadlines", "pending"),
+             _task("Extract details", "completed"), _task("Make page", "awaiting_approval")]
+    ok = await chat_tools.update_plan(types.SimpleNamespace(deps=deps), tasks)
+    assert ok.get("ok") and ok["awaiting_approval"] == 2 and not ok["all_done"]
+
+
+# ── "Saved" while cards wait ────────────────────────────────────────────────
+
+@pytest.mark.parametrize("reply, claims", [
+    ("All four steps are prepared.", True),
+    ("Award snapshot saved", True),
+    ("The deadlines have been added to the RA inbox.", True),
+    ("I saved it to the project folder.", True),
+    ("All four steps are prepared and waiting for your approval.", False),
+    ("Once you approve Add to inbox, the deadlines will be added.", False),
+    ("The snapshot is not saved yet — approve Save to folder to save it.", False),
+    ("Here is what the subaward says about reporting.", False),
+])
+def test_claims_done(reply, claims):
+    assert approval_claims.claims_done(reply) is claims
+
+
+def test_a_done_claim_with_waiting_cards_is_sent_back_once():
+    deps = _deps(pending=[("propose_obligations", 7), ("save_to_folder", 7)])
+    ctx = types.SimpleNamespace(deps=deps, partial_output=False)
+    with pytest.raises(ModelRetry) as retry:
+        approval_claims.require_honest_completion(ctx, "All four steps are prepared. Award snapshot saved")
+    assert "Add to inbox" in str(retry.value) or "propose" in str(retry.value).lower()
+    # Second miss accepted; no waiting cards → nothing to check.
+    assert approval_claims.require_honest_completion(ctx, "All done.") == "All done."
+    quiet = types.SimpleNamespace(deps=_deps(pending=[("save_to_folder", 2)]), partial_output=False)
+    assert approval_claims.require_honest_completion(quiet, "Saved.") == "Saved."
+
+
+def test_the_validator_is_registered_on_the_chat_agent():
+    from app.services import llm_service
+    import inspect
+    assert "require_honest_completion" in inspect.getsource(llm_service.create_agentic_chat_agent)
+
+
+# ── Inbox before the project exists ─────────────────────────────────────────
+
+async def test_inbox_items_wait_for_a_pending_create_project():
+    from tests.test_chat_tools import _make_context
+
+    ctx = _make_context()
+    ctx.deps.conversation = types.SimpleNamespace(pending_confirmations=[{"fp": "x", "turn": 5, "tool": "create_project"}])
+    with patch.object(chat_tools, "_resolve_active_project", AsyncMock(return_value=None)):
+        out = await chat_tools.propose_obligations(ctx, [{"kind": "deadline", "title": "Final report", "sources": []}])
+    assert out["waiting_for"] == "create_project" and "error" not in out
+    ctx.deps.conversation = types.SimpleNamespace(pending_confirmations=[])
+    with patch.object(chat_tools, "_resolve_active_project", AsyncMock(return_value=None)):
+        assert "No project is open" in (await chat_tools.propose_obligations(ctx, [{"kind": "deadline"}]))["error"]
+
+
+# ── One card per action ─────────────────────────────────────────────────────
+
+async def test_repeating_an_action_in_one_reply_is_one_card():
+    conversation = types.SimpleNamespace(pending_confirmations=[], save=AsyncMock())
+    ctx = types.SimpleNamespace(deps=types.SimpleNamespace(conversation=conversation, turn_marker=9))
+    kwargs = {"tool_name": "propose_obligations", "key": {"project": "p", "items": "abc"}, "confirmed": False}
+    first = await chat_tools._confirm_gate(ctx, preview={"preview": "Add 3 items", "action": "propose_obligations"}, **kwargs)
+    second = await chat_tools._confirm_gate(ctx, preview={"preview": "Add 3 items\nNot included: X", "action": "propose_obligations"}, **kwargs)
+    assert first["approval_key"] == second["approval_key"]
+    assert "already_waiting" not in first and second["already_waiting"] is True
+    assert len(conversation.pending_confirmations) == 1
+
+
+async def test_the_card_the_chat_shows_is_the_one_armed():
+    # The chat keeps the first card per approval_key; its button sends that
+    # card's call id (approval_for), so the first call id must stay armed.
+    conversation = types.SimpleNamespace(pending_confirmations=[], save=AsyncMock())
+    deps = types.SimpleNamespace(conversation=conversation, turn_marker=9)
+    kwargs = {"tool_name": "propose_obligations", "key": {"project": "p", "items": "abc"}, "confirmed": False}
+    await chat_tools._confirm_gate(types.SimpleNamespace(deps=deps, tool_call_id="call-1"),
+                                   preview={"preview": "Add 3 items"}, **kwargs)
+    await chat_tools._confirm_gate(types.SimpleNamespace(deps=deps, tool_call_id="call-2"),
+                                   preview={"preview": "Add 3 items\nNot included: X"}, **kwargs)
+    assert [p["call_id"] for p in conversation.pending_confirmations] == ["call-1"]
+
+
+# ── Page without a template ─────────────────────────────────────────────────
+
+async def test_a_page_from_a_source_file_needs_no_template():
+    from app.services import chat_artifact_tools
+
+    save = AsyncMock(return_value={"needs_confirmation": True})
+    ctx = types.SimpleNamespace(deps=types.SimpleNamespace(context_document_uuids=["sub"]))
+    with patch.object(chat_artifact_tools, "_save", save):
+        await chat_artifact_tools.create_html_artifact(ctx, "Award snapshot", "<main><h1>Award</h1></main>", source_document_uuid="sub")
+    save.assert_awaited_once()
+    with patch.object(chat_artifact_tools, "_save", save):
+        refused = await chat_artifact_tools.create_html_artifact(ctx, "Award snapshot", template_values=[{"field_id": "x", "value": "1", "quote": "1"}])
+        empty = await chat_artifact_tools.create_html_artifact(ctx, "Award snapshot", "", source_document_uuid="sub")
+    assert "none was given" in refused["error"] and "do not deliver a different kind of output" in refused["hint"]
+    assert "Write the Page in html" in empty["error"]
+    assert save.await_count == 1
+
+
+def test_the_agent_is_told_not_to_swap_a_page_for_a_file():
+    from app.services.llm_service import AGENTIC_CHAT_SYSTEM_PROMPT
+    assert "never substitute a different output" in AGENTIC_CHAT_SYSTEM_PROMPT
+
+
+# ── Relative deadlines with a clear anchor ──────────────────────────────────
+
+def _src(quote, role):
+    return ObligationSource(document_uuid="sub", document_title="Subaward.pdf", page=2, quote=quote, role=role)
+
+
+PERIOD = _src("Start Date: September 1, 2026  End Date: August 31, 2027", "period_of_performance")
+
+
+def test_a_rule_with_its_own_dated_anchor():
+    [due] = calculate_deadlines([_src("The annual progress report is due 60 days after March 1, 2027.", "timing")])
+    assert due["due_at"].date() == datetime.date(2027, 4, 30)
+    assert due["deadline_calculation"].anchor_kind == "stated_date"
+    assert due["deadline_calculation"].formula == "2027-03-01 + 60 calendar days = 2027-04-30"
+
+
+def test_a_rule_anchored_on_the_end_date():
+    [due] = calculate_deadlines([_src("The final technical report is due 120 days after the End Date.", "timing"), PERIOD])
+    assert due["due_at"].date() == datetime.date(2027, 12, 29)
+    assert due["deadline_calculation"].anchor_kind == "performance_period_end"
+
+
+@pytest.mark.parametrize("rule, reason", [
+    ("Report due 60 days after March 1.", "must include its year"),
+    ("Report due within 60 days of March 1, 2027.", "before or after"),
+])
+def test_unclear_anchors_are_still_refused(rule, reason):
+    with pytest.raises(ValueError) as exc:
+        calculate_deadlines([_src(rule, "timing"), PERIOD])
+    assert reason in str(exc.value)
+
+
+# ── An approved action the reply never carried out ──────────────────────────
+# Support ticket: a Create project card was approved (by "ok thanks", which
+# counted as a yes), the model replied "The project 'OK Thanks Test' was
+# created and is ready" without calling the tool, and no project existed.
+
+def _approved(mode="card", still_waiting=True):
+    entry = {"fp": "fp-project", "turn": 3, "tool": "create_project", "label": "Create project", "call_id": "call-1"}
+    conversation = types.SimpleNamespace(pending_confirmations=[entry] if still_waiting else [], save=AsyncMock())
+    deps = types.SimpleNamespace(conversation=conversation, turn_marker=9, approval_mode=mode,
+                                 approved_confirmations=frozenset({"fp-project"}), unrun_approval_retry_used=False)
+    return types.SimpleNamespace(deps=deps, partial_output=False)
+
+
+CLAIM = "The project 'OK Thanks Test' was created and is ready."
+
+
+def test_an_approved_card_that_did_not_run_is_sent_back_once_then_noted():
+    ctx = _approved()
+    with pytest.raises(ModelRetry) as retry:
+        approval_claims.require_approved_action_ran(ctx, CLAIM)
+    assert "“Create project”" in str(retry.value) and "create_project" in str(retry.value)
+    assert "confirmed=true" in str(retry.value)
+    # Second miss is accepted, and the user is told it did not run.
+    assert approval_claims.require_approved_action_ran(ctx, CLAIM) == CLAIM
+    note = approval_claims.unrun_approval_note(CLAIM, ctx.deps)
+    assert "“Create project” did not run" in note and "nothing was created" in note
+    assert "approve it again" in note
+
+
+def test_a_button_approval_that_did_not_run_is_reported_whatever_the_reply_says():
+    ctx = _approved()
+    with pytest.raises(ModelRetry):
+        approval_claims.require_approved_action_ran(ctx, "Anything else I can help with?")
+    assert approval_claims.unrun_approval_note("Anything else I can help with?", ctx.deps)
+
+
+def test_an_action_that_ran_needs_no_note():
+    ctx = _approved(still_waiting=False)  # the gate removes it when it executes
+    assert approval_claims.require_approved_action_ran(ctx, "Created the project.") == "Created the project."
+    assert approval_claims.unrun_approval_note("Created the project.", ctx.deps) is None
+
+
+def test_a_typed_message_only_counts_when_the_reply_claims_it_was_done():
+    # "ok thanks" now reaches the model as typed. Answering it is fine;
+    # answering "created" is not.
+    ctx = _approved(mode="typed_single")
+    polite = "You're welcome! The Create project card is still waiting for your approval."
+    assert approval_claims.require_approved_action_ran(ctx, polite) == polite
+    assert approval_claims.unrun_approval_note(polite, ctx.deps) is None
+    with pytest.raises(ModelRetry) as retry:
+        approval_claims.require_approved_action_ran(ctx, CLAIM)
+    assert "acknowledgement" in str(retry.value)
+    assert approval_claims.unrun_approval_note(CLAIM, ctx.deps)
+
+
+def test_a_typed_question_about_something_else_is_not_a_claim_about_the_card():
+    """A Create project card waits and the user asks an unrelated question.
+    The answer reports something as done, but not the card's action."""
+    ctx = _approved(mode="typed_single")
+    answer = "Three files were added last week."
+    assert approval_claims.require_approved_action_ran(ctx, answer) == answer
+    assert approval_claims.unrun_approval_note(answer, ctx.deps) is None
+    assert ctx.deps.unrun_approval_retry_used is False
+
+
+def test_a_typed_message_is_never_told_to_run_the_action():
+    """A typed message got here without being recognised as an approval, so
+    the retry must not have the model call the tool."""
+    ctx = _approved(mode="typed_single")
+    with pytest.raises(ModelRetry) as retry:
+        approval_claims.require_approved_action_ran(ctx, CLAIM)
+    text = str(retry.value)
+    assert "Do not call create_project" in text
+    assert "confirmed=true" not in text
+
+
+def test_a_turn_that_approved_nothing_is_left_alone():
+    ctx = _approved(mode="none")
+    ctx.deps.approved_confirmations = frozenset()
+    assert approval_claims.require_approved_action_ran(ctx, CLAIM) == CLAIM
+    assert approval_claims.unrun_approval_note(CLAIM, ctx.deps) is None
+
+
+def test_the_unrun_validator_is_registered_and_the_reminder_rules_out_thanks():
+    import inspect
+
+    from app.services import llm_service
+    from app.services.approval_scope import approval_reminder, decide
+
+    assert "require_approved_action_ran" in inspect.getsource(llm_service)
+    pending = [{"fp": "fp-project", "turn": 3, "tool": "create_project", "label": "Create project", "call_id": "c"}]
+    note = approval_reminder(decide(pending), pending)
+    assert "thank-you" in note and "is not an approval" in note
+    assert "Never say the step was done unless you ran it" in note
+
+
+def test_a_turn_can_send_a_reply_back_more_than_once():
+    """Each reply check retries at most once, but the library allows one retry
+    per turn by default: two different checks failing in a row ended the turn
+    with an error. The chat agent is built with room for a few."""
+    import inspect
+
+    from app.services import llm_service
+
+    assert llm_service.CHAT_OUTPUT_RETRIES >= 2
+    assert 'retries={"output": CHAT_OUTPUT_RETRIES}' in inspect.getsource(llm_service.create_agentic_chat_agent)

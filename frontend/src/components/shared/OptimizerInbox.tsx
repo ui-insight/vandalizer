@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import {
   AlertTriangle,
   BookOpen,
@@ -79,17 +79,17 @@ const CATEGORY_ORDER: OptimizerInboxCategory[] = [
 const CATEGORY_META: Record<OptimizerInboxCategory, { title: string; blurb: string }> = {
   needs_review: {
     title: 'Ready to review',
-    blurb: 'A tuning run found a better configuration. Nothing changes until you apply it.',
+    blurb: 'A tuning run found a better configuration. Nothing changes until you apply it. Applying replaces the settings used by future runs; inspect a comparison first.',
   },
   failed: {
     title: 'Tuning failed',
     blurb: 'These runs stopped before producing a suggestion.',
   },
   in_flight: { title: 'Tuning now', blurb: 'Runs still in progress.' },
-  applied: { title: 'Applied', blurb: 'These configurations are live on the item.' },
+  applied: { title: 'Applied', blurb: 'Previously applied configurations. Each row identifies whether it is still live.' },
   no_change: {
     title: 'No change recommended',
-    blurb: 'The best configuration found was no better than the current one.',
+    blurb: 'The best configuration found was no better than the tested baseline.',
   },
   cancelled: { title: 'Cancelled', blurb: 'Runs cancelled before finishing.' },
   dismissed: { title: 'Dismissed', blurb: 'Suggestions you decided against.' },
@@ -108,6 +108,8 @@ function triggerSentence(item: OptimizerInboxItem): string {
 export function OptimizerInbox() {
   const { toast } = useToast()
   const confirm = useConfirm()
+  const requestVersion = useRef(0)
+  const mutationPending = useRef(false)
   const [data, setData] = useState<OptimizerInboxResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -122,21 +124,24 @@ export function OptimizerInbox() {
   /** Returns whether the fetch succeeded, so a caller can tell a real refresh
    *  from one that only produced an error banner. */
   const load = useCallback(async (includeDismissed: boolean): Promise<boolean> => {
+    const version = ++requestVersion.current
     setLoading(true)
     setError(null)
     try {
-      setData(await getOptimizerInbox({ includeDismissed }))
+      const result = await getOptimizerInbox({ includeDismissed })
+      if (version !== requestVersion.current) return false
+      setData(result)
       setLoadedAt(new Date().toISOString())
       return true
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load tuning suggestions')
+      if (version === requestVersion.current) setError(e instanceof Error ? e.message : 'Failed to load tuning suggestions')
       return false
     } finally {
-      setLoading(false)
+      if (version === requestVersion.current) setLoading(false)
     }
   }, [])
 
-  useEffect(() => { void load(showDismissed) }, [load, showDismissed])
+  useEffect(() => { const guard = requestVersion; void load(showDismissed); return () => { guard.current++ } }, [load, showDismissed])
 
   // A manual refresh that returns the same rows looks like a dead button, so
   // acknowledge it explicitly for a beat after the request lands.
@@ -157,6 +162,8 @@ export function OptimizerInbox() {
   }, [load, showDismissed])
 
   const applyItem = useCallback(async (item: OptimizerInboxItem) => {
+    if (mutationPending.current) return
+    mutationPending.current = true
     setBusyRun(item.run_uuid)
     try {
       if (item.surface === 'kb') {
@@ -172,6 +179,7 @@ export function OptimizerInbox() {
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Apply failed', 'error')
     } finally {
+      mutationPending.current = false
       setBusyRun(null)
     }
   }, [toast, load, showDismissed])
@@ -192,6 +200,8 @@ export function OptimizerInbox() {
   }, [confirm, applyItem])
 
   const handleDismiss = useCallback(async (item: OptimizerInboxItem) => {
+    if (mutationPending.current) return
+    mutationPending.current = true
     setBusyRun(item.run_uuid)
     try {
       await dismissOptimizerCandidate(item.surface, item.run_uuid)
@@ -199,11 +209,14 @@ export function OptimizerInbox() {
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Dismiss failed', 'error')
     } finally {
+      mutationPending.current = false
       setBusyRun(null)
     }
   }, [toast, load, showDismissed])
 
   const handleRestore = useCallback(async (item: OptimizerInboxItem) => {
+    if (mutationPending.current) return
+    mutationPending.current = true
     setBusyRun(item.run_uuid)
     try {
       await restoreOptimizerCandidate(item.surface, item.run_uuid)
@@ -211,6 +224,7 @@ export function OptimizerInbox() {
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Restore failed', 'error')
     } finally {
+      mutationPending.current = false
       setBusyRun(null)
     }
   }, [toast, load, showDismissed])
@@ -227,7 +241,7 @@ export function OptimizerInbox() {
 
   if (loading && !data) {
     return (
-      <div style={{ padding: 32, textAlign: 'center', color: '#6b7280' }}>
+      <div style={{ padding: 'var(--workspace-space-32)', textAlign: 'center', color: '#6b7280' }}>
         <Loader2 className="animate-spin" style={{ width: 18, height: 18, margin: '0 auto' }} />
       </div>
     )
@@ -236,12 +250,12 @@ export function OptimizerInbox() {
   if (error) {
     return (
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 10, padding: 16,
-        background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8,
-        color: '#991b1b', fontSize: 13,
+        display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)', padding: 'var(--workspace-space-16)',
+        background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--workspace-radius-medium)',
+        color: '#991b1b', fontSize: 'var(--workspace-font-control)',
       }}>
         <AlertTriangle style={{ width: 16, height: 16, flexShrink: 0 }} />
-        <span style={{ flex: 1 }}>{error}</span>
+        <span role="alert" style={{ flex: 1 }}>{error}</span>
         <button onClick={() => void load(showDismissed)} style={secondaryButton}>Retry</button>
       </div>
     )
@@ -253,19 +267,19 @@ export function OptimizerInbox() {
   return (
     <div>
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 12,
-        flexWrap: 'wrap', marginBottom: 16,
+        display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)',
+        flexWrap: 'wrap', marginBottom: 'var(--workspace-space-16)',
       }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 'var(--workspace-space-8)', flexWrap: 'wrap' }}>
           <Stat label="Ready to review" value={counts?.needs_review ?? 0} tone="action" />
           <Stat label="Failed" value={counts?.failed ?? 0} tone={counts?.failed ? 'bad' : 'neutral'} />
           <Stat label="Tuning now" value={counts?.in_flight ?? 0} tone="neutral" />
           <Stat label="Applied" value={counts?.applied ?? 0} tone="good" />
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-12)' }}>
           <label style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            fontSize: 12, color: '#4b5563', cursor: 'pointer',
+            display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+            fontSize: 'var(--workspace-font-meta)', color: '#4b5563', cursor: 'pointer',
           }}>
             <input
               type="checkbox"
@@ -276,8 +290,8 @@ export function OptimizerInbox() {
           </label>
           {loadedAt && !loading && (
             <span style={{
-              fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4,
-              color: justRefreshed ? '#166534' : '#9ca3af',
+              fontSize: 'var(--workspace-font-meta)', display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+              color: justRefreshed ? '#166534' : 'var(--ui-text-muted, #59616b)',
             }}>
               {justRefreshed && <CheckCircle2 style={{ width: 11, height: 11 }} />}
               Updated {relativeTime(loadedAt).toLowerCase()}
@@ -296,14 +310,14 @@ export function OptimizerInbox() {
 
       {!hasRows ? (
         <div style={{
-          padding: 24, background: '#fff', border: '1px solid #e5e7eb',
-          borderRadius: 8, textAlign: 'center',
+          padding: 'var(--workspace-space-24)', background: '#fff', border: "1px solid var(--workspace-border)",
+          borderRadius: 'var(--workspace-radius-medium)', textAlign: 'center',
         }}>
-          <Inbox style={{ width: 20, height: 20, color: '#9ca3af', margin: '0 auto 8px' }} />
-          <div style={{ fontSize: 14, color: '#374151', fontWeight: 600 }}>
+          <Inbox style={{ width: 20, height: 20, color: 'var(--ui-text-muted, #59616b)', margin: "0 auto var(--workspace-space-8)" }} />
+          <div style={{ fontSize: 'var(--workspace-font-body)', color: '#374151', fontWeight: 600 }}>
             Nothing waiting for review
           </div>
-          <div style={{ marginTop: 4, fontSize: 12, color: '#6b7280', maxWidth: 460, margin: '4px auto 0' }}>
+          <div style={{ marginTop: 'var(--workspace-space-4)', fontSize: 'var(--workspace-font-meta)', color: '#6b7280', maxWidth: 460, margin: "var(--workspace-space-4) auto 0" }}>
             When quality slips on a workflow, extraction set, or knowledge base, the
             system tunes it in the background and the candidate fix shows up here.
             Failed tuning runs show up here too.
@@ -315,21 +329,21 @@ export function OptimizerInbox() {
           if (!items?.length) return null
           const meta = CATEGORY_META[category]
           return (
-            <section key={category} style={{ marginBottom: 24 }}>
+            <section key={category} style={{ marginBottom: 'var(--workspace-space-24)' }}>
               <h2 style={{
-                fontSize: 13, fontWeight: 700, color: '#111827',
-                margin: '0 0 2px', display: 'flex', alignItems: 'center', gap: 6,
+                fontSize: 'var(--workspace-font-control)', fontWeight: 700, color: '#111827',
+                margin: "0 0 var(--workspace-space-2)", display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
               }}>
                 {meta.title}
                 <span style={{ fontWeight: 500, color: '#6b7280' }}>({items.length})</span>
               </h2>
-              <p style={{ fontSize: 12, color: '#6b7280', margin: '0 0 8px' }}>{meta.blurb}</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <p style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', margin: "0 0 var(--workspace-space-8)" }}>{meta.blurb}</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-8)' }}>
                 {items.map(item => (
                   <Row
                     key={`${item.surface}:${item.run_uuid}`}
                     item={item}
-                    busy={busyRun === item.run_uuid}
+                    busy={busyRun !== null}
                     onApply={() => void handleApplyClick(item)}
                     onDismiss={() => void handleDismiss(item)}
                     onRestore={() => void handleRestore(item)}
@@ -342,7 +356,7 @@ export function OptimizerInbox() {
       )}
 
       {data && (
-        <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
+        <p style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--ui-text-muted, #59616b)', marginTop: 'var(--workspace-space-4)' }}>
           Showing the last {data.lookback_days} days. Older runs stay in each item's
           Validate &amp; improve history.
         </p>
@@ -385,65 +399,65 @@ function Row({ item, busy, onApply, onDismiss, onRestore }: {
     <article style={{
       background: '#fff',
       border: `1px solid ${isFailed ? '#fecaca' : '#e5e7eb'}`,
-      borderRadius: 8, padding: '12px 14px',
-      opacity: isDismissed ? 0.7 : 1,
+      borderRadius: 'var(--workspace-radius-medium)', padding: "var(--workspace-space-12) var(--workspace-space-16)",
+
     }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 'var(--workspace-space-12)' }}>
         <span
           title={meta.label}
           style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            width: 26, height: 26, borderRadius: 6, flexShrink: 0,
+            width: 26, height: 26, borderRadius: 'var(--workspace-radius-small)', flexShrink: 0,
             background: `${meta.color}14`, color: meta.color,
           }}
         >
           <Icon style={{ width: 14, height: 14 }} />
         </span>
 
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>
+        <div style={{ flex: '1 1 220px', minWidth: 0, overflowWrap: 'anywhere' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--workspace-space-8)', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#111827' }}>
               {item.item_name}
             </span>
-            <span style={{ fontSize: 11, color: '#6b7280' }}>{meta.label}</span>
+            <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>{meta.label}</span>
             {when && (
-              <span style={{ fontSize: 11, color: '#9ca3af' }}>· {relativeTime(when)}</span>
+              <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--ui-text-muted, #59616b)' }}>· {relativeTime(when)}</span>
             )}
           </div>
 
-          <div style={{ fontSize: 12, color: '#4b5563', marginTop: 3 }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#4b5563', marginTop: 'var(--workspace-space-4)' }}>
             {triggerSentence(item)}
           </div>
 
           {isFailed ? (
             <div style={{
-              marginTop: 8, padding: '8px 10px', background: '#fef2f2',
-              borderRadius: 6, fontSize: 12, color: '#991b1b',
+              marginTop: 'var(--workspace-space-8)', padding: "var(--workspace-space-8) var(--workspace-space-12)", background: '#fef2f2',
+              borderRadius: 'var(--workspace-radius-small)', fontSize: 'var(--workspace-font-meta)', color: '#991b1b',
             }}>
               <strong style={{ fontWeight: 600 }}>
                 {item.error_code ? item.error_code.replace(/_/g, ' ') : 'Run failed'}
               </strong>
               {item.error_message && (
-                <div style={{ marginTop: 2, color: '#7f1d1d', wordBreak: 'break-word' }}>
+                <div style={{ marginTop: 'var(--workspace-space-2)', color: '#7f1d1d', wordBreak: 'break-word' }}>
                   {item.error_message}
                 </div>
               )}
             </div>
           ) : item.category === 'in_flight' ? (
-            <div style={{ marginTop: 6, fontSize: 12, color: '#0050d7', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ marginTop: 'var(--workspace-space-6)', fontSize: 'var(--workspace-font-meta)', color: '#0050d7', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)' }}>
               <Loader2 className="animate-spin" style={{ width: 12, height: 12 }} />
               {item.progress_message || item.phase || 'Running'}
             </div>
           ) : (
-            <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ marginTop: 'var(--workspace-space-6)', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)', flexWrap: 'wrap' }}>
               <span style={{
-                fontSize: 12, color: '#374151', fontVariantNumeric: 'tabular-nums',
+                fontSize: 'var(--workspace-font-meta)', color: '#374151', fontVariantNumeric: 'tabular-nums',
               }}>
                 Score {pct(item.baseline_score)} → <strong>{pct(item.score)}</strong>
               </span>
               {lift != null && (
                 <span style={{
-                  fontSize: 12, fontWeight: 600,
+                  fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
                   color: lift > 0 ? '#166534' : lift < 0 ? '#b3261e' : '#6b7280',
                   fontVariantNumeric: 'tabular-nums',
                 }}>
@@ -451,7 +465,7 @@ function Row({ item, busy, onApply, onDismiss, onRestore }: {
                 </span>
               )}
               {preview && (
-                <span style={{ fontSize: 12, color: '#4b5563' }}>
+                <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#4b5563' }}>
                   {preview.will_change} of {preview.total} {meta.itemNounPlural} change
                   {preview.regressions > 0 && (
                     <span style={{ color: '#9a3412' }}>
@@ -464,31 +478,35 @@ function Row({ item, busy, onApply, onDismiss, onRestore }: {
               {item.overfitting_warning && (
                 <span
                   title="Too few test items to hold any back, so the score is measured on the same data the tuner optimized against."
-                  style={{ fontSize: 11, color: '#9a3412', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                  style={{ fontSize: 'var(--workspace-font-meta)', color: '#9a3412', display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)' }}
                 >
                   <AlertTriangle style={{ width: 11, height: 11 }} />
-                  in-sample score
+                  In-sample score — tested on the same examples used for tuning
                 </span>
               )}
             </div>
           )}
 
-          {item.category === 'applied' && (
-            <div style={{ marginTop: 6, fontSize: 12, color: '#166534', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+          {item.score != null && <p style={{ margin: '8px 0 0', fontSize: 'var(--workspace-font-meta)', color: '#59616b', lineHeight: 1.5 }}>Recorded test score, on a 0–100 scale.{item.judge_model && ` Grader: ${item.judge_model}.`} Compare the failures and regressions before applying; this does not establish correctness on new documents.</p>}
+          {item.reverted_at && <p style={{ fontSize: 'var(--workspace-font-meta)', color: '#59616b' }}>Reverted {relativeTime(item.reverted_at)}; this suggestion is not the live configuration.</p>}
+          {item.category === 'applied' && item.is_live && (
+            <div style={{ marginTop: 'var(--workspace-space-6)', fontSize: 'var(--workspace-font-meta)', color: '#166534', display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)' }}>
               <CheckCircle2 style={{ width: 12, height: 12 }} />
               Live on this item{item.applied_at ? ` since ${relativeTime(item.applied_at)}` : ''}
             </div>
           )}
 
+          {item.category === 'applied' && !item.is_live && !item.reverted_at && <p style={{ fontSize: 'var(--workspace-font-meta)', color: '#59616b' }}>Applied earlier; not the current live configuration.</p>}
+
           {item.category === 'no_change' && (
-            <div style={{ marginTop: 6, fontSize: 12, color: '#6b7280', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <div style={{ marginTop: 'var(--workspace-space-6)', fontSize: 'var(--workspace-font-meta)', color: '#6b7280', display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)' }}>
               <MinusCircle style={{ width: 12, height: 12 }} />
-              Statistically tied with the current settings — nothing to apply.
+              Statistically tied with the tested baseline — nothing to apply.
             </div>
           )}
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'stretch' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-6)', alignItems: 'stretch' }}>
           {item.category === 'needs_review' && item.can_manage && (
             <button onClick={onApply} disabled={!canAct} style={primaryButton}>
               {busy ? <Loader2 className="animate-spin" style={{ width: 12, height: 12 }} /> : <Sparkles style={{ width: 12, height: 12 }} />}
@@ -545,9 +563,9 @@ function Stat({ label, value, tone }: {
   const c = colors[tone]
   return (
     <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 6,
-      padding: '4px 10px', borderRadius: 999,
-      background: c.bg, color: c.fg, fontSize: 12, fontWeight: 600,
+      display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+      padding: "var(--workspace-space-4) var(--workspace-space-12)", borderRadius: 999,
+      background: c.bg, color: c.fg, fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
     }}>
       <span style={{ fontVariantNumeric: 'tabular-nums' }}>{value}</span>
       <span style={{ fontWeight: 500 }}>{label}</span>
@@ -556,8 +574,8 @@ function Stat({ label, value, tone }: {
 }
 
 const baseButton: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-  padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--workspace-space-6)',
+  padding: "var(--workspace-space-6) var(--workspace-space-12)", borderRadius: 'var(--workspace-radius-small)', fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
   cursor: 'pointer', whiteSpace: 'nowrap',
 }
 
@@ -568,5 +586,5 @@ const primaryButton: React.CSSProperties = {
 
 const secondaryButton: React.CSSProperties = {
   ...baseButton,
-  background: '#fff', color: '#374151', border: '1px solid #d1d5db',
+  background: '#fff', color: '#374151', border: "1px solid var(--workspace-border)",
 }

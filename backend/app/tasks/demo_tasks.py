@@ -1,21 +1,34 @@
 """Celery periodic tasks for the demo waitlist system."""
 
+from __future__ import annotations
+from collections.abc import Coroutine
+from typing import Any, TypeVar
+
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from celery import Task
+
+
 import logging
 
 from app.celery_app import celery_app
 from app.tasks import TRANSIENT_EXCEPTIONS, run_task_async
 from app.config import Settings
 
+T = TypeVar("T")
+
 logger = logging.getLogger(__name__)
 
 
-def _run_async(coro):
+def _run_async(coro: Coroutine[Any, Any, T]) -> T:
     """Run an async coroutine from sync Celery task context, releasing the
     loop's pooled LLM HTTP client on teardown (see ``run_task_async``)."""
     return run_task_async(coro)
 
 
-async def _init_and_sweep_budgets():
+async def _init_and_sweep_budgets() -> dict:
     from app.database import init_db
     from app.services import demo_service
 
@@ -24,7 +37,7 @@ async def _init_and_sweep_budgets():
     return await demo_service.sweep_trial_budgets(settings)
 
 
-async def _init_and_process_recapture():
+async def _init_and_process_recapture() -> int:
     from app.database import init_db
     from app.services import demo_service
 
@@ -33,7 +46,7 @@ async def _init_and_process_recapture():
     return await demo_service.process_recapture_drips(settings)
 
 
-async def _init_and_enqueue_recapture_all():
+async def _init_and_enqueue_recapture_all() -> int:
     from app.database import init_db
     from app.services import demo_service
 
@@ -50,7 +63,7 @@ async def _init_and_enqueue_recapture_all():
     max_retries=2,
     default_retry_delay=30,
 )
-def sweep_trial_budgets(self):
+def sweep_trial_budgets(self: Task) -> dict:
     """Advance the trial token lifecycle: running-low warnings, then exhaustion."""
     return _run_async(_init_and_sweep_budgets())
 
@@ -63,7 +76,7 @@ def sweep_trial_budgets(self):
     max_retries=2,
     default_retry_delay=30,
 )
-def process_demo_recapture(self):
+def process_demo_recapture(self: Task) -> dict[str, int]:
     """Send recapture drip emails to activated users who haven't logged in."""
     count = _run_async(_init_and_process_recapture())
     return {"recapture_sent": count}
@@ -77,7 +90,7 @@ def process_demo_recapture(self):
     max_retries=2,
     default_retry_delay=30,
 )
-def enqueue_recapture_all(self):
+def enqueue_recapture_all(self: Task) -> dict[str, int]:
     """Admin-triggered: enqueue recapture drips for all eligible active demo users."""
     count = _run_async(_init_and_enqueue_recapture_all())
     return {"enqueued": count}

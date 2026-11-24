@@ -9,8 +9,9 @@ from app.services import access_control, audit_service
 
 logger = logging.getLogger(__name__)
 
-# Documents a folder expansion hands on: not retention soft-deleted.
-LIVE_DOCUMENT_FILTER: dict[str, object] = {"soft_deleted": {"$ne": True}}
+# Documents a folder expansion hands on: not retention soft-deleted, and the
+# current version of each document (older versions point at their successor).
+LIVE_DOCUMENT_FILTER: dict[str, object] = {"soft_deleted": {"$ne": True}, "superseded_by": None}
 
 
 def _safe_component(name: str) -> str:
@@ -27,7 +28,7 @@ async def create_folder(
 ) -> SmartFolder:
     parent_folder: SmartFolder | None = None
     if parent_id != "0":
-        parent_folder = await access_control.get_authorized_folder(parent_id, user)
+        parent_folder = await access_control.get_authorized_folder(parent_id, user, contribute=True)
         if not parent_folder:
             raise ValueError("Parent folder not found.")
 
@@ -193,6 +194,8 @@ async def convert_to_team_folder(folder_uuid: str, user: User) -> SmartFolder:
 
     # Refresh and return
     folder = await SmartFolder.find_one(SmartFolder.uuid == folder_uuid)
+    if folder is None:
+        raise ValueError("The folder is no longer available after the ownership change.")
     return folder
 
 
@@ -251,9 +254,9 @@ async def expand_folders_to_document_uuids(
 
     Each root folder must be viewable by the user (raises ValueError otherwise);
     documents are additionally filtered by per-document view access. Returns a
-    de-duplicated, order-preserving list. Soft-deleted documents are left out.
-    Used by "Run workflow on folder", folders ticked in Files for a workflow
-    run, and "Add folder to knowledge base".
+    de-duplicated, order-preserving list. Superseded versions and soft-deleted
+    documents are left out. Used by "Run workflow on folder", folders ticked in
+    Files for a workflow run, and "Add folder to knowledge base".
     """
     team_access = await access_control.get_team_access_context(user)
 
@@ -277,8 +280,8 @@ async def expand_folders_to_document_uuids(
             ).to_list()
             frontier = [c.uuid for c in children if c.uuid not in seen_folders]
 
-    # Nothing retention has soft-deleted: the same documents Files lists and
-    # chat's folder expansion uses.
+    # Current versions only, and nothing retention has soft-deleted: the same
+    # documents Files lists and chat's folder expansion uses.
     docs = await SmartDocument.find(
         {"folder": {"$in": folder_uuid_set}, **LIVE_DOCUMENT_FILTER}
     ).to_list()
@@ -287,7 +290,7 @@ async def expand_folders_to_document_uuids(
     for doc in docs:
         if doc.uuid in seen_docs:
             continue
-        if access_control.can_view_document(doc, user, team_access, allow_admin=True):
+        if await access_control.get_authorized_document(doc.uuid, user, team_access=team_access, allow_admin=True):
             result.append(doc.uuid)
             seen_docs.add(doc.uuid)
     return result
@@ -325,6 +328,8 @@ async def convert_to_personal_folder(
     )
 
     folder = await SmartFolder.find_one(SmartFolder.uuid == folder_uuid)
+    if folder is None:
+        raise ValueError("The folder is no longer available after the ownership change.")
     return folder
 
 

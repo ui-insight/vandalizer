@@ -17,7 +17,9 @@ export function isUnappliedUpload(result: DuplicateUploadResult): boolean {
 
 export const IDENTICAL_UPLOAD_NOTE = 'Already here with the same content. Nothing was changed.'
 
-const ADVICE = 'To use the new one, rename it or delete the existing file first, then upload again.'
+// Upload new version needs edit rights on the existing file; a team member
+// without them (a teammate's file in a team folder) can still rename theirs.
+const ADVICE = 'To update it, choose Upload new version on the existing file. If you can\u2019t change that file, rename yours and upload it again.'
 
 export function unappliedUploadMessage(
   fileName: string,

@@ -1,8 +1,9 @@
 """Request/response models for extraction endpoints."""
 
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+from app.schemas.skills import WHEN_TO_USE_MAX
 from app.utils.naming import EntityName, OptionalEntityName
 
 
@@ -14,11 +15,15 @@ class CreateSearchSetRequest(BaseModel):
     title: EntityName
     set_type: str = "extraction"
     extraction_config: Optional[dict] = None
+    # Skills only: the author's line on which tasks the Skill is for.
+    when_to_use: Optional[str] = Field(default=None, max_length=WHEN_TO_USE_MAX)
 
 
 class UpdateSearchSetRequest(BaseModel):
     title: OptionalEntityName = None
     extraction_config: Optional[dict] = None
+    # Skills only. Omitted keeps the saved line; an empty string clears it.
+    when_to_use: Optional[str] = Field(default=None, max_length=WHEN_TO_USE_MAX)
 
 
 class SearchSetItemRequest(BaseModel):
@@ -27,6 +32,7 @@ class SearchSetItemRequest(BaseModel):
     title: Optional[str] = None
     is_optional: bool = False
     enum_values: list[str] = []
+    description: Optional[str] = None
 
 
 class UpdateSearchSetItemRequest(BaseModel):
@@ -34,6 +40,7 @@ class UpdateSearchSetItemRequest(BaseModel):
     title: Optional[str] = None
     is_optional: Optional[bool] = None
     enum_values: Optional[list[str]] = None
+    description: Optional[str] = None
 
 
 class ReorderItemsRequest(BaseModel):
@@ -95,6 +102,7 @@ class SearchSetItemResponse(BaseModel):
     title: Optional[str] = None
     is_optional: bool = False
     enum_values: list[str] = []
+    description: Optional[str] = None
     pdf_binding: Optional[str] = None
 
 

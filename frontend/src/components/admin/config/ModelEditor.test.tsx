@@ -18,6 +18,7 @@ const mockSetDefaultModel = vi.fn()
 const mockTestModel = vi.fn()
 const mockProbeModel = vi.fn()
 const mockSetLongDocumentModel = vi.fn()
+const mockProbeSavedWindow = vi.fn()
 
 vi.mock('../../../api/admin', () => ({
   addModel: (...a: unknown[]) => mockAddModel(...a),
@@ -27,6 +28,7 @@ vi.mock('../../../api/admin', () => ({
   testModel: (...a: unknown[]) => mockTestModel(...a),
   probeModel: (...a: unknown[]) => mockProbeModel(...a),
   setLongDocumentModel: (...a: unknown[]) => mockSetLongDocumentModel(...a),
+  probeSavedModelContextWindow: (...a: unknown[]) => mockProbeSavedWindow(...a),
 }))
 
 const mockConfirm = vi.fn()
@@ -109,8 +111,10 @@ describe('ModelEditor — save path', () => {
 
     // Step 1 — pick a provider; its preset fills in the technical fields.
     fireEvent.click(screen.getByRole('button', { name: /OpenAI GPT models from the OpenAI API\./ }))
-    // Step 2 — the admin only has to supply a name.
+    // Step 2 — a name, and the context window: OpenAI's API doesn't report
+    // one, so the admin enters it from the model card.
     fireEvent.change(screen.getByLabelText('Model name'), { target: { value: 'gpt-4o-mini' } })
+    fireEvent.change(screen.getByLabelText('Context window (tokens)'), { target: { value: '128000' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save & test connection' }))
 
     await waitFor(() => expect(mockAddModel).toHaveBeenCalledTimes(1))
@@ -120,6 +124,8 @@ describe('ModelEditor — save path', () => {
       api_protocol: 'openai',
       endpoint: 'https://api.openai.com/v1',
       external: true,
+      context_window: 128000,
+      context_window_source: 'entered',
     }))
 
     // The new list is handed back to the parent, and the connection test runs
@@ -380,5 +386,66 @@ describe('ModelEditor — first-run wizard hook', () => {
 
     act(() => ref.current?.openFirstRunWizard())
     expect(screen.getByLabelText('Model name')).toHaveValue('half-typed')
+  })
+})
+
+
+// Every context budget depends on the window, so it is detected from the
+// server or entered, never defaulted (ticket: a 1M-class model on dev was
+// budgeted as 65,536 tokens and cut a spreadsheet on the first question).
+describe('ModelEditor — context window', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockAddModel.mockResolvedValue({ status: 'ok', models: [...MODELS, { id: 'model-new', name: 'gpt-oss-120b', tag: 'openai', external: true, thinking: false }] })
+    mockTestModel.mockResolvedValue({ ok: true, checks: [], summary: 'ok' })
+  })
+
+  function openOpenAiForm(name: string) {
+    renderPanel()
+    fireEvent.click(screen.getByRole('button', { name: /Add Model/ }))
+    fireEvent.click(screen.getByRole('button', { name: /OpenAI GPT models from the OpenAI API\./ }))
+    fireEvent.change(screen.getByLabelText('Model name'), { target: { value: name } })
+  }
+
+  it('starts empty and fills in the window the server reports, without a click', async () => {
+    mockProbeModel.mockResolvedValue({ context_window: 131072, source: 'vllm_max_model_len', detail: null, raw: null })
+    openOpenAiForm('gpt-oss-120b')
+    const field = screen.getByLabelText('Context window (tokens)') as HTMLInputElement
+    expect(field.value).toBe('')
+    await waitFor(() => expect(field.value).toBe('131072'), { timeout: 3000 })
+    expect(screen.getByText(/Detected 131,072 tokens from the server/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Save & test connection' }))
+    await waitFor(() => expect(mockAddModel).toHaveBeenCalledWith(expect.objectContaining({ context_window: 131072, context_window_source: 'detected' })))
+  })
+
+  it('refuses to save without a window when the server reports none', async () => {
+    mockProbeModel.mockResolvedValue({ context_window: null, source: 'openai_no_field', detail: 'No context length reported.', raw: null })
+    openOpenAiForm('gpt-4o-mini')
+    fireEvent.click(screen.getByRole('button', { name: 'Save & test connection' }))
+    await waitFor(() => expect(onError).toHaveBeenCalledWith(expect.stringMatching(/Enter the model's context window/)))
+    expect(mockAddModel).not.toHaveBeenCalled()
+  })
+
+  it('asks before replacing a window the admin typed', async () => {
+    mockProbeModel.mockResolvedValue({ context_window: 65536, source: 'vllm_max_model_len', detail: null, raw: null })
+    openOpenAiForm('kimi-k3')
+    const field = screen.getByLabelText('Context window (tokens)') as HTMLInputElement
+    fireEvent.change(field, { target: { value: '131072' } })
+    await waitFor(() => expect(screen.getByText(/The server reports 65,536 tokens; you entered 131,072/)).toBeInTheDocument(), { timeout: 3000 })
+    expect(field.value).toBe('131072')
+    fireEvent.click(screen.getByRole('button', { name: 'Use 65,536' }))
+    expect(field.value).toBe('65536')
+  })
+
+  it('flags a saved model whose window was never confirmed, and checks it in one click', async () => {
+    const legacy = { ...MODELS[0], context_window_status: 'unconfirmed' as const }
+    const fixed = { ...legacy, context_window: 128000, context_window_source: 'detected' as const, context_window_status: 'detected' as const }
+    mockProbeSavedWindow.mockResolvedValue({ probe: { context_window: 128000, source: 'openrouter_context_length', detail: null, raw: null }, applied: true, entered_differs: false, models: [fixed, MODELS[1]] })
+    renderPanel([legacy, MODELS[1]])
+    expect(screen.getByText('Context window not confirmed (128,000)')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: "Check gpt-4o's context window with its server" }))
+    await waitFor(() => expect(mockProbeSavedWindow).toHaveBeenCalledWith('model-alpha', false))
+    expect(await screen.findByText('Detected 128,000 tokens from the server.')).toBeInTheDocument()
+    expect(onConfigPatch).toHaveBeenCalledWith({ available_models: [fixed, MODELS[1]] })
   })
 })

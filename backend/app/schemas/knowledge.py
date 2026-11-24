@@ -43,6 +43,7 @@ class ConvertDocumentsRequest(BaseModel):
 
 class ShareKBRequest(BaseModel):
     comment: Optional[str] = None
+    shared_with_team: bool | None = None  # omitted by legacy toggle clients
 
 
 class AddUrlsRequest(BaseModel):
@@ -50,6 +51,14 @@ class AddUrlsRequest(BaseModel):
     crawl_enabled: bool = False
     max_crawl_pages: int = 5
     allowed_domains: str = ""  # comma-separated hosts, optionally with path prefixes (example.com/irb)
+
+
+class SuggestSourcesRequest(BaseModel):
+    topic: str
+
+
+class ReadSitemapRequest(BaseModel):
+    url: str
 
 
 class CommitUrlPreviewRequest(BaseModel):
@@ -259,6 +268,7 @@ class KBResponse(BaseModel):
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
     # Scope & ownership fields for the UI
+    team_id: Optional[str] = None
     user_id: Optional[str] = None
     scope: Optional[str] = None  # "mine" | "team" | "verified" | "reference"
     is_reference: bool = False
@@ -287,6 +297,8 @@ class KBResponse(BaseModel):
     last_validation_score: Optional[float] = None
     last_validation_baseline_score: Optional[float] = None
     last_validation_lift: Optional[float] = None
+    last_validation_metric: Optional[Literal["answer_accuracy", "composite_quality"]] = None
+    last_validation_config_state: Optional[Literal["proposed", "applied", "reverted", "default", "no_improvement"]] = None
     last_validated_at: Optional[str] = None
     # Per-requesting-user: when this user last chatted with the KB. Powers the
     # "Recently Used" sort. None = never used (or legacy pre-tracking usage).

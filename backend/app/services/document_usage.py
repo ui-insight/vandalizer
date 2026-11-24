@@ -143,7 +143,7 @@ def build_workflow_entries(
     steps_by_id = {str(s.id): s for s in steps}
     entries: dict[str, dict[str, Any]] = {}
 
-    def _entry(wf) -> dict[str, Any]:
+    def _entry(wf: Workflow) -> dict[str, Any]:
         key = str(wf.id)
         if key not in entries:
             entries[key] = {"id": key, "name": wf.name, "uses": []}

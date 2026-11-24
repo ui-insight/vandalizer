@@ -1,14 +1,25 @@
 """Approval lifecycle Celery tasks (timeout sweeper)."""
 
+from __future__ import annotations
+from collections.abc import Coroutine
+from typing import Any, TypeVar
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from celery import Task
+
+
 import logging
 
 from app.celery_app import celery
 from app.tasks import TRANSIENT_EXCEPTIONS, run_task_async
 
 logger = logging.getLogger(__name__)
+T = TypeVar('T')
 
 
-def _run_async(coro):
+def _run_async(coro: Coroutine[Any, Any, T]) -> T:
     """Run an async coroutine from sync Celery task context, releasing the
     loop's pooled LLM HTTP client on teardown (see ``run_task_async``)."""
     return run_task_async(coro)
@@ -22,12 +33,12 @@ def _run_async(coro):
     max_retries=2,
     default_retry_delay=10,
 )
-def expire_overdue_approvals_task(self):
+def expire_overdue_approvals_task(self: Task) -> dict:
     """Find overdue pending approvals and apply their configured timeout_action.
 
     Scheduled via Celery beat (see celery_app.py beat_schedule).
     """
-    async def _run():
+    async def _run() -> dict:
         from app.config import Settings
         from app.database import init_db
         from app.services.approval_service import expire_overdue_approvals

@@ -54,6 +54,7 @@ async def test_ticked_folders_run_on_their_documents(client):  # noqa: F811
     )
     assert resp.status_code == 200
     assert run.await_args.args[1] == ["D1", "D2", "D3"]
+    assert activity_start.await_args.kwargs["document_uuids"] == ["D1", "D2", "D3"]
 
 
 @pytest.mark.asyncio

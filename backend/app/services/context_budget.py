@@ -8,6 +8,11 @@ and to Sentry.
 """
 
 from __future__ import annotations
+from typing import TYPE_CHECKING, Callable
+if TYPE_CHECKING:
+    from tokenizers import Tokenizer
+    from tiktoken import Encoding
+
 
 import logging
 import math
@@ -143,7 +148,7 @@ def _warn_estimated_once(model_name: str) -> None:
 
 
 @lru_cache(maxsize=32)
-def _load_tokenizer(path: str):
+def _load_tokenizer(path: str) -> Tokenizer | None:
     """Load a `tokenizer.json` from disk, or return None if it is unusable.
 
     Cached: a real vocabulary is several megabytes and takes milliseconds to
@@ -224,7 +229,7 @@ def _find_vocabulary(model_name: str, cache_root: str) -> Optional[str]:
     return None
 
 
-def resolve_exact_tokenizer(model_name: str, model_config: Optional[dict] = None):
+def resolve_exact_tokenizer(model_name: str, model_config: Optional[dict] = None) -> Tokenizer | None:
     """This model's real tokenizer, or None when we do not have it.
 
     None is an ordinary outcome, not an error: hosted models (Claude, and any
@@ -252,7 +257,7 @@ def resolve_exact_tokenizer(model_name: str, model_config: Optional[dict] = None
 
 
 @lru_cache(maxsize=8)
-def _get_encoder(encoding_name: str):
+def _get_encoder(encoding_name: str) -> Encoding | None:
     try:
         import tiktoken
 
@@ -398,7 +403,7 @@ def _configured_margin(
     if isinstance(raw, bool):
         raw = None  # bool is an int subclass; never a meaningful margin
     try:
-        value = float(raw) if raw not in (None, "") else 0.0
+        value = float(raw) if raw is not None and raw != "" else 0.0
     except (TypeError, ValueError):
         value = 0.0
     if value >= 1.0:
@@ -565,9 +570,16 @@ _CONTEXT_WINDOW_FALLBACKS: list[tuple[str, int]] = [
     ("mistral", 32_768),
     ("qwen", 131_072),
     ("gemma", 8_192),
+    # Conservative catch-all: every Claude generation since 3 has had at least
+    # a 200k window. Must stay after the specific claude-* entries.
+    ("claude", 200_000),
 ]
 
 DEFAULT_CONTEXT_WINDOW = 65_536
+
+# Models we've already warned about falling back to the default window —
+# once per process per model, not once per turn.
+_window_fallback_warned: set[str] = set()
 
 
 def resolve_context_window(
@@ -576,11 +588,14 @@ def resolve_context_window(
     """Return the max input-context length for a model, in tokens.
 
     Priority: ``model_config['context_window']`` → fallback registry → default.
+    Hitting the default is almost always an admin-config gap (the registry is
+    a convenience, not a source of truth), so it logs a warning once per model:
+    a wrong window makes every budget/threshold decision wrong.
     """
     if model_config:
         raw = model_config.get("context_window")
         try:
-            value = int(raw) if raw not in (None, "") else 0
+            value = int(raw) if raw is not None and raw != "" else 0
         except (TypeError, ValueError):
             value = 0
         if value > 0:
@@ -590,6 +605,14 @@ def resolve_context_window(
     for pattern, window in _CONTEXT_WINDOW_FALLBACKS:
         if pattern in name:
             return window
+    if model_name and model_name not in _window_fallback_warned:
+        _window_fallback_warned.add(model_name)
+        logger.warning(
+            "No context_window configured for model %r and no registry match; "
+            "assuming %d tokens. Set context_window in the model's System "
+            "Config entry — budgets and context warnings are wrong without it.",
+            model_name, DEFAULT_CONTEXT_WINDOW,
+        )
     return DEFAULT_CONTEXT_WINDOW
 
 
@@ -605,6 +628,10 @@ class DocumentSegment:
     label: str
     text: str
     required: bool = False  # required segments are never trimmed
+    # KB segment only: snippet number -> [(page, text)] for a snippet whose
+    # chunk crosses a page break, so its citation can name the page that
+    # holds the claim the answer makes (#1058). Never sent to the model.
+    page_segments: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -715,7 +742,7 @@ def resolve_response_reserve(
     return _default_response_reserve(context_window)
 
 
-def _split_head_tail(ids, budget: int, decode) -> Optional[tuple[str, str]]:
+def _split_head_tail(ids: list[int], budget: int, decode: Callable[[list[int]], str]) -> Optional[tuple[str, str]]:
     """Take ``budget`` tokens from ``ids`` as a 75/25 head and tail.
 
     Returns None when ``budget`` already covers the whole list. That is not a
@@ -733,6 +760,47 @@ def _split_head_tail(ids, budget: int, decode) -> Optional[tuple[str, str]]:
     head_text = decode(ids[:head_n]) if head_n else ""
     tail_text = decode(ids[-tail_n:]) if tail_n else ""
     return head_text, tail_text
+
+
+# Where a file's middle was cut to fit, say so to the model and how to get it
+# back. A bare "[truncated]" left it answering as though it had read the file.
+#
+# The note sits inside the file's text, so it names its author. Unsigned, it
+# read as the file talking to the model: with a large Excel file attached,
+# chat told the user their spreadsheet "contains internal notes addressed to
+# an AI (e.g., 'Read the omitted part…')", obeying the rule that flags such
+# text in documents. The chat prompts describe this prefix (see
+# llm_service), so keep the two in step.
+CUT_NOTE_PREFIX = "[Vandalizer note, not part of the file: "
+_DOCUMENT_CUT_MARKER = (
+    f"\n\n…{CUT_NOTE_PREFIX}the middle of this document was left out to fit the "
+    "model's memory. Read the omitted part with get_document_text before "
+    "answering about it.]…\n\n"
+)
+_FILE_CUT_MARKER = (
+    f"\n\n…{CUT_NOTE_PREFIX}the middle of this file was left out to fit the "
+    "model's memory. Say so if the answer may depend on it.]…\n\n"
+)
+
+
+def _segment_name(label: str) -> str:
+    """The file or page name inside a segment label such as ``doc:Budget.xlsx``."""
+    return label.split(":", 1)[1] if ":" in label else label
+
+
+def _partly_sent_detail(kept: list[tuple[str, int]]) -> str:
+    """Name each file that was cut and how much of it the model received.
+
+    A bare "Trimmed 95001 tokens from reference documents" on someone's first
+    question read like a memory error, and didn't say which file was cut or
+    that the rest can still be read.
+    """
+    parts = [f'"{name}" (about {pct}%)' for name, pct in kept]
+    files = parts[0] if len(parts) == 1 else ", ".join(parts[:-1]) + " and " + parts[-1]
+    return (
+        f"Too large to send in full, so only part went with your question: {files}. "
+        "Ask about a specific sheet, section or page and chat will read that part."
+    )
 
 
 def _truncate_text_to_tokens(
@@ -948,9 +1016,9 @@ def plan_and_compact_context(
     def _cmt(message: Any) -> int:
         return count_message_tokens(message, model_name, model_config, native=native)
 
-    def _trunc(text: str, max_tokens: int) -> tuple[str, int]:
+    def _trunc(text: str, max_tokens: int, marker: str = "\n\n…[truncated]…\n\n") -> tuple[str, int]:
         return _truncate_text_to_tokens(
-            text, max_tokens, model_name, model_config=model_config, native=native
+            text, max_tokens, model_name, marker=marker, model_config=model_config, native=native
         )
 
     plan.system_tokens = _ct(system_prompt) if system_prompt else 0
@@ -1018,6 +1086,7 @@ def plan_and_compact_context(
     # 2. Trim attachments proportionally.
     if plan.attachments_tokens > attach_target and attachments:
         dropped = 0
+        kept_attachments: list[tuple[str, int]] = []
         scale = attach_target / max(1, plan.attachments_tokens)
         for i, a in enumerate(attachments):
             if a.required:
@@ -1026,8 +1095,9 @@ def plan_and_compact_context(
             allowed = max(256, int(raw * scale))
             if allowed >= raw:
                 continue
-            new_text, loss = _trunc(a.text, allowed)
+            new_text, loss = _trunc(a.text, allowed, _FILE_CUT_MARKER)
             dropped += loss
+            kept_attachments.append((_segment_name(a.label), max(1, round(100 * (raw - loss) / max(1, raw)))))
             attachments[i] = DocumentSegment(
                 label=a.label, text=new_text, required=a.required
             )
@@ -1038,7 +1108,7 @@ def plan_and_compact_context(
             actions.append(
                 CompactionAction(
                     kind="attachments_trimmed",
-                    detail=f"Trimmed {dropped} tokens from attached files.",
+                    detail=_partly_sent_detail(kept_attachments),
                     tokens_dropped=dropped,
                 )
             )
@@ -1046,6 +1116,7 @@ def plan_and_compact_context(
     # 3. Trim documents proportionally.
     if plan.documents_tokens > doc_target and documents:
         dropped = 0
+        kept_documents: list[tuple[str, int]] = []
         scale = doc_target / max(1, plan.documents_tokens)
         for i, d in enumerate(documents):
             if d.required:
@@ -1054,8 +1125,9 @@ def plan_and_compact_context(
             allowed = max(512, int(raw * scale))
             if allowed >= raw:
                 continue
-            new_text, loss = _trunc(d.text, allowed)
+            new_text, loss = _trunc(d.text, allowed, _DOCUMENT_CUT_MARKER)
             dropped += loss
+            kept_documents.append((_segment_name(d.label), max(1, round(100 * (raw - loss) / max(1, raw)))))
             documents[i] = DocumentSegment(
                 label=d.label, text=new_text, required=d.required
             )
@@ -1066,7 +1138,7 @@ def plan_and_compact_context(
             actions.append(
                 CompactionAction(
                     kind="documents_trimmed",
-                    detail=f"Trimmed {dropped} tokens from reference documents.",
+                    detail=_partly_sent_detail(kept_documents),
                     tokens_dropped=dropped,
                 )
             )
@@ -1153,6 +1225,177 @@ def plan_and_compact_context(
         history=history,
         plan=plan,
         actions=actions,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Usage-anchored estimation + context meter (uplift plan Phase 2)
+# ---------------------------------------------------------------------------
+#
+# The tiktoken counting above re-encodes the entire request every turn and is
+# only approximate for non-OpenAI tokenizers anyway. The cheap, more honest
+# alternative (Claude Code's approach): anchor on the provider's *reported*
+# usage from the previous turn's final model request — that number IS the
+# context size, no tokenizer needed — and char-estimate only what's new since.
+# Because the anchor is stamped after the whole turn persists, the only new
+# content at the next turn's pre-flight is the user's new message.
+
+# Conservative pad on rough estimates: under-estimating fires warnings too
+# late, which is the expensive direction (Claude Code pads 4/3 for the same
+# reason).
+_ESTIMATE_PAD_NUM = 4
+_ESTIMATE_PAD_DEN = 3
+
+
+def rough_text_tokens(text: str) -> int:
+    """Char-based token estimate (~4 chars/token), no tokenizer, no pad."""
+    if not text:
+        return 0
+    return max(1, len(text) // _CHAR_TO_TOKEN_RATIO)
+
+
+def effective_input_window(
+    context_window: int, response_reserve: Optional[int] = None
+) -> int:
+    """Input tokens actually available after reserving response space."""
+    reserve = (
+        response_reserve
+        if response_reserve is not None
+        else _default_response_reserve(context_window)
+    )
+    return max(1, context_window - reserve)
+
+
+def estimate_next_request_tokens(
+    *,
+    anchor_tokens: int,
+    new_text: str,
+) -> int:
+    """Estimate the next request's input size from the previous turn's anchor.
+
+    ``anchor_tokens`` is the previous turn's final-request context size as
+    reported by the provider (input + cache_read + cache_write + output — the
+    output becomes replayed history next turn). ``new_text`` is everything new
+    since the anchor: in practice the user's new message (the per-turn
+    reminder/document blocks were already counted inside the anchor's request
+    and are re-sent at roughly the same size). The rough delta is padded 4/3;
+    the exact anchor is not.
+    """
+    delta = rough_text_tokens(new_text)
+    return anchor_tokens + delta * _ESTIMATE_PAD_NUM // _ESTIMATE_PAD_DEN
+
+
+# Threshold ladder (tokens of headroom below the effective window). Values
+# from Claude Code's autoCompact.ts, which arrived at them empirically:
+# warn with ~20k left, compact with ~13k (or 6% of window) left, hard-block
+# with 3k left. Small windows use percentages instead — flat buffers would
+# consume most of the budget.
+_WARN_BUFFER_TOKENS = 20_000
+_COMPACT_BUFFER_TOKENS = 13_000
+_COMPACT_BUFFER_WINDOW_FRACTION = 0.06
+_BLOCK_BUFFER_TOKENS = 3_000
+_SMALL_WINDOW_TOKENS = 32_000
+_SMALL_WARN_FRACTION = 0.75
+_SMALL_COMPACT_FRACTION = 0.85
+_SMALL_BLOCK_FRACTION = 0.97
+
+METER_OK = "ok"
+METER_WARNING = "warning"
+METER_COMPACT = "compact"
+METER_BLOCKED = "blocked"
+
+
+@dataclass
+class ContextMeter:
+    """Per-turn context utilization + the escalation ladder state.
+
+    ``state`` escalates ok → warning → compact → blocked. ``compact`` means
+    "past the auto-compact threshold" — Phase 4 will act on it; until then the
+    UI treats it as a strong warning. ``percent_until_compact`` is headroom
+    relative to the compact threshold (0 once past it).
+    """
+
+    estimated_tokens: int
+    context_window: int
+    effective_window: int
+    warn_threshold: int
+    compact_threshold: int
+    block_threshold: int
+    state: str
+    percent_until_compact: int
+    estimate_source: str  # "usage_anchor" | "token_count"
+    # Tokens the conversation itself (earlier messages) accounts for. When
+    # attached files fill most of the window, trimming the conversation
+    # won't help, so the UI shouldn't say "this conversation is getting long".
+    history_tokens: Optional[int] = None
+
+    def to_dict(self) -> dict:
+        return {
+            "estimated_tokens": self.estimated_tokens,
+            "context_window": self.context_window,
+            "effective_window": self.effective_window,
+            "warn_threshold": self.warn_threshold,
+            "compact_threshold": self.compact_threshold,
+            "block_threshold": self.block_threshold,
+            "state": self.state,
+            "percent_until_compact": self.percent_until_compact,
+            "estimate_source": self.estimate_source,
+            "history_tokens": self.history_tokens,
+        }
+
+
+def build_context_meter(
+    *,
+    estimated_tokens: int,
+    context_window: int,
+    response_reserve: Optional[int] = None,
+    estimate_source: str = "token_count",
+    history_tokens: Optional[int] = None,
+) -> ContextMeter:
+    """Place an estimate on the warn/compact/block escalation ladder."""
+    effective = effective_input_window(context_window, response_reserve)
+
+    if context_window < _SMALL_WINDOW_TOKENS:
+        warn_at = int(effective * _SMALL_WARN_FRACTION)
+        compact_at = int(effective * _SMALL_COMPACT_FRACTION)
+        block_at = int(effective * _SMALL_BLOCK_FRACTION)
+    else:
+        compact_buffer = max(
+            _COMPACT_BUFFER_TOKENS,
+            int(context_window * _COMPACT_BUFFER_WINDOW_FRACTION),
+        )
+        warn_at = effective - max(_WARN_BUFFER_TOKENS, compact_buffer + 4_000)
+        compact_at = effective - compact_buffer
+        block_at = effective - _BLOCK_BUFFER_TOKENS
+
+    # The ladder must be strictly ordered even for odd window configs.
+    warn_at = max(1, min(warn_at, compact_at - 1))
+    block_at = max(compact_at + 1, block_at)
+
+    if estimated_tokens >= block_at:
+        state = METER_BLOCKED
+    elif estimated_tokens >= compact_at:
+        state = METER_COMPACT
+    elif estimated_tokens >= warn_at:
+        state = METER_WARNING
+    else:
+        state = METER_OK
+
+    percent = 0
+    if compact_at > 0:
+        percent = max(0, round((compact_at - estimated_tokens) / compact_at * 100))
+
+    return ContextMeter(
+        estimated_tokens=estimated_tokens,
+        context_window=context_window,
+        effective_window=effective,
+        warn_threshold=warn_at,
+        compact_threshold=compact_at,
+        block_threshold=block_at,
+        state=state,
+        percent_until_compact=percent,
+        estimate_source=estimate_source,
+        history_tokens=history_tokens,
     )
 
 

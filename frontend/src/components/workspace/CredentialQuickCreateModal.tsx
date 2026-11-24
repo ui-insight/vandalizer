@@ -1,6 +1,7 @@
+import { usePanelEffect } from '../shared/usePanelEffect'
 import { useEffect, useMemo, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { FocusTrap } from 'focus-trap-react'
+import { createPortal } from '../shared/panelPortal'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { X } from 'lucide-react'
 import { createCredential, testCredentialDraft } from '../../api/credentials'
 import { CredentialTestPanel } from '../credentials/CredentialTestPanel'
@@ -57,12 +58,12 @@ function buildPayload(form: FormState): Record<string, string> {
 }
 
 const labelStyle: React.CSSProperties = {
-  display: 'block', fontSize: 11, fontWeight: 600, textTransform: 'uppercase',
-  letterSpacing: 0.4, color: '#6b7280', marginBottom: 4,
+  display: 'block', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, textTransform: 'uppercase',
+  letterSpacing: 0.4, color: '#6b7280', marginBottom: 'var(--workspace-space-4)',
 }
 const inputStyle: React.CSSProperties = {
-  width: '100%', fontSize: 13, fontFamily: 'inherit',
-  border: '1px solid #d1d5db', borderRadius: 6, padding: '8px 10px',
+  width: '100%', fontSize: 'var(--workspace-font-control)', fontFamily: 'inherit',
+  border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', padding: "var(--workspace-space-8) var(--workspace-space-12)",
   boxSizing: 'border-box', background: '#fff',
 }
 const monoInputStyle: React.CSSProperties = {
@@ -83,7 +84,7 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
     }
   }, [open, initialType])
 
-  useEffect(() => {
+  usePanelEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -136,27 +137,27 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
         aria-modal="true"
         aria-label="New credential"
         style={{
-          backgroundColor: '#fff', borderRadius: 12, width: 560,
+          backgroundColor: '#fff', borderRadius: 'var(--workspace-radius-large)', width: 560,
           maxHeight: '90vh', display: 'flex', flexDirection: 'column',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.18)',
+          boxShadow: 'var(--workspace-shadow-dialog)',
         }}
       >
         <div style={{
-          padding: '14px 20px', borderBottom: '1px solid #e5e7eb',
+          padding: "var(--workspace-space-16) var(--workspace-space-20)", borderBottom: "1px solid var(--workspace-border)",
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#111827' }}>New credential</span>
+          <span style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: '#111827' }}>New credential</span>
           <button
             onClick={onClose}
             aria-label="Close"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#6b7280', display: 'flex' }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', color: '#6b7280', display: 'flex' }}
           >
             <X style={{ width: 18, height: 18 }} />
           </button>
         </div>
 
-        <div style={{ padding: '16px 20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div style={{ padding: "var(--workspace-space-16) var(--workspace-space-20)", overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-12)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--workspace-space-12)' }}>
             <div>
               <label htmlFor="cred-name" style={labelStyle}>Name</label>
               <input
@@ -196,7 +197,7 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
           </div>
 
           {form.type === 'static_header' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--workspace-space-12)' }}>
               <div>
                 <label htmlFor="cred-header-name" style={labelStyle}>Header name</label>
                 <input
@@ -229,7 +230,7 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
 
           {form.type === 'oauth_client_credentials' && (
             <>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--workspace-space-12)' }}>
                 <div>
                   <label htmlFor="cred-client-id" style={labelStyle}>Client ID</label>
                   <input
@@ -252,7 +253,7 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
                   />
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--workspace-space-12)' }}>
                 <div>
                   <label htmlFor="cred-scope" style={labelStyle}>Scope</label>
                   <input
@@ -299,7 +300,7 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
                   onChange={e => setForm({ ...form, private_key: e.target.value })}
                   rows={7}
                   placeholder={'-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----'}
-                  style={{ ...monoInputStyle, fontSize: 12, resize: 'vertical' }}
+                  style={{ ...monoInputStyle, fontSize: 'var(--workspace-font-meta)', resize: 'vertical' }}
                 />
               </div>
             </>
@@ -307,20 +308,20 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
 
           {error && (
             <div role="alert" style={{
-              borderRadius: 6, border: '1px solid #fecaca', background: '#fef2f2',
-              padding: '8px 10px', fontSize: 12, color: '#b91c1c',
+              borderRadius: 'var(--workspace-radius-small)', border: '1px solid #fecaca', background: '#fef2f2',
+              padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', color: '#b91c1c',
             }}>
               {error}
             </div>
           )}
 
-          <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-4)' }}>
             Secrets are encrypted at rest and never returned to the client after creation.
           </div>
         </div>
 
-          <div style={{ border: '1px solid #e5e7eb', backgroundColor: '#f9fafb', borderRadius: 6, padding: 10, marginBottom: 12 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Test before saving</div>
+          <div style={{ border: "1px solid var(--workspace-border)", backgroundColor: '#f9fafb', borderRadius: 'var(--workspace-radius-small)', padding: 'var(--workspace-space-12)', marginBottom: 'var(--workspace-space-12)' }}>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#374151', marginBottom: 'var(--workspace-space-6)' }}>Test before saving</div>
             <CredentialTestPanel
               testUrl={testUrl}
               onTestUrlChange={setTestUrl}
@@ -329,23 +330,23 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
             />
           </div>
         <div style={{
-          padding: '12px 20px', borderTop: '1px solid #e5e7eb',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+          padding: "var(--workspace-space-12) var(--workspace-space-20)", borderTop: "1px solid var(--workspace-border)",
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--workspace-space-8)',
         }}>
           <a
             href="/credentials"
             target="_blank"
             rel="noopener noreferrer"
-            style={{ fontSize: 12, color: '#6b7280', textDecoration: 'underline' }}
+            style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', textDecoration: 'underline' }}
           >
             Manage all credentials →
           </a>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 'var(--workspace-space-8)' }}>
             <button
               onClick={onClose}
               style={{
-                border: '1px solid #d1d5db', background: '#fff', color: '#374151',
-                fontSize: 13, fontWeight: 500, padding: '7px 14px', borderRadius: 6, cursor: 'pointer',
+                border: "1px solid var(--workspace-border)", background: '#fff', color: '#374151',
+                fontSize: 'var(--workspace-font-control)', fontWeight: 500, padding: "7px var(--workspace-space-16)", borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
               }}
             >
               Cancel
@@ -357,7 +358,7 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
                 border: 'none',
                 background: !valid || saving ? '#9ca3af' : 'var(--highlight-color, #2563eb)',
                 color: 'var(--highlight-text, #fff)',
-                fontSize: 13, fontWeight: 600, padding: '7px 14px', borderRadius: 6,
+                fontSize: 'var(--workspace-font-control)', fontWeight: 600, padding: "7px var(--workspace-space-16)", borderRadius: 'var(--workspace-radius-small)',
                 cursor: !valid || saving ? 'not-allowed' : 'pointer',
               }}
             >

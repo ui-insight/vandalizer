@@ -102,6 +102,27 @@ class TestPreviewRoutes:
         add_delay.assert_not_called()
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("crawl, count", [(False, 51), (True, 6)])
+    async def test_a_preview_checks_a_handful_not_a_sitemap(self, client, crawl, count):
+        # One worker task fetches every URL of a preview; a sitemap's worth
+        # would be killed at the time limit with the rest never fetched. Large
+        # adds take the batched add_urls path instead.
+        cookies, headers = _auth()
+        _, patches = _routes()
+        with patches[0], patches[1], patches[2], patches[3], \
+             patch.object(kb_url_preview, "start_preview", AsyncMock()) as start, \
+             patch("app.tasks.kb_validation_tasks.preview_urls_task.delay") as preview_delay:
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/add_urls/preview",
+                json={"urls": [f"https://example.gov/p{i}" for i in range(count)], "crawl_enabled": crawl},
+                cookies=cookies, headers=headers,
+            )
+        assert resp.status_code == 400
+        assert "at most" in resp.json()["detail"]
+        start.assert_not_called()
+        preview_delay.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_someone_elses_preview_is_not_found(self, client):
         cookies, headers = _auth()
         _, patches = _routes()

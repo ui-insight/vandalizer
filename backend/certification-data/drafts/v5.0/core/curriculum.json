@@ -1,0 +1,327 @@
+[
+  {
+    "id": "core_chat",
+    "title": "Chat",
+    "subtitle": "Answer one question from one award",
+    "estimatedMinutes": 6,
+    "icon": "MessageSquare",
+    "documents": [
+      "cedar-creek-award.pdf"
+    ],
+    "lessons": [
+      {
+        "id": "core_chat.first-answer",
+        "title": "Find the award amount",
+        "objective": "Ask a bounded question and open its supporting passage.",
+        "content": "Use Set Up Lab above the lesson to put the fictional Cedar Creek award in your library. In a new Chat, attach cedar-creek-award.pdf. Ask “How much did the sponsor authorize for CC-17? Quote the sentence and tell me the page.” Open the source and compare the amount with the award notice. You now have the first line of a case note.",
+        "revision": 1,
+        "variant": "walkthrough"
+      },
+      {
+        "id": "core_chat.missing-term",
+        "title": "Recognize a missing term",
+        "objective": "Distinguish a missing term from an explicit zero.",
+        "content": "In the same Chat ask “What cost-share percentage does this award require?” Open the award again. There is no percentage or waiver in it. Ask the assistant to record the question for the research administrator. A confident zero would change the award terms. Keep this chat for the next module.",
+        "revision": 1,
+        "variant": "walkthrough"
+      }
+    ],
+    "decisions": [
+      {
+        "id": "award",
+        "prompt": "The award authorizes $48,000 and says nothing about cost share. Which statement can go in your case note?",
+        "choices": [
+          {
+            "id": "zero",
+            "text": "Authorized amount $48,000, cost share 0%.",
+            "feedback": "Silence supplies no percentage. Keep this question open."
+          },
+          {
+            "id": "open",
+            "text": "Authorized amount $48,000. Ask the administrator to confirm cost share.",
+            "feedback": "The amount is traceable to the award and the missing term stays open."
+          }
+        ],
+        "correct_choice_id": "open"
+      }
+    ]
+  },
+  {
+    "id": "core_projects",
+    "title": "Projects",
+    "subtitle": "Give the case a private home",
+    "estimatedMinutes": 6,
+    "icon": "FolderOpen",
+    "documents": [],
+    "lessons": [
+      {
+        "id": "core_projects.workspace",
+        "title": "Set up the case project",
+        "objective": "Create a personal Project and check its sharing and source scope.",
+        "content": "Create a personal Project named Cedar Creek CC-17. Leave sharing private. Open its workspace and add the assigned award from the library to the chat using the attachment control. Start the project case chat with “Check the authorized amount in the attached award.” If you started outside the project, repeat this one question here. Keep this project chat for the rest of the case.",
+        "revision": 1,
+        "variant": "walkthrough"
+      },
+      {
+        "id": "core_projects.resume",
+        "title": "Resume after an interruption",
+        "objective": "Reopen the intended Project and verify its working context.",
+        "content": "Leave the project and return to it by name. Reopen the case chat, inspect its attachments and compare its award with your first answer. Remove unrelated sources from the chat scope. Project Context is a durable place for your private case note. Leave the final note until you have checked policy and website evidence.",
+        "revision": 1,
+        "variant": "walkthrough"
+      }
+    ],
+    "decisions": [
+      {
+        "id": "scope",
+        "prompt": "You reopen CC-17 and see an unrelated award in the chat selection. What do you do before continuing?",
+        "choices": [
+          {
+            "id": "narrow",
+            "text": "Confirm the private CC-17 project and select only the assigned award.",
+            "feedback": "The project and selected source now match the task."
+          },
+          {
+            "id": "continue",
+            "text": "Continue with both awards because the chat remembers the case.",
+            "feedback": "The other award can introduce terms from a different agreement."
+          }
+        ],
+        "correct_choice_id": "narrow"
+      }
+    ]
+  },
+  {
+    "id": "core_knowledge",
+    "title": "Knowledge Bases",
+    "subtitle": "Check the travel rule separately",
+    "estimatedMinutes": 8,
+    "icon": "BookOpen",
+    "documents": [
+      "training-travel-policy.pdf"
+    ],
+    "lessons": [
+      {
+        "id": "core_knowledge.policy-source",
+        "title": "Build a small policy reference",
+        "objective": "Add a separate policy document to a Knowledge Base and retrieve its passage.",
+        "content": "Use Set Up Lab for the fictional training travel policy. In Knowledge Bases, create a personal base named CC-17 Travel Policy and add training-travel-policy.pdf from your library. Wait until indexing finishes. Return to the Cedar Creek project chat, ask the assistant to find the Knowledge Base named CC-17 Travel Policy and search that specific base for the approval required before booking field travel. A project also has its own default base, so check the source filename. Open the policy passage.",
+        "revision": 1,
+        "variant": "walkthrough"
+      },
+      {
+        "id": "core_knowledge.attribution",
+        "title": "Keep policy and award terms separate",
+        "objective": "Attribute each finding to the source that states it.",
+        "content": "The training policy requires written approval before booking. It does not change the sponsor’s award amount or answer the cost-share question. Ask the assistant to label the award finding and the policy finding separately. If retrieval returns no passage, inspect the selected base and its indexing status, then search again.",
+        "revision": 1,
+        "variant": "walkthrough"
+      }
+    ],
+    "decisions": [
+      {
+        "id": "policy",
+        "prompt": "A search retrieves the training policy’s written pre-booking approval rule. How should you attribute it?",
+        "choices": [
+          {
+            "id": "sponsor",
+            "text": "List it as a sponsor condition in the award.",
+            "feedback": "The cited passage is institutional training policy."
+          },
+          {
+            "id": "policy",
+            "text": "Cite the training travel policy for booking approval and keep the award citation for the amount.",
+            "feedback": "Each claim points to the source that governs it."
+          }
+        ],
+        "correct_choice_id": "policy"
+      }
+    ]
+  },
+  {
+    "id": "core_skills",
+    "title": "Skills",
+    "subtitle": "Apply a repeatable review instruction",
+    "estimatedMinutes": 6,
+    "icon": "Lightbulb",
+    "documents": [],
+    "lessons": [
+      {
+        "id": "core_skills.inspect",
+        "title": "Inspect and select a Skill",
+        "objective": "Read a Skill’s instructions before applying it to the case.",
+        "content": "Open Skills and inspect a source-checking Skill. If you need one, create a personal Skill called Case source check with these instructions: “For each claim, name the source, quote its support and flag any missing term for a person to resolve. Keep the result private.” Check its scope before selecting it in the Cedar Creek project chat.",
+        "revision": 1,
+        "variant": "walkthrough"
+      },
+      {
+        "id": "core_skills.apply",
+        "title": "Review a Skill-assisted reply",
+        "objective": "Run one turn with a selected Skill and check the reply against its sources.",
+        "content": "With the Skill selected, ask “Audit the award amount and the travel rule. What is still unresolved?” Inspect the reply and open its references. A Skill gives the assistant instructions. It supplies neither policy evidence nor permission to share. Keep the active-Skill turn in this chat.",
+        "revision": 1,
+        "variant": "walkthrough"
+      }
+    ],
+    "decisions": [
+      {
+        "id": "skill",
+        "prompt": "A source-checking Skill produces a polished summary that assigns a cost-share percentage. What is your next action?",
+        "choices": [
+          {
+            "id": "trust",
+            "text": "Accept the percentage because the Skill ran successfully.",
+            "feedback": "A completed Skill turn establishes no missing term."
+          },
+          {
+            "id": "inspect",
+            "text": "Inspect the sources, remove the unsupported percentage and keep the question for the administrator.",
+            "feedback": "The Skill guides the review while the sources govern the finding."
+          }
+        ],
+        "correct_choice_id": "inspect"
+      }
+    ]
+  },
+  {
+    "id": "core_browser",
+    "title": "Browser controls",
+    "subtitle": "Check the listed web address",
+    "estimatedMinutes": 7,
+    "icon": "Globe",
+    "documents": [],
+    "lessons": [
+      {
+        "id": "core_browser.authorize",
+        "title": "Approve one bounded lookup",
+        "objective": "Review the browser destination and requested actions.",
+        "content": "The training award lists example.org as its contact domain. In the same project chat, enable browser control and request a read-only visit to https://www.iana.org/help/example-domains. Review the destination and access request. In the same request, ask the browser to read the page, record the literal domain example.org, then finish and close its working tab. Keep the page URL with that observation.",
+        "revision": 1,
+        "variant": "walkthrough"
+      },
+      {
+        "id": "core_browser.finish",
+        "title": "Record the observation and release the tab",
+        "objective": "Separate an observed web value from a sponsor decision.",
+        "content": "Ask the assistant to finish the browser task and release its working tab after recording the domain. IANA explains the purpose of example domains. Its page cannot confirm a sponsor deadline or a contact person. If the browser, site access or page is unavailable, save the rest of your work and resume this lookup when access returns.",
+        "revision": 1,
+        "variant": "walkthrough"
+      }
+    ],
+    "decisions": [
+      {
+        "id": "browser",
+        "prompt": "The training award lists example.org. Which browser action supplies evidence for a private case note?",
+        "choices": [
+          {
+            "id": "lookup",
+            "text": "Read the IANA page, record the matching domain and URL, then finish the working tab.",
+            "feedback": "This preserves the observed value and releases the task tab."
+          },
+          {
+            "id": "send",
+            "text": "Type award details into a contact form to see whether the address works.",
+            "feedback": "The assignment authorizes a read-only lookup and no disclosure."
+          }
+        ],
+        "correct_choice_id": "lookup"
+      }
+    ]
+  },
+  {
+    "id": "core_case",
+    "title": "Private case note",
+    "subtitle": "Finish the Cedar Creek handoff",
+    "estimatedMinutes": 8,
+    "icon": "ClipboardCheck",
+    "documents": [],
+    "lessons": [
+      {
+        "id": "core_case.assemble",
+        "title": "Write the private case note",
+        "objective": "Save a source-attributed note in the training Project.",
+        "content": "Open Project Context in your personal Cedar Creek project. This exercise uses four tagged lines so a colleague can scan the handoff. Use the four statements you judge correct in the challenge, one per line including its label. Save the note there and keep the project private. Only use this dedicated training project.",
+        "revision": 1,
+        "variant": "walkthrough"
+      },
+      {
+        "id": "core_case.handoff",
+        "title": "Check the handoff",
+        "objective": "Verify the work sample and identify the outstanding human decision.",
+        "content": "Reopen the note. Compare each line to the award passage, the policy passage or the recorded web observation. Verify the open question names the person who should resolve it. In the challenge select this project and its case chat, choose the four lines you saved and submit. The course checks your private training note and saved activity. Advanced Builder is a separate optional course for anyone who needs to design extractions and workflows.",
+        "revision": 1,
+        "variant": "walkthrough"
+      }
+    ],
+    "decisions": [
+      {
+        "id": "award",
+        "prompt": "Which award line belongs in the note?",
+        "choices": [
+          {
+            "id": "request",
+            "text": "Award: $48,000 requested in a proposal.",
+            "feedback": "The award notice authorizes funds."
+          },
+          {
+            "id": "authorized",
+            "text": "Award: CC-17 authorizes $48,000.",
+            "feedback": "The award notice states this amount."
+          }
+        ],
+        "correct_choice_id": "authorized"
+      },
+      {
+        "id": "policy",
+        "prompt": "Which policy line belongs in the note?",
+        "choices": [
+          {
+            "id": "written",
+            "text": "Policy: Obtain written approval before booking travel.",
+            "feedback": "The training travel policy supplies this rule."
+          },
+          {
+            "id": "later",
+            "text": "Policy: Send travel receipts after booking instead of obtaining approval.",
+            "feedback": "Reimbursement paperwork does not replace prior approval."
+          }
+        ],
+        "correct_choice_id": "written"
+      },
+      {
+        "id": "website",
+        "prompt": "Which browser observation belongs in the note?",
+        "choices": [
+          {
+            "id": "address",
+            "text": "Website: example.org is the verified sponsor contact.",
+            "feedback": "The IANA source identifies an example domain."
+          },
+          {
+            "id": "example",
+            "text": "Website: IANA lists example.org as a documentation domain.",
+            "feedback": "This observation stays within what the page establishes."
+          }
+        ],
+        "correct_choice_id": "example"
+      },
+      {
+        "id": "open",
+        "prompt": "Which question belongs in the handoff?",
+        "choices": [
+          {
+            "id": "confirm",
+            "text": "Open: Ask the research administrator to confirm the cost-share requirement.",
+            "feedback": "The award leaves this institutional question unresolved."
+          },
+          {
+            "id": "none",
+            "text": "Open: No action needed because cost share is zero.",
+            "feedback": "The award contains no waiver or percentage."
+          }
+        ],
+        "correct_choice_id": "confirm"
+      }
+    ]
+  }
+]

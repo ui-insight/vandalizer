@@ -82,6 +82,92 @@ def _mock_find_chain(items):
 
 
 class TestListContents:
+    @pytest.fixture(autouse=True)
+    def no_project_scope(self):
+        with patch("app.services.access_control.find_folder_project", new=AsyncMock(return_value=None)), \
+             patch("app.services.access_control.project_root_folder_uuids", new=AsyncMock(return_value=set())):
+            yield
+
+    @pytest.mark.asyncio
+    async def test_folder_rows_carry_item_count_and_modified_date(self):
+        """A folder stores neither; both are derived from what is in it, and
+        only from what this viewer would see on opening it."""
+        from bson import ObjectId
+
+        created = datetime.datetime(2026, 1, 5, 9, 0, tzinfo=datetime.timezone.utc)
+        full = _make_folder(uuid="f1", title="Full")
+        full.id = ObjectId.from_datetime(created)
+        full.user_id = "user1"
+        empty = _make_folder(uuid="f2", title="Empty")
+        empty.id = ObjectId.from_datetime(created)
+        empty.user_id = "user1"
+
+        def child_doc(folder, user_id, updated_at):
+            d = MagicMock()
+            d.folder, d.user_id, d.team_id, d.updated_at = folder, user_id, None, updated_at
+            return d
+
+        newest = datetime.datetime(2026, 3, 2, 14, 30)
+        child_docs = [
+            child_doc("f1", "user1", datetime.datetime(2026, 2, 1, 8, 0)),
+            child_doc("f1", "user1", newest),
+            # Someone else's file under the same parent uuid is not this
+            # viewer's to count.
+            child_doc("f1", "someone-else", datetime.datetime(2026, 6, 1, 8, 0)),
+        ]
+        subfolder = MagicMock()
+        subfolder.id = ObjectId.from_datetime(created)
+        subfolder.parent_id, subfolder.user_id, subfolder.team_id = "f1", "user1", None
+
+        def doc_find(query, **kwargs):
+            return _mock_find_chain(child_docs if "$in" in str(query.get("folder")) else [])
+
+        def folder_find(*args, **kwargs):
+            is_children = args and isinstance(args[0], dict) and "$in" in str(args[0].get("parent_id"))
+            return _mock_find_chain([subfolder] if is_children else [full, empty])
+
+        with patch("app.services.document_service.SmartFolder") as MockFolder, \
+             patch("app.services.document_service.SmartDocument") as MockDoc, \
+             patch("app.services.document_service.access_control.get_team_access_context", new=AsyncMock(return_value=TeamAccessContext(team_uuids=set(), roles_by_uuid={}))):
+            MockFolder.find = MagicMock(side_effect=folder_find)
+            MockDoc.find = MagicMock(side_effect=doc_find)
+
+            from app.services.document_service import list_contents
+            result = await list_contents(user=_make_user())
+
+        by_title = {f["title"]: f for f in result["folders"]}
+        assert by_title["Full"]["item_count"] == 3  # two files + one subfolder
+        assert by_title["Full"]["updated_at"] == newest.isoformat()
+        assert by_title["Empty"]["item_count"] == 0
+        # Nothing in it: the date is when the folder was made.
+        assert by_title["Empty"]["updated_at"] == created.astimezone().replace(tzinfo=None).isoformat()
+
+    @pytest.mark.asyncio
+    async def test_document_rows_carry_size_on_disk(self, tmp_path):
+        (tmp_path / "there.pdf").write_bytes(b"x" * 2048)
+        present = _make_document(uuid="d1")
+        present.path = "there.pdf"
+        missing = _make_document(uuid="d2")
+        missing.path = "gone.pdf"
+        escaped = _make_document(uuid="d3")
+        escaped.path = "../outside.pdf"
+        (tmp_path.parent / "outside.pdf").write_bytes(b"secret")
+
+        settings = MagicMock()
+        settings.upload_dir = str(tmp_path)
+        with patch("app.services.document_service.SmartFolder") as MockFolder, \
+             patch("app.services.document_service.SmartDocument") as MockDoc, \
+             patch("app.services.document_service.Settings", return_value=settings), \
+             patch("app.services.document_service.access_control.get_team_access_context", new=AsyncMock(return_value=TeamAccessContext(team_uuids=set(), roles_by_uuid={}))):
+            MockFolder.find = MagicMock(return_value=_mock_find_chain([]))
+            MockDoc.find = MagicMock(return_value=_mock_find_chain([present, missing, escaped]))
+
+            from app.services.document_service import list_contents
+            result = await list_contents(user=_make_user())
+
+        sizes = {d["uuid"]: d["size_bytes"] for d in result["documents"]}
+        assert sizes == {"d1": 2048, "d2": None, "d3": None}
+
     @pytest.mark.asyncio
     async def test_returns_folders_and_documents(self):
         folders = [_make_folder(uuid="f1", title="My Folder")]
@@ -140,6 +226,8 @@ class TestListContents:
         assert filters["soft_deleted"] == {"$ne": True}
         assert filters["user_id"] == "user1"
         assert filters["folder"] == "0"
+        # A revised file's older versions live in Version history only.
+        assert filters["superseded_by"] is None
 
         assert len(result["documents"]) == 1
         assert result["documents"][0]["soft_deleted"] is False

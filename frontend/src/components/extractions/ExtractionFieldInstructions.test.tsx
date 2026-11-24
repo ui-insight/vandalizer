@@ -1,0 +1,53 @@
+import { act, fireEvent, render, screen } from '@testing-library/react'
+import { expect, it, vi } from 'vitest'
+import { ExtractionFieldInstructions } from './ExtractionFieldInstructions'
+const props = { fieldName: 'Total Project Budget', instruction: 'Use the annual budget.' }
+it('saves an instruction only on explicit submit and prevents duplicate pending saves', async () => {
+  let finish!: () => void
+  const save = vi.fn(() => new Promise<void>(resolve => { finish = resolve }))
+  render(<ExtractionFieldInstructions {...props} onSave={save} />)
+  const input = screen.getByRole('textbox', { name: 'Extraction instructions' })
+  fireEvent.change(input, { target: { value: '  Use the full multi-year budget.  ' } })
+  fireEvent.blur(input)
+  expect(save).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Save instructions' }))
+  fireEvent.submit(screen.getByRole('form'))
+  expect(save).toHaveBeenCalledExactlyOnceWith('Use the full multi-year budget.')
+  expect(input).toBeDisabled()
+  await act(async () => finish())
+  expect(screen.getByRole('status')).toHaveTextContent('Instructions saved')
+  expect(screen.getByRole('button', { name: 'Save instructions' })).toBeDisabled()
+  expect(screen.getByRole('form')).toHaveAccessibleName('Extraction instructions for Total Project Budget')
+})
+it('retains the draft after an unconfirmed save and retries the same instruction', async () => {
+  const save = vi.fn().mockRejectedValueOnce(new Error('Lost response')).mockResolvedValueOnce(undefined)
+  render(<ExtractionFieldInstructions {...props} onSave={save} />)
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Use every project year.' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Save instructions' }))
+  await screen.findByRole('alert')
+  expect(screen.getByRole('textbox')).toHaveValue('Use every project year.')
+  fireEvent.click(screen.getByRole('button', { name: 'Save instructions' }))
+  await screen.findByRole('status')
+  expect(save.mock.calls).toEqual([['Use every project year.'], ['Use every project year.']])
+})
+it('preserves a dirty draft when saved instructions change and requires an explicit reconciliation', () => {
+  const save = vi.fn()
+  const view = render(<ExtractionFieldInstructions {...props} onSave={save} />)
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'My unfinished source-specific draft.' } })
+  view.rerender(<ExtractionFieldInstructions {...props} instruction="New saved instructions from another editor." onSave={save} />)
+  expect(screen.getByRole('alert')).toHaveTextContent('Your draft is retained')
+  expect(screen.getByRole('textbox')).toHaveValue('My unfinished source-specific draft.')
+  expect(screen.getByRole('button', { name: 'Save instructions' })).toBeDisabled()
+  fireEvent.submit(screen.getByRole('form'))
+  expect(save).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Use latest saved instructions' }))
+  expect(screen.getByRole('textbox')).toHaveValue('New saved instructions from another editor.')
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+})
+it('adopts a refreshed saved instruction when the form has no local changes', () => {
+  const save = vi.fn()
+  const view = render(<ExtractionFieldInstructions {...props} onSave={save} />)
+  view.rerender(<ExtractionFieldInstructions {...props} instruction="Refreshed original." onSave={save} />)
+  expect(screen.getByRole('textbox')).toHaveValue('Refreshed original.')
+  expect(save).not.toHaveBeenCalled()
+})

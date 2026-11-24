@@ -79,8 +79,34 @@
       ],
       "input_config": {},
       "output_config": {},
-      "validation_plan": [],
-      "validation_inputs": []
+      "validation_plan": [
+        {
+          "id": "dc8109f7-f445-5caa-a225-f1fc2b4a0dc5",
+          "name": "Figures match the source",
+          "category": "accuracy",
+          "description": "Every dollar amount, date, rate, award number, email address and phone number in the output appears in the source document with the same value, unit and (for dates) year. A figure the output calculated says how it was calculated and the arithmetic is right. FAIL if any value differs from the source, or appears with no basis in it."
+        },
+        {
+          "id": "e916def0-387b-5d46-b468-a1127b4b933c",
+          "name": "Contact details are exact",
+          "category": "accuracy",
+          "description": "Every email address and phone number matches the source character for character and is attached to the role the source gives it. FAIL for any altered contact detail or one assigned to the wrong person or role."
+        },
+        {
+          "id": "64720026-e4fc-509d-aea3-670decc6a903",
+          "name": "Says when the document is silent",
+          "category": "content",
+          "description": "For each subaward term, rate or reporting requirement that the source document does not state, the output says it is not stated (or not found) instead of filling in a typical value, a common practice or a figure from memory, and instead of leaving it out without comment. FAIL if a missing item is given a value the document does not contain."
+        }
+      ],
+      "validation_inputs": [
+        {
+          "id": "7dd03422-ca19-593d-831e-b436aa8048bb",
+          "type": "text",
+          "label": "Fictional subaward. Answer key: PTE Example State University; subrecipient Example Coastal Institute; FAIN EXA-2027-4410; subaward number SUB-2027-018; project Coastal Drone Survey Methods; federal agency Example Science Agency. Period October 1, 2027 to September 30, 2028. Amount funded this action $148,250.00; incrementally estimated total $450,000.00. Cost type is cost reimbursable. F&A 52% of MTDC. Invoices are monthly; the final invoice is due 60 days after the end date. Required reports are only the checked ones: the annual technical report and the final invention report. The equipment report is unchecked and must not be listed. Carryforward is not stated, and the PTE financial contact's phone is not stated; both must read Not specified. Emails and phones must match character for character.",
+          "text": "FICTIONAL QA MATERIAL — NOT A REAL SUBAWARD\nResearch Subaward Agreement\nPass-Through Entity (PTE): Example State University\nSubrecipient: Example Coastal Institute\nPTE Federal Award No (FAIN): EXA-2027-4410\nSubaward No: SUB-2027-018\nFederal Awarding Agency: Example Science Agency\nProject Title: Coastal Drone Survey Methods\nSubaward Period of Performance: 10/01/2027 – 09/30/2028\nAmount Funded This Action: $148,250.00\nIncrementally Estimated Total: $450,000.00\nCost Type: Cost Reimbursable\n\nTerms\n- Invoices shall be submitted monthly. The final invoice is due no later than 60 days after the subaward end date.\n- Indirect costs: 52% of modified total direct costs (MTDC).\n- Cost sharing: none required.\n\nAttachment 4 — Required Reports\n[X] Annual technical report, due 30 days before the end of each budget period, to the PTE PI\n[ ] Equipment inventory report\n[X] Final invention report, due 60 days after the subaward end date, to the PTE administrative contact\n\nAttachment A — PTE Contacts\nPrincipal Investigator: Riley Example, riley.example@exampleu.edu, (208) 555-0142\nAdministrative Contact: Taylor Example, osp@exampleu.edu, (208) 555-0110\nFinancial Contact: Quinn Example, grants.accounting@exampleu.edu\n\nAttachment B — Subrecipient Contacts\nPrincipal Investigator: Robin Example, r.example@coastal-inst.example, (604) 555-0199\nAuthorized Official: Drew Example, contracts@coastal-inst.example, (604) 555-0123"
+        }
+      ]
     }
   ]
 }

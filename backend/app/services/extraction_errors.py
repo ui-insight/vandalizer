@@ -12,6 +12,9 @@ sentence the user can act on, naming the model. The raw text stays on the run.
 """
 
 from __future__ import annotations
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from pydantic_ai.exceptions import ModelHTTPError
 
 from typing import Optional
 
@@ -20,7 +23,7 @@ from typing import Optional
 _RAW_SNIPPET = 300
 
 
-def _model_http_error(exc: BaseException):
+def _model_http_error(exc: BaseException) -> ModelHTTPError | None:
     """The ``ModelHTTPError`` in ``exc``'s cause chain, if any."""
     try:
         from pydantic_ai.exceptions import ModelHTTPError

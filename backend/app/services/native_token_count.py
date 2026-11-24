@@ -340,9 +340,7 @@ async def _ask_provider(
     # bug even where the timeout is the only field we change. Thinking settings
     # are kept because Anthropic's count endpoint takes a `thinking` param and
     # returns a different figure with it set.
-    settings = dict(
-        build_thinking_model_settings(model_name, None, system_config_doc) or {}
-    )
+    settings = build_thinking_model_settings(model_name, None, system_config_doc).copy()
     settings["timeout"] = NATIVE_COUNT_TIMEOUT_SECONDS
 
     messages = list(history)

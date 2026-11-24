@@ -1,5 +1,5 @@
 """Tier 2: expanding ticked folders to documents (workflow runs, "Add folder
-to knowledge base") skips soft-deleted documents,
+to knowledge base") skips superseded versions and soft-deleted documents,
 against a real MongoDB so the query, not a stand-in, is what's tested."""
 
 import os
@@ -18,7 +18,7 @@ pytestmark = [
 ]
 
 
-async def test_expansion_returns_live_documents_only(mongo_client):
+async def test_expansion_returns_current_live_documents_only(mongo_client):
     from app.models.document import SmartDocument
     from app.models.folder import SmartFolder
     from app.services import folder_service
@@ -35,12 +35,14 @@ async def test_expansion_returns_live_documents_only(mongo_client):
         return uuid
 
     plain = await doc("plain", root)
+    await doc("v1", root, superseded_by=f"v2-{tag}")
+    v2 = await doc("v2", root, version_number=2)
     await doc("deleted", child, soft_deleted=True)
     nested = await doc("nested", child)
 
     with patch.object(folder_service.access_control, "get_team_access_context", AsyncMock(return_value=MagicMock())), \
          patch.object(folder_service.access_control, "get_authorized_folder", AsyncMock(return_value=MagicMock(uuid=root))), \
-         patch.object(folder_service.access_control, "can_view_document", MagicMock(return_value=True)):
+         patch.object(folder_service.access_control, "get_authorized_document", AsyncMock(return_value=True)):
         result = await folder_service.expand_folders_to_document_uuids([root], MagicMock(user_id="u1"))
 
-    assert sorted(result) == sorted([plain, nested])
+    assert sorted(result) == sorted([plain, v2, nested])

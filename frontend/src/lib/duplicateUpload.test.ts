@@ -21,6 +21,14 @@ describe('unappliedUploadMessage', () => {
     expect(text).toContain('was not replaced')
     expect(text).toContain('was not uploaded')
   })
+  it('gives a way forward to someone who cannot change the existing file', () => {
+    // Upload new version needs edit rights on a teammate's file.
+    for (const changed of [true, null]) {
+      const text = unappliedUploadMessage('budget.xlsx', { exists: true, changed })
+      expect(text).toContain('Upload new version on the existing file')
+      expect(text).toContain('rename yours and upload it again')
+    }
+  })
   it('does not claim a difference it could not check', () => {
     const text = unappliedUploadMessage('budget.xlsx', { exists: true, changed: null }, 'your files')
     expect(text).not.toContain('different')

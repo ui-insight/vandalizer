@@ -52,8 +52,8 @@ export function TrialQueryDeltas({
   if (!optimized || optimized.length === 0) {
     return (
       <div style={{
-        padding: 12, fontSize: 12, color: '#888',
-        backgroundColor: '#1f1f1f', border: '1px solid #2e2e2e', borderRadius: 8,
+        padding: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)',
+        backgroundColor: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-medium)',
       }}>
         Per-query data isn't available for this run.
       </div>
@@ -66,20 +66,21 @@ export function TrialQueryDeltas({
 
   return (
     <div style={{
-      padding: 14, backgroundColor: '#1f1f1f',
-      border: '1px solid #2e2e2e', borderRadius: 8,
+      padding: 'var(--workspace-space-16)', backgroundColor: 'var(--workspace-surface)',
+      border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-medium)',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-12)' }}>
+        <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: 'var(--workspace-text)' }}>
           {title} ({rows.length})
         </span>
-        <span style={{ marginLeft: 'auto', fontSize: 10, color: '#666' }}>Sort by:</span>
+        <span style={{ marginLeft: 'auto', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>Sort by:</span>
         <select
+          aria-label="Sort question changes"
           value={sortKey}
           onChange={e => setSortKey(e.target.value as SortKey)}
           style={{
-            background: '#1a1a1a', color: '#e5e5e5', border: '1px solid #333',
-            borderRadius: 4, padding: '2px 6px', fontSize: 11, fontFamily: 'inherit',
+            background: 'var(--workspace-canvas)', color: 'var(--workspace-text)', border: '1px solid var(--workspace-border)',
+            borderRadius: 'var(--workspace-radius-small)', padding: "var(--workspace-space-4) var(--workspace-space-6)", fontSize: 'var(--workspace-font-meta)', minHeight: 'var(--workspace-control-height)', maxWidth: '100%', fontFamily: 'inherit',
           }}
         >
           <option value="delta-desc">Biggest wins</option>
@@ -90,10 +91,9 @@ export function TrialQueryDeltas({
       </div>
 
       <div style={{
-        display: 'flex', flexDirection: 'column', gap: 3,
+        display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)',
         maxHeight: 360, overflowY: 'auto',
       }}>
-        <HeaderRow />
         {rows.map(({ optimized: o, baseline: b, delta }) => (
           <Row
             key={o.query_uuid}
@@ -116,28 +116,6 @@ export function TrialQueryDeltas({
   )
 }
 
-function HeaderRow() {
-  return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: '1fr 60px 60px 70px',
-      gap: 6, padding: '4px 8px',
-      fontSize: 9, color: '#666',
-      textTransform: 'uppercase', letterSpacing: 0.5,
-    }}>
-      <span>Query</span>
-      <span style={{ textAlign: 'right' }}>Default</span>
-      <span style={{ textAlign: 'right' }}>Optimized</span>
-      <span
-        style={{ textAlign: 'right', cursor: 'help' }}
-        title="Difference in percentage points (optimized minus default), not a relative % change."
-      >
-        Δ pts
-      </span>
-    </div>
-  )
-}
-
 function Row({
   optimized, baseline, delta, onOpen,
 }: {
@@ -150,47 +128,49 @@ function Row({
   const bScore = baseline?.score ?? null
   const deltaPts = delta != null ? delta * 100 : null
   const deltaColor =
-    deltaPts == null ? '#666'
-    : deltaPts > 5 ? '#22c55e'
-    : deltaPts < -5 ? '#ef4444'
-    : '#888'
+    deltaPts == null ? 'var(--workspace-muted)'
+    : deltaPts > 5 ? 'var(--workspace-success)'
+    : deltaPts < -5 ? 'var(--workspace-danger)'
+    : 'var(--workspace-muted)'
 
   return (
     <button
       onClick={onOpen}
       style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 60px 60px 70px',
-        gap: 6, padding: '6px 8px',
-        fontSize: 11, color: '#ddd',
-        backgroundColor: '#1a1a1a',
-        border: '1px solid #262626',
-        borderRadius: 4, cursor: 'pointer',
+        display: 'flex', flexDirection: 'column',
+        gap: 'var(--workspace-space-6)', padding: "var(--workspace-space-6) var(--workspace-space-8)",
+        fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)',
+        backgroundColor: 'var(--workspace-canvas)',
+        border: '1px solid var(--workspace-border)',
+        borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
         textAlign: 'left', fontFamily: 'inherit',
       }}
-      onMouseEnter={e => (e.currentTarget.style.borderColor = '#3a3a3a')}
-      onMouseLeave={e => (e.currentTarget.style.borderColor = '#262626')}
+      onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--workspace-border)')}
+      onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--workspace-border)')}
       title={optimized.query}
     >
-      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#ddd' }}>
+      <span style={{ overflowWrap: 'anywhere', lineHeight: 1.5, color: 'var(--workspace-text)' }}>
         {optimized.query}
       </span>
-      <span style={{ textAlign: 'right', color: bScore != null ? scoreColor(bScore) : '#444' }}>
-        {bScore != null ? `${(bScore * 100).toFixed(0)}%` : '—'}
+      <span style={{ display: 'flex', flexWrap: 'wrap', gap: "var(--workspace-space-6) var(--workspace-space-16)" }}>
+      <span style={{ color: bScore != null ? scoreColor(bScore) : 'var(--workspace-muted)' }}>
+        Default:
+        {bScore != null ? `${(bScore * 100).toFixed(0)}%` : '-'}
       </span>
-      <span style={{ textAlign: 'right', color: scoreColor(oScore), fontWeight: 600 }}>
-        {(oScore * 100).toFixed(0)}%
+      <span style={{ color: scoreColor(oScore), fontWeight: 600 }}>
+        Optimized:         {(oScore * 100).toFixed(0)}%
       </span>
       <span style={{
         textAlign: 'right', color: deltaColor, fontWeight: 600,
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 2,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 'var(--workspace-space-2)',
       }}>
-        {deltaPts == null ? '—' : (
+        Change: {deltaPts == null ? 'Not available' : (
           <>
             {deltaPts > 5 ? <ArrowUpRight size={10} /> : deltaPts < -5 ? <ArrowDownRight size={10} /> : null}
-            {deltaPts > 0 ? '+' : ''}{deltaPts.toFixed(0)}
+            {deltaPts > 0 ? '+' : ''}{deltaPts.toFixed(0)} points
           </>
         )}
+      </span>
       </span>
     </button>
   )

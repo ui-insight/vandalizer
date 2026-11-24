@@ -7,9 +7,12 @@
     "seed_id": "wf-financial-cost-allocation",
     "display_name": "Cost Allocation Analyzer",
     "description": "Reviews cost allocations for compliance with 2 CFR 200 Uniform Guidance, checking allowability, allocability, and reasonableness.",
-    "quality_tier": "excellent",
     "collections": [
       "financial"
+    ],
+    "superseded_prompt_sha256": [
+      "778660374791cf2deac8fcde2347df5b34e7e8450add05c777be9bbcd7ac7608",
+      "22daf4a59a974c395bca3035a47a307a06142dfc1aa78ecd84888eab6e79f4a5"
     ]
   },
   "items": [
@@ -27,6 +30,15 @@
               "data": {
                 "searchphrases": "Award Number, Cost Category, Direct Cost Description, Cost Amount, Allocation Methodology, Benefiting Projects, Time Period, Supporting Documentation, Special Award Conditions, Cost Type"
               }
+            },
+            {
+              "name": "KnowledgeBaseQuery",
+              "data": {
+                "kb_seed_id": "kb-2cfr200",
+                "query": "factors affecting allowability of costs 200.403; reasonable costs 200.404; allocable costs 200.405; prior written approval 200.407; selected items of cost entertainment alcoholic beverages fundraising bad debts",
+                "mode": "passages",
+                "k": 8
+              }
             }
           ]
         },
@@ -38,11 +50,45 @@
             {
               "name": "Prompt",
               "data": {
-                "prompt": "You are a cost accounting specialist for sponsored programs. Review cost allocations for compliance with 2 CFR 200 (Uniform Guidance):\n\n## Allowability (2 CFR 200.403)\nFor each cost, determine if it is allowable:\n- Is it necessary and reasonable for the award?\n- Is it consistent with institutional policies?\n- Is it treated consistently (not charged as direct on some awards and indirect on others)?\n- Is it adequately documented?\n\n## Specific Cost Categories (2 CFR 200.420-475)\nCheck against specific provisions:\n- **Unallowable costs**: entertainment, alcohol, lobbying, fines/penalties, bad debts, fundraising\n- **Requires prior approval**: equipment >$5K, foreign travel, participant support, subawards\n- **Conditional allowability**: memberships, advertising, insurance\n\n## Allocability (2 CFR 200.405)\n- Does each cost benefit the specific award?\n- Is the allocation methodology reasonable and consistently applied?\n- Is there adequate documentation linking costs to the project?\n\n## Classification\nFor each cost item:\n- **Allowable** - cite relevant 2 CFR 200 section\n- **Questionable** - explain concern\n- **Unallowable** - cite prohibition\n\nPresent as a structured review table with recommendations.",
+                "prompt": "You are a cost accounting specialist for sponsored programs. Review cost allocations for compliance with 2 CFR 200 (Uniform Guidance):\n\nYour input has two parts: the fields extracted from the document, and passages from the Uniform Guidance (2 CFR 200) retrieved for this review, each labeled with its source. Apply each rule as those passages state it and cite its section (for example 2 CFR 200.403, factors affecting allowability). If the passages don't cover a rule you need, name the rule and say it should be checked against the regulation text. Never fill in a threshold, rate or requirement from memory.\n\n## Allowability (2 CFR 200.403)\nFor each cost, determine if it is allowable:\n- Is it necessary and reasonable for the award?\n- Is it consistent with institutional policies?\n- Is it treated consistently (not charged as direct on some awards and indirect on others)?\n- Is it adequately documented?\n\n## Specific Cost Categories (2 CFR 200.420-475)\nCheck against specific provisions:\n- **Unallowable costs**: entertainment, alcohol, lobbying, fines/penalties, bad debts, fundraising\n- **Requires prior approval**: the items 2 CFR 200.407 and the passages list as needing prior written approval (for example equipment and participant support costs), citing the section for each\n- **Conditional allowability**: memberships, advertising, insurance\n\n## Allocability (2 CFR 200.405)\n- Does each cost benefit the specific award?\n- Is the allocation methodology reasonable and consistently applied?\n- Is there adequate documentation linking costs to the project?\n\n## Classification\nFor each cost item:\n- **Allowable** - cite relevant 2 CFR 200 section\n- **Questionable** - explain concern\n- **Unallowable** - cite prohibition\n\nPresent as a structured review table with recommendations.",
                 "input_source": "workflow_documents"
               }
             }
           ]
+        }
+      ],
+      "validation_plan": [
+        {
+          "id": "6f0f6b1e-3f4a-4f0e-9c1a-1009a0000003",
+          "name": "Cites the regulation it applied",
+          "description": "Each rule, threshold or requirement the output applies is cited to its section of the Uniform Guidance (2 CFR 200) (for example 2 CFR 200.403, factors affecting allowability), and nothing is stated as a rule without a citation or an explicit note that the retrieved passages did not cover it.",
+          "category": "accuracy"
+        },
+        {
+          "id": "8cd2940c-1853-51e8-9be2-d9b54886fb69",
+          "name": "Figures match the source",
+          "category": "accuracy",
+          "description": "Every cost amount, allocation percentage and period in the output appears in the source document with the same value, unit and (for dates) year. A figure the output calculated says how it was calculated and the arithmetic is right. FAIL if any value differs from the source, or appears with no basis in it."
+        },
+        {
+          "id": "a0229d70-51b0-5c4d-b526-bea703b72250",
+          "name": "Every cost item is assessed",
+          "category": "completeness",
+          "description": "Each cost item the document lists is assessed for allowability, allocability and reasonableness. FAIL for each listed cost the output skips."
+        },
+        {
+          "id": "f66e73f5-f1a5-542f-89a8-62a786daacd8",
+          "name": "No clearance without evidence",
+          "category": "content",
+          "description": "Every favourable conclusion (allowable, allocable, reasonable) rests on something the document states. Where the document does not give enough to decide, the output says the item could not be determined and what is needed. FAIL if the output calls something compliant, complete, allowable or low-risk without stated support."
+        }
+      ],
+      "validation_inputs": [
+        {
+          "id": "f10a624b-8c6b-5a60-8433-c19e4d9b050b",
+          "type": "text",
+          "label": "Fictional cost listing. Answer key: (1) Lab reagents $2,400 is allowable and allocable: it was used only on this project (2 CFR 200.405). (2) The $650 holiday reception is unallowable: entertainment with no programmatic purpose (200.438), and its $180 of wine is unallowable as alcohol (200.423). (3) The $3,000 freezer service contract benefits three projects equally, so only $1,000 is allocable to this award under 200.405(d); $2,000 is overcharged. (4) The $4,000 of administrative assistant salary is normally indirect. Direct charging needs all three conditions of 200.413(c), which the listing does not establish, so it is not shown allowable. A total of $6,650 (the reception, the freezer overcharge and the salary) is questioned or unallowable.",
+          "text": "FICTIONAL QA MATERIAL — NOT A REAL LEDGER\nDirect Cost Review — Example University\nAward number: EXA-2027-0310 (Federal research award)\nPeriod reviewed: January 1, 2027 through March 31, 2027\n\n1. Laboratory reagents — $2,400. Used only for the experiments on this award. Invoices attached.\n2. Department holiday reception — $650, including $180 for wine. Attended by department faculty and staff.\n3. Ultra-low freezer service contract — $3,000, charged 100% to this award. The freezer stores samples for three projects, each using it equally.\n4. Administrative assistant salary — $4,000 (Pat Example, 25% effort for the quarter). The assistant schedules meetings and processes purchases for the department.\n\nSpecial award conditions: none."
         }
       ]
     }

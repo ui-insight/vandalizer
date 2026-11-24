@@ -1,0 +1,391 @@
+{
+  "schema_version": 1,
+  "contract_id": "vandalizer-core.cc17.1",
+  "rubric_id": "v5.0-competency-draft.1",
+  "state": "design_draft",
+  "credential_promise": "Use Chat, Projects, Knowledge Bases, Skills and browser controls to prepare a private, source-checked research administration case note and identify the decision that needs a person.",
+  "agent_assistance": "Use the assistant to retrieve passages and apply instructions. Select your own source judgments, save your case note and choose the work sample to submit.",
+  "exclusions": [
+    "Workflow design and extraction authoring belong to the optional Advanced Builder course.",
+    "Institutional authority to approve or transmit an award."
+  ],
+  "credit_policy": "all_required_outcomes",
+  "legacy_equivalence": "no_automatic_transfer_without_assessed_evidence",
+  "evidence_policy": [
+    "Each required judgment uses an authenticated, pinned scenario submission.",
+    "The case note also requires a matching private project and saved chat evidence for the assigned award, policy retrieval, active Skill and recorded browser lookup with tab cleanup."
+  ],
+  "modules": [
+    {
+      "module_id": "core_chat",
+      "outcomes": [
+        {
+          "id": "core_chat.award",
+          "statement": "Distinguish a missing term from an explicit zero.",
+          "lesson_ids": [
+            "core_chat.first-answer",
+            "core_chat.missing-term"
+          ],
+          "practice": "In the same Chat ask “What cost-share percentage does this award require?” Open the award again. There is no percentage or waiver in it. Ask the assistant to record the question for the research administrator. A confident zero would change the award terms. Keep this chat for the next module.",
+          "assessment": "The award authorizes $48,000 and says nothing about cost share. Which statement can go in your case note?",
+          "evidence": [
+            "learner_choice",
+            "scenario_revision"
+          ],
+          "passing_conditions": [
+            "Authorized amount $48,000. Ask the administrator to confirm cost share."
+          ],
+          "critical_failures": [
+            "Authorized amount $48,000, cost share 0%."
+          ],
+          "method": "scenario_choice",
+          "calibration": [
+            {
+              "id": "supported",
+              "situation": "Authorized amount $48,000. Ask the administrator to confirm cost share.",
+              "expected": "pass",
+              "reason": "The amount is traceable to the award and the missing term stays open."
+            },
+            {
+              "id": "unsupported",
+              "situation": "Authorized amount $48,000, cost share 0%.",
+              "expected": "fail",
+              "reason": "Silence supplies no percentage. Keep this question open."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        }
+      ]
+    },
+    {
+      "module_id": "core_projects",
+      "outcomes": [
+        {
+          "id": "core_projects.scope",
+          "statement": "Reopen the intended Project and verify its working context.",
+          "lesson_ids": [
+            "core_projects.workspace",
+            "core_projects.resume"
+          ],
+          "practice": "Leave the project and return to it by name. Reopen the case chat, inspect its attachments and compare its award with your first answer. Remove unrelated sources from the chat scope. Project Context is a durable place for your private case note. Leave the final note until you have checked policy and website evidence.",
+          "assessment": "You reopen CC-17 and see an unrelated award in the chat selection. What do you do before continuing?",
+          "evidence": [
+            "learner_choice",
+            "scenario_revision"
+          ],
+          "passing_conditions": [
+            "Confirm the private CC-17 project and select only the assigned award."
+          ],
+          "critical_failures": [
+            "Continue with both awards because the chat remembers the case."
+          ],
+          "method": "scenario_choice",
+          "calibration": [
+            {
+              "id": "supported",
+              "situation": "Confirm the private CC-17 project and select only the assigned award.",
+              "expected": "pass",
+              "reason": "The project and selected source now match the task."
+            },
+            {
+              "id": "unsupported",
+              "situation": "Continue with both awards because the chat remembers the case.",
+              "expected": "fail",
+              "reason": "The other award can introduce terms from a different agreement."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        }
+      ]
+    },
+    {
+      "module_id": "core_knowledge",
+      "outcomes": [
+        {
+          "id": "core_knowledge.policy",
+          "statement": "Attribute each finding to the source that states it.",
+          "lesson_ids": [
+            "core_knowledge.policy-source",
+            "core_knowledge.attribution"
+          ],
+          "practice": "The training policy requires written approval before booking. It does not change the sponsor’s award amount or answer the cost-share question. Ask the assistant to label the award finding and the policy finding separately. If retrieval returns no passage, inspect the selected base and its indexing status, then search again.",
+          "assessment": "A search retrieves the training policy’s written pre-booking approval rule. How should you attribute it?",
+          "evidence": [
+            "learner_choice",
+            "scenario_revision"
+          ],
+          "passing_conditions": [
+            "Cite the training travel policy for booking approval and keep the award citation for the amount."
+          ],
+          "critical_failures": [
+            "List it as a sponsor condition in the award."
+          ],
+          "method": "scenario_choice",
+          "calibration": [
+            {
+              "id": "supported",
+              "situation": "Cite the training travel policy for booking approval and keep the award citation for the amount.",
+              "expected": "pass",
+              "reason": "Each claim points to the source that governs it."
+            },
+            {
+              "id": "unsupported",
+              "situation": "List it as a sponsor condition in the award.",
+              "expected": "fail",
+              "reason": "The cited passage is institutional training policy."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        }
+      ]
+    },
+    {
+      "module_id": "core_skills",
+      "outcomes": [
+        {
+          "id": "core_skills.skill",
+          "statement": "Run one turn with a selected Skill and check the reply against its sources.",
+          "lesson_ids": [
+            "core_skills.inspect",
+            "core_skills.apply"
+          ],
+          "practice": "With the Skill selected, ask “Audit the award amount and the travel rule. What is still unresolved?” Inspect the reply and open its references. A Skill gives the assistant instructions. It supplies neither policy evidence nor permission to share. Keep the active-Skill turn in this chat.",
+          "assessment": "A source-checking Skill produces a polished summary that assigns a cost-share percentage. What is your next action?",
+          "evidence": [
+            "learner_choice",
+            "scenario_revision"
+          ],
+          "passing_conditions": [
+            "Inspect the sources, remove the unsupported percentage and keep the question for the administrator."
+          ],
+          "critical_failures": [
+            "Accept the percentage because the Skill ran successfully."
+          ],
+          "method": "scenario_choice",
+          "calibration": [
+            {
+              "id": "supported",
+              "situation": "Inspect the sources, remove the unsupported percentage and keep the question for the administrator.",
+              "expected": "pass",
+              "reason": "The Skill guides the review while the sources govern the finding."
+            },
+            {
+              "id": "unsupported",
+              "situation": "Accept the percentage because the Skill ran successfully.",
+              "expected": "fail",
+              "reason": "A completed Skill turn establishes no missing term."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        }
+      ]
+    },
+    {
+      "module_id": "core_browser",
+      "outcomes": [
+        {
+          "id": "core_browser.browser",
+          "statement": "Separate an observed web value from a sponsor decision.",
+          "lesson_ids": [
+            "core_browser.authorize",
+            "core_browser.finish"
+          ],
+          "practice": "Ask the assistant to finish the browser task and release its working tab after recording the domain. IANA explains the purpose of example domains. Its page cannot confirm a sponsor deadline or a contact person. If the browser, site access or page is unavailable, save the rest of your work and resume this lookup when access returns.",
+          "assessment": "The training award lists example.org. Which browser action supplies evidence for a private case note?",
+          "evidence": [
+            "learner_choice",
+            "scenario_revision"
+          ],
+          "passing_conditions": [
+            "Read the IANA page, record the matching domain and URL, then finish the working tab."
+          ],
+          "critical_failures": [
+            "Type award details into a contact form to see whether the address works."
+          ],
+          "method": "scenario_choice",
+          "calibration": [
+            {
+              "id": "supported",
+              "situation": "Read the IANA page, record the matching domain and URL, then finish the working tab.",
+              "expected": "pass",
+              "reason": "This preserves the observed value and releases the task tab."
+            },
+            {
+              "id": "unsupported",
+              "situation": "Type award details into a contact form to see whether the address works.",
+              "expected": "fail",
+              "reason": "The assignment authorizes a read-only lookup and no disclosure."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        }
+      ]
+    },
+    {
+      "module_id": "core_case",
+      "outcomes": [
+        {
+          "id": "core_case.award",
+          "statement": "Attribute the authorized funding amount to the assigned award notice.",
+          "lesson_ids": [
+            "core_case.assemble",
+            "core_case.handoff"
+          ],
+          "practice": "Reopen the note. Compare each line to the award passage, the policy passage or the recorded web observation. Verify the open question names the person who should resolve it. In the challenge select this project and its case chat, choose the four lines you saved and submit. The course checks your private training note and saved activity. Advanced Builder is a separate optional course for anyone who needs to design extractions and workflows.",
+          "assessment": "Which award line belongs in the note?",
+          "evidence": [
+            "learner_choice",
+            "scenario_revision",
+            "private_project_note",
+            "saved_project_chat"
+          ],
+          "passing_conditions": [
+            "Award: CC-17 authorizes $48,000."
+          ],
+          "critical_failures": [
+            "Award: $48,000 requested in a proposal."
+          ],
+          "method": "scenario_choice",
+          "calibration": [
+            {
+              "id": "supported",
+              "situation": "Award: CC-17 authorizes $48,000.",
+              "expected": "pass",
+              "reason": "The award notice states this amount."
+            },
+            {
+              "id": "unsupported",
+              "situation": "Award: $48,000 requested in a proposal.",
+              "expected": "fail",
+              "reason": "The award notice authorizes funds."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        },
+        {
+          "id": "core_case.policy",
+          "statement": "Attribute the pre-booking decision to the separate training policy.",
+          "lesson_ids": [
+            "core_case.assemble",
+            "core_case.handoff"
+          ],
+          "practice": "Reopen the note. Compare each line to the award passage, the policy passage or the recorded web observation. Verify the open question names the person who should resolve it. In the challenge select this project and its case chat, choose the four lines you saved and submit. The course checks your private training note and saved activity. Advanced Builder is a separate optional course for anyone who needs to design extractions and workflows.",
+          "assessment": "Which policy line belongs in the note?",
+          "evidence": [
+            "learner_choice",
+            "scenario_revision",
+            "private_project_note",
+            "saved_project_chat"
+          ],
+          "passing_conditions": [
+            "Policy: Obtain written approval before booking travel."
+          ],
+          "critical_failures": [
+            "Policy: Send travel receipts after booking instead of obtaining approval."
+          ],
+          "method": "scenario_choice",
+          "calibration": [
+            {
+              "id": "supported",
+              "situation": "Policy: Obtain written approval before booking travel.",
+              "expected": "pass",
+              "reason": "The training travel policy supplies this rule."
+            },
+            {
+              "id": "unsupported",
+              "situation": "Policy: Send travel receipts after booking instead of obtaining approval.",
+              "expected": "fail",
+              "reason": "Reimbursement paperwork does not replace prior approval."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        },
+        {
+          "id": "core_case.website",
+          "statement": "Keep the web observation within the scope of the retrieved page.",
+          "lesson_ids": [
+            "core_case.assemble",
+            "core_case.handoff"
+          ],
+          "practice": "Reopen the note. Compare each line to the award passage, the policy passage or the recorded web observation. Verify the open question names the person who should resolve it. In the challenge select this project and its case chat, choose the four lines you saved and submit. The course checks your private training note and saved activity. Advanced Builder is a separate optional course for anyone who needs to design extractions and workflows.",
+          "assessment": "Which browser observation belongs in the note?",
+          "evidence": [
+            "learner_choice",
+            "scenario_revision",
+            "private_project_note",
+            "saved_project_chat"
+          ],
+          "passing_conditions": [
+            "Website: IANA lists example.org as a documentation domain."
+          ],
+          "critical_failures": [
+            "Website: example.org is the verified sponsor contact."
+          ],
+          "method": "scenario_choice",
+          "calibration": [
+            {
+              "id": "supported",
+              "situation": "Website: IANA lists example.org as a documentation domain.",
+              "expected": "pass",
+              "reason": "This observation stays within what the page establishes."
+            },
+            {
+              "id": "unsupported",
+              "situation": "Website: example.org is the verified sponsor contact.",
+              "expected": "fail",
+              "reason": "The IANA source identifies an example domain."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        },
+        {
+          "id": "core_case.open",
+          "statement": "Identify the missing award term and assign the outstanding human question.",
+          "lesson_ids": [
+            "core_case.assemble",
+            "core_case.handoff"
+          ],
+          "practice": "Reopen the note. Compare each line to the award passage, the policy passage or the recorded web observation. Verify the open question names the person who should resolve it. In the challenge select this project and its case chat, choose the four lines you saved and submit. The course checks your private training note and saved activity. Advanced Builder is a separate optional course for anyone who needs to design extractions and workflows.",
+          "assessment": "Which question belongs in the handoff?",
+          "evidence": [
+            "learner_choice",
+            "scenario_revision",
+            "private_project_note",
+            "saved_project_chat"
+          ],
+          "passing_conditions": [
+            "Open: Ask the research administrator to confirm the cost-share requirement."
+          ],
+          "critical_failures": [
+            "Open: No action needed because cost share is zero."
+          ],
+          "method": "scenario_choice",
+          "calibration": [
+            {
+              "id": "supported",
+              "situation": "Open: Ask the research administrator to confirm the cost-share requirement.",
+              "expected": "pass",
+              "reason": "The award leaves this institutional question unresolved."
+            },
+            {
+              "id": "unsupported",
+              "situation": "Open: No action needed because cost share is zero.",
+              "expected": "fail",
+              "reason": "The award contains no waiver or percentage."
+            }
+          ],
+          "teaching_status": "authored",
+          "assessment_status": "implemented"
+        }
+      ]
+    }
+  ]
+}

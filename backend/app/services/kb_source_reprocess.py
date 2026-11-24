@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 class ReprocessRefused(Exception):
     """A reprocess that cannot start, with the HTTP status and reason to show."""
 
-    def __init__(self, status_code: int, detail: str):
+    def __init__(self, status_code: int, detail: str) -> None:
         super().__init__(detail)
         self.status_code = status_code
         self.detail = detail
@@ -124,8 +124,14 @@ async def _reprocess_document_source(
     if extracting:
         return "waiting"
     if needs_read:
+        assert authorized_doc is not None  # Edit access was checked before saving source state.
+        from app.services.extraction_restarts import ExtractionRestartConflict
         try:
             await document_service.restart_extraction(authorized_doc, user.user_id)
+        except ExtractionRestartConflict as error:
+            source.status, source.error_message, source.refresh_queued_at = previous
+            await source.save()
+            raise ReprocessRefused(409, str(error)) from error
         except Exception:
             source.status, source.error_message, source.refresh_queued_at = previous
             await source.save()

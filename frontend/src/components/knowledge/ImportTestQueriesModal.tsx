@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
-import { FocusTrap } from 'focus-trap-react'
+import { usePanelEffect } from '../shared/usePanelEffect'
+import { useRef, useState } from 'react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { Upload, X, FileSpreadsheet, Download, Loader2 } from 'lucide-react'
 import { importKBTestQueries, type KBTestQueryImportResult } from '../../api/knowledge'
 
 interface Props {
   kbUuid: string
-  onImported: () => void
+  onImported: () => void | Promise<void>
   onClose: () => void
 }
 
@@ -34,10 +35,11 @@ export function ImportTestQueriesModal({ kbUuid, onImported, onClose }: Props) {
   const [result, setResult] = useState<KBTestQueryImportResult | null>(null)
   const [dragOver, setDragOver] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const inFlight = useRef(false)
 
-  useEffect(() => {
+  usePanelEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape' && !inFlight.current) onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -45,23 +47,28 @@ export function ImportTestQueriesModal({ kbUuid, onImported, onClose }: Props) {
 
   const pickFile = (f: File | undefined | null) => {
     if (!f) return
+    if (inFlight.current) return
     setError(null)
     setResult(null)
+    if (!/\.(csv|xlsx)$/i.test(f.name)) { setFile(null); setError('Choose a CSV or Excel (.xlsx) file.'); return }
+    if (f.size > 5 * 1024 * 1024) { setFile(null); setError('This file exceeds the 5 MB limit.'); return }
     setFile(f)
   }
 
   const handleImport = async () => {
-    if (!file) return
+    if (!file || inFlight.current || result) return
+    inFlight.current = true
     setImporting(true)
     setError(null)
     try {
       const res = await importKBTestQueries(kbUuid, file)
       setResult(res)
-      if (res.created > 0 || res.updated > 0) onImported()
+      if (res.created > 0 || res.updated > 0) await onImported()
     } catch (e) {
       setError((e as Error).message)
     } finally {
       setImporting(false)
+      inFlight.current = false
     }
   }
 
@@ -76,24 +83,25 @@ export function ImportTestQueriesModal({ kbUuid, onImported, onClose }: Props) {
         aria-modal="true"
         aria-label="Import test queries"
         style={{
-          width: 480, padding: 20, backgroundColor: '#1f1f1f',
-          border: '1px solid #2e2e2e', borderRadius: 10,
+          width: 480, maxWidth: 'calc(100vw - 24px)', maxHeight: '90dvh', overflowY: 'auto', padding: 'var(--workspace-space-16)', backgroundColor: 'var(--workspace-surface)', overflowWrap: 'anywhere',
+          border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-large)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-          <Upload size={16} style={{ color: '#0ea5e9' }} aria-hidden="true" />
-          <h3 style={{ margin: 0, fontSize: 15, color: '#fff' }}>Import test queries</h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-4)' }}>
+          <Upload size={16} style={{ color: 'var(--workspace-info)' }} aria-hidden="true" />
+          <h3 style={{ margin: 0, fontSize: 'var(--workspace-font-card-title)', color: 'var(--workspace-text)' }}>Import test queries</h3>
           <button
             type="button"
             aria-label="Close"
             onClick={onClose}
-            style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: '#888' }}
+            disabled={importing}
+            style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-2)', color: 'var(--workspace-muted)' }}
           >
             <X size={16} aria-hidden="true" />
           </button>
         </div>
-        <div style={{ fontSize: 12, color: '#aaa', marginBottom: 12 }}>
-          Upload a CSV or Excel (.xlsx) file with a <strong>Question</strong> column;
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginBottom: 'var(--workspace-space-12)' }}>
+          Upload a CSV or Excel (.xlsx) file, up to 5 MB, with a <strong>Question</strong> column;
           Expected Answer, Category, Source or Section, Notes, and ID columns are
           optional. Rows whose ID matches a previously imported question update it
           instead of creating a duplicate — re-import the same sheet as your KB evolves.
@@ -108,9 +116,9 @@ export function ImportTestQueriesModal({ kbUuid, onImported, onClose }: Props) {
           type="button"
           onClick={downloadTemplate}
           style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 12,
+            display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)', marginBottom: 'var(--workspace-space-12)',
             padding: 0, background: 'transparent', border: 'none', cursor: 'pointer',
-            fontSize: 12, color: '#0ea5e9', fontFamily: 'inherit',
+            fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-info)', fontFamily: 'inherit',
           }}
         >
           <Download size={12} aria-hidden="true" />
@@ -120,10 +128,11 @@ export function ImportTestQueriesModal({ kbUuid, onImported, onClose }: Props) {
         {/* Drop zone / picker */}
         <div
           role="button"
-          tabIndex={0}
+          tabIndex={importing ? -1 : 0}
+          aria-disabled={importing}
           aria-label="Choose a file to import"
-          onClick={() => inputRef.current?.click()}
-          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') inputRef.current?.click() }}
+          onClick={() => { if (!importing) inputRef.current?.click() }}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (!importing) inputRef.current?.click() } }}
           onDragOver={e => { e.preventDefault(); setDragOver(true) }}
           onDragLeave={() => setDragOver(false)}
           onDrop={e => {
@@ -132,14 +141,14 @@ export function ImportTestQueriesModal({ kbUuid, onImported, onClose }: Props) {
             pickFile(e.dataTransfer.files?.[0])
           }}
           style={{
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-            padding: '22px 12px', marginBottom: 12, cursor: 'pointer',
-            backgroundColor: dragOver ? 'rgba(14,165,233,0.08)' : '#262626',
-            border: `1px dashed ${dragOver ? '#0ea5e9' : '#3a3a3a'}`, borderRadius: 8,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--workspace-space-6)',
+            padding: "22px var(--workspace-space-12)", marginBottom: 'var(--workspace-space-12)', cursor: 'pointer',
+            backgroundColor: dragOver ? 'rgba(14,165,233,0.08)' : 'var(--workspace-surface)',
+            border: `1px dashed ${dragOver ? '#0ea5e9' : 'var(--workspace-border)'}`, borderRadius: 'var(--workspace-radius-medium)',
           }}
         >
-          <FileSpreadsheet size={20} style={{ color: file ? '#22c55e' : '#666' }} aria-hidden="true" />
-          <div style={{ fontSize: 12, color: file ? '#e5e5e5' : '#888', textAlign: 'center' }}>
+          <FileSpreadsheet size={20} style={{ color: file ? 'var(--workspace-success)' : 'var(--workspace-muted)' }} aria-hidden="true" />
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: file ? 'var(--workspace-text)' : 'var(--workspace-muted)', textAlign: 'center' }}>
             {file ? file.name : 'Drop a .csv or .xlsx file here, or click to browse'}
           </div>
           <input
@@ -156,9 +165,9 @@ export function ImportTestQueriesModal({ kbUuid, onImported, onClose }: Props) {
 
         {error && (
           <div role="alert" style={{
-            padding: '8px 10px', marginBottom: 12, fontSize: 12, color: '#fca5a5',
+            padding: "var(--workspace-space-8) var(--workspace-space-12)", marginBottom: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-danger)',
             backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
-            borderRadius: 6, whiteSpace: 'pre-wrap',
+            borderRadius: 'var(--workspace-radius-small)', whiteSpace: 'pre-wrap',
           }}>
             {error}
           </div>
@@ -166,9 +175,9 @@ export function ImportTestQueriesModal({ kbUuid, onImported, onClose }: Props) {
 
         {result && (
           <div role="status" style={{
-            padding: '8px 10px', marginBottom: 12, fontSize: 12, color: '#e5e5e5',
+            padding: "var(--workspace-space-8) var(--workspace-space-12)", marginBottom: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)',
             backgroundColor: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.3)',
-            borderRadius: 6,
+            borderRadius: 'var(--workspace-radius-small)',
           }}>
             <div>
               Imported: <strong>{result.created}</strong> created,{' '}
@@ -177,9 +186,9 @@ export function ImportTestQueriesModal({ kbUuid, onImported, onClose }: Props) {
               {' '}of {result.total_rows} rows.
             </div>
             {result.errors.length > 0 && (
-              <div style={{ marginTop: 6, color: '#fbbf24' }}>
+              <div style={{ marginTop: 'var(--workspace-space-6)', color: 'var(--workspace-warning)' }}>
                 {result.errors.length} row{result.errors.length === 1 ? '' : 's'} could not be imported:
-                <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+                <ul style={{ margin: "var(--workspace-space-4) 0 0", paddingLeft: 'var(--workspace-space-20)' }}>
                   {result.errors.slice(0, 8).map(e => (
                     <li key={e.row}>Row {e.row}: {e.error}</li>
                   ))}
@@ -188,13 +197,13 @@ export function ImportTestQueriesModal({ kbUuid, onImported, onClose }: Props) {
               </div>
             )}
             {(result.unmatched_source_labels?.length ?? 0) > 0 && (
-              <div style={{ marginTop: 6, color: '#fbbf24' }}>
+              <div style={{ marginTop: 'var(--workspace-space-6)', color: 'var(--workspace-warning)' }}>
                 {result.unmatched_source_labels!.length} source label
                 {result.unmatched_source_labels!.length === 1 ? '' : 's'} match no source in
                 this knowledge base. Questions using them always score 0 retrieval
                 precision, which pulls the run score down for a naming mismatch rather
                 than a retrieval problem — rename them to match a source, or clear them:
-                <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+                <ul style={{ margin: "var(--workspace-space-4) 0 0", paddingLeft: 'var(--workspace-space-20)' }}>
                   {result.unmatched_source_labels!.slice(0, 8).map(u => (
                     <li key={u.label}>
                       "{u.label}" — {u.questions} question{u.questions === 1 ? '' : 's'}
@@ -209,29 +218,29 @@ export function ImportTestQueriesModal({ kbUuid, onImported, onClose }: Props) {
           </div>
         )}
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button type="button" onClick={onClose} style={{
-            padding: '6px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-            color: '#aaa', background: 'transparent', border: '1px solid #333',
-            borderRadius: 6, cursor: 'pointer',
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--workspace-space-8)' }}>
+          <button type="button" onClick={onClose} disabled={importing} style={{
+            padding: "var(--workspace-space-6) var(--workspace-space-16)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+            color: 'var(--workspace-muted)', background: 'transparent', border: '1px solid var(--workspace-border)',
+            borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
           }}>
             {result ? 'Done' : 'Cancel'}
           </button>
           <button
             type="button"
             onClick={handleImport}
-            disabled={!file || importing}
+            disabled={!file || importing || !!result}
             style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '6px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-              color: '#fff', backgroundColor: !file || importing ? '#134e6b' : '#0ea5e9',
-              border: '1px solid #0ea5e9', borderRadius: 6,
+              display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+              padding: "var(--workspace-space-6) var(--workspace-space-16)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+              color: 'var(--workspace-text)', backgroundColor: !file || importing || result ? 'var(--workspace-info-surface)' : 'var(--workspace-info-surface)',
+              border: '1px solid #0ea5e9', borderRadius: 'var(--workspace-radius-small)',
               cursor: !file || importing ? 'not-allowed' : 'pointer',
               opacity: !file || importing ? 0.7 : 1,
             }}
           >
             {importing && <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />}
-            {importing ? 'Importing…' : 'Import'}
+            {importing ? 'Importing…' : result ? 'Import complete' : 'Import'}
           </button>
         </div>
       </div>
