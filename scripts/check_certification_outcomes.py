@@ -25,6 +25,11 @@ from app.services.certification_versions.governance_case import GovernanceCase  
 
 
 def main():
+    from assemble_certification_v5_preview import DATA, core_assets
+    panel, core_lessons, _, assets, core, _ = core_assets(DATA / 'drafts/v5.0')
+    core.verify_teaching_references(core_lessons)
+    for module in panel:
+        ScenarioBank.model_validate(assets[f"assessments/{module['id']}.json"]).verify_contract(core)
     path = ROOT / 'backend/certification-data/drafts/v5.0/outcomes.json'
     contract = OutcomeContract.model_validate_json(path.read_bytes())
     lessons = json.loads((ROOT / 'backend/certification-data/lessons.json').read_text())
@@ -109,6 +114,9 @@ def main():
     with fitz.open(stream=advanced_source, filetype='pdf') as pdf:
         advanced.verify_source(advanced_source, [page.get_text() for page in pdf])
     print(json.dumps({
+        'core': {'modules': len(panel), 'lessons': sum(len(m['lessons']) for m in panel),
+                 'required_outcomes': len(core.required_outcomes()), 'state': core.state},
+        'track': 'advanced',
         'contract_id': contract.contract_id,
         'contract_sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
         'rubric_id': contract.rubric_id,

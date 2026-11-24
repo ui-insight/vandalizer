@@ -21,7 +21,7 @@ SELECTED = {'review_attempt_id': '1' * 32, 'scenario_attempt_id': '2' * 32}
 
 @pytest.fixture
 def candidate(tmp_path):
-    root = preview.assemble(tmp_path / 'candidate', VERSION)
+    root = preview.assemble(tmp_path / 'candidate', VERSION, track='advanced')
     folder = root / VERSION
     # Synthetic metadata only. Production drafts remain implemented/unverified.
     contract = json.loads((folder / 'outcomes.json').read_text())

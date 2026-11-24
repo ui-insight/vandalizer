@@ -5,6 +5,8 @@ import { ApiError } from '../../api/client'
 import { ScenarioAssessment } from './ScenarioAssessment'
 import type { ScenarioDefinition, ScenarioSubmission } from '../../types/certification'
 
+vi.mock('../../api/projects', () => ({ listProjects: vi.fn().mockResolvedValue([{ uuid: 'project', title: 'Cedar Creek CC-17', team_id: null }]) }))
+vi.mock('../../api/chat', () => ({ listConversations: vi.fn().mockResolvedValue([{ uuid: 'chat', title: 'Award questions' }]) }))
 vi.mock('../../api/certification', () => ({ submitScenarios: vi.fn(), getScenarioSubmission: vi.fn() }))
 const definition: ScenarioDefinition = { bank_id: 'test', revision: 1, bank_sha256: 'a'.repeat(64), module_id: 'ai_literacy', questions: [
   { id: 'source', prompt: 'What should you do with an unsupported claim?', choices: [{ id: 'verify', text: 'Verify it against the source' }, { id: 'accept', text: 'Accept the fluent answer' }] },
@@ -23,7 +25,7 @@ it('requires explicit choices and submission, then displays a saved result witho
   expect(api.submitScenarios).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: 'Submit scenario choices' }))
   expect(await screen.findByText('All scenario requirements met')).toBeInTheDocument()
-  expect(api.submitScenarios).toHaveBeenCalledWith('one', 'ai_literacy', expect.stringMatching(/^[a-f0-9]{32}$/), definition.bank_sha256, { source: 'verify' })
+  expect(api.submitScenarios).toHaveBeenCalledWith('one', 'ai_literacy', expect.stringMatching(/^[a-f0-9]{32}$/), definition.bank_sha256, { source: 'verify' }, undefined)
   expect(refresh).toHaveBeenCalledOnce()
   expect(screen.getByText(/No module credit or XP was awarded/)).toBeInTheDocument()
 })
@@ -62,7 +64,7 @@ it.each(['missing', 'unlinked'] as const)('requires a separate explicit retry fo
   expect(api.submitScenarios).not.toHaveBeenCalled()
   expect(screen.getByLabelText('Accept the fluent answer')).toBeDisabled()
   fireEvent.click(retry)
-  await waitFor(() => expect(api.submitScenarios).toHaveBeenCalledWith('one', definition.module_id, pendingId, definition.bank_sha256, { source: 'verify' }))
+  await waitFor(() => expect(api.submitScenarios).toHaveBeenCalledWith('one', definition.module_id, pendingId, definition.bank_sha256, { source: 'verify' }, undefined))
   await waitFor(() => expect(screen.getByLabelText('Accept the fluent answer')).not.toBeDisabled())
 })
 
@@ -212,4 +214,72 @@ it('retains the earlier-result warning when reopening an original deduplicated r
   expect(await screen.findByText(/A newer result remains selected/)).toBeInTheDocument()
   expect(api.getScenarioSubmission).toHaveBeenCalledWith(response.attempt_id)
   expect(api.submitScenarios).not.toHaveBeenCalled()
+})
+
+
+it('keeps the private case note editable when its selected work sample is incomplete', async () => {
+  const core = { ...definition, module_id: 'core_case', work_sample_project: 'Cedar Creek CC-17' }
+  vi.mocked(api.submitScenarios).mockRejectedValueOnce(Object.assign(new ApiError(422, 'Read the assigned IANA page.'), { code: 'work_sample_incomplete' }))
+  render(<ScenarioAssessment definition={core} enrollmentId="core" />)
+  fireEvent.click(screen.getByLabelText('Verify it against the source'))
+  expect(screen.getByLabelText('Case note to save in Project context')).toHaveValue('Verify it against the source')
+  const submit = screen.getByRole('button', { name: 'Submit case note' })
+  expect(submit).toBeDisabled()
+  await screen.findByRole('option', { name: 'Cedar Creek CC-17' })
+  fireEvent.change(screen.getByLabelText('Training project'), { target: { value: 'project' } })
+  fireEvent.change(screen.getByLabelText('Case chat'), { target: { value: 'chat' } })
+  fireEvent.click(submit)
+  expect(await screen.findByText('Read the assigned IANA page.')).toBeInTheDocument()
+  expect(screen.getByLabelText('Training project')).toBeEnabled()
+  fireEvent.click(submit)
+  await screen.findByText('All scenario requirements met')
+  expect(api.submitScenarios).toHaveBeenLastCalledWith('core', 'core_case', expect.any(String), definition.bank_sha256,
+    { source: 'verify' }, { project_id: 'project', conversation_id: 'chat' })
+})
+
+
+it('resubmits a reloaded case note with only the selected project and chat', async () => {
+  const core = { ...definition, module_id: 'core_case', work_sample_project: 'Cedar Creek CC-17' }
+  const attempt = 'c'.repeat(32)
+  // A saved result carries the evidence the server captured beside the selection.
+  vi.mocked(api.getScenarioSubmission).mockResolvedValue({ uuid: attempt, enrollment_id: 'core', module_id: 'core_case',
+    bank_sha256: definition.bank_sha256, answers: { source: 'accept' }, result: { ...result, passed: false }, progress_link: 'selected', read_only: true,
+    work_sample: { project_id: 'project', conversation_id: 'chat', note_sha256: 'd'.repeat(64), observations: { award: 1 } } as never })
+  vi.mocked(api.submitScenarios).mockResolvedValue({ ...response, module_id: 'core_case' })
+  render(<ScenarioAssessment definition={core} enrollmentId="core" attemptId={attempt} />)
+  await waitFor(() => expect(screen.getByLabelText('Accept the fluent answer')).toBeChecked())
+  await screen.findByRole('option', { name: 'Award questions' })
+  expect(screen.getByLabelText('Case chat')).toHaveValue('chat')
+  fireEvent.click(screen.getByLabelText('Verify it against the source'))
+  fireEvent.click(screen.getByRole('button', { name: 'Submit case note' }))
+  await screen.findByText('All scenario requirements met')
+  expect(api.submitScenarios).toHaveBeenLastCalledWith('core', 'core_case', expect.any(String), definition.bank_sha256,
+    { source: 'verify' }, { project_id: 'project', conversation_id: 'chat' })
+})
+
+it('drops evidence keys that an earlier draft stored with the selection', async () => {
+  const core = { ...definition, module_id: 'core_case', work_sample_project: 'Cedar Creek CC-17' }
+  sessionStorage.setItem(`certification-scenarios:core:core_case:${definition.bank_sha256}`, JSON.stringify({
+    answers: { source: 'verify' }, sample: { project_id: 'project', conversation_id: 'chat', note_sha256: 'd'.repeat(64), observations: {} } }))
+  vi.mocked(api.submitScenarios).mockResolvedValue({ ...response, module_id: 'core_case' })
+  render(<ScenarioAssessment definition={core} enrollmentId="core" />)
+  await screen.findByRole('option', { name: 'Cedar Creek CC-17' })
+  fireEvent.change(screen.getByLabelText('Training project'), { target: { value: 'project' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Submit case note' }))
+  await screen.findByText('All scenario requirements met')
+  expect(vi.mocked(api.submitScenarios).mock.calls[0][5]).toEqual({ project_id: 'project', conversation_id: 'chat' })
+})
+
+it('explains a rejected work sample without showing a validation message', async () => {
+  const core = { ...definition, module_id: 'core_case', work_sample_project: 'Cedar Creek CC-17' }
+  vi.mocked(api.submitScenarios).mockRejectedValueOnce(new ApiError(422, 'Extra inputs are not permitted; Extra inputs are not permitted'))
+  render(<ScenarioAssessment definition={core} enrollmentId="core" />)
+  fireEvent.click(screen.getByLabelText('Verify it against the source'))
+  await screen.findByRole('option', { name: 'Cedar Creek CC-17' })
+  fireEvent.change(screen.getByLabelText('Training project'), { target: { value: 'project' } })
+  fireEvent.change(screen.getByLabelText('Case chat'), { target: { value: 'chat' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Submit case note' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('We could not check this work sample. Choose your project and case chat again, then resubmit.')
+  expect(screen.queryByText(/Extra inputs/)).not.toBeInTheDocument()
+  expect(screen.getByLabelText('Training project')).toBeEnabled()
 })

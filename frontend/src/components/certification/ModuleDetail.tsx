@@ -155,6 +155,7 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
               </h3>
               <p className="text-sm text-gray-500">
                 {module.subtitle}
+                {!!module.estimatedMinutes && <span> · About {module.estimatedMinutes} min</span>}
                 <span className="text-gray-500"> · {enrollmentId ? 'Use Save this place to resume later.' : 'Reading place is saved in this browser.'}</span>
               </p>
             </div>

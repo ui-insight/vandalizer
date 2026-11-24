@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.services.certification_versions.core_work_sample import SampleIncomplete, SampleSelection
 from app.config import Settings
 from app.dependencies import get_current_user, get_settings
 from app.models.user import User
@@ -69,6 +70,7 @@ class ScenarioSubmissionPayload(BaseModel):
     request_id: str = Field(pattern=r'^[a-f0-9]{32}$')
     bank_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
     answers: dict[str, str]
+    work_sample: SampleSelection | None = None
 
 
 class CompletionOptions(TypedDict):
@@ -292,7 +294,8 @@ async def provision_module(
     enrollment_id: str | None = None,
 ) -> dict:
     """Provision sample documents for a certification module into the user's workspace."""
-    await _require_lessons_read(user.user_id, module_id, "Setting up the lab")
+    if not svc.lab_used_in_lessons(module_id):
+        await _require_lessons_read(user.user_id, module_id, "Setting up the lab")
     result = await svc.provision_module_documents(user, module_id, settings)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
@@ -326,11 +329,11 @@ async def check_chat_practice(payload: ChatPracticeCheck, user: User = Depends(g
 @router.get('/modules/{module_id}/scenarios', response_model=None)
 @course_operation(http=True)
 async def get_scenario_assessment(module_id: str, user: User = Depends(get_current_user), enrollment_id: str | None = None) -> dict:
-    from app.services.certification_versions.scenario_submissions import module_bank
+    from app.services.certification_versions.scenario_submissions import public_scenarios
     operation = current_operation()
     if operation is None:
         raise HTTPException(status_code=404, detail='This course does not offer scenario assessments')
-    return module_bank(operation.package, module_id).public_definition()
+    return public_scenarios(operation.package, module_id)
 
 
 @router.post('/modules/{module_id}/scenarios', response_model=None)
@@ -341,9 +344,13 @@ async def submit_scenario_assessment(module_id: str, payload: ScenarioSubmission
     operation = current_operation()
     if operation is None:
         raise HTTPException(status_code=404, detail='This course does not offer scenario assessments')
-    return await ScenarioSubmissionRepository().submit(
-        operation, module_id, payload.request_id, payload.bank_sha256, payload.answers, actor_user_id=user.user_id,
-    )
+    try:
+        return await ScenarioSubmissionRepository().submit(
+            operation, module_id, payload.request_id, payload.bank_sha256, payload.answers,
+            actor_user_id=user.user_id, sample=payload.work_sample,
+        )
+    except SampleIncomplete as exc:
+        raise HTTPException(status_code=422, detail={'code': 'work_sample_incomplete', 'message': str(exc)}) from exc
 
 
 @router.get('/scenario-attempts/{attempt_id}', response_model=None)

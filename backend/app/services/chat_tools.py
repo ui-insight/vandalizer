@@ -6750,7 +6750,7 @@ async def _saved_scenario_summary(user_id: str, enrollment_id: str, module_id: s
 async def get_certification_progress(
     context: RunContext[AgenticChatDeps],
 ) -> dict:
-    """Get the user's Vandal Workflow Architect certification progress.
+    """Get the learner's progress in their selected certification course.
 
     Returns overall XP, level, per-module completion/stars, and the
     next incomplete module. Call this when the user says "start certification",
@@ -6918,7 +6918,7 @@ async def get_certification_module(
     }
 
 
-def lessons_first(action: str) -> Callable[[Callable[Concatenate[RunContext[AgenticChatDeps], str, P], Awaitable[dict]]], Callable[Concatenate[RunContext[AgenticChatDeps], str, P], Awaitable[dict]]]:
+def lessons_first(action: str, *, lab_setup: bool = False) -> Callable[[Callable[Concatenate[RunContext[AgenticChatDeps], str, P], Awaitable[dict]]], Callable[Concatenate[RunContext[AgenticChatDeps], str, P], Awaitable[dict]]]:
     """Refuse a course step until the module's lessons are read (guided course).
 
     Applied inside the course operation, so it reads the pinned enrollment.
@@ -6930,6 +6930,8 @@ def lessons_first(action: str) -> Callable[[Callable[Concatenate[RunContext[Agen
         async def wrapped(context: RunContext[AgenticChatDeps], module_id: str, *args: P.args, **kwargs: P.kwargs) -> dict:
             from app.services import certification_service as cert_svc
 
+            if lab_setup and cert_svc.lab_used_in_lessons(module_id):
+                return await function(context, module_id, *args, **kwargs)
             gate = await cert_svc.lesson_gate(context.deps.user_id, module_id)
             if gate is not None:
                 return cert_svc.lesson_gate_error(module_id, gate, action)
@@ -7118,7 +7120,7 @@ async def _save_certification_position_versioned(
 
 @course_operation(write=True, tool=True)
 @certification_result(ProvisionResult)
-@lessons_first("The lab")
+@lessons_first("The lab", lab_setup=True)
 async def provision_certification_lab(
     context: RunContext[AgenticChatDeps],
     module_id: str,

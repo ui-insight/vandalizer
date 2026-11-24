@@ -66,3 +66,12 @@ it('keeps the historical star discrepancy visible after opening the challenge', 
   expect(screen.getByRole('complementary', { name: 'Known limitation in historical star guidance' })).toBeInTheDocument()
   expect(props.onComplete).not.toHaveBeenCalled()
 })
+
+it('shows an estimate only when the module has one', () => {
+  const view = render(<ModuleDetail {...props} module={{ ...legacy, estimatedMinutes: 0 }} />)
+  const summary = () => screen.getByText('Use Save this place to resume later.', { exact: false }).closest('p')
+  expect(summary()).toHaveTextContent(`${legacy.subtitle} · Use Save this place to resume later.`, { normalizeWhitespace: true })
+  expect(summary()?.textContent?.startsWith(`${legacy.subtitle} ·`)).toBe(true)
+  view.rerender(<ModuleDetail {...props} module={{ ...legacy, estimatedMinutes: 8 }} />)
+  expect(summary()).toHaveTextContent('· About 8 min ·')
+})

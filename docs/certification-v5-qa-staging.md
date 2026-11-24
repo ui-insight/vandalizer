@@ -19,12 +19,12 @@ export QA_CATALOG=/srv/vandalizer/qa-catalog      # any new directory outside th
 backend/.venv/bin/python scripts/stage_certification_v5_qa.py prepare "$QA_CATALOG"
 ```
 
-This assembles 5.0 from `backend/certification-data/drafts/v5.0/` (the same code as `scripts/assemble_certification_v5_preview.py`), marks it for QA, and copies the legacy continuation baseline. Both are registered as drafts. The output prints both manifest digests. The default release ID is `v5.0-qa-staging.1`; pass `--release-id v5.0-qa-staging.2` for a rebuilt package. A release ID is never reused, and `prepare` refuses to overwrite an existing directory.
+This assembles **Vandalizer Core**, the default training path. For the optional **Advanced Builder** course, run `prepare` with `--track advanced` and a separate output directory. Its default release ID is `v5.0-advanced-qa.1`. Substitute that ID throughout when testing Builder. The tool reads from `backend/certification-data/drafts/v5.0/` (the same code as `scripts/assemble_certification_v5_preview.py`), marks it for QA, and copies the legacy continuation baseline. Both are registered as drafts. The output prints both manifest digests. The default release ID is `v5.0-core-qa.1`; pass `--release-id v5.0-core-qa.2` for a rebuilt package. A release ID is never reused, and `prepare` refuses to overwrite an existing directory.
 
 To review the package before publishing:
 
 ```bash
-backend/.venv/bin/python scripts/manage_certification_release.py --catalog-root "$QA_CATALOG" inspect v5.0-qa-staging.1
+backend/.venv/bin/python scripts/manage_certification_release.py --catalog-root "$QA_CATALOG" inspect v5.0-core-qa.1
 ```
 
 ## 2. Take the staging cohort inventory
@@ -65,11 +65,11 @@ $M publish legacy-2026-10-02.1 --expected-manifest-sha256 <legacy digest>
 $M legacy-continuation legacy-2026-10-02.1
 backend/.venv/bin/python scripts/inspect_certification_release_impact.py \
   --source-catalog-root "$QA_CATALOG" --target-catalog-root "$QA_CATALOG" \
-  --source-release-id legacy-2026-10-02.1 --target-release-id v5.0-qa-staging.1 \
+  --source-release-id legacy-2026-10-02.1 --target-release-id v5.0-core-qa.1 \
   --cohort-inventory inventory.json > impact.json   # exits 2; stderr lists changes and findings
-$M publish v5.0-qa-staging.1 --expected-manifest-sha256 <5.0 digest> --impact-report impact.json \
+$M publish v5.0-core-qa.1 --expected-manifest-sha256 <5.0 digest> --impact-report impact.json \
   --cohort-inventory inventory.json --qa-staging --reason "QA of the 5.0 course" --actor "<your name>"
-$M default v5.0-qa-staging.1
+$M default v5.0-core-qa.1
 ```
 
 ## 4. Enable the course on staging

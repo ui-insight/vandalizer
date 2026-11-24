@@ -352,7 +352,13 @@ export interface TierDefinition {
   celebration: string
 }
 
+export interface CoreSampleSelection {
+  project_id: string
+  conversation_id: string
+}
+
 export interface ScenarioDefinition {
+  work_sample_project?: string
   bank_id: string
   revision: number
   bank_sha256: string
@@ -377,6 +383,7 @@ export interface ScenarioSubmission {
 }
 
 export interface SavedScenarioSubmission {
+  work_sample?: CoreSampleSelection
   uuid: string
   enrollment_id: string
   module_id: string

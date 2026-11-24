@@ -64,7 +64,7 @@ async def observed_inventory():
 async def test_qa_staging_release_rehearsal(repo, tmp_path, monkeypatch):
     application_registry = (CATALOG_ROOT / 'registry.json').read_bytes()
     staging = tmp_path / 'staging-catalog'
-    manifests = stage.prepare(staging, RELEASE)
+    manifests = stage.prepare(staging, RELEASE, track='advanced')
     assert set(manifests) == {LEGACY, RELEASE}
     deploy(monkeypatch, staging)
     assert EnrollmentRepository().catalog.root == staging.resolve()
@@ -135,7 +135,7 @@ async def test_qa_staging_release_rehearsal(repo, tmp_path, monkeypatch):
 
     # Completion notices stay single under replay and concurrency.
     credential = CredentialSnapshot(credential_id=uuid4().hex, user_id='learner-b', enrollment_id=learner_b.uuid,
-        learner_name='Synthetic Learner', course_title=stage.TITLE, course_version=RELEASE,
+        learner_name='Synthetic Learner', course_title='Vandalizer Advanced Builder (QA staging)', course_version=RELEASE,
         manifest_sha256=manifests[RELEASE], rubric_id='v5.0-competency-draft.1', provenance='versioned_course_completion',
         certified_at='2026-10-15T12:00:00+00:00', recorded_at='2026-10-15T12:01:00+00:00',
         level='synthetic', module_ids=('ai_literacy',), evidence=(), outcomes=('outcome-one',))

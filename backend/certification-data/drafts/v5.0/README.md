@@ -1,4 +1,12 @@
-# Vandalizer 5.0 competency design
+# Vandalizer V5 certification
+
+**Start with Vandalizer Core.** A learner uses one fictional research award throughout Chat, Projects, Knowledge Bases, Skills and browser controls, then saves a private case note. Its six modules have twelve lessons and nine required judgments. The capstone also checks the learner’s own project and saved case chat. The suggested 41 minutes is an author estimate to test in a learner pilot.
+
+The default preview and QA staging commands assemble Core. Use `--track advanced` in a separate output directory to assemble Advanced Builder. Each package has its own course title, release identity, assessments and credential scope.
+
+## Optional Advanced Builder
+
+Choose this course for extraction authoring, workflow design, validation, recovery and delivery. Its eleven modules and 33 outcomes are independent of Core completion. The Advanced Builder source inventory follows.
 
 **State: unpublished design draft.** The current course, grading and enrollments are unchanged. This directory is outside the course registry; it cannot enroll a learner.
 
@@ -188,7 +196,7 @@ Checkpoint 167 adds an authenticated read-only combined module preview. The lear
 `foundations-exercise.json` replaces the legacy field-count/extra-star directions only for a future scoped-assessment package. Its case digest and five required fields match the saved proposal and value-review prompts. It includes the explicit approval/execution/source-check sequence, repair and automatic feedback without exposing expected answers. The complete assignment is available in the practical-review panel and chat; original courses keep their original instructions. Catalog, saved-scope persistence and 54 responsive/zoom/text captures pass. No package registration, enrollment, earned credit or live-model validity is implied.
 
 
-Checkpoint 169 adds `scripts/assemble_certification_v5_preview.py` for deterministic isolated full-course inspection. Its output includes all eleven authored module/assignment definitions, 74 revised lessons and all 33 draft mechanisms, with private answers excluded from the public payload. Output inside the application catalog is rejected. Its catalog has no supported/default course and its rubric intentionally cannot award credit. Preview prerequisites and XP/star policy are unfinished inspection settings. Thirty-five assembly/catalog tests and 69 entry/teaching/assessment browser captures pass; live grading, final credit, learner transition and release verification remain open.
+Checkpoint 169 adds `scripts/assemble_certification_v5_preview.py` for deterministic isolated full-course inspection. With `--track advanced`, its output includes all eleven authored module/assignment definitions, 74 revised lessons and all 33 draft mechanisms, with private answers excluded from the public payload. Output inside the application catalog is rejected. Its catalog has no supported/default course and its rubric intentionally cannot award credit. Preview prerequisites and XP/star policy are unfinished inspection settings. Thirty-five assembly/catalog tests and 69 entry/teaching/assessment browser captures pass; live grading, final credit, learner transition and release verification remain open.
 
 
 Checkpoints 170–172 connect current chat module cards directly to their bound assessments, permit reading new directions before lab setup, and present explicit selected-receipt outcomes in the Challenge panel. Missing, failed, pending and unavailable results remain distinct; no latest/best attempt is inferred and no credit is awarded. The selection interface was checked against actual saved MongoDB receipts with no data or judge-call changes. New outcome modules omit legacy three-star indicators while old earned stars remain unchanged. These improvements do not close live calibration, final-credit or release gates.

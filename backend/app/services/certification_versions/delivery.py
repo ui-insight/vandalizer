@@ -23,7 +23,7 @@ from .editorial_corrections import module_notices_for, notices_for
 
 def public_modules(package: CoursePackage) -> list[dict]:
     """Deliver pinned teaching and recognition prompts without answer keys."""
-    from .scenario_submissions import module_bank
+    from .scenario_submissions import public_scenarios
     lessons = package.json('lessons.json')
     modules = []
     for module in package.json('panel-modules.json'):
@@ -34,7 +34,7 @@ def public_modules(package: CoursePackage) -> list[dict]:
                            for lesson in module['lessons']
                            for notices in [notices_for(package.manifest_sha256, lesson.get('id'))]]
         if f"assessments/{module['id']}.json" in package.manifest.artifacts:
-            item['scenarioAssessment'] = module_bank(package, module['id']).public_definition()
+            item['scenarioAssessment'] = public_scenarios(package, module['id'])
             item['assessment'] = None
         if f"process-cases/{module['id']}.json" in package.manifest.artifacts:
             from .process_case import load_process_case

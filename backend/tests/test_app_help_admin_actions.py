@@ -130,3 +130,17 @@ def test_chat_looks_up_help_before_describing_vandalizer_features():
     assert "BEFORE your first answer that names a Vandalizer screen" in prompt
     assert "Describe only features the help content or your tools confirm exist" in prompt
     assert "Progress can't be reset, by the learner" in prompt
+
+
+def test_certification_guidance_describes_the_current_program_and_defers_to_the_panel():
+    """Core and Advanced Builder are unpublished: neither text may offer them for enrolment."""
+    from app.services.llm_service import VANDALIZER_CONTEXT
+
+    help_body = next(t for t in HELP_TOPICS if t["id"] == "certification")["body"]
+    assert "**Vandal Workflow Architect** program teaches document-workflow skills" in help_body
+    assert "appear in the Certification panel once they are published" in help_body
+    assert "Go by the course your Certification panel shows" in help_body
+    assert "Vandalizer offers the Vandal Workflow Architect certification program" in VANDALIZER_CONTEXT
+    assert "teach document upload, extraction, workflow building, automation" in VANDALIZER_CONTEXT
+    assert "appear in the Certification panel once published" in VANDALIZER_CONTEXT
+    assert "never offer a course it does not show" in VANDALIZER_CONTEXT

@@ -15,7 +15,7 @@ TARGET = 'v5-legacy-preview-qa.1'
 
 
 def install_authored_package(repo, tmp_path):
-    root = preview.assemble(tmp_path / 'assembled', TARGET)
+    root = preview.assemble(tmp_path / 'assembled', TARGET, track='advanced')
     shutil.copytree(root / TARGET, repo.catalog.root / TARGET)
     registry_path = repo.catalog.root / 'registry.json'
     registry = json.loads(registry_path.read_text())
