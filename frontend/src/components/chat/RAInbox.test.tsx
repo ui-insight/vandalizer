@@ -21,6 +21,8 @@ const api = vi.hoisted(() => ({
   setInboxHidden: vi.fn(),
   downloadDeadlineCalendar: vi.fn(),
   addDeadlineByHand: vi.fn(),
+  editDeadlineByHand: vi.fn(),
+  deleteDeadlineByHand: vi.fn(),
 }))
 vi.mock('../../api/obligations', async (actual) => {
   const real = await actual<typeof import('../../api/obligations')>()
@@ -394,5 +396,106 @@ describe('Add deadline by hand', () => {
     render(<RAInbox />)
     await screen.findByText('Sponsor deadline')
     expect(screen.queryByRole('button', { name: /Add deadline/ })).not.toBeInTheDocument()
+  })
+})
+
+describe('Edit or delete a deadline added by hand (#1165)', () => {
+  const HAND = item({
+    uuid: 'hand-1', title: 'Final finacial report', deadline_type: 'other', due_at: '2099-03-13T00:00:00', due_text: null,
+    sources: [], entered_by_hand: true, source_note: 'Subaward agreement, section 5', editable: true,
+  })
+
+  it('corrects the title and date in place', async () => {
+    api.getInbox.mockResolvedValue({ items: [HAND], inbox_hidden: false, project_count: 1 })
+    api.editDeadlineByHand.mockResolvedValue({ ...HAND, title: 'Final financial report', due_at: '2099-03-31T00:00:00' })
+    render(<RAInbox projectUuid="proj-1" />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit "Final finacial report"' }))
+
+    const form = screen.getByRole('form', { name: 'Edit "Final finacial report"' })
+    expect(screen.getByLabelText('Title')).toHaveValue('Final finacial report')
+    expect(screen.getByLabelText('Due date')).toHaveValue('2099-03-13')
+    expect(screen.getByLabelText('Source (optional)')).toHaveValue('Subaward agreement, section 5')
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Final financial report' } })
+    fireEvent.change(screen.getByLabelText('Due date'), { target: { value: '2099-03-31' } })
+    fireEvent.submit(form)
+
+    await waitFor(() => expect(api.editDeadlineByHand).toHaveBeenCalledWith('hand-1', 'Final financial report', '2099-03-31', 'Subaward agreement, section 5'))
+    expect(await screen.findByText('Final financial report')).toBeInTheDocument()
+    expect(screen.getByText('Mar 31, 2099')).toBeInTheDocument()
+    expect(screen.queryByRole('form')).not.toBeInTheDocument()
+    expect(api.addDeadlineByHand).not.toHaveBeenCalled()
+  })
+
+  it('keeps focus on the row when the new date moves it to another group, and clears an earlier error', async () => {
+    const soon = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10)
+    const THIS_WEEK = { ...HAND, due_at: `${soon}T00:00:00` }
+    api.getInbox.mockResolvedValue({ items: [THIS_WEEK], inbox_hidden: false, project_count: 1 })
+    api.deleteDeadlineByHand.mockRejectedValue(new Error('Could not delete.'))
+    api.editDeadlineByHand.mockResolvedValue({ ...HAND, due_at: '2099-03-31T00:00:00' })
+    render(<RAInbox projectUuid="proj-1" />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete "Final finacial report"' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete deadline' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not delete.')
+    fireEvent.keyDown(screen.getByRole('group', { name: 'Delete "Final finacial report"' }), { key: 'Escape' })
+    expect(screen.queryByRole('group', { name: 'Delete "Final finacial report"' })).not.toBeInTheDocument()
+
+    expect(screen.getByRole('group', { name: 'Due this week' })).toHaveTextContent('Final finacial report')
+    fireEvent.click(screen.getByRole('button', { name: 'Edit "Final finacial report"' }))
+    fireEvent.change(screen.getByLabelText('Due date'), { target: { value: '2099-03-31' } })
+    fireEvent.submit(screen.getByRole('form', { name: 'Edit "Final finacial report"' }))
+    await waitFor(() => expect(screen.getByRole('group', { name: 'Later' })).toHaveTextContent('Final finacial report'))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit "Final finacial report"' })).toHaveFocus())
+  })
+
+  it("keeps the form and shows the server's reason when the change can't be saved, and Cancel leaves the row as it was", async () => {
+    api.getInbox.mockResolvedValue({ items: [HAND], inbox_hidden: false, project_count: 1 })
+    api.editDeadlineByHand.mockRejectedValue(new Error("Only the project's owner and editors can change its inbox."))
+    render(<RAInbox projectUuid="proj-1" />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit "Final finacial report"' }))
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Something else' } })
+    fireEvent.submit(screen.getByRole('form', { name: 'Edit "Final finacial report"' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('owner and editors')
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('form')).not.toBeInTheDocument()
+    expect(screen.getByText('Final finacial report')).toBeInTheDocument()
+  })
+
+  it('deletes only after confirming, and says it is for everyone', async () => {
+    api.getInbox.mockResolvedValue({ items: [HAND, DEADLINE], inbox_hidden: false, project_count: 1 })
+    api.deleteDeadlineByHand.mockResolvedValue({ deleted: true })
+    render(<RAInbox projectUuid="proj-1" />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete "Final finacial report"' }))
+    const confirm = screen.getByRole('group', { name: 'Delete "Final finacial report"' })
+    expect(confirm).toHaveTextContent('for everyone on the project')
+    expect(api.deleteDeadlineByHand).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('group', { name: 'Delete "Final finacial report"' })).not.toBeInTheDocument()
+    expect(screen.getByText('Final finacial report')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete "Final finacial report"' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete deadline' }))
+    await waitFor(() => expect(screen.queryByText('Final finacial report')).not.toBeInTheDocument())
+    expect(api.deleteDeadlineByHand).toHaveBeenCalledWith('hand-1')
+    expect(screen.getByText('Sponsor deadline')).toBeInTheDocument()
+  })
+
+  it('keeps the deadline and says so when deleting fails', async () => {
+    api.getInbox.mockResolvedValue({ items: [HAND], inbox_hidden: false, project_count: 1 })
+    api.deleteDeadlineByHand.mockRejectedValue(new Error("Only the project's owner and editors can change its inbox."))
+    render(<RAInbox projectUuid="proj-1" />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete "Final finacial report"' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete deadline' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('owner and editors')
+    expect(screen.getByText('Final finacial report')).toBeInTheDocument()
+  })
+
+  it('offers neither on an item that comes from a document', async () => {
+    api.getInbox.mockResolvedValue({ items: [DEADLINE, { ...HAND, uuid: 'confirmed', title: 'Confirmed later', editable: false }], inbox_hidden: false, project_count: 1 })
+    render(<RAInbox projectUuid="proj-1" />)
+    await screen.findByText('Sponsor deadline')
+    expect(screen.queryByRole('button', { name: /^Edit / })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Delete / })).not.toBeInTheDocument()
   })
 })

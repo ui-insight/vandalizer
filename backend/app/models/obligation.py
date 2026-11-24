@@ -77,6 +77,8 @@ class Obligation(Document):
     # Where that person says it comes from ("Subaward §5"), as typed. Not a
     # verified citation.
     source_note: Optional[str] = None
+    # Who last corrected a hand-entered item (#1165); ``updated_at`` says when.
+    edited_by: Optional[str] = None
     created_by: str
     created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc))
     updated_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc))
