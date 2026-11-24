@@ -35,6 +35,7 @@ from app.services.form_fill import (  # noqa: F401  (form_value_is_missing is re
 from app.services.llm_service import create_chat_agent
 from app.services.metering import current_scope, metered_step, step_models
 from app.services import workflow_workspace_steps as _ws
+from app.services.workflow_diagnostics import inline_extraction_fields
 from app.services.page_locator import annotate_chunk_pages, cited_pages, format_page_range, locator_for_meta
 
 logger = logging.getLogger(__name__)
@@ -849,15 +850,7 @@ class ExtractionNode(Node):
         self.data = data
 
     def process(self, inputs: dict) -> dict:
-        keys = self.data.get("searchphrases", [])
-        if not keys:
-            keys = self.data.get("keys", [])
-        if not keys:
-            raw = self.data.get("extractions", [])
-            if isinstance(raw, list):
-                keys = [str(k).strip() for k in raw if str(k).strip()]
-            elif isinstance(raw, str) and raw.strip():
-                keys = [s.strip() for s in raw.split(",") if s.strip()]
+        keys = inline_extraction_fields(self.data)
 
         prev_step_name = inputs.get("step_name")
 

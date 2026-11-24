@@ -1,30 +1,51 @@
 import { describe, expect, it } from 'vitest'
 import { inlineExtractionFields, withInlineExtractionFields, withoutInlineExtractionFields } from './extractionFields'
 
+// The same rows are in backend/tests/test_workflow_legacy_extraction_fields.py,
+// where they are also run through the engine.
+const CASES: Array<[Record<string, unknown>, string[]]> = [
+  // Every stored form.
+  [{ searchphrases: 'PI Name, Sponsor/Funder,  Award Number ,' }, ['PI Name', 'Sponsor/Funder', 'Award Number']],
+  [{ searchphrases: ['A', '', ' B '] }, ['A', 'B']],
+  [{ keys: ['Start Date', ' End Date '] }, ['Start Date', 'End Date']],
+  [{ keys: 'A, B' }, ['A', 'B']],
+  [{ extractions: ['Award Number', 'F&A Rate'] }, ['Award Number', 'F&A Rate']],
+  [{ extractions: 'A, B' }, ['A', 'B']],
+  // Order of preference: searchphrases, then keys, then extractions.
+  [{ searchphrases: 'Old', keys: ['Older'], extractions: ['New'] }, ['Old']],
+  [{ searchphrases: '', keys: ['Keys'], extractions: ['New'] }, ['Keys']],
+  [{ keys: ['Older'], extractions: ['New'] }, ['Older']],
+  // A list with nothing but blanks gives way to the next one.
+  [{ searchphrases: ' , ', keys: [], extractions: ['New'] }, ['New']],
+  [{ searchphrases: [''], extractions: ['New'] }, ['New']],
+  [{ keys: [' '], extractions: ['New'] }, ['New']],
+  // Blank entries are dropped; duplicates are kept as stored.
+  [{ searchphrases: 'A,,B,' }, ['A', 'B']],
+  [{ searchphrases: ['A', ''], extractions: ['New'] }, ['A']],
+  [{ extractions: ['A', 'a', 'A'] }, ['A', 'a', 'A']],
+  // A field stored with a description is read by its name.
+  [{ extractions: [{ key: ' F&A Rate ', description: 'x' }, 'B'] }, ['F&A Rate', 'B']],
+  [{ searchphrases: [{ key: 'A' }] }, ['A']],
+  [{ extractions: [{ description: 'no name' }, { key: '' }, { key: { key: 'nested' } }, 'B'] }, ['B']],
+  // A number becomes its text; anything else that is not a name is skipped.
+  [{ extractions: [5, null, 'B'] }, ['5', 'B']],
+  [{ searchphrases: [5, 'A'] }, ['5', 'A']],
+  [{ extractions: [2.5, 3.0, true, false, ['x'], 'B'] }, ['2.5', '3', 'B']],
+  // A value that is not a list or text holds no fields.
+  [{ searchphrases: 5, extractions: ['N'] }, ['N']],
+  [{ searchphrases: { a: 1 }, extractions: ['N'] }, ['N']],
+  [{ extractions: null, searchphrases: 5, keys: {} }, []],
+  [{}, []],
+]
+
 describe('a workflow extraction step\'s own fields', () => {
-  it('shows fields stored the older way, as the catalog workflows store them', () => {
-    // Seeded as one comma-separated string; the editor showed no fields.
-    expect(inlineExtractionFields({ searchphrases: 'PI Name, Sponsor/Funder,  Award Number ,' }))
-      .toEqual(['PI Name', 'Sponsor/Funder', 'Award Number'])
-    expect(inlineExtractionFields({ keys: ['Start Date', ' End Date '] })).toEqual(['Start Date', 'End Date'])
-    expect(inlineExtractionFields({ searchphrases: ['A', '', 'B'] })).toEqual(['A', 'B'])
+  it.each(CASES)('reads %j as the engine runs it', (data, expected) => {
+    expect(inlineExtractionFields(data)).toEqual(expected)
   })
 
-  it('reads the list the editor writes', () => {
-    expect(inlineExtractionFields({ extractions: ['Award Number', 'F&A Rate'] })).toEqual(['Award Number', 'F&A Rate'])
-  })
-
-  it('shows what the engine will run when more than one list is present', () => {
-    // workflow_engine.ExtractionNode: searchphrases, then keys, then extractions.
-    expect(inlineExtractionFields({ searchphrases: 'Old', keys: ['Older'], extractions: ['New'] })).toEqual(['Old'])
-    expect(inlineExtractionFields({ searchphrases: '', keys: ['Keys'], extractions: ['New'] })).toEqual(['Keys'])
-    expect(inlineExtractionFields({ searchphrases: ' , ', keys: [], extractions: ['New'] })).toEqual(['New'])
-  })
-
-  it('is empty for a step with no fields or with junk', () => {
-    for (const data of [{}, { extractions: null }, { searchphrases: 5 }, { keys: {} }, { extractions: [null, ''] }]) {
-      expect(inlineExtractionFields(data as Record<string, unknown>)).toEqual([])
-    }
+  it('never shows an object as a field name', () => {
+    const shown = inlineExtractionFields({ extractions: [{ key: 'F&A Rate' }, { other: 1 }, undefined, NaN, Infinity] })
+    expect(shown).toEqual(['F&A Rate'])
   })
 
   it('saves an edit so the engine runs the edited fields, not the old ones', () => {
