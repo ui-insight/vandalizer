@@ -51,6 +51,9 @@ export interface LibraryItem {
   created_by?: AuthorRef | null
   /** Whether the current user may permanently delete the backing workflow/extraction. */
   can_delete_underlying?: boolean
+  /** Whether the current user may edit the backing Skill, formatter or extraction:
+   *  its creator, an owner or admin of its team, or a site admin. */
+  can_edit_underlying?: boolean
 }
 
 export interface LibraryFolder {

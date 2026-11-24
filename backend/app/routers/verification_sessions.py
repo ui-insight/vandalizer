@@ -17,7 +17,9 @@ from pydantic import BaseModel
 
 from app.dependencies import get_current_user
 from app.models.user import User
+from app.models.search_set import SearchSet
 from app.models.verification_session import VerificationSession
+from app.services import access_control
 from app.services import extraction_validation_service as val_svc
 
 router = APIRouter()
@@ -67,6 +69,24 @@ async def _get_owned(uuid: str, user: User) -> VerificationSession:
     return s
 
 
+async def _require_test_case_rights(s: VerificationSession, user: User) -> None:
+    """A session ends as a test case on its extraction, so answering it needs
+    the right to add one: the extraction's creator, an owner or admin of its
+    team, or a site admin (#1164). A teammate who can open the session could
+    otherwise add a test case to an extraction they cannot change. A verified
+    extraction keeps the exception chat makes when it starts the session."""
+    ss = await SearchSet.find_one(SearchSet.uuid == s.search_set_uuid)
+    if ss is not None and ss.verified:
+        return
+    if ss is None or not await access_control.get_authorized_search_set(
+        s.search_set_uuid, user, manage=True, allow_admin=True,
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Only this extraction's creator or a team admin can add test cases to it.",
+        )
+
+
 @router.get("/{uuid}")
 async def get_session(uuid: str, user: User = Depends(get_current_user)) -> dict:
     s = await _get_owned(uuid, user)
@@ -82,6 +102,7 @@ async def update_field(
 ) -> dict:
     """Approve, correct, or skip a single extracted field."""
     s = await _get_owned(uuid, user)
+    await _require_test_case_rights(s, user)
     if s.status != "pending":
         raise HTTPException(status_code=400, detail=f"Session is {s.status}")
 
@@ -126,6 +147,7 @@ async def finalize_session(
     couldn't confirm them from the document, so no ground truth).
     """
     s = await _get_owned(uuid, user)
+    await _require_test_case_rights(s, user)
     if s.status != "pending":
         raise HTTPException(status_code=400, detail=f"Session is {s.status}")
     if not s.all_resolved():

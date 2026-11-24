@@ -758,6 +758,47 @@ class TestCanManageSearchSet:
         assert can_manage_search_set(ss, user, allow_admin=False) is False
         assert can_manage_search_set(ss, user, allow_admin=True) is True
 
+    def test_a_team_member_cannot_manage_a_teammates_item(self):
+        """#1164: membership alone let any teammate edit or delete an unshared Skill."""
+        user = _make_user("member")
+        ss = _make_search_set("owner1")
+        ss.team_id = "team-1"
+        member = _team_access(team_uuids={"team-1"}, roles={"team-1": "member"})
+        assert can_manage_search_set(ss, user, team_access=member) is False
+        # ...but can still open and run it.
+        assert can_view_search_set(ss, user, team_access=member) is True
+
+    @pytest.mark.parametrize("role", ["owner", "admin"])
+    def test_a_team_owner_or_admin_can_manage_it(self, role):
+        user = _make_user("lead")
+        ss = _make_search_set("owner1")
+        ss.team_id = "team-1"
+        assert can_manage_search_set(
+            ss, user, team_access=_team_access(team_uuids={"team-1"}, roles={"team-1": role}),
+        ) is True
+        # Older items are stamped with the team's database id instead of its uuid.
+        ss.team_id = "64b000000000000000000001"
+        assert can_manage_search_set(
+            ss, user,
+            team_access=_team_access(team_object_ids={ss.team_id}, object_roles={ss.team_id: role}),
+        ) is True
+
+    def test_an_admin_of_another_team_cannot_manage_it(self):
+        user = _make_user("elsewhere")
+        ss = _make_search_set("owner1")
+        ss.team_id = "team-1"
+        assert can_manage_search_set(
+            ss, user, team_access=_team_access(team_uuids={"team-2"}, roles={"team-2": "admin"}),
+        ) is False
+
+    def test_an_item_with_no_team_is_its_creators_alone(self):
+        user = _make_user("lead")
+        ss = _make_search_set("owner1")
+        ss.team_id = None
+        assert can_manage_search_set(
+            ss, user, team_access=_team_access(team_uuids={"team-1"}, roles={"team-1": "owner"}),
+        ) is False
+
 
 # ---------------------------------------------------------------------------
 # TestGetTeamAccessContext

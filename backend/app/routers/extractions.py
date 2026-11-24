@@ -1689,7 +1689,9 @@ async def create_test_case(req: CreateTestCaseRequest, user: User = Depends(get_
 
 @router.get("/test-cases", response_model=list[TestCaseResponse])
 async def list_test_cases(search_set_uuid: str, user: User = Depends(get_current_user)) -> list[TestCaseResponse]:
-    await _get_search_set_or_404(search_set_uuid, user, manage=True)
+    # Reading is view-level, like download-validation: a teammate who opens
+    # the extraction sees its test cases; changing them needs manage.
+    await _get_search_set_or_404(search_set_uuid, user)
     tcs = await val_svc.list_test_cases(search_set_uuid)
     exists_map = await _check_documents_exist([tc.document_uuid for tc in tcs if tc.document_uuid])
     return [

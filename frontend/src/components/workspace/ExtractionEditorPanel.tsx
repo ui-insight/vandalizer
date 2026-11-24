@@ -112,6 +112,28 @@ interface ExtractionConfig {
   repetition?: { enabled?: boolean }
 }
 
+/** Shown on a teammate's extraction: it can be run, not changed (#1164). */
+export function NotYoursNotice({ cloning, onClone }: { cloning: boolean; onClone: () => void }) {
+  return (
+    <div role="note" style={{
+      margin: '0 var(--workspace-space-24) var(--workspace-space-8)', padding: 'var(--workspace-space-8) var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: '#1f2937',
+      backgroundColor: '#f3f4f6', borderRadius: 'var(--workspace-radius-small)', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)',
+      border: '1px solid #d1d5db',
+    }}>
+      <span style={{ flex: 1 }}>
+        You can run this extraction, but only its creator or a team admin can change it. Changes you make here won't be saved. Make a copy to edit your own.
+      </span>
+      <button type="button" onClick={onClone} disabled={cloning} style={{
+        padding: 'var(--workspace-space-4) var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', fontWeight: 700, fontFamily: 'inherit',
+        borderRadius: 'var(--workspace-radius-small)', border: '1px solid #4b5563', backgroundColor: '#fff', color: '#1f2937',
+        cursor: 'pointer', whiteSpace: 'nowrap', opacity: cloning ? 0.6 : 1,
+      }}>
+        {cloning ? 'Copying...' : 'Make a copy to edit'}
+      </button>
+    </div>
+  )
+}
+
 export function ExtractionEditorPanel() {
   const queryClient = useQueryClient()
   const { openExtractionId, extractionOpenSignal, openExtraction, closeExtraction, selectedDocUuids, selectedDocNames, setSelectedDocUuids, setSelectedDocNames, setHighlightTerms, viewDocument, bumpActivitySignal, consumeExtractionResults, activeProjectUuid, activeProjectRootFolder } = useWorkspace()
@@ -867,6 +889,10 @@ export function ExtractionEditorPanel() {
             {cloning ? 'Copying...' : 'Make a copy to edit'}
           </button>
         </div>
+      )}
+
+      {!searchSet.verified && searchSet.can_manage === false && (
+        <NotYoursNotice cloning={cloning} onClone={handleClone} />
       )}
 
       {/* Tab bar */}
