@@ -302,7 +302,9 @@ def edit_env(monkeypatch):
     monkeypatch.setattr(service, "Obligation", model)
     cleared = AsyncMock()
     monkeypatch.setattr(service, "_clear_notifications", cleared)
-    return SimpleNamespace(others=others, cleared=cleared)
+    retitled = AsyncMock()
+    monkeypatch.setattr(service, "_retitle_notifications", retitled)
+    return SimpleNamespace(others=others, cleared=cleared, retitled=retitled)
 
 
 @pytest.mark.asyncio
@@ -320,6 +322,7 @@ async def test_a_hand_added_deadline_can_be_corrected_in_place(edit_env):
     ob.save.assert_awaited_once()
     # The bell's "due in N days" for the old date is no longer true.
     edit_env.cleared.assert_awaited_once_with("hand")
+    edit_env.retitled.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -328,9 +331,88 @@ async def test_correcting_only_the_note_keeps_reminders_already_in_the_bell(edit
     await service.edit_by_hand(ob, USER, title="Final finacial report", due_date="2027-03-13", source_note="Award letter")
     assert ob.source_note == "Award letter"
     edit_env.cleared.assert_not_awaited()
-    # A corrected title: the bell item spelling it the old way is cleared.
+    edit_env.retitled.assert_not_awaited()
+    # A corrected title on the same date: the bell items stay unread and are respelled.
     await service.edit_by_hand(ob, USER, title="Final financial report", due_date="2027-03-13", source_note="Award letter")
-    edit_env.cleared.assert_awaited_once_with("hand")
+    edit_env.cleared.assert_not_awaited()
+    edit_env.retitled.assert_awaited_once_with("hand", "Final finacial report", "Final financial report")
+
+
+def _stores(monkeypatch, bell: list, sent: set):
+    """In-memory stand-ins for the bell (Notification) and the sent-reminder table."""
+    from pymongo.errors import DuplicateKeyError
+
+    import app.models.notification as notification_model
+
+    class Query:
+        def __init__(self, rows):
+            self.rows = rows
+
+        async def to_list(self):
+            return list(self.rows)
+
+        async def update_many(self, update):
+            for row in self.rows:
+                vars(row).update(update["$set"])
+
+    class Bell:
+        @staticmethod
+        def find(query):
+            return Query([n for n in bell if all(getattr(n, k) == v for k, v in query.items())])
+
+    class Sent(SimpleNamespace):
+        async def insert(self):
+            key = (self.obligation_uuid, self.user_id, self.stage, self.due_date)
+            if key in sent:
+                raise DuplicateKeyError("sent")
+            sent.add(key)
+
+    monkeypatch.setattr(notification_model, "Notification", Bell)
+    monkeypatch.setattr(deadline_reminders, "ObligationReminder", Sent)
+
+
+@pytest.mark.asyncio
+async def test_a_corrected_title_keeps_a_teammates_unread_reminder_and_sends_no_second_one(monkeypatch):
+    """Review of #1165: three days before it is due, an editor fixes a typo in the title.
+
+    The PI's unread "Due in 3 days" was marked read, and that stage is sent
+    once per due date, so the PI heard nothing more until the due date.
+    """
+    model, _ = _obligation_model([])
+    monkeypatch.setattr(service, "Obligation", model)
+    ob = _hand()
+    day = deadline_reminders.due_date(ob).isoformat()
+    bell: list = []
+    sent: set = set()
+    _stores(monkeypatch, bell, sent)
+
+    def remind(user_id, **kw):
+        item = deadline_reminders._Due(ob, PROJECT, deadline_reminders.due_date(ob), 3, "before_3")
+        return SimpleNamespace(**{"uuid": f"n-{user_id}", "read": False, **deadline_reminders._notification(user_id, item), **kw})
+
+    # The sweep reminded the PI (unread) and the editor (already read) at this stage.
+    assert await deadline_reminders._claim("hand", "pi", "before_3", day, ["bell"])
+    bell.extend([remind("pi"), remind("ra", read=True), SimpleNamespace(
+        uuid="other", read=False, user_id="pi", item_kind="obligation", item_id="another",
+        title="Due in 3 days: Final finacial report", item_name="Final finacial report",
+    )])
+
+    await service.edit_by_hand(ob, USER, title="Final financial report", due_date="2027-03-13", source_note="Sponsor email")
+
+    pi, ra, other = bell
+    assert (pi.read, pi.title, pi.item_name) == (False, "Due in 3 days: Final financial report", "Final financial report")
+    assert pi.body == "NIH Subaward. Due Mar 13, 2027. Added by hand: Sponsor email."
+    # One already read, and another deadline's reminder, are not touched.
+    assert (ra.read, ra.title) == (True, "Due in 3 days: Final finacial report")
+    assert other.title == "Due in 3 days: Final finacial report"
+    # The next hourly sweep finds this stage already sent for the unchanged date.
+    assert not await deadline_reminders._claim("hand", "pi", "before_3", deadline_reminders.due_date(ob).isoformat(), ["bell"])
+    assert len(bell) == 3
+
+    # A new date clears the old date's reminder and is reminded on its own schedule.
+    await service.edit_by_hand(ob, USER, title="Final financial report", due_date="2027-03-20", source_note="Sponsor email")
+    assert pi.read is True
+    assert await deadline_reminders._claim("hand", "pi", "before_14", deadline_reminders.due_date(ob).isoformat(), ["bell"])
 
 
 @pytest.mark.asyncio
@@ -370,11 +452,57 @@ async def test_deleting_removes_the_deadline_its_reminders_and_its_bell_items(mo
 
 
 def test_only_a_hand_added_deadline_that_is_still_current_is_editable():
-    assert service.serialize(_existing(entered_by_hand=True), USER)["editable"] is True
-    assert service.serialize(_existing(entered_by_hand=True, status="done"), USER)["editable"] is True
+    def editable(ob, can_manage=True):
+        return service.serialize(ob, USER, can_manage=can_manage)["editable"]
+
+    assert editable(_existing(entered_by_hand=True)) is True
+    assert editable(_existing(entered_by_hand=True, status="done")) is True
     # Found in a document, confirmed by one later, or replaced by an amendment.
-    assert service.serialize(_existing(), USER)["editable"] is False
-    assert service.serialize(_existing(entered_by_hand=True, status="superseded"), USER)["editable"] is False
+    assert editable(_existing()) is False
+    assert editable(_existing(entered_by_hand=True, status="superseded")) is False
+    # Someone who can only view the project: the server would refuse them.
+    assert editable(_existing(entered_by_hand=True), can_manage=False) is False
+    assert service.serialize(_existing(entered_by_hand=True), USER)["editable"] is False
+
+
+@pytest.mark.asyncio
+async def test_the_inbox_offers_edit_and_delete_only_in_projects_the_person_can_change(monkeypatch):
+    """Review of #1165: a viewer saw Edit and Delete, and the server refused both."""
+    from app.services import project_service
+
+    mine = SimpleNamespace(uuid="proj-1", title="Mine")
+    shared = SimpleNamespace(uuid="proj-2", title="Shared with me to view")
+    cited = SimpleNamespace(uuid="proj-3", title="Documents only")
+    rows = [
+        _existing(uuid="a", entered_by_hand=True),
+        _existing(uuid="b", entered_by_hand=True, due_at=datetime.datetime(2027, 4, 1)),
+        _existing(uuid="c", entered_by_hand=True, project_uuid="proj-2"),
+        _existing(uuid="d", project_uuid="proj-3"),
+    ]
+    model, _ = _obligation_model(rows)
+    monkeypatch.setattr(service, "Obligation", model)
+    monkeypatch.setattr(service, "deleted_source_uuids", AsyncMock(return_value=set()))
+    can_manage = AsyncMock(side_effect=lambda project, user: project.uuid == "proj-1")
+    monkeypatch.setattr(project_service, "can_manage_project", can_manage)
+
+    listed = await service.inbox(USER, projects={p.uuid: p for p in (mine, shared, cited)})
+    assert {r["uuid"]: r["editable"] for r in listed} == {"a": True, "b": True, "c": False, "d": False}
+    # Asked once per project that has a hand-entered deadline, not per row.
+    assert sorted(c.args[0].uuid for c in can_manage.await_args_list) == ["proj-1", "proj-2"]
+
+
+@pytest.mark.asyncio
+async def test_a_viewer_opening_or_dismissing_a_hand_added_deadline_is_not_offered_edit(monkeypatch):
+    ob = _existing(uuid="hand", entered_by_hand=True)
+    monkeypatch.setattr(routes, "_obligation_for", AsyncMock(return_value=(ob, PROJECT)))
+    monkeypatch.setattr(service, "deleted_source_uuids", AsyncMock(return_value=set()))
+    monkeypatch.setattr(service, "set_dismissed", AsyncMock(return_value=ob))
+    can_manage = AsyncMock(return_value=False)
+    monkeypatch.setattr(routes.project_service, "can_manage_project", can_manage)
+    assert (await routes.get_obligation("hand", user=USER))["editable"] is False
+    assert (await routes.dismiss("hand", routes.DismissRequest(dismissed=True), user=USER))["editable"] is False
+    can_manage.return_value = True
+    assert (await routes.get_obligation("hand", user=USER))["editable"] is True
 
 
 @pytest.mark.asyncio

@@ -970,7 +970,10 @@ async def edit_by_hand(
     """Correct a hand-entered deadline's title, date or note, for everyone on the project.
 
     The item keeps its uuid, done state and dismissals. Reminders are keyed by
-    due date, so a changed date is reminded on its new schedule.
+    due date, so a changed date is reminded on its new schedule and the old
+    date's unread bell items are cleared. A corrected title alone keeps them
+    unread and respells them: that stage has been sent and won't be again, so
+    clearing it would leave the people it reminded with nothing.
     """
     fields, reason = _hand_fields(title, due_date, source_note)
     if fields is None:
@@ -978,15 +981,17 @@ async def edit_by_hand(
     reason = await _hand_duplicate(ob.project_uuid, user, fields["title"], fields["due_at"], skip_uuid=ob.uuid)
     if reason:
         return None, reason
-    changed = (ob.title, ob.due_at) != (fields["title"], fields["due_at"])
+    old_title, old_due = ob.title, ob.due_at
     for key, value in fields.items():
         setattr(ob, key, value)
     ob.edited_by = user.user_id
     ob.updated_at = _now()
     await ob.save()
-    if changed:
-        # A bell item carrying the old title or date is no longer true.
+    if old_due != ob.due_at:
+        # A bell item saying "due in N days" for the old date is no longer true.
         await _clear_notifications(ob.uuid)
+    elif old_title != ob.title:
+        await _retitle_notifications(ob.uuid, old_title, ob.title)
     return ob, None
 
 
@@ -1004,6 +1009,27 @@ async def _clear_notifications(obligation_uuid: str) -> None:
     await Notification.find(
         {"item_kind": "obligation", "item_id": obligation_uuid, "read": False},
     ).update_many({"$set": {"read": True}})
+
+
+async def _retitle_notifications(obligation_uuid: str, old_title: str, new_title: str) -> None:
+    """Respell a deadline's unread bell reminders after its title was corrected.
+
+    A reminder's title is a lead-in plus the deadline's title ("Due in 3 days:
+    Final report") and ``item_name`` is the title alone; the body never names
+    it. One that doesn't end with the old title is left as it is.
+    """
+    from app.models.notification import Notification
+
+    unread = await Notification.find(
+        {"item_kind": "obligation", "item_id": obligation_uuid, "read": False},
+    ).to_list()
+    for note in unread:
+        if not old_title or not (note.title or "").endswith(old_title):
+            continue
+        await Notification.find({"uuid": note.uuid, "read": False}).update_many({"$set": {
+            "title": note.title[: -len(old_title)] + new_title,
+            "item_name": new_title,
+        }})
 
 
 def _sort_key(ob: Obligation) -> tuple[int, datetime.datetime, datetime.datetime]:
@@ -1049,16 +1075,25 @@ def awaiting_source_decision(ob: Obligation, deleted: Collection[str]) -> bool:
     return source_deleted(ob, deleted) and not getattr(ob, "kept_without_source", False)
 
 
-async def serialize_checked(ob: Obligation, user: User, project_title: str | None = None) -> dict:
+async def serialize_checked(
+    ob: Obligation, user: User, project_title: str | None = None, *, can_manage: bool = False,
+) -> dict:
     """``serialize`` for one item, with its sources checked for deletion."""
-    return serialize(ob, user, project_title, await deleted_source_uuids([ob]))
+    return serialize(ob, user, project_title, await deleted_source_uuids([ob]), can_manage=can_manage)
 
 
 def serialize(
     ob: Obligation, user: User, project_title: str | None = None,
     deleted: Collection[str] = (),
+    *,
+    can_manage: bool = False,
 ) -> dict:
-    """*deleted* is ``deleted_source_uuids`` for the items being listed."""
+    """*deleted* is ``deleted_source_uuids`` for the items being listed.
+
+    *can_manage*: *user* is the project's owner or an editor. Only then is a
+    hand-entered deadline ``editable``, so the inbox offers Edit and Delete
+    where the server will accept them.
+    """
     return {
         "uuid": ob.uuid,
         "project_uuid": ob.project_uuid,
@@ -1078,7 +1113,7 @@ def serialize(
         "kept_without_source": bool(getattr(ob, "kept_without_source", False)),
         "entered_by_hand": bool(getattr(ob, "entered_by_hand", False)),
         "source_note": getattr(ob, "source_note", None),
-        "editable": hand_editable(ob),
+        "editable": can_manage and hand_editable(ob),
         "status": ob.status,
         "supersedes": ob.supersedes,
         "superseded_by": ob.superseded_by,
@@ -1111,7 +1146,18 @@ async def inbox(
         obligations = [o for o in obligations if user.user_id not in (o.dismissed_by or [])]
     obligations.sort(key=_sort_key)
     deleted = await deleted_source_uuids(obligations)
-    return [serialize(o, user, projects[o.project_uuid].title, deleted) for o in obligations]
+    manageable = await _manageable(user, [projects[uuid] for uuid in {o.project_uuid for o in obligations if hand_editable(o)}])
+    return [
+        serialize(o, user, projects[o.project_uuid].title, deleted, can_manage=o.project_uuid in manageable)
+        for o in obligations
+    ]
+
+
+async def _manageable(user: User, projects: Iterable[Project]) -> set[str]:
+    """Which of *projects* the user owns or edits. Asked once per project, not per row."""
+    from app.services.project_service import can_manage_project
+
+    return {p.uuid for p in projects if await can_manage_project(p, user)}
 
 
 async def project_obligations(project: Project, user: User) -> list[dict]:

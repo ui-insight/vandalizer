@@ -46,7 +46,7 @@ export interface Obligation {
   entered_by_hand?: boolean
   /** That person's note on where it comes from, as typed. Not a verified citation. */
   source_note?: string | null
-  /** A hand-entered deadline that can still be edited or deleted (not one a document confirmed or an amendment replaced). */
+  /** A hand-entered deadline you can edit or delete: you own or edit its project, and no document confirmed it or amendment replaced it. */
   editable?: boolean
 }
 
