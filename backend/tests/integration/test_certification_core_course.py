@@ -1,4 +1,5 @@
 """Exercise the Core credential over HTTP using a disposable database and synthetic chat turns."""
+import datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 from uuid import uuid4
@@ -11,7 +12,7 @@ from app.dependencies import get_current_user
 from app.models.activity import ActivityEvent
 from app.models.certification import CertificationProgress
 from app.models.chat import ChatConversation, ChatMessage, ChatRole
-from app.models.project import Project
+from app.models.project import Project, ProjectJoinLink
 from app.models.user import User
 from app.routers.certification import router
 from app.schemas.skills import SkillSnapshot
@@ -31,7 +32,7 @@ async def test_core_graduates_from_its_own_work_sample_without_builder_credit(re
     rehearsal.stage.publish_qa(staging, inventory=await rehearsal.observed_inventory(), reason='Core QA', actor='test')
     repo.catalog = CourseCatalog(staging)
     await init_beanie(database=CertificationProgress.get_motor_collection().database,
-                      document_models=[ActivityEvent, ChatConversation, ChatMessage])
+                      document_models=[ActivityEvent, ChatConversation, ChatMessage, ProjectJoinLink])
     user = await User(user_id='core-learner', name='Core Learner', email='core@example.test').insert()
     learner = await repo.ensure_initial(user.user_id)
     package = repo.catalog.load(learner.course_version)
@@ -74,13 +75,20 @@ async def test_core_graduates_from_its_own_work_sample_without_builder_credit(re
                 project.context = '\n'.join(next(c.text for c in q.choices if c.id == answers[q.id]) for q in bank.questions)
                 await project.save()
                 missing = await client.post(endpoint, params=params, json=body)
-                assert missing.status_code == 422 and 'IANA' in missing.text
+                assert missing.status_code == 422 and 'IANA' in missing.json()['detail']['message']
+                assert missing.json()['detail']['code'] == 'work_sample_incomplete'
                 await chat.add_message(ChatRole.ASSISTANT, 'Verified the contact domain.', tool_results=[
                     {'tool_name': 'record_value', 'content': {'recorded': True, 'value': 'example.org',
                      'url': 'https://www.iana.org/help/example-domains'}},
                     {'tool_name': 'browser_finish', 'content': {'ok': True, 'working_tab': 'closed'}}])
                 foreign = {**body, 'work_sample': {**body['work_sample'], 'project_id': 'another-project'}}
                 assert (await client.post(endpoint, params=params, json=foreign)).status_code == 422
+                invite = await ProjectJoinLink(project_uuid=project.uuid, token=uuid4().hex, created_by=user.user_id,
+                    expires_at=datetime.datetime.now() + datetime.timedelta(hours=1)).insert()
+                shared = await client.post(endpoint, params=params, json=body)
+                assert shared.status_code == 422 and 'unshared' in shared.text
+                invite.revoked = True
+                await invite.save()
             saved = await client.post(endpoint, params=params, json=body)
             assert saved.status_code == 200 and saved.json()['result']['passed'], saved.text
             if mid == 'core_case':

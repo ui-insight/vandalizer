@@ -350,7 +350,7 @@ async def submit_scenario_assessment(module_id: str, payload: ScenarioSubmission
             actor_user_id=user.user_id, sample=payload.work_sample,
         )
     except SampleIncomplete as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise HTTPException(status_code=422, detail={'code': 'work_sample_incomplete', 'message': str(exc)}) from exc
 
 
 @router.get('/scenario-attempts/{attempt_id}', response_model=None)

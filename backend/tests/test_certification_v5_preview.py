@@ -155,3 +155,121 @@ def test_core_note_requires_each_observed_action(tmp_path, missing):
                      {'tool_name': 'browser_finish', 'content': {'ok': True, 'working_tab': 'kept' if missing == 'finish' else 'closed'}}]}]
     with pytest.raises(SampleIncomplete):
         check_case(case, bank, answers, note, messages, ['award'], ['policy'])
+
+
+@pytest.fixture(scope='module')
+def core_case(tmp_path_factory):
+    from app.services.certification_versions.scenario_submissions import module_bank
+    output = preview.assemble(tmp_path_factory.mktemp('core-case') / 'core', VERSION)
+    package = CourseCatalog(output).load(VERSION, preview=True)
+    case = package.json('work-sample.json')
+    bank = module_bank(package, case['module_id'])
+    answers = {q.id: q.correct_choice_id for q in bank.questions}
+    return case, bank, answers, [c.text for q in bank.questions for c in q.choices if c.id == answers[q.id]]
+
+
+def core_sample(core_case, *, note=None, reply='The award authorizes $48,000.', value='example.org', url=None,
+                tab='closed', policy='tool'):
+    """Grade one synthetic chat; return None when accepted, else the learner message."""
+    from app.services.certification_versions.core_work_sample import SampleIncomplete, check_case
+    case, bank, answers, lines = core_case
+    passage = {'document_uuid': 'policy', 'content': 'Obtain written approval before booking travel.',
+               'content_preview': 'Obtain written approval before booking travel.'}
+    messages = [{'role': 'user', 'source_documents': [{'uuid': 'award'}]},
+                {'role': 'assistant', 'content': reply, 'active_skill': {'uuid': 'skill', 'version': '1'},
+                 'citations': [passage] if policy == 'attached' else [],
+                 'tool_results': [
+                     {'tool_name': 'search_knowledge_base', 'content': [passage] if policy == 'tool' else []},
+                     {'tool_name': 'record_value', 'content': {'recorded': True, 'value': value, 'url': url or case['browser_url']}},
+                     {'tool_name': 'browser_finish', 'content': {'ok': True, 'working_tab': tab}}]}]
+    try:
+        check_case(case, bank, answers, '\n'.join(lines) if note is None else note, messages, ['award'], ['policy'])
+    except SampleIncomplete as exc:
+        return str(exc)
+    return None
+
+
+@pytest.mark.parametrize('reply', [
+    'The sponsor authorizes $48,000.', 'Authorized: **$48,000.00**', 'It authorizes USD 48,000 (page 1).',
+    'The notice authorizes 48,000 dollars for CC-17.', r'The amount is \$48,000, on page 1.', 'US$48,000', '$48K'])
+def test_core_award_answer_accepts_the_amount_however_it_is_written(core_case, reply):
+    assert core_sample(core_case, reply=reply) is None
+
+
+@pytest.mark.parametrize('reply', [
+    '$48,000,000', 'The award authorizes $480,000.', 'It authorizes $148,000.', 'USD 4,800',
+    'It is not $48,000; it is $480,000,000.', 'The notice gives no amount.'])
+def test_core_award_answer_rejects_another_amount(core_case, reply):
+    assert 'authorized amount' in core_sample(core_case, reply=reply)
+
+
+@pytest.mark.parametrize('value, url', [
+    ('Example.org', None), (' example.org. ', None), ('example.org', 'https://WWW.IANA.org/help/example-domains/')])
+def test_core_browser_record_ignores_case_spacing_and_a_trailing_dot_or_slash(core_case, value, url):
+    assert core_sample(core_case, value=value, url=url) is None
+
+
+@pytest.mark.parametrize('value, url', [
+    ('example.com and example.org', None), ('example.com', None), ('example.org', 'https://www.iana.org/help/other'),
+    ('example.org', 'https://example.org/help/example-domains')])
+def test_core_browser_record_still_needs_the_one_domain_on_the_assigned_page(core_case, value, url):
+    assert 'IANA' in core_sample(core_case, value=value, url=url)
+
+
+@pytest.mark.parametrize('tab', ['none', 'kept'])
+def test_core_browser_task_is_unfinished_until_the_assistant_closes_its_tab(core_case, tab):
+    assert 'let the assistant close it' in core_sample(core_case, tab=tab)
+
+
+def test_core_policy_passage_counts_when_an_attached_knowledge_base_supplied_it(core_case):
+    assert core_sample(core_case, policy='attached') is None
+    assert 'Knowledge Base' in core_sample(core_case, policy='none')
+
+
+@pytest.mark.parametrize('style', ['- {}', '* {}', '• {}', '  {}  ', '{}.', '-   {}'])
+def test_core_note_accepts_list_markers_spacing_and_either_final_period(core_case, style):
+    lines = [style.format(line.rstrip('.')) for line in core_case[3]]
+    assert core_sample(core_case, note='\n\n'.join(lines)) is None
+
+
+@pytest.mark.parametrize('change', ['heading', 'reworded', 'missing', 'wrong_choice'])
+def test_core_note_still_needs_exactly_the_selected_statements(core_case, change):
+    case, bank, answers, lines = core_case
+    lines = list(lines)
+    if change == 'heading':
+        lines.insert(0, 'Case note')
+    elif change == 'reworded':
+        lines[0] = lines[0].replace('authorizes', 'requests')
+    elif change == 'missing':
+        lines.pop()
+    else:
+        lines[0] = next(c.text for c in bank.questions[0].choices if c.id != answers[bank.questions[0].id])
+    assert 'four selected lines' in core_sample(core_case, note='\n'.join(lines))
+
+
+@pytest.mark.parametrize('link, shared', [
+    ({}, True), ({'revoked': True}, False), ({'expired': True}, False), ({'max_uses': 1, 'use_count': 1}, False),
+    ({'max_uses': 2, 'use_count': 1}, True), (None, False)])
+async def test_core_sample_project_with_a_usable_invite_link_is_shared(core_case, monkeypatch, link, shared):
+    import datetime
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+    from app.models.project import ProjectJoinLink
+    from app.services.certification_versions import core_work_sample as sample
+    case, bank, answers, lines = core_case
+    project = SimpleNamespace(uuid='project', title=case['project_title'], context='\n'.join(lines))
+    links = []
+    if link is not None:
+        fields = {'revoked': False, 'max_uses': None, 'use_count': 0, **link}
+        hours = -1 if fields.pop('expired', False) else 1
+        links = [ProjectJoinLink.model_construct(project_uuid='project', token='t', created_by='learner',
+                                                 expires_at=datetime.datetime.now() + datetime.timedelta(hours=hours), **fields)]
+    found = SimpleNamespace(to_list=AsyncMock(return_value=links))
+    monkeypatch.setattr(sample, 'Project', SimpleNamespace(find_one=AsyncMock(return_value=project)))
+    monkeypatch.setattr(sample, 'ProjectMembership', SimpleNamespace(find_one=AsyncMock(return_value=None)))
+    monkeypatch.setattr(sample, 'ProjectJoinLink', SimpleNamespace(find=lambda query: found))
+    # Stop at the next lookup: reaching it means the project was accepted as private.
+    monkeypatch.setattr(sample, 'ActivityEvent', SimpleNamespace(find_one=AsyncMock(return_value=None)))
+    operation = SimpleNamespace(user_id='learner', progress=SimpleNamespace(modules={}))
+    with pytest.raises(sample.SampleIncomplete, match='unshared' if shared else 'chat you used'):
+        await sample.capture_sample(operation, sample.SampleSelection(project_id='project', conversation_id='chat'), bank, answers, case)

@@ -28,13 +28,13 @@ export function CoreSamplePicker({ title, value, disabled, onChange }: {
     <legend className="px-1 font-semibold">Your private work sample</legend>
     <p className="text-sm">In Project context, save the four lines you selected below, one per line. Select the training project and the chat you used for its award, policy, Skill and browser lookup.</p>
     <label className="block text-sm">Training project
-      <select className="block min-h-11 w-full" value={value.project_id} onChange={e => onChange({ ...value, project_id: e.target.value })}>
+      <select className="block min-h-11 w-full" value={value.project_id} onChange={e => onChange({ project_id: e.target.value, conversation_id: value.conversation_id })}>
         <option value="">Choose your project</option>
         {options?.projects.map(p => <option key={p.uuid} value={p.uuid}>{p.title}</option>)}
       </select>
     </label>
     <label className="block text-sm">Case chat
-      <select className="block min-h-11 w-full" value={value.conversation_id} onChange={e => onChange({ ...value, conversation_id: e.target.value })}>
+      <select className="block min-h-11 w-full" value={value.conversation_id} onChange={e => onChange({ project_id: value.project_id, conversation_id: e.target.value })}>
         <option value="">Choose your case chat</option>
         {options?.chats.map(c => <option key={c.uuid} value={c.uuid}>{c.title}</option>)}
       </select>

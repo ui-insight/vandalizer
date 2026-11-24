@@ -489,8 +489,10 @@ HELP_TOPICS: list[dict] = [
             "modules", "lessons", "training", "tutorial", "learn vandalizer",
         ],
         "body": (
-            "Look at the course title in your enrollment. **Vandalizer Core** teaches Chat, Projects, Knowledge Bases, Skills and browser controls. "
-            "**Advanced Builder** covers extraction and workflow authoring. The original **Vandal Workflow Architect** course has its own requirements. "
+            "The **Vandal Workflow Architect** program teaches document-workflow skills. "
+            "The V5 courses, **Vandalizer Core** (Chat, Projects, Knowledge Bases, Skills and browser controls) and "
+            "**Advanced Builder** (extraction and workflow authoring), appear in the Certification panel once they are published. "
+            "Go by the course your Certification panel shows. "
             "Your selected course defines its modules, assessments and XP; an earned "
             "certificate records that course's requirements.\n\n"
             "**To start or resume:** ask *\"start the certification course\"* or open "

@@ -11,13 +11,18 @@ interface Draft {
   lastAttemptId?: string
 }
 
+/** Only the learner's selection is ever sent; a saved result also carries the evidence the server captured. */
+function selection(sample?: CoreSampleSelection): CoreSampleSelection | undefined {
+  return sample && { project_id: sample.project_id, conversation_id: sample.conversation_id }
+}
+
 function readDraft(key: string): Draft {
   try {
     const value = JSON.parse(sessionStorage.getItem(key) || 'null')
     if (value && typeof value.answers === 'object' && value.answers !== null && !Array.isArray(value.answers)
       && Object.values(value.answers).every(answer => typeof answer === 'string')
       && (value.sample === undefined || (typeof value.sample?.project_id === 'string' && typeof value.sample?.conversation_id === 'string'))
-      && [value.pendingId, value.lastAttemptId].every(id => id === undefined || /^[a-f0-9]{32}$/.test(id))) return value
+      && [value.pendingId, value.lastAttemptId].every(id => id === undefined || /^[a-f0-9]{32}$/.test(id))) return { ...value, sample: selection(value.sample) }
   } catch { /* A blocked browser store is explained before any submission. */ }
   return { answers: {} }
 }
@@ -58,7 +63,7 @@ export function ScenarioAssessment({ definition, enrollmentId, attemptId, onSave
       setHistoryError('')
       // Keep unsent edits, including edits made while this request was loading.
       if (!Object.keys(draftRef.current.answers).length) {
-        const next = { ...draftRef.current, answers: record.answers, sample: record.work_sample }
+        const next = { ...draftRef.current, answers: record.answers, sample: selection(record.work_sample) }
         draftRef.current = next
         setDraft(next)
       }
@@ -100,8 +105,10 @@ export function ScenarioAssessment({ definition, enrollmentId, attemptId, onSave
       try { await onSaved?.() } catch { setError('Your scenario result was saved. Refresh the course to update its progress display.') }
     } catch (error) {
       if (definition.work_sample_project && error instanceof ApiError && error.status === 422) {
+        // Nothing was saved, so the learner can correct the note or selection and submit again.
         store({ ...draftRef.current, pendingId: undefined })
-        setError(error.message)
+        setError(error.code === 'work_sample_incomplete' ? error.message
+          : 'We could not check this work sample. Choose your project and case chat again, then resubmit.')
         return
       }
       setError(draftRef.current.pendingId
@@ -173,7 +180,7 @@ export function ScenarioAssessment({ definition, enrollmentId, attemptId, onSave
     <form onSubmit={event => { event.preventDefault(); void (draftRef.current.pendingId ? checkSaved() : submit()) }} className="space-y-4">
       {definition.work_sample_project && <CoreSamplePicker title={definition.work_sample_project}
         value={draft.sample || { project_id: '', conversation_id: '' }} disabled={busy || !!draft.pendingId}
-        onChange={sample => edit({ ...draftRef.current, sample })} />}
+        onChange={sample => edit({ ...draftRef.current, sample: selection(sample) })} />}
       {definition.questions.map((question, index) => <fieldset key={question.id} ref={element => { questionGroups.current[question.id] = element }} disabled={busy || !!draft.pendingId} className="min-w-0 rounded-lg border border-gray-200 p-4">
         <legend className="max-w-full px-1 text-sm font-semibold leading-relaxed text-gray-900">{index + 1}. {question.prompt}</legend>
         <div className="mt-2 space-y-2">{question.choices.map(choice => <label key={choice.id} className="flex min-h-11 cursor-pointer items-start gap-3 rounded-md border border-gray-200 p-3 text-sm leading-relaxed text-gray-800 has-checked:border-highlight-text has-checked:bg-highlight/20 has-focus-visible:outline-2 has-focus-visible:outline-offset-2">
