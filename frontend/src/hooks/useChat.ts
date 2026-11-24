@@ -434,6 +434,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
       // the agent made them; the server waits for each result.
       // A newly injected bridge announces itself without a page reload.
       const browserAvailable = isBrowserExtensionReady()
+      let browserConversation = conversationUuid || undefined
       let browserQueue: Promise<unknown> = Promise.resolve()
       try {
         const result = await streamChat(
@@ -450,7 +451,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
                 .then(async () => {
                   // After Stop, calls still queued must not open or click anything.
                   if (stoppedTurnsRef.current.has(controller) || controller.signal.aborted) return
-                  const outcome = await runBrowserTool(tool, args ?? {}, allowedHosts)
+                  const outcome = await runBrowserTool(tool, args ?? {}, allowedHosts, browserConversation)
                   await postBrowserResult(callId, outcome)
                 })
                 .catch(() => { /* the server reports a timeout to the agent */ })
@@ -609,6 +610,7 @@ export function useChat({ onLiveToolResult }: ChatEvents = {}) {
           controller.signal,
           projectUuid,
           identity => {
+            browserConversation = identity.conversationUuid
             if (controller.signal.aborted || !ownsView()) return
             lastSendAcceptedRef.current = true
             setConversationUuid(identity.conversationUuid)

@@ -51,7 +51,7 @@ from app.schemas.extractions import (
 )
 from app.services import extraction_validation_service as val_svc
 from app.services import search_set_service as svc
-from app.services import skill_service
+from app.services import skill_service, skill_share_service
 from app.services.name_conflicts import DuplicateNameError
 from app.utils.content_disposition import content_disposition
 
@@ -209,6 +209,74 @@ async def get_search_set(uuid: str, user: User = Depends(get_current_user)) -> S
     return await _ss_response(ss, can_manage=can_manage)
 
 
+class _ShareTokenBody(BaseModel):
+    share_token: str
+
+
+_NOT_A_SKILL = "Only Skills have a share link that works outside the team."
+
+
+@router.post("/search-sets/{uuid}/share-token", response_model=None)
+async def mint_search_set_share_token(uuid: str, user: User = Depends(get_current_user)) -> dict[str, str]:
+    """Create (or return) a Skill's share link token.
+
+    Only the Skill's creator, or an owner or admin of its team, can make its
+    link. Anyone signed in
+    who opens the link can then read the Skill and use it in their chats;
+    they cannot edit it or see anything else attached to it.
+    """
+    ss = await _get_search_set_or_404(uuid, user, manage=True)
+    if ss.set_type != "prompt":
+        raise HTTPException(status_code=400, detail=_NOT_A_SKILL)
+    if not await access_control.can_share_search_set_outside_team(ss, user):
+        raise HTTPException(
+            status_code=403,
+            detail="Only the Skill's creator or a team owner or admin can share it outside the team.",
+        )
+    token = await skill_share_service.create_link(ss.uuid, user.user_id)
+    await audit_service.log_event(
+        action="skill.share_link_copy", actor_user_id=user.user_id,
+        resource_type="search_set", resource_id=ss.uuid, resource_name=ss.title,
+        team_id=ss.team_id,
+    )
+    return {"share_token": token}
+
+
+@router.delete("/search-sets/{uuid}/share-token", response_model=None)
+async def revoke_search_set_share_token(uuid: str, user: User = Depends(get_current_user)) -> dict[str, bool]:
+    """Turn the share link off: the token stops working and everyone who got
+    access through it loses that access."""
+    ss = await _get_search_set_or_404(uuid, user, manage=True)
+    removed = await skill_share_service.turn_off(ss.uuid)
+    await audit_service.log_event(
+        action="skill.share_link_off", actor_user_id=user.user_id,
+        resource_type="search_set", resource_id=ss.uuid, resource_name=ss.title,
+        team_id=ss.team_id, detail={"recipients_removed": removed},
+    )
+    return {"ok": True}
+
+
+@router.post("/search-sets/{uuid}/share-token/redeem", response_model=None)
+@limiter.limit("30/minute")
+async def redeem_search_set_share_token(
+    request: Request, uuid: str, body: _ShareTokenBody, user: User = Depends(get_current_user),
+) -> dict[str, str]:
+    """Open a share link: record the signed-in person as someone the Skill is
+    shared with. A wrong token and a Skill that does not exist answer alike."""
+    invalid = HTTPException(status_code=404, detail="This share link is not valid. Ask for a new one.")
+    if not await skill_share_service.open_link(uuid, body.share_token, user.user_id):
+        raise invalid
+    ss = await SearchSet.find_one(SearchSet.uuid == uuid)
+    if not ss or ss.set_type != "prompt":
+        raise invalid
+    await audit_service.log_event(
+        action="skill.share_link_open", actor_user_id=user.user_id,
+        resource_type="search_set", resource_id=ss.uuid, resource_name=ss.title,
+        team_id=ss.team_id,
+    )
+    return {"uuid": ss.uuid, "title": ss.title}
+
+
 @router.patch("/search-sets/{uuid}", response_model=SearchSetResponse)
 async def update_search_set(uuid: str, req: UpdateSearchSetRequest, user: User = Depends(get_current_user)) -> SearchSetResponse:
     await _get_search_set_or_404(uuid, user, manage=True)
@@ -238,6 +306,11 @@ async def delete_search_set(uuid: str, user: User = Depends(get_current_user)) -
     ok = await svc.delete_search_set(uuid)
     if not ok:
         raise HTTPException(status_code=404, detail="SearchSet not found")
+    try:
+        # A deleted Skill's link has nothing left to open; this only tidies up.
+        await skill_share_service.turn_off(uuid)
+    except Exception:
+        logger.warning("Could not remove the share link of deleted search set %s", uuid, exc_info=True)
     await audit_service.log_event(
         action="extraction.delete",
         actor_user_id=user.user_id,

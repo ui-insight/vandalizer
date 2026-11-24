@@ -22,7 +22,8 @@ logger = logging.getLogger(__name__)
 
 
 async def authorize_skill(skill_uuid: str, user: User) -> SearchSet:
-    skill = await access_control.get_authorized_search_set(skill_uuid, user)
+    # Reading a Skill for chat is what a share link is for.
+    skill = await access_control.get_authorized_search_set(skill_uuid, user, allow_shared=True)
     if not skill or skill.set_type != "prompt":
         raise HTTPException(status_code=404, detail="Skill not found or no longer accessible")
     return skill
@@ -223,7 +224,7 @@ async def core_skill_states(
             continue
         if not access_control.can_view_search_set(doc, user, team_access=team_access):
             # Library-shared and verified Skills are authorized the long way.
-            if await access_control.get_authorized_search_set(uuid, user) is None:
+            if await access_control.get_authorized_search_set(uuid, user, allow_shared=True) is None:
                 states.append(CoreSkillState(uuid, "unavailable", problem=gone))
                 continue
         title = doc.title or "Untitled Skill"

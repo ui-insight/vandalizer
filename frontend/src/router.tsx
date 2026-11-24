@@ -31,6 +31,7 @@ const DemoResend = lazy(() => import('./pages/DemoResend'))
 const InviteAccept = lazy(() => import('./pages/InviteAccept'))
 const JoinLinkAccept = lazy(() => import('./pages/JoinLinkAccept'))
 const JoinProjectAccept = lazy(() => import('./pages/JoinProjectAccept'))
+const SharedItemAccept = lazy(() => import('./pages/SharedItemAccept'))
 const Organizations = lazy(() => import('./pages/Organizations'))
 const Credentials = lazy(() => import('./pages/Credentials'))
 const Reviews = lazy(() => import('./pages/Reviews'))
@@ -182,6 +183,17 @@ const joinProjectRoute = createRoute({
     token: (search.token as string) || undefined,
   }),
   component: JoinProjectAccept,
+})
+
+// A Skill's share link ("Copy share link").
+const sharedItemRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/shared',
+  validateSearch: (search: Record<string, unknown>) => ({
+    item: search.item == null ? undefined : String(search.item),
+    token: search.token == null ? undefined : String(search.token),
+  }),
+  component: SharedItemAccept,
 })
 
 const indexRoute = createRoute({
@@ -533,6 +545,7 @@ const routeTree = rootRoute.addChildren([
   inviteRoute,
   joinRoute,
   joinProjectRoute,
+  sharedItemRoute,
   indexRoute,
   teamsRoute,
   workflowsRoute,

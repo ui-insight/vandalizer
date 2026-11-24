@@ -1,6 +1,11 @@
 import type { ChatMessage } from '../../types/chat'
 import { formatPageLocator } from '../../utils/pageLocator'
 
+export function messageToolResults(message: ChatMessage) {
+  const streamed = message.segments?.flatMap(segment => segment.kind === 'tool_result' ? [segment.result] : [])
+  return streamed?.length ? streamed : message.tool_results ?? []
+}
+
 /** "Budget.xlsx, Award.pdf and 1 other": the names known for ``ids``, the rest counted. */
 function namedList(ids: string[], names: Record<string, string>): string {
   const known = ids.map((id) => names[id]).filter((name): name is string => Boolean(name))
@@ -42,6 +47,14 @@ export function conversationEvidence(message: ChatMessage, names: Record<string,
   if (message.unsupported_citations?.length) lines.push(`Unsupported citations: ${message.unsupported_citations.join(', ')}. The retrieved text does not support the claim; check the originals.`)
   if (message.unconfirmed_web_facts?.length) lines.push(`Unconfirmed web details: ${message.unconfirmed_web_facts.join(', ')}. No page read for this answer states them; check the official page.`)
   if (message.silence_inferences?.length) lines.push(`Inferences from missing information: ${message.silence_inferences.join(' ')}. A gap in the sources does not establish a rule.`)
+  const browserSources = new Set<string>()
+  for (const result of messageToolResults(message)) {
+    if (result.tool_name !== 'record_value' || !result.content || typeof result.content !== 'object') continue
+    const item = result.content as Record<string, unknown>
+    if (item.recorded !== true || typeof item.value !== 'string' || typeof item.url !== 'string' || !/^https?:\/\//i.test(item.url)) continue
+    browserSources.add(`${item.label || 'Recorded value'}: ${item.value}\n${item.url}${typeof item.captured_at === 'string' ? ' · ' + item.captured_at : ''}`)
+  }
+  if (browserSources.size) lines.push('Recorded browser sources:', ...browserSources)
   if (message.citations?.length) {
     lines.push('Source references (inspect the originals before relying on the answer):')
     message.citations.forEach((source, index) => {
@@ -54,6 +67,6 @@ export function conversationEvidence(message: ChatMessage, names: Record<string,
       if (source.content_preview) lines.push(`Saved passage: ${source.content_preview}`)
       else lines.push('No passage preview was recorded.')
     })
-  } else if (message.role === 'assistant') lines.push('No source references were recorded for this answer.')
+  } else if (message.role === 'assistant' && !browserSources.size) lines.push('No source references were recorded for this answer.')
   return lines.join('\n')
 }
