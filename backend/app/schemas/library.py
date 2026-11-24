@@ -61,6 +61,9 @@ class LibraryItemResponse(BaseModel):
     # Whether the requesting user may permanently delete the backing
     # workflow/extraction (vs. only removing this bookmark).
     can_delete_underlying: bool = False
+    # Whether the user may edit the backing Skill/formatter/extraction: its
+    # creator, an owner/admin of its team, or a site admin (#1164).
+    can_edit_underlying: bool = False
 
 
 class AddItemRequest(BaseModel):

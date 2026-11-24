@@ -171,6 +171,7 @@ class TestUpdateLibrary:
         user = _make_user()
         with patch("app.services.library_service.access_control") as mock_ac:
             mock_ac.get_authorized_library = AsyncMock(return_value=lib)
+            mock_ac.get_team_access_context = AsyncMock(return_value=MagicMock())
             from app.services.library_service import update_library
 
             result = await update_library(str(lib.id), user, title="New Title", description="New desc")
@@ -207,6 +208,7 @@ class TestDeleteLibrary:
             patch("app.services.library_service.LibraryItem") as MockItem,
         ):
             mock_ac.get_authorized_library = AsyncMock(return_value=lib)
+            mock_ac.get_team_access_context = AsyncMock(return_value=MagicMock())
             MockItem.get = AsyncMock(side_effect=[item1, item2])
 
             from app.services.library_service import delete_library
@@ -256,6 +258,7 @@ class TestAddItem:
             patch("app.services.library_service.Workflow") as MockWF,
         ):
             mock_ac.get_authorized_library = AsyncMock(return_value=lib)
+            mock_ac.get_team_access_context = AsyncMock(return_value=MagicMock())
             mock_ac.get_authorized_workflow = AsyncMock(return_value=mock_wf)
             MockItem.return_value = mock_item
             MockItem.find_one = AsyncMock(return_value=None)
@@ -274,6 +277,7 @@ class TestAddItem:
         user = _make_user()
         with patch("app.services.library_service.access_control") as mock_ac:
             mock_ac.get_authorized_library = AsyncMock(return_value=lib)
+            mock_ac.get_team_access_context = AsyncMock(return_value=MagicMock())
             from app.services.library_service import add_item
 
             result = await add_item(str(lib.id), user, str(PydanticObjectId()), "unknown_kind")
@@ -295,6 +299,7 @@ class TestAddItem:
             patch("app.services.library_service.Workflow") as MockWF,
         ):
             mock_ac.get_authorized_library = AsyncMock(return_value=lib)
+            mock_ac.get_team_access_context = AsyncMock(return_value=MagicMock())
             mock_ac.get_authorized_workflow = AsyncMock(return_value=mock_wf)
             MockItem.return_value = _make_library_item()
             MockItem.find_one = AsyncMock(return_value=None)
@@ -335,6 +340,7 @@ class TestAddItem:
             patch("app.services.library_service.Workflow") as MockWF,
         ):
             mock_ac.get_authorized_library = AsyncMock(return_value=lib)
+            mock_ac.get_team_access_context = AsyncMock(return_value=MagicMock())
             mock_ac.get_authorized_workflow = AsyncMock(return_value=mock_wf)
             MockItem.find_one = AsyncMock(return_value=None)
             MockWF.get = AsyncMock(return_value=mock_wf)
@@ -368,6 +374,7 @@ class TestAddItem:
             patch("app.services.library_service.SearchSet") as MockSS,
         ):
             mock_ac.get_authorized_library = AsyncMock(return_value=lib)
+            mock_ac.get_team_access_context = AsyncMock(return_value=MagicMock())
             mock_ac.get_authorized_search_set = AsyncMock(return_value=mock_ss)
             MockItem.find_one = AsyncMock(return_value=None)
             MockSS.get = AsyncMock(return_value=mock_ss)
@@ -403,6 +410,7 @@ class TestAddItemIdempotency:
             patch("app.services.library_service.Workflow") as MockWF,
         ):
             mock_ac.get_authorized_library = AsyncMock(return_value=lib)
+            mock_ac.get_team_access_context = AsyncMock(return_value=MagicMock())
             mock_ac.get_authorized_workflow = AsyncMock(return_value=mock_wf)
             MockItem.find_one = AsyncMock(return_value=existing)
             MockWF.get = AsyncMock(return_value=mock_wf)
@@ -695,6 +703,7 @@ class TestRemoveItem:
             patch("app.services.library_service.LibraryItem") as MockItem,
         ):
             mock_ac.get_authorized_library = AsyncMock(return_value=lib)
+            mock_ac.get_team_access_context = AsyncMock(return_value=MagicMock())
             MockItem.get = AsyncMock(return_value=item)
 
             from app.services.library_service import remove_item
@@ -725,6 +734,7 @@ class TestRemoveItem:
             patch("app.services.workflow_service.delete_workflow", new_callable=AsyncMock) as mock_delete,
         ):
             mock_ac.get_authorized_library = AsyncMock(return_value=lib)
+            mock_ac.get_team_access_context = AsyncMock(return_value=MagicMock())
             MockItem.get = AsyncMock(return_value=item)
             MockItem.find.return_value.to_list = AsyncMock(return_value=[item])
             MockLib.find.return_value.update = AsyncMock()
@@ -760,6 +770,7 @@ class TestRemoveItem:
             patch("app.services.workflow_service.delete_workflow", new_callable=AsyncMock) as mock_delete,
         ):
             mock_ac.get_authorized_library = AsyncMock(return_value=lib)
+            mock_ac.get_team_access_context = AsyncMock(return_value=MagicMock())
             MockItem.get = AsyncMock(return_value=item)
             MockWf.get = AsyncMock(return_value=MagicMock())
             mock_delete.return_value = False
@@ -792,6 +803,7 @@ class TestRemoveItem:
             patch("app.services.search_set_service.delete_search_set", new_callable=AsyncMock) as mock_delete,
         ):
             mock_ac.get_authorized_library = AsyncMock(return_value=lib)
+            mock_ac.get_team_access_context = AsyncMock(return_value=MagicMock())
             mock_ac.get_authorized_search_set_by_id = AsyncMock(return_value=ss)
             MockItem.get = AsyncMock(return_value=item)
             MockItem.find.return_value.to_list = AsyncMock(return_value=[item])
@@ -822,6 +834,7 @@ class TestRemoveItem:
             patch("app.services.library_service.LibraryItem") as MockItem,
         ):
             mock_ac.get_authorized_library = AsyncMock(return_value=lib)
+            mock_ac.get_team_access_context = AsyncMock(return_value=MagicMock())
             MockItem.get = AsyncMock(return_value=item)
 
             with pytest.raises(UnderlyingDeleteError) as exc:

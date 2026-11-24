@@ -424,6 +424,20 @@ async def _verified_library_item_visible(
     return _org_scope_allows(meta.organization_ids if meta else None, org_ancestry)
 
 
+async def _is_library_of_team(library: Library, team_id: str | None) -> bool:
+    """Whether *library* is the team library of the team *team_id* names.
+
+    Items carry their team as a uuid or an ObjectId string; a library carries
+    the team's ObjectId.
+    """
+    if library.scope != LibraryScope.TEAM or not library.team or not team_id:
+        return False
+    if str(library.team) == team_id:
+        return True
+    team = await Team.get(library.team)
+    return bool(team and team.uuid == team_id)
+
+
 async def has_library_backed_object_access(
     item_kind: str,
     object_id: str,
@@ -433,7 +447,17 @@ async def has_library_backed_object_access(
     manage: bool = False,
     user_org_ancestry: list[str] | None = None,
     allow_admin: bool = False,
+    object_team_id: str | None = None,
 ) -> bool:
+    """Whether a library entry for the object lets *user* in.
+
+    Viewing follows the library: whoever can see a library can open what is
+    filed in it. Managing does not. Any team member can file an item they can
+    see into any team library they belong to, so an entry only counts toward
+    manage when the library belongs to the item's own team
+    (``object_team_id``). Otherwise the owner of one team could edit or delete
+    another team's item by filing it in their own team's library (#1164).
+    """
     if allow_admin and user.is_admin:
         return True
 
@@ -457,6 +481,13 @@ async def has_library_backed_object_access(
     for item in library_items:
         parent_libraries = await Library.find({"items": item.id}).to_list()
         for library in parent_libraries:
+            # A bookmark is not ownership: anyone who can see an item can
+            # file it in their own library or in a team library they belong
+            # to, which used to let them edit or delete it (#1164). Only the
+            # library of the item's own team counts; its creator passes the
+            # direct check instead.
+            if manage and not await _is_library_of_team(library, object_team_id):
+                continue
             allowed = (
                 can_manage_library(library, user, team_access, allow_admin=allow_admin)
                 if manage
@@ -625,6 +656,7 @@ async def get_authorized_workflow(
             access,
             manage=(manage or validate),
             allow_admin=allow_admin,
+            object_team_id=wf.team_id,
         )
     if not allowed and not manage:
         allowed = await has_open_verification_review_access("workflow", wf.id, user)
@@ -871,14 +903,22 @@ def can_manage_search_set(
     allow_admin: bool = False,
     team_access: TeamAccessContext | None = None,
 ) -> bool:
+    """Edit or delete: the creator, or an owner/admin of the item's team.
+
+    Same rule as ``can_manage_workflow``. Team membership alone used to be
+    enough, so any teammate could change or delete a Skill or extraction
+    that its creator had never shared (#1164). Members can still open and
+    run a teammate's item (``can_view_search_set``).
+    """
     if allow_admin and user.is_admin:
         return True
     if search_set.user_id == user.user_id:
         return True
-    if search_set.team_id and team_access:
-        if search_set.team_id in team_access.team_uuids or search_set.team_id in team_access.team_object_ids:
-            return True
-    return False
+    return bool(
+        search_set.team_id
+        and team_access
+        and _team_role(search_set.team_id, team_access) in TEAM_MANAGE_ROLES
+    )
 
 
 async def can_share_search_set_outside_team(search_set: "SearchSet", user: User) -> bool:
@@ -930,6 +970,7 @@ async def get_authorized_search_set(
             team_access,
             manage=manage,
             allow_admin=allow_admin,
+            object_team_id=ss.team_id,
         )
     if not allowed and not manage:
         allowed = await has_open_verification_review_access("search_set", ss.id, user)
@@ -956,13 +997,13 @@ async def get_authorized_search_set_by_id(
     if not ss:
         return None
 
+    team_access = await get_team_access_context(user)
     allowed = (
-        can_manage_search_set(ss, user, allow_admin=allow_admin)
+        can_manage_search_set(ss, user, allow_admin=allow_admin, team_access=team_access)
         if manage
         else can_view_search_set(ss, user, allow_admin=allow_admin)
     )
     if not allowed:
-        team_access = await get_team_access_context(user)
         allowed = await has_library_backed_object_access(
             "search_set",
             str(ss.id),
@@ -970,6 +1011,7 @@ async def get_authorized_search_set_by_id(
             team_access,
             manage=manage,
             allow_admin=allow_admin,
+            object_team_id=ss.team_id,
         )
     if not allowed and not manage:
         allowed = await has_open_verification_review_access("search_set", ss.id, user)
