@@ -57,6 +57,7 @@ import { listKnowledgeBases } from '../../api/knowledge'
 import { listAllFolders } from '../../api/folders'
 import type { KnowledgeBase } from '../../types/knowledge'
 import { listItems as listSearchSetItems, suggestFields, getSearchSet } from '../../api/extractions'
+import { inlineExtractionFields, withInlineExtractionFields, withoutInlineExtractionFields } from '../../lib/extractionFields'
 import { useWorkflowRunner } from '../../hooks/useWorkflowRunner'
 import { useLastWorkflowRun } from '../../hooks/useLastWorkflowRun'
 import { WorkflowLastRunNotice } from './WorkflowLastRunNotice'
@@ -3472,9 +3473,9 @@ function TaskEditModal({ task, isNew = false, step, selectedDocUuids, workflow, 
     // (saved-set keys win) — leaving them in state silently drops the user's
     // manual work the next time they unlink. Make state match what the UI shows.
     setTaskData(prev => {
-      const next = { ...prev, search_set_uuid: id, name: name || prev.name }
-      delete (next as Record<string, unknown>).extractions
-      return next
+      // Older field lists (`searchphrases`, `keys`) go too: the engine reads
+      // them before the saved set's fields, so one left behind would win.
+      return { ...withoutInlineExtractionFields(prev), search_set_uuid: id, name: name || prev.name }
     })
     setShowSetPicker(false)
   }
@@ -3534,7 +3535,7 @@ function TaskEditModal({ task, isNew = false, step, selectedDocUuids, workflow, 
         return
       }
       setTaskData(prev => {
-        const existing = Array.isArray(prev.extractions) ? (prev.extractions as string[]) : []
+        const existing = inlineExtractionFields(prev)
         const seen = new Set(existing.map(s => s.toLowerCase()))
         const merged = [...existing]
         for (const name of entities) {
@@ -3543,7 +3544,7 @@ function TaskEditModal({ task, isNew = false, step, selectedDocUuids, workflow, 
             seen.add(name.toLowerCase())
           }
         }
-        return { ...prev, extractions: merged }
+        return withInlineExtractionFields(prev, merged)
       })
     } catch (err) {
       setSuggestError(err instanceof Error ? err.message : 'Failed to suggest fields')
@@ -3730,8 +3731,8 @@ function TaskEditModal({ task, isNew = false, step, selectedDocUuids, workflow, 
                       </button>
                     </div>
                     <ExtractionTagInput
-                      tags={Array.isArray(taskData.extractions) ? (taskData.extractions as string[]) : []}
-                      onChange={(tags) => setTaskData(prev => ({ ...prev, extractions: tags }))}
+                      tags={inlineExtractionFields(taskData)}
+                      onChange={(tags) => setTaskData(prev => withInlineExtractionFields(prev, tags))}
                     />
                     {suggestError && (
                       <div role="alert" style={{ marginTop: 'var(--workspace-space-6)', fontSize: 'var(--workspace-font-meta)', color: '#b91c1c' }}>
