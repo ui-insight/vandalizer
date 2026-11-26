@@ -23,7 +23,7 @@
     "@types/d3": "^7.4.3",
     "@types/dompurify": "^3.2.0",
     "clsx": "^2.1.1",
-    "d3": "^7.9.0",
+    "d3": "^7.9.2",
     "dompurify": "^3.4.17",
     "focus-trap-react": "^12.0.4",
     "lucide-react": "^1.28.0",
